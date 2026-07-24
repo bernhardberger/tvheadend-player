@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name" translatable="false">Leoville TV</string>
+    <string name="app_name" translatable="false">TVHeadend Player</string>
 
     <string name="channel_list">Channel List</string>
     <string name="nav_channels">Channels</string>
@@ -49,12 +49,12 @@
     <string name="subtitle_language">Subtitle Language</string>
 
     <string name="settings_appliance">Settings - Appliance entry</string>
-    <string name="appliance_accessibility_disclosure">When enabled, Leoville TV opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
+    <string name="appliance_accessibility_disclosure">When enabled, TVHeadend Player opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
     <string name="appliance_service_enabled">Appliance entry service: enabled</string>
     <string name="appliance_service_disabled">Appliance entry service: disabled</string>
     <string name="open_accessibility_settings">Open accessibility settings</string>
-    <string name="appliance_accessibility_service_label">Leoville appliance entry</string>
-    <string name="appliance_accessibility_service_description">Opens Leoville TV at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
+    <string name="appliance_accessibility_service_label">TVHeadend Player appliance entry</string>
+    <string name="appliance_accessibility_service_description">Opens TVHeadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
     <string name="appliance_starting_tv">Starting television…</string>
     <string name="appliance_connection_recovering">Television is currently unavailable. Reconnecting automatically…</string>
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>

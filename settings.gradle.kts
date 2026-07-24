@@ -14,6 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "TVHStream"
+rootProject.name = "TVHeadendPlayer"
 include(":app")
- 

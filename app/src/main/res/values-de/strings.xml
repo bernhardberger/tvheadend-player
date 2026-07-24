@@ -45,12 +45,12 @@
     <string name="subtitle_language">Untertitelsprache</string>
 
     <string name="settings_appliance">Einstellungen – TV-Start</string>
-    <string name="appliance_accessibility_disclosure">Wenn diese Funktion aktiviert ist, öffnet sich Leoville TV nach dem Starten und Aufwecken des Fernsehers und übernimmt ausschließlich die TV-/GUIDE-Taste. Sie liest weder Bildschirminhalte noch Text. Alle anderen Fernbedienungstasten werden unverändert weitergegeben.</string>
+    <string name="appliance_accessibility_disclosure">Wenn diese Funktion aktiviert ist, öffnet sich TVHeadend Player nach dem Starten und Aufwecken des Fernsehers und übernimmt ausschließlich die TV-/GUIDE-Taste. Sie liest weder Bildschirminhalte noch Text. Alle anderen Fernbedienungstasten werden unverändert weitergegeben.</string>
     <string name="appliance_service_enabled">TV-Startdienst: aktiviert</string>
     <string name="appliance_service_disabled">TV-Startdienst: deaktiviert</string>
     <string name="open_accessibility_settings">Bedienungshilfen öffnen</string>
-    <string name="appliance_accessibility_service_label">Leoville TV-Start</string>
-    <string name="appliance_accessibility_service_description">Öffnet Leoville TV nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
+    <string name="appliance_accessibility_service_label">TVHeadend Player-Start</string>
+    <string name="appliance_accessibility_service_description">Öffnet TVHeadend Player nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
     <string name="appliance_starting_tv">Fernsehen wird gestartet…</string>
     <string name="appliance_connection_recovering">Fernsehen ist gerade nicht verfügbar. Die Verbindung wird automatisch wiederhergestellt…</string>
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>

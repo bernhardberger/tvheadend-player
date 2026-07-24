@@ -38,6 +38,8 @@ Thumbs.db
 [Dd]ebug*/
 !/app/src/debug/
 !/app/src/debug/**
+!/app/src/test/java/**/debug/
+!/app/src/test/java/**/debug/**
 *.lib
 *.sbr
 obj/
