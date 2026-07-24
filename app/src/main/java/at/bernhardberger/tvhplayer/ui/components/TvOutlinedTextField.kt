@@ -19,6 +19,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.VisualTransformation
 
 /**
  * A D-pad friendly text field for Android TV.
@@ -39,6 +40,7 @@ fun TvOutlinedTextField(
     label: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
     singleLine: Boolean = true,
 ) {
     val isEditing = editingId == id
@@ -62,6 +64,7 @@ fun TvOutlinedTextField(
         readOnly = !isEditing,
         singleLine = singleLine,
         keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
+        visualTransformation = visualTransformation,
         keyboardActions = KeyboardActions(onDone = { setEditingId(null) }),
         modifier = modifier
             .focusRequester(focusRequester)

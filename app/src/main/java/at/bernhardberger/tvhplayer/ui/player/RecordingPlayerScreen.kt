@@ -48,6 +48,9 @@ import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.recordingSeekTarget
+import at.bernhardberger.tvhplayer.core.SimpleTvCapability
+import at.bernhardberger.tvhplayer.core.SimpleTvProfile
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.player.PlaybackFailureReason
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
 import at.bernhardberger.tvhplayer.player.PlayerSession
@@ -64,6 +67,8 @@ fun RecordingPlayerScreen(
     recordingId: Int,
     repository: DvrRepository = koinInject(),
     session: PlayerSession = koinInject(),
+    simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
+    onUnlock: () -> Unit = {},
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -76,6 +81,8 @@ fun RecordingPlayerScreen(
     val ready = availability as? RecordingPlaybackAvailability.Ready
     val player = remember { session.getOrCreatePlayer(context) }
     val initialFocus = remember { FocusRequester() }
+    val showStop = simpleTvProfile.allows(SimpleTvCapability.STOP)
+    val showUnlock = simpleTvProfile.settings.enabled && !simpleTvProfile.unlocked
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(C.TIME_UNSET) }
     var isPlaying by remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -248,23 +255,39 @@ fun RecordingPlayerScreen(
                         Text(stringResource(R.string.seek_forward_30))
                     }
                 }
-                OutlinedButton(
-                    onClick = ::close,
-                    modifier = if (availability !is RecordingPlaybackAvailability.Ready) {
-                        Modifier.focusRequester(initialFocus)
-                    } else {
-                        Modifier
-                    },
-                ) {
-                    Text(
-                        stringResource(
-                            if (availability is RecordingPlaybackAvailability.Ready) {
-                                R.string.stop_playback
-                            } else {
-                                R.string.close
-                            }
+                if (showStop) {
+                    OutlinedButton(
+                        onClick = ::close,
+                        modifier = if (availability !is RecordingPlaybackAvailability.Ready) {
+                            Modifier.focusRequester(initialFocus)
+                        } else {
+                            Modifier
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (availability is RecordingPlaybackAvailability.Ready) {
+                                    R.string.stop_playback
+                                } else {
+                                    R.string.close
+                                }
+                            )
                         )
-                    )
+                    }
+                }
+                if (showUnlock) {
+                    Button(
+                        onClick = onUnlock,
+                        modifier = if (
+                            availability !is RecordingPlaybackAvailability.Ready && !showStop
+                        ) {
+                            Modifier.focusRequester(initialFocus)
+                        } else {
+                            Modifier
+                        },
+                    ) {
+                        Text(stringResource(R.string.simple_tv_unlock))
+                    }
                 }
             }
         }

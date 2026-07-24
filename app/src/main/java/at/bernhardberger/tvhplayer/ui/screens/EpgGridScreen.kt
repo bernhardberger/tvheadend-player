@@ -76,6 +76,9 @@ import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.moveMagazineEpgFocus
 import at.bernhardberger.tvhplayer.core.nearestProgrammeAt
 import at.bernhardberger.tvhplayer.core.programmeActions
+import at.bernhardberger.tvhplayer.core.SimpleTvCapability
+import at.bernhardberger.tvhplayer.core.SimpleTvProfile
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrConfig
@@ -126,6 +129,7 @@ fun EpgGridScreen(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (Int) -> Unit = {},
+    simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -480,6 +484,7 @@ fun EpgGridScreen(
             val channel = channels.firstOrNull { it.id == event.channelId }
             val recording = dvrEntries.firstOrNull { it.eventId == event.eventId }
             val timeshiftCoversEvent = playingChannelId == event.channelId &&
+                simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT) &&
                 timeshiftState.available &&
                 event.stop <= nowSec &&
                 event.start * 1_000L >= nowSec * 1_000L + timeshiftState.bufferStartMs
@@ -489,6 +494,7 @@ fun EpgGridScreen(
                 recording = recording,
                 nowSec = nowSec,
                 serverTimeshiftCoversEvent = timeshiftCoversEvent,
+                simpleTvProfile = simpleTvProfile,
                 actionResult = actionResult,
                 onAction = { action ->
                     when (action) {
@@ -970,6 +976,7 @@ private fun ProgrammeDetailsPanel(
     recording: DvrEntry?,
     nowSec: Long,
     serverTimeshiftCoversEvent: Boolean,
+    simpleTvProfile: SimpleTvProfile,
     actionResult: DvrActionResult?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
@@ -980,7 +987,20 @@ private fun ProgrammeDetailsPanel(
         nowSec,
         recording,
         serverTimeshiftCoversEvent = serverTimeshiftCoversEvent,
-    )
+    ).filter { action ->
+        when (action) {
+            ProgrammeAction.RECORD,
+            ProgrammeAction.CANCEL_RECORDING ->
+                simpleTvProfile.allows(SimpleTvCapability.RECORDINGS)
+            ProgrammeAction.WATCH_FROM_START ->
+                if (recording != null) {
+                    simpleTvProfile.allows(SimpleTvCapability.RECORDINGS)
+                } else {
+                    simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT)
+                }
+            ProgrammeAction.WATCH -> true
+        }
+    }
     LaunchedEffect(event.eventId, actions) { initialFocus.requestFocus() }
     BackHandler(onBack = onClose)
     DialogScrim {

@@ -28,6 +28,10 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.BackAction
 import at.bernhardberger.tvhplayer.core.rootBackAction
+import at.bernhardberger.tvhplayer.core.SimpleTvCapability
+import at.bernhardberger.tvhplayer.core.SimpleTvRoute
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
+import at.bernhardberger.tvhplayer.core.simpleTvProfile
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
 import at.bernhardberger.tvhplayer.player.PlayerSession
@@ -37,7 +41,9 @@ import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.ui.components.ContentContainer
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
@@ -49,6 +55,7 @@ import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
+import at.bernhardberger.tvhplayer.ui.screens.SimpleTvUnlockScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.flow.filter
@@ -64,6 +71,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val PLAYER = "player"
     const val RECORDING_PLAYER = "recording-player"
+    const val UNLOCK = "unlock"
     fun player(channelId: Int, serviceId: Int, channelName: String) =
         "player/$channelId/$serviceId/${android.net.Uri.encode(channelName)}"
     fun recordingPlayer(recordingId: Int) = "recording-player/$recordingId"
@@ -107,11 +115,19 @@ fun AppRoot(
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playerSession.state.collectAsStateWithLifecycle()
     val activeServiceId by playerSession.activeServiceId.collectAsStateWithLifecycle()
+    val activeRecordingId by playerSession.activeRecordingId.collectAsStateWithLifecycle()
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
     )
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    val simpleTvStore: SimpleTvSettingsStore = koinInject()
+    val simpleTvSession: SimpleTvSession = koinInject()
+    val simpleTvSettings by simpleTvStore.settings.collectAsStateWithLifecycle(
+        initialValue = SimpleTvSettings()
+    )
+    val simpleTvUnlocked by simpleTvSession.unlocked.collectAsStateWithLifecycle()
+    val capabilityProfile = simpleTvProfile(simpleTvSettings, simpleTvUnlocked)
     val applianceLaunchRequest by applianceLaunchRequests.pending.collectAsStateWithLifecycle()
 
     val backStackEntry by nav.currentBackStackEntryAsState()
@@ -122,6 +138,16 @@ fun AppRoot(
 
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
         currentRoute?.startsWith(Routes.RECORDING_PLAYER) == true
+
+    LaunchedEffect(topRoute, capabilityProfile) {
+        val route = topRoute.toSimpleTvRoute() ?: return@LaunchedEffect
+        if (!capabilityProfile.allowsRoute(route)) {
+            nav.navigate(Routes.CHANNELS) {
+                popUpTo(Routes.CHANNELS) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     LaunchedEffect(isPlayer) {
         onPlayerVisibilityChanged(isPlayer)
@@ -153,7 +179,32 @@ fun AppRoot(
             isStartDestination = currentRoute == Routes.CHANNELS,
             hasActivePlayback = activeServiceId != null,
         )) {
-            BackAction.FINISH_ACTIVITY -> activity?.finish()
+            BackAction.FINISH_ACTIVITY -> {
+                if (capabilityProfile.allows(SimpleTvCapability.APP_EXIT)) {
+                    activity?.finish()
+                } else {
+                    val serviceId = activeServiceId
+                    val recordingId = activeRecordingId
+                    when {
+                        serviceId != null -> {
+                            val channel = channelsVm.allChannels.value
+                                .firstOrNull { it.id == serviceId }
+                            nav.navigate(
+                                Routes.player(
+                                    channelId = channel?.id ?: serviceId,
+                                    serviceId = serviceId,
+                                    channelName = channel?.name.orEmpty(),
+                                )
+                            ) { launchSingleTop = true }
+                        }
+                        recordingId != null ->
+                            nav.navigate(Routes.recordingPlayer(recordingId)) {
+                                launchSingleTop = true
+                            }
+                        else -> Unit
+                    }
+                }
+            }
             BackAction.POP_NAVIGATION -> {
                 if (!nav.popBackStack()) activity?.finish()
             }
@@ -198,35 +249,55 @@ fun AppRoot(
                     }
 
                     composable(Routes.EPG) {
-                        ContentContainer {
-                            EpgGridScreen(
-                                connectionUiState = connectionUiState,
-                                onRetry = appVm::reconnectNow,
-                                onPlayRecording = { recordingId ->
-                                    nav.navigate(Routes.recordingPlayer(recordingId))
-                                },
-                                onPlay = { channelId, serviceId, name ->
-                                    nav.navigate(Routes.player(channelId, serviceId, name))
-                                }
-                            )
+                        if (capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
+                            ContentContainer {
+                                EpgGridScreen(
+                                    connectionUiState = connectionUiState,
+                                    onRetry = appVm::reconnectNow,
+                                    simpleTvProfile = capabilityProfile,
+                                    onPlayRecording = { recordingId ->
+                                        nav.navigate(Routes.recordingPlayer(recordingId))
+                                    },
+                                    onPlay = { channelId, serviceId, name ->
+                                        nav.navigate(Routes.player(channelId, serviceId, name))
+                                    }
+                                )
+                            }
                         }
                     }
 
                     composable(Routes.RECORDINGS) {
-                        ContentContainer {
-                            RecordingsScreen(
-                                connectionUiState = connectionUiState,
-                                onRetry = appVm::reconnectNow,
-                                onPlayRecording = { recordingId ->
-                                    nav.navigate(Routes.recordingPlayer(recordingId))
-                                },
-                            )
+                        if (capabilityProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
+                            ContentContainer {
+                                RecordingsScreen(
+                                    connectionUiState = connectionUiState,
+                                    onRetry = appVm::reconnectNow,
+                                    onPlayRecording = { recordingId ->
+                                        nav.navigate(Routes.recordingPlayer(recordingId))
+                                    },
+                                )
+                            }
                         }
                     }
 
                     composable(Routes.SETTINGS) {
+                        if (capabilityProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
+                            ContentContainer {
+                                SettingsScreen(onBack = { nav.popBackStack() })
+                            }
+                        }
+                    }
+
+                    composable(Routes.UNLOCK) {
                         ContentContainer {
-                            SettingsScreen(onBack = { nav.popBackStack() })
+                            SimpleTvUnlockScreen(
+                                onUnlocked = {
+                                    nav.navigate(Routes.CHANNELS) {
+                                        popUpTo(Routes.UNLOCK) { inclusive = true }
+                                    }
+                                },
+                                onBack = { nav.popBackStack() },
+                            )
                         }
                     }
 
@@ -246,6 +317,8 @@ fun AppRoot(
                             channelId = channelId,
                             channelName = channelName,
                             serviceId = serviceId,
+                            simpleTvProfile = capabilityProfile,
+                            onUnlock = { nav.navigate(Routes.UNLOCK) },
                             onClose = { nav.popBackStack() }
                         )
                     }
@@ -257,10 +330,16 @@ fun AppRoot(
                         ),
                     ) { backStackEntry ->
                         val recordingId = backStackEntry.arguments?.getInt("recordingId") ?: 0
-                        RecordingPlayerScreen(
-                            recordingId = recordingId,
-                            onClose = { nav.popBackStack() },
-                        )
+                        if (
+                            capabilityProfile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER)
+                        ) {
+                            RecordingPlayerScreen(
+                                recordingId = recordingId,
+                                simpleTvProfile = capabilityProfile,
+                                onUnlock = { nav.navigate(Routes.UNLOCK) },
+                                onClose = { nav.popBackStack() },
+                            )
+                        }
                     }
                 }
 
@@ -302,6 +381,7 @@ fun AppRoot(
             SideRail(
                 currentRoute = topRoute,
                 showEpgMenu = uiSettings.showEpgMenu,
+                simpleTvProfile = capabilityProfile,
                 onNavigate = { route ->
                     val current = nav.currentBackStackEntry?.destination?.route
                     if (current == route) {
@@ -320,4 +400,15 @@ fun AppRoot(
             content()
         }
     }
+}
+
+private fun String?.toSimpleTvRoute(): SimpleTvRoute? = when (this) {
+    Routes.CHANNELS -> SimpleTvRoute.CHANNELS
+    Routes.EPG -> SimpleTvRoute.EPG
+    Routes.RECORDINGS -> SimpleTvRoute.RECORDINGS
+    Routes.SETTINGS -> SimpleTvRoute.SETTINGS
+    Routes.PLAYER -> SimpleTvRoute.PLAYER
+    Routes.RECORDING_PLAYER -> SimpleTvRoute.RECORDING_PLAYER
+    Routes.UNLOCK -> SimpleTvRoute.UNLOCK
+    else -> null
 }

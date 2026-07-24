@@ -77,10 +77,13 @@ fun OverlayControlsTv(
     onToggleTimeshiftPause: () -> Unit,
     onSeekTimeshift: (Long) -> Unit,
     onGoLive: () -> Unit,
+    showStop: Boolean = true,
+    showUnlock: Boolean = false,
+    onUnlock: () -> Unit = {},
 ) {
     var showAudio by remember { mutableStateOf(false) }
     var showSubs by remember { mutableStateOf(false) }
-    var lastFocused by rememberSaveable { mutableIntStateOf(0) }
+    var lastFocused by rememberSaveable { mutableStateOf("stop") }
 
     val stopFocus = remember { FocusRequester() }
     val aspectFocus = remember { FocusRequester() }
@@ -90,18 +93,29 @@ fun OverlayControlsTv(
     val backFocus = remember { FocusRequester() }
     val forwardFocus = remember { FocusRequester() }
     val liveFocus = remember { FocusRequester() }
-    val baseFocusRequesters = remember {
-        listOf(stopFocus, aspectFocus, audioFocus, subtitleFocus)
-    }
+    val unlockFocus = remember { FocusRequester() }
 
-    LaunchedEffect(controlsVisible, timeshiftState.available) {
+    LaunchedEffect(
+        controlsVisible,
+        timeshiftState.available,
+        showStop,
+        showUnlock,
+    ) {
         if (controlsVisible) {
-            val requesters = if (timeshiftState.available) {
-                baseFocusRequesters + listOf(pauseFocus, backFocus, forwardFocus, liveFocus)
-            } else {
-                baseFocusRequesters
+            val requesters = buildMap {
+                if (showStop) put("stop", stopFocus)
+                put("aspect", aspectFocus)
+                put("audio", audioFocus)
+                put("subtitles", subtitleFocus)
+                if (timeshiftState.available) {
+                    put("pause", pauseFocus)
+                    put("back", backFocus)
+                    put("forward", forwardFocus)
+                    put("live", liveFocus)
+                }
+                if (showUnlock) put("unlock", unlockFocus)
             }
-            requesters.getOrElse(lastFocused) { stopFocus }.requestFocus()
+            (requesters[lastFocused] ?: requesters.values.first()).requestFocus()
         }
     }
 
@@ -246,19 +260,21 @@ fun OverlayControlsTv(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RoundIconButton(
-                    icon = {
-                        Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
-                    },
-                    onClick = { onUserInteraction(); onStopPlayback() },
-                    focusRequester = stopFocus,
-                    onFocused = { lastFocused = 0 },
-                )
+                if (showStop) {
+                    RoundIconButton(
+                        icon = {
+                            Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
+                        },
+                        onClick = { onUserInteraction(); onStopPlayback() },
+                        focusRequester = stopFocus,
+                        onFocused = { lastFocused = "stop" },
+                    )
+                }
                 RoundIconButton(
                     icon = { AspectRatioIcon(aspectRatio) },
                     onClick = { onUserInteraction(); onAspectRatioChange() },
                     focusRequester = aspectFocus,
-                    onFocused = { lastFocused = 1 },
+                    onFocused = { lastFocused = "aspect" },
                 )
                 RoundIconButton(
                     icon = {
@@ -266,7 +282,7 @@ fun OverlayControlsTv(
                     },
                     onClick = { onUserInteraction(); showAudio = true },
                     focusRequester = audioFocus,
-                    onFocused = { lastFocused = 2 },
+                    onFocused = { lastFocused = "audio" },
                 )
                 RoundIconButton(
                     icon = {
@@ -274,14 +290,14 @@ fun OverlayControlsTv(
                     },
                     onClick = { onUserInteraction(); showSubs = true },
                     focusRequester = subtitleFocus,
-                    onFocused = { lastFocused = 3 },
+                    onFocused = { lastFocused = "subtitles" },
                 )
                 if (timeshiftState.available) {
                     Button(
                         onClick = { onUserInteraction(); onToggleTimeshiftPause() },
                         modifier = Modifier
                             .focusRequester(pauseFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = 4 },
+                            .onFocusChanged { if (it.isFocused) lastFocused = "pause" },
                     ) {
                         Text(
                             stringResource(
@@ -296,7 +312,7 @@ fun OverlayControlsTv(
                         },
                         modifier = Modifier
                             .focusRequester(backFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = 5 },
+                            .onFocusChanged { if (it.isFocused) lastFocused = "back" },
                     ) {
                         Text(stringResource(R.string.seek_back_30))
                     }
@@ -307,7 +323,7 @@ fun OverlayControlsTv(
                         },
                         modifier = Modifier
                             .focusRequester(forwardFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = 6 },
+                            .onFocusChanged { if (it.isFocused) lastFocused = "forward" },
                     ) {
                         Text(stringResource(R.string.seek_forward_30))
                     }
@@ -315,9 +331,19 @@ fun OverlayControlsTv(
                         onClick = { onUserInteraction(); onGoLive() },
                         modifier = Modifier
                             .focusRequester(liveFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = 7 },
+                            .onFocusChanged { if (it.isFocused) lastFocused = "live" },
                     ) {
                         Text(stringResource(R.string.timeshift_go_live))
+                    }
+                }
+                if (showUnlock) {
+                    Button(
+                        onClick = { onUserInteraction(); onUnlock() },
+                        modifier = Modifier
+                            .focusRequester(unlockFocus)
+                            .onFocusChanged { if (it.isFocused) lastFocused = "unlock" },
+                    ) {
+                        Text(stringResource(R.string.simple_tv_unlock))
                     }
                 }
             }

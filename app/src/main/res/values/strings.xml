@@ -66,6 +66,8 @@
     <string name="settings_connection_nav">Connection</string>
     <string name="settings_player_nav">Player</string>
     <string name="settings_appliance_nav">Appliance</string>
+    <string name="settings_simple_tv_nav">Simple TV</string>
+    <string name="settings_simple_tv">Settings - Simple TV mode</string>
     <string name="language_follow_system">Follow system</string>
     <string name="language_german">German</string>
     <string name="language_english">English</string>
@@ -197,6 +199,28 @@
     <string name="timeshift_at_live">Returned to live television.</string>
     <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
     <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
+    <string name="simple_tv_enabled">Enable Simple TV mode</string>
+    <string name="simple_tv_epg">Allow Guide</string>
+    <string name="simple_tv_recordings">Allow Recordings</string>
+    <string name="simple_tv_timeshift">Allow timeshift controls</string>
+    <string name="simple_tv_stop">Allow Stop</string>
+    <string name="simple_tv_settings_access">Allow Settings</string>
+    <string name="simple_tv_app_exit">Allow exiting the app</string>
+    <string name="simple_tv_unlock">Unlock controls</string>
+    <string name="simple_tv_unlock_title">Unlock owner controls</string>
+    <string name="simple_tv_unlock_session">Unlocking restores all controls for this app session only.</string>
+    <string name="simple_tv_unlock_required">Unlock owner controls before changing Simple TV mode.</string>
+    <string name="simple_tv_pin">4-digit owner PIN</string>
+    <string name="simple_tv_pin_explanation">The optional PIN is a convenience barrier for household use, not a security boundary.</string>
+    <string name="simple_tv_pin_security_boundary">The PIN is a convenience barrier, not a security boundary.</string>
+    <string name="simple_tv_pin_recovery">If the PIN is forgotten, reset the app data and configure the connection again.</string>
+    <string name="simple_tv_set_pin">Set owner PIN</string>
+    <string name="simple_tv_clear_pin">Remove owner PIN</string>
+    <string name="simple_tv_pin_saved">Owner PIN saved.</string>
+    <string name="simple_tv_pin_cleared">Owner PIN removed.</string>
+    <string name="simple_tv_pin_invalid">Enter exactly four digits.</string>
+    <string name="simple_tv_pin_wrong">That PIN is incorrect.</string>
+    <string name="simple_tv_no_pin">No PIN is configured. Unlocking requires only confirmation.</string>
 
     <string name="play">Play</string>
 

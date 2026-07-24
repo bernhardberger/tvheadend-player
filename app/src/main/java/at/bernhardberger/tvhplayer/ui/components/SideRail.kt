@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -32,11 +33,15 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.models.RailItem
 import at.bernhardberger.tvhplayer.ui.Routes
 import at.bernhardberger.tvhplayer.ui.TvSettingsPanelAlpha
+import at.bernhardberger.tvhplayer.core.SimpleTvCapability
+import at.bernhardberger.tvhplayer.core.SimpleTvProfile
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 
 @Composable
 fun SideRail(
     currentRoute: String?,
     showEpgMenu: Boolean,
+    simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -45,30 +50,49 @@ fun SideRail(
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
-    val items = remember(
+    val unlockLabel = stringResource(R.string.simple_tv_unlock)
+    val mainItems = remember(
         channelsLabel,
         epgLabel,
         recordingsLabel,
-        settingsLabel,
         showEpgMenu,
+        simpleTvProfile,
     ) {
         buildList {
             add(RailItem(Routes.CHANNELS, channelsLabel) {
                 Icon(Icons.AutoMirrored.Filled.List, null, Modifier.size(24.dp))
             })
-            if (showEpgMenu) {
+            if (showEpgMenu && simpleTvProfile.allows(SimpleTvCapability.EPG)) {
                 add(RailItem(Routes.EPG, epgLabel) {
                     Icon(Icons.Filled.Event, null, Modifier.size(24.dp))
                 })
             }
-            add(RailItem(Routes.RECORDINGS, recordingsLabel) {
-                Icon(Icons.Filled.VideoLibrary, null, Modifier.size(24.dp))
-            })
-            add(RailItem(Routes.SETTINGS, settingsLabel) {
-                Icon(Icons.Filled.Settings, null, Modifier.size(24.dp))
-            })
+            if (simpleTvProfile.allows(SimpleTvCapability.RECORDINGS)) {
+                add(RailItem(Routes.RECORDINGS, recordingsLabel) {
+                    Icon(Icons.Filled.VideoLibrary, null, Modifier.size(24.dp))
+                })
+            }
         }
     }
+    val footerItems = remember(
+        unlockLabel,
+        settingsLabel,
+        simpleTvProfile,
+    ) {
+        buildList {
+            if (simpleTvProfile.settings.enabled && !simpleTvProfile.unlocked) {
+                add(RailItem(Routes.UNLOCK, unlockLabel) {
+                    Icon(Icons.Filled.LockOpen, null, Modifier.size(24.dp))
+                })
+            }
+            if (simpleTvProfile.allows(SimpleTvCapability.SETTINGS)) {
+                add(RailItem(Routes.SETTINGS, settingsLabel) {
+                    Icon(Icons.Filled.Settings, null, Modifier.size(24.dp))
+                })
+            }
+        }
+    }
+    val items = mainItems + footerItems
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
 
     NavigationDrawer(
@@ -89,7 +113,7 @@ fun SideRail(
                     .selectableGroup(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items.dropLast(1).forEach { item ->
+                mainItems.forEach { item ->
                     NavigationDrawerItem(
                         selected = currentRoute == item.route,
                         onClick = { onNavigate(item.route) },
@@ -102,14 +126,15 @@ fun SideRail(
 
                 Spacer(Modifier.weight(1f))
 
-                val settings = items.last()
-                NavigationDrawerItem(
-                    selected = currentRoute == settings.route,
-                    onClick = { onNavigate(settings.route) },
-                    leadingContent = settings.icon,
-                    modifier = Modifier.focusRequester(itemFocus.getValue(settings.route)),
-                ) {
-                    Text(settings.label)
+                footerItems.forEach { item ->
+                    NavigationDrawerItem(
+                        selected = currentRoute == item.route,
+                        onClick = { onNavigate(item.route) },
+                        leadingContent = item.icon,
+                        modifier = Modifier.focusRequester(itemFocus.getValue(item.route)),
+                    ) {
+                        Text(item.label)
+                    }
                 }
             }
         },

@@ -13,6 +13,8 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -28,6 +30,11 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnection
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsLanguage
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsOptions
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer
+import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsSimpleTv
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
+import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
+import at.bernhardberger.tvhplayer.stores.SimpleTvSession
+import org.koin.compose.koinInject
 
 object SettingsRoutes {
     const val GENERAL = "settings/general"
@@ -35,15 +42,30 @@ object SettingsRoutes {
     const val OPTIONS = "settings/options"
     const val CONNECTION = "settings/connection"
     const val APPLIANCE = "settings/appliance"
+    const val SIMPLE_TV = "settings/simple-tv"
     const val ABOUT = "settings/about"
 }
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val nav = rememberNavController()
+    val simpleTvStore: SimpleTvSettingsStore = koinInject()
+    val simpleTvSession: SimpleTvSession = koinInject()
+    val simpleTvSettings by simpleTvStore.settings.collectAsStateWithLifecycle(
+        initialValue = SimpleTvSettings()
+    )
+    val simpleTvUnlocked by simpleTvSession.unlocked.collectAsStateWithLifecycle()
+    val showSimpleTvSettings = !simpleTvSettings.enabled || simpleTvUnlocked
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    LaunchedEffect(currentRoute, showSimpleTvSettings) {
+        if (currentRoute == SettingsRoutes.SIMPLE_TV && !showSimpleTvSettings) {
+            nav.navigate(SettingsRoutes.GENERAL) {
+                popUpTo(SettingsRoutes.GENERAL) { inclusive = true }
+            }
+        }
+    }
     BackHandler {
         when (nestedBackAction(hasPreviousEntry = nav.previousBackStackEntry != null)) {
             BackAction.POP_NAVIGATION -> nav.popBackStack()
@@ -66,6 +88,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         ) {
             SettingsSubRail(
                 currentRoute = currentRoute,
+                showSimpleTv = showSimpleTvSettings,
                 onNavigate = { route ->
                     nav.navigate(route) {
                         popUpTo(SettingsRoutes.GENERAL) { inclusive = false }
@@ -104,6 +127,10 @@ fun SettingsScreen(onBack: () -> Unit) {
 
                     composable(SettingsRoutes.APPLIANCE) {
                         SettingsAppliance()
+                    }
+
+                    composable(SettingsRoutes.SIMPLE_TV) {
+                        SettingsSimpleTv()
                     }
                 }
             }

@@ -62,6 +62,10 @@ import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.shouldRevealPlaybackControls
+import at.bernhardberger.tvhplayer.core.SimpleTvCapability
+import at.bernhardberger.tvhplayer.core.SimpleTvProfile
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
+import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
@@ -111,6 +115,8 @@ fun VideoPlayerScreen(
     channelId: Int,
     channelName: String,
     serviceId: Int,
+    simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
+    onUnlock: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -122,6 +128,13 @@ fun VideoPlayerScreen(
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
     val timeshiftState by videoPlayerViewModel.timeshiftState.collectAsStateWithLifecycle()
+    val effectiveTimeshiftState = if (
+        simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT)
+    ) {
+        timeshiftState
+    } else {
+        TimeshiftState()
+    }
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
     val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
@@ -343,7 +356,8 @@ fun VideoPlayerScreen(
                 if (!connectionLost) {
                     connectionLost = true
                     restoreToLiveAfterReconnect =
-                        timeshiftState.available && timeshiftState.positionMs < -1_000L
+                        effectiveTimeshiftState.available &&
+                            effectiveTimeshiftState.positionMs < -1_000L
                     showControls()
                     videoPlayerViewModel.stop()
                     lastPlayedServiceId = -1
@@ -365,7 +379,10 @@ fun VideoPlayerScreen(
                     pauseKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
                     toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                 )
-                if (mediaAction != MediaPlaybackAction.NONE && timeshiftState.available) {
+                if (
+                    mediaAction != MediaPlaybackAction.NONE &&
+                    effectiveTimeshiftState.available
+                ) {
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> {
                             player.play()
@@ -387,7 +404,7 @@ fun VideoPlayerScreen(
                             }
                         }
                         MediaPlaybackAction.TOGGLE -> {
-                            if (timeshiftState.paused || !player.playWhenReady) {
+                            if (effectiveTimeshiftState.paused || !player.playWhenReady) {
                                 player.play()
                                 scope.launch {
                                     if (!videoPlayerViewModel.resumeTimeshift()) {
@@ -564,10 +581,10 @@ fun VideoPlayerScreen(
                     }
                     scope.launch { settingsStore.setAspectRatio(aspectRatio) }
                 },
-                timeshiftState = timeshiftState,
+                timeshiftState = effectiveTimeshiftState,
                 timeshiftFeedback = timeshiftFeedback,
                 onToggleTimeshiftPause = {
-                    if (timeshiftState.paused) {
+                    if (effectiveTimeshiftState.paused) {
                         player.play()
                         scope.launch {
                             if (!videoPlayerViewModel.resumeTimeshift()) {
@@ -609,6 +626,9 @@ fun VideoPlayerScreen(
                         }
                     }
                 },
+                showStop = simpleTvProfile.allows(SimpleTvCapability.STOP),
+                showUnlock = simpleTvProfile.settings.enabled && !simpleTvProfile.unlocked,
+                onUnlock = onUnlock,
             )
         }
 

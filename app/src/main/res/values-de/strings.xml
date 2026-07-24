@@ -62,6 +62,8 @@
     <string name="settings_connection_nav">Verbindung</string>
     <string name="settings_player_nav">Wiedergabe</string>
     <string name="settings_appliance_nav">TV-Start</string>
+    <string name="settings_simple_tv_nav">Einfaches TV</string>
+    <string name="settings_simple_tv">Einstellungen – Einfaches TV</string>
     <string name="language_follow_system">Systemsprache verwenden</string>
     <string name="language_german">Deutsch</string>
     <string name="language_english">Englisch</string>
@@ -183,6 +185,28 @@
     <string name="timeshift_at_live">Zur Live-Sendung zurückgekehrt.</string>
     <string name="timeshift_reconnect_live">Der Server konnte die vorherige Position nicht bestätigen. Zur Live-Sendung zurückgekehrt.</string>
     <string name="timeshift_unavailable">Timeshift ist für diesen Server oder dieses Stream-Profil nicht verfügbar.</string>
+    <string name="simple_tv_enabled">Einfaches TV aktivieren</string>
+    <string name="simple_tv_epg">Programm erlauben</string>
+    <string name="simple_tv_recordings">Aufnahmen erlauben</string>
+    <string name="simple_tv_timeshift">Timeshift-Steuerung erlauben</string>
+    <string name="simple_tv_stop">Stopp erlauben</string>
+    <string name="simple_tv_settings_access">Einstellungen erlauben</string>
+    <string name="simple_tv_app_exit">Beenden der App erlauben</string>
+    <string name="simple_tv_unlock">Steuerung entsperren</string>
+    <string name="simple_tv_unlock_title">Besitzersteuerung entsperren</string>
+    <string name="simple_tv_unlock_session">Das Entsperren stellt alle Bedienelemente nur für diese App-Sitzung wieder her.</string>
+    <string name="simple_tv_unlock_required">Entsperren Sie die Besitzersteuerung, bevor Sie Einfaches TV ändern.</string>
+    <string name="simple_tv_pin">4-stellige Besitzer-PIN</string>
+    <string name="simple_tv_pin_explanation">Die optionale PIN ist eine Komfortbarriere für den Haushalt, keine Sicherheitsgrenze.</string>
+    <string name="simple_tv_pin_security_boundary">Die PIN ist eine Komfortbarriere, keine Sicherheitsgrenze.</string>
+    <string name="simple_tv_pin_recovery">Bei vergessener PIN müssen die App-Daten zurückgesetzt und die Verbindung neu eingerichtet werden.</string>
+    <string name="simple_tv_set_pin">Besitzer-PIN festlegen</string>
+    <string name="simple_tv_clear_pin">Besitzer-PIN entfernen</string>
+    <string name="simple_tv_pin_saved">Besitzer-PIN gespeichert.</string>
+    <string name="simple_tv_pin_cleared">Besitzer-PIN entfernt.</string>
+    <string name="simple_tv_pin_invalid">Geben Sie genau vier Ziffern ein.</string>
+    <string name="simple_tv_pin_wrong">Diese PIN ist falsch.</string>
+    <string name="simple_tv_no_pin">Keine PIN eingerichtet. Zum Entsperren genügt die Bestätigung.</string>
     <string name="play">Abspielen</string>
 
     <string name="tvh_target_invalid">Ungültiges Streaming-Ziel</string>

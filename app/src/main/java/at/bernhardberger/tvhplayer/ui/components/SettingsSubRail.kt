@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,10 +42,13 @@ import at.bernhardberger.tvhplayer.ui.TvSettingsPanelAlpha
 fun SettingsSubRail(
     currentRoute: String?,
     onNavigate: (String) -> Unit,
+    showSimpleTv: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     var railFocused by remember { mutableStateOf(false) }
-    val items = rememberSettingsItems()
+    val items = rememberSettingsItems(
+        showSimpleTv = showSimpleTv,
+    )
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
 
     var didInit by remember { mutableStateOf(false) }
@@ -92,29 +96,50 @@ fun SettingsSubRail(
 }
 
 @Composable
-private fun rememberSettingsItems(): List<RailItem> {
+private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
     val languageLabel = stringResource(R.string.settings_language_nav)
     val optionsLabel = stringResource(R.string.settings_options_nav)
     val connectionLabel = stringResource(R.string.settings_connection_nav)
     val playerLabel = stringResource(R.string.settings_player_nav)
     val applianceLabel = stringResource(R.string.settings_appliance_nav)
-    return remember(languageLabel, optionsLabel, connectionLabel, playerLabel, applianceLabel) {
-        listOf(
+    val simpleTvLabel = stringResource(R.string.settings_simple_tv_nav)
+    return remember(
+        languageLabel,
+        optionsLabel,
+        connectionLabel,
+        playerLabel,
+        applianceLabel,
+        simpleTvLabel,
+        showSimpleTv,
+    ) {
+        buildList {
+            add(
             RailItem(SettingsRoutes.GENERAL, languageLabel) {
                 Icon(Icons.Filled.Language, null, Modifier.size(24.dp))
-            },
+            })
+            add(
             RailItem(SettingsRoutes.OPTIONS, optionsLabel) {
                 Icon(Icons.Filled.Tune, null, Modifier.size(24.dp))
-            },
+            })
+            add(
             RailItem(SettingsRoutes.CONNECTION, connectionLabel) {
                 Icon(Icons.AutoMirrored.Filled.List, null, Modifier.size(24.dp))
-            },
+            })
+            add(
             RailItem(SettingsRoutes.PLAYER, playerLabel) {
                 Icon(Icons.Filled.PlayArrow, null, Modifier.size(24.dp))
-            },
+            })
+            add(
             RailItem(SettingsRoutes.APPLIANCE, applianceLabel) {
                 Icon(Icons.Filled.Home, null, Modifier.size(24.dp))
-            },
-        )
+            })
+            if (showSimpleTv) {
+                add(
+                    RailItem(SettingsRoutes.SIMPLE_TV, simpleTvLabel) {
+                        Icon(Icons.Filled.AccessibilityNew, null, Modifier.size(24.dp))
+                    }
+                )
+            }
+        }
     }
 }
