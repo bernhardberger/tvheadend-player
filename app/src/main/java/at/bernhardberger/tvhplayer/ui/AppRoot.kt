@@ -194,6 +194,8 @@ fun AppRoot(
                     composable(Routes.EPG) {
                         ContentContainer {
                             EpgGridScreen(
+                                connectionUiState = connectionUiState,
+                                onRetry = appVm::reconnectNow,
                                 onPlay = { channelId, serviceId, name ->
                                     nav.navigate(Routes.player(channelId, serviceId, name))
                                 }

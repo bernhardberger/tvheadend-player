@@ -120,6 +120,30 @@
     <string name="epg_title">EPG</string>
     <string name="epg_schedule">Schedule</string>
     <string name="epg_loading">Loading EPG…</string>
+    <string name="epg_jump">Jump to time</string>
+    <string name="epg_jump_title">Jump to date and time</string>
+    <string name="epg_jump_action">Jump</string>
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="previous_day">Previous day</string>
+    <string name="next_day">Next day</string>
+    <string name="previous_hour">−1 hour</string>
+    <string name="next_hour">+1 hour</string>
+    <string name="now">Now</string>
+    <string name="epg_state_ready">Guide data available</string>
+    <string name="epg_no_data">No guide data for this channel</string>
+    <string name="epg_empty_day">No programmes in this time window</string>
+    <string name="epg_partial">Partial guide data</string>
+    <string name="epg_stale">Guide data may be out of date while reconnecting</string>
+    <string name="epg_permission_denied">This account cannot read guide data</string>
+    <string name="epg_reconnecting">Reconnecting to TVHeadend…</string>
+    <string name="epg_server_failure">Guide unavailable. Retry the server connection.</string>
+    <string name="epg_state_now">on now</string>
+    <string name="epg_state_future">upcoming</string>
+    <string name="epg_state_past">ended</string>
+    <string name="epg_cell_description">%1$s, %2$s to %3$s, %4$s, %5$s</string>
+    <string name="epg_details_action_hint">Programme actions are shown in this panel. Playback never starts directly from the guide.</string>
 
     <string name="play">Play</string>
 
