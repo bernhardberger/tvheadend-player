@@ -104,11 +104,89 @@ data class ChannelTagUi(
 data class EpgEventEntry(
     val eventId: Int,
     val channelId: Int,
-    val start: Long,   // epoch seconds (nebo ms – sjednoť si to)
+    val start: Long,
     val stop: Long,
     val title: String,
-    val summary: String? = null
+    val summary: String? = null,
+    val description: String? = null,
+    val genre: String? = null,
+    val contentType: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val episodeCount: Int? = null,
+    val partNumber: Int? = null,
+    val partCount: Int? = null,
+    val episodeId: Int? = null,
+    val seriesLinkId: Int? = null,
 )
+
+fun epgEventFromFields(fields: Map<String, Any?>): EpgEventEntry? {
+    val eventId = fields.intValue("eventId", "id") ?: return null
+    val channelId = fields.intValue("channelId", "channel") ?: return null
+    val start = fields.longValue("start", "startTime") ?: return null
+    val stop = fields.longValue("stop", "stopTime") ?: return null
+    val episode = fields["episode"] as? Map<*, *>
+
+    return EpgEventEntry(
+        eventId = eventId,
+        channelId = channelId,
+        start = start,
+        stop = stop,
+        title = fields.stringValue("title", "eventTitle", "name") ?: "—",
+        summary = fields.stringValue("summary"),
+        description = fields.stringValue("description"),
+        genre = fields.stringValue("genre", "category"),
+        contentType = fields.intValue("contentType", "content"),
+        seasonNumber = fields.intValue("seasonNumber", "season")
+            ?: episode.intValue("seasonNumber", "season"),
+        episodeNumber = fields.intValue("episodeNumber")
+            ?: episode.intValue("episodeNumber", "number"),
+        episodeCount = fields.intValue("episodeCount")
+            ?: episode.intValue("episodeCount", "count"),
+        partNumber = fields.intValue("partNumber", "part")
+            ?: episode.intValue("partNumber", "part"),
+        partCount = fields.intValue("partCount")
+            ?: episode.intValue("partCount"),
+        episodeId = fields.intValue("episodeId"),
+        seriesLinkId = fields.intValue("serieslinkId", "seriesLinkId"),
+    )
+}
+
+private fun Map<*, *>?.intValue(vararg keys: String): Int? {
+    val map = this ?: return null
+    for (key in keys) {
+        val value = map[key]
+        when (value) {
+            is Number -> return value.toInt()
+            is String -> value.toIntOrNull()?.let { return it }
+        }
+    }
+    return null
+}
+
+private fun Map<*, *>.longValue(vararg keys: String): Long? {
+    for (key in keys) {
+        val value = this[key]
+        when (value) {
+            is Number -> return value.toLong()
+            is String -> value.toLongOrNull()?.let { return it }
+        }
+    }
+    return null
+}
+
+private fun Map<*, *>.stringValue(vararg keys: String): String? {
+    for (key in keys) {
+        when (val value = this[key]) {
+            is String -> return value.takeIf { it.isNotBlank() }
+            is List<*> -> {
+                val joined = value.filterIsInstance<String>().joinToString(", ")
+                if (joined.isNotBlank()) return joined
+            }
+        }
+    }
+    return null
+}
 
 data class SubscriptionStatus
     (

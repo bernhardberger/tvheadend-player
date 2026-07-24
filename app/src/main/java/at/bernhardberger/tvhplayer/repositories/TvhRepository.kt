@@ -1,12 +1,17 @@
 package at.bernhardberger.tvhplayer.repositories
 
 import at.bernhardberger.tvhplayer.core.coverageForEvents
+import at.bernhardberger.tvhplayer.core.EPG_KEEP_FUTURE_SEC
+import at.bernhardberger.tvhplayer.core.EPG_KEEP_PAST_SEC
+import at.bernhardberger.tvhplayer.core.epgRetentionWindow
+import at.bernhardberger.tvhplayer.core.evictEpgOutsideWindow
 import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.htsp.HtspEvent
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
+import at.bernhardberger.tvhplayer.htsp.epgEventFromFields
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -98,12 +103,12 @@ class TvhRepository(
     /**
      * How much past we retain in cache (for "now/prev" and seeking).
      */
-    private val keepPastSec = 6 * 3600L
+    private val keepPastSec = EPG_KEEP_PAST_SEC
 
     /**
      * How much future we retain in cache (should be >= steadyMaxFutureSec).
      */
-    private val keepFutureSec = steadyMaxFutureSec
+    private val keepFutureSec = EPG_KEEP_FUTURE_SEC
 
     /**
      * Don't refresh same channel too often (prevents spinning).
@@ -142,6 +147,7 @@ class TvhRepository(
      * We use it to maintain a sliding horizon.
      */
     private val epgCoverage = mutableMapOf<Int, EpgCoverage>()
+    private val epgRetentionAnchor = mutableMapOf<Int, Long>()
 
     /**
      * Prevent parallel duplicate requests per channel.
@@ -186,6 +192,7 @@ class TvhRepository(
 
             if (!preservePublishedChannels) epgByChannel.clear()
             epgCoverage.clear()
+            epgRetentionAnchor.clear()
             epgInFlight.clear()
 
             // Force a fresh warmup for the new connection; coverage was just cleared.
@@ -313,7 +320,8 @@ class TvhRepository(
 
             stateMutex.withLock {
                 // ingest + update coverage from reply
-                ingestGetEventsReplyLocked(reply, nowSec = nowSec)
+                val retentionAnchor = epgRetentionAnchor.getOrPut(channelId) { nowSec }
+                ingestGetEventsReplyLocked(reply, anchorSec = retentionAnchor)
                 // An empty response still confirms that the server has no events in
                 // this range; do not query the same empty horizon forever.
                 epgCoverage.getOrPut(channelId) { EpgCoverage() }
@@ -323,6 +331,50 @@ class TvhRepository(
                 trimAllEpgLocked(nowSec)
                 return true
             }
+        } finally {
+            stateMutex.withLock { epgInFlight.remove(channelId) }
+        }
+    }
+
+    fun requestEpgAtFrontier(channelIds: List<Int>, anchorSec: Long) {
+        if (channelIds.isEmpty()) return
+        scope.launch {
+            for (channelId in channelIds.distinct()) {
+                fetchEpgWindowOnce(channelId, anchorSec)
+                delay(requestDelayMs)
+            }
+        }
+    }
+
+    private suspend fun fetchEpgWindowOnce(channelId: Int, anchorSec: Long): Boolean {
+        stateMutex.withLock {
+            if (!epgInFlight.add(channelId)) return false
+        }
+
+        try {
+            val window = epgRetentionWindow(anchorSec)
+            val reply = runCatching {
+                htsp.request(
+                    method = "getEvents",
+                    fields = mapOf(
+                        "channelId" to channelId,
+                        "minTime" to window.fromSec,
+                        "maxTime" to window.toSec,
+                    ),
+                    timeoutMs = 20_000,
+                    disconnectOnTimeout = false,
+                )
+            }.getOrNull() ?: return false
+            if (reply.fields.containsKey("error")) return false
+
+            stateMutex.withLock {
+                epgRetentionAnchor[channelId] = anchorSec
+                ingestGetEventsReplyLocked(reply, anchorSec)
+                epgCoverage.getOrPut(channelId) { EpgCoverage() }
+                    .recordSuccessfulFetch(window.toSec, nowSec())
+                trimChannelEpgLocked(channelId, anchorSec)
+            }
+            return true
         } finally {
             stateMutex.withLock { epgInFlight.remove(channelId) }
         }
@@ -489,29 +541,24 @@ class TvhRepository(
     // ---------------------------
 
     private fun handleEventUpsertLocked(msg: HtspMessage) {
-        val eventId = msg.int("eventId") ?: msg.int("id") ?: return
-        val channelId = msg.int("channelId") ?: msg.int("channel") ?: return
-
-        val title = msg.str("title") ?: msg.str("eventTitle") ?: msg.str("name") ?: "—"
-        val summary = msg.str("summary") ?: msg.str("description")
-
-        val start = msg.long("start") ?: msg.long("startTime") ?: return
-        val stop = msg.long("stop") ?: msg.long("stopTime") ?: return
+        val event = epgEventFromFields(msg.fields) ?: return
+        val channelId = event.channelId
 
         val nowSec = nowSec()
+        val anchorSec = epgRetentionAnchor[channelId] ?: nowSec
         val flow = epgByChannel.getOrPut(channelId) { MutableStateFlow(emptyList()) }
         flow.value = upsertAndTrim(
             list = flow.value,
-            item = EpgEventEntry(eventId, channelId, start, stop, title, summary),
-            nowSec = nowSec,
+            item = event,
+            anchorSec = anchorSec,
             keepPastSec = keepPastSec,
             keepFutureSec = keepFutureSec
         )
 
         // Update coverage
         val cov = epgCoverage.getOrPut(channelId) { EpgCoverage() }
-        cov.coveredFrom = min(cov.coveredFrom, start)
-        cov.coveredTo = max(cov.coveredTo, stop)
+        cov.coveredFrom = min(cov.coveredFrom, event.start)
+        cov.coveredTo = max(cov.coveredTo, event.stop)
     }
 
     private fun handleEventDeleteLocked(msg: HtspMessage) {
@@ -533,7 +580,7 @@ class TvhRepository(
         val perChannelMaxStop: MutableMap<Int, Long>
     )
 
-    private fun ingestGetEventsReplyLocked(reply: HtspMessage, nowSec: Long): IngestResult {
+    private fun ingestGetEventsReplyLocked(reply: HtspMessage, anchorSec: Long): IngestResult {
         val raw = reply.fields["events"]
             ?: reply.fields["epg"]
             ?: reply.fields["entries"]
@@ -551,40 +598,20 @@ class TvhRepository(
         var total = 0
 
         for (ev in list) {
-            val eventId = (ev["eventId"] as? Number)?.toInt()
-                ?: (ev["id"] as? Number)?.toInt()
-                ?: continue
-
-            val channelId = (ev["channelId"] as? Number)?.toInt()
-                ?: (ev["channel"] as? Number)?.toInt()
-                ?: continue
-
-            val title = (ev["title"] as? String)
-                ?: (ev["eventTitle"] as? String)
-                ?: (ev["name"] as? String)
-                ?: "—"
-
-            val summary = (ev["summary"] as? String) ?: (ev["description"] as? String)
-
-            val start = (ev["start"] as? Number)?.toLong()
-                ?: (ev["startTime"] as? Number)?.toLong()
-                ?: continue
-
-            val stop = (ev["stop"] as? Number)?.toLong()
-                ?: (ev["stopTime"] as? Number)?.toLong()
-                ?: continue
+            val event = epgEventFromFields(ev) ?: continue
+            val channelId = event.channelId
 
             val flow = epgByChannel.getOrPut(channelId) { MutableStateFlow(emptyList()) }
             flow.value = upsertAndTrim(
                 list = flow.value,
-                item = EpgEventEntry(eventId, channelId, start, stop, title, summary),
-                nowSec = nowSec,
+                item = event,
+                anchorSec = anchorSec,
                 keepPastSec = keepPastSec,
                 keepFutureSec = keepFutureSec
             )
 
-            minStart[channelId] = min(minStart[channelId] ?: Long.MAX_VALUE, start)
-            maxStop[channelId] = max(maxStop[channelId] ?: 0L, stop)
+            minStart[channelId] = min(minStart[channelId] ?: Long.MAX_VALUE, event.start)
+            maxStop[channelId] = max(maxStop[channelId] ?: 0L, event.stop)
             total++
         }
 
@@ -606,15 +633,11 @@ class TvhRepository(
     // ---------------------------
 
     private fun trimAllEpgLocked(nowSec: Long) {
-        // Trim each channel's list to keepPast/keepFuture bounds
-        for ((chId, flow) in epgByChannel) {
-            flow.value = flow.value
-                .asSequence()
-                .filter { e ->
-                    e.stop >= (nowSec - keepPastSec) && e.start <= (nowSec + keepFutureSec)
-                }
-                .sortedBy { it.start }
-                .toList()
+        for (channelId in epgByChannel.keys) {
+            trimChannelEpgLocked(
+                channelId = channelId,
+                anchorSec = epgRetentionAnchor[channelId] ?: nowSec,
+            )
         }
 
         // Re-derive coverage from what we actually still hold. Coverage must track
@@ -631,15 +654,20 @@ class TvhRepository(
         }
     }
 
+    private fun trimChannelEpgLocked(channelId: Int, anchorSec: Long) {
+        val flow = epgByChannel[channelId] ?: return
+        flow.value = evictEpgOutsideWindow(flow.value, epgRetentionWindow(anchorSec))
+    }
+
     private fun upsertAndTrim(
         list: List<EpgEventEntry>,
         item: EpgEventEntry,
-        nowSec: Long,
+        anchorSec: Long,
         keepPastSec: Long,
         keepFutureSec: Long
     ): List<EpgEventEntry> {
-        val from = nowSec - keepPastSec
-        val to = nowSec + keepFutureSec
+        val from = anchorSec - keepPastSec
+        val to = anchorSec + keepFutureSec
 
         val replaced = buildList(list.size + 1) {
             var found = false
