@@ -1,6 +1,6 @@
 # AI engineering harness
 
-The canonical LXC 106 checkout for this fork is:
+The current LXC 106 checkout is:
 
 ```text
 /root/projects/tvhstream
@@ -16,8 +16,8 @@ project instructions, agents, skills, and commands.
 |---|---|
 | `AGENTS.md` | Project-wide engineering, safety, testing, Git, and upstream rules |
 | `docs/device-targets.md` | Current development-versus-production TV boundary, without private addresses |
-| `.opencode/opencode.json` | Project config; selects the appliance agent, disables sharing and subagent spawning |
-| `.opencode/agents/android-appliance.md` | Default implementation agent |
+| `.opencode/opencode.json` | Project config; selects the Android TV agent, disables sharing and subagent spawning |
+| `.opencode/agents/android-tv.md` | Default implementation agent |
 | `.opencode/agents/android-reviewer.md` | Directly selectable read-only review agent |
 | `.opencode/skills/android-tv-device-testing/` | Safe TCL/ADB/runtime verification workflow |
 | `.opencode/skills/tvhstream-upstream-contribution/` | Upstream sync and contribution boundary workflow |
@@ -40,7 +40,7 @@ Media3/HTSP path as a regression boundary, incomplete native provenance as a
 signed-release blocker, and read-only GitHub CI as the only enabled automation
 until signing and publication are separately approved.
 
-Dedicated TV UX sections in `AGENTS.md`, `android-appliance`, and
+Dedicated TV UX sections in `AGENTS.md`, `android-tv`, and
 `android-reviewer` make Google TV and Android TV design guidance, Compose for TV,
 and Material for TV guidance a standing implementation and review gate. Google
 TV defines the target product experience; Android TV OS and Compose for TV remain
@@ -61,13 +61,13 @@ assigned development target may use `role: "test"`; test-device mutations also
 require exact `expected_manufacturer` and `expected_model` values:
 
 ```bash
-cp .tvhstream-device.example.json .tvhstream-device.json
+cp .tvhplayer-device.example.json .tvhplayer-device.json
 ```
 
 The same value can be supplied without a file:
 
 ```bash
-export TVHSTREAM_ADB_SERIAL='<adb-serial>'
+export TVHPLAYER_ADB_SERIAL='<adb-serial>'
 ```
 
 An environment or command-line serial does not override the role policy from

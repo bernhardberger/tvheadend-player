@@ -6,7 +6,7 @@ not a release feature or a general credential-import API.
 
 ## Policy
 
-- The local `.tvhstream-device.json` must set `role` to `test` and contain the
+- The local `.tvhplayer-device.json` must set `role` to `test` and contain the
   exact expected manufacturer and model. `tools/device` re-reads both properties
   from the connected TV before provisioning.
 - Production and unclassified devices are rejected before the local secret is
@@ -20,16 +20,16 @@ not a release feature or a general credential-import API.
 
 ## Setup
 
-Copy `.tvhstream-device.example.json` to the ignored local device file. Change
+Copy `.tvhplayer-device.example.json` to the ignored local device file. Change
 the role only for a device explicitly assigned to testing, then fill in the live
 identity reported by `doctor`:
 
 ```bash
-cp .tvhstream-device.example.json .tvhstream-device.json
+cp .tvhplayer-device.example.json .tvhplayer-device.json
 ./tools/device doctor
 ```
 
-Create the configured `.tvhstream-credentials.json` locally with this shape:
+Create the configured `.tvhplayer-credentials.json` locally with this shape:
 
 ```json
 {
@@ -44,12 +44,12 @@ Create the configured `.tvhstream-credentials.json` locally with this shape:
 Restrict the file and provision an installed debug build:
 
 ```bash
-chmod 600 .tvhstream-credentials.json
+chmod 600 .tvhplayer-credentials.json
 ./tools/device install-debug
 ./tools/device provision-test-credentials
 ```
 
-`TVHSTREAM_CREDENTIAL_FILE` may select a different owner-only local file by
+`TVHPLAYER_CREDENTIAL_FILE` may select a different owner-only local file by
 path. It carries only the path; never put credential values in that variable.
 
 ## Data flow
@@ -77,7 +77,7 @@ marker. Release builds do not contain the importer.
 Delete the host-side secret when repeated provisioning is no longer needed:
 
 ```bash
-rm .tvhstream-credentials.json
+rm .tvhplayer-credentials.json
 ```
 
 To remove credentials from the TV, use **Clear saved password** in connection

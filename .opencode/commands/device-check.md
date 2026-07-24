@@ -1,6 +1,6 @@
 ---
 description: Run a bounded Android TV device check through the repository wrapper.
-agent: android-appliance
+agent: android-tv
 ---
 
 Use `$ARGUMENTS` as the `./tools/device` subcommand and arguments. If no argument

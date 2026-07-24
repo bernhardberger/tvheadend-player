@@ -18,7 +18,7 @@ REQUIRED_FILES = (
     "AGENTS.md",
     "docs/device-targets.md",
     ".opencode/opencode.json",
-    ".opencode/agents/android-appliance.md",
+    ".opencode/agents/android-tv.md",
     ".opencode/agents/android-reviewer.md",
     ".opencode/skills/android-tv-device-testing/SKILL.md",
     ".opencode/skills/tvhstream-upstream-contribution/SKILL.md",
@@ -28,7 +28,7 @@ REQUIRED_FILES = (
     "docs/ai-engineering-harness.md",
     "docs/test-device-credential-provisioning.md",
     "app/src/debug/AndroidManifest.xml",
-    "app/src/debug/java/cz/preclikos/tvhstream/DebugApp.kt",
+    "app/src/debug/java/at/bernhardberger/tvhplayer/DebugApp.kt",
     "app/libs/native-dependencies.json",
     ".github/workflows/build.yml",
     "tools/verify",
@@ -41,7 +41,7 @@ PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
 PRIVATE_LAN_IP = re.compile(r"\b(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]))(?:\.\d{1,3}){2}\b")
 REQUIRED_TV_UX_SECTIONS = {
     "AGENTS.md": "## TV UX and UI requirements",
-    ".opencode/agents/android-appliance.md": "## TV UX implementation checklist",
+    ".opencode/agents/android-tv.md": "## TV UX implementation checklist",
     ".opencode/agents/android-reviewer.md": "## TV UX review gates",
 }
 
@@ -76,8 +76,8 @@ def main() -> int:
 
     if config.get("$schema") != "https://opencode.ai/config.json":
         errors.append(".opencode/opencode.json must declare the official schema")
-    if config.get("default_agent") != "android-appliance":
-        errors.append("default_agent must be android-appliance")
+    if config.get("default_agent") != "android-tv":
+        errors.append("default_agent must be android-tv")
     if config.get("share") != "disabled":
         errors.append("project session sharing must remain disabled")
     if config.get("subagent_depth") != 0:
@@ -126,7 +126,7 @@ def main() -> int:
         ROOT / "docs/ai-engineering-harness.md",
         ROOT / "docs/test-device-credential-provisioning.md",
         ROOT / "docs/device-targets.md",
-        ROOT / ".tvhstream-device.example.json",
+        ROOT / ".tvhplayer-device.example.json",
         *sorted((ROOT / ".opencode").rglob("*.md")),
         *sorted(
             path
@@ -145,21 +145,21 @@ def main() -> int:
 
     try:
         device_example = json.loads(
-            (ROOT / ".tvhstream-device.example.json").read_text(encoding="utf-8")
+            (ROOT / ".tvhplayer-device.example.json").read_text(encoding="utf-8")
         )
     except (OSError, json.JSONDecodeError) as exc:
         errors.append(f"invalid device example JSON: {exc}")
         device_example = {}
     if device_example.get("role") != "production":
         errors.append("device example must default to the safe production role")
-    if device_example.get("credential_file") != ".tvhstream-credentials.json":
+    if device_example.get("credential_file") != ".tvhplayer-credentials.json":
         errors.append("device example must name the ignored local credential file")
     for key in ("expected_manufacturer", "expected_model"):
         if not device_example.get(key):
             errors.append(f"device example must include {key}")
 
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
-    if ".tvhstream-credentials.json" not in gitignore.splitlines():
+    if ".tvhplayer-credentials.json" not in gitignore.splitlines():
         errors.append("default local credential file must be ignored")
 
     workflow_path = ROOT / ".github/workflows/build.yml"

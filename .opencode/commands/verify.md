@@ -1,6 +1,6 @@
 ---
 description: Run AI-harness, native-integrity, tool-policy, JVM, lint, Android-test compilation, APK, and identity verification.
-agent: android-appliance
+agent: android-tv
 ---
 
 Run `./tools/check-ai-harness` and then `./tools/verify`. If either fails, stop,

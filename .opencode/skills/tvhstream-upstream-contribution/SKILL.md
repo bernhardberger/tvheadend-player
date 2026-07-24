@@ -5,28 +5,32 @@ description: Use for TVHStream upstream syncs, generic feature extraction, GPLv3
 
 # TVHStream Upstream Contribution
 
-The remotes have deliberate roles:
+TVHeadend Player is a standalone product descended from TVHStream. Remote names
+can differ between existing and fresh clones, so inspect their URLs before every
+upstream operation. The intended roles are:
 
-- `origin` — `Preclikos/tvhstream`, upstream source and pull-request target
-- `fork` — `bernhardberger/tvhstream`, appliance fork and branch publication
+- product repository: `bernhardberger/tvheadend-player`, normally `origin`
+- predecessor repository: `Preclikos/tvhstream`, normally read-only `upstream`
 
-Never push to `origin`.
+Never push product or appliance commits to the predecessor repository.
 
 ## Classify first
 
 Before coding or extracting commits, classify the work:
 
-- **Generic:** no Leoville package, household device, server, HOME-default, or
-  TCL-specific assumption. Candidate for upstream.
-- **Appliance-specific:** branding, launcher behavior, TCL GUIDE interception,
-  deployment, signing, or household policy. Fork only.
+- **Generic:** no TVHeadend Player package, product branding, household device,
+  server, HOME-default, or TCL-specific assumption. Candidate for predecessor.
+- **Product-specific:** branding, public UX, repository metadata, and release
+  policy. Product repository only.
+- **Appliance-specific:** HOME behavior, TCL GUIDE interception, deployment,
+  signing, or household policy. Product repository only.
 - **Mixed:** split a generic primitive/policy from the appliance integration.
 
 ## Sync workflow
 
 ```bash
-git fetch origin
-git fetch fork
+git remote -v
+git fetch --all --prune
 git status -sb
 git log --oneline --decorate --graph -20
 ```
@@ -36,8 +40,9 @@ exact commit graph and proposed range. Preserve published appliance history.
 
 ## Upstream-ready gate
 
-1. Compare the candidate range against `origin/master`.
-2. Confirm it contains no Leoville application ID, local device/server address,
+1. Compare the candidate range against the configured `Preclikos/tvhstream`
+   remote's default branch.
+2. Confirm it contains no TVHeadend Player application ID, local device/server address,
    credentials, signing assumptions, household copy, or appliance-only docs.
 3. Keep the patch narrow and match upstream naming/style.
 4. Add a regression test that proves the generic behavior.

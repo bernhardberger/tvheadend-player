@@ -54,8 +54,8 @@ packages/
 google-services.json
 
 # Local device and signing configuration
-.tvhstream-device.json
-.tvhstream-credentials.json
+.tvhplayer-device.json
+.tvhplayer-credentials.json
 *.jks
 *.keystore
 keystore.properties

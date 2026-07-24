@@ -25,7 +25,7 @@ roles. Do not treat “Mum's TV” or “the household TV” as an unambiguous t
   development target and never substitute the G08.
 - Keep private IP addresses, ADB serials, MAC addresses, credentials, and signing
   material out of tracked files. The active ADB serial belongs only in ignored
-  `.tvhstream-device.json` or `TVHSTREAM_ADB_SERIAL`.
+  `.tvhplayer-device.json` or `TVHPLAYER_ADB_SERIAL`.
 - Device roles describe current lifecycle state, not permanent hardware
   capability. Update this document and the local role deliberately when the G10
   is handed over or a new development target is assigned.

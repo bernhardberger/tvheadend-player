@@ -1,6 +1,6 @@
 ---
 name: android-tv-device-testing
-description: Use for Android TV or TCL ADB testing, test-device credential provisioning, APK installation, playback checks, remote keys, HOME, GUIDE, standby/wake, reboot, and device diagnostics in this TVHStream fork.
+description: Use for TVHeadend Player Android TV or TCL ADB testing, test-device credential provisioning, APK installation, playback checks, remote keys, HOME, GUIDE, standby/wake, reboot, and device diagnostics.
 ---
 
 # Android TV Device Testing
@@ -14,14 +14,14 @@ dumps whenever it supports the required operation.
    `docs/appliance-mode-spec.md`.
 2. Confirm the source tree is clean or identify the exact uncommitted slice.
 3. Run the relevant JVM test, then `./tools/verify` before installing.
-4. Configure the ADB serial through ignored `.tvhstream-device.json`,
-   `TVHSTREAM_ADB_SERIAL`, or `--serial`. Never commit a household device
+4. Configure the ADB serial through ignored `.tvhplayer-device.json`,
+   `TVHPLAYER_ADB_SERIAL`, or `--serial`. Never commit a household device
    address as a required default.
 5. Confirm the package under test. The appliance default is
-   `at.leoville.tvhstream`; rollback clients use different package IDs.
-6. Run `./tools/device doctor` and confirm the local role. The household TV must
-   remain `production`. Only a separately assigned target may be `test`, and
-   mutations require matching `expected_manufacturer` and `expected_model`.
+   `at.bernhardberger.tvhplayer`; rollback clients use different package IDs.
+6. Run `./tools/device doctor` and confirm the local role against
+   `docs/device-targets.md`. Only a designated development target may be `test`,
+   and mutations require matching `expected_manufacturer` and `expected_model`.
 
 ## Safe sequence
 

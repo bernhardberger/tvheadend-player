@@ -79,8 +79,8 @@ internal class TestCredentialProvisioner(private val context: Context) {
     }
 
     private companion object {
-        const val STAGING_FILE_NAME = "tvh_test_provisioning.json"
-        const val RESULT_FILE_NAME = "tvh_test_provisioning.result"
+        const val STAGING_FILE_NAME = "tvhplayer_test_provisioning.json"
+        const val RESULT_FILE_NAME = "tvhplayer_test_provisioning.result"
         const val MAX_PAYLOAD_BYTES = 64 * 1024L
     }
 }

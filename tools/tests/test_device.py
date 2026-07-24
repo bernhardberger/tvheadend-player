@@ -18,6 +18,14 @@ key_events = DEVICE["KEY_EVENTS"]
 
 
 class DevicePolicyTest(unittest.TestCase):
+    def test_product_identity_defaults_are_current(self) -> None:
+        self.assertEqual(DEVICE["LOCAL_CONFIG"].name, ".tvhplayer-device.json")
+        self.assertEqual(DEVICE["DEFAULT_PACKAGE"], "at.bernhardberger.tvhplayer")
+        self.assertEqual(
+            DEVICE["DEFAULT_CREDENTIAL_FILE"].name,
+            ".tvhplayer-credentials.json",
+        )
+
     def test_bounded_remote_navigation_keys_are_available(self) -> None:
         self.assertEqual(key_events["up"], "KEYCODE_DPAD_UP")
         self.assertEqual(key_events["down"], "KEYCODE_DPAD_DOWN")
