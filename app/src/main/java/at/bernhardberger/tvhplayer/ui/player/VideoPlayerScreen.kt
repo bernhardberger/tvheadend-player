@@ -55,6 +55,7 @@ import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
+import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
 import at.bernhardberger.tvhplayer.core.channelPickAction
@@ -121,6 +122,7 @@ fun VideoPlayerScreen(
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
+    val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
     val selectedInitId by selection.selectedId.collectAsStateWithLifecycle()
@@ -270,8 +272,8 @@ fun VideoPlayerScreen(
 
     val nowEvent = remember(epg, nowSec) { epg.nowEvent(nowSec) }
     val nextEvent = remember(epg, nowEvent) { epg.nextAfter(nowEvent) }
-    val currentChannel = remember(channels, currentChannelId) {
-        channels.firstOrNull { it.id == currentChannelId }
+    val currentChannel = remember(allChannels, currentChannelId) {
+        allChannels.firstOrNull { it.id == currentChannelId }
     }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
@@ -425,7 +427,10 @@ fun VideoPlayerScreen(
                 when (event.key) {
                     Key.DirectionLeft -> {
                         if (!controlsVisible) {
-                            selectedId = currentChannelId
+                            selectedId = browsingFocusChannelId(
+                                visibleChannels = channels,
+                                currentFocusId = currentChannelId,
+                            ) ?: -1
                             drawerOpen = true
                             true
                         } else false

@@ -1,0 +1,70 @@
+package at.bernhardberger.tvhplayer.core
+
+import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
+import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+class ChannelScopePolicyTest {
+    private val news = ChannelTagUi(id = 10, name = "News", index = 1)
+    private val sport = ChannelTagUi(id = 20, name = "Sport", index = 2)
+    private val channels = listOf(
+        channel(id = 1, number = 1, tags = setOf(10)),
+        channel(id = 2, number = 2, tags = setOf(10, 20)),
+        channel(id = 3, number = 3, tags = emptySet()),
+    )
+
+    @Test
+    fun allChannelsIsAlwaysAvailableAndPreservesServerOrder() {
+        val scope = resolveChannelScope(channels, listOf(news, sport), requestedTagId = null)
+
+        assertNull(scope.activeTagId)
+        assertEquals(listOf(1, 2, 3), scope.visibleChannels.map { it.id })
+        assertNull(scope.fallback)
+    }
+
+    @Test
+    fun selectedTagFiltersOnceWithoutChangingChannelOrderOrNumbers() {
+        val scope = resolveChannelScope(channels, listOf(news, sport), requestedTagId = 20)
+
+        assertEquals(20, scope.activeTagId)
+        assertEquals(listOf(2), scope.visibleChannels.map { it.id })
+        assertEquals(2, scope.visibleChannels.single().number)
+    }
+
+    @Test
+    fun emptyTagRemainsSelectedAndRecoverable() {
+        val emptyTag = ChannelTagUi(id = 30, name = "Empty", index = 3)
+
+        val scope = resolveChannelScope(channels, listOf(news, sport, emptyTag), requestedTagId = 30)
+
+        assertEquals(30, scope.activeTagId)
+        assertEquals(emptyList<ChannelUi>(), scope.visibleChannels)
+        assertNull(scope.fallback)
+    }
+
+    @Test
+    fun removedOrRestrictedTagFallsBackToAllWithExplanation() {
+        val scope = resolveChannelScope(channels, listOf(news), requestedTagId = 20)
+
+        assertNull(scope.activeTagId)
+        assertEquals(listOf(1, 2, 3), scope.visibleChannels.map { it.id })
+        assertEquals(TagScopeFallback.TAG_UNAVAILABLE, scope.fallback)
+    }
+
+    @Test
+    fun browsingFocusMovesToFirstVisibleWithoutChangingPlayback() {
+        assertEquals(2, browsingFocusChannelId(listOf(channels[1]), currentFocusId = 1))
+        assertEquals(2, browsingFocusChannelId(listOf(channels[1]), currentFocusId = 2))
+        assertNull(browsingFocusChannelId(emptyList(), currentFocusId = 1))
+    }
+
+    private fun channel(id: Int, number: Int, tags: Set<Int>) = ChannelUi(
+        id = id,
+        name = "Channel $id",
+        number = number,
+        icon = null,
+        tagIds = tags,
+    )
+}

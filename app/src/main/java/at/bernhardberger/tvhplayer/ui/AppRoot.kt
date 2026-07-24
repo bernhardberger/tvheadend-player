@@ -125,7 +125,7 @@ fun AppRoot(
         if (applianceLaunchRequest == null) return@LaunchedEffect
 
         val persistedId = lastPlayedChannelStore.channelId.first()
-        val channels = channelsVm.channels.filter { it.isNotEmpty() }.first()
+        val channels = channelsVm.allChannels.filter { it.isNotEmpty() }.first()
         val target = applianceLaunchRequests.resolve(channels.map { it.id }, persistedId)
             ?: return@LaunchedEffect
         val channel = channels.firstOrNull { it.id == target.channelId }
@@ -154,7 +154,7 @@ fun AppRoot(
             BackAction.RETURN_TO_PARENT -> Unit
             BackAction.RETURN_TO_PLAYER -> {
                 val serviceId = activeServiceId ?: return@BackHandler
-                val channel = channelsVm.channels.value.firstOrNull { it.id == serviceId }
+                val channel = channelsVm.allChannels.value.firstOrNull { it.id == serviceId }
                 nav.navigate(
                     Routes.player(
                         channelId = channel?.id ?: serviceId,

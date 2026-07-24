@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
@@ -56,7 +57,9 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
+import at.bernhardberger.tvhplayer.ui.components.ChannelTagBar
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -76,7 +79,9 @@ fun ChannelsScreen(
     onOpenConnectionSettings: () -> Unit,
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
-    val channels by channelViewModel.channels.collectAsStateWithLifecycle()
+    val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
+    val channels = channelScope.visibleChannels
+    val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
@@ -104,16 +109,21 @@ fun ChannelsScreen(
         }
     }
 
-    LaunchedEffect(channels) {
-        if (channels.isEmpty()) return@LaunchedEffect
-        if (selectedId == -1) selection.setSelected(channels.first().id)
+    LaunchedEffect(channels, selectedId) {
+        val focusId = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
+        if (focusId != selectedId) selection.setSelected(focusId)
+    }
+
+    LaunchedEffect(channelScope.activeTagId) {
+        didInitialRestore = false
     }
 
     LaunchedEffect(channels, selectedId) {
         if (didInitialRestore) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
 
-        val id = if (selectedId == -1) channels.first().id else selectedId
+        val id = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
+        if (selectedId != id) selection.setSelected(id)
         val idx = channels.indexOfFirst { it.id == id }
         if (idx < 0) return@LaunchedEffect
 
@@ -150,13 +160,30 @@ fun ChannelsScreen(
 
         Spacer(Modifier.height(20.dp))
 
+        UnavailableTagNotice(
+            visible = tagNotice,
+            onDismiss = channelViewModel::dismissUnavailableTagNotice,
+        )
+        if (tagNotice) Spacer(Modifier.height(12.dp))
+
+        ChannelTagBar(
+            tags = channelScope.tags,
+            activeTagId = channelScope.activeTagId,
+            onSelectTag = channelViewModel::selectTag,
+        )
+        Spacer(Modifier.height(16.dp))
+
         if (channels.isEmpty()) {
-            EmptyChannelsState(
-                state = connectionUiState,
-                onRetry = onRetryConnection,
-                onOpenSettings = onOpenConnectionSettings,
-                modifier = Modifier.fillMaxSize(),
-            )
+            if (channelScope.allChannels.isNotEmpty() && channelScope.activeTagId != null) {
+                EmptyTagState(Modifier.fillMaxSize())
+            } else {
+                EmptyChannelsState(
+                    state = connectionUiState,
+                    onRetry = onRetryConnection,
+                    onOpenSettings = onOpenConnectionSettings,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             return@Column
         }
 
@@ -243,6 +270,27 @@ fun ChannelsScreen(
                     piconPath = focusedChannel?.icon
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun EmptyTagState(modifier: Modifier = Modifier) {
+    Surface(
+        tonalElevation = 2.dp,
+        shape = MaterialTheme.shapes.medium,
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvBrowsePanelAlpha),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        modifier = modifier,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = stringResource(R.string.empty_channel_tag),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.widthIn(max = 680.dp),
+            )
         }
     }
 }

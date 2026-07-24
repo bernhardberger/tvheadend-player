@@ -4,7 +4,8 @@ internal data class ChannelMetadata(
     val id: Int,
     val name: String,
     val number: Int?,
-    val icon: String?
+    val icon: String?,
+    val tagIds: Set<Int> = emptySet(),
 )
 
 internal class ChannelSnapshotStore {

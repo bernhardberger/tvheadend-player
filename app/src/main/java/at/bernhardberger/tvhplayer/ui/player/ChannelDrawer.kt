@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,6 +31,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -105,38 +108,54 @@ fun ChannelDrawer(
                 }
             }
     ) {
-        LazyColumn(
-            state = listState,
-            contentPadding = TvPlaybackPadding,
-            modifier = Modifier
-                .width(420.dp)
-                .fillMaxHeight()
-                .focusGroup()
-                .focusRestorer()
-        ) {
-            items(channels, key = { ch -> ch.id }) { ch ->
-                val isSelected = ch.id == selectedId
+        if (channels.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .width(420.dp)
+                    .fillMaxSize()
+                    .padding(TvPlaybackPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.tv.material3.Text(stringResource(R.string.empty_channel_tag))
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                contentPadding = TvPlaybackPadding,
+                modifier = Modifier
+                    .width(420.dp)
+                    .fillMaxHeight()
+                    .focusGroup()
+                    .focusRestorer()
+            ) {
+                items(channels, key = { ch -> ch.id }) { ch ->
+                    val isSelected = ch.id == selectedId
 
-                val now = remember(ch.id, nowSec) { channelsVm.nowEvent(ch.id, nowSec) }
-                val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
+                    val now = remember(ch.id, nowSec) { channelsVm.nowEvent(ch.id, nowSec) }
+                    val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
 
-                ChannelRow(
-                    modifier = if (isSelected) Modifier.focusRequester(focusRequester) else Modifier,
-                    number = ChannelNavigation.numberForId(
-                        orderedChannelIds,
-                        channelNumbers,
-                        ch.id,
-                    ),
-                    name = ch.name,
-                    programTitle = now?.title ?: stringResource(R.string.no_epg),
-                    progress = if (now != null) prog else null,
-                    imageLoader = imageLoader,
-                    piconPath = ch.icon,
-                    focused = isSelected,
-                    onFocus = { if (!isRestoring) onFocusChannel(ch.id) },
-                    onConfirm = { onPickChannel(ch) }
-                )
+                    ChannelRow(
+                        modifier = if (isSelected) {
+                            Modifier.focusRequester(focusRequester)
+                        } else {
+                            Modifier
+                        },
+                        number = ChannelNavigation.numberForId(
+                            orderedChannelIds,
+                            channelNumbers,
+                            ch.id,
+                        ),
+                        name = ch.name,
+                        programTitle = now?.title ?: stringResource(R.string.no_epg),
+                        progress = if (now != null) prog else null,
+                        imageLoader = imageLoader,
+                        piconPath = ch.icon,
+                        focused = isSelected,
+                        onFocus = { if (!isRestoring) onFocusChannel(ch.id) },
+                        onConfirm = { onPickChannel(ch) }
+                    )
 
+                }
             }
         }
     }

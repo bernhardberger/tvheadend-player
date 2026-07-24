@@ -2,6 +2,10 @@
     <string name="app_name" translatable="false">TVHeadend Player</string>
 
     <string name="channel_list">Channel List</string>
+    <string name="all_channels">All channels</string>
+    <string name="empty_channel_tag">This channel tag is empty. Choose another tag or All channels.</string>
+    <string name="active_tag_unavailable">The selected channel tag is no longer available. Showing All channels.</string>
+    <string name="dismiss">Dismiss</string>
     <string name="nav_channels">Channels</string>
     <string name="nav_epg">Guide</string>
     <string name="nav_settings">Settings</string>

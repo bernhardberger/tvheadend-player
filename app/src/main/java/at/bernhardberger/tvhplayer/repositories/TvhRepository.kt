@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.repositories
 
 import at.bernhardberger.tvhplayer.core.coverageForEvents
+import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.htsp.HtspEvent
@@ -120,6 +121,11 @@ class TvhRepository(
     private val channelStore = ChannelSnapshotStore()
     private val _channelsUi = MutableStateFlow<List<ChannelUi>>(emptyList())
     val channelsUi: StateFlow<List<ChannelUi>> = _channelsUi
+    private val tagStore = ChannelTagSnapshotStore()
+    private val _tagsUi = MutableStateFlow<List<ChannelTagUi>>(emptyList())
+    val tagsUi: StateFlow<List<ChannelTagUi>> = _tagsUi
+    private val _metadataReady = MutableStateFlow(false)
+    val metadataReady: StateFlow<Boolean> = _metadataReady
 
     private var channelsReadyDef = CompletableDeferred<Unit>()
 
@@ -158,7 +164,7 @@ class TvhRepository(
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             htsp.controlEvents.collect { e ->
                 when (e) {
-                    is HtspEvent.ServerMessage -> handleServerMessage(e.msg)
+                    is HtspEvent.ServerMessage -> acceptMetadataMessage(e.msg)
                     else -> {}
                 }
             }
@@ -174,6 +180,9 @@ class TvhRepository(
         stateMutex.withLock {
             channelStore.reset(preservePublished = preservePublishedChannels)
             _channelsUi.value = channelStore.publishedSnapshot().toChannelUi()
+            tagStore.reset(preservePublished = preservePublishedChannels)
+            _tagsUi.value = tagStore.publishedSnapshot().toTagUi()
+            _metadataReady.value = false
 
             if (!preservePublishedChannels) epgByChannel.clear()
             epgCoverage.clear()
@@ -363,18 +372,23 @@ class TvhRepository(
     // Server message handling
     // ---------------------------
 
-    private suspend fun handleServerMessage(msg: HtspMessage) {
+    internal suspend fun acceptMetadataMessage(msg: HtspMessage) {
         when (msg.method) {
             "channelAdd", "channelUpdate" -> stateMutex.withLock { handleChannelLocked(msg) }
             "channelDelete" -> stateMutex.withLock { handleChannelDeleteLocked(msg) }
+            "tagAdd", "tagUpdate" -> stateMutex.withLock { handleTagLocked(msg) }
+            "tagDelete" -> stateMutex.withLock { handleTagDeleteLocked(msg) }
 
             "initialSyncCompleted" -> {
                 stateMutex.withLock {
                     val channels = channelStore.completeInitialSync()
+                    val tags = tagStore.completeInitialSync()
                     val channelIds = channels.mapTo(mutableSetOf()) { it.id }
                     epgByChannel.keys.removeAll { it !in channelIds }
                     epgCoverage.keys.removeAll { it !in channelIds }
                     publishChannelsLocked(channels)
+                    publishTagsLocked(tags)
+                    _metadataReady.value = true
                     if (!channelsReadyDef.isCompleted) channelsReadyDef.complete(Unit)
                 }
             }
@@ -398,8 +412,16 @@ class TvhRepository(
             ?: msg.int("channelno")
             ?: existing?.number
         val icon = msg.str("channelIcon") ?: existing?.icon
+        val rawTagIds = msg.list("tagIds")
+            ?: msg.list("tags")
+            ?: msg.list("channelTags")
+        val tagIds = rawTagIds
+            ?.mapNotNull { (it as? Number)?.toInt() }
+            ?.toSet()
+            ?: existing?.tagIds
+            ?: emptySet()
 
-        val snapshot = channelStore.upsert(ChannelMetadata(id, name, number, icon))
+        val snapshot = channelStore.upsert(ChannelMetadata(id, name, number, icon, tagIds))
         epgCoverage.getOrPut(id) { EpgCoverage() }
 
         snapshot?.let(::publishChannelsLocked)
@@ -420,12 +442,32 @@ class TvhRepository(
         snapshot?.let(::publishChannelsLocked)
     }
 
+    private fun handleTagLocked(msg: HtspMessage) {
+        val id = msg.int("tagId") ?: msg.int("id") ?: return
+        val existing = tagStore[id]
+        val name = msg.str("tagName") ?: msg.str("name") ?: existing?.name ?: return
+        val index = msg.int("tagIndex") ?: msg.int("index") ?: existing?.index ?: Int.MAX_VALUE
+        tagStore.upsert(ChannelTagMetadata(id, name, index))?.let(::publishTagsLocked)
+    }
+
+    private fun handleTagDeleteLocked(msg: HtspMessage) {
+        val id = msg.int("tagId") ?: msg.int("id") ?: return
+        tagStore.delete(id)?.let(::publishTagsLocked)
+    }
+
     private fun publishChannelsLocked(channels: List<ChannelMetadata>) {
         _channelsUi.value = channels.toChannelUi()
     }
 
     private fun List<ChannelMetadata>.toChannelUi(): List<ChannelUi> =
-        map { ChannelUi(it.id, it.name, it.number, it.icon) }
+        map { ChannelUi(it.id, it.name, it.number, it.icon, it.tagIds) }
+
+    private fun publishTagsLocked(tags: List<ChannelTagMetadata>) {
+        _tagsUi.value = tags.toTagUi()
+    }
+
+    private fun List<ChannelTagMetadata>.toTagUi(): List<ChannelTagUi> =
+        map { ChannelTagUi(it.id, it.name, it.index) }
 
     // ---------------------------
     // Query helpers

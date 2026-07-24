@@ -1,5 +1,9 @@
 <resources>
     <string name="channel_list">Senderliste</string>
+    <string name="all_channels">Alle Sender</string>
+    <string name="empty_channel_tag">Diese Sendergruppe ist leer. Wählen Sie eine andere Gruppe oder Alle Sender.</string>
+    <string name="active_tag_unavailable">Die gewählte Sendergruppe ist nicht mehr verfügbar. Alle Sender werden angezeigt.</string>
+    <string name="dismiss">Ausblenden</string>
     <string name="nav_channels">Sender</string>
     <string name="nav_epg">Programm</string>
     <string name="nav_settings">Einstellungen</string>

@@ -7,6 +7,7 @@ import at.bernhardberger.tvhplayer.htsp.buildImageLoader
 import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -37,6 +38,7 @@ val appModule = module {
     single { ServerSettingsStore(context = get()) }
     single { SecurePasswordStore(context = get()) }
     single { PlayerSettingsStore(context = get()) }
+    single { ChannelTagSettingsStore(context = get()) }
     single { UiSettingsStore(context = get()) }
 
     single { ChannelSelectionStore() }
@@ -60,7 +62,7 @@ val appModule = module {
         )
     }
     viewModel { VideoPlayerViewModel(playerSession = get(), repo = get(), htspService = get()) }
-    viewModel { ChannelsViewModel(repo = get()) }
+    viewModel { ChannelsViewModel(repo = get(), tagSettings = get()) }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),

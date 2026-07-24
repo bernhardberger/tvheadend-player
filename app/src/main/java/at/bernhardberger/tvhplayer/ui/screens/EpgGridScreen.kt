@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
@@ -67,6 +68,8 @@ import at.bernhardberger.tvhplayer.ui.common.floorToMinutes
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvEpgPanelAlpha
+import at.bernhardberger.tvhplayer.ui.components.ChannelTagBar
+import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -85,7 +88,9 @@ fun EpgGridScreen(
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
-    val channels by channelViewModel.channels.collectAsStateWithLifecycle()
+    val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
+    val channels = channelScope.visibleChannels
+    val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
 
@@ -99,10 +104,9 @@ fun EpgGridScreen(
     }
 
     
-    LaunchedEffect(channels) {
-        if (channels.isNotEmpty() && selectedId == -1) {
-            selection.setSelected(channels.first().id)
-        }
+    LaunchedEffect(channels, selectedId) {
+        val focusId = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
+        if (focusId != selectedId) selection.setSelected(focusId)
     }
 
     
@@ -138,6 +142,10 @@ fun EpgGridScreen(
     var isRestoring by remember { mutableStateOf(false) }
     var activationReady by remember { mutableStateOf(false) }
 
+    LaunchedEffect(channelScope.activeTagId) {
+        didInitialFocus = false
+    }
+
     LaunchedEffect(Unit) {
         delay(300L)
         activationReady = true
@@ -148,8 +156,8 @@ fun EpgGridScreen(
         if (didInitialFocus) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
 
-        val id = if (selectedId == -1) channels.first().id else selectedId
-        if (selectedId == -1) selection.setSelected(id)
+        val id = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
+        if (selectedId != id) selection.setSelected(id)
 
         val idx = channels.indexOfFirst { it.id == id }
         if (idx < 0) return@LaunchedEffect
@@ -188,6 +196,40 @@ fun EpgGridScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(20.dp))
+
+        UnavailableTagNotice(
+            visible = tagNotice,
+            onDismiss = channelViewModel::dismissUnavailableTagNotice,
+        )
+        if (tagNotice) Spacer(Modifier.height(10.dp))
+        ChannelTagBar(
+            tags = channelScope.tags,
+            activeTagId = channelScope.activeTagId,
+            onSelectTag = channelViewModel::selectTag,
+        )
+        Spacer(Modifier.height(12.dp))
+
+        if (channels.isEmpty() && channelScope.activeTagId != null) {
+            Surface(
+                tonalElevation = 2.dp,
+                shape = MaterialTheme.shapes.medium,
+                colors = SurfaceDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(
+                        alpha = TvEpgPanelAlpha
+                    ),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = stringResource(R.string.empty_channel_tag),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+            }
+            return@Column
+        }
 
         
         Surface(
