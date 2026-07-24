@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -42,8 +43,15 @@ fun SideRail(
 ) {
     val channelsLabel = stringResource(R.string.nav_channels)
     val epgLabel = stringResource(R.string.nav_epg)
+    val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
-    val items = remember(channelsLabel, epgLabel, settingsLabel, showEpgMenu) {
+    val items = remember(
+        channelsLabel,
+        epgLabel,
+        recordingsLabel,
+        settingsLabel,
+        showEpgMenu,
+    ) {
         buildList {
             add(RailItem(Routes.CHANNELS, channelsLabel) {
                 Icon(Icons.AutoMirrored.Filled.List, null, Modifier.size(24.dp))
@@ -53,6 +61,9 @@ fun SideRail(
                     Icon(Icons.Filled.Event, null, Modifier.size(24.dp))
                 })
             }
+            add(RailItem(Routes.RECORDINGS, recordingsLabel) {
+                Icon(Icons.Filled.VideoLibrary, null, Modifier.size(24.dp))
+            })
             add(RailItem(Routes.SETTINGS, settingsLabel) {
                 Icon(Icons.Filled.Settings, null, Modifier.size(24.dp))
             })

@@ -271,6 +271,8 @@ class AppConnectionViewModel(
             htsp.enableAsyncMetadataAndWaitInitialSync()
 
             repo.awaitChannelsReady()
+            runCatching { dvrRepository.refreshConfigs() }
+                .onFailure { Timber.w(it, "DVR configurations unavailable") }
             repo.startEpgWorker()
             _uiState.value = ConnectionUiState.Ready
 

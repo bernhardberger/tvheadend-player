@@ -6,6 +6,7 @@
     <string name="dismiss">Ausblenden</string>
     <string name="nav_channels">Sender</string>
     <string name="nav_epg">Programm</string>
+    <string name="nav_recordings">Aufnahmen</string>
     <string name="nav_settings">Einstellungen</string>
 
     <string name="player_ends_in">Endet um: %1$s</string>
@@ -136,7 +137,9 @@
     <string name="record">Aufnehmen</string>
     <string name="cancel_recording">Aufnahme abbrechen</string>
     <string name="record_confirm_title">Diese Sendung aufnehmen?</string>
-    <string name="record_confirm_message">TVHeadend plant die Sendung mit der Standard-Aufnahmekonfiguration des Servers.</string>
+    <string name="record_confirm_message">TVHeadend plant die Sendung mit der gewählten Aufnahmekonfiguration des Servers.</string>
+    <string name="recording_config_title">Aufnahmekonfiguration wählen</string>
+    <string name="recording_config_message">Auf diesem Server sind mehrere Aufnahmekonfigurationen verfügbar.</string>
     <string name="cancel_recording_confirm_title">Diese Aufnahme abbrechen?</string>
     <string name="cancel_recording_confirm_message">TVHeadend beendet oder entfernt die geplante Aufnahme.</string>
     <string name="recording_status">Aufnahme: %1$s</string>
@@ -152,6 +155,17 @@
     <string name="recording_action_conflict">TVHeadend meldet einen Aufnahme- oder Tuner-Konflikt.</string>
     <string name="recording_action_rejected">TVHeadend hat die Aufnahmeanfrage abgelehnt.</string>
     <string name="recording_action_connection">TVHeadend konnte für die Aufnahmeanfrage nicht erreicht werden.</string>
+    <string name="recordings_title">Aufnahmen</string>
+    <string name="recordings_upcoming_active">Geplant und aktiv</string>
+    <string name="recordings_completed">Abgeschlossen</string>
+    <string name="recordings_failed_cancelled">Fehlgeschlagen und abgebrochen</string>
+    <string name="recordings_empty">Keine Aufnahmen verfügbar.</string>
+    <string name="recordings_loading">Aufnahmen werden geladen…</string>
+    <string name="recordings_reconnecting">Verbindung wird wiederhergestellt. Gespeicherte Aufnahmedaten können veraltet sein…</string>
+    <string name="recordings_server_failure">Aufnahmen sind nicht verfügbar. Serververbindung erneut versuchen.</string>
+    <string name="delete_recording">Aufnahme löschen</string>
+    <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
+    <string name="delete_recording_confirm_message">TVHeadend löscht diese abgeschlossene Aufnahme dauerhaft.</string>
     <string name="play">Abspielen</string>
 
     <string name="tvh_target_invalid">Ungültiges Streaming-Ziel</string>

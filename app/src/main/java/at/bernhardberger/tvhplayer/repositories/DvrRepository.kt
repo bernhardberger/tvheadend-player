@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.core.DvrActionFailure
 import at.bernhardberger.tvhplayer.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.dvrActionFailure
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
+import at.bernhardberger.tvhplayer.htsp.DvrConfig
 import at.bernhardberger.tvhplayer.htsp.DvrFile
 import at.bernhardberger.tvhplayer.htsp.HtspEvent
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
@@ -30,6 +31,8 @@ class DvrRepository(
     private val store = DvrSnapshotStore()
     private val _entries = MutableStateFlow<List<DvrEntry>>(emptyList())
     val entries: StateFlow<List<DvrEntry>> = _entries
+    private val _configs = MutableStateFlow<List<DvrConfig>>(emptyList())
+    val configs: StateFlow<List<DvrConfig>> = _configs
 
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -43,7 +46,18 @@ class DvrRepository(
         mutex.withLock {
             store.reset(preservePublished)
             _entries.value = store.publishedSnapshot()
+            if (!preservePublished) _configs.value = emptyList()
         }
+    }
+
+    suspend fun refreshConfigs() {
+        val reply = htsp.request(
+            method = "getDvrConfigs",
+            fields = emptyMap(),
+            timeoutMs = 10_000,
+            disconnectOnTimeout = false,
+        )
+        _configs.value = dvrConfigsFromReply(reply)
     }
 
     internal suspend fun acceptDvrMessage(message: HtspMessage) {
@@ -138,6 +152,30 @@ class DvrRepository(
             id = (fields["id"] as? Number)?.toInt(),
             path = fields["filename"] as? String ?: fields["path"] as? String,
             size = (fields["size"] as? Number)?.toLong(),
+        )
+    }
+}
+
+internal fun dvrConfigsFromReply(reply: HtspMessage): List<DvrConfig> {
+    val raw = reply.list("dvrconfigs") ?: reply.list("configs") ?: emptyList()
+    return raw.mapNotNull { value ->
+        val fields = value as? Map<*, *> ?: return@mapNotNull null
+        val id = listOf("uuid", "configId", "id")
+            .firstNotNullOfOrNull { fields[it]?.toString()?.takeIf(String::isNotBlank) }
+            ?: return@mapNotNull null
+        val name = listOf("name", "profileName")
+            .firstNotNullOfOrNull { fields[it]?.toString()?.takeIf(String::isNotBlank) }
+            ?: id
+        DvrConfig(
+            id = id,
+            name = name,
+            comment = fields["comment"]?.toString()?.takeIf(String::isNotBlank),
+            enabled = when (val enabled = fields["enabled"]) {
+                is Boolean -> enabled
+                is Number -> enabled.toInt() != 0
+                is String -> enabled != "0" && !enabled.equals("false", ignoreCase = true)
+                else -> true
+            },
         )
     }
 }

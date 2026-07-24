@@ -46,6 +46,7 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
+import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -58,6 +59,7 @@ import org.koin.compose.koinInject
 object Routes {
     const val CHANNELS = "channels"
     const val EPG = "epg"
+    const val RECORDINGS = "recordings"
     const val SETTINGS = "settings"
     const val PLAYER = "player"
     fun player(channelId: Int, serviceId: Int, channelName: String) =
@@ -199,6 +201,15 @@ fun AppRoot(
                                 onPlay = { channelId, serviceId, name ->
                                     nav.navigate(Routes.player(channelId, serviceId, name))
                                 }
+                            )
+                        }
+                    }
+
+                    composable(Routes.RECORDINGS) {
+                        ContentContainer {
+                            RecordingsScreen(
+                                connectionUiState = connectionUiState,
+                                onRetry = appVm::reconnectNow,
                             )
                         }
                     }

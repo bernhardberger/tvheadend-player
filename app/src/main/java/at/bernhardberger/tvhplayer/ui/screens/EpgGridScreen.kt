@@ -63,6 +63,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrActionFailure
+import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
@@ -70,12 +71,14 @@ import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
+import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.moveMagazineEpgFocus
 import at.bernhardberger.tvhplayer.core.nearestProgrammeAt
 import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
+import at.bernhardberger.tvhplayer.htsp.DvrConfig
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.player.PlayerSession
@@ -132,6 +135,7 @@ fun EpgGridScreen(
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
     val playingChannelId by playerSession.activeServiceId.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
+    val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
     val lazyRowState = rememberLazyListState()
     val selectedFocus = remember { FocusRequester() }
     val dayStripFocus = remember { FocusRequester() }
@@ -148,6 +152,8 @@ fun EpgGridScreen(
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
+    var configChoices by remember { mutableStateOf<List<DvrConfig>?>(null) }
+    var selectedRecordConfigId by remember { mutableStateOf<String?>(null) }
     var actionResult by remember { mutableStateOf<DvrActionResult?>(null) }
     var showJumpDialog by remember { mutableStateOf(false) }
     var frontierAfterSec by remember { mutableStateOf<Long?>(null) }
@@ -487,7 +493,15 @@ fun EpgGridScreen(
                         ProgrammeAction.WATCH_FROM_START -> {
                             recording?.let { onPlayRecording(it.id) }
                         }
-                        ProgrammeAction.RECORD,
+                        ProgrammeAction.RECORD -> when (val choice = chooseDvrConfig(dvrConfigs)) {
+                            is DvrConfigChoice.Automatic -> {
+                                selectedRecordConfigId = choice.configId
+                                pendingAction = action
+                            }
+                            is DvrConfigChoice.RequiresSelection -> {
+                                configChoices = choice.configs
+                            }
+                        }
                         ProgrammeAction.CANCEL_RECORDING -> pendingAction = action
                     }
                 },
@@ -513,13 +527,28 @@ fun EpgGridScreen(
                     coroutineScope.launch {
                         actionResult = when (confirmationAction) {
                             ProgrammeAction.RECORD ->
-                                dvrRepository.scheduleEvent(confirmationEvent.eventId)
+                                dvrRepository.scheduleEvent(
+                                    eventId = confirmationEvent.eventId,
+                                    configId = selectedRecordConfigId,
+                                )
                             ProgrammeAction.CANCEL_RECORDING -> recording?.let {
                                 dvrRepository.cancelEntry(it.id)
                             } ?: DvrActionResult.Failed(DvrActionFailure.REJECTED)
                             else -> null
                         }
                     }
+                },
+            )
+        }
+
+        configChoices?.let { configs ->
+            DvrConfigDialog(
+                configs = configs,
+                onDismiss = { configChoices = null },
+                onSelect = { config ->
+                    configChoices = null
+                    selectedRecordConfigId = config.id
+                    pendingAction = ProgrammeAction.RECORD
                 },
             )
         }
@@ -1015,6 +1044,47 @@ private fun ProgrammeDetailsPanel(
             ) {
                 Text(stringResource(R.string.close))
             }
+        }
+    }
+}
+
+@Composable
+private fun DvrConfigDialog(
+    configs: List<DvrConfig>,
+    onDismiss: () -> Unit,
+    onSelect: (DvrConfig) -> Unit,
+) {
+    val initialFocus = remember { FocusRequester() }
+    LaunchedEffect(configs) { initialFocus.requestFocus() }
+    BackHandler(onBack = onDismiss)
+    DialogScrim {
+        Text(
+            text = stringResource(R.string.recording_config_title),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            text = stringResource(R.string.recording_config_message),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        configs.forEachIndexed { index, config ->
+            OutlinedButton(
+                onClick = { onSelect(config) },
+                modifier = if (index == 0) {
+                    Modifier.focusRequester(initialFocus)
+                } else {
+                    Modifier
+                },
+            ) {
+                Column {
+                    Text(config.name)
+                    config.comment?.takeIf(String::isNotBlank)?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+        OutlinedButton(onClick = onDismiss) {
+            Text(stringResource(R.string.back))
         }
     }
 }

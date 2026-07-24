@@ -15,6 +15,13 @@ data class DvrFile(
     val size: Long? = null,
 )
 
+data class DvrConfig(
+    val id: String,
+    val name: String,
+    val comment: String? = null,
+    val enabled: Boolean = true,
+)
+
 data class DvrEntry(
     val id: Int,
     val eventId: Int?,
