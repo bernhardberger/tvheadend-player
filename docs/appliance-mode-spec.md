@@ -46,12 +46,12 @@ on the Android debug keystore.
   debug APK installs, ADB key injection, smoke tests, or development experiments.
 - The dining-room TCL Smart TV Pro is the temporary debug/test target. Its address
   remains only in ignored local device configuration, and tooling must verify its
-  manufacturer and model before every mutation.
+  manufacturer, model, device, and product before every mutation.
 - `tools/device` enforces this boundary: production and unclassified devices
   reject install, launch, force-stop, smoke, synthetic-key, and credential-
   provisioning actions.
 - A designated test device may receive TVHeadend credentials through the
-  debug-only app-private provisioning path after role and live manufacturer/model
+  debug-only app-private provisioning path after role and complete live identity
   validation. Secret values travel only over process stdin from an ignored,
   owner-only local file and are never entered through the TV UI.
 

@@ -58,7 +58,7 @@ no private address; the ignored local file selects the reachable device.
 Copy the tracked example to the ignored local file and set the current ADB
 serial. Keep `role` set to `production` for the household TV. Only a separately
 assigned development target may use `role: "test"`; test-device mutations also
-require exact `expected_manufacturer` and `expected_model` values:
+require exact manufacturer, model, device, and product expectations:
 
 ```bash
 cp .tvhplayer-device.example.json .tvhplayer-device.json
@@ -74,7 +74,7 @@ An environment or command-line serial does not override the role policy from
 the local file. `doctor`, `current`, and `package-info` are available for
 production or unclassified targets. Debug install, launch, force-stop, smoke,
 and synthetic-key operations are rejected unless the configured role is
-`test` and the live manufacturer/model match the local expectations.
+`test` and all four live identity properties match the local expectations.
 
 The device file contains no TVHeadend credential values. For a designated test
 device only, it may name an ignored owner-only `credential_file`; the bounded

@@ -7,8 +7,8 @@ not a release feature or a general credential-import API.
 ## Policy
 
 - The local `.tvhplayer-device.json` must set `role` to `test` and contain the
-  exact expected manufacturer and model. `tools/device` re-reads both properties
-  from the connected TV before provisioning.
+  exact expected manufacturer, model, device, and product. `tools/device`
+  re-reads all four properties from the connected TV before provisioning.
 - Production and unclassified devices are rejected before the local secret is
   read.
 - Credential values must come from an ignored, owner-only local file. They must
@@ -55,7 +55,7 @@ path. It carries only the path; never put credential values in that variable.
 ## Data flow
 
 1. `tools/device` rejects every role except `test`, verifies ADB readiness, and
-   compares the live manufacturer/model with local expected values.
+   compares all four live identity properties with local expected values.
 2. It reads and validates the local JSON without printing it, force-stops the
    app, and streams canonical JSON through subprocess stdin.
 3. ADB `run-as` writes the payload with mode `0600` into the debug app's private

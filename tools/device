@@ -183,8 +183,12 @@ def identity_errors(
     *,
     actual_manufacturer: str,
     actual_model: str,
+    actual_device: str,
+    actual_product: str,
     expected_manufacturer: str | None,
     expected_model: str | None,
+    expected_device: str | None,
+    expected_product: str | None,
     require_expected: bool,
 ) -> list[str]:
     errors: list[str] = []
@@ -197,11 +201,17 @@ def identity_errors(
 
     expected_manufacturer = configured_value(expected_manufacturer)
     expected_model = configured_value(expected_model)
+    expected_device = configured_value(expected_device)
+    expected_product = configured_value(expected_product)
 
     if require_expected and not expected_manufacturer:
         errors.append("expected_manufacturer is required for mutating test-device actions")
     if require_expected and not expected_model:
         errors.append("expected_model is required for mutating test-device actions")
+    if require_expected and not expected_device:
+        errors.append("expected_device is required for mutating test-device actions")
+    if require_expected and not expected_product:
+        errors.append("expected_product is required for mutating test-device actions")
 
     if expected_manufacturer and actual_manufacturer.casefold() != expected_manufacturer.casefold():
         errors.append(
@@ -211,6 +221,14 @@ def identity_errors(
     if expected_model and actual_model.casefold() != expected_model.casefold():
         errors.append(
             f"device model {actual_model!r} does not match expected {expected_model!r}"
+        )
+    if expected_device and actual_device.casefold() != expected_device.casefold():
+        errors.append(
+            f"device code {actual_device!r} does not match expected {expected_device!r}"
+        )
+    if expected_product and actual_product.casefold() != expected_product.casefold():
+        errors.append(
+            f"device product {actual_product!r} does not match expected {expected_product!r}"
         )
     return errors
 
@@ -226,6 +244,8 @@ def read_device_properties(adb: str, serial: str) -> dict[str, str]:
     names = {
         "manufacturer": "ro.product.manufacturer",
         "model": "ro.product.model",
+        "device": "ro.product.device",
+        "product": "ro.product.name",
         "android": "ro.build.version.release",
         "abis": "ro.product.cpu.abilist",
     }
@@ -247,8 +267,12 @@ def verify_configured_identity(
     errors = identity_errors(
         actual_manufacturer=properties["manufacturer"],
         actual_model=properties["model"],
+        actual_device=properties["device"],
+        actual_product=properties["product"],
         expected_manufacturer=config.get("expected_manufacturer"),
         expected_model=config.get("expected_model"),
+        expected_device=config.get("expected_device"),
+        expected_product=config.get("expected_product"),
         require_expected=require_expected,
     )
     if errors:
@@ -374,8 +398,9 @@ def main() -> int:
         print(f"device={serial}")
         print(f"role={role}")
         print(
-            "manufacturer|model|android|abis="
+            "manufacturer|model|device|product|android|abis="
             f"{properties['manufacturer']}|{properties['model']}|"
+            f"{properties['device']}|{properties['product']}|"
             f"{properties['android']}|{properties['abis']}"
         )
         return 0

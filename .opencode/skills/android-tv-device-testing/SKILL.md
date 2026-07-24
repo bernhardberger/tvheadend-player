@@ -21,7 +21,7 @@ dumps whenever it supports the required operation.
    `at.bernhardberger.tvhplayer`; rollback clients use different package IDs.
 6. Run `./tools/device doctor` and confirm the local role against
    `docs/device-targets.md`. Only a designated development target may be `test`,
-   and mutations require matching `expected_manufacturer` and `expected_model`.
+   and mutations require matching manufacturer, model, device, and product.
 
 ## Safe sequence
 
@@ -57,10 +57,10 @@ ADB commands.
 Provision only a designated test device after installing the debug APK. Put the
 credential JSON in the ignored path configured by `credential_file`, set its
 mode to `0600`, and run `./tools/device provision-test-credentials`. The wrapper
-validates role plus live manufacturer/model before reading the secret, streams
-the payload over stdin into the debug app's private directory, suppresses device
-output for that operation, launches the app to consume it, and reports only a
-non-sensitive acknowledgment.
+validates role plus all four live identity properties before reading the secret,
+streams the payload over stdin into the debug app's private directory, suppresses
+device output for that operation, launches the app to consume it, and reports
+only a non-sensitive acknowledgment.
 
 The password is then stored by the existing Android Keystore-backed store. The
 plaintext staging file is deleted whether import succeeds or fails. Delete the

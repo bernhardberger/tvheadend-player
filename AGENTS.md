@@ -170,8 +170,9 @@ introduce abstractions for a single use.
   providers for credential injection.
 - Automated credential provisioning is permitted only through
   `./tools/device provision-test-credentials`, for a local device configured
-  with `role: "test"` whose live manufacturer and model exactly match the local
-  expectations. Production and unclassified devices remain prohibited.
+  with `role: "test"` whose live manufacturer, model, device, and product exactly
+  match the local expectations. Production and unclassified devices remain
+  prohibited.
 - Provisioning must use the debug-only app-private staging mechanism and local
   secret file described in `docs/test-device-credential-provisioning.md`. Do
   not replace it with synthetic keyboard input, raw ADB arguments, UI automation,
@@ -185,8 +186,8 @@ introduce abstractions for a single use.
   `production`. The exact identities and lifecycle rules are in
   `docs/device-targets.md`.
 - `tools/device` rejects install, launch, force-stop, smoke, synthetic key, and
-  credential-provisioning actions unless the local role is `test` and expected
-  manufacturer/model match.
+  credential-provisioning actions unless the local role is `test` and all four
+  expected identity properties match.
 - Do not modify TVHeadend server accounts, tuners, OSCam, recording storage,
   stream profiles, TCL/Google packages, or network infrastructure from this
   repository unless the user explicitly approves that separate operation.

@@ -154,7 +154,12 @@ def main() -> int:
         errors.append("device example must default to the safe production role")
     if device_example.get("credential_file") != ".tvhplayer-credentials.json":
         errors.append("device example must name the ignored local credential file")
-    for key in ("expected_manufacturer", "expected_model"):
+    for key in (
+        "expected_manufacturer",
+        "expected_model",
+        "expected_device",
+        "expected_product",
+    ):
         if not device_example.get(key):
             errors.append(f"device example must include {key}")
 

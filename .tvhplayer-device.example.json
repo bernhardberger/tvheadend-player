@@ -4,5 +4,7 @@
   "role": "production",
   "expected_manufacturer": "replace-after-running-doctor",
   "expected_model": "replace-after-running-doctor",
+  "expected_device": "replace-after-running-doctor",
+  "expected_product": "replace-after-running-doctor",
   "credential_file": ".tvhplayer-credentials.json"
 }
