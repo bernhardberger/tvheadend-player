@@ -180,6 +180,15 @@
     <string name="delete_recording">Delete recording</string>
     <string name="delete_recording_confirm_title">Delete this recording?</string>
     <string name="delete_recording_confirm_message">TVHeadend will permanently delete this completed recording.</string>
+    <string name="recording_unavailable_title">Recording unavailable</string>
+    <string name="recording_not_ready">This recording has not started yet.</string>
+    <string name="recording_file_unavailable">TVHeadend did not expose a playable file for this recording.</string>
+    <string name="recording_read_failed">TVHeadend could not continue reading this recording.</string>
+    <string name="recording_growing_playback">This recording is still growing. Seeking is available where the server permits it.</string>
+    <string name="recording_duration_unknown">Live duration</string>
+    <string name="pause">Pause</string>
+    <string name="seek_back_30">−30 seconds</string>
+    <string name="seek_forward_30">+30 seconds</string>
 
     <string name="play">Play</string>
 

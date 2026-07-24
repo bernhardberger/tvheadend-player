@@ -288,6 +288,22 @@ class HtspService(
         return msg.bin("data") ?: ByteArray(0) // EOF => empty
     }
 
+    suspend fun fileSeek(
+        id: Int,
+        offset: Long,
+        whence: String = "SEEK_SET",
+        timeoutMs: Long = 5_000,
+    ): Long {
+        val msg = request(
+            method = "fileSeek",
+            fields = mapOf("id" to id, "offset" to offset, "whence" to whence),
+            timeoutMs = timeoutMs,
+            flush = true,
+            disconnectOnTimeout = false,
+        )
+        return msg.long("offset") ?: offset
+    }
+
     suspend fun fileClose(id: Int, timeoutMs: Long = 5_000) {
         request(
             method = "fileClose",

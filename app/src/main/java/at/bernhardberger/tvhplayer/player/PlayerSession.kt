@@ -15,6 +15,7 @@ import androidx.media3.exoplayer.util.EventLogger
 import at.bernhardberger.tvhplayer.core.PlaybackRecoveryPolicy
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.player.htsp.HtspSubscriptionDataSource
+import at.bernhardberger.tvhplayer.player.htsp.HtspRecordingDataSource
 import at.bernhardberger.tvhplayer.player.htsp.LegacyRenderer
 import at.bernhardberger.tvhplayer.player.htsp.TvheadendExtractorsFactory
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -47,7 +48,14 @@ sealed interface PlaybackSessionState {
     data object Idle : PlaybackSessionState
     data object Starting : PlaybackSessionState
     data object Playing : PlaybackSessionState
+    data object Finished : PlaybackSessionState
     data class Recovering(val retryDelayMillis: Long) : PlaybackSessionState
+    data class Failed(val reason: PlaybackFailureReason) : PlaybackSessionState
+}
+
+enum class PlaybackFailureReason {
+    RECORDING_UNAVAILABLE,
+    RECORDING_READ_FAILED,
 }
 
 class PlayerSession(
@@ -58,6 +66,7 @@ class PlayerSession(
     private val commands = PlayerCommandGate()
     private var player: ExoPlayer? = null
     private var dataSourceFactory: HtspSubscriptionDataSource.Factory? = null
+    private var recordingDataSourceFactory: HtspRecordingDataSource.Factory? = null
 
     private data class ActivePlayback(
         val context: Context,
@@ -77,6 +86,8 @@ class PlayerSession(
 
     private val _activeServiceId = MutableStateFlow<Int?>(null)
     val activeServiceId: StateFlow<Int?> = _activeServiceId
+    private val _activeRecordingId = MutableStateFlow<Int?>(null)
+    val activeRecordingId: StateFlow<Int?> = _activeRecordingId
 
     private var playWhenReadyState = true
     private var currentItem = 0
@@ -87,14 +98,28 @@ class PlayerSession(
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             Timber.e(error, "Playback failed")
-            if (recoveryEventsEnabled) scheduleRecovery()
+            if (_activeRecordingId.value != null) {
+                _state.value = PlaybackSessionState.Failed(
+                    PlaybackFailureReason.RECORDING_READ_FAILED
+                )
+            } else if (recoveryEventsEnabled) {
+                scheduleRecovery()
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (activePlayback == null || !recoveryEventsEnabled) return
+            val liveActive = activePlayback != null && recoveryEventsEnabled
+            val recordingActive = _activeRecordingId.value != null
+            if (!liveActive && !recordingActive) return
             when (playbackState) {
                 Player.STATE_READY -> _state.value = PlaybackSessionState.Playing
-                Player.STATE_ENDED -> scheduleRecovery()
+                Player.STATE_ENDED -> {
+                    if (recordingActive) {
+                        _state.value = PlaybackSessionState.Finished
+                    } else {
+                        scheduleRecovery()
+                    }
+                }
                 Player.STATE_BUFFERING -> {
                     if (_state.value !is PlaybackSessionState.Recovering) {
                         _state.value = PlaybackSessionState.Starting
@@ -104,7 +129,7 @@ class PlayerSession(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying && activePlayback != null) {
+            if (isPlaying && (activePlayback != null || _activeRecordingId.value != null)) {
                 retryJob?.cancel()
                 retryJob = null
                 consecutiveFailures = 0
@@ -162,10 +187,82 @@ class PlayerSession(
                 ActivePlayback(appContext, serviceId, ++playbackGeneration).also {
                     activePlayback = it
                     _activeServiceId.value = serviceId
+                    _activeRecordingId.value = null
                     _state.value = PlaybackSessionState.Starting
                 }
             }
             startPlaybackLocked(target)
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    suspend fun playRecording(
+        context: Context,
+        recordingId: Int,
+        path: String,
+        knownSize: Long?,
+    ) {
+        commands.run {
+            val appContext = context.applicationContext
+            withContext(Dispatchers.Main.immediate) {
+                activePlayback = null
+                _activeServiceId.value = null
+                _activeRecordingId.value = recordingId
+                playbackGeneration++
+                retryJob?.cancel()
+                retryJob = null
+                watchdogJob?.cancel()
+                recoveryEventsEnabled = false
+                consecutiveFailures = 0
+                _state.value = PlaybackSessionState.Starting
+                player?.let {
+                    updateState(it)
+                    it.stop()
+                    it.clearMediaItems()
+                }
+            }
+            releaseCurrentDataSource()
+
+            try {
+                val settings = playerSettingsStore.playerSettings.first()
+                withContext(Dispatchers.Main.immediate) {
+                    val p = getOrCreatePlayer(appContext)
+                    p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().apply {
+                        setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+                        settings.audioLanguage?.takeIf { it.isNotBlank() }
+                            ?.let { setPreferredAudioLanguage(it) }
+                        val subtitle = settings.subtitleLanguage
+                        if (subtitle.isNullOrBlank()) {
+                            setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                        } else {
+                            setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            setPreferredTextLanguage(subtitle)
+                        }
+                    }.build()
+                    val factory = HtspRecordingDataSource.Factory(
+                        htsp = htsp,
+                        path = path,
+                        knownSize = knownSize,
+                    )
+                    recordingDataSourceFactory = factory
+                    val mediaSource = ProgressiveMediaSource.Factory(factory)
+                        .createMediaSource(
+                            MediaItem.fromUri("htsp-file://recording/$recordingId")
+                        )
+                    p.setMediaSource(mediaSource)
+                    p.prepare()
+                    p.playWhenReady = true
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                Timber.e(error, "Unable to start recording %d", recordingId)
+                withContext(Dispatchers.Main.immediate) {
+                    _state.value = PlaybackSessionState.Failed(
+                        PlaybackFailureReason.RECORDING_UNAVAILABLE
+                    )
+                }
+            }
         }
     }
 
@@ -182,7 +279,7 @@ class PlayerSession(
                     watchdogJob?.cancel()
                     recoveryEventsEnabled = false
                     _state.value = PlaybackSessionState.Starting
-                    if (dataSourceFactory != null) {
+                    if (dataSourceFactory != null || recordingDataSourceFactory != null) {
                         updateState(player)
                         player.stop()
                         player.clearMediaItems()
@@ -308,6 +405,7 @@ class PlayerSession(
                 withContext(Dispatchers.Main.immediate) {
                     activePlayback = null
                     _activeServiceId.value = null
+                    _activeRecordingId.value = null
                     playbackGeneration++
                     consecutiveFailures = 0
                     retryJob?.cancel()
@@ -332,6 +430,7 @@ class PlayerSession(
                 withContext(Dispatchers.Main.immediate) {
                     activePlayback = null
                     _activeServiceId.value = null
+                    _activeRecordingId.value = null
                     playbackGeneration++
                     retryJob?.cancel()
                     retryJob = null
@@ -351,9 +450,14 @@ class PlayerSession(
     }
 
     private suspend fun releaseCurrentDataSource() {
-        val factory = dataSourceFactory ?: return
+        val liveFactory = dataSourceFactory
+        val recordingFactory = recordingDataSourceFactory
         dataSourceFactory = null
-        withContext(Dispatchers.IO) { factory.releaseCurrentDataSource() }
+        recordingDataSourceFactory = null
+        withContext(Dispatchers.IO) {
+            liveFactory?.releaseCurrentDataSource()
+            recordingFactory?.releaseCurrentDataSource()
+        }
     }
 
     private fun updateState(p: ExoPlayer) {

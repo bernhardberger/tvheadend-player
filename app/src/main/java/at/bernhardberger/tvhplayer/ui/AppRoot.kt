@@ -42,6 +42,7 @@ import at.bernhardberger.tvhplayer.ui.components.ContentContainer
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
+import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
@@ -62,8 +63,10 @@ object Routes {
     const val RECORDINGS = "recordings"
     const val SETTINGS = "settings"
     const val PLAYER = "player"
+    const val RECORDING_PLAYER = "recording-player"
     fun player(channelId: Int, serviceId: Int, channelName: String) =
         "player/$channelId/$serviceId/${android.net.Uri.encode(channelName)}"
+    fun recordingPlayer(recordingId: Int) = "recording-player/$recordingId"
 }
 
 @Composable
@@ -115,9 +118,10 @@ fun AppRoot(
 
     val currentRoute = backStackEntry?.destination?.route
     val topRoute = currentRoute?.substringBefore("/")
-    val showRail = topRoute != Routes.PLAYER
+    val showRail = topRoute != Routes.PLAYER && topRoute != Routes.RECORDING_PLAYER
 
-    val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true
+    val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
+        currentRoute?.startsWith(Routes.RECORDING_PLAYER) == true
 
     LaunchedEffect(isPlayer) {
         onPlayerVisibilityChanged(isPlayer)
@@ -198,6 +202,9 @@ fun AppRoot(
                             EpgGridScreen(
                                 connectionUiState = connectionUiState,
                                 onRetry = appVm::reconnectNow,
+                                onPlayRecording = { recordingId ->
+                                    nav.navigate(Routes.recordingPlayer(recordingId))
+                                },
                                 onPlay = { channelId, serviceId, name ->
                                     nav.navigate(Routes.player(channelId, serviceId, name))
                                 }
@@ -210,6 +217,9 @@ fun AppRoot(
                             RecordingsScreen(
                                 connectionUiState = connectionUiState,
                                 onRetry = appVm::reconnectNow,
+                                onPlayRecording = { recordingId ->
+                                    nav.navigate(Routes.recordingPlayer(recordingId))
+                                },
                             )
                         }
                     }
@@ -237,6 +247,19 @@ fun AppRoot(
                             channelName = channelName,
                             serviceId = serviceId,
                             onClose = { nav.popBackStack() }
+                        )
+                    }
+
+                    composable(
+                        route = "${Routes.RECORDING_PLAYER}/{recordingId}",
+                        arguments = listOf(
+                            navArgument("recordingId") { type = NavType.IntType },
+                        ),
+                    ) { backStackEntry ->
+                        val recordingId = backStackEntry.arguments?.getInt("recordingId") ?: 0
+                        RecordingPlayerScreen(
+                            recordingId = recordingId,
+                            onClose = { nav.popBackStack() },
                         )
                     }
                 }

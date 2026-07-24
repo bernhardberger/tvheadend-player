@@ -46,6 +46,8 @@ import at.bernhardberger.tvhplayer.core.DvrActionFailure
 import at.bernhardberger.tvhplayer.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.DvrSection
 import at.bernhardberger.tvhplayer.core.groupRecordings
+import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
@@ -68,6 +70,7 @@ fun RecordingsScreen(
     repository: DvrRepository = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
+    onPlayRecording: (Int) -> Unit = {},
 ) {
     val entries by repository.entries.collectAsStateWithLifecycle()
     val groups = remember(entries) { groupRecordings(entries) }
@@ -146,6 +149,9 @@ fun RecordingsScreen(
         RecordingDetailsPanel(
             entry = authoritative,
             actionResult = actionResult,
+            onPlay = {
+                onPlayRecording(authoritative.id)
+            },
             onCancel = { pendingAction = PendingRecordingAction.CANCEL },
             onDelete = { pendingAction = PendingRecordingAction.DELETE },
             onClose = closeDetails,
@@ -214,6 +220,7 @@ private fun RecordingRow(
 private fun RecordingDetailsPanel(
     entry: DvrEntry,
     actionResult: DvrActionResult?,
+    onPlay: () -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit,
@@ -221,6 +228,8 @@ private fun RecordingDetailsPanel(
     val initialFocus = remember { FocusRequester() }
     val canCancel = entry.state == DvrState.SCHEDULED || entry.state == DvrState.RECORDING
     val canDelete = entry.state == DvrState.COMPLETED
+    val playbackAvailability = recordingPlaybackAvailability(entry)
+    val canPlay = playbackAvailability is RecordingPlaybackAvailability.Ready
     LaunchedEffect(entry.id, entry.state) { initialFocus.requestFocus() }
     BackHandler(onBack = onClose)
     RecordingDialogSurface {
@@ -249,6 +258,15 @@ private fun RecordingDetailsPanel(
                 color = MaterialTheme.colorScheme.error,
             )
         }
+        if (
+            (entry.state == DvrState.COMPLETED || entry.state == DvrState.RECORDING) &&
+            playbackAvailability !is RecordingPlaybackAvailability.Ready
+        ) {
+            Text(
+                stringResource(R.string.recording_file_unavailable),
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         actionResult?.let {
             Text(
                 dvrActionResultLabel(it),
@@ -260,10 +278,22 @@ private fun RecordingDetailsPanel(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (canPlay) {
+                Button(
+                    onClick = onPlay,
+                    modifier = Modifier.focusRequester(initialFocus),
+                ) {
+                    Text(stringResource(R.string.play))
+                }
+            }
             if (canCancel) {
                 Button(
                     onClick = onCancel,
-                    modifier = Modifier.focusRequester(initialFocus),
+                    modifier = if (!canPlay) {
+                        Modifier.focusRequester(initialFocus)
+                    } else {
+                        Modifier
+                    },
                 ) {
                     Text(stringResource(R.string.cancel_recording))
                 }
@@ -271,14 +301,18 @@ private fun RecordingDetailsPanel(
             if (canDelete) {
                 Button(
                     onClick = onDelete,
-                    modifier = Modifier.focusRequester(initialFocus),
+                    modifier = if (!canPlay) {
+                        Modifier.focusRequester(initialFocus)
+                    } else {
+                        Modifier
+                    },
                 ) {
                     Text(stringResource(R.string.delete_recording))
                 }
             }
             OutlinedButton(
                 onClick = onClose,
-                modifier = if (!canCancel && !canDelete) {
+                modifier = if (!canPlay && !canCancel && !canDelete) {
                     Modifier.focusRequester(initialFocus)
                 } else {
                     Modifier

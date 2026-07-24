@@ -166,6 +166,15 @@
     <string name="delete_recording">Aufnahme löschen</string>
     <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
     <string name="delete_recording_confirm_message">TVHeadend löscht diese abgeschlossene Aufnahme dauerhaft.</string>
+    <string name="recording_unavailable_title">Aufnahme nicht verfügbar</string>
+    <string name="recording_not_ready">Diese Aufnahme hat noch nicht begonnen.</string>
+    <string name="recording_file_unavailable">TVHeadend stellt für diese Aufnahme keine abspielbare Datei bereit.</string>
+    <string name="recording_read_failed">TVHeadend konnte diese Aufnahme nicht weiterlesen.</string>
+    <string name="recording_growing_playback">Diese Aufnahme wächst noch. Spulen ist möglich, soweit der Server es unterstützt.</string>
+    <string name="recording_duration_unknown">Laufende Dauer</string>
+    <string name="pause">Pause</string>
+    <string name="seek_back_30">−30 Sekunden</string>
+    <string name="seek_forward_30">+30 Sekunden</string>
     <string name="play">Abspielen</string>
 
     <string name="tvh_target_invalid">Ungültiges Streaming-Ziel</string>
