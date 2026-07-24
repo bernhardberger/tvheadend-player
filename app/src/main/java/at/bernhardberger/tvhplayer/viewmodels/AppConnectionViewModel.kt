@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.htsp.SubscriptionStatus
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.StoredPassword
@@ -29,6 +30,7 @@ import timber.log.Timber
 class AppConnectionViewModel(
     private val htsp: HtspService,
     private val repo: TvhRepository,
+    private val dvrRepository: DvrRepository,
     private val settings: ServerSettingsStore,
     private val passwords: SecurePasswordStore,
 ) : ViewModel() {
@@ -251,6 +253,9 @@ class AppConnectionViewModel(
 
             repo.onNewConnectionStarting(
                 preservePublishedChannels = preservePublishedChannels,
+            )
+            dvrRepository.onNewConnectionStarting(
+                preservePublished = preservePublishedChannels,
             )
 
             htsp.connect(

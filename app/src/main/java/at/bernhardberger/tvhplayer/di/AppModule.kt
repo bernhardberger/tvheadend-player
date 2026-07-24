@@ -6,6 +6,7 @@ import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
 import at.bernhardberger.tvhplayer.htsp.buildImageLoader
 import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
@@ -13,6 +14,7 @@ import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
@@ -34,6 +36,11 @@ val appModule = module {
             htsp = get(), ioDispatcher = get(named("io")),
         )
     }
+    single {
+        DvrRepository(
+            htsp = get(), ioDispatcher = get(named("io")),
+        )
+    }
 
     single { ServerSettingsStore(context = get()) }
     single { SecurePasswordStore(context = get()) }
@@ -43,6 +50,7 @@ val appModule = module {
 
     single { ChannelSelectionStore() }
     single { LastPlayedChannelStore(context = get()) }
+    single { GuidePositionStore() }
 
     single { PlayerSession(htsp = get(), playerSettingsStore = get()) }
 
@@ -57,6 +65,7 @@ val appModule = module {
         AppConnectionViewModel(
             htsp = get(),
             repo = get(),
+            dvrRepository = get(),
             settings = get(),
             passwords = get(),
         )

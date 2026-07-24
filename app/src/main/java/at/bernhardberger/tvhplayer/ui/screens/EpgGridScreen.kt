@@ -2,8 +2,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -61,17 +62,27 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.DvrActionFailure
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
+import at.bernhardberger.tvhplayer.core.DvrActionResult
+import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.moveMagazineEpgFocus
+import at.bernhardberger.tvhplayer.core.nearestProgrammeAt
+import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvhplayer.htsp.DvrEntry
+import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.stores.GuidePosition
+import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TvEpgPanelAlpha
@@ -104,11 +115,14 @@ fun EpgGridScreen(
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     repository: TvhRepository = koinInject(),
+    dvrRepository: DvrRepository = koinInject(),
     playerSession: PlayerSession = koinInject(),
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
+    guidePositionStore: GuidePositionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
+    onPlayRecording: (Int) -> Unit = {},
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -117,18 +131,24 @@ fun EpgGridScreen(
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
     val playingChannelId by playerSession.activeServiceId.collectAsStateWithLifecycle()
+    val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val lazyRowState = rememberLazyListState()
     val selectedFocus = remember { FocusRequester() }
     val dayStripFocus = remember { FocusRequester() }
 
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
     var nowSec by remember { mutableLongStateOf(openedAtSec) }
-    var windowStartSec by remember { mutableLongStateOf(floorToHour(openedAtSec)) }
+    val restoredPosition = remember { guidePositionStore.position.value }
+    var windowStartSec by remember {
+        mutableLongStateOf(restoredPosition?.windowStartSec ?: floorToHour(openedAtSec))
+    }
     val windowEndSec = windowStartSec + VISIBLE_WINDOW_SEC
     var selectedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
+    var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
+    var actionResult by remember { mutableStateOf<DvrActionResult?>(null) }
     var showJumpDialog by remember { mutableStateOf(false) }
     var frontierAfterSec by remember { mutableStateOf<Long?>(null) }
     var frontierLoading by remember { mutableStateOf(false) }
@@ -163,19 +183,31 @@ fun EpgGridScreen(
     LaunchedEffect(channels, playingChannelId, lastPlayedId, initialPositionDone) {
         if (initialPositionDone || channels.isEmpty()) return@LaunchedEffect
         val preferredId = playingChannelId ?: lastPlayedId ?: selectedChannelId
-        val channelId = browsingFocusChannelId(channels, preferredId)
+        val restored = restoredPosition?.takeIf { position ->
+            channels.any { it.id == position.channelId }
+        }
+        val channelId = browsingFocusChannelId(
+            channels,
+            restored?.channelId ?: preferredId,
+        )
             ?: return@LaunchedEffect
         val channelIndex = channels.indexOfFirst { it.id == channelId }
         pendingInitialChannelIndex = channelIndex
         val events = repository.epgForChannel(channelId).value.sortedBy { it.start }
-        val event = events.firstOrNull { it.start <= nowSec && nowSec < it.stop }
+        val event = restored?.let { position ->
+            events.firstOrNull { it.eventId == position.eventId }
+                ?: nearestProgrammeAt(events, position.eventStartSec)
+        } ?: events.firstOrNull { it.start <= nowSec && nowSec < it.stop }
             ?: events.firstOrNull { it.start >= nowSec }
 
         selection.setSelected(channelId)
         requestVisibleWindow(windowStartSec, channelIndex)
         if (event != null) {
             selectedTarget = EpgFocusTarget(channelIndex, event.eventId)
-            lazyRowState.scrollToItem((channelIndex / COLUMN_PAGE_SIZE) * COLUMN_PAGE_SIZE)
+            lazyRowState.scrollToItem(
+                restored?.firstVisibleColumn?.coerceIn(channels.indices)
+                    ?: (channelIndex / COLUMN_PAGE_SIZE) * COLUMN_PAGE_SIZE
+            )
         }
         initialPositionDone = true
     }
@@ -210,6 +242,15 @@ fun EpgGridScreen(
             )
         }
         selection.setSelected(event.channelId)
+        guidePositionStore.save(
+            GuidePosition(
+                channelId = event.channelId,
+                eventId = event.eventId,
+                eventStartSec = event.start,
+                windowStartSec = windowStartSec,
+                firstVisibleColumn = lazyRowState.firstVisibleItemIndex,
+            )
+        )
         delay(80)
         runCatching { selectedFocus.requestFocus() }
     }
@@ -413,7 +454,13 @@ fun EpgGridScreen(
                             onFocused = { event ->
                                 selectedTarget = EpgFocusTarget(channelIndex, event.eventId)
                             },
-                            onOpenDetails = { detailsEvent = it },
+                            recordingForEvent = { eventId ->
+                                dvrEntries.firstOrNull { it.eventId == eventId }
+                            },
+                            onOpenDetails = {
+                                detailsEvent = it
+                                actionResult = null
+                            },
                             onMoveFocus = ::moveFocus,
                             onRetry = onRetry,
                         )
@@ -424,14 +471,54 @@ fun EpgGridScreen(
 
         detailsEvent?.let { event ->
             val channel = channels.firstOrNull { it.id == event.channelId }
-            ProgrammePreviewPanel(
+            val recording = dvrEntries.firstOrNull { it.eventId == event.eventId }
+            ProgrammeDetailsPanel(
                 event = event,
                 channel = channel,
+                recording = recording,
+                nowSec = nowSec,
+                actionResult = actionResult,
+                onAction = { action ->
+                    when (action) {
+                        ProgrammeAction.WATCH -> {
+                            detailsEvent = null
+                            channel?.let { onPlay(it.id, it.id, it.name) }
+                        }
+                        ProgrammeAction.WATCH_FROM_START -> {
+                            recording?.let { onPlayRecording(it.id) }
+                        }
+                        ProgrammeAction.RECORD,
+                        ProgrammeAction.CANCEL_RECORDING -> pendingAction = action
+                    }
+                },
                 onClose = {
                     detailsEvent = null
                     coroutineScope.launch {
                         delay(80)
                         runCatching { selectedFocus.requestFocus() }
+                    }
+                },
+            )
+        }
+
+        val confirmationAction = pendingAction
+        val confirmationEvent = detailsEvent
+        if (confirmationAction != null && confirmationEvent != null) {
+            val recording = dvrEntries.firstOrNull { it.eventId == confirmationEvent.eventId }
+            ConfirmProgrammeActionDialog(
+                action = confirmationAction,
+                onDismiss = { pendingAction = null },
+                onConfirm = {
+                    pendingAction = null
+                    coroutineScope.launch {
+                        actionResult = when (confirmationAction) {
+                            ProgrammeAction.RECORD ->
+                                dvrRepository.scheduleEvent(confirmationEvent.eventId)
+                            ProgrammeAction.CANCEL_RECORDING -> recording?.let {
+                                dvrRepository.cancelEntry(it.id)
+                            } ?: DvrActionResult.Failed(DvrActionFailure.REJECTED)
+                            else -> null
+                        }
                     }
                 },
             )
@@ -475,6 +562,7 @@ private fun MagazineChannelColumn(
     repository: TvhRepository,
     connectionUiState: ConnectionUiState,
     frontierLoading: Boolean,
+    recordingForEvent: (Int) -> DvrEntry?,
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
@@ -522,6 +610,7 @@ private fun MagazineChannelColumn(
                 ProgrammeCell(
                     event = event,
                     channel = channel,
+                    recording = recordingForEvent(event.eventId),
                     nowSec = nowSec,
                     selected = selectedTarget?.channelIndex == channelIndex &&
                         selectedTarget.eventId == event.eventId,
@@ -601,6 +690,7 @@ internal fun MagazineChannelHeader(
 private fun ProgrammeCell(
     event: EpgEventEntry,
     channel: ChannelUi,
+    recording: DvrEntry?,
     nowSec: Long,
     selected: Boolean,
     selectedFocusRequester: FocusRequester,
@@ -614,6 +704,7 @@ private fun ProgrammeCell(
         event.start > nowSec -> stringResource(R.string.epg_state_future)
         else -> stringResource(R.string.epg_state_past)
     }
+    val recordingText = recording?.state?.let { dvrStateLabel(it) }
     val description = stringResource(
         R.string.epg_cell_description,
         channel.name,
@@ -635,7 +726,13 @@ private fun ProgrammeCell(
         },
         supportingContent = {
             Text(
-                text = "${formatHm(event.start)}–${formatHm(event.stop)}",
+                text = buildString {
+                    append("${formatHm(event.start)}–${formatHm(event.stop)}")
+                    recordingText?.let {
+                        append(" • ")
+                        append(it)
+                    }
+                },
                 maxLines = 1,
             )
         },
@@ -644,6 +741,7 @@ private fun ProgrammeCell(
             focusedSelectedScale = 1f,
         ),
         modifier = modifier
+            .alpha(if (event.stop <= nowSec) 0.62f else 1f)
             .padding(2.dp)
             .then(if (selected) Modifier.focusRequester(selectedFocusRequester) else Modifier)
             .onFocusChanged { if (it.isFocused) onFocused() }
@@ -820,13 +918,18 @@ private fun JumpToTimeDialog(
 }
 
 @Composable
-private fun ProgrammePreviewPanel(
+private fun ProgrammeDetailsPanel(
     event: EpgEventEntry,
     channel: ChannelUi?,
+    recording: DvrEntry?,
+    nowSec: Long,
+    actionResult: DvrActionResult?,
+    onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
 ) {
-    val closeFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { closeFocus.requestFocus() }
+    val initialFocus = remember { FocusRequester() }
+    val actions = programmeActions(event, nowSec, recording)
+    LaunchedEffect(event.eventId, actions) { initialFocus.requestFocus() }
     BackHandler(onBack = onClose)
     DialogScrim {
         Text(
@@ -841,19 +944,190 @@ private fun ProgrammePreviewPanel(
             }",
             style = MaterialTheme.typography.titleMedium,
         )
-        event.summary?.let { Text(it, maxLines = 4, overflow = TextOverflow.Ellipsis) }
         Text(
-            text = stringResource(R.string.epg_details_action_hint),
+            text = stringResource(
+                R.string.epg_time_duration,
+                formatHm(event.start),
+                formatHm(event.stop),
+                ((event.stop - event.start).coerceAtLeast(0L) / 60L),
+            ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Button(
-            onClick = onClose,
-            modifier = Modifier.focusRequester(closeFocus),
-        ) {
-            Text(stringResource(R.string.close))
+        programmeMetadata(event)?.let {
+            Text(it, style = MaterialTheme.typography.titleSmall)
+        }
+        event.summary?.takeIf { it.isNotBlank() }?.let {
+            Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
+        event.description
+            ?.takeIf { it.isNotBlank() && it != event.summary }
+            ?.let { Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis) }
+        recording?.let {
+            Text(
+                text = stringResource(R.string.recording_status, dvrStateLabel(it.state)),
+                color = MaterialTheme.colorScheme.primary,
+            )
+            it.failureReason?.takeIf(String::isNotBlank)?.let { reason ->
+                Text(
+                    text = stringResource(R.string.recording_failure_reason, reason),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+        actionResult?.let {
+            Text(
+                text = dvrActionResultLabel(it),
+                color = if (it is DvrActionResult.Failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+            )
+        }
+        Text(
+            text = if (actions.isEmpty()) {
+                stringResource(R.string.epg_no_actions)
+            } else {
+                stringResource(R.string.epg_details_action_hint)
+            },
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            actions.forEachIndexed { index, action ->
+                Button(
+                    onClick = { onAction(action) },
+                    modifier = if (index == 0) {
+                        Modifier.focusRequester(initialFocus)
+                    } else {
+                        Modifier
+                    },
+                ) {
+                    Text(programmeActionLabel(action))
+                }
+            }
+            OutlinedButton(
+                onClick = onClose,
+                modifier = if (actions.isEmpty()) {
+                    Modifier.focusRequester(initialFocus)
+                } else {
+                    Modifier
+                },
+            ) {
+                Text(stringResource(R.string.close))
+            }
         }
     }
 }
+
+@Composable
+private fun ConfirmProgrammeActionDialog(
+    action: ProgrammeAction,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val confirmFocus = remember { FocusRequester() }
+    LaunchedEffect(action) { confirmFocus.requestFocus() }
+    BackHandler(onBack = onDismiss)
+    DialogScrim {
+        Text(
+            text = stringResource(
+                if (action == ProgrammeAction.RECORD) {
+                    R.string.record_confirm_title
+                } else {
+                    R.string.cancel_recording_confirm_title
+                }
+            ),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            stringResource(
+                if (action == ProgrammeAction.RECORD) {
+                    R.string.record_confirm_message
+                } else {
+                    R.string.cancel_recording_confirm_message
+                }
+            )
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.focusRequester(confirmFocus),
+            ) {
+                Text(
+                    stringResource(
+                        if (action == ProgrammeAction.RECORD) {
+                            R.string.record
+                        } else {
+                            R.string.cancel_recording
+                        }
+                    )
+                )
+            }
+            OutlinedButton(onClick = onDismiss) {
+                Text(stringResource(R.string.back))
+            }
+        }
+    }
+}
+
+@Composable
+private fun programmeActionLabel(action: ProgrammeAction): String = stringResource(
+    when (action) {
+        ProgrammeAction.WATCH -> R.string.watch
+        ProgrammeAction.RECORD -> R.string.record
+        ProgrammeAction.CANCEL_RECORDING -> R.string.cancel_recording
+        ProgrammeAction.WATCH_FROM_START -> R.string.watch_from_start
+    }
+)
+
+@Composable
+private fun dvrStateLabel(state: DvrState): String = stringResource(
+    when (state) {
+        DvrState.SCHEDULED -> R.string.recording_state_scheduled
+        DvrState.RECORDING -> R.string.recording_state_recording
+        DvrState.COMPLETED -> R.string.recording_state_completed
+        DvrState.FAILED -> R.string.recording_state_failed
+        DvrState.CANCELLED -> R.string.recording_state_cancelled
+        DvrState.UNKNOWN -> R.string.recording_state_unknown
+    }
+)
+
+@Composable
+private fun dvrActionResultLabel(result: DvrActionResult): String = stringResource(
+    when (result) {
+        is DvrActionResult.Accepted -> R.string.recording_action_accepted
+        is DvrActionResult.Failed -> when (result.reason) {
+            DvrActionFailure.PERMISSION_DENIED -> R.string.recording_action_permission
+            DvrActionFailure.CONFLICT -> R.string.recording_action_conflict
+            DvrActionFailure.REJECTED -> R.string.recording_action_rejected
+            DvrActionFailure.CONNECTION -> R.string.recording_action_connection
+        }
+    }
+)
+
+private fun programmeMetadata(event: EpgEventEntry): String? = buildList {
+    event.genre?.takeIf(String::isNotBlank)?.let(::add)
+    if (event.seasonNumber != null || event.episodeNumber != null) {
+        add(
+            buildString {
+                event.seasonNumber?.let { append("S$it") }
+                event.episodeNumber?.let {
+                    if (isNotEmpty()) append(" ")
+                    append("E$it")
+                    event.episodeCount?.let { count -> append("/$count") }
+                }
+            }
+        )
+    }
+    if (event.partNumber != null) {
+        add(
+            buildString {
+                append("Part ${event.partNumber}")
+                event.partCount?.let { append("/$it") }
+            }
+        )
+    }
+}.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 
 @Composable
 private fun DialogScrim(content: @Composable ColumnScope.() -> Unit) {

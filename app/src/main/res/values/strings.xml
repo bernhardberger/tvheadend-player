@@ -144,6 +144,28 @@
     <string name="epg_state_past">ended</string>
     <string name="epg_cell_description">%1$s, %2$s to %3$s, %4$s, %5$s</string>
     <string name="epg_details_action_hint">Programme actions are shown in this panel. Playback never starts directly from the guide.</string>
+    <string name="epg_no_actions">There are no available actions for this programme.</string>
+    <string name="watch">Watch</string>
+    <string name="watch_from_start">Watch from start</string>
+    <string name="record">Record</string>
+    <string name="cancel_recording">Cancel recording</string>
+    <string name="record_confirm_title">Record this programme?</string>
+    <string name="record_confirm_message">TVHeadend will schedule this event using the server default recording configuration.</string>
+    <string name="cancel_recording_confirm_title">Cancel this recording?</string>
+    <string name="cancel_recording_confirm_message">TVHeadend will stop or remove the scheduled recording.</string>
+    <string name="recording_status">Recording: %1$s</string>
+    <string name="recording_failure_reason">Reason: %1$s</string>
+    <string name="recording_state_scheduled">Scheduled</string>
+    <string name="recording_state_recording">Recording now</string>
+    <string name="recording_state_completed">Completed</string>
+    <string name="recording_state_failed">Failed</string>
+    <string name="recording_state_cancelled">Cancelled</string>
+    <string name="recording_state_unknown">Server status unknown</string>
+    <string name="recording_action_accepted">Request accepted. Waiting for the server status update…</string>
+    <string name="recording_action_permission">This account is not allowed to manage recordings.</string>
+    <string name="recording_action_conflict">TVHeadend reported a recording or tuner conflict.</string>
+    <string name="recording_action_rejected">TVHeadend rejected the recording request.</string>
+    <string name="recording_action_connection">The recording request could not reach TVHeadend.</string>
 
     <string name="play">Play</string>
 
