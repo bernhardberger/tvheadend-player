@@ -1,10 +1,10 @@
-# Implementation plan: Leoville TV appliance mode
+# Implementation plan: TVHeadend Player appliance mode
 
 ## Architecture decisions
 
 - Keep upstream's Media3/HTSP playback path unchanged because the live TCL test
   passed the human motion-quality gate.
-- Use a distinct `at.leoville.tvhstream` application ID so the accepted
+- Use a distinct `at.bernhardberger.tvhplayer` application ID so the accepted
   diagnostic build and Headent remain installable rollback clients.
 - Keep UI focus selection in memory, but persist the last channel actually sent
   to the player in Preferences DataStore.
@@ -104,11 +104,12 @@ reboot matrix before deployment to the production household TV.
 
 ## Phase 1: Reproducible private build identity
 
-### Task 1: Create the Leoville build identity
+### Task 1: Create the TVHeadend Player build identity
 
 **Acceptance criteria:**
 
-- Package ID is `at.leoville.tvhstream` and label is `Leoville TV`.
+- Package ID and source namespace are `at.bernhardberger.tvhplayer`; the launcher
+  label is `TVHeadend Player`.
 - Firebase/Crashlytics and the Google services build requirement are absent.
 - The GPLv3 license and upstream attribution remain intact.
 
@@ -217,15 +218,15 @@ interlaced-motion regression check.
 
 The packaged activity appears in Android's HOME candidate list. On the TCL,
 both `cmd package set-home-activity` and affirmative selection in Android's Home
-app screen store Leoville as preferred, but Google Basic TV still resolves and
-opens. The system launcher has privileged priority `2`, while Android caps the
-third-party Leoville filter to `0`. Google remains enabled and selected; no
+app screen store TVHeadend Player as preferred, but Google Basic TV still resolves
+and opens. The system launcher has privileged priority `2`, while Android caps the
+third-party app filter to `0`. Google remains enabled and selected; no
 HOME-role standby/wake or cold-reboot success is claimed. The separate
 accessibility entry fallback is validated under Task 6.
 
 **Acceptance criteria:**
 
-- Android lists Leoville TV as a HOME candidate.
+- Android lists TVHeadend Player as a HOME candidate.
 - ADB can select it as HOME without disabling Google Basic TV.
 - HOME, standby/wake, and cold boot enter playback through the one-shot launch
   policy.
@@ -245,7 +246,7 @@ receiver fallback.
 
 TCL initially stored the user-approved service component but left global
 accessibility off because Safety Guard rejected the app's hidden
-`APP_AUTO_START` operation. Setting that app-op to `allow` for Leoville only and
+`APP_AUTO_START` operation. Setting that app-op to `allow` for TVHeadend Player only and
 repeating the Android consent toggle bound the service. The setting, app-op, and
 live autoplay then survived three standby/wake cycles from Google Home and one
 approved Android reboot while Google remained the default HOME.
@@ -253,7 +254,7 @@ approved Android reboot while Google remained the default HOME.
 The physical remote reports Linux `KEY_EPG` with scan code `0x0c005b`, but TCL's
 Android callback exposes private key code `4001`, not standard `KEYCODE_GUIDE`
 (`172`). The service recognizes both codes. Physical TV launched playback from
-TCL UI and Leoville's operator UI, and pressing it during playback no longer
+TCL UI and TVHeadend Player's operator UI, and pressing it during playback no longer
 restarts the player. The final metadata requests key filtering but no
 accessibility events or window-content access.
 
@@ -261,7 +262,7 @@ accessibility events or window-content access.
 
 - Service declares key filtering without window-content access or accessibility
   event subscriptions.
-- GUIDE down launches/reorders Leoville TV and GUIDE up is consumed.
+- GUIDE down launches/reorders TVHeadend Player and GUIDE up is consumed.
 - An entry intent while the player is already visible does not restart playback.
 - Every key other than standard GUIDE and captured TCL code `4001` returns
   `false`.
@@ -339,14 +340,14 @@ Open product choices before implementation:
 
 **Acceptance criteria:**
 
-- Release APK uses a stable private Leoville key outside Git.
+- Release APK uses a stable private product key outside Git.
 - Release package upgrades over itself and remains 32-bit compatible.
 - APK SHA-256, signing fingerprint, source commit, and rollback commands are
   documented without secrets.
 - `./tools/check-native-libs --release` passes with exact corresponding source,
   toolchain, license, and notice evidence for every bundled decoder AAR.
-- Final product name and clean-break application ID are decided before stable
-  signing; inherited Play/Fastlane workflows must not be re-enabled unchanged.
+- The approved product identity is used before stable signing; inherited
+  Play/Fastlane workflows must not be re-enabled unchanged.
 
 **Verification:** unit suite, release build, `apksigner verify`, install/upgrade,
 and complete TCL runtime matrix.

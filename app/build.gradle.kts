@@ -11,15 +11,15 @@ kotlin {
 }
 
 android {
-    namespace = "cz.preclikos.tvhstream"
+    namespace = "at.bernhardberger.tvhplayer"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "at.leoville.tvhstream"
+        applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0-leoville.1"
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

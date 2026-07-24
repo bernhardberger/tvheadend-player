@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded ADB operations for TVHStream Android TV validation.
+"""Bounded ADB operations for TVHeadend Player Android TV validation.
 
 This wrapper deliberately omits UI hierarchy dumps, app-private data exports,
 and unrestricted logcat/dumpsys output because those paths can expose runtime
@@ -22,10 +22,10 @@ from typing import NoReturn
 
 
 ROOT = Path(__file__).resolve().parents[1]
-LOCAL_CONFIG = ROOT / ".tvhstream-device.json"
-DEFAULT_PACKAGE = "at.leoville.tvhstream"
+LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
+DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
-DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhstream-credentials.json"
+DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 MAX_CREDENTIAL_FILE_BYTES = 64 * 1024
 KEY_EVENTS = {
     "up": "KEYCODE_DPAD_UP",
@@ -155,8 +155,8 @@ def adb_command(adb: str, serial: str, *arguments: str) -> list[str]:
 def require_serial(value: str | None) -> str:
     if not value or value == "replace-with-adb-serial":
         fail(
-            "ADB serial is required; set TVHSTREAM_ADB_SERIAL, pass --serial, "
-            "or create ignored .tvhstream-device.json"
+            "ADB serial is required; set TVHPLAYER_ADB_SERIAL, pass --serial, "
+            "or create ignored .tvhplayer-device.json"
         )
     if any(character.isspace() for character in value):
         fail("ADB serial must not contain whitespace")
@@ -175,7 +175,7 @@ def mutation_error(role: str, action: str) -> str | None:
         )
     return (
         f"{action} requires an explicitly classified test device; set role to "
-        "'test' in ignored .tvhstream-device.json"
+        "'test' in ignored .tvhplayer-device.json"
     )
 
 
@@ -183,8 +183,12 @@ def identity_errors(
     *,
     actual_manufacturer: str,
     actual_model: str,
+    actual_device: str,
+    actual_product: str,
     expected_manufacturer: str | None,
     expected_model: str | None,
+    expected_device: str | None,
+    expected_product: str | None,
     require_expected: bool,
 ) -> list[str]:
     errors: list[str] = []
@@ -197,11 +201,17 @@ def identity_errors(
 
     expected_manufacturer = configured_value(expected_manufacturer)
     expected_model = configured_value(expected_model)
+    expected_device = configured_value(expected_device)
+    expected_product = configured_value(expected_product)
 
     if require_expected and not expected_manufacturer:
         errors.append("expected_manufacturer is required for mutating test-device actions")
     if require_expected and not expected_model:
         errors.append("expected_model is required for mutating test-device actions")
+    if require_expected and not expected_device:
+        errors.append("expected_device is required for mutating test-device actions")
+    if require_expected and not expected_product:
+        errors.append("expected_product is required for mutating test-device actions")
 
     if expected_manufacturer and actual_manufacturer.casefold() != expected_manufacturer.casefold():
         errors.append(
@@ -211,6 +221,14 @@ def identity_errors(
     if expected_model and actual_model.casefold() != expected_model.casefold():
         errors.append(
             f"device model {actual_model!r} does not match expected {expected_model!r}"
+        )
+    if expected_device and actual_device.casefold() != expected_device.casefold():
+        errors.append(
+            f"device code {actual_device!r} does not match expected {expected_device!r}"
+        )
+    if expected_product and actual_product.casefold() != expected_product.casefold():
+        errors.append(
+            f"device product {actual_product!r} does not match expected {expected_product!r}"
         )
     return errors
 
@@ -226,6 +244,8 @@ def read_device_properties(adb: str, serial: str) -> dict[str, str]:
     names = {
         "manufacturer": "ro.product.manufacturer",
         "model": "ro.product.model",
+        "device": "ro.product.device",
+        "product": "ro.product.name",
         "android": "ro.build.version.release",
         "abis": "ro.product.cpu.abilist",
     }
@@ -247,8 +267,12 @@ def verify_configured_identity(
     errors = identity_errors(
         actual_manufacturer=properties["manufacturer"],
         actual_model=properties["model"],
+        actual_device=properties["device"],
+        actual_product=properties["product"],
         expected_manufacturer=config.get("expected_manufacturer"),
         expected_model=config.get("expected_model"),
+        expected_device=config.get("expected_device"),
+        expected_product=config.get("expected_product"),
         require_expected=require_expected,
     )
     if errors:
@@ -297,7 +321,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--serial",
-        help="ADB device serial; overrides TVHSTREAM_ADB_SERIAL and local config",
+        help="ADB device serial; overrides TVHPLAYER_ADB_SERIAL and local config",
     )
     parser.add_argument(
         "--package",
@@ -344,11 +368,11 @@ def main() -> int:
         fail("adb is not available on PATH")
 
     serial = require_serial(
-        args.serial or os.environ.get("TVHSTREAM_ADB_SERIAL") or config.get("serial")
+        args.serial or os.environ.get("TVHPLAYER_ADB_SERIAL") or config.get("serial")
     )
     package_name = (
         args.package_name
-        or os.environ.get("TVHSTREAM_ANDROID_PACKAGE")
+        or os.environ.get("TVHPLAYER_ANDROID_PACKAGE")
         or config.get("package")
         or DEFAULT_PACKAGE
     )
@@ -374,8 +398,9 @@ def main() -> int:
         print(f"device={serial}")
         print(f"role={role}")
         print(
-            "manufacturer|model|android|abis="
+            "manufacturer|model|device|product|android|abis="
             f"{properties['manufacturer']}|{properties['model']}|"
+            f"{properties['device']}|{properties['product']}|"
             f"{properties['android']}|{properties['abis']}"
         )
         return 0
@@ -399,7 +424,7 @@ def main() -> int:
                 f"package {DEFAULT_PACKAGE}"
             )
         credential_path = Path(
-            os.environ.get("TVHSTREAM_CREDENTIAL_FILE")
+            os.environ.get("TVHPLAYER_CREDENTIAL_FILE")
             or config.get("credential_file")
             or DEFAULT_CREDENTIAL_FILE
         ).expanduser()
@@ -418,8 +443,8 @@ def main() -> int:
                 "sh",
                 "-c",
                 "umask 077; mkdir -p files; "
-                "rm -f files/tvh_test_provisioning.result; "
-                "cat > files/tvh_test_provisioning.json",
+                "rm -f files/tvhplayer_test_provisioning.result; "
+                "cat > files/tvhplayer_test_provisioning.json",
             ),
             capture=True,
             input_data=payload,
@@ -447,9 +472,9 @@ def main() -> int:
             package_name,
             "sh",
             "-c",
-            "if test -f files/tvh_test_provisioning.result; then "
-            "cat files/tvh_test_provisioning.result; "
-            "elif test -f files/tvh_test_provisioning.json; then printf pending; "
+            "if test -f files/tvhplayer_test_provisioning.result; then "
+            "cat files/tvhplayer_test_provisioning.result; "
+            "elif test -f files/tvhplayer_test_provisioning.json; then printf pending; "
             "else printf missing; fi",
         )
         deadline = time.monotonic() + 10
@@ -467,8 +492,8 @@ def main() -> int:
                 package_name,
                 "rm",
                 "-f",
-                "files/tvh_test_provisioning.json",
-                "files/tvh_test_provisioning.result",
+                "files/tvhplayer_test_provisioning.json",
+                "files/tvhplayer_test_provisioning.result",
             ),
             capture=True,
             check=False,

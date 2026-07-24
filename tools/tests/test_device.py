@@ -18,6 +18,14 @@ key_events = DEVICE["KEY_EVENTS"]
 
 
 class DevicePolicyTest(unittest.TestCase):
+    def test_product_identity_defaults_are_current(self) -> None:
+        self.assertEqual(DEVICE["LOCAL_CONFIG"].name, ".tvhplayer-device.json")
+        self.assertEqual(DEVICE["DEFAULT_PACKAGE"], "at.bernhardberger.tvhplayer")
+        self.assertEqual(
+            DEVICE["DEFAULT_CREDENTIAL_FILE"].name,
+            ".tvhplayer-credentials.json",
+        )
+
     def test_bounded_remote_navigation_keys_are_available(self) -> None:
         self.assertEqual(key_events["up"], "KEYCODE_DPAD_UP")
         self.assertEqual(key_events["down"], "KEYCODE_DPAD_DOWN")
@@ -61,8 +69,12 @@ class DevicePolicyTest(unittest.TestCase):
             identity_errors(
                 actual_manufacturer="TCL",
                 actual_model="Test TV",
+                actual_device="G10",
+                actual_product="G10_4K_GB",
                 expected_manufacturer="replace-after-running-doctor",
                 expected_model="replace-after-running-doctor",
+                expected_device="replace-after-running-doctor",
+                expected_product="replace-after-running-doctor",
                 require_expected=False,
             ),
             [],
@@ -71,34 +83,50 @@ class DevicePolicyTest(unittest.TestCase):
             identity_errors(
                 actual_manufacturer="TCL",
                 actual_model="Test TV",
+                actual_device="G10",
+                actual_product="G10_4K_GB",
                 expected_manufacturer="replace-after-running-doctor",
                 expected_model="replace-after-running-doctor",
+                expected_device="replace-after-running-doctor",
+                expected_product="replace-after-running-doctor",
                 require_expected=True,
             ),
             [
                 "expected_manufacturer is required for mutating test-device actions",
                 "expected_model is required for mutating test-device actions",
+                "expected_device is required for mutating test-device actions",
+                "expected_product is required for mutating test-device actions",
             ],
         )
         self.assertEqual(
             identity_errors(
                 actual_manufacturer="TCL",
                 actual_model="Test TV",
+                actual_device="G10",
+                actual_product="G10_4K_GB",
                 expected_manufacturer=None,
                 expected_model=None,
+                expected_device=None,
+                expected_product=None,
                 require_expected=True,
             ),
             [
                 "expected_manufacturer is required for mutating test-device actions",
                 "expected_model is required for mutating test-device actions",
+                "expected_device is required for mutating test-device actions",
+                "expected_product is required for mutating test-device actions",
             ],
         )
         self.assertEqual(
             identity_errors(
                 actual_manufacturer="TCL",
                 actual_model="Test TV",
+                actual_device="G10",
+                actual_product="G10_4K_GB",
                 expected_manufacturer="tcl",
                 expected_model="test tv",
+                expected_device="g10",
+                expected_product="g10_4k_gb",
                 require_expected=True,
             ),
             [],
@@ -107,11 +135,19 @@ class DevicePolicyTest(unittest.TestCase):
             identity_errors(
                 actual_manufacturer="TCL",
                 actual_model="Household TV",
+                actual_device="G08",
+                actual_product="G08_4K_GB",
                 expected_manufacturer="TCL",
                 expected_model="Test TV",
+                expected_device="G10",
+                expected_product="G10_4K_GB",
                 require_expected=True,
             ),
-            ["device model 'Household TV' does not match expected 'Test TV'"],
+            [
+                "device model 'Household TV' does not match expected 'Test TV'",
+                "device code 'G08' does not match expected 'G10'",
+                "device product 'G08_4K_GB' does not match expected 'G10_4K_GB'",
+            ],
         )
 
     def test_missing_credential_file_is_rejected_without_secret_output(self) -> None:

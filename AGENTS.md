@@ -1,9 +1,10 @@
-# TVHStream Fork Engineering Guide
+# TVHeadend Player Engineering Guide
 
-This repository is a public GPLv3 fork of
-[`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream). The fork adds a
-Leoville appliance mode while preserving upstream history, attribution, and a
-clean path for contributing generic improvements back upstream.
+TVHeadend Player for TV is an independently developed, public GPLv3 Android TV
+client for TVHeadend servers. It descends from
+[`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) and preserves the
+upstream history, copyright, and a clean path for contributing generic fixes
+back to that project.
 
 ## Start here
 
@@ -16,30 +17,30 @@ Before non-trivial work:
 4. Read `docs/codebase-audit-2026-07-23.md` for hardening work and
    `docs/product-identity-plan.md` for identity work.
 5. Run `git status -sb` and inspect the recent log.
-6. Fetch both remotes before changing code:
-   `git fetch origin && git fetch fork`.
+6. Fetch configured remotes before changing code: `git fetch --all --prune`.
 7. Run `./tools/check-ai-harness` when changing agents, skills, commands, or
    OpenCode configuration.
 
-`origin` is the upstream repository. `fork` is Bernhard's public fork. Never
-push appliance work to `origin`; push normal development branches to `fork`.
+The standalone product repository is `bernhardberger/tvheadend-player`. A
+separately configured `upstream` remote may point at `Preclikos/tvhstream` for
+comparison and generic contributions; never push product or appliance work to
+that predecessor repository.
 
 ## Current product boundary
 
-The immediate target is a single-purpose Android TV live-TV appliance for a
-household user who should not need to navigate Google TV. The fork is also
-being hardened as an independently developed, GitHub-first public project that
-remains compatible with a later Google Play path. The final product name and
-whether appliance mode is the public product or an optional profile are still
-open decisions. Do not perform the namespace/identity migration until those
-decisions are recorded.
+The public product is a remote-first Android TV live-TV client for TVHeadend.
+Appliance behavior is an optional profile and household integration layer, not
+the identity of every core type or workflow. Distribution is GitHub-first while
+remaining compatible with a later Google Play path.
 
 The accepted playback baseline is upstream TVHStream's Media3/HTSP path.
 
-Current fork identity:
+Current product identity:
 
-- Application ID: `at.leoville.tvhstream`
-- Label: `Leoville TV`
+- Application ID: `at.bernhardberger.tvhplayer`
+- Public name: `TVHeadend Player for TV`
+- Launcher label: `TVHeadend Player`
+- Source namespace: `at.bernhardberger.tvhplayer`
 - Minimum SDK: 28
 - Target/compile SDK: 36
 - Java toolchain: 21
@@ -130,7 +131,7 @@ Use the project-local skills when relevant:
 ./tools/check-native-libs
 
 # Configure a local device without committing its address
-cp .tvhstream-device.example.json .tvhstream-device.json
+cp .tvhplayer-device.example.json .tvhplayer-device.json
 ./tools/device doctor
 ```
 
@@ -142,7 +143,7 @@ The Gradle portion of verification is:
 
 ## Code layout
 
-- `app/src/main/java/cz/preclikos/tvhstream/` — application source
+- `app/src/main/java/at/bernhardberger/tvhplayer/` — application source
 - `app/src/test/` — JVM unit tests for pure policy and navigation logic
 - `app/src/androidTest/` — device/instrumentation tests
 - `docs/` — appliance specification, plan, and engineering/operator notes
@@ -169,23 +170,24 @@ introduce abstractions for a single use.
   providers for credential injection.
 - Automated credential provisioning is permitted only through
   `./tools/device provision-test-credentials`, for a local device configured
-  with `role: "test"` whose live manufacturer and model exactly match the local
-  expectations. Production and unclassified devices remain prohibited.
+  with `role: "test"` whose live manufacturer, model, device, and product exactly
+  match the local expectations. Production and unclassified devices remain
+  prohibited.
 - Provisioning must use the debug-only app-private staging mechanism and local
   secret file described in `docs/test-device-credential-provisioning.md`. Do
   not replace it with synthetic keyboard input, raw ADB arguments, UI automation,
   or an exported Android component.
 - Never commit signing keys, keystores, key passwords, service-account JSON, or
   Firebase configuration.
-- Runtime device addresses belong in ignored `.tvhstream-device.json` or the
-  `TVHSTREAM_ADB_SERIAL` environment variable.
+- Runtime device addresses belong in ignored `.tvhplayer-device.json` or the
+  `TVHPLAYER_ADB_SERIAL` environment variable.
 - The dining-room G10 is the current development target and may use local role
   `test`. The bedroom G08 is handed-over production and must use role
   `production`. The exact identities and lifecycle rules are in
   `docs/device-targets.md`.
 - `tools/device` rejects install, launch, force-stop, smoke, synthetic key, and
-  credential-provisioning actions unless the local role is `test` and expected
-  manufacturer/model match.
+  credential-provisioning actions unless the local role is `test` and all four
+  expected identity properties match.
 - Do not modify TVHeadend server accounts, tuners, OSCam, recording storage,
   stream profiles, TCL/Google packages, or network infrastructure from this
   repository unless the user explicitly approves that separate operation.
@@ -213,10 +215,13 @@ result. Do not infer a human-visible motion-quality pass from ADB counters.
 
 Classify each change before implementation:
 
-- **Generic:** useful to TVHStream users without Leoville assumptions. Keep it
-  separable and suitable for an upstream pull request.
-- **Appliance-specific:** HOME behavior, Leoville identity, TCL GUIDE handling,
-  household defaults, deployment, or signing. Keep it in the fork.
+- **Generic:** useful to the predecessor TVHStream project without TVHeadend
+  Player assumptions. Keep it separable and suitable for an upstream pull
+  request.
+- **Product-specific:** TVHeadend Player identity, public UX, release policy, or
+  repository metadata. Keep it in this repository.
+- **Appliance-specific:** HOME behavior, TCL GUIDE handling, household defaults,
+  device deployment, or signing. Keep it in this repository.
 - **Mixed:** split the generic foundation from the appliance integration before
   committing.
 
@@ -234,5 +239,5 @@ obligations are satisfied.
 - Do not force-push, rewrite published history, or amend commits unless the user
   explicitly asks.
 - Before committing, inspect `git status`, `git diff`, and recent history.
-- Before an upstream pull request, compare the proposed commit range against
-  `origin/master` and remove Leoville-only assumptions from that range.
+- Before an upstream pull request, compare the proposed range with the configured
+  `Preclikos/tvhstream` remote and remove product/appliance assumptions.

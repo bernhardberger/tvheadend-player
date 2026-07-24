@@ -1,9 +1,9 @@
-# Spec: Leoville TV appliance mode
+# Spec: TVHeadend Player appliance mode
 
 ## Objective
 
-Turn the GPLv3 TVHStream Android TV client into a single-purpose live-TV
-appliance for a household user who should not need to navigate Google TV.
+Provide an optional single-purpose live-TV profile and household integration for
+TVHeadend Player users who should not need to navigate Google TV.
 
 The app must keep the configured household TVHeadend account local to the device,
 play the last selected channel after an appliance launch, support physical
@@ -26,7 +26,7 @@ backs out to those screens.
   transfer disabled and password input excluded from saved-instance state
 - Android `AccessibilityService` for GUIDE filtering plus boot/wake appliance
   entry, without subscribing to accessibility events or window content
-- GPL-3.0; the public fork retains upstream copyright and license material
+- GPL-3.0; the public product retains predecessor copyright and license material
 
 ## Commands
 
@@ -37,7 +37,7 @@ backs out to those screens.
 ./tools/device launch
 ```
 
-Final release builds must use the private Leoville signing key and must not rely
+Final release builds must use a private stable product signing key and must not rely
 on the Android debug keystore.
 
 ## Device roles
@@ -46,12 +46,12 @@ on the Android debug keystore.
   debug APK installs, ADB key injection, smoke tests, or development experiments.
 - The dining-room TCL Smart TV Pro is the temporary debug/test target. Its address
   remains only in ignored local device configuration, and tooling must verify its
-  manufacturer and model before every mutation.
+  manufacturer, model, device, and product before every mutation.
 - `tools/device` enforces this boundary: production and unclassified devices
   reject install, launch, force-stop, smoke, synthetic-key, and credential-
   provisioning actions.
 - A designated test device may receive TVHeadend credentials through the
-  debug-only app-private provisioning path after role and live manufacturer/model
+  debug-only app-private provisioning path after role and complete live identity
   validation. Secret values travel only over process stdin from an ignored,
   owner-only local file and are never entered through the TV UI.
 
@@ -106,7 +106,8 @@ fun adjacentChannelId(
   keep it unavailable in release builds and on production/unclassified devices.
 - Preserve a route to channel list, EPG, and settings through Back navigation.
 - Keep Google Basic TV and stock Headent installed until all runtime checks pass.
-- Use a distinct Leoville application ID and stable signing key.
+- Use the distinct `at.bernhardberger.tvhplayer` application ID and a stable
+  signing key.
 - Keep the operator UI on one overscan-safe TV layout grid. Use TV Material
   navigation drawers and list items rather than hand-built focusable replicas;
   focused rows must remain unclipped, and the playback channel sheet must attach
@@ -134,7 +135,7 @@ fun adjacentChannelId(
 
 ## Success criteria
 
-1. The Leoville package installs and runs on the TCL's 32-bit `armeabi-v7a`
+1. The TVHeadend Player package installs and runs on the TCL's 32-bit `armeabi-v7a`
    Android TV 12 environment.
 2. Interlaced-channel playback remains at least as good as the accepted
    TVHStream diagnostic result.
@@ -147,7 +148,7 @@ fun adjacentChannelId(
 6. A fresh app, HOME, boot, wake, or GUIDE-appliance launch waits for connection
    and channel data, then plays the persisted channel or the first channel. If
    playback is already visible, the entry intent must not restart it.
-7. Back reveals the normal TVHStream UI without an autoplay loop and keeps the
+7. Back reveals the normal TVHeadend Player UI without an autoplay loop and keeps the
    foreground live session and video surface warm behind a readable navigation
    scrim. Back from the root Channel List returns to that fullscreen session,
    and selecting the same channel does so without retuning. Root Back exits to
@@ -169,7 +170,7 @@ fun adjacentChannelId(
 
 ## Open questions
 
-- How to make Leoville the TCL's HOME app without disabling Google Basic TV.
+- How to make TVHeadend Player the TCL's HOME app without disabling Google Basic TV.
   The firmware gives its system launcher priority `2`, caps third-party HOME
   candidates to priority `0`, and ignores both shell and user role selection.
   Google must remain enabled until a safe reversible path is proven.

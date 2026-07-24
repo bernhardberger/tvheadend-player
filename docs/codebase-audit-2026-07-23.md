@@ -1,4 +1,4 @@
-# TVHStream fork technical audit
+# TVHeadend Player predecessor-fork technical audit
 
 Date: 2026-07-23
 
@@ -19,7 +19,7 @@ accepted appliance-entry behavior.
 | AUD-007 TV UI framework | Migrated focusable UI to TV Material 1.1.0, added safe areas, lifecycle-aware state, localization, and media-key policy |
 | AUD-008 native provenance | Integrity manifest/tooling added; signed release remains blocked because exact sources, notices, and toolchains are unknown |
 | AUD-009 stale public/release metadata | Replaced with accurate README/privacy text and read-only SHA-pinned CI; inherited deployment automation removed |
-| AUD-010 production device safety | Fixed with tested production/test roles and live manufacturer/model matching for mutations, including credential provisioning |
+| AUD-010 production device safety | Fixed with tested production/test roles and four-property live identity matching for mutations, including credential provisioning |
 | AUD-011 UI/data boundaries | Partially improved through lifecycle-aware collection; broader ViewModel boundary work remains incremental P2 work |
 | AUD-012 dependencies | Dead Firebase/Security Crypto declarations removed and TV Material added; version upgrades remain isolated future work |
 | AUD-013 memory/footprint | Not yet measured on a test TV; release shrinking and baseline profiles remain future measured work |
@@ -31,6 +31,11 @@ this code-only pass. A dining-room TCL was subsequently assigned as the test TV,
 but the complete runtime matrix is still required. Signed release publication is
 additionally blocked until `./tools/check-native-libs --release` passes with real
 provenance rather than placeholders.
+
+The product identity was subsequently migrated from the temporary package and
+TVHStream-shaped source namespace to `at.bernhardberger.tvhplayer`. Historical
+findings below intentionally retain names and paths that existed on the audit
+date; current paths are recorded in `AGENTS.md`.
 
 ## Executive conclusion
 
@@ -475,13 +480,14 @@ directly addresses.
 ## AI harness and tooling implications
 
 The current harness passes its own validator and has strong credential/device
-safety language. It is too narrowly encoded around the temporary Leoville
+safety language. It is too narrowly encoded around the temporary household
 appliance milestone to be the long-term product harness.
 
 After Stage 0 decisions:
 
-- Replace the default `android-appliance` framing with a product-level Android
-  TV engineer; keep appliance behavior as a selectable specialty.
+- Replace the default appliance framing with a product-level Android TV engineer;
+  keep appliance behavior as an optional integration specialty. This was
+  completed during the product identity migration.
 - Keep an independent read-only reviewer, but add explicit concurrency, TV
   Material, accessibility, privacy, native provenance, and release checks.
 - Split the durable product specification from TCL/household deployment notes.

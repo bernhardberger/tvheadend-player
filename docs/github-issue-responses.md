@@ -36,7 +36,7 @@ Fixes are in commit `f93c061` on `master` (ships in the next build).
 > Thanks for the suggestion. As you noticed, the left-hand side panel already covers this: it lets you browse channels (with live now/next info) while the current channel keeps playing in the background, which addresses the main use case. A full picture-in-picture tile in the channel list is out of scope for now, so I'm closing this. The side panel will keep being improved instead.
 
 ### #10 — Android tablets/phones
-> Thanks for the interest. TVHStream is intentionally built as a 10-foot, D-pad-first Android **TV** experience (leanback UI, focus navigation, HTSP streaming). A touch-first phone/tablet client is a substantially different app and isn't planned, so I'm closing this as out of scope.
+> Thanks for the interest. TVHeadend Player is intentionally built as a 10-foot, D-pad-first Android **TV** experience (leanback UI, focus navigation, HTSP streaming). A touch-first phone/tablet client is a substantially different app and isn't planned, so I'm closing this as out of scope.
 
 ---
 

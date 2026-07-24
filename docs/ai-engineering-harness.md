@@ -1,6 +1,6 @@
 # AI engineering harness
 
-The canonical LXC 106 checkout for this fork is:
+The current LXC 106 checkout is:
 
 ```text
 /root/projects/tvhstream
@@ -16,8 +16,8 @@ project instructions, agents, skills, and commands.
 |---|---|
 | `AGENTS.md` | Project-wide engineering, safety, testing, Git, and upstream rules |
 | `docs/device-targets.md` | Current development-versus-production TV boundary, without private addresses |
-| `.opencode/opencode.json` | Project config; selects the appliance agent, disables sharing and subagent spawning |
-| `.opencode/agents/android-appliance.md` | Default implementation agent |
+| `.opencode/opencode.json` | Project config; selects the Android TV agent, disables sharing and subagent spawning |
+| `.opencode/agents/android-tv.md` | Default implementation agent |
 | `.opencode/agents/android-reviewer.md` | Directly selectable read-only review agent |
 | `.opencode/skills/android-tv-device-testing/` | Safe TCL/ADB/runtime verification workflow |
 | `.opencode/skills/tvhstream-upstream-contribution/` | Upstream sync and contribution boundary workflow |
@@ -40,7 +40,7 @@ Media3/HTSP path as a regression boundary, incomplete native provenance as a
 signed-release blocker, and read-only GitHub CI as the only enabled automation
 until signing and publication are separately approved.
 
-Dedicated TV UX sections in `AGENTS.md`, `android-appliance`, and
+Dedicated TV UX sections in `AGENTS.md`, `android-tv`, and
 `android-reviewer` make Google TV and Android TV design guidance, Compose for TV,
 and Material for TV guidance a standing implementation and review gate. Google
 TV defines the target product experience; Android TV OS and Compose for TV remain
@@ -58,23 +58,23 @@ no private address; the ignored local file selects the reachable device.
 Copy the tracked example to the ignored local file and set the current ADB
 serial. Keep `role` set to `production` for the household TV. Only a separately
 assigned development target may use `role: "test"`; test-device mutations also
-require exact `expected_manufacturer` and `expected_model` values:
+require exact manufacturer, model, device, and product expectations:
 
 ```bash
-cp .tvhstream-device.example.json .tvhstream-device.json
+cp .tvhplayer-device.example.json .tvhplayer-device.json
 ```
 
 The same value can be supplied without a file:
 
 ```bash
-export TVHSTREAM_ADB_SERIAL='<adb-serial>'
+export TVHPLAYER_ADB_SERIAL='<adb-serial>'
 ```
 
 An environment or command-line serial does not override the role policy from
 the local file. `doctor`, `current`, and `package-info` are available for
 production or unclassified targets. Debug install, launch, force-stop, smoke,
 and synthetic-key operations are rejected unless the configured role is
-`test` and the live manufacturer/model match the local expectations.
+`test` and all four live identity properties match the local expectations.
 
 The device file contains no TVHeadend credential values. For a designated test
 device only, it may name an ignored owner-only `credential_file`; the bounded

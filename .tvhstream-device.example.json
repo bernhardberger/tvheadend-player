@@ -1,8 +1,0 @@
-{
-  "serial": "replace-with-adb-serial",
-  "package": "at.leoville.tvhstream",
-  "role": "production",
-  "expected_manufacturer": "replace-after-running-doctor",
-  "expected_model": "replace-after-running-doctor",
-  "credential_file": ".tvhstream-credentials.json"
-}

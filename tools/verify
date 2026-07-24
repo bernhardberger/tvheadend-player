@@ -77,10 +77,10 @@ manifest_tree="$($aapt dump xmltree "$apk" AndroidManifest.xml)"
 accessibility_tree="$($aapt dump xmltree "$apk" res/xml/appliance_entry_accessibility_service.xml)"
 
 required_badging=(
-    "package: name='at.leoville.tvhstream'"
+    "package: name='at.bernhardberger.tvhplayer'"
     "sdkVersion:'28'"
     "targetSdkVersion:'36'"
-    "application-label:'Leoville TV'"
+    "application-label:'TVHeadend Player'"
     "'armeabi-v7a'"
 )
 for expected in "${required_badging[@]}"; do
@@ -102,7 +102,7 @@ for expected in "${required_home_entries[@]}"; do
 done
 
 required_accessibility_entries=(
-    'cz.preclikos.tvhstream.accessibility.ApplianceEntryAccessibilityService'
+    'at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService'
     'android.permission.BIND_ACCESSIBILITY_SERVICE'
     'android.accessibilityservice.AccessibilityService'
 )

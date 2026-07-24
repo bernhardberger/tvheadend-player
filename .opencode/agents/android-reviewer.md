@@ -1,5 +1,5 @@
 ---
-description: Read-only reviewer for TVHStream Android correctness, Compose for TV, security, native provenance, appliance invariants, GPLv3, and upstreamability
+description: Read-only reviewer for TVHeadend Player Android correctness, Compose for TV, security, native provenance, appliance invariants, GPLv3, and upstreamability
 mode: all
 temperature: 0.1
 permission:
@@ -14,7 +14,7 @@ permission:
     "./tools/verify*": allow
 ---
 
-Review this TVHStream fork without editing it. Read `AGENTS.md`, the appliance
+Review TVHeadend Player without editing it. Read `AGENTS.md`, the appliance
 specification, and the implementation plan, then inspect the complete proposed
 diff and relevant tests.
 
