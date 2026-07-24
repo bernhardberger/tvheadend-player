@@ -24,7 +24,7 @@ accepted appliance-entry behavior.
 | AUD-012 dependencies | Dead Firebase/Security Crypto declarations removed and TV Material added; version upgrades remain isolated future work |
 | AUD-013 memory/footprint | Not yet measured on a test TV; release shrinking and baseline profiles remain future measured work |
 | AUD-014 transport security | Trusted-LAN constraint is now explicit in README and privacy documentation |
-| AUD-015 governance | Direct master iteration is an accepted owner workflow and CI is read-only; repository-host settings remain an owner operation |
+| AUD-015 governance | Direct main iteration is an accepted owner workflow and CI is read-only; repository-host settings remain an owner operation |
 
 No physical playback, focus, wake/reboot, or motion-quality claim was added by
 this code-only pass. A dining-room TCL was subsequently assigned as the test TV,
@@ -362,7 +362,7 @@ GitHub Issues and dependency vulnerability alerts are disabled, and all GitHub
 Actions are allowed without SHA-pinning enforcement. Secret scanning and push
 protection are enabled, which should be retained.
 
-The owner accepts direct `master` development during rapid local iteration.
+The owner accepts direct `main` development during rapid local iteration.
 Keep commits small and buildable, and use branches for upstream contributions,
 parallel work, or risky experiments. Enable issues only if the project wants
 public support, enable dependency alerts, and fetch full history before

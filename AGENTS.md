@@ -233,7 +233,7 @@ obligations are satisfied.
 
 ## Git discipline
 
-- Direct local development on `master` is allowed during rapid iteration. Use a
+- Direct local development on `main` is allowed during rapid iteration. Use a
   branch for upstream contributions, parallel work, or risky experiments.
 - Keep commits small, buildable, and independently reviewable.
 - Do not force-push, rewrite published history, or amend commits unless the user

@@ -1,6 +1,6 @@
 # Draft GitHub issue responses (not yet posted)
 
-Fixes are in commit `f93c061` on `master` (ships in the next build).
+Fixes are in commit `f93c061` on `main` (ships in the next build).
 
 ---
 
