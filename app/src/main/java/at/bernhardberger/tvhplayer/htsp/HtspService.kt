@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.htsp
 
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.ConnectionPolicy
+import at.bernhardberger.tvhplayer.core.MetadataPermissionDeniedException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -196,13 +197,16 @@ class HtspService(
         initialSyncDef = def
 
         try {
-            request(
+            val reply = request(
                 method = "enableAsyncMetadata",
                 fields = emptyMap(),
                 timeoutMs = timeoutMs,
                 flush = true,
                 disconnectOnTimeout = true
             )
+            if (reply.int("noaccess") == 1 || reply.fields.containsKey("error")) {
+                throw MetadataPermissionDeniedException()
+            }
             withTimeout(timeoutMs) { def.await() }
         } finally {
             if (initialSyncDef === def) initialSyncDef = null

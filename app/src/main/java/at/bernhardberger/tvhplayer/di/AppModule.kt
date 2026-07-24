@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.di
 
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.htsp.HtspService
+import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
 import at.bernhardberger.tvhplayer.htsp.buildImageLoader
 import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
@@ -26,6 +27,7 @@ val appModule = module {
     single<CoroutineDispatcher>(qualifier = named("io")) { Dispatchers.IO }
 
     single { HtspService(ioDispatcher = get(named("io"))) }
+    single { HtspConnectionProbe(ioDispatcher = get(named("io"))) }
     single {
         TvhRepository(
             htsp = get(), ioDispatcher = get(named("io")),

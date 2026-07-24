@@ -8,7 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
@@ -31,6 +33,8 @@ import at.bernhardberger.tvhplayer.player.PlaybackSessionState
 import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.ServerSettings
+import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
@@ -41,10 +45,12 @@ import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
+import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -63,6 +69,25 @@ fun AppRoot(
     applianceLaunchRequests: ApplianceLaunchRequests,
     onPlayerVisibilityChanged: (Boolean) -> Unit,
 ) {
+    val serverSettingsStore: ServerSettingsStore = koinInject()
+    var serverSettings by remember { mutableStateOf<ServerSettings?>(null) }
+    LaunchedEffect(serverSettingsStore) {
+        serverSettingsStore.serverSettings.collect { serverSettings = it }
+    }
+    val currentServerSettings = serverSettings
+    if (currentServerSettings == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(androidx.tv.material3.MaterialTheme.colorScheme.background)
+        )
+        return
+    }
+    if (currentServerSettings.host.isBlank()) {
+        OnboardingScreen()
+        return
+    }
+
     val nav = rememberNavController()
     val context = LocalContext.current
     val activity = context as? Activity

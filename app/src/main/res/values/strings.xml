@@ -36,6 +36,26 @@
     <string name="clear_saved_password">Clear saved password</string>
     <string name="credential_save_failed">The credential could not be stored. Try clearing it and entering it again.</string>
     <string name="credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
+    <string name="onboarding_title">Welcome to TVHeadend Player</string>
+    <string name="onboarding_requirement">This app connects to a TVHeadend server that provides your channels, guide and recordings.</string>
+    <string name="trusted_network_guidance">Connect only on a trusted home network or through a protected tunnel. HTSP does not encrypt the channel metadata or video stream.</string>
+    <string name="onboarding_continue">Set up TVHeadend</string>
+    <string name="onboarding_connection_title">Connect to your TVHeadend server</string>
+    <string name="test_connection">Test connection</string>
+    <string name="save_and_continue">Save and continue</string>
+    <string name="connection_test_running">Testing hello, sign-in and channel access…</string>
+    <plurals name="connection_test_success">
+        <item quantity="one">Connection successful. 1 channel is available.</item>
+        <item quantity="other">Connection successful. %d channels are available.</item>
+    </plurals>
+    <string name="connection_test_authentication">TVHeadend rejected the username or password. Check them and retry.</string>
+    <string name="connection_test_dns">The server name could not be found. Check the host name and network.</string>
+    <string name="connection_test_unreachable">The server is unreachable. Check the host, HTSP port and network.</string>
+    <string name="connection_test_timeout">The server did not answer in time. Check that TVHeadend and HTSP are running.</string>
+    <string name="connection_test_incompatible">This TVHeadend server uses an HTSP version that the app cannot support.</string>
+    <string name="connection_test_permission">The account connected but cannot read channel metadata. Check its TVHeadend permissions.</string>
+    <string name="connection_test_zero_channels">The account connected successfully, but no channels are visible to it.</string>
+    <string name="connection_test_other">The connection test failed. Check the settings and retry.</string>
 
     <string name="settings_player">Settings - Player</string>
     <string name="settings_connection_nav">Connection</string>
@@ -120,5 +140,8 @@
     <string name="status_connection_failed_dns">Connection failed: server name not found</string>
     <string name="status_connection_failed_unreachable">Connection failed: server unreachable</string>
     <string name="status_connection_failed_timeout">Connection failed: server timed out</string>
+    <string name="status_connection_failed_incompatible">Connection failed: this TVHeadend version is not supported</string>
+    <string name="status_connection_failed_permission">Connection failed: this account cannot read channel metadata</string>
+    <string name="status_connection_failed_zero_channels">Connection succeeded, but this account has no visible channels</string>
     <string name="status_connection_failed_other">Connection failed</string>
 </resources>

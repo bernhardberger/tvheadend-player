@@ -16,6 +16,18 @@ class ConnectionFailurePolicyTest {
         assertEquals(ConnectionFailureKind.DNS, connectionFailureKind(UnknownHostException()))
         assertEquals(ConnectionFailureKind.UNREACHABLE, connectionFailureKind(ConnectException()))
         assertEquals(ConnectionFailureKind.TIMEOUT, connectionFailureKind(SocketTimeoutException()))
+        assertEquals(
+            ConnectionFailureKind.INCOMPATIBLE_SERVER,
+            connectionFailureKind(IncompatibleServerVersionException(18)),
+        )
+        assertEquals(
+            ConnectionFailureKind.PERMISSION_DENIED,
+            connectionFailureKind(MetadataPermissionDeniedException()),
+        )
+        assertEquals(
+            ConnectionFailureKind.ZERO_CHANNELS,
+            connectionFailureKind(ZeroChannelsException()),
+        )
         assertEquals(ConnectionFailureKind.OTHER, connectionFailureKind(IllegalArgumentException()))
     }
 

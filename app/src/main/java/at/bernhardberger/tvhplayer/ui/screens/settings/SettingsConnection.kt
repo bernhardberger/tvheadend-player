@@ -28,11 +28,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.ConnectionProbeResult
+import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
+import at.bernhardberger.tvhplayer.settings.StoredPassword
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
+import at.bernhardberger.tvhplayer.ui.screens.ConnectionProbeUiState
+import at.bernhardberger.tvhplayer.ui.screens.connectionProbeMessage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -40,7 +45,8 @@ import org.koin.compose.koinInject
 @Composable
 fun SettingsConnection(
     settingsStore: ServerSettingsStore = koinInject(),
-    passwordStore: SecurePasswordStore = koinInject()
+    passwordStore: SecurePasswordStore = koinInject(),
+    connectionProbe: HtspConnectionProbe = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current
@@ -60,7 +66,13 @@ fun SettingsConnection(
     var pass by remember { mutableStateOf("") }
     var passwordChanged by remember { mutableStateOf(false) }
     var credentialError by remember { mutableStateOf(false) }
+    var probeState by remember {
+        mutableStateOf<ConnectionProbeUiState>(ConnectionProbeUiState.Idle)
+    }
     var auto by rememberSaveable { mutableStateOf(true) }
+    val parsedPort = htspPort.toIntOrNull()?.takeIf { it in 1..65535 }
+    val validEndpoint = host.isNotBlank() && parsedPort != null
+    val probeMessage = connectionProbeMessage(probeState)
 
     LaunchedEffect(Unit) {
         val s = settingsStore.serverSettings.first()
@@ -81,7 +93,10 @@ fun SettingsConnection(
                 editingId = editingId,
                 setEditingId = { editingId = it },
                 value = host,
-                onValueChange = { host = it },
+                onValueChange = {
+                    host = it
+                    probeState = ConnectionProbeUiState.Idle
+                },
                 label = { Text(stringResource(R.string.host)) }
             )
 
@@ -92,7 +107,10 @@ fun SettingsConnection(
                 editingId = editingId,
                 setEditingId = { editingId = it },
                 value = htspPort,
-                onValueChange = { htspPort = it },
+                onValueChange = {
+                    htspPort = it
+                    probeState = ConnectionProbeUiState.Idle
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 label = { Text(stringResource(R.string.port_htsp)) }
             )
@@ -104,7 +122,10 @@ fun SettingsConnection(
                 editingId = editingId,
                 setEditingId = { editingId = it },
                 value = user,
-                onValueChange = { user = it },
+                onValueChange = {
+                    user = it
+                    probeState = ConnectionProbeUiState.Idle
+                },
                 label = { Text(stringResource(R.string.username)) }
             )
 
@@ -119,6 +140,7 @@ fun SettingsConnection(
                     pass = it
                     passwordChanged = true
                     credentialError = false
+                    probeState = ConnectionProbeUiState.Idle
                 }
             )
 
@@ -137,14 +159,61 @@ fun SettingsConnection(
                 color = MaterialTheme.colorScheme.error,
             )
         }
+        if (probeMessage != null) {
+            val successful = (probeState as? ConnectionProbeUiState.Complete)
+                ?.result is ConnectionProbeResult.Success
+            Text(
+                text = probeMessage,
+                color = if (successful) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                val pHtsp = htspPort.toIntOrNull() ?: 9982
+            OutlinedButton(
+                enabled = validEndpoint && probeState != ConnectionProbeUiState.Testing,
+                onClick = {
+                    val endpointPort = parsedPort ?: return@OutlinedButton
+                    probeState = ConnectionProbeUiState.Testing
+                    scope.launch {
+                        val testPassword = if (passwordChanged) {
+                            pass
+                        } else {
+                            when (val stored = passwordStore.passwordState.first()) {
+                                StoredPassword.Empty -> ""
+                                is StoredPassword.Available -> stored.value
+                                StoredPassword.Unavailable -> {
+                                    credentialError = true
+                                    probeState = ConnectionProbeUiState.Idle
+                                    return@launch
+                                }
+                            }
+                        }
+                        probeState = ConnectionProbeUiState.Complete(
+                            connectionProbe.test(
+                                host = host.trim(),
+                                port = endpointPort,
+                                username = user.trim(),
+                                password = testPassword,
+                            )
+                        )
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.test_connection))
+            }
+
+            Button(
+                enabled = validEndpoint,
+                onClick = {
+                val pHtsp = parsedPort ?: return@Button
                 scope.launch {
                     try {
                         if (passwordChanged) passwordStore.setPassword(pass)
-                        settingsStore.saveServer(host, pHtsp, user, auto)
+                        settingsStore.saveServer(host.trim(), pHtsp, user.trim(), auto)
                         pass = ""
                         passwordChanged = false
                         credentialError = false
