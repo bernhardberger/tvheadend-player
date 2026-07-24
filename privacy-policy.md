@@ -1,9 +1,9 @@
 # Privacy Policy
 
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
-This policy describes the current Leoville TV development fork. The product
-name may change before its first stable release.
+This policy describes TVHeadend Player for TV, an independent open-source Android
+TV client for TVHeadend servers.
 
 ## Data stored on the TV
 
@@ -30,7 +30,7 @@ a protected tunnel such as a VPN.
 
 ## Analytics and third parties
 
-The fork does not include Firebase, analytics, advertising, crash-reporting, or
+The app does not include Firebase, analytics, advertising, crash-reporting, or
 user-tracking services. It does not send app usage or credential data to the
 project maintainers.
 
@@ -58,4 +58,4 @@ Keystore key, making any remaining encrypted password blob unusable.
 ## Source and questions
 
 The app is open-source under GPLv3. Current source and privacy-policy changes
-are available at https://github.com/bernhardberger/tvhstream.
+are available at https://github.com/bernhardberger/tvheadend-player.

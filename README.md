@@ -1,80 +1,85 @@
-# Leoville TV
+# TVHeadend Player for TV
 
-Leoville TV is the current working identity for an experimental, remote-first
-live TV client for Android TV and Google TV. It connects directly to a
-TVHeadend server over HTSP and uses AndroidX Media3 for playback.
+![TVHeadend Player](artwork/tvheadend-player-logo.png)
 
-The final public product name has not been selected. Package identity, artwork,
-and repository branding will change before the first stable release.
+TVHeadend Player for TV is an independent, remote-first Android TV and Google TV
+live-TV client for TVHeadend servers. It connects over HTSP and uses AndroidX
+Media3 for playback.
 
-## Current capabilities
+This project is under active development and is not an official TVHeadend app or
+a stable release.
+
+## Features
 
 - TVHeadend channel synchronization and live playback over HTSP
 - Channel list and electronic programme guide
-- D-pad, channel-up/down, and direct channel-number navigation
+- D-pad, channel-up/down, and direct TVHeadend channel-number navigation
 - Audio track, subtitle, aspect-ratio, and stream-profile controls
-- Encrypted app-private password storage
+- Automatic connection/playback recovery with visible status
+- System, German, and English app language selection
+- Encrypted app-private password storage with Android backup disabled
 - Last-played-channel restoration
 - Optional household appliance entry through a narrowly scoped accessibility
-  service that handles only GUIDE/TV entry and does not inspect screen content
+  service that handles only GUIDE/TV entry and cannot inspect screen content
 
-## Status
+The interface is built specifically for a ten-foot, remote-only TV experience.
+Phone and tablet support is not currently planned.
 
-The project is under active hardening and is not a stable release. The accepted
-playback baseline is tested on an Android TV 12 TCL device, including progressive
-and interlaced broadcasts, but routine development must use a separate test TV.
+## Requirements
 
-The intended distribution path is signed GitHub releases first while retaining
-a path to Google Play requirements. No deployment workflow is currently enabled.
+- Android TV 9 (API 28) or newer
+- TVHeadend server reachable over HTSP
+- Remote control with D-pad navigation
+- Java 21 and Android SDK 36 for local builds
 
-See:
-
-- `docs/appliance-mode-spec.md` for current appliance behavior
-- `docs/appliance-mode-plan.md` for implementation and release gates
-- `docs/codebase-audit-2026-07-23.md` for the technical audit
-- `docs/product-identity-plan.md` for naming and migration decisions
+Direct HTSP traffic is not encrypted. Use it only on a trusted local network or
+through a protected tunnel such as a VPN.
 
 ## Build and verify
-
-Requirements are Android SDK 36 and Java 21.
 
 ```bash
 ./tools/verify
 ```
 
-The verifier runs JVM tests, Android lint, instrumentation-test compilation,
-debug APK assembly, and package/SDK/ABI metadata checks.
+The verifier runs native-library integrity and 16 KB alignment checks, tool
+policy tests, JVM tests, lint, Android-test compilation, debug assembly, and APK
+identity/ABI assertions.
 
 Device operations use an ignored local configuration and the bounded wrapper:
 
 ```bash
-cp .tvhstream-device.example.json .tvhstream-device.json
+cp .tvhplayer-device.example.json .tvhplayer-device.json
 ./tools/device doctor
 ```
 
 Never put TVHeadend credentials, signing keys, or private device addresses in
-Git. Direct HTSP traffic is not encrypted and should be used only on a trusted
-LAN or through a protected tunnel.
+Git. The debug-only designated-test-device provisioning flow is documented in
+`docs/test-device-credential-provisioning.md`.
 
-Designated test devices can be configured non-interactively through the bounded,
-debug-only workflow in `docs/test-device-credential-provisioning.md`. It remains
-blocked for production and unclassified devices.
+## Release status
 
-## Fork and upstream
+The intended distribution path is signed GitHub releases first, while retaining
+a path to Google Play requirements. No release automation is enabled. Signed
+binary distribution is currently blocked because bundled native decoder AARs do
+not yet have complete reproducible provenance, corresponding source, and notices.
 
-This repository is a GPLv3 fork of
-[Preclikos/tvhstream](https://github.com/Preclikos/tvhstream). It retains the
-upstream history and attribution. Generic improvements are kept separable for
-possible upstream contribution; Leoville identity, TCL integration, and
-household appliance policy remain fork-specific.
+See `docs/appliance-mode-spec.md`, `docs/appliance-mode-plan.md`, and
+`docs/product-identity-plan.md` for behavior and release gates.
 
-Upstream TVHStream acknowledges ideas and code from
-[TVHClient](https://github.com/rsiebert/TVHClient). Native decoder binaries also
-require corresponding source and third-party notices before distribution; that
-provenance work is tracked in the hardening plan.
+## Lineage and contributions
+
+This GPLv3 project descends from
+[Preclikos/tvhstream](https://github.com/Preclikos/tvhstream) and preserves its
+history and copyright. Generic fixes may be proposed to that predecessor;
+TVHeadend Player product UX, repository identity, and household appliance
+integration are developed here.
+
+The predecessor acknowledges ideas and code from
+[TVHClient](https://github.com/rsiebert/TVHClient). See `NOTICE.md` for third-party
+attribution and the unresolved native-distribution boundary.
 
 ## License
 
 The combined work is licensed under the GNU General Public License v3.0. See
-`LICENSE`. Distribution of binaries must be accompanied by the corresponding
-source and applicable third-party license material.
+`LICENSE`. Distributed binaries must be accompanied by corresponding source and
+all applicable third-party license and notice material.

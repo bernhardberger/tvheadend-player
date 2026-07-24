@@ -51,7 +51,7 @@ revision or procedure produced the checked-in binaries:
 The FFmpeg archive exposes decoders for Vorbis, Opus, FLAC, ALAC, G.711,
 MP1/MP2/MP3, AMR-NB/WB, AAC, AC3, EAC3, DTS, TrueHD, H.264, and HEVC. The
 checked-in binary does not disclose the complete configure invocation. The
-Leoville playback path currently relies on the FFmpeg extension specifically as
+accepted household playback path relies on the FFmpeg extension specifically as
 the MP1/MP2 fallback for the TCL's failing platform decoder.
 
 ## License observations

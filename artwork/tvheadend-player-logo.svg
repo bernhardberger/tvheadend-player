@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="300" viewBox="0 0 960 300">
+  <title>TVHeadend Player logo</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#112240"/>
+      <stop offset="1" stop-color="#080f1e"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="300" fill="url(#bg)"/>
+  <rect x="55" y="55" width="190" height="190" rx="42" fill="#101d33" stroke="#324a6b" stroke-width="4"/>
+  <rect x="89" y="103" width="84" height="14" rx="7" fill="#f4f7fb"/>
+  <rect x="89" y="131" width="101" height="14" rx="7" fill="#59c3ff"/>
+  <rect x="89" y="160" width="65" height="14" rx="7" fill="#657cff"/>
+  <rect x="89" y="188" width="91" height="14" rx="7" fill="#f4f7fb"/>
+  <rect x="196" y="93" width="13" height="118" rx="7" fill="#ffb454"/>
+  <text x="290" y="145" fill="#f4f7fb" font-family="DejaVu Sans, sans-serif" font-size="54" font-weight="700">TVHeadend Player</text>
+  <text x="290" y="190" fill="#b5c1d4" font-family="DejaVu Sans, sans-serif" font-size="18">Live TV client for TVHeadend servers</text>
+</svg>
