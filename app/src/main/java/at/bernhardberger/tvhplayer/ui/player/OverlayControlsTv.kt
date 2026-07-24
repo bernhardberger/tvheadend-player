@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -41,13 +43,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import androidx.tv.material3.Icon
+import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
+import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.formatHms
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
@@ -67,6 +72,11 @@ fun OverlayControlsTv(
     onUserInteraction: () -> Unit,
     aspectRatio: AspectRatioMode,
     onAspectRatioChange: () -> Unit,
+    timeshiftState: TimeshiftState,
+    timeshiftFeedback: String?,
+    onToggleTimeshiftPause: () -> Unit,
+    onSeekTimeshift: (Long) -> Unit,
+    onGoLive: () -> Unit,
 ) {
     var showAudio by remember { mutableStateOf(false) }
     var showSubs by remember { mutableStateOf(false) }
@@ -76,12 +86,23 @@ fun OverlayControlsTv(
     val aspectFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
     val subtitleFocus = remember { FocusRequester() }
-    val focusRequesters = remember {
+    val pauseFocus = remember { FocusRequester() }
+    val backFocus = remember { FocusRequester() }
+    val forwardFocus = remember { FocusRequester() }
+    val liveFocus = remember { FocusRequester() }
+    val baseFocusRequesters = remember {
         listOf(stopFocus, aspectFocus, audioFocus, subtitleFocus)
     }
 
-    LaunchedEffect(controlsVisible) {
-        if (controlsVisible) focusRequesters.getOrNull(lastFocused)?.requestFocus()
+    LaunchedEffect(controlsVisible, timeshiftState.available) {
+        if (controlsVisible) {
+            val requesters = if (timeshiftState.available) {
+                baseFocusRequesters + listOf(pauseFocus, backFocus, forwardFocus, liveFocus)
+            } else {
+                baseFocusRequesters
+            }
+            requesters.getOrElse(lastFocused) { stopFocus }.requestFocus()
+        }
     }
 
     val progress = remember(nowEvent, nowSec) { nowEvent?.progress(nowSec) ?: 0f }
@@ -177,6 +198,49 @@ fun OverlayControlsTv(
                     .height(4.dp),
             )
 
+            if (timeshiftState.available) {
+                Spacer(Modifier.height(14.dp))
+                val bufferDuration = (
+                    timeshiftState.liveEdgeMs - timeshiftState.bufferStartMs
+                ).coerceAtLeast(1L)
+                val bufferProgress = (
+                    timeshiftState.positionMs - timeshiftState.bufferStartMs
+                ).toFloat() / bufferDuration.toFloat()
+                Row(Modifier.fillMaxWidth()) {
+                    Text(
+                        text = stringResource(
+                            R.string.timeshift_buffer_start,
+                            formatHms((-timeshiftState.bufferStartMs) / 1_000L),
+                        ),
+                        color = Color.White.copy(alpha = 0.82f),
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = if (timeshiftState.positionMs >= -1_000L) {
+                            stringResource(R.string.timeshift_live)
+                        } else {
+                            stringResource(
+                                R.string.timeshift_behind_live,
+                                formatHms((-timeshiftState.positionMs) / 1_000L),
+                            )
+                        },
+                        color = Color.White,
+                    )
+                }
+                LinearProgressIndicator(
+                    progress = { bufferProgress.coerceIn(0f, 1f) },
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = Color.White.copy(alpha = 0.24f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(5.dp),
+                )
+            }
+            timeshiftFeedback?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, color = MaterialTheme.colorScheme.primary)
+            }
+
             Spacer(Modifier.height(18.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -212,6 +276,50 @@ fun OverlayControlsTv(
                     focusRequester = subtitleFocus,
                     onFocused = { lastFocused = 3 },
                 )
+                if (timeshiftState.available) {
+                    Button(
+                        onClick = { onUserInteraction(); onToggleTimeshiftPause() },
+                        modifier = Modifier
+                            .focusRequester(pauseFocus)
+                            .onFocusChanged { if (it.isFocused) lastFocused = 4 },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (timeshiftState.paused) R.string.play else R.string.pause
+                            )
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            onUserInteraction()
+                            onSeekTimeshift(-at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
+                        },
+                        modifier = Modifier
+                            .focusRequester(backFocus)
+                            .onFocusChanged { if (it.isFocused) lastFocused = 5 },
+                    ) {
+                        Text(stringResource(R.string.seek_back_30))
+                    }
+                    Button(
+                        onClick = {
+                            onUserInteraction()
+                            onSeekTimeshift(at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
+                        },
+                        modifier = Modifier
+                            .focusRequester(forwardFocus)
+                            .onFocusChanged { if (it.isFocused) lastFocused = 6 },
+                    ) {
+                        Text(stringResource(R.string.seek_forward_30))
+                    }
+                    Button(
+                        onClick = { onUserInteraction(); onGoLive() },
+                        modifier = Modifier
+                            .focusRequester(liveFocus)
+                            .onFocusChanged { if (it.isFocused) lastFocused = 7 },
+                    ) {
+                        Text(stringResource(R.string.timeshift_go_live))
+                    }
+                }
             }
         }
     }

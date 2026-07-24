@@ -121,6 +121,7 @@ fun VideoPlayerScreen(
 
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
+    val timeshiftState by videoPlayerViewModel.timeshiftState.collectAsStateWithLifecycle()
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
     val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
@@ -133,6 +134,8 @@ fun VideoPlayerScreen(
     var drawerOpen by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
     var channelNumberInput by remember { mutableStateOf("") }
+    var timeshiftFeedback by remember { mutableStateOf<String?>(null) }
+    var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     val drawerFocus = remember { FocusRequester() }
 
     val showDrawer = drawerOpen && !controlsVisible
@@ -143,6 +146,10 @@ fun VideoPlayerScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val ctx = LocalContext.current
+    val timeshiftUnavailableText = stringResource(R.string.timeshift_unavailable)
+    val timeshiftReconnectLiveText = stringResource(R.string.timeshift_reconnect_live)
+    val timeshiftSeekClampedText = stringResource(R.string.timeshift_seek_clamped)
+    val timeshiftAtLiveText = stringResource(R.string.timeshift_at_live)
     val player = remember { videoPlayerViewModel.getPlayerInstance(ctx) }
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
@@ -211,6 +218,7 @@ fun VideoPlayerScreen(
         currentChannelId = channel.id
         currentServiceId = channel.id
         currentChannelName = channel.name
+        timeshiftFeedback = null
 
         drawerOpen = false
         showControls()
@@ -322,6 +330,10 @@ fun VideoPlayerScreen(
 
                     videoPlayerViewModel.playService(ctx, currentServiceId)
                     lastPlayedServiceId = currentServiceId
+                    if (restoreToLiveAfterReconnect) {
+                        timeshiftFeedback = timeshiftReconnectLiveText
+                        restoreToLiveAfterReconnect = false
+                    }
                 }
             }
 
@@ -330,6 +342,8 @@ fun VideoPlayerScreen(
             is ConnectionState.Error -> {
                 if (!connectionLost) {
                     connectionLost = true
+                    restoreToLiveAfterReconnect =
+                        timeshiftState.available && timeshiftState.positionMs < -1_000L
                     showControls()
                     videoPlayerViewModel.stop()
                     lastPlayedServiceId = -1
@@ -351,12 +365,46 @@ fun VideoPlayerScreen(
                     pauseKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
                     toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                 )
-                if (mediaAction != MediaPlaybackAction.NONE) {
+                if (mediaAction != MediaPlaybackAction.NONE && timeshiftState.available) {
                     when (mediaAction) {
-                        MediaPlaybackAction.PLAY -> player.play()
-                        MediaPlaybackAction.PAUSE -> player.pause()
+                        MediaPlaybackAction.PLAY -> {
+                            player.play()
+                            scope.launch {
+                                if (!videoPlayerViewModel.resumeTimeshift()) {
+                                    timeshiftFeedback =
+                                        timeshiftUnavailableText
+                                }
+                            }
+                        }
+                        MediaPlaybackAction.PAUSE -> {
+                            player.pause()
+                            scope.launch {
+                                if (!videoPlayerViewModel.pauseTimeshift()) {
+                                    player.play()
+                                    timeshiftFeedback =
+                                        timeshiftUnavailableText
+                                }
+                            }
+                        }
                         MediaPlaybackAction.TOGGLE -> {
-                            if (player.playWhenReady) player.pause() else player.play()
+                            if (timeshiftState.paused || !player.playWhenReady) {
+                                player.play()
+                                scope.launch {
+                                    if (!videoPlayerViewModel.resumeTimeshift()) {
+                                        timeshiftFeedback =
+                                            timeshiftUnavailableText
+                                    }
+                                }
+                            } else {
+                                player.pause()
+                                scope.launch {
+                                    if (!videoPlayerViewModel.pauseTimeshift()) {
+                                        player.play()
+                                        timeshiftFeedback =
+                                            timeshiftUnavailableText
+                                    }
+                                }
+                            }
                         }
                         MediaPlaybackAction.NONE -> Unit
                     }
@@ -515,7 +563,52 @@ fun VideoPlayerScreen(
                         AspectRatioMode.FORCE_4_3 -> AspectRatioMode.FIT
                     }
                     scope.launch { settingsStore.setAspectRatio(aspectRatio) }
-                }
+                },
+                timeshiftState = timeshiftState,
+                timeshiftFeedback = timeshiftFeedback,
+                onToggleTimeshiftPause = {
+                    if (timeshiftState.paused) {
+                        player.play()
+                        scope.launch {
+                            if (!videoPlayerViewModel.resumeTimeshift()) {
+                                timeshiftFeedback =
+                                    timeshiftUnavailableText
+                            }
+                        }
+                    } else {
+                        player.pause()
+                        scope.launch {
+                            if (!videoPlayerViewModel.pauseTimeshift()) {
+                                player.play()
+                                timeshiftFeedback =
+                                    timeshiftUnavailableText
+                            }
+                        }
+                    }
+                },
+                onSeekTimeshift = { deltaMs ->
+                    scope.launch {
+                        val decision = videoPlayerViewModel.seekTimeshift(deltaMs)
+                        timeshiftFeedback = if (decision?.clamped == true) {
+                            timeshiftSeekClampedText
+                        } else if (decision == null) {
+                            timeshiftUnavailableText
+                        } else {
+                            null
+                        }
+                    }
+                },
+                onGoLive = {
+                    scope.launch {
+                        val decision = videoPlayerViewModel.goLive()
+                        if (decision == null || !videoPlayerViewModel.resumeTimeshift()) {
+                            timeshiftFeedback = timeshiftUnavailableText
+                        } else {
+                            player.play()
+                            timeshiftFeedback = timeshiftAtLiveText
+                        }
+                    }
+                },
             )
         }
 

@@ -189,6 +189,14 @@
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 seconds</string>
     <string name="seek_forward_30">+30 seconds</string>
+    <string name="timeshift_buffer_start">Buffer: %1$s ago</string>
+    <string name="timeshift_live">Live</string>
+    <string name="timeshift_behind_live">%1$s behind live</string>
+    <string name="timeshift_go_live">Go live</string>
+    <string name="timeshift_seek_clamped">Reached the available buffer limit.</string>
+    <string name="timeshift_at_live">Returned to live television.</string>
+    <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
+    <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
 
     <string name="play">Play</string>
 

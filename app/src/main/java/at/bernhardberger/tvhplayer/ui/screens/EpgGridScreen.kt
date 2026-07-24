@@ -134,6 +134,7 @@ fun EpgGridScreen(
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
     val playingChannelId by playerSession.activeServiceId.collectAsStateWithLifecycle()
+    val timeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
     val lazyRowState = rememberLazyListState()
@@ -478,11 +479,16 @@ fun EpgGridScreen(
         detailsEvent?.let { event ->
             val channel = channels.firstOrNull { it.id == event.channelId }
             val recording = dvrEntries.firstOrNull { it.eventId == event.eventId }
+            val timeshiftCoversEvent = playingChannelId == event.channelId &&
+                timeshiftState.available &&
+                event.stop <= nowSec &&
+                event.start * 1_000L >= nowSec * 1_000L + timeshiftState.bufferStartMs
             ProgrammeDetailsPanel(
                 event = event,
                 channel = channel,
                 recording = recording,
                 nowSec = nowSec,
+                serverTimeshiftCoversEvent = timeshiftCoversEvent,
                 actionResult = actionResult,
                 onAction = { action ->
                     when (action) {
@@ -491,7 +497,18 @@ fun EpgGridScreen(
                             channel?.let { onPlay(it.id, it.id, it.name) }
                         }
                         ProgrammeAction.WATCH_FROM_START -> {
-                            recording?.let { onPlayRecording(it.id) }
+                            if (recording != null) {
+                                onPlayRecording(recording.id)
+                            } else if (timeshiftCoversEvent && channel != null) {
+                                val targetPositionMs = (event.start - nowSec) * 1_000L
+                                coroutineScope.launch {
+                                    playerSession.seekTimeshift(
+                                        targetPositionMs - timeshiftState.positionMs
+                                    )
+                                }
+                                detailsEvent = null
+                                onPlay(channel.id, channel.id, channel.name)
+                            }
                         }
                         ProgrammeAction.RECORD -> when (val choice = chooseDvrConfig(dvrConfigs)) {
                             is DvrConfigChoice.Automatic -> {
@@ -952,12 +969,18 @@ private fun ProgrammeDetailsPanel(
     channel: ChannelUi?,
     recording: DvrEntry?,
     nowSec: Long,
+    serverTimeshiftCoversEvent: Boolean,
     actionResult: DvrActionResult?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
 ) {
     val initialFocus = remember { FocusRequester() }
-    val actions = programmeActions(event, nowSec, recording)
+    val actions = programmeActions(
+        event,
+        nowSec,
+        recording,
+        serverTimeshiftCoversEvent = serverTimeshiftCoversEvent,
+    )
     LaunchedEffect(event.eventId, actions) { initialFocus.requestFocus() }
     BackHandler(onBack = onClose)
     DialogScrim {

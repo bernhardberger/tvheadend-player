@@ -11,12 +11,20 @@ import androidx.media3.datasource.TransferListener
 import at.bernhardberger.tvhplayer.htsp.HtspEvent
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
+import at.bernhardberger.tvhplayer.core.REQUESTED_TIMESHIFT_PERIOD_SEC
+import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
+import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvhplayer.core.timeshiftSeek
+import at.bernhardberger.tvhplayer.core.timeshiftStateFromStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 import java.io.Closeable
 import java.util.concurrent.atomic.AtomicInteger
@@ -27,7 +35,8 @@ import kotlin.math.min
 class HtspSubscriptionDataSource private constructor(
     private val context: Context,
     private val htspConnection: HtspService,
-    private val streamProfile: String?
+    private val streamProfile: String?,
+    private val sharedTimeshiftState: MutableStateFlow<TimeshiftState>,
 ) : DataSource, Closeable, HtspDataSourceInterface {
 
     private var dataSpec: DataSpec? = null
@@ -69,10 +78,17 @@ class HtspSubscriptionDataSource private constructor(
         private val streamProfile: String?
     ) : DataSource.Factory {
         private var dataSource: HtspSubscriptionDataSource? = null
+        private val _timeshiftState = MutableStateFlow(TimeshiftState())
+        val timeshiftState: StateFlow<TimeshiftState> = _timeshiftState.asStateFlow()
 
         override fun createDataSource(): DataSource {
             Timber.d("Created new data source from factory")
-            dataSource = HtspSubscriptionDataSource(context, htspConnection, streamProfile)
+            dataSource = HtspSubscriptionDataSource(
+                context,
+                htspConnection,
+                streamProfile,
+                _timeshiftState,
+            )
             return dataSource!!
         }
 
@@ -82,6 +98,8 @@ class HtspSubscriptionDataSource private constructor(
         fun releaseCurrentDataSource() {
             Timber.d("Releasing data source")
             dataSource?.release()
+            dataSource = null
+            _timeshiftState.value = TimeshiftState()
         }
     }
 
@@ -141,13 +159,14 @@ class HtspSubscriptionDataSource private constructor(
                         mapOf(
                             "subscriptionId" to subscriptionId,
                             "channelId" to channelId,
-                            "timeshiftPeriod" to timeshiftPeriod,
+                            "timeshiftPeriod" to REQUESTED_TIMESHIFT_PERIOD_SEC,
                             "profile" to streamProfile,
                         )
                     )
 
                     val availableTimeshiftPeriod = response.int("timeshiftPeriod")
                     if (availableTimeshiftPeriod != null) {
+                        timeshiftPeriod = availableTimeshiftPeriod.coerceAtLeast(0)
                         Timber.d(
                             "Available timeshift period in seconds: %s",
                             availableTimeshiftPeriod
@@ -156,38 +175,6 @@ class HtspSubscriptionDataSource private constructor(
                 }
 
                 isSubscribed = true
-            }
-        }
-
-        val seekPosition = this.dataSpec!!.position
-        if (seekPosition > 0 && timeshiftPeriod > 0) {
-            Timber.d(
-                "Sending subscription skip (subscriptionId=%s time=%d)",
-                subscriptionId,
-                seekPosition
-            )
-
-            runBlocking {
-                htspConnection.request(
-                    "subscriptionSkip",
-                    mapOf(
-                        "subscriptionId" to subscriptionId,
-                        "time" to seekPosition,
-                        "absolute" to 1
-                    )
-                )
-            }
-
-            // Clear buffered stream data on seek.
-            lock.lock()
-            try {
-                ring.clear()
-                // keep header so consumer stays sane:
-                ring.write(HtspFramedCodec.HEADER, 0, HtspFramedCodec.HEADER.size) { true }
-                notEmpty.signalAll()
-                notFull.signalAll()
-            } finally {
-                lock.unlock()
             }
         }
 
@@ -206,6 +193,20 @@ class HtspSubscriptionDataSource private constructor(
                     if (msgSubId != null && msgSubId != subscriptionId) return@collect
 
                     when (msg.method) {
+                        "timeshiftStatus" -> {
+                            val previous = sharedTimeshiftState.value
+                            sharedTimeshiftState.value = timeshiftStateFromStatus(
+                                advertisedPeriodSec = timeshiftPeriod.takeIf { it > 0 }
+                                    ?: REQUESTED_TIMESHIFT_PERIOD_SEC,
+                                shiftMicros = msg.long("shift"),
+                                startMicros = msg.long("start"),
+                                full = msg.bool("full") == true,
+                                speed = msg.int("speed")
+                                    ?: if (previous.paused) 0 else 100,
+                                nowEpochMs = System.currentTimeMillis(),
+                            )
+                        }
+
                         "subscriptionStart" -> {
                             subscriptionStarted = true
                             // Write the start frame first, then release any muxpkts that
@@ -222,6 +223,7 @@ class HtspSubscriptionDataSource private constructor(
 
                         "subscriptionStop" -> {
                             subscriptionStarted = false
+                            sharedTimeshiftState.value = TimeshiftState()
                             synchronized(startGate) {
                                 subscriptionStartWritten = false
                                 pendingMux.clear()
@@ -356,10 +358,14 @@ class HtspSubscriptionDataSource private constructor(
                 )
             )
         }
+        sharedTimeshiftState.value = sharedTimeshiftState.value.copy(paused = true)
     }
 
+    override val timeshiftState: StateFlow<TimeshiftState>
+        get() = sharedTimeshiftState.asStateFlow()
+
     override val timeshiftOffsetPts: Long
-        get() = 0
+        get() = sharedTimeshiftState.value.positionMs * 90L
 
     override fun setSpeed(tvhSpeed: Int) {
         runBlocking {
@@ -374,10 +380,12 @@ class HtspSubscriptionDataSource private constructor(
     }
 
     override val timeshiftStartTime: Long
-        get() = 0
+        get() = (
+            System.currentTimeMillis() + sharedTimeshiftState.value.bufferStartMs
+        ) / 1_000L
 
     override val timeshiftStartPts: Long
-        get() = 0
+        get() = sharedTimeshiftState.value.bufferStartMs * 90L
 
     override fun resume() {
         Timber.d("Resuming subscription data source (%d)", dataSourceNumber)
@@ -386,6 +394,39 @@ class HtspSubscriptionDataSource private constructor(
                 "subscriptionSpeed",
                 mapOf("subscriptionId" to subscriptionId, "speed" to 100)
             )
+        }
+        sharedTimeshiftState.value = sharedTimeshiftState.value.copy(paused = false)
+    }
+
+    override fun seekTimeshift(deltaMs: Long): TimeshiftSeekDecision {
+        val decision = timeshiftSeek(sharedTimeshiftState.value, deltaMs)
+        if (decision.deltaMs != 0L) {
+            runBlocking {
+                htspConnection.request(
+                    "subscriptionSkip",
+                    mapOf(
+                        "subscriptionId" to subscriptionId,
+                        "time" to decision.deltaMs * 1_000L,
+                        "absolute" to 0,
+                    )
+                )
+            }
+            clearBufferedFramesForSkip()
+        }
+        return decision
+    }
+
+    override fun goLive(): TimeshiftSeekDecision =
+        seekTimeshift(sharedTimeshiftState.value.liveEdgeMs - sharedTimeshiftState.value.positionMs)
+
+    private fun clearBufferedFramesForSkip() {
+        lock.lock()
+        try {
+            ring.clear()
+            notEmpty.signalAll()
+            notFull.signalAll()
+        } finally {
+            lock.unlock()
         }
     }
 

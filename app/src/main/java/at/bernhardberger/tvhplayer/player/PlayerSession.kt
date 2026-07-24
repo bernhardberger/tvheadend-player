@@ -13,6 +13,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.util.EventLogger
 import at.bernhardberger.tvhplayer.core.PlaybackRecoveryPolicy
+import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
+import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.player.htsp.HtspSubscriptionDataSource
 import at.bernhardberger.tvhplayer.player.htsp.HtspRecordingDataSource
@@ -29,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -79,6 +82,7 @@ class PlayerSession(
     private var playbackGeneration = 0L
     private var consecutiveFailures = 0
     private var retryJob: Job? = null
+    private var timeshiftStateJob: Job? = null
     private var recoveryEventsEnabled = false
 
     private val _state = MutableStateFlow<PlaybackSessionState>(PlaybackSessionState.Idle)
@@ -88,6 +92,8 @@ class PlayerSession(
     val activeServiceId: StateFlow<Int?> = _activeServiceId
     private val _activeRecordingId = MutableStateFlow<Int?>(null)
     val activeRecordingId: StateFlow<Int?> = _activeRecordingId
+    private val _timeshiftState = MutableStateFlow(TimeshiftState())
+    val timeshiftState: StateFlow<TimeshiftState> = _timeshiftState
 
     private var playWhenReadyState = true
     private var currentItem = 0
@@ -314,6 +320,10 @@ class PlayerSession(
                     settings.profile,
                 )
                 dataSourceFactory = factory
+                timeshiftStateJob?.cancel()
+                timeshiftStateJob = mainScope.launch {
+                    factory.timeshiftState.collectLatest { _timeshiftState.value = it }
+                }
                 val mediaSource = ProgressiveMediaSource.Factory(
                     factory,
                     TvheadendExtractorsFactory(),
@@ -411,6 +421,9 @@ class PlayerSession(
                     retryJob?.cancel()
                     retryJob = null
                     watchdogJob?.cancel()
+                    timeshiftStateJob?.cancel()
+                    timeshiftStateJob = null
+                    _timeshiftState.value = TimeshiftState()
                     recoveryEventsEnabled = false
                     _state.value = PlaybackSessionState.Idle
                     player?.let { p ->
@@ -435,6 +448,9 @@ class PlayerSession(
                     retryJob?.cancel()
                     retryJob = null
                     watchdogJob?.cancel()
+                    timeshiftStateJob?.cancel()
+                    timeshiftStateJob = null
+                    _timeshiftState.value = TimeshiftState()
                     recoveryEventsEnabled = false
                     _state.value = PlaybackSessionState.Idle
                     player?.let { p ->
@@ -454,10 +470,52 @@ class PlayerSession(
         val recordingFactory = recordingDataSourceFactory
         dataSourceFactory = null
         recordingDataSourceFactory = null
+        timeshiftStateJob?.cancel()
+        timeshiftStateJob = null
+        _timeshiftState.value = TimeshiftState()
         withContext(Dispatchers.IO) {
             liveFactory?.releaseCurrentDataSource()
             recordingFactory?.releaseCurrentDataSource()
         }
+    }
+
+    suspend fun pauseTimeshift(): Boolean = withContext(Dispatchers.IO) {
+        val source = dataSourceFactory?.currentDataSource ?: return@withContext false
+        if (!source.timeshiftState.value.available) return@withContext false
+        runCatching { source.pause() }.isSuccess.also { success ->
+            if (!success) disableTimeshiftForCurrentSubscription()
+        }
+    }
+
+    suspend fun resumeTimeshift(): Boolean = withContext(Dispatchers.IO) {
+        val source = dataSourceFactory?.currentDataSource ?: return@withContext false
+        if (!source.timeshiftState.value.available) return@withContext false
+        runCatching { source.resume() }.isSuccess.also { success ->
+            if (!success) disableTimeshiftForCurrentSubscription()
+        }
+    }
+
+    suspend fun seekTimeshift(deltaMs: Long): TimeshiftSeekDecision? =
+        withContext(Dispatchers.IO) {
+            val source = dataSourceFactory?.currentDataSource ?: return@withContext null
+            if (!source.timeshiftState.value.available) return@withContext null
+            runCatching { source.seekTimeshift(deltaMs) }.getOrNull().also {
+                if (it == null) disableTimeshiftForCurrentSubscription()
+            }
+        }
+
+    suspend fun goLive(): TimeshiftSeekDecision? = withContext(Dispatchers.IO) {
+        val source = dataSourceFactory?.currentDataSource ?: return@withContext null
+        if (!source.timeshiftState.value.available) return@withContext null
+        runCatching { source.goLive() }.getOrNull().also {
+            if (it == null) disableTimeshiftForCurrentSubscription()
+        }
+    }
+
+    private fun disableTimeshiftForCurrentSubscription() {
+        timeshiftStateJob?.cancel()
+        timeshiftStateJob = null
+        _timeshiftState.value = TimeshiftState()
     }
 
     private fun updateState(p: ExoPlayer) {

@@ -13,6 +13,7 @@ class VideoPlayerViewModel(
 ) : ViewModel() {
     val connectionState = htspService.state
     val playbackState = playerSession.state
+    val timeshiftState = playerSession.timeshiftState
 
     fun getPlayerInstance(context: Context) =
         playerSession.getOrCreatePlayer(context)
@@ -24,6 +25,14 @@ class VideoPlayerViewModel(
     suspend fun stop() {
         playerSession.stop()
     }
+
+    suspend fun pauseTimeshift() = playerSession.pauseTimeshift()
+
+    suspend fun resumeTimeshift() = playerSession.resumeTimeshift()
+
+    suspend fun seekTimeshift(deltaMs: Long) = playerSession.seekTimeshift(deltaMs)
+
+    suspend fun goLive() = playerSession.goLive()
 
     fun epgForChannel(channelId: Int) = repo.epgForChannel(channelId)
 }
