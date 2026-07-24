@@ -185,6 +185,8 @@
     <string name="timeshift_at_live">Zur Live-Sendung zurückgekehrt.</string>
     <string name="timeshift_reconnect_live">Der Server konnte die vorherige Position nicht bestätigen. Zur Live-Sendung zurückgekehrt.</string>
     <string name="timeshift_unavailable">Timeshift ist für diesen Server oder dieses Stream-Profil nicht verfügbar.</string>
+    <string name="timeshift_setting">Timeshift</string>
+    <string name="timeshift_setting_description">Diesem Client erlauben, für Live-TV einen Timeshift-Puffer vom Server anzufordern.</string>
     <string name="simple_tv_enabled">Einfaches TV aktivieren</string>
     <string name="simple_tv_epg">Programm erlauben</string>
     <string name="simple_tv_recordings">Aufnahmen erlauben</string>

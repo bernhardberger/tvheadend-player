@@ -14,14 +14,17 @@ import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.core.REQUESTED_TIMESHIFT_PERIOD_SEC
 import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvhplayer.core.timeshiftAbsoluteTargetUs
 import at.bernhardberger.tvhplayer.core.timeshiftSeek
 import at.bernhardberger.tvhplayer.core.timeshiftStateFromStatus
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +39,7 @@ class HtspSubscriptionDataSource private constructor(
     private val context: Context,
     private val htspConnection: HtspService,
     private val streamProfile: String?,
+    private val timeshiftEnabled: Boolean,
     private val sharedTimeshiftState: MutableStateFlow<TimeshiftState>,
 ) : DataSource, Closeable, HtspDataSourceInterface {
 
@@ -49,6 +53,8 @@ class HtspSubscriptionDataSource private constructor(
 
     private val jobScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var eventJob: Job? = null
+    @Volatile
+    private var pendingSkip: CompletableDeferred<Boolean>? = null
 
     // ---------- subscriptionStart / muxpkt ordering ----------
     // The control-event and mux-event flows are collected by two independent
@@ -75,7 +81,8 @@ class HtspSubscriptionDataSource private constructor(
     class Factory internal constructor(
         private val context: Context,
         private val htspConnection: HtspService,
-        private val streamProfile: String?
+        private val streamProfile: String?,
+        private val timeshiftEnabled: Boolean,
     ) : DataSource.Factory {
         private var dataSource: HtspSubscriptionDataSource? = null
         private val _timeshiftState = MutableStateFlow(TimeshiftState())
@@ -87,6 +94,7 @@ class HtspSubscriptionDataSource private constructor(
                 context,
                 htspConnection,
                 streamProfile,
+                timeshiftEnabled,
                 _timeshiftState,
             )
             return dataSource!!
@@ -159,7 +167,11 @@ class HtspSubscriptionDataSource private constructor(
                         mapOf(
                             "subscriptionId" to subscriptionId,
                             "channelId" to channelId,
-                            "timeshiftPeriod" to REQUESTED_TIMESHIFT_PERIOD_SEC,
+                            "timeshiftPeriod" to if (timeshiftEnabled) {
+                                REQUESTED_TIMESHIFT_PERIOD_SEC
+                            } else {
+                                0
+                            },
                             "profile" to streamProfile,
                         )
                     )
@@ -200,6 +212,7 @@ class HtspSubscriptionDataSource private constructor(
                                     ?: REQUESTED_TIMESHIFT_PERIOD_SEC,
                                 shiftMicros = msg.long("shift"),
                                 startMicros = msg.long("start"),
+                                endMicros = msg.long("end"),
                                 full = msg.bool("full") == true,
                                 speed = msg.int("speed")
                                     ?: if (previous.paused) 0 else 100,
@@ -223,6 +236,7 @@ class HtspSubscriptionDataSource private constructor(
 
                         "subscriptionStop" -> {
                             subscriptionStarted = false
+                            pendingSkip?.complete(false)
                             sharedTimeshiftState.value = TimeshiftState()
                             synchronized(startGate) {
                                 subscriptionStartWritten = false
@@ -236,6 +250,10 @@ class HtspSubscriptionDataSource private constructor(
                                 lock.unlock()
                             }
                         }
+
+                        "subscriptionSkip" -> {
+                            pendingSkip?.complete(msg.int("error") != 1)
+                        }
                     }
                 }
             }
@@ -244,6 +262,7 @@ class HtspSubscriptionDataSource private constructor(
                 htspConnection.muxEvents.collect { msg ->
                     val msgSubId = msg.int("subscriptionId")
                     if (msgSubId != null && msgSubId != subscriptionId) return@collect
+                    if (pendingSkip != null) return@collect
 
                     // If subscriptionStart hasn't been framed yet, hold the muxpkt back
                     // so the extractor never sees a packet before its stream definition.
@@ -399,19 +418,31 @@ class HtspSubscriptionDataSource private constructor(
     }
 
     override fun seekTimeshift(deltaMs: Long): TimeshiftSeekDecision {
-        val decision = timeshiftSeek(sharedTimeshiftState.value, deltaMs)
+        val state = sharedTimeshiftState.value
+        val decision = timeshiftSeek(state, deltaMs)
         if (decision.deltaMs != 0L) {
-            runBlocking {
-                htspConnection.request(
-                    "subscriptionSkip",
-                    mapOf(
-                        "subscriptionId" to subscriptionId,
-                        "time" to decision.deltaMs * 1_000L,
-                        "absolute" to 0,
+            val acknowledgement = CompletableDeferred<Boolean>()
+            pendingSkip = acknowledgement
+            try {
+                val acknowledged = runBlocking {
+                    val absoluteTargetUs = timeshiftAbsoluteTargetUs(state, decision)
+                    htspConnection.request(
+                        "subscriptionSeek",
+                        mapOf(
+                            "subscriptionId" to subscriptionId,
+                            "time" to (absoluteTargetUs ?: decision.deltaMs * 1_000L),
+                            "absolute" to if (absoluteTargetUs != null) 1 else 0,
+                        )
                     )
-                )
+                    withTimeoutOrNull(SKIP_ACK_TIMEOUT_MS) {
+                        acknowledgement.await()
+                    } == true
+                }
+                check(acknowledged) { "TVHeadend did not confirm the timeshift seek" }
+                clearBufferedFramesForSkip()
+            } finally {
+                if (pendingSkip === acknowledgement) pendingSkip = null
             }
-            clearBufferedFramesForSkip()
         }
         return decision
     }
@@ -511,6 +542,7 @@ class HtspSubscriptionDataSource private constructor(
     }
 
     companion object {
+        private const val SKIP_ACK_TIMEOUT_MS = 5_000L
         private val dataSourceCount = AtomicInteger()
         private val subscriptionCount = AtomicInteger()
 

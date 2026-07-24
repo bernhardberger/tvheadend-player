@@ -42,4 +42,16 @@ class PlaybackKeyPolicyTest {
         assertEquals(ChannelPickAction.CLOSE_DRAWER, channelPickAction(33, 33))
         assertEquals(ChannelPickAction.TUNE, channelPickAction(33, 34))
     }
+
+    @Test
+    fun overlayFocusStartsOnThePrimaryNonDestructiveAction() {
+        assertEquals(
+            PlaybackOverlayFocusTarget.TIMESHIFT_TOGGLE,
+            initialPlaybackOverlayFocus(timeshiftAvailable = true),
+        )
+        assertEquals(
+            PlaybackOverlayFocusTarget.CHANNELS,
+            initialPlaybackOverlayFocus(timeshiftAvailable = false),
+        )
+    }
 }

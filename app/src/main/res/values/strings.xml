@@ -199,6 +199,8 @@
     <string name="timeshift_at_live">Returned to live television.</string>
     <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
     <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
+    <string name="timeshift_setting">Timeshift</string>
+    <string name="timeshift_setting_description">Allow this client to request a server timeshift buffer for live TV.</string>
     <string name="simple_tv_enabled">Enable Simple TV mode</string>
     <string name="simple_tv_epg">Allow Guide</string>
     <string name="simple_tv_recordings">Allow Recordings</string>

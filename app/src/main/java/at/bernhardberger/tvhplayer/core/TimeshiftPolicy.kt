@@ -11,6 +11,8 @@ data class TimeshiftState(
     val positionMs: Long = 0,
     val liveEdgeMs: Long = 0,
     val paused: Boolean = false,
+    val serverStartUs: Long? = null,
+    val serverEndUs: Long? = null,
 )
 
 data class TimeshiftSeekDecision(
@@ -19,10 +21,20 @@ data class TimeshiftSeekDecision(
     val clamped: Boolean,
 )
 
+fun canSeekTimeshiftBackward(state: TimeshiftState): Boolean =
+    state.available && state.positionMs - state.bufferStartMs > 1_000L
+
+fun canSeekTimeshiftForward(state: TimeshiftState): Boolean =
+    state.available && state.liveEdgeMs - state.positionMs > 1_000L
+
+fun isTimeshiftActive(state: TimeshiftState): Boolean =
+    state.available && (state.paused || state.liveEdgeMs - state.positionMs > 1_000L)
+
 fun timeshiftStateFromStatus(
     advertisedPeriodSec: Int,
     shiftMicros: Long?,
     startMicros: Long?,
+    endMicros: Long?,
     full: Boolean,
     speed: Int?,
     nowEpochMs: Long,
@@ -30,21 +42,27 @@ fun timeshiftStateFromStatus(
     if (advertisedPeriodSec <= 0 || shiftMicros == null) return TimeshiftState()
     val capacityMs = advertisedPeriodSec * 1_000L
     val positionMs = -(shiftMicros.absoluteValue / 1_000L).coerceAtMost(capacityMs)
-    val startEpochMs = startMicros?.div(1_000L)
-    val reportedStartRelativeMs = startEpochMs
-        ?.takeIf { it in 1_000_000_000_000L..nowEpochMs }
-        ?.minus(nowEpochMs)
-    val bufferStartMs = when {
-        full -> -capacityMs
-        reportedStartRelativeMs != null -> reportedStartRelativeMs.coerceIn(-capacityMs, 0L)
-        else -> -capacityMs
+    val reportedDurationMs = if (
+        startMicros != null && endMicros != null && endMicros >= startMicros
+    ) {
+        ((endMicros - startMicros) / 1_000L).coerceAtMost(capacityMs)
+    } else {
+        null
     }
+    val bufferDurationMs = when {
+        reportedDurationMs != null -> reportedDurationMs
+        full -> capacityMs
+        else -> -positionMs
+    }
+    val bufferStartMs = -maxOf(bufferDurationMs.absoluteValue, positionMs.absoluteValue)
     return TimeshiftState(
         available = true,
         bufferStartMs = bufferStartMs,
         positionMs = positionMs.coerceIn(bufferStartMs, 0L),
         liveEdgeMs = 0,
         paused = speed == 0,
+        serverStartUs = startMicros,
+        serverEndUs = endMicros,
     )
 }
 
@@ -57,3 +75,14 @@ fun timeshiftSeek(state: TimeshiftState, deltaMs: Long): TimeshiftSeekDecision {
         clamped = target != state.positionMs + deltaMs,
     )
 }
+
+fun coalesceTimeshiftSeekDelta(
+    state: TimeshiftState,
+    pendingDeltaMs: Long,
+    requestedDeltaMs: Long,
+): Long = timeshiftSeek(state, pendingDeltaMs + requestedDeltaMs).deltaMs
+
+fun timeshiftAbsoluteTargetUs(
+    state: TimeshiftState,
+    decision: TimeshiftSeekDecision,
+): Long? = state.serverEndUs?.plus(decision.targetMs * 1_000L)

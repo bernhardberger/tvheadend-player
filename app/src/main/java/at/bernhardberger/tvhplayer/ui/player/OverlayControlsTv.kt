@@ -14,11 +14,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay30
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,15 +48,21 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Button
+import androidx.tv.material3.IconButton
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
+import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
+import at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward
+import at.bernhardberger.tvhplayer.core.initialPlaybackOverlayFocus
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.common.formatClock
-import at.bernhardberger.tvhplayer.ui.common.formatHms
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
@@ -68,6 +78,7 @@ fun OverlayControlsTv(
     nextEvent: EpgEventEntry?,
     nowSec: Long,
     controlsVisible: Boolean,
+    onOpenChannels: () -> Unit,
     onStopPlayback: () -> Unit,
     onUserInteraction: () -> Unit,
     aspectRatio: AspectRatioMode,
@@ -83,8 +94,9 @@ fun OverlayControlsTv(
 ) {
     var showAudio by remember { mutableStateOf(false) }
     var showSubs by remember { mutableStateOf(false) }
-    var lastFocused by rememberSaveable { mutableStateOf("stop") }
+    var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
 
+    val channelsFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
     val aspectFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
@@ -94,36 +106,58 @@ fun OverlayControlsTv(
     val forwardFocus = remember { FocusRequester() }
     val liveFocus = remember { FocusRequester() }
     val unlockFocus = remember { FocusRequester() }
+    val canSeekBack = canSeekTimeshiftBackward(timeshiftState)
+    val canSeekForward = canSeekTimeshiftForward(timeshiftState)
 
     LaunchedEffect(
         controlsVisible,
         timeshiftState.available,
+        canSeekBack,
+        canSeekForward,
         showStop,
         showUnlock,
     ) {
         if (controlsVisible) {
             val requesters = buildMap {
-                if (showStop) put("stop", stopFocus)
+                put("channels", channelsFocus)
+                if (timeshiftState.available) {
+                    put("pause", pauseFocus)
+                    if (canSeekBack) put("back", backFocus)
+                    if (canSeekForward) {
+                        put("forward", forwardFocus)
+                        put("live", liveFocus)
+                    }
+                }
                 put("aspect", aspectFocus)
                 put("audio", audioFocus)
                 put("subtitles", subtitleFocus)
-                if (timeshiftState.available) {
-                    put("pause", pauseFocus)
-                    put("back", backFocus)
-                    put("forward", forwardFocus)
-                    put("live", liveFocus)
-                }
                 if (showUnlock) put("unlock", unlockFocus)
+                if (showStop) put("stop", stopFocus)
             }
-            (requesters[lastFocused] ?: requesters.values.first()).requestFocus()
+            val initialKey = when (initialPlaybackOverlayFocus(timeshiftState.available)) {
+                PlaybackOverlayFocusTarget.TIMESHIFT_TOGGLE -> "pause"
+                PlaybackOverlayFocusTarget.CHANNELS -> "channels"
+            }
+            (lastFocused?.let(requesters::get)
+                ?: requesters[initialKey]
+                ?: requesters.values.first()).requestFocus()
         }
     }
 
-    val progress = remember(nowEvent, nowSec) { nowEvent?.progress(nowSec) ?: 0f }
+    val playbackSec = nowSec + timeshiftState.positionMs / 1_000L
+    val progress = remember(nowEvent, playbackSec) {
+        nowEvent?.progress(playbackSec) ?: 0f
+    }
     val title = remember(nowEvent) { nowEvent?.title.orEmpty() }
-    val summary = remember(nowEvent) { nowEvent?.summary?.trim().orEmpty() }
-    val timeRange = remember(nowEvent) { nowEvent?.timeRangeText().orEmpty() }
+    val eventTimeRange = remember(nowEvent) {
+        nowEvent?.let { "${formatClock(it.start)}-${formatClock(it.stop)}" }.orEmpty()
+    }
     val clock = remember(nowSec) { formatClock(nowSec) }
+
+    fun focused(key: String) {
+        lastFocused = key
+        onUserInteraction()
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -131,18 +165,18 @@ fun OverlayControlsTv(
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .background(bottomGradient)
-                .padding(start = 56.dp, end = 56.dp, top = 120.dp, bottom = 32.dp),
+                .padding(start = 56.dp, end = 56.dp, top = 96.dp, bottom = 32.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
             ) {
                 PiconBox(
                     imageLoader = imageLoader,
                     piconPath = piconPath,
                     modifier = Modifier
-                        .width(80.dp)
-                        .height(56.dp)
+                        .width(72.dp)
+                        .height(48.dp)
                         .clip(MaterialTheme.shapes.medium)
                         .background(Color.White.copy(alpha = 0.10f))
                         .padding(6.dp),
@@ -160,49 +194,53 @@ fun OverlayControlsTv(
                     Text(
                         text = title.ifEmpty { channelName },
                         color = Color.White,
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (eventTimeRange.isNotEmpty()) {
+                            Text(
+                                text = eventTimeRange,
+                                color = Color.White.copy(alpha = 0.72f),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                        if (nextEvent != null) {
+                            Text(
+                                text = stringResource(R.string.player_next_event, nextEvent.title),
+                                color = Color.White.copy(alpha = 0.72f),
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
                 Text(
                     text = clock,
                     color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                 )
             }
 
-            if (summary.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = summary,
-                    color = Color.White.copy(alpha = 0.82f),
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(0.72f),
-                )
-            }
-
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth()) {
                 Text(
-                    text = timeRange,
+                    text = nowEvent?.let { formatClock(it.start) }.orEmpty(),
                     color = Color.White.copy(alpha = 0.82f),
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Spacer(Modifier.weight(1f))
-                if (nextEvent != null) {
-                    Text(
-                        text = stringResource(R.string.player_next_event, nextEvent.title),
-                        color = Color.White.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Text(
+                    text = nowEvent?.let { formatClock(it.stop) }.orEmpty(),
+                    color = Color.White.copy(alpha = 0.82f),
+                    style = MaterialTheme.typography.labelLarge,
+                )
             }
-            Spacer(Modifier.height(8.dp))
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 color = Color.White,
@@ -211,140 +249,151 @@ fun OverlayControlsTv(
                     .fillMaxWidth()
                     .height(4.dp),
             )
-
-            if (timeshiftState.available) {
-                Spacer(Modifier.height(14.dp))
-                val bufferDuration = (
-                    timeshiftState.liveEdgeMs - timeshiftState.bufferStartMs
-                ).coerceAtLeast(1L)
-                val bufferProgress = (
-                    timeshiftState.positionMs - timeshiftState.bufferStartMs
-                ).toFloat() / bufferDuration.toFloat()
-                Row(Modifier.fillMaxWidth()) {
-                    Text(
-                        text = stringResource(
-                            R.string.timeshift_buffer_start,
-                            formatHms((-timeshiftState.bufferStartMs) / 1_000L),
-                        ),
-                        color = Color.White.copy(alpha = 0.82f),
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        text = if (timeshiftState.positionMs >= -1_000L) {
-                            stringResource(R.string.timeshift_live)
-                        } else {
-                            stringResource(
-                                R.string.timeshift_behind_live,
-                                formatHms((-timeshiftState.positionMs) / 1_000L),
-                            )
-                        },
-                        color = Color.White,
-                    )
-                }
-                LinearProgressIndicator(
-                    progress = { bufferProgress.coerceIn(0f, 1f) },
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.White.copy(alpha = 0.24f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(5.dp),
-                )
-            }
             timeshiftFeedback?.let {
                 Spacer(Modifier.height(6.dp))
                 Text(it, color = MaterialTheme.colorScheme.primary)
             }
 
             Spacer(Modifier.height(18.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                if (showStop) {
-                    RoundIconButton(
-                        icon = {
-                            Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
-                        },
-                        onClick = { onUserInteraction(); onStopPlayback() },
-                        focusRequester = stopFocus,
-                        onFocused = { lastFocused = "stop" },
-                    )
-                }
-                RoundIconButton(
-                    icon = { AspectRatioIcon(aspectRatio) },
-                    onClick = { onUserInteraction(); onAspectRatioChange() },
-                    focusRequester = aspectFocus,
-                    onFocused = { lastFocused = "aspect" },
-                )
-                RoundIconButton(
-                    icon = {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, stringResource(R.string.audio_track))
-                    },
-                    onClick = { onUserInteraction(); showAudio = true },
-                    focusRequester = audioFocus,
-                    onFocused = { lastFocused = "audio" },
-                )
-                RoundIconButton(
-                    icon = {
-                        Icon(Icons.Filled.Subtitles, stringResource(R.string.subtitles))
-                    },
-                    onClick = { onUserInteraction(); showSubs = true },
-                    focusRequester = subtitleFocus,
-                    onFocused = { lastFocused = "subtitles" },
-                )
-                if (timeshiftState.available) {
-                    Button(
-                        onClick = { onUserInteraction(); onToggleTimeshiftPause() },
+                Row(
+                    modifier = Modifier.align(Alignment.CenterStart),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = { onUserInteraction(); onOpenChannels() },
                         modifier = Modifier
-                            .focusRequester(pauseFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = "pause" },
+                            .size(52.dp)
+                            .focusRequester(channelsFocus)
+                            .onFocusChanged { if (it.isFocused) focused("channels") },
                     ) {
-                        Text(
-                            stringResource(
-                                if (timeshiftState.paused) R.string.play else R.string.pause
-                            )
+                        Icon(
+                            Icons.AutoMirrored.Filled.List,
+                            stringResource(R.string.nav_channels),
                         )
                     }
-                    Button(
-                        onClick = {
-                            onUserInteraction()
-                            onSeekTimeshift(-at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
-                        },
-                        modifier = Modifier
-                            .focusRequester(backFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = "back" },
-                    ) {
-                        Text(stringResource(R.string.seek_back_30))
+                    if (showStop) {
+                        IconButton(
+                            onClick = { onUserInteraction(); onStopPlayback() },
+                            modifier = Modifier
+                                .size(52.dp)
+                                .focusRequester(stopFocus)
+                                .onFocusChanged { if (it.isFocused) focused("stop") },
+                        ) {
+                            Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
+                        }
                     }
-                    Button(
-                        onClick = {
-                            onUserInteraction()
-                            onSeekTimeshift(at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
-                        },
-                        modifier = Modifier
-                            .focusRequester(forwardFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = "forward" },
-                    ) {
-                        Text(stringResource(R.string.seek_forward_30))
-                    }
-                    Button(
-                        onClick = { onUserInteraction(); onGoLive() },
-                        modifier = Modifier
-                            .focusRequester(liveFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = "live" },
-                    ) {
-                        Text(stringResource(R.string.timeshift_go_live))
+                    if (showUnlock) {
+                        OutlinedButton(
+                            onClick = { onUserInteraction(); onUnlock() },
+                            modifier = Modifier
+                                .focusRequester(unlockFocus)
+                                .onFocusChanged { if (it.isFocused) focused("unlock") },
+                        ) {
+                            Text(stringResource(R.string.simple_tv_unlock))
+                        }
                     }
                 }
-                if (showUnlock) {
-                    Button(
-                        onClick = { onUserInteraction(); onUnlock() },
-                        modifier = Modifier
-                            .focusRequester(unlockFocus)
-                            .onFocusChanged { if (it.isFocused) lastFocused = "unlock" },
+
+                if (timeshiftState.available) {
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(stringResource(R.string.simple_tv_unlock))
+                        if (canSeekBack) {
+                            IconButton(
+                                onClick = {
+                                    onUserInteraction()
+                                    onSeekTimeshift(-at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
+                                },
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .focusRequester(backFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("back") },
+                            ) {
+                                Icon(Icons.Filled.Replay30, stringResource(R.string.seek_back_30))
+                            }
+                        }
+                        IconButton(
+                            onClick = { onUserInteraction(); onToggleTimeshiftPause() },
+                            modifier = Modifier
+                                .size(64.dp)
+                                .focusRequester(pauseFocus)
+                                .onFocusChanged { if (it.isFocused) focused("pause") },
+                        ) {
+                            Icon(
+                                if (timeshiftState.paused) {
+                                    Icons.Filled.PlayArrow
+                                } else {
+                                    Icons.Filled.Pause
+                                },
+                                stringResource(
+                                    if (timeshiftState.paused) R.string.play else R.string.pause
+                                ),
+                            )
+                        }
+                        if (canSeekForward) {
+                            IconButton(
+                                onClick = {
+                                    onUserInteraction()
+                                    onSeekTimeshift(at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
+                                },
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .focusRequester(forwardFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("forward") },
+                            ) {
+                                Icon(
+                                    Icons.Filled.Forward30,
+                                    stringResource(R.string.seek_forward_30),
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { onUserInteraction(); onGoLive() },
+                                modifier = Modifier
+                                    .focusRequester(liveFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("live") },
+                            ) {
+                                Text(stringResource(R.string.timeshift_go_live))
+                            }
+                        }
                     }
+                }
+
+                Row(
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RoundIconButton(
+                        icon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.VolumeUp,
+                                stringResource(R.string.audio_track),
+                            )
+                        },
+                        onClick = { onUserInteraction(); showAudio = true },
+                        focusRequester = audioFocus,
+                        onFocused = { focused("audio") },
+                    )
+                    RoundIconButton(
+                        icon = {
+                            Icon(Icons.Filled.Subtitles, stringResource(R.string.subtitles))
+                        },
+                        onClick = { onUserInteraction(); showSubs = true },
+                        focusRequester = subtitleFocus,
+                        onFocused = { focused("subtitles") },
+                    )
+                    RoundIconButton(
+                        icon = { AspectRatioIcon(aspectRatio) },
+                        onClick = { onUserInteraction(); onAspectRatioChange() },
+                        focusRequester = aspectFocus,
+                        onFocused = { focused("aspect") },
+                    )
                 }
             }
         }
@@ -383,6 +432,3 @@ private fun AspectRatioIcon(aspectRatio: AspectRatioMode) {
         )
     }
 }
-
-private fun EpgEventEntry.timeRangeText(): String =
-    "${formatClock(start)}-${formatClock(stop)}"

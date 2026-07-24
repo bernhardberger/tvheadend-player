@@ -59,6 +59,7 @@ import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
 import at.bernhardberger.tvhplayer.core.channelPickAction
+import at.bernhardberger.tvhplayer.core.coalesceTimeshiftSeekDelta
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.shouldRevealPlaybackControls
@@ -81,12 +82,14 @@ import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
+private const val TIMESHIFT_SEEK_DEBOUNCE_MS = 400L
 
 internal suspend fun stopPlaybackAndClose(
     stopPlayback: suspend () -> Unit,
@@ -148,6 +151,8 @@ fun VideoPlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var channelNumberInput by remember { mutableStateOf("") }
     var timeshiftFeedback by remember { mutableStateOf<String?>(null) }
+    var pendingTimeshiftSeekMs by remember { mutableLongStateOf(0L) }
+    var timeshiftSeekJob by remember { mutableStateOf<Job?>(null) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     val drawerFocus = remember { FocusRequester() }
 
@@ -219,6 +224,8 @@ fun VideoPlayerScreen(
     }
 
     fun tuneChannel(channel: ChannelUi): Boolean {
+        timeshiftSeekJob?.cancel()
+        pendingTimeshiftSeekMs = 0L
         channelNumberInput = ""
         selection.setSelected(channel.id)
         selectedId = channel.id
@@ -563,6 +570,14 @@ fun VideoPlayerScreen(
                 nextEvent = nextEvent,
                 nowSec = nowSec,
                 controlsVisible = controlsVisible,
+                onOpenChannels = {
+                    selectedId = browsingFocusChannelId(
+                        visibleChannels = channels,
+                        currentFocusId = currentChannelId,
+                    ) ?: -1
+                    hideControls()
+                    drawerOpen = true
+                },
                 onStopPlayback = {
                     scope.launch {
                         stopPlaybackAndClose(
@@ -604,8 +619,17 @@ fun VideoPlayerScreen(
                     }
                 },
                 onSeekTimeshift = { deltaMs ->
-                    scope.launch {
-                        val decision = videoPlayerViewModel.seekTimeshift(deltaMs)
+                    pendingTimeshiftSeekMs = coalesceTimeshiftSeekDelta(
+                        state = effectiveTimeshiftState,
+                        pendingDeltaMs = pendingTimeshiftSeekMs,
+                        requestedDeltaMs = deltaMs,
+                    )
+                    timeshiftSeekJob?.cancel()
+                    timeshiftSeekJob = scope.launch {
+                        delay(TIMESHIFT_SEEK_DEBOUNCE_MS)
+                        val coalescedDeltaMs = pendingTimeshiftSeekMs
+                        pendingTimeshiftSeekMs = 0L
+                        val decision = videoPlayerViewModel.seekTimeshift(coalescedDeltaMs)
                         timeshiftFeedback = if (decision?.clamped == true) {
                             timeshiftSeekClampedText
                         } else if (decision == null) {

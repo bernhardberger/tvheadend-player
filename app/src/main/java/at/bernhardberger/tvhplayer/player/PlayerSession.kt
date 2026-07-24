@@ -318,6 +318,7 @@ class PlayerSession(
                     target.context,
                     htsp,
                     settings.profile,
+                    settings.timeshiftEnabled,
                 )
                 dataSourceFactory = factory
                 timeshiftStateJob?.cancel()

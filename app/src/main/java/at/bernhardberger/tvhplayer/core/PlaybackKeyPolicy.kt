@@ -14,6 +14,18 @@ enum class ChannelPickAction {
     TUNE,
 }
 
+enum class PlaybackOverlayFocusTarget {
+    TIMESHIFT_TOGGLE,
+    CHANNELS,
+}
+
+fun initialPlaybackOverlayFocus(timeshiftAvailable: Boolean): PlaybackOverlayFocusTarget =
+    if (timeshiftAvailable) {
+        PlaybackOverlayFocusTarget.TIMESHIFT_TOGGLE
+    } else {
+        PlaybackOverlayFocusTarget.CHANNELS
+    }
+
 fun shouldRevealPlaybackControls(controlsVisible: Boolean, keyCode: Int): Boolean {
     if (controlsVisible) return false
     return when (keyCode) {

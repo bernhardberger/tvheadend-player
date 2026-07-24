@@ -27,7 +27,8 @@ sealed interface ProfilesUiState {
 data class SettingsPlayerUiState(
     val connected: Boolean = false,
     val profiles: ProfilesUiState = ProfilesUiState.Idle,
-    val selectedProfileUuid: String? = null
+    val selectedProfileUuid: String? = null,
+    val timeshiftEnabled: Boolean = true,
 )
 
 class SettingsPlayerViewModel(
@@ -41,6 +42,15 @@ class SettingsPlayerViewModel(
     val ui: StateFlow<SettingsPlayerUiState> = _ui.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            settingsStore.playerSettings
+                .map { it.timeshiftEnabled }
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    _ui.value = _ui.value.copy(timeshiftEnabled = enabled)
+                }
+        }
+
         viewModelScope.launch {
             htsp.state.collect { st ->
                 _ui.value = _ui.value.copy(connected = st is ConnectionState.Connected)
@@ -91,6 +101,13 @@ class SettingsPlayerViewModel(
 
         viewModelScope.launch {
             settingsStore.setProfile(profile.name)
+        }
+    }
+
+    fun onTimeshiftEnabledChanged(enabled: Boolean) {
+        _ui.value = _ui.value.copy(timeshiftEnabled = enabled)
+        viewModelScope.launch {
+            settingsStore.setTimeshiftEnabled(enabled)
         }
     }
 

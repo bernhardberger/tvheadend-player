@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import at.bernhardberger.tvhplayer.htsp.HtspService
@@ -16,6 +17,7 @@ data class PlayerSettings(
     val audioLanguage: String?,
     val subtitleLanguage: String?,
     val aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
+    val timeshiftEnabled: Boolean = true,
 )
 
 class PlayerSettingsStore(private val context: Context) {
@@ -25,6 +27,7 @@ class PlayerSettingsStore(private val context: Context) {
         val AUDIO_LANGUAGE = stringPreferencesKey("audioLanguage")
         val SUBTITLE_LANGUAGE = stringPreferencesKey("subtitleLanguage")
         val ASPECT_RATIO = stringPreferencesKey("aspectRatio")
+        val TIMESHIFT_ENABLED = booleanPreferencesKey("timeshiftEnabled")
     }
 
     val playerSettings: Flow<PlayerSettings> =
@@ -37,7 +40,8 @@ class PlayerSettingsStore(private val context: Context) {
                 profile = p[Keys.PROFILE] ?: "",
                 audioLanguage = p[Keys.AUDIO_LANGUAGE]?.takeIf { it.isNotBlank() },
                 subtitleLanguage = p[Keys.SUBTITLE_LANGUAGE]?.takeIf { it.isNotBlank() },
-                aspectRatio = aspect
+                aspectRatio = aspect,
+                timeshiftEnabled = p[Keys.TIMESHIFT_ENABLED] ?: true,
             )
         }
 
@@ -46,12 +50,14 @@ class PlayerSettingsStore(private val context: Context) {
         audioLanguage: String?,
         subtitleLanguage: String?,
         aspectRatio: AspectRatioMode,
+        timeshiftEnabled: Boolean,
     ) {
         context.dataStore.edit { p ->
             p[Keys.PROFILE] = profile
             p[Keys.AUDIO_LANGUAGE] = audioLanguage.orEmpty()
             p[Keys.SUBTITLE_LANGUAGE] = subtitleLanguage.orEmpty()
             p[Keys.ASPECT_RATIO] = aspectRatio.name
+            p[Keys.TIMESHIFT_ENABLED] = timeshiftEnabled
         }
     }
 
@@ -64,6 +70,12 @@ class PlayerSettingsStore(private val context: Context) {
     suspend fun setAspectRatio(aspectRatio: AspectRatioMode) {
         context.dataStore.edit { p ->
             p[Keys.ASPECT_RATIO] = aspectRatio.name
+        }
+    }
+
+    suspend fun setTimeshiftEnabled(enabled: Boolean) {
+        context.dataStore.edit { p ->
+            p[Keys.TIMESHIFT_ENABLED] = enabled
         }
     }
 }
