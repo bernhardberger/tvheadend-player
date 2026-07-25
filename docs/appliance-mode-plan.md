@@ -80,6 +80,15 @@
   surface and remote input, and show only delayed compact feedback when tuning is
   slow. Reserve the full-screen recovery scrim for connection loss or actual
   playback recovery, not every non-playing state.
+- Give recording playback the same auto-hiding cinematic control language as
+  live TV, with recording metadata, a progress bar, icon-based transport and
+  track controls, and focus restoration. Hidden controls use Kodi-style direct
+  seeks: Left/Right move 30 seconds and Down/Up move 10 minutes; visible controls
+  retain normal D-pad focus navigation. Accumulate rapid fixed-step inputs and
+  dispatch one seek after a short debounce, keeping feedback visible while the
+  player buffers and briefly after playback resumes. Back hides visible controls
+  before a subsequent Back returns to the recordings library while playback
+  remains warm; only the explicit Stop control tears down the session.
 - Consume OK and D-pad Down when they reveal hidden playback controls so the same
   key event cannot activate a newly focused control. Treat selection of the
   current playback channel as a drawer-close action rather than a tune request.

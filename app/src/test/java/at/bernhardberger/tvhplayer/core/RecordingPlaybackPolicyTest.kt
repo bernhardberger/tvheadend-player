@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import android.view.KeyEvent
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrFile
 import at.bernhardberger.tvhplayer.htsp.DvrState
@@ -64,6 +65,139 @@ class RecordingPlaybackPolicyTest {
         assertEquals(0L, recordingSeekTarget(10_000L, 120_000L, -30_000L))
         assertEquals(120_000L, recordingSeekTarget(110_000L, 120_000L, 30_000L))
         assertEquals(70_000L, recordingSeekTarget(40_000L, null, 30_000L))
+    }
+
+    @Test
+    fun rapidSeekStepsStackFromThePendingTarget() {
+        assertEquals(
+            80_000L,
+            recordingStackedSeekTarget(
+                currentMs = 10_000L,
+                pendingTargetMs = 50_000L,
+                durationMs = 120_000L,
+                deltaMs = 30_000L,
+            ),
+        )
+        assertEquals(
+            40_000L,
+            recordingStackedSeekTarget(
+                currentMs = 10_000L,
+                pendingTargetMs = null,
+                durationMs = 120_000L,
+                deltaMs = 30_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun seekFeedbackWaitsForPlaybackToResumeOrPausedMediaToBecomeReady() {
+        assertEquals(
+            false,
+            recordingSeekFeedbackSettled(
+                playerReady = false,
+                playerEnded = false,
+                playWhenReady = true,
+                isPlaying = false,
+                playbackFailed = false,
+            ),
+        )
+        assertEquals(
+            false,
+            recordingSeekFeedbackSettled(
+                playerReady = true,
+                playerEnded = false,
+                playWhenReady = true,
+                isPlaying = false,
+                playbackFailed = false,
+            ),
+        )
+        assertEquals(
+            true,
+            recordingSeekFeedbackSettled(
+                playerReady = true,
+                playerEnded = false,
+                playWhenReady = true,
+                isPlaying = true,
+                playbackFailed = false,
+            ),
+        )
+        assertEquals(
+            true,
+            recordingSeekFeedbackSettled(
+                playerReady = true,
+                playerEnded = false,
+                playWhenReady = false,
+                isPlaying = false,
+                playbackFailed = false,
+            ),
+        )
+        assertEquals(
+            true,
+            recordingSeekFeedbackSettled(
+                playerReady = false,
+                playerEnded = true,
+                playWhenReady = true,
+                isPlaying = false,
+                playbackFailed = false,
+            ),
+        )
+        assertEquals(
+            true,
+            recordingSeekFeedbackSettled(
+                playerReady = false,
+                playerEnded = false,
+                playWhenReady = true,
+                isPlaying = false,
+                playbackFailed = true,
+            ),
+        )
+    }
+
+    @Test
+    fun hiddenPlayerUsesKodiStyleSeekKeysAndTwoStageBack() {
+        assertEquals(
+            RecordingPlaybackKeyAction.SEEK_BACK_SHORT,
+            recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_LEFT),
+        )
+        assertEquals(
+            RecordingPlaybackKeyAction.SEEK_FORWARD_SHORT,
+            recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_RIGHT),
+        )
+        assertEquals(
+            RecordingPlaybackKeyAction.SEEK_FORWARD_LONG,
+            recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_UP),
+        )
+        assertEquals(
+            RecordingPlaybackKeyAction.SEEK_BACK_LONG,
+            recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_DOWN),
+        )
+        assertEquals(
+            RecordingPlaybackKeyAction.REVEAL_CONTROLS,
+            recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+        assertEquals(
+            RecordingPlaybackKeyAction.HIDE_CONTROLS,
+            recordingPlaybackKeyAction(true, KeyEvent.KEYCODE_BACK),
+        )
+        assertEquals(
+            RecordingPlaybackKeyAction.CLOSE,
+            recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_BACK),
+        )
+    }
+
+    @Test
+    fun visiblePlayerLeavesDirectionKeysToControlFocus() {
+        listOf(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+        ).forEach { keyCode ->
+            assertEquals(
+                RecordingPlaybackKeyAction.PASS_THROUGH,
+                recordingPlaybackKeyAction(true, keyCode),
+            )
+        }
     }
 
     private fun recording(state: DvrState, path: String?, size: Long?) = DvrEntry(

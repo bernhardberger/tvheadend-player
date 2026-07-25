@@ -186,6 +186,15 @@ fun adjacentChannelId(
     into the destination rather than falling back to the main navigation. Folder
     panes summarize descendant recordings with count, storage, date range, and
     a focusable newest-first recording list that opens normal recording details.
+    Recording playback uses an auto-hiding TV overlay with metadata, elapsed and
+    total time, a seek bar, icon-based playback and track controls, and stable
+    focus. With controls hidden, Left/Right seek 30 seconds and Down/Up seek 10
+    minutes. Rapid steps accumulate on screen and dispatch as one seek after a
+    short input pause; the seek timeline and cumulative step remain visible
+    through buffering and briefly after playback resumes. With controls visible,
+    D-pad navigation moves focus normally. Back dismisses visible controls before
+    a subsequent Back returns to the recordings library without stopping
+    playback. Only the explicit Stop control tears down the recording session.
 
 ## Open questions
 

@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import android.view.KeyEvent
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 
@@ -12,6 +13,37 @@ sealed interface RecordingPlaybackAvailability {
 
     data object NotReady : RecordingPlaybackAvailability
     data object FileUnavailable : RecordingPlaybackAvailability
+}
+
+enum class RecordingPlaybackKeyAction {
+    PASS_THROUGH,
+    REVEAL_CONTROLS,
+    HIDE_CONTROLS,
+    CLOSE,
+    SEEK_BACK_SHORT,
+    SEEK_FORWARD_SHORT,
+    SEEK_BACK_LONG,
+    SEEK_FORWARD_LONG,
+}
+
+fun recordingPlaybackKeyAction(
+    controlsVisible: Boolean,
+    keyCode: Int,
+): RecordingPlaybackKeyAction = when {
+    keyCode == KeyEvent.KEYCODE_BACK -> if (controlsVisible) {
+        RecordingPlaybackKeyAction.HIDE_CONTROLS
+    } else {
+        RecordingPlaybackKeyAction.CLOSE
+    }
+    controlsVisible -> RecordingPlaybackKeyAction.PASS_THROUGH
+    keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+        keyCode == KeyEvent.KEYCODE_ENTER ||
+        keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER -> RecordingPlaybackKeyAction.REVEAL_CONTROLS
+    keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> RecordingPlaybackKeyAction.SEEK_BACK_SHORT
+    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> RecordingPlaybackKeyAction.SEEK_FORWARD_SHORT
+    keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> RecordingPlaybackKeyAction.SEEK_BACK_LONG
+    keyCode == KeyEvent.KEYCODE_DPAD_UP -> RecordingPlaybackKeyAction.SEEK_FORWARD_LONG
+    else -> RecordingPlaybackKeyAction.PASS_THROUGH
 }
 
 fun recordingPlaybackAvailability(entry: DvrEntry): RecordingPlaybackAvailability {
@@ -42,3 +74,24 @@ fun recordingSeekTarget(currentMs: Long, durationMs: Long?, deltaMs: Long): Long
     val upperBound = durationMs?.takeIf { it >= 0L } ?: Long.MAX_VALUE
     return (currentMs + deltaMs).coerceIn(0L, upperBound)
 }
+
+fun recordingStackedSeekTarget(
+    currentMs: Long,
+    pendingTargetMs: Long?,
+    durationMs: Long?,
+    deltaMs: Long,
+): Long = recordingSeekTarget(
+    currentMs = pendingTargetMs ?: currentMs,
+    durationMs = durationMs,
+    deltaMs = deltaMs,
+)
+
+fun recordingSeekFeedbackSettled(
+    playerReady: Boolean,
+    playerEnded: Boolean,
+    playWhenReady: Boolean,
+    isPlaying: Boolean,
+    playbackFailed: Boolean,
+): Boolean = playbackFailed ||
+    playerEnded ||
+    (playerReady && (!playWhenReady || isPlaying))
