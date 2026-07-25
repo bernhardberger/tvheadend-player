@@ -41,7 +41,9 @@ import timber.log.Timber
 internal class PlayerCommandGate {
     private val mutex = Mutex()
 
-    suspend fun <T> run(command: suspend () -> T): T = mutex.withLock { command() }
+    suspend fun <T> run(command: suspend () -> T): T = mutex.withLock {
+        withContext(NonCancellable) { command() }
+    }
 }
 
 internal fun shouldStartPlayback(activeServiceId: Int?, requestedServiceId: Int): Boolean =

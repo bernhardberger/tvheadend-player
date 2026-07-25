@@ -19,9 +19,12 @@ import at.bernhardberger.tvhplayer.core.timeshiftSeek
 import at.bernhardberger.tvhplayer.core.timeshiftStateFromStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,6 +36,22 @@ import java.io.Closeable
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.min
+
+internal fun <C, M> CoroutineScope.launchSubscriptionEventPump(
+    controlEvents: Flow<C>,
+    muxEvents: Flow<M>,
+    onControl: suspend (C) -> Unit,
+    onMux: suspend (M) -> Unit,
+): Job = launch(start = CoroutineStart.UNDISPATCHED) {
+    coroutineScope {
+        launch(start = CoroutineStart.UNDISPATCHED) {
+            controlEvents.collect { onControl(it) }
+        }
+        launch(start = CoroutineStart.UNDISPATCHED) {
+            muxEvents.collect { onMux(it) }
+        }
+    }
+}
 
 @OptIn(UnstableApi::class)
 class HtspSubscriptionDataSource private constructor(
@@ -197,86 +216,85 @@ class HtspSubscriptionDataSource private constructor(
     private fun startPumpIfNeeded() {
         if (eventJob != null) return
 
-        eventJob = jobScope.launch {
-            launch {
-                htspConnection.controlEvents.collect { ev ->
-                    val msg = (ev as? HtspEvent.ServerMessage)?.msg ?: return@collect
-                    val msgSubId = msg.int("subscriptionId")
-                    if (msgSubId != null && msgSubId != subscriptionId) return@collect
+        eventJob = jobScope.launchSubscriptionEventPump(
+            controlEvents = htspConnection.controlEvents,
+            muxEvents = htspConnection.muxEvents,
+            onControl = control@{ ev ->
+                val msg = (ev as? HtspEvent.ServerMessage)?.msg ?: return@control
+                val msgSubId = msg.int("subscriptionId")
+                if (msgSubId != null && msgSubId != subscriptionId) return@control
 
-                    when (msg.method) {
-                        "timeshiftStatus" -> {
-                            val previous = sharedTimeshiftState.value
-                            sharedTimeshiftState.value = timeshiftStateFromStatus(
-                                advertisedPeriodSec = timeshiftPeriod.takeIf { it > 0 }
-                                    ?: REQUESTED_TIMESHIFT_PERIOD_SEC,
-                                shiftMicros = msg.long("shift"),
-                                startMicros = msg.long("start"),
-                                endMicros = msg.long("end"),
-                                full = msg.bool("full") == true,
-                                speed = msg.int("speed")
-                                    ?: if (previous.paused) 0 else 100,
-                                nowEpochMs = System.currentTimeMillis(),
-                            )
+                when (msg.method) {
+                    "timeshiftStatus" -> {
+                        val previous = sharedTimeshiftState.value
+                        sharedTimeshiftState.value = timeshiftStateFromStatus(
+                            advertisedPeriodSec = timeshiftPeriod.takeIf { it > 0 }
+                                ?: REQUESTED_TIMESHIFT_PERIOD_SEC,
+                            shiftMicros = msg.long("shift"),
+                            startMicros = msg.long("start"),
+                            endMicros = msg.long("end"),
+                            full = msg.bool("full") == true,
+                            speed = msg.int("speed")
+                                ?: if (previous.paused) 0 else 100,
+                            nowEpochMs = System.currentTimeMillis(),
+                        )
+                    }
+
+                    "subscriptionStart" -> {
+                        subscriptionStarted = true
+                        // Write the start frame first, then release any muxpkts that
+                        // arrived before it (preserving their original order).
+                        writeFramedMessage(msg)
+                        val drained: List<HtspMessage>
+                        synchronized(startGate) {
+                            subscriptionStartWritten = true
+                            drained = pendingMux.toList()
+                            pendingMux.clear()
                         }
+                        drained.forEach { writeFramedMessage(it) }
+                    }
 
-                        "subscriptionStart" -> {
-                            subscriptionStarted = true
-                            // Write the start frame first, then release any muxpkts that
-                            // arrived before it (preserving their original order).
-                            writeFramedMessage(msg)
-                            val drained: List<HtspMessage>
-                            synchronized(startGate) {
-                                subscriptionStartWritten = true
-                                drained = pendingMux.toList()
-                                pendingMux.clear()
-                            }
-                            drained.forEach { writeFramedMessage(it) }
+                    "subscriptionStop" -> {
+                        subscriptionStarted = false
+                        pendingSkip?.complete(false)
+                        sharedTimeshiftState.value = TimeshiftState()
+                        synchronized(startGate) {
+                            subscriptionStartWritten = false
+                            pendingMux.clear()
                         }
-
-                        "subscriptionStop" -> {
-                            subscriptionStarted = false
-                            pendingSkip?.complete(false)
-                            sharedTimeshiftState.value = TimeshiftState()
-                            synchronized(startGate) {
-                                subscriptionStartWritten = false
-                                pendingMux.clear()
-                            }
-                            lock.lock()
-                            try {
-                                notEmpty.signalAll()
-                                notFull.signalAll()
-                            } finally {
-                                lock.unlock()
-                            }
-                        }
-
-                        "subscriptionSkip" -> {
-                            pendingSkip?.complete(msg.int("error") != 1)
+                        lock.lock()
+                        try {
+                            notEmpty.signalAll()
+                            notFull.signalAll()
+                        } finally {
+                            lock.unlock()
                         }
                     }
-                }
-            }
 
-            launch {
-                htspConnection.muxEvents.collect { msg ->
-                    val msgSubId = msg.int("subscriptionId")
-                    if (msgSubId != null && msgSubId != subscriptionId) return@collect
-                    if (pendingSkip != null) return@collect
-
-                    // If subscriptionStart hasn't been framed yet, hold the muxpkt back
-                    // so the extractor never sees a packet before its stream definition.
-                    val deferred = synchronized(startGate) {
-                        if (!subscriptionStartWritten) {
-                            pendingMux.addLast(msg)
-                            while (pendingMux.size > MAX_PENDING_MUX) pendingMux.removeFirst()
-                            true
-                        } else false
+                    "subscriptionSkip" -> {
+                        pendingSkip?.complete(msg.int("error") != 1)
                     }
-                    if (!deferred) writeFramedMessage(msg)
                 }
-            }
-        }
+            },
+            onMux = mux@{ msg ->
+                val msgSubId = msg.int("subscriptionId")
+                if (msgSubId != null && msgSubId != subscriptionId) return@mux
+                if (pendingSkip != null) return@mux
+
+                // If subscriptionStart hasn't been framed yet, hold the muxpkt back
+                // so the extractor never sees a packet before its stream definition.
+                val deferred = synchronized(startGate) {
+                    if (!subscriptionStartWritten) {
+                        pendingMux.addLast(msg)
+                        while (pendingMux.size > MAX_PENDING_MUX) pendingMux.removeFirst()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                if (!deferred) writeFramedMessage(msg)
+            },
+        )
     }
 
     override fun getUri(): Uri? = dataSpec?.uri

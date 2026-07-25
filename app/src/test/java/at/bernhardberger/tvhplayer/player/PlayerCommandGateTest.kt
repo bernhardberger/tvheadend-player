@@ -48,4 +48,29 @@ class PlayerCommandGateTest {
         joinAll(first, second)
         assertEquals(listOf("first-start", "first-end", "second"), events)
     }
+
+    @Test
+    fun acceptedCommandFinishesWhenSubmittingScopeIsCancelled() = runBlocking {
+        val gate = PlayerCommandGate()
+        val commandEntered = CompletableDeferred<Unit>()
+        val releaseCommand = CompletableDeferred<Unit>()
+        val commandFinished = CompletableDeferred<Unit>()
+
+        val submitter = launch(Dispatchers.Default) {
+            gate.run {
+                commandEntered.complete(Unit)
+                releaseCommand.await()
+                commandFinished.complete(Unit)
+            }
+        }
+        commandEntered.await()
+
+        submitter.cancel()
+        delay(50)
+        assertFalse(submitter.isCompleted)
+
+        releaseCommand.complete(Unit)
+        submitter.join()
+        assertTrue(commandFinished.isCompleted)
+    }
 }
