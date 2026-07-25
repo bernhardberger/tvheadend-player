@@ -48,8 +48,8 @@ on the Android debug keystore.
   remains only in ignored local device configuration, and tooling must verify its
   manufacturer, model, device, and product before every mutation.
 - `tools/device` enforces this boundary: production and unclassified devices
-  reject install, launch, force-stop, smoke, synthetic-key, and credential-
-  provisioning actions.
+  reject install, launch, force-stop, smoke, screenshot, synthetic-key, and
+  credential-provisioning actions.
 - A designated test device may receive TVHeadend credentials through the
   debug-only app-private provisioning path after role and complete live identity
   validation. Secret values travel only over process stdin from an ignored,
@@ -139,8 +139,9 @@ fun adjacentChannelId(
    Android TV 12 environment.
 2. Interlaced-channel playback remains at least as good as the accepted
    TVHStream diagnostic result.
-3. Physical `CH+` and `CH-` switch to adjacent visible channels and wrap at the
-   ends of the list.
+3. During fullscreen playback, physical `CH+` and `CH-` switch to adjacent
+   visible channels and wrap at the ends of the list. When a channel browser is
+   focused, they page that list without tuning until the user confirms a row.
 4. Physical `0`-`9` keys show a channel-number overlay and select the matching
    TVHeadend channel number after 1 to 3 digits. Positional numbering is used only
    when the server supplies no channel numbers at all.

@@ -1,6 +1,6 @@
 ---
 name: android-tv-device-testing
-description: Use for TVHeadend Player Android TV or TCL ADB testing, test-device credential provisioning, APK installation, playback checks, remote keys, HOME, GUIDE, standby/wake, reboot, and device diagnostics.
+description: Use for TVHeadend Player Android TV or TCL ADB testing, screenshots, test-device credential provisioning, APK installation, playback checks, remote keys, HOME, GUIDE, standby/wake, reboot, and device diagnostics.
 ---
 
 # Android TV Device Testing
@@ -25,7 +25,7 @@ dumps whenever it supports the required operation.
 
 ## Safe sequence
 
-The following mutating sequence is available only for a configured test device:
+The following restricted sequence is available only for a configured test device:
 
 ```bash
 ./tools/device doctor
@@ -35,6 +35,7 @@ The following mutating sequence is available only for a configured test device:
 ./tools/device launch
 ./tools/device current
 ./tools/device package-info
+./tools/device screenshot --confirm-safe-screen
 ```
 
 Use named key commands rather than numeric key codes:
@@ -51,6 +52,23 @@ Use named key commands rather than numeric key codes:
 For production and unclassified devices, use only bounded diagnostics such as
 `doctor`, `current`, and `package-info`. Do not bypass the role policy with raw
 ADB commands.
+
+## Screenshots
+
+After confirming that no connection, settings, password, or other secret-bearing
+screen is visible, capture the designated test TV with:
+
+```bash
+./tools/device screenshot --confirm-safe-screen
+```
+
+The default owner-only output is `/tmp/tvheadend-player-screenshot.png`. Pass
+`--output /tmp/descriptive-name.png` when retaining several comparisons. The
+wrapper requires exact test-device identity, rejects repository output paths,
+validates the PNG, and replaces the output atomically. Use the file-reading tool
+to inspect the resulting image. Screenshots can validate static layout, focus
+appearance, clipping, and text, but cannot establish video visibility or motion
+quality.
 
 ## Test credential provisioning
 
@@ -92,6 +110,8 @@ acceptable motion quality.
 ## Secret and privacy boundary
 
 - Do not dump UI hierarchies on connection/settings/password screens.
+- Do not capture screenshots while a connection, settings, password, or other
+  secret-bearing screen is visible.
 - Do not print SharedPreferences, DataStore, Android Keystore entries, app-private
   files, full `dumpsys`, or unrestricted `logcat` output.
 - Do not type credentials through an uncertain focus state.

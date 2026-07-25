@@ -54,6 +54,7 @@ import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.ChannelKeyAction
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
@@ -62,6 +63,7 @@ import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.core.coalesceTimeshiftSeekDelta
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
+import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.shouldRevealPlaybackControls
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
@@ -443,7 +445,11 @@ fun VideoPlayerScreen(
 
                 ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)?.let { direction ->
                     channelNumberInput = ""
-                    return@onPreviewKeyEvent tuneAdjacentChannel(direction)
+                    when (playbackChannelKeyAction(browserVisible = showDrawer)) {
+                        ChannelKeyAction.TUNE ->
+                            return@onPreviewKeyEvent tuneAdjacentChannel(direction)
+                        ChannelKeyAction.PAGE_LIST -> Unit
+                    }
                 }
 
                 if (channelNumberInput.isNotEmpty()) {

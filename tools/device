@@ -16,6 +16,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import NoReturn
@@ -26,7 +27,9 @@ LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
 DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
+DEFAULT_SCREENSHOT = Path("/tmp/tvheadend-player-screenshot.png")
 MAX_CREDENTIAL_FILE_BYTES = 64 * 1024
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 KEY_EVENTS = {
     "up": "KEYCODE_DPAD_UP",
     "down": "KEYCODE_DPAD_DOWN",
@@ -40,12 +43,13 @@ KEY_EVENTS = {
     "back": "KEYCODE_BACK",
     "power": "KEYCODE_POWER",
 }
-MUTATING_ACTIONS = {
+TEST_DEVICE_ACTIONS = {
     "install-debug",
     "launch",
     "force-stop",
     "smoke",
     "key",
+    "screenshot",
     "provision-test-credentials",
 }
 VALID_ROLES = {"production", "test", "unclassified"}
@@ -163,8 +167,8 @@ def require_serial(value: str | None) -> str:
     return value
 
 
-def mutation_error(role: str, action: str) -> str | None:
-    if action not in MUTATING_ACTIONS:
+def action_policy_error(role: str, action: str) -> str | None:
+    if action not in TEST_DEVICE_ACTIONS:
         return None
     if role == "test":
         return None
@@ -205,13 +209,13 @@ def identity_errors(
     expected_product = configured_value(expected_product)
 
     if require_expected and not expected_manufacturer:
-        errors.append("expected_manufacturer is required for mutating test-device actions")
+        errors.append("expected_manufacturer is required for restricted test-device actions")
     if require_expected and not expected_model:
-        errors.append("expected_model is required for mutating test-device actions")
+        errors.append("expected_model is required for restricted test-device actions")
     if require_expected and not expected_device:
-        errors.append("expected_device is required for mutating test-device actions")
+        errors.append("expected_device is required for restricted test-device actions")
     if require_expected and not expected_product:
-        errors.append("expected_product is required for mutating test-device actions")
+        errors.append("expected_product is required for restricted test-device actions")
 
     if expected_manufacturer and actual_manufacturer.casefold() != expected_manufacturer.casefold():
         errors.append(
@@ -317,6 +321,58 @@ def show_package_info(adb: str, serial: str, package_name: str) -> None:
     print("\n".join(dict.fromkeys(lines)))
 
 
+def resolve_screenshot_output(path: Path) -> Path:
+    if path.suffix.lower() != ".png":
+        fail("screenshot output must use a .png extension")
+    try:
+        output = path.expanduser().resolve()
+    except OSError as exc:
+        fail(f"cannot resolve screenshot output {path}: {exc.strerror or 'I/O error'}")
+    if output == ROOT or ROOT in output.parents:
+        fail("screenshot output must be outside the repository")
+    if not output.parent.is_dir():
+        fail(f"screenshot output directory does not exist: {output.parent}")
+    if output.is_symlink() or (output.exists() and not output.is_file()):
+        fail(f"screenshot output must be a regular file path: {output}")
+    return output
+
+
+def capture_screenshot(adb: str, serial: str, output_path: Path) -> None:
+    output = resolve_screenshot_output(output_path)
+    command = adb_command(adb, serial, "exec-out", "screencap", "-p")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{output.name}.",
+        dir=output.parent,
+    )
+    temporary = Path(temporary_name)
+    try:
+        os.chmod(temporary, stat.S_IRUSR | stat.S_IWUSR)
+        print(f"$ {shlex.join(command)} > {shlex.quote(str(output))}", flush=True)
+        with os.fdopen(descriptor, "wb") as stream:
+            result = subprocess.run(
+                command,
+                check=False,
+                stdout=stream,
+                stderr=subprocess.PIPE,
+            )
+        if result.returncode != 0:
+            detail = result.stderr.decode("utf-8", errors="replace").strip()
+            fail(
+                "screenshot capture failed with exit code "
+                f"{result.returncode}: {detail or 'no output'}"
+            )
+        with temporary.open("rb") as stream:
+            if stream.read(len(PNG_SIGNATURE)) != PNG_SIGNATURE:
+                fail("device screenshot did not return a valid PNG")
+        os.replace(temporary, output)
+        os.chmod(output, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError as exc:
+        fail(f"cannot write screenshot {output}: {exc.strerror or 'I/O error'}")
+    finally:
+        temporary.unlink(missing_ok=True)
+    print(f"screenshot={output}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -347,6 +403,21 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("force-stop", help="Force-stop the selected package")
     subparsers.add_parser("current", help="Show only the current/focused activity")
     subparsers.add_parser("package-info", help="Show bounded package metadata")
+    screenshot_parser = subparsers.add_parser(
+        "screenshot",
+        help="Capture a test-device screen to an owner-only PNG outside the repository",
+    )
+    screenshot_parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_SCREENSHOT,
+        help=f"PNG output path outside the repository (default: {DEFAULT_SCREENSHOT})",
+    )
+    screenshot_parser.add_argument(
+        "--confirm-safe-screen",
+        action="store_true",
+        help="Confirm that no credential or other secret-bearing screen is visible",
+    )
     subparsers.add_parser("smoke", help="Force-stop, launch, and show current focus")
     subparsers.add_parser(
         "provision-test-credentials",
@@ -382,9 +453,11 @@ def main() -> int:
             f"invalid device role {role!r}; expected production, test, or unclassified"
         )
 
-    policy_error = mutation_error(role, args.action)
+    policy_error = action_policy_error(role, args.action)
     if policy_error:
         fail(policy_error)
+    if args.action == "screenshot" and not args.confirm_safe_screen:
+        fail("screenshot requires --confirm-safe-screen")
 
     if args.action == "connect":
         run([adb, "connect", serial])
@@ -405,7 +478,7 @@ def main() -> int:
         )
         return 0
 
-    if args.action in MUTATING_ACTIONS:
+    if args.action in TEST_DEVICE_ACTIONS:
         require_device_ready(adb, serial)
         properties = read_device_properties(adb, serial)
         verify_configured_identity(properties, config, require_expected=True)
@@ -530,6 +603,10 @@ def main() -> int:
 
     if args.action == "package-info":
         show_package_info(adb, serial, package_name)
+        return 0
+
+    if args.action == "screenshot":
+        capture_screenshot(adb, serial, args.output)
         return 0
 
     if args.action == "key":

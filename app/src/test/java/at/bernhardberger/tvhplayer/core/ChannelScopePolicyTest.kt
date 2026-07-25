@@ -60,6 +60,25 @@ class ChannelScopePolicyTest {
         assertNull(browsingFocusChannelId(emptyList(), currentFocusId = 1))
     }
 
+    @Test
+    fun tagNavigationMovesBetweenAllChannelsAndServerTags() {
+        val tags = listOf(news, sport)
+
+        assertEquals(10, adjacentTagId(tags, activeTagId = null, direction = 1))
+        assertEquals(20, adjacentTagId(tags, activeTagId = 10, direction = 1))
+        assertEquals(10, adjacentTagId(tags, activeTagId = 20, direction = -1))
+        assertNull(adjacentTagId(tags, activeTagId = 10, direction = -1))
+    }
+
+    @Test
+    fun tagNavigationStopsAtEndpoints() {
+        val tags = listOf(news, sport)
+
+        assertNull(adjacentTagId(tags, activeTagId = null, direction = -1))
+        assertEquals(20, adjacentTagId(tags, activeTagId = 20, direction = 1))
+        assertNull(adjacentTagId(emptyList(), activeTagId = null, direction = 1))
+    }
+
     private fun channel(id: Int, number: Int, tags: Set<Int>) = ChannelUi(
         id = id,
         name = "Channel $id",

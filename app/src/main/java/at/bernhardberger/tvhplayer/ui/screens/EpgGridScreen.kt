@@ -94,7 +94,8 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TvEpgPanelAlpha
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.components.ChannelTagBar
+import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
+import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -365,17 +366,12 @@ fun EpgGridScreen(
                 .padding(TvScreenPadding)
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (event.nativeKeyEvent.keyCode) {
-                        AndroidKeyEvent.KEYCODE_CHANNEL_UP -> {
-                            pageColumns(1)
-                            true
-                        }
-                        AndroidKeyEvent.KEYCODE_CHANNEL_DOWN -> {
-                            pageColumns(-1)
-                            true
-                        }
-                        else -> false
-                    }
+                    ChannelNavigation.pageDirectionForKeyCode(
+                        event.nativeKeyEvent.keyCode
+                    )?.let {
+                        pageColumns(it)
+                        true
+                    } ?: false
                 },
         ) {
             Row(
@@ -397,7 +393,7 @@ fun EpgGridScreen(
                 onDismiss = channelViewModel::dismissUnavailableTagNotice,
             )
             if (tagNotice) Spacer(Modifier.height(8.dp))
-            ChannelTagBar(
+            ChannelTagSelector(
                 tags = channelScope.tags,
                 activeTagId = channelScope.activeTagId,
                 onSelectTag = channelViewModel::selectTag,
@@ -1217,30 +1213,6 @@ private fun dvrActionResultLabel(result: DvrActionResult): String = stringResour
         }
     }
 )
-
-private fun programmeMetadata(event: EpgEventEntry): String? = buildList {
-    event.genre?.takeIf(String::isNotBlank)?.let(::add)
-    if (event.seasonNumber != null || event.episodeNumber != null) {
-        add(
-            buildString {
-                event.seasonNumber?.let { append("S$it") }
-                event.episodeNumber?.let {
-                    if (isNotEmpty()) append(" ")
-                    append("E$it")
-                    event.episodeCount?.let { count -> append("/$count") }
-                }
-            }
-        )
-    }
-    if (event.partNumber != null) {
-        add(
-            buildString {
-                append("Part ${event.partNumber}")
-                event.partCount?.let { append("/$it") }
-            }
-        )
-    }
-}.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 
 @Composable
 private fun DialogScrim(content: @Composable ColumnScope.() -> Unit) {

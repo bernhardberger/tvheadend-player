@@ -29,9 +29,11 @@ import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -41,6 +43,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,9 +60,10 @@ import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
-import at.bernhardberger.tvhplayer.ui.components.ChannelTagBar
+import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
@@ -66,6 +72,7 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
@@ -91,8 +98,40 @@ fun ChannelsScreen(
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
 
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     val selectedRowFocus = remember { FocusRequester() }
+    var pageGeneration by remember { mutableIntStateOf(0) }
+
+    fun pageChannels(direction: Int): Boolean {
+        val currentIndex = channels.indexOfFirst { it.id == selectedId }
+        val targetIndex = ChannelNavigation.pageTargetIndex(
+            itemCount = channels.size,
+            currentIndex = currentIndex,
+            visibleItemCount = listState.layoutInfo.visibleItemsInfo.size,
+            direction = direction,
+        ) ?: return true
+        if (targetIndex == currentIndex) return true
+
+        val targetId = channels[targetIndex].id
+        val generation = ++pageGeneration
+        isRestoring = true
+        selection.setSelected(targetId)
+        coroutineScope.launch {
+            try {
+                listState.animateScrollToItem(targetIndex)
+                snapshotFlow {
+                    listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
+                }.filter { it }.first()
+                withFrameNanos { }
+                selectedRowFocus.requestFocus()
+                withFrameNanos { }
+            } finally {
+                if (pageGeneration == generation) isRestoring = false
+            }
+        }
+        return true
+    }
 
     val focusedChannel = channels.firstOrNull { it.id == selectedId }
     val focusedNow = remember(selectedId, nowSec) {
@@ -112,10 +151,6 @@ fun ChannelsScreen(
     LaunchedEffect(channels, selectedId) {
         val focusId = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
         if (focusId != selectedId) selection.setSelected(focusId)
-    }
-
-    LaunchedEffect(channelScope.activeTagId) {
-        didInitialRestore = false
     }
 
     LaunchedEffect(channels, selectedId) {
@@ -149,29 +184,23 @@ fun ChannelsScreen(
             .padding(TvScreenPadding)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.channel_list),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
+            Text(
+                stringResource(R.string.channel_list),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f),
+            )
+            if (channelScope.tags.isNotEmpty()) {
+                ChannelTagSelector(
+                    tags = channelScope.tags,
+                    activeTagId = channelScope.activeTagId,
+                    onSelectTag = channelViewModel::selectTag,
+                    modifier = Modifier.width(300.dp),
                 )
             }
         }
 
         Spacer(Modifier.height(20.dp))
-
-        UnavailableTagNotice(
-            visible = tagNotice,
-            onDismiss = channelViewModel::dismissUnavailableTagNotice,
-        )
-        if (tagNotice) Spacer(Modifier.height(12.dp))
-
-        ChannelTagBar(
-            tags = channelScope.tags,
-            activeTagId = channelScope.activeTagId,
-            onSelectTag = channelViewModel::selectTag,
-        )
-        Spacer(Modifier.height(16.dp))
 
         if (channels.isEmpty()) {
             if (channelScope.allChannels.isNotEmpty() && channelScope.activeTagId != null) {
@@ -210,38 +239,55 @@ fun ChannelsScreen(
                     .fillMaxHeight()
                     .weight(0.44f)
             ) {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
-                    modifier = Modifier
-                        .focusGroup()
-                        .focusRestorer()
-                ) {
-                    items(channels, key = { ch -> ch.id }) { ch ->
-                        val isSelected = ch.id == selectedId
-                        val now =
-                            remember(ch.id, nowSec) { channelViewModel.nowEvent(ch.id, nowSec) }
-                        val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
+                Column(Modifier.fillMaxSize()) {
+                    UnavailableTagNotice(
+                        visible = tagNotice,
+                        onDismiss = channelViewModel::dismissUnavailableTagNotice,
+                    )
+                    if (tagNotice) Spacer(Modifier.height(8.dp))
 
-                        ChannelRow(
-                            modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
-                            number = ChannelNavigation.numberForId(
-                                orderedChannelIds,
-                                channelNumbers,
-                                ch.id,
-                            ),
-                            name = ch.name,
-                            programTitle = now?.title ?: stringResource(R.string.no_epg),
-                            progress = if (now != null) prog else null,
-                            imageLoader = imageLoader,
-                            piconPath = ch.icon,
-                            focused = isSelected,
-                            onFocus = {
-                                if (!isRestoring) selection.setSelected(ch.id)
-                            },
-                            onConfirm = { onPlay(ch.id, ch.id, ch.name) }
-                        )
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusGroup()
+                            .focusRestorer()
+                            .onPreviewKeyEvent { event ->
+                                if (event.type != KeyEventType.KeyDown) {
+                                    return@onPreviewKeyEvent false
+                                }
+                                ChannelNavigation.pageDirectionForKeyCode(
+                                    event.nativeKeyEvent.keyCode
+                                )?.let(::pageChannels) ?: false
+                            }
+                    ) {
+                        items(channels, key = { ch -> ch.id }) { ch ->
+                            val isSelected = ch.id == selectedId
+                            val now =
+                                remember(ch.id, nowSec) { channelViewModel.nowEvent(ch.id, nowSec) }
+                            val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
 
+                            ChannelRow(
+                                modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
+                                number = ChannelNavigation.numberForId(
+                                    orderedChannelIds,
+                                    channelNumbers,
+                                    ch.id,
+                                ),
+                                name = ch.name,
+                                programTitle = now?.title ?: stringResource(R.string.no_epg),
+                                progress = if (now != null) prog else null,
+                                imageLoader = imageLoader,
+                                piconPath = ch.icon,
+                                focused = isSelected,
+                                onFocus = {
+                                    if (!isRestoring) selection.setSelected(ch.id)
+                                },
+                                onConfirm = { onPlay(ch.id, ch.id, ch.name) }
+                            )
+
+                        }
                     }
                 }
             }
@@ -574,6 +620,16 @@ private fun EpgDetailPane(
                     .height(6.dp)
                     .clip(MaterialTheme.shapes.small)
             )
+
+            val metadata = remember(now) { programmeMetadata(now) }
+            if (metadata != null) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = metadata,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -583,6 +639,17 @@ private fun EpgDetailPane(
                 text = now.summary,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (now?.description != null) {
+            Text(
+                text = now.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 6,
                 overflow = TextOverflow.Ellipsis
             )

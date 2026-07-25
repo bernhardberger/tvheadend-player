@@ -51,3 +51,15 @@ fun browsingFocusChannelId(
     currentFocusId: Int,
 ): Int? = visibleChannels.firstOrNull { it.id == currentFocusId }?.id
     ?: visibleChannels.firstOrNull()?.id
+
+fun adjacentTagId(
+    tags: List<ChannelTagUi>,
+    activeTagId: Int?,
+    direction: Int,
+): Int? {
+    val orderedIds = listOf<Int?>(null) + tags.map { it.id }
+    val currentIndex = orderedIds.indexOf(activeTagId).coerceAtLeast(0)
+    val targetIndex = (currentIndex + direction.coerceIn(-1, 1))
+        .coerceIn(orderedIds.indices)
+    return orderedIds[targetIndex]
+}

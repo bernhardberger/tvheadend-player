@@ -13,8 +13,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -42,6 +44,7 @@ import at.bernhardberger.tvhplayer.ui.TvPlaybackPadding
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @Composable
 fun ChannelDrawer(
@@ -56,11 +59,43 @@ fun ChannelDrawer(
     onCloseDrawer: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
 
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
+    var pageGeneration by remember { mutableIntStateOf(0) }
+
+    fun pageChannels(direction: Int): Boolean {
+        val currentIndex = channels.indexOfFirst { it.id == selectedId }
+        val targetIndex = ChannelNavigation.pageTargetIndex(
+            itemCount = channels.size,
+            currentIndex = currentIndex,
+            visibleItemCount = listState.layoutInfo.visibleItemsInfo.size,
+            direction = direction,
+        ) ?: return true
+        if (targetIndex == currentIndex) return true
+
+        val targetId = channels[targetIndex].id
+        val generation = ++pageGeneration
+        isRestoring = true
+        onFocusChannel(targetId)
+        coroutineScope.launch {
+            try {
+                listState.animateScrollToItem(targetIndex)
+                snapshotFlow {
+                    listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
+                }.filter { it }.first()
+                withFrameNanos { }
+                focusRequester.requestFocus()
+                withFrameNanos { }
+            } finally {
+                if (pageGeneration == generation) isRestoring = false
+            }
+        }
+        return true
+    }
 
     LaunchedEffect(channels, selectedId) {
         if (didInitialRestore) return@LaunchedEffect
@@ -99,6 +134,9 @@ fun ChannelDrawer(
             )
             .onPreviewKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                ChannelNavigation.pageDirectionForKeyCode(
+                    ev.nativeKeyEvent.keyCode
+                )?.let(::pageChannels)?.let { return@onPreviewKeyEvent it }
                 when (ev.key) {
                     Key.Back, Key.DirectionRight -> {
                         onCloseDrawer(); true

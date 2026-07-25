@@ -1,6 +1,9 @@
 <resources>
     <string name="channel_list">Senderliste</string>
     <string name="all_channels">Alle Sender</string>
+    <string name="choose_channel_tag">Sendergruppe wählen</string>
+    <string name="previous_channel_tag">Vorherige Sendergruppe</string>
+    <string name="next_channel_tag">Nächste Sendergruppe</string>
     <string name="empty_channel_tag">Diese Sendergruppe ist leer. Wählen Sie eine andere Gruppe oder Alle Sender.</string>
     <string name="active_tag_unavailable">Die gewählte Sendergruppe ist nicht mehr verfügbar. Alle Sender werden angezeigt.</string>
     <string name="dismiss">Ausblenden</string>

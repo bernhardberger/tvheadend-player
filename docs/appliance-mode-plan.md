@@ -143,8 +143,13 @@ aapt dump badging app/build/outputs/apk/debug/app-debug.apk
 
 **Acceptance criteria:**
 
-- `KEYCODE_CHANNEL_UP` selects the next channel and wraps at the end.
-- `KEYCODE_CHANNEL_DOWN` selects the previous channel and wraps at the start.
+- During fullscreen playback, `KEYCODE_CHANNEL_UP` selects the next channel and
+  wraps at the end; `KEYCODE_CHANNEL_DOWN` selects the previous channel and
+  wraps at the start.
+- In the root channel list and focused playback channel drawer, the same keys
+  page by one viewport with one-row overlap: `CH+` pages toward earlier rows and
+  `CH-` toward later rows. Paging stops at the list boundary and does not tune
+  until the user confirms a row.
 - Other player keys preserve current behavior.
 
 **Verification:** pure navigation unit tests and physical remote checks.

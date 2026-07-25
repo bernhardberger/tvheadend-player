@@ -31,6 +31,46 @@ class ChannelNavigationTest {
     }
 
     @Test
+    fun pageTarget_advancesByOneViewportWithOverlap() {
+        assertEquals(
+            14,
+            ChannelNavigation.pageTargetIndex(
+                itemCount = 30,
+                currentIndex = 10,
+                visibleItemCount = 5,
+                direction = 1,
+            ),
+        )
+        assertEquals(
+            6,
+            ChannelNavigation.pageTargetIndex(
+                itemCount = 30,
+                currentIndex = 10,
+                visibleItemCount = 5,
+                direction = -1,
+            ),
+        )
+    }
+
+    @Test
+    fun pageTarget_isBoundedAndDoesNotWrap() {
+        assertEquals(29, ChannelNavigation.pageTargetIndex(30, 28, 5, 1))
+        assertEquals(0, ChannelNavigation.pageTargetIndex(30, 1, 5, -1))
+    }
+
+    @Test
+    fun pageTarget_movesAtLeastOneItem() {
+        assertEquals(11, ChannelNavigation.pageTargetIndex(30, 10, 1, 1))
+    }
+
+    @Test
+    fun pageTarget_requiresItemsAndAValidCurrentIndex() {
+        assertNull(ChannelNavigation.pageTargetIndex(0, 0, 5, 1))
+        assertNull(ChannelNavigation.pageTargetIndex(3, -1, 5, 1))
+        assertNull(ChannelNavigation.pageTargetIndex(3, 3, 5, -1))
+    }
+
+    @Test
     fun staleCurrentChannel_fallsBackToFirstCurrentChannel() {
         assertEquals(10, ChannelNavigation.adjacentId(channels, 99, 1))
         assertEquals(10, ChannelNavigation.adjacentId(channels, 99, -1))
@@ -45,6 +85,13 @@ class ChannelNavigationTest {
     fun channelKeys_mapToNavigationDirection() {
         assertEquals(1, ChannelNavigation.directionForKeyCode(KeyEvent.KEYCODE_CHANNEL_UP))
         assertEquals(-1, ChannelNavigation.directionForKeyCode(KeyEvent.KEYCODE_CHANNEL_DOWN))
+    }
+
+    @Test
+    fun channelKeys_mapToConventionalPageDirection() {
+        assertEquals(-1, ChannelNavigation.pageDirectionForKeyCode(KeyEvent.KEYCODE_CHANNEL_UP))
+        assertEquals(1, ChannelNavigation.pageDirectionForKeyCode(KeyEvent.KEYCODE_CHANNEL_DOWN))
+        assertNull(ChannelNavigation.pageDirectionForKeyCode(KeyEvent.KEYCODE_DPAD_UP))
     }
 
     @Test

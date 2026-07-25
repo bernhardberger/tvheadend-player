@@ -185,9 +185,11 @@ introduce abstractions for a single use.
   `test`. The bedroom G08 is handed-over production and must use role
   `production`. The exact identities and lifecycle rules are in
   `docs/device-targets.md`.
-- `tools/device` rejects install, launch, force-stop, smoke, synthetic key, and
-  credential-provisioning actions unless the local role is `test` and all four
-  expected identity properties match.
+- `tools/device` rejects install, launch, force-stop, smoke, screenshot,
+  synthetic key, and credential-provisioning actions unless the local role is
+  `test` and all four expected identity properties match. Capture screenshots
+  only after confirming that no credential or other secret-bearing screen is
+  visible.
 - Do not modify TVHeadend server accounts, tuners, OSCam, recording storage,
   stream profiles, TCL/Google packages, or network infrastructure from this
   repository unless the user explicitly approves that separate operation.

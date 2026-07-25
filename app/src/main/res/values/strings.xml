@@ -3,6 +3,9 @@
 
     <string name="channel_list">Channel List</string>
     <string name="all_channels">All channels</string>
+    <string name="choose_channel_tag">Choose a channel tag</string>
+    <string name="previous_channel_tag">Previous channel tag</string>
+    <string name="next_channel_tag">Next channel tag</string>
     <string name="empty_channel_tag">This channel tag is empty. Choose another tag or All channels.</string>
     <string name="active_tag_unavailable">The selected channel tag is no longer available. Showing All channels.</string>
     <string name="dismiss">Dismiss</string>

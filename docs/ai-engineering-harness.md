@@ -25,7 +25,7 @@ project instructions, agents, skills, and commands.
 | `tools/check-ai-harness` | Static harness/config validation plus OpenCode parser check |
 | `tools/verify` | Native/tool/JVM/lint/Android-test compilation, debug assembly, APK identity/ABI, and 16 KB gate |
 | `tools/check-native-libs` | Audited AAR hashes, ABI/ELF checks, and a strict release-provenance gate |
-| `tools/device` | Role-aware bounded ADB wrapper that blocks production mutations, safely provisions designated test devices, and avoids secret-bearing broad dumps |
+| `tools/device` | Role-aware bounded ADB wrapper that blocks production mutations and screenshots, safely provisions designated test devices, and avoids secret-bearing broad dumps |
 
 The project intentionally does not pin an AI provider or model. It inherits the
 operator's OpenCode provider configuration while keeping project behavior and
@@ -82,6 +82,11 @@ device only, it may name an ignored owner-only `credential_file`; the bounded
 app-private importer after role and identity validation. Production and
 unclassified devices are always rejected. See
 `docs/test-device-credential-provisioning.md` for setup and cleanup.
+
+Test-device screenshots use
+`./tools/device screenshot --confirm-safe-screen`, default to an owner-only PNG
+under `/tmp`, and reject repository output paths. Never run that command while a
+credential or other secret-bearing screen is visible.
 
 ## Validation
 

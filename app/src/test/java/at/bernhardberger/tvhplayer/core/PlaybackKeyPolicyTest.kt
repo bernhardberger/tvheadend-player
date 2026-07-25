@@ -44,6 +44,12 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
+    fun channelKeysPageAnOpenBrowserAndTuneFromFullscreenPlayback() {
+        assertEquals(ChannelKeyAction.PAGE_LIST, playbackChannelKeyAction(browserVisible = true))
+        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = false))
+    }
+
+    @Test
     fun overlayFocusStartsOnThePrimaryNonDestructiveAction() {
         assertEquals(
             PlaybackOverlayFocusTarget.TIMESHIFT_TOGGLE,

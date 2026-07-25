@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import runpy
 import stat
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,9 +11,11 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 DEVICE = runpy.run_path(str(ROOT / "tools/device"), run_name="device_tool")
-mutation_error = DEVICE["mutation_error"]
+action_policy_error = DEVICE["action_policy_error"]
 identity_errors = DEVICE["identity_errors"]
 load_credential_payload = DEVICE["load_credential_payload"]
+capture_screenshot = DEVICE["capture_screenshot"]
+resolve_screenshot_output = DEVICE["resolve_screenshot_output"]
 run = DEVICE["run"]
 key_events = DEVICE["KEY_EVENTS"]
 
@@ -33,6 +36,13 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertEqual(key_events["right"], "KEYCODE_DPAD_RIGHT")
         self.assertEqual(key_events["center"], "KEYCODE_DPAD_CENTER")
 
+    def test_screenshot_requires_explicit_safe_screen_confirmation(self) -> None:
+        parser = DEVICE["build_parser"]()
+        args = parser.parse_args(["screenshot"])
+
+        self.assertFalse(args.confirm_safe_screen)
+        self.assertEqual(args.output, DEVICE["DEFAULT_SCREENSHOT"])
+
     def test_production_and_unclassified_devices_reject_mutation(self) -> None:
         for role in ("production", "unclassified"):
             for action in (
@@ -41,10 +51,11 @@ class DevicePolicyTest(unittest.TestCase):
                 "force-stop",
                 "smoke",
                 "key",
+                "screenshot",
                 "provision-test-credentials",
             ):
                 with self.subTest(role=role, action=action):
-                    self.assertIsNotNone(mutation_error(role, action))
+                    self.assertIsNotNone(action_policy_error(role, action))
 
     def test_test_device_allows_mutation(self) -> None:
         for action in (
@@ -53,16 +64,17 @@ class DevicePolicyTest(unittest.TestCase):
             "force-stop",
             "smoke",
             "key",
+            "screenshot",
             "provision-test-credentials",
         ):
             with self.subTest(action=action):
-                self.assertIsNone(mutation_error("test", action))
+                self.assertIsNone(action_policy_error("test", action))
 
     def test_read_only_actions_are_allowed_for_every_role(self) -> None:
         for role in ("production", "test", "unclassified"):
             for action in ("connect", "doctor", "current", "package-info"):
                 with self.subTest(role=role, action=action):
-                    self.assertIsNone(mutation_error(role, action))
+                    self.assertIsNone(action_policy_error(role, action))
 
     def test_test_mutation_requires_matching_expected_identity(self) -> None:
         self.assertEqual(
@@ -92,10 +104,10 @@ class DevicePolicyTest(unittest.TestCase):
                 require_expected=True,
             ),
             [
-                "expected_manufacturer is required for mutating test-device actions",
-                "expected_model is required for mutating test-device actions",
-                "expected_device is required for mutating test-device actions",
-                "expected_product is required for mutating test-device actions",
+                "expected_manufacturer is required for restricted test-device actions",
+                "expected_model is required for restricted test-device actions",
+                "expected_device is required for restricted test-device actions",
+                "expected_product is required for restricted test-device actions",
             ],
         )
         self.assertEqual(
@@ -111,10 +123,10 @@ class DevicePolicyTest(unittest.TestCase):
                 require_expected=True,
             ),
             [
-                "expected_manufacturer is required for mutating test-device actions",
-                "expected_model is required for mutating test-device actions",
-                "expected_device is required for mutating test-device actions",
-                "expected_product is required for mutating test-device actions",
+                "expected_manufacturer is required for restricted test-device actions",
+                "expected_model is required for restricted test-device actions",
+                "expected_device is required for restricted test-device actions",
+                "expected_product is required for restricted test-device actions",
             ],
         )
         self.assertEqual(
@@ -193,6 +205,31 @@ class DevicePolicyTest(unittest.TestCase):
         )
         self.assertNotIn("super-secret", output)
         self.assertIn("redacted", output)
+
+    def test_screenshot_output_must_be_png_outside_repository(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "2"):
+            resolve_screenshot_output(ROOT / "screenshot.png")
+        with self.assertRaisesRegex(SystemExit, "2"):
+            resolve_screenshot_output(Path("/tmp/tvheadend-player-screenshot.jpg"))
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "screen.png"
+            self.assertEqual(resolve_screenshot_output(output), output.resolve())
+
+    def test_screenshot_is_validated_and_written_owner_only(self) -> None:
+        png = b"\x89PNG\r\n\x1a\ncontent"
+
+        def fake_run(command, **kwargs):
+            kwargs["stdout"].write(png)
+            return subprocess.CompletedProcess(command, 0, stderr=b"")
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "screen.png"
+            with patch.object(DEVICE["subprocess"], "run", side_effect=fake_run):
+                capture_screenshot("adb", "test-device", output)
+
+            self.assertEqual(output.read_bytes(), png)
+            self.assertEqual(stat.S_IMODE(output.stat().st_mode), stat.S_IRUSR | stat.S_IWUSR)
 
 
 if __name__ == "__main__":

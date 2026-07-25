@@ -13,16 +13,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-class ChannelTagBarTest {
+class ChannelTagSelectorTest {
     @get:Rule
     val composeRule = createComposeRule()
 
     @Test
-    fun allChannelsAndServerTagsRemainSelectable() {
+    fun chooserSelectsServerTag() {
         var selectedTagId by mutableStateOf<Int?>(null)
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                ChannelTagBar(
+                ChannelTagSelector(
                     tags = listOf(ChannelTagUi(id = 7, name = "News", index = 1)),
                     activeTagId = selectedTagId,
                     onSelectTag = { selectedTagId = it },
@@ -31,6 +31,7 @@ class ChannelTagBarTest {
         }
 
         composeRule.onNodeWithText("All channels").assertIsDisplayed()
+        composeRule.onNodeWithText("All channels").performClick()
         composeRule.onNodeWithText("News").performClick()
         composeRule.runOnIdle { assertEquals(7, selectedTagId) }
     }

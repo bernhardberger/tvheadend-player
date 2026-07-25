@@ -11,6 +11,12 @@ object ChannelNavigation {
         else -> null
     }
 
+    fun pageDirectionForKeyCode(keyCode: Int): Int? = when (keyCode) {
+        KeyEvent.KEYCODE_CHANNEL_UP -> -1
+        KeyEvent.KEYCODE_CHANNEL_DOWN -> 1
+        else -> null
+    }
+
     fun digitForKeyCode(keyCode: Int): Int? = when (keyCode) {
         in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
         in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 ->
@@ -64,5 +70,18 @@ object ChannelNavigation {
 
         val offset = if (direction < 0) -1 else 1
         return orderedIds[Math.floorMod(currentIndex + offset, orderedIds.size)]
+    }
+
+    fun pageTargetIndex(
+        itemCount: Int,
+        currentIndex: Int,
+        visibleItemCount: Int,
+        direction: Int,
+    ): Int? {
+        if (itemCount <= 0 || currentIndex !in 0 until itemCount) return null
+
+        val pageSize = (visibleItemCount - 1).coerceAtLeast(1)
+        val offset = if (direction < 0) -pageSize else pageSize
+        return (currentIndex + offset).coerceIn(0, itemCount - 1)
     }
 }

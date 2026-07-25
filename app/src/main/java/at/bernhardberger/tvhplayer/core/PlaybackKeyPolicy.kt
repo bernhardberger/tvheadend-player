@@ -14,6 +14,11 @@ enum class ChannelPickAction {
     TUNE,
 }
 
+enum class ChannelKeyAction {
+    PAGE_LIST,
+    TUNE,
+}
+
 enum class PlaybackOverlayFocusTarget {
     TIMESHIFT_TOGGLE,
     CHANNELS,
@@ -43,6 +48,9 @@ fun channelPickAction(currentChannelId: Int, pickedChannelId: Int): ChannelPickA
     } else {
         ChannelPickAction.TUNE
     }
+
+fun playbackChannelKeyAction(browserVisible: Boolean): ChannelKeyAction =
+    if (browserVisible) ChannelKeyAction.PAGE_LIST else ChannelKeyAction.TUNE
 
 fun mediaPlaybackAction(
     keyCode: Int,

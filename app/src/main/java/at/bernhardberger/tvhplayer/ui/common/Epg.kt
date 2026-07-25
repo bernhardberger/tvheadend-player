@@ -18,3 +18,27 @@ fun EpgEventEntry.progress(nowSec: Long): Float {
     val pos = (nowSec - start).coerceIn(0L, dur)
     return (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f)
 }
+
+fun programmeMetadata(event: EpgEventEntry): String? = buildList {
+    event.genre?.takeIf(String::isNotBlank)?.let(::add)
+    if (event.seasonNumber != null || event.episodeNumber != null) {
+        add(
+            buildString {
+                event.seasonNumber?.let { append("S$it") }
+                event.episodeNumber?.let {
+                    if (isNotEmpty()) append(" ")
+                    append("E$it")
+                    event.episodeCount?.let { count -> append("/$count") }
+                }
+            }
+        )
+    }
+    if (event.partNumber != null) {
+        add(
+            buildString {
+                append("Part ${event.partNumber}")
+                event.partCount?.let { append("/$it") }
+            }
+        )
+    }
+}.takeIf { it.isNotEmpty() }?.joinToString(" • ")
