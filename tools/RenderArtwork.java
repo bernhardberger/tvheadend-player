@@ -78,12 +78,12 @@ public final class RenderArtwork {
                     size * 0.22f));
         }
 
-        float tvLeft = x + size * 0.14f;
-        float tvTop = y + size * 0.12f;
-        float tvWidth = size * 0.72f;
-        float tvHeight = size * 0.52f;
-        float tvRadius = size * 0.10f;
-        float bezel = size * 0.075f;
+        float tvLeft = x + size * 0.17f;
+        float tvTop = y + size * 0.20f;
+        float tvWidth = size * 0.66f;
+        float tvHeight = size * 0.43f;
+        float tvRadius = size * 0.09f;
+        float bezel = size * 0.055f;
 
         // Solid cyan TV chassis
         graphics.setColor(TVH_CYAN);
@@ -103,8 +103,8 @@ public final class RenderArtwork {
         float cy = tvTop + tvHeight * 0.5f;
 
         // Official-style orange center diamond (rounded square rotated 45°)
-        float diamondRadius = size * 0.155f;
-        float diamondCorner = size * 0.06f;
+        float diamondRadius = size * 0.085f;
+        float diamondCorner = size * 0.025f;
         RoundRectangle2D diamondRect = new RoundRectangle2D.Float(
                 cx - diamondRadius,
                 cy - diamondRadius,
@@ -118,7 +118,7 @@ public final class RenderArtwork {
         graphics.fill(diamond);
 
         // Play triangle cut through the diamond (screen-colored so it reads on any bg)
-        float play = size * 0.115f;
+        float play = size * 0.095f;
         GeneralPath triangle = new GeneralPath();
         triangle.moveTo(cx - play * 0.30f, cy - play * 0.48f);
         triangle.lineTo(cx - play * 0.30f, cy + play * 0.48f);
@@ -128,9 +128,9 @@ public final class RenderArtwork {
         graphics.fill(triangle);
 
         // Neck
-        float neckWidth = size * 0.07f;
+        float neckWidth = size * 0.055f;
         float neckTop = tvTop + tvHeight;
-        float neckBottom = y + size * 0.74f;
+        float neckBottom = y + size * 0.75f;
         graphics.setColor(TVH_CYAN);
         graphics.fill(new RoundRectangle2D.Float(
                 cx - neckWidth * 0.5f,
@@ -140,11 +140,11 @@ public final class RenderArtwork {
                 neckWidth * 0.35f,
                 neckWidth * 0.35f));
 
-        // Orange base (brand accent + “player” warmth)
-        float baseWidth = size * 0.40f;
-        float baseHeight = size * 0.075f;
+        // A single cyan silhouette keeps the orange play diamond as the focal point.
+        float baseWidth = size * 0.31f;
+        float baseHeight = size * 0.05f;
         float baseTop = y + size * 0.74f;
-        graphics.setColor(TVH_ORANGE);
+        graphics.setColor(TVH_CYAN);
         graphics.fill(new RoundRectangle2D.Float(
                 cx - baseWidth * 0.5f,
                 baseTop,
@@ -224,7 +224,7 @@ public final class RenderArtwork {
             BufferedImage image = new BufferedImage(sizes[index], sizes[index], BufferedImage.TYPE_INT_ARGB);
             Graphics2D graphics = graphics(image);
             paintBackground(graphics, sizes[index], sizes[index]);
-            drawMark(graphics, sizes[index] * 0.08f, sizes[index] * 0.08f, sizes[index] * 0.84f, false);
+            drawMark(graphics, sizes[index] * 0.02f, sizes[index] * 0.02f, sizes[index] * 0.96f, false);
             graphics.dispose();
             Path directory = Path.of("app/src/main/res/mipmap-" + densities[index]);
             writePng(image, directory.resolve("ic_launcher.png"));
@@ -244,17 +244,17 @@ public final class RenderArtwork {
                     <path
                         android:fillColor="#FFFFFFFF"
                         android:fillType="evenOdd"
-                        android:pathData="M28.1,26.6h51.8c3.6,0 6.5,2.9 6.5,6.5v30.9c0,3.6 -2.9,6.5 -6.5,6.5H28.1c-3.6,0 -6.5,-2.9 -6.5,-6.5V33.1c0,-3.6 2.9,-6.5 6.5,-6.5z M33.5,32.0h41.0c2.1,0 3.8,1.7 3.8,3.8v22.9c0,2.1 -1.7,3.8 -3.8,3.8H33.5c-2.1,0 -3.8,-1.7 -3.8,-3.8V35.8c0,-2.1 1.7,-3.8 3.8,-3.8z" />
+                        android:pathData="M30.2,32.4h47.6c3.6,0 6.5,2.9 6.5,6.5v18.0c0,3.6 -2.9,6.5 -6.5,6.5H30.2c-3.6,0 -6.5,-2.9 -6.5,-6.5V38.9c0,-3.6 2.9,-6.5 6.5,-6.5z M34.2,36.4h39.6c2.1,0 3.8,1.7 3.8,3.8v13.4c0,2.1 -1.7,3.8 -3.8,3.8H34.2c-2.1,0 -3.8,-1.7 -3.8,-3.8V40.2c0,-2.1 1.7,-3.8 3.8,-3.8z" />
                     <path
                         android:fillColor="#FFFFFFFF"
                         android:fillType="evenOdd"
-                        android:pathData="M54,37.0 L65.2,48.2 L54,59.4 L42.8,48.2 Z M50.0,42.7 L50.0,53.7 L60.4,48.2 Z" />
+                        android:pathData="M54,39.2 L62.6,47.9 L54,56.5 L45.4,47.9 Z M50.9,43.3 L50.9,52.4 L59.4,47.9 Z" />
                     <path
                         android:fillColor="#FFFFFFFF"
-                        android:pathData="M51.5,70.1h5c0.9,0 1.6,0.7 1.6,1.6v6.2c0,0.9 -0.7,1.6 -1.6,1.6h-5c-0.9,0 -1.6,-0.7 -1.6,-1.6v-6.2c0,-0.9 0.7,-1.6 1.6,-1.6z" />
+                        android:pathData="M52.0,63.0h4c0.8,0 1.4,0.6 1.4,1.4v6.9c0,0.8 -0.6,1.4 -1.4,1.4h-4c-0.8,0 -1.4,-0.6 -1.4,-1.4v-6.9c0,-0.8 0.6,-1.4 1.4,-1.4z" />
                     <path
                         android:fillColor="#FFFFFFFF"
-                        android:pathData="M39.6,79.3h28.8c2.1,0 3.8,1.7 3.8,3.8v0c0,2.1 -1.7,3.8 -3.8,3.8H39.6c-2.1,0 -3.8,-1.7 -3.8,-3.8v0c0,-2.1 1.7,-3.8 3.8,-3.8z" />
+                        android:pathData="M42.8,71.3h22.4c1.8,0 3.2,1.4 3.2,3.2v0c0,1.8 -1.4,3.2 -3.2,3.2H42.8c-1.8,0 -3.2,-1.4 -3.2,-3.2v0c0,-1.8 1.4,-3.2 3.2,-3.2z" />
                 </vector>
                 """;
         Files.writeString(
@@ -276,19 +276,19 @@ public final class RenderArtwork {
                   <rect width="960" height="300" fill="url(#bg)"/>
                   <rect x="55" y="55" width="190" height="190" rx="42" fill="#101d33" stroke="#324a6b" stroke-width="4"/>
                   <!-- TV chassis -->
-                  <rect x="81.6" y="77.8" width="136.8" height="98.8" rx="19" fill="#00BCFA"/>
+                  <rect x="87.3" y="93" width="125.4" height="81.7" rx="17.1" fill="#00BCFA"/>
                   <!-- Screen -->
-                  <rect x="95.9" y="92.1" width="108.3" height="70.3" rx="10.5" fill="#0A1A2E"/>
+                  <rect x="97.8" y="103.5" width="104.5" height="60.8" rx="9.4" fill="#0A1A2E"/>
                   <!-- Orange diamond -->
-                  <g transform="translate(150 127.2) rotate(45)">
-                    <rect x="-29.5" y="-29.5" width="58.9" height="58.9" rx="11.4" fill="#FA7F00"/>
+                  <g transform="translate(150 133.9) rotate(45)">
+                    <rect x="-16.2" y="-16.2" width="32.3" height="32.3" rx="4.8" fill="#FA7F00"/>
                   </g>
                   <!-- Play cutout -->
-                  <polygon points="138.5,109.3 138.5,145.1 174.2,127.2" fill="#0A1A2E"/>
+                  <polygon points="144.6,125.2 144.6,142.5 160.1,133.9" fill="#0A1A2E"/>
                   <!-- Neck -->
-                  <rect x="143.4" y="174.7" width="13.3" height="21.9" rx="4" fill="#00BCFA"/>
+                  <rect x="144.8" y="172.8" width="10.5" height="24.7" rx="3.7" fill="#00BCFA"/>
                   <!-- Base -->
-                  <rect x="112" y="195.6" width="76" height="14.3" rx="7.1" fill="#FA7F00"/>
+                  <rect x="120.6" y="195.6" width="58.9" height="9.5" rx="4.8" fill="#00BCFA"/>
                   <text x="290" y="145" fill="#f4f7fb" font-family="DejaVu Sans, sans-serif" font-size="54" font-weight="700">TVHeadend Player</text>
                   <text x="290" y="190" fill="#b5c1d4" font-family="DejaVu Sans, sans-serif" font-size="18">Live TV client for TVHeadend servers</text>
                 </svg>
