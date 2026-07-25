@@ -19,6 +19,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
@@ -53,10 +54,19 @@ fun AudioTrackDialog(player: Player, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.audio_track)) },
+        title = {
+            Text(
+                text = stringResource(R.string.audio_track),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        },
         text = {
             if (items.isEmpty()) {
-                Text(stringResource(R.string.no_audio_tracks))
+                Text(
+                    text = stringResource(R.string.no_audio_tracks),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items.forEach { t ->
@@ -77,7 +87,10 @@ fun AudioTrackDialog(player: Player, onDismiss: () -> Unit) {
             OutlinedButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
@@ -89,7 +102,13 @@ fun SubtitleTrackDialog(player: Player, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.subtitles)) },
+        title = {
+            Text(
+                text = stringResource(R.string.subtitles),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
@@ -103,7 +122,10 @@ fun SubtitleTrackDialog(player: Player, onDismiss: () -> Unit) {
                 )
 
                 if (items.isEmpty()) {
-                    Text(stringResource(R.string.no_subtitles))
+                    Text(
+                        text = stringResource(R.string.no_subtitles),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 } else {
                     items.forEach { t ->
                         TrackOption(
@@ -123,6 +145,9 @@ fun SubtitleTrackDialog(player: Player, onDismiss: () -> Unit) {
             OutlinedButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
