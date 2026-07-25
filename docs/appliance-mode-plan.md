@@ -9,8 +9,9 @@
 - Keep UI focus selection in memory, but persist the last channel actually sent
   to the player in Preferences DataStore.
 - Represent appliance launches as one-shot requests owned by `MainActivity`.
-  Compose consumes a request only after channels are available. Closing the
-  player with Back does not create a new request.
+  Compose creates the fresh-start request only when startup autoplay is enabled
+  and consumes a request only after channels are available. Closing the player
+  with Back does not create a new request.
 - Register for the HOME role without disabling the Google/TCL launcher. TCL's
   firmware currently blocks selection of third-party HOME apps with a
   privileged launcher priority, so boot/wake entry needs a separate safe
@@ -62,9 +63,15 @@
   action model.
 - Preserve HTSP DVR owner, path, channel, artwork, playback, and episode metadata.
   Build the Archive from sanitized server-relative file parents, preserve nested
-  folders and focus/scroll restoration, and keep Schedule and Problems as
-  separate modes. Treat TVHeadend access control as the recording-visibility
-  security boundary; client grouping is presentation, not authorization.
+  folders and focus/scroll restoration, sort each archive level newest-first,
+  and present it as a non-scaling list with persistent full metadata beside it.
+  Join DVR channel IDs to channel picons, prefer HTSP-cached programme artwork,
+  and use recursive folder summaries with count, size, timeframe, and directly
+  selectable recent recordings rather than repeating folder labels.
+  Keep Schedule and Problems as separate, opaque modes over live video and move
+  focus directly between folder levels without a navigation-rail fallback.
+  Treat TVHeadend access control as the recording-visibility security boundary;
+  client grouping is presentation, not authorization.
 - Support app-specific German and English selection and persist the
   operator preference for showing the main EPG menu.
 - Retry interrupted playback through the serialized player command gate with

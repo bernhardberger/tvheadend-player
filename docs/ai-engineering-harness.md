@@ -31,9 +31,10 @@ The project intentionally does not pin an AI provider or model. It inherits the
 operator's OpenCode provider configuration while keeping project behavior and
 safety rules in Git.
 
-Automatic/background subagents are disabled. To get an independent review,
-switch directly to `android-reviewer` or run `/upstream-review` rather than
-having the implementation agent spawn another session.
+Automatic/background subagents remain disabled for the tracked OpenCode agents.
+Codex Ultra mode has a narrow exception in `AGENTS.md` and may use subagents for
+bounded parallel work. In OpenCode, get an independent review by switching
+directly to `android-reviewer` or running `/upstream-review`.
 
 The harness treats Compose for TV as the focusable UI default, the accepted
 Media3/HTSP path as a regression boundary, incomplete native provenance as a

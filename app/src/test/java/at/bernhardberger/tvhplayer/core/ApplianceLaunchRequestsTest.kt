@@ -10,15 +10,38 @@ class ApplianceLaunchRequestsTest {
     private val channels = listOf(10, 20, 30)
 
     @Test
-    fun freshLaunch_hasOnePendingRequest() {
+    fun enabledStartup_hasOnePendingRequest() {
         val requests = ApplianceLaunchRequests()
+
+        requests.requestStartup(autoStartPlayback = true)
 
         assertNotNull(requests.pending.value)
     }
 
     @Test
+    fun disabledStartup_hasNoPendingRequest() {
+        val requests = ApplianceLaunchRequests()
+
+        requests.requestStartup(autoStartPlayback = false)
+
+        assertNull(requests.pending.value)
+    }
+
+    @Test
+    fun startupDoesNotReplacePendingExplicitRequest() {
+        val requests = ApplianceLaunchRequests()
+        requests.request()
+        val explicitRequest = requests.pending.value
+
+        requests.requestStartup(autoStartPlayback = true)
+
+        assertEquals(explicitRequest, requests.pending.value)
+    }
+
+    @Test
     fun emptyChannelList_doesNotConsumePendingRequest() {
         val requests = ApplianceLaunchRequests()
+        requests.requestStartup(autoStartPlayback = true)
         val pending = requests.pending.value
 
         assertNull(requests.resolve(emptyList(), persistedId = 20))
@@ -28,6 +51,7 @@ class ApplianceLaunchRequestsTest {
     @Test
     fun loadedChannels_resolvePersistedChannel() {
         val requests = ApplianceLaunchRequests()
+        requests.requestStartup(autoStartPlayback = true)
 
         assertEquals(20, requests.resolve(channels, persistedId = 20)?.channelId)
     }
@@ -35,6 +59,7 @@ class ApplianceLaunchRequestsTest {
     @Test
     fun stalePersistedChannel_resolvesFirstCurrentChannel() {
         val requests = ApplianceLaunchRequests()
+        requests.requestStartup(autoStartPlayback = true)
 
         assertEquals(10, requests.resolve(channels, persistedId = 99)?.channelId)
     }
@@ -42,6 +67,7 @@ class ApplianceLaunchRequestsTest {
     @Test
     fun consumedRequest_doesNotResolveAgainOnRecompositionOrResume() {
         val requests = ApplianceLaunchRequests()
+        requests.requestStartup(autoStartPlayback = true)
         val target = requireNotNull(requests.resolve(channels, persistedId = 20))
 
         assertTrue(requests.consume(target.request))
@@ -52,6 +78,7 @@ class ApplianceLaunchRequestsTest {
     @Test
     fun explicitNewRequest_startsPlaybackAgain() {
         val requests = ApplianceLaunchRequests()
+        requests.requestStartup(autoStartPlayback = true)
         val first = requireNotNull(requests.resolve(channels, persistedId = 20))
         assertTrue(requests.consume(first.request))
 
@@ -65,6 +92,7 @@ class ApplianceLaunchRequestsTest {
     @Test
     fun backWithoutExplicitLaunch_leavesNoPendingRequest() {
         val requests = ApplianceLaunchRequests()
+        requests.requestStartup(autoStartPlayback = true)
         val target = requireNotNull(requests.resolve(channels, persistedId = 20))
         assertTrue(requests.consume(target.request))
 
@@ -75,6 +103,7 @@ class ApplianceLaunchRequestsTest {
     @Test
     fun pendingStartup_canBeCancelledForOperatorAccess() {
         val requests = ApplianceLaunchRequests()
+        requests.requestStartup(autoStartPlayback = true)
         val pending = requireNotNull(requests.pending.value)
 
         assertTrue(requests.cancel(pending))

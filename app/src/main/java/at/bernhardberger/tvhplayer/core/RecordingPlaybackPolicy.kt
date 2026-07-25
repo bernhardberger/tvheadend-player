@@ -25,7 +25,7 @@ fun recordingPlaybackAvailability(entry: DvrEntry): RecordingPlaybackAvailabilit
     val file = entry.files.firstOrNull { !it.path.isNullOrBlank() }
         ?: return RecordingPlaybackAvailability.FileUnavailable
     return RecordingPlaybackAvailability.Ready(
-        path = requireNotNull(file.path),
+        path = "/dvrfile/${entry.id}",
         size = file.size,
         growing = entry.state == DvrState.RECORDING,
     )

@@ -148,9 +148,11 @@ fun adjacentChannelId(
    TVHeadend channel number after 1 to 3 digits. Positional numbering is used only
    when the server supplies no channel numbers at all.
 5. The last successfully selected channel survives process death and reboot.
-6. A fresh app, HOME, boot, wake, or GUIDE-appliance launch waits for connection
-   and channel data, then plays the persisted channel or the first channel. If
-   playback is already visible, the entry intent must not restart it.
+6. When startup autoplay is enabled, a fresh app, HOME, boot, wake, or
+   GUIDE-appliance launch waits for connection and channel data, then plays the
+   persisted channel or the first channel. When it is disabled, a fresh app
+   opens the normal UI. If playback is already visible, the entry intent must
+   not restart it.
 7. Back reveals the normal TVHeadend Player UI without an autoplay loop and keeps the
    foreground live session and video surface warm behind a readable navigation
    scrim. Back from the root Channel List returns to that fullscreen session,
@@ -178,7 +180,12 @@ fun adjacentChannelId(
     only playable completed recordings in the sanitized TVHeadend folder
     hierarchy; Schedule isolates active and future entries; Problems isolates
     failed and cancelled entries. Recording, stop, and delete operations require
-    confirmation with the safe action focused by default.
+    confirmation with the safe action focused by default. Recording folders and
+    entries use a newest-first list with an opaque persistent metadata pane;
+    focused rows do not scale or clip, and folder changes transfer focus directly
+    into the destination rather than falling back to the main navigation. Folder
+    panes summarize descendant recordings with count, storage, date range, and
+    a focusable newest-first recording list that opens normal recording details.
 
 ## Open questions
 

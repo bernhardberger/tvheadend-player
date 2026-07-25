@@ -31,12 +31,38 @@ data class DvrArchiveFolder(
     val folders: List<DvrArchiveFolder>,
     val recordings: List<DvrEntry>,
 ) {
+    val newestRecordingStart: Long?
+        get() = (recordings.map { it.start } + folders.mapNotNull { it.newestRecordingStart })
+            .maxOrNull()
+
     fun folderAt(targetPath: List<String>): DvrArchiveFolder? {
         if (targetPath.isEmpty()) return this
         val child = folders.firstOrNull { it.name == targetPath.first() } ?: return null
         return child.folderAt(targetPath.drop(1))
     }
 }
+
+data class DvrFolderSummary(
+    val recordingCount: Int,
+    val totalSizeBytes: Long,
+    val oldestStart: Long?,
+    val newestStart: Long?,
+    val recentRecordings: List<DvrEntry>,
+)
+
+fun summarizeDvrFolder(folder: DvrArchiveFolder): DvrFolderSummary {
+    val recordings = folder.descendantRecordings().sortedByDescending { it.start }
+    return DvrFolderSummary(
+        recordingCount = recordings.size,
+        totalSizeBytes = recordings.sumOf { entry -> entry.files.sumOf { it.size ?: 0L } },
+        oldestStart = recordings.minOfOrNull { it.start },
+        newestStart = recordings.maxOfOrNull { it.start },
+        recentRecordings = recordings.take(5),
+    )
+}
+
+private fun DvrArchiveFolder.descendantRecordings(): List<DvrEntry> =
+    recordings + folders.flatMap { it.descendantRecordings() }
 
 sealed interface DvrConfigChoice {
     data class Automatic(val configId: String?) : DvrConfigChoice
@@ -104,17 +130,15 @@ fun groupDvrSchedule(
     }
 }
 
-fun recordingGridPageTargetIndex(
+fun recordingListPageTargetIndex(
     itemCount: Int,
     currentIndex: Int,
-    columns: Int,
     visibleItemCount: Int,
     direction: Int,
 ): Int? {
-    if (itemCount <= 0 || currentIndex !in 0 until itemCount || columns <= 0) return null
-    val visibleRows = ((visibleItemCount + columns - 1) / columns).coerceAtLeast(1)
-    val pageRows = (visibleRows - 1).coerceAtLeast(1)
-    return (currentIndex + direction * pageRows * columns).coerceIn(0, itemCount - 1)
+    if (itemCount <= 0 || currentIndex !in 0 until itemCount) return null
+    val pageSize = (visibleItemCount - 1).coerceAtLeast(1)
+    return (currentIndex + direction * pageSize).coerceIn(0, itemCount - 1)
 }
 
 private fun recordingFolderPath(entry: DvrEntry): List<String>? {
@@ -146,10 +170,17 @@ private class MutableArchiveFolder(
     val children = linkedMapOf<String, MutableArchiveFolder>()
     val recordings = mutableListOf<DvrEntry>()
 
-    fun freeze(): DvrArchiveFolder = DvrArchiveFolder(
-        name = name,
-        path = path,
-        folders = children.values.map(MutableArchiveFolder::freeze).sortedBy { it.name.lowercase() },
-        recordings = recordings.sortedByDescending { it.start },
-    )
+    fun freeze(): DvrArchiveFolder {
+        val frozenChildren = children.values.map(MutableArchiveFolder::freeze)
+        return DvrArchiveFolder(
+            name = name,
+            path = path,
+            folders = frozenChildren.sortedWith(
+                compareByDescending<DvrArchiveFolder> {
+                    it.newestRecordingStart ?: Long.MIN_VALUE
+                }.thenBy { it.name.lowercase() }
+            ),
+            recordings = recordings.sortedByDescending { it.start },
+        )
+    }
 }

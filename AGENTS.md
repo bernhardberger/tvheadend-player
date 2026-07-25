@@ -105,8 +105,9 @@ second competing theme or move focusable controls back to mobile Material.
   build from this fork.
 - Review every diff for secrets, unrelated churn, upstreamability, and GPLv3
   attribution before pushing.
-- Do not spawn background or automatic subagents. The project agents are for
-  direct selection and explicit review sessions.
+- Codex Ultra mode may spawn automatic subagents for bounded parallel work.
+  Other project agents must not spawn background or automatic subagents; use
+  direct selection and explicit review sessions instead.
 
 Use the project-local skills when relevant:
 

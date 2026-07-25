@@ -28,6 +28,7 @@ fun PiconBox(
     imageLoader: ImageLoader,
     serverTag: String = "default",
     piconPath: String?,
+    contentScale: ContentScale = ContentScale.Fit,
     modifier: Modifier = Modifier
         .width(92.dp)
         .height(64.dp),
@@ -47,7 +48,7 @@ fun PiconBox(
                 model = piconUrl,
                 imageLoader = imageLoader,
                 contentDescription = null,
-                contentScale = ContentScale.Fit,
+                contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
                 loading = { PiconPlaceholder() },
                 error = { PiconPlaceholder() },

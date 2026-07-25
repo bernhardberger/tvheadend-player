@@ -15,4 +15,15 @@ class UiSettingsTest {
         assertFalse(resolveEpgMenuVisibility(false))
         assertTrue(resolveEpgMenuVisibility(true))
     }
+
+    @Test
+    fun playbackAutoStart_isEnabledWhenNoPreferenceHasBeenSaved() {
+        assertTrue(resolvePlaybackAutoStart(null))
+    }
+
+    @Test
+    fun playbackAutoStart_respectsSavedPreference() {
+        assertFalse(resolvePlaybackAutoStart(false))
+        assertTrue(resolvePlaybackAutoStart(true))
+    }
 }

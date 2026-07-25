@@ -3,13 +3,17 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.input.key.Key
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
@@ -20,6 +24,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalTestApi::class)
 class RecordingsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -63,8 +68,14 @@ class RecordingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("News").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("Evening News").performClick()
+        composeRule.onNodeWithTag("recordings-folder-News").assertIsDisplayed()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("folder-preview-recording-7").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused().performClick()
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsDisplayed().assertIsFocused()
+        composeRule.onNodeWithText("Evening News").assertIsDisplayed()
+        composeRule.onNodeWithTag("recording-list-entry-7").performClick()
         composeRule.onNodeWithContentDescription("Play").assertIsDisplayed().performClick()
         composeRule.runOnIdle { assertEquals(7, playedRecordingId) }
         composeRule.onNodeWithContentDescription("Delete recording")
@@ -120,7 +131,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun syntheticThreeHundredRecordingArchiveRemainsScrollable() {
+    fun syntheticThreeHundredRecordingArchiveListRemainsScrollable() {
         val repository = DvrRepository(
             htsp = HtspService(Dispatchers.Unconfined),
             ioDispatcher = Dispatchers.Unconfined,
@@ -152,7 +163,54 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme { RecordingsScreen(repository = repository) }
         }
 
-        composeRule.onNodeWithTag("recordings-archive-grid").performScrollToIndex(299)
+        composeRule.onNodeWithTag("recordings-archive-list").performScrollToIndex(299)
         composeRule.onNodeWithText("Recording 1").assertIsDisplayed()
+    }
+
+    @Test
+    fun selectedRecordingShowsFullMetadataInPersistentPane() {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 9,
+                        "channelId" to 1,
+                        "channelName" to "ORF SPORT +",
+                        "start" to 100L,
+                        "stop" to 3700L,
+                        "title" to "A complete recording title that must remain readable",
+                        "subtitle" to "Race highlights",
+                        "summary" to "The complete programme summary.",
+                        "description" to "A longer recording description shown in the detail pane.",
+                        "seasonNumber" to 2,
+                        "episodeNumber" to 4,
+                        "state" to "completed",
+                        "files" to listOf(mapOf("filename" to "Sport/highlights.ts")),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme { RecordingsScreen(repository = repository) }
+        }
+
+        composeRule.onNodeWithTag("recordings-folder-Sport").performClick()
+        composeRule.onNodeWithTag("recording-metadata-pane").assertIsDisplayed()
+        composeRule.onNodeWithText("A complete recording title that must remain readable")
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("ORF SPORT +").assertIsDisplayed()
+        composeRule.onNodeWithText("The complete programme summary.").assertIsDisplayed()
+        composeRule.onNodeWithText("A longer recording description shown in the detail pane.")
+            .assertIsDisplayed()
     }
 }

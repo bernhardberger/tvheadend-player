@@ -37,7 +37,7 @@ class DvrLibraryPolicyTest {
 
         val archive = buildDvrArchive(entries)
 
-        assertEquals(listOf("Films", "Sport"), archive.folders.map { it.name })
+        assertEquals(listOf("Sport", "Films"), archive.folders.map { it.name })
         val formulaOne = archive.folders.single { it.name == "Sport" }
             .folders.single { it.name == "Formula 1" }
         assertEquals(listOf(1, 2), formulaOne.recordings.map { it.id })
@@ -91,10 +91,50 @@ class DvrLibraryPolicyTest {
     }
 
     @Test
-    fun channelKeysPageArchiveByVisibleGridRowsAndPreserveColumn() {
-        assertEquals(6, recordingGridPageTargetIndex(30, 0, 3, 9, 1))
-        assertEquals(0, recordingGridPageTargetIndex(30, 6, 3, 9, -1))
-        assertEquals(29, recordingGridPageTargetIndex(30, 27, 3, 9, 1))
+    fun channelKeysPageArchiveByVisibleListRowsWithOverlap() {
+        assertEquals(4, recordingListPageTargetIndex(30, 0, 5, 1))
+        assertEquals(0, recordingListPageTargetIndex(30, 4, 5, -1))
+        assertEquals(29, recordingListPageTargetIndex(30, 28, 5, 1))
+    }
+
+    @Test
+    fun archiveFoldersAndRecordingsAreNewestFirst() {
+        val archive = buildDvrArchive(
+            listOf(
+                entry(1, DvrState.COMPLETED, 100, "Older/show.ts"),
+                entry(2, DvrState.COMPLETED, 500, "Newest/show.ts"),
+                entry(3, DvrState.COMPLETED, 300, "Middle/show.ts"),
+                entry(4, DvrState.COMPLETED, 200, "Newest/older-show.ts"),
+            )
+        )
+
+        assertEquals(listOf("Newest", "Middle", "Older"), archive.folders.map { it.name })
+        assertEquals(listOf(2, 4), archive.folders.first().recordings.map { it.id })
+    }
+
+    @Test
+    fun folderSummaryAggregatesDescendantSizeRangeAndRecentRecordings() {
+        val unwatched = entry(1, DvrState.COMPLETED, 100, "Shows/one.ts").copy(
+            files = listOf(DvrFile(path = "Shows/one.ts", size = 1_000)),
+        )
+        val inProgress = entry(2, DvrState.COMPLETED, 200, "Shows/Series/two.ts").copy(
+            files = listOf(DvrFile(path = "Shows/Series/two.ts", size = 2_000)),
+            playPosition = 30,
+        )
+        val watched = entry(3, DvrState.COMPLETED, 300, "Shows/Series/three.ts").copy(
+            files = listOf(DvrFile(path = "Shows/Series/three.ts", size = 3_000)),
+            playCount = 1,
+        )
+
+        val folder = buildDvrArchive(listOf(unwatched, inProgress, watched))
+            .folders.single { it.name == "Shows" }
+        val summary = summarizeDvrFolder(folder)
+
+        assertEquals(3, summary.recordingCount)
+        assertEquals(6_000L, summary.totalSizeBytes)
+        assertEquals(100L, summary.oldestStart)
+        assertEquals(300L, summary.newestStart)
+        assertEquals(listOf(3, 2, 1), summary.recentRecordings.map { it.id })
     }
 
     @Test

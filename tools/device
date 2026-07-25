@@ -258,11 +258,9 @@ def read_device_properties(adb: str, serial: str) -> dict[str, str]:
             adb,
             serial,
             "shell",
-            "sh",
-            "-c",
-            'for property do getprop "$property"; done',
-            "get-device-properties",
-            *names.values(),
+            "for property in "
+            + " ".join(names.values())
+            + '; do getprop "$property"; done',
         ),
         capture=True,
     )

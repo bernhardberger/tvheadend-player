@@ -83,6 +83,7 @@
     <string name="subtitle_language">Subtitle Language</string>
 
     <string name="settings_appliance">Settings - Appliance entry</string>
+    <string name="auto_start_playback">Start playback when the app opens</string>
     <string name="appliance_accessibility_disclosure">When enabled, TVHeadend Player opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
     <string name="appliance_service_enabled">Appliance entry service: enabled</string>
     <string name="appliance_service_disabled">Appliance entry service: disabled</string>
@@ -189,6 +190,13 @@
     <string name="recordings_schedule_empty">Nothing is recording or scheduled.</string>
     <string name="recordings_problems_empty">No recording problems.</string>
     <string name="recordings_folder_items">%1$d items</string>
+    <string name="recordings_folder_recordings">Recordings</string>
+    <string name="recordings_folder_size">Folder size</string>
+    <string name="recordings_folder_timeframe">Timeframe</string>
+    <string name="recordings_folder_date_range">%1$s – %2$s</string>
+    <string name="recordings_folder_recent">Recent recordings</string>
+    <string name="recordings_minutes_short">min</string>
+    <string name="recordings_play_count">Played %1$d times</string>
     <string name="recordings_recording_now">Recording now</string>
     <string name="recordings_later">Later</string>
     <string name="recordings_upcoming_active">Upcoming and active</string>

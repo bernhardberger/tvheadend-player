@@ -79,6 +79,7 @@
     <string name="subtitle_language">Untertitelsprache</string>
 
     <string name="settings_appliance">Einstellungen – TV-Start</string>
+    <string name="auto_start_playback">Wiedergabe beim Öffnen der App starten</string>
     <string name="appliance_accessibility_disclosure">Wenn diese Funktion aktiviert ist, öffnet sich TVHeadend Player nach dem Starten und Aufwecken des Fernsehers und übernimmt ausschließlich die TV-/GUIDE-Taste. Sie liest weder Bildschirminhalte noch Text. Alle anderen Fernbedienungstasten werden unverändert weitergegeben.</string>
     <string name="appliance_service_enabled">TV-Startdienst: aktiviert</string>
     <string name="appliance_service_disabled">TV-Startdienst: deaktiviert</string>
@@ -175,6 +176,13 @@
     <string name="recordings_schedule_empty">Keine laufenden oder geplanten Aufnahmen.</string>
     <string name="recordings_problems_empty">Keine Aufnahmeprobleme.</string>
     <string name="recordings_folder_items">%1$d Einträge</string>
+    <string name="recordings_folder_recordings">Aufnahmen</string>
+    <string name="recordings_folder_size">Ordnergröße</string>
+    <string name="recordings_folder_timeframe">Zeitraum</string>
+    <string name="recordings_folder_date_range">%1$s – %2$s</string>
+    <string name="recordings_folder_recent">Neueste Aufnahmen</string>
+    <string name="recordings_minutes_short">Min.</string>
+    <string name="recordings_play_count">%1$d-mal abgespielt</string>
     <string name="recordings_recording_now">Laufende Aufnahme</string>
     <string name="recordings_later">Später</string>
     <string name="recordings_upcoming_active">Geplant und aktiv</string>

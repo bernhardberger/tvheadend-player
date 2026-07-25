@@ -186,6 +186,18 @@ class DevicePolicyTest(unittest.TestCase):
             },
         )
         run_mock.assert_called_once()
+        self.assertEqual(
+            run_mock.call_args.args[0],
+            [
+                "adb",
+                "-s",
+                "test-device",
+                "shell",
+                "for property in ro.product.manufacturer ro.product.model "
+                "ro.product.device ro.product.name ro.build.version.release "
+                'ro.product.cpu.abilist; do getprop "$property"; done',
+            ],
+        )
 
     def test_missing_credential_file_is_rejected_without_secret_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

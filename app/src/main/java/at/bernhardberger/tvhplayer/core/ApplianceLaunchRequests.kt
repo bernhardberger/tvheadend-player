@@ -15,12 +15,12 @@ class ApplianceLaunchRequests {
     private val _pending = MutableStateFlow<ApplianceLaunchRequest?>(null)
     val pending = _pending.asStateFlow()
 
-    init {
-        request()
-    }
-
     fun request() {
         _pending.value = ApplianceLaunchRequest(++nextRequestId)
+    }
+
+    fun requestStartup(autoStartPlayback: Boolean) {
+        if (autoStartPlayback && _pending.value == null) request()
     }
 
     fun resolve(orderedIds: List<Int>, persistedId: Int?): ApplianceLaunchTarget? {

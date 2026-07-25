@@ -121,6 +121,11 @@ fun AppRoot(
     )
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    LaunchedEffect(uiSettingsStore) {
+        applianceLaunchRequests.requestStartup(
+            uiSettingsStore.settings.first().autoStartPlayback
+        )
+    }
     val simpleTvStore: SimpleTvSettingsStore = koinInject()
     val simpleTvSession: SimpleTvSession = koinInject()
     val simpleTvSettings by simpleTvStore.settings.collectAsStateWithLifecycle(

@@ -16,7 +16,7 @@ class RecordingPlaybackPolicyTest {
 
         assertEquals(
             RecordingPlaybackAvailability.Ready(
-                path = "/recordings/news.ts",
+                path = "/dvrfile/1",
                 size = 500L,
                 growing = false,
             ),
@@ -24,7 +24,7 @@ class RecordingPlaybackPolicyTest {
         )
         assertEquals(
             RecordingPlaybackAvailability.Ready(
-                path = "/recordings/live.ts",
+                path = "/dvrfile/1",
                 size = null,
                 growing = true,
             ),
@@ -32,7 +32,7 @@ class RecordingPlaybackPolicyTest {
         )
         assertEquals(
             RecordingPlaybackAvailability.Ready(
-                path = "/recordings/partial.ts",
+                path = "/dvrfile/1",
                 size = 250L,
                 growing = false,
             ),

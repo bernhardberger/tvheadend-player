@@ -6,9 +6,10 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,11 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -42,10 +40,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -57,7 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
-import androidx.tv.material3.Card
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.ListItem
@@ -82,66 +81,79 @@ import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
-import at.bernhardberger.tvhplayer.core.recordingGridPageTargetIndex
+import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.core.resolvePiconModel
+import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
+import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import coil3.ImageLoader
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-
-private const val ARCHIVE_COLUMNS = 3
 
 private enum class PendingRecordingAction {
     CANCEL,
     DELETE,
 }
 
-private sealed interface ArchiveGridItem {
+private sealed interface ArchiveListItem {
     val key: String
 
-    data class Folder(val folder: DvrArchiveFolder) : ArchiveGridItem {
+    data class Folder(val folder: DvrArchiveFolder) : ArchiveListItem {
         override val key = "folder:${folder.path.joinToString("/")}"
     }
 
-    data class Recording(val entry: DvrEntry) : ArchiveGridItem {
+    data class Recording(val entry: DvrEntry) : ArchiveListItem {
         override val key = "recording:${entry.id}"
     }
 }
 
+private fun DvrArchiveFolder.listItems(): List<ArchiveListItem> =
+    folders.map(ArchiveListItem::Folder) + recordings.map(ArchiveListItem::Recording)
+
 @Composable
 fun RecordingsScreen(
     repository: DvrRepository = koinInject(),
+    channelRepository: TvhRepository = koinInject(),
+    imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (Int) -> Unit = {},
 ) {
     val entries by repository.entries.collectAsStateWithLifecycle()
+    val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
+    val channelsById = remember(channels) { channels.associateBy(ChannelUi::id) }
     val library = remember(entries) { partitionDvrLibrary(entries) }
     val archive = remember(library.archive) { buildDvrArchive(library.archive) }
     val scope = rememberCoroutineScope()
     val contentFocus = remember { FocusRequester() }
+    val folderPreviewFocus = remember { FocusRequester() }
     val selectedKeys = remember { mutableStateMapOf<String, String>() }
     val archiveScrollPositions = remember { mutableStateMapOf<String, Int>() }
     var mode by remember { mutableStateOf(DvrLibraryMode.ARCHIVE) }
     var archivePath by remember { mutableStateOf(emptyList<String>()) }
     var requestContentFocus by remember { mutableStateOf(true) }
+    var folderPreviewFocused by remember { mutableStateOf(false) }
+    var folderPreviewRecordingId by remember { mutableStateOf<Int?>(null) }
+    var detailsOpenedFromFolderPreview by remember { mutableStateOf(false) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
     var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
     var actionResult by remember { mutableStateOf<DvrActionResult?>(null) }
 
     val archiveFolder = archive.folderAt(archivePath) ?: archive
-    val archiveItems = remember(archiveFolder) {
-        archiveFolder.folders.map(ArchiveGridItem::Folder) +
-            archiveFolder.recordings.map(ArchiveGridItem::Recording)
-    }
+    val archiveItems = remember(archiveFolder) { archiveFolder.listItems() }
     val scheduleGroups = remember(library.schedule) {
         groupDvrSchedule(library.schedule, System.currentTimeMillis() / 1000L)
     }
@@ -155,18 +167,43 @@ fun RecordingsScreen(
         DvrLibraryMode.SCHEDULE -> library.schedule.map { "recording:${it.id}" }
         DvrLibraryMode.PROBLEMS -> library.problems.map { "recording:${it.id}" }
     }
+    val selectedArchiveItem = archiveItems.firstOrNull { it.key == selectedKeys[location] }
+    val selectedRecording = when (mode) {
+        DvrLibraryMode.ARCHIVE ->
+            (selectedArchiveItem as? ArchiveListItem.Recording)?.entry
+        DvrLibraryMode.SCHEDULE -> library.schedule.firstOrNull {
+            "recording:${it.id}" == selectedKeys[location]
+        }
+        DvrLibraryMode.PROBLEMS -> library.problems.firstOrNull {
+            "recording:${it.id}" == selectedKeys[location]
+        }
+    }
 
-    LaunchedEffect(location, itemKeys, requestContentFocus) {
-        if (itemKeys.isEmpty() || !requestContentFocus) return@LaunchedEffect
-        if (selectedKeys[location] !in itemKeys) selectedKeys[location] = itemKeys.first()
-        delay(80)
+    LaunchedEffect(location, itemKeys, selectedKeys[location], requestContentFocus) {
+        if (!requestContentFocus) return@LaunchedEffect
+        if (itemKeys.isEmpty()) {
+            requestContentFocus = false
+            return@LaunchedEffect
+        }
+        if (selectedKeys[location] !in itemKeys) {
+            selectedKeys[location] = itemKeys.first()
+            return@LaunchedEffect
+        }
         runCatching { contentFocus.requestFocus() }
         requestContentFocus = false
+    }
+    LaunchedEffect(location) {
+        folderPreviewFocused = false
+        folderPreviewRecordingId = null
     }
 
     BackHandler(enabled = archivePath.isNotEmpty() && detailsEntry == null) {
         archivePath = archivePath.dropLast(1)
         requestContentFocus = true
+    }
+    BackHandler(enabled = folderPreviewFocused && detailsEntry == null) {
+        folderPreviewFocused = false
+        runCatching { contentFocus.requestFocus() }
     }
 
     Column(
@@ -196,10 +233,6 @@ fun RecordingsScreen(
                 },
                 onMoveToContent = {
                     requestContentFocus = true
-                    scope.launch {
-                        delay(40)
-                        runCatching { contentFocus.requestFocus() }
-                    }
                 },
             )
         }
@@ -223,45 +256,115 @@ fun RecordingsScreen(
         if (entries.isEmpty()) {
             RecordingsEmptyState(connectionUiState, onRetry)
         } else {
-            when (mode) {
-                DvrLibraryMode.ARCHIVE -> key(location) {
-                    ArchiveGrid(
-                        items = archiveItems,
-                        selectedKey = selectedKeys[location],
-                        selectedFocus = contentFocus,
-                        initialScrollIndex = archiveScrollPositions[location] ?: 0,
-                        onScrollChanged = { archiveScrollPositions[location] = it },
-                        onFocused = { selectedKeys[location] = it },
-                        onOpenFolder = {
-                            archivePath = it.path
-                            requestContentFocus = true
-                        },
-                        onOpenRecording = {
-                            detailsEntry = it
-                            actionResult = null
-                        },
-                    )
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                RecordingBrowserSurface(
+                    modifier = Modifier.weight(0.46f).fillMaxHeight(),
+                ) {
+                    when (mode) {
+                        DvrLibraryMode.ARCHIVE -> key(location) {
+                            ArchiveList(
+                                items = archiveItems,
+                                selectedKey = selectedKeys[location],
+                                selectedFocus = contentFocus,
+                                initialScrollIndex = archiveScrollPositions[location] ?: 0,
+                                onScrollChanged = { archiveScrollPositions[location] = it },
+                                onFocused = {
+                                    selectedKeys[location] = it
+                                    folderPreviewFocused = false
+                                },
+                                onMoveToPreview = {
+                                    runCatching { folderPreviewFocus.requestFocus() }
+                                },
+                                onOpenFolder = { folder ->
+                                    val destination = "archive:${folder.path.joinToString("/")}"
+                                    val destinationKeys = folder.listItems().map { it.key }
+                                    if (selectedKeys[destination] !in destinationKeys) {
+                                        selectedKeys[destination] = destinationKeys.firstOrNull().orEmpty()
+                                    }
+                                    archivePath = folder.path
+                                    requestContentFocus = true
+                                },
+                                onOpenRecording = {
+                                    detailsOpenedFromFolderPreview = false
+                                    detailsEntry = it
+                                    actionResult = null
+                                },
+                                imageLoader = imageLoader,
+                                piconForEntry = { channelsById[it.channelId]?.icon },
+                            )
+                        }
+                        DvrLibraryMode.SCHEDULE -> RecordingSchedule(
+                            groups = scheduleGroups,
+                            selectedKey = selectedKeys[location],
+                            selectedFocus = contentFocus,
+                            onFocused = { selectedKeys[location] = it },
+                            onOpen = {
+                                detailsOpenedFromFolderPreview = false
+                                detailsEntry = it
+                                actionResult = null
+                            },
+                            imageLoader = imageLoader,
+                            piconForEntry = { channelsById[it.channelId]?.icon },
+                        )
+                        DvrLibraryMode.PROBLEMS -> RecordingProblems(
+                            entries = library.problems,
+                            selectedKey = selectedKeys[location],
+                            selectedFocus = contentFocus,
+                            onFocused = { selectedKeys[location] = it },
+                            onOpen = {
+                                detailsOpenedFromFolderPreview = false
+                                detailsEntry = it
+                                actionResult = null
+                            },
+                            imageLoader = imageLoader,
+                            piconForEntry = { channelsById[it.channelId]?.icon },
+                        )
+                    }
                 }
-                DvrLibraryMode.SCHEDULE -> RecordingSchedule(
-                    groups = scheduleGroups,
-                    selectedKey = selectedKeys[location],
-                    selectedFocus = contentFocus,
-                    onFocused = { selectedKeys[location] = it },
-                    onOpen = {
-                        detailsEntry = it
-                        actionResult = null
-                    },
-                )
-                DvrLibraryMode.PROBLEMS -> RecordingProblems(
-                    entries = library.problems,
-                    selectedKey = selectedKeys[location],
-                    selectedFocus = contentFocus,
-                    onFocused = { selectedKeys[location] = it },
-                    onOpen = {
-                        detailsEntry = it
-                        actionResult = null
-                    },
-                )
+                RecordingBrowserSurface(
+                    modifier = Modifier.weight(0.54f).fillMaxHeight(),
+                ) {
+                    when (val item = selectedArchiveItem) {
+                        is ArchiveListItem.Folder -> if (mode == DvrLibraryMode.ARCHIVE) {
+                            FolderMetadataPane(
+                                folder = item.folder,
+                                imageLoader = imageLoader,
+                                piconForEntry = { channelsById[it.channelId]?.icon },
+                                previewFocus = folderPreviewFocus,
+                                selectedPreviewId = folderPreviewRecordingId,
+                                onPreviewFocusChanged = { folderPreviewFocused = it },
+                                onPreviewRecordingFocused = { folderPreviewRecordingId = it },
+                                onMoveToFolder = {
+                                    folderPreviewFocused = false
+                                    runCatching { contentFocus.requestFocus() }
+                                },
+                                onOpenRecording = {
+                                    detailsOpenedFromFolderPreview = true
+                                    detailsEntry = it
+                                    actionResult = null
+                                },
+                            )
+                        } else {
+                            RecordingMetadataPane(
+                                entry = selectedRecording,
+                                piconPath = selectedRecording?.let {
+                                    channelsById[it.channelId]?.icon
+                                },
+                                imageLoader = imageLoader,
+                            )
+                        }
+                        else -> RecordingMetadataPane(
+                            entry = selectedRecording,
+                            piconPath = selectedRecording?.let {
+                                channelsById[it.channelId]?.icon
+                            },
+                            imageLoader = imageLoader,
+                        )
+                    }
+                }
             }
         }
     }
@@ -278,7 +381,15 @@ fun RecordingsScreen(
             onClose = {
                 detailsEntry = null
                 actionResult = null
-                requestContentFocus = true
+                if (detailsOpenedFromFolderPreview) {
+                    folderPreviewFocused = true
+                    scope.launch {
+                        delay(40)
+                        runCatching { folderPreviewFocus.requestFocus() }
+                    }
+                } else {
+                    requestContentFocus = true
+                }
             },
         )
     }
@@ -342,50 +453,68 @@ private fun RecordingModeTabs(
 }
 
 @Composable
-private fun ArchiveGrid(
-    items: List<ArchiveGridItem>,
+private fun RecordingBrowserSurface(
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun ArchiveList(
+    items: List<ArchiveListItem>,
     selectedKey: String?,
     selectedFocus: FocusRequester,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
     onFocused: (String) -> Unit,
+    onMoveToPreview: () -> Unit,
     onOpenFolder: (DvrArchiveFolder) -> Unit,
     onOpenRecording: (DvrEntry) -> Unit,
+    imageLoader: ImageLoader,
+    piconForEntry: (DvrEntry) -> String?,
 ) {
     if (items.isEmpty()) {
         ModeEmptyState(R.string.recordings_archive_empty)
         return
     }
-    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = initialScrollIndex)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
     val scope = rememberCoroutineScope()
-    LaunchedEffect(gridState) {
-        snapshotFlow { gridState.firstVisibleItemIndex }.collect(onScrollChanged)
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }.collect(onScrollChanged)
     }
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(ARCHIVE_COLUMNS),
-        state = gridState,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
-            .testTag("recordings-archive-grid")
+            .testTag("recordings-archive-list")
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val direction = ChannelNavigation.pageDirectionForKeyCode(
                     event.nativeKeyEvent.keyCode
                 ) ?: return@onPreviewKeyEvent false
                 val current = items.indexOfFirst { it.key == selectedKey }
-                val target = recordingGridPageTargetIndex(
+                val target = recordingListPageTargetIndex(
                     itemCount = items.size,
                     currentIndex = current,
-                    columns = ARCHIVE_COLUMNS,
-                    visibleItemCount = gridState.layoutInfo.visibleItemsInfo.size,
+                    visibleItemCount = listState.layoutInfo.visibleItemsInfo.size,
                     direction = direction,
                 ) ?: return@onPreviewKeyEvent true
                 onFocused(items[target].key)
                 scope.launch {
-                    gridState.animateScrollToItem(target)
+                    listState.animateScrollToItem(target)
                     delay(60)
                     runCatching { selectedFocus.requestFocus() }
                 }
@@ -393,19 +522,24 @@ private fun ArchiveGrid(
             },
     ) {
         items(items, key = { it.key }) { item ->
-            val modifier = Modifier
-                .then(if (item.key == selectedKey) Modifier.focusRequester(selectedFocus) else Modifier)
-                .onFocusChanged { if (it.isFocused) onFocused(item.key) }
+            val selected = item.key == selectedKey
             when (item) {
-                is ArchiveGridItem.Folder -> FolderCard(
+                is ArchiveListItem.Folder -> FolderListRow(
                     folder = item.folder,
+                    selected = selected,
+                    selectedFocus = selectedFocus,
+                    onFocused = { onFocused(item.key) },
+                    onMoveToPreview = onMoveToPreview,
                     onClick = { onOpenFolder(item.folder) },
-                    modifier = modifier,
                 )
-                is ArchiveGridItem.Recording -> RecordingCard(
+                is ArchiveListItem.Recording -> RecordingListRow(
                     entry = item.entry,
+                    piconPath = piconForEntry(item.entry),
+                    imageLoader = imageLoader,
+                    selected = selected,
+                    selectedFocus = selectedFocus,
+                    onFocused = { onFocused(item.key) },
                     onClick = { onOpenRecording(item.entry) },
-                    modifier = modifier,
                 )
             }
         }
@@ -413,80 +547,325 @@ private fun ArchiveGrid(
 }
 
 @Composable
-private fun FolderCard(
+private fun FolderListRow(
     folder: DvrArchiveFolder,
+    selected: Boolean,
+    selectedFocus: FocusRequester,
+    onFocused: () -> Unit,
+    onMoveToPreview: () -> Unit,
     onClick: () -> Unit,
-    modifier: Modifier,
 ) {
     val itemCount = folder.folders.size + folder.recordings.size
-    Card(
+    ListItem(
+        selected = selected,
         onClick = onClick,
-        modifier = modifier.aspectRatio(16f / 9f),
+        headlineContent = {
+            Text(folder.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(
+                buildString {
+                    append(stringResource(R.string.recordings_folder_items, itemCount))
+                    folder.newestRecordingStart?.let {
+                        append(" • ").append(it.recordingDateTime())
+                    }
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = Color.Unspecified,
+            )
+        },
+        leadingContent = {
+            Icon(
+                Icons.Filled.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("recordings-folder-${folder.path.joinToString("/")}")
+            .then(if (selected) Modifier.focusRequester(selectedFocus) else Modifier)
+            .onFocusChanged { if (it.isFocused) onFocused() }
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight) {
+                    onMoveToPreview()
+                    true
+                } else {
+                    false
+                }
+            },
+    )
+}
+
+@Composable
+private fun FolderMetadataPane(
+    folder: DvrArchiveFolder,
+    imageLoader: ImageLoader,
+    piconForEntry: (DvrEntry) -> String?,
+    previewFocus: FocusRequester,
+    selectedPreviewId: Int?,
+    onPreviewFocusChanged: (Boolean) -> Unit,
+    onPreviewRecordingFocused: (Int) -> Unit,
+    onMoveToFolder: () -> Unit,
+    onOpenRecording: (DvrEntry) -> Unit,
+) {
+    val summary = remember(folder) { summarizeDvrFolder(folder) }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Folder,
-                    contentDescription = null,
-                    modifier = Modifier.size(44.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
-            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+            FolderMetric(
+                value = summary.recordingCount.toString(),
+                label = stringResource(R.string.recordings_folder_recordings),
+            )
+            FolderMetric(
+                value = formatFileSize(summary.totalSizeBytes),
+                label = stringResource(R.string.recordings_folder_size),
+            )
+        }
+        if (summary.oldestStart != null && summary.newestStart != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    stringResource(R.string.recordings_folder_items, itemCount),
-                    style = MaterialTheme.typography.bodySmall,
+                    text = stringResource(R.string.recordings_folder_timeframe),
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    text = stringResource(
+                        R.string.recordings_folder_date_range,
+                        summary.oldestStart.recordingDate(),
+                        summary.newestStart.recordingDate(),
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+        if (summary.recentRecordings.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.recordings_folder_recent),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .focusGroup()
+                    .onFocusChanged { onPreviewFocusChanged(it.hasFocus) }
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
+                            onMoveToFolder()
+                            true
+                        } else {
+                            false
+                        }
+                    },
+            ) {
+                itemsIndexed(summary.recentRecordings, key = { _, entry -> entry.id }) {
+                        index, entry ->
+                    FolderRecentRecordingRow(
+                        entry = entry,
+                        imageLoader = imageLoader,
+                        piconPath = piconForEntry(entry),
+                        selected = selectedPreviewId == entry.id ||
+                            (selectedPreviewId == null && index == 0),
+                        modifier = Modifier
+                            .testTag("folder-preview-recording-${entry.id}")
+                            .then(
+                                if (selectedPreviewId == entry.id ||
+                                    (selectedPreviewId == null && index == 0)
+                                ) {
+                                    Modifier.focusRequester(previewFocus)
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .onFocusChanged {
+                                if (it.isFocused) onPreviewRecordingFocused(entry.id)
+                            },
+                        onClick = { onOpenRecording(entry) },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RecordingCard(
+private fun FolderMetric(value: String, label: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun FolderRecentRecordingRow(
     entry: DvrEntry,
-    onClick: () -> Unit,
+    imageLoader: ImageLoader,
+    piconPath: String?,
+    selected: Boolean,
     modifier: Modifier,
+    onClick: () -> Unit,
 ) {
-    Card(
+    ListItem(
+        selected = selected,
         onClick = onClick,
-        modifier = modifier.aspectRatio(16f / 9f),
+        headlineContent = {
+            Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(
+                buildString {
+                    append(entry.start.recordingDateTime())
+                    entry.channelName?.takeIf(String::isNotBlank)?.let {
+                        append(" • ").append(it)
+                    }
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = Color.Unspecified,
+            )
+        },
+        leadingContent = {
+            PiconBox(
+                imageLoader = imageLoader,
+                piconPath = piconPath,
+                modifier = Modifier.width(64.dp).height(42.dp),
+            )
+        },
+        scale = ListItemDefaults.scale(focusedScale = 1f),
+        modifier = modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun RecordingMetadataPane(
+    entry: DvrEntry?,
+    piconPath: String?,
+    imageLoader: ImageLoader,
+) {
+    if (entry == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Filled.VideoLibrary,
+                contentDescription = null,
+                modifier = Modifier.size(44.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .testTag("recording-metadata-pane"),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.VideoLibrary,
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    text = entry.start.recordingDateTime(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
+        val artworkPath = (entry.image ?: entry.fanartImage)?.takeIf {
+            resolvePiconModel("default", it) != null
+        }
+        PiconBox(
+            imageLoader = imageLoader,
+            piconPath = artworkPath ?: piconPath,
+            contentScale = if (artworkPath != null) ContentScale.Crop else ContentScale.Fit,
+            modifier = Modifier
+                .width(if (artworkPath != null) 176.dp else 92.dp)
+                .height(if (artworkPath != null) 99.dp else 64.dp)
+                .clip(MaterialTheme.shapes.small),
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            RecordingStatusIndicator(state = entry.state)
+            Text(
+                text = dvrStateLabel(entry.state),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            text = entry.title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        entry.subtitle?.takeIf(String::isNotBlank)?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = buildString {
+                entry.channelName?.takeIf(String::isNotBlank)?.let {
+                    append(it).append(" • ")
+                }
+                append(entry.start.recordingDateTime())
+                append('–').append(formatHm(entry.stop))
+                append(" • ").append((entry.stop - entry.start).coerceAtLeast(0L) / 60L)
+                append(' ').append(stringResource(R.string.recordings_minutes_short))
+            },
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        recordingEpisodeMetadata(entry)?.let {
+            Text(text = it, color = MaterialTheme.colorScheme.primary)
+        }
+        entry.summary?.takeIf(String::isNotBlank)?.let {
+            Text(text = it, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        }
+        entry.description?.takeIf { it.isNotBlank() && it != entry.summary }?.let {
+            Text(
+                text = it,
+                maxLines = 7,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        entry.failureReason?.takeIf(String::isNotBlank)?.let {
+            Text(text = it, color = MaterialTheme.colorScheme.error, maxLines = 2)
+        }
+        entry.playCount?.takeIf { it > 0 }?.let {
+            Text(
+                text = stringResource(R.string.recordings_play_count, it),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
+
+private fun recordingEpisodeMetadata(entry: DvrEntry): String? = buildList {
+    if (entry.seasonNumber != null || entry.episodeNumber != null) {
+        add(
+            buildString {
+                entry.seasonNumber?.let { append("S").append(it.toString().padStart(2, '0')) }
+                entry.episodeNumber?.let { append("E").append(it.toString().padStart(2, '0')) }
+                entry.episodeCount?.let { append('/').append(it) }
+            }
+        )
+    }
+    entry.partNumber?.let { part ->
+        add(buildString {
+            append("Part ").append(part)
+            entry.partCount?.let { append('/').append(it) }
+        })
+    }
+}.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 
 @Composable
 private fun RecordingSchedule(
@@ -495,12 +874,15 @@ private fun RecordingSchedule(
     selectedFocus: FocusRequester,
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
+    imageLoader: ImageLoader,
+    piconForEntry: (DvrEntry) -> String?,
 ) {
     if (groups.values.all(List<DvrEntry>::isEmpty)) {
         ModeEmptyState(R.string.recordings_schedule_empty)
         return
     }
     LazyColumn(
+        contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.fillMaxSize().focusGroup(),
     ) {
@@ -511,12 +893,15 @@ private fun RecordingSchedule(
                     Text(
                         text = scheduleBucketLabel(bucket),
                         style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 2.dp),
                     )
                 }
                 items(bucketEntries, key = { it.id }) { entry ->
                     RecordingListRow(
                         entry = entry,
+                        piconPath = piconForEntry(entry),
+                        imageLoader = imageLoader,
                         selected = selectedKey == "recording:${entry.id}",
                         selectedFocus = selectedFocus,
                         onFocused = { onFocused("recording:${entry.id}") },
@@ -535,18 +920,23 @@ private fun RecordingProblems(
     selectedFocus: FocusRequester,
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
+    imageLoader: ImageLoader,
+    piconForEntry: (DvrEntry) -> String?,
 ) {
     if (entries.isEmpty()) {
         ModeEmptyState(R.string.recordings_problems_empty)
         return
     }
     LazyColumn(
+        contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.fillMaxSize().focusGroup(),
     ) {
         items(entries, key = { it.id }) { entry ->
             RecordingListRow(
                 entry = entry,
+                piconPath = piconForEntry(entry),
+                imageLoader = imageLoader,
                 selected = selectedKey == "recording:${entry.id}",
                 selectedFocus = selectedFocus,
                 onFocused = { onFocused("recording:${entry.id}") },
@@ -560,6 +950,8 @@ private fun RecordingProblems(
 @Composable
 private fun RecordingListRow(
     entry: DvrEntry,
+    piconPath: String?,
+    imageLoader: ImageLoader,
     selected: Boolean,
     selectedFocus: FocusRequester,
     onFocused: () -> Unit,
@@ -569,7 +961,7 @@ private fun RecordingListRow(
     ListItem(
         selected = selected,
         onClick = onClick,
-        headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Text(
                 text = buildString {
@@ -583,24 +975,38 @@ private fun RecordingListRow(
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (problem) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (problem) MaterialTheme.colorScheme.error else Color.Unspecified,
             )
         },
         leadingContent = {
-            if (problem) {
-                Icon(
-                    Icons.Filled.Warning,
-                    contentDescription = stringResource(R.string.recordings_problems),
-                    tint = MaterialTheme.colorScheme.error,
+            Box(
+                modifier = Modifier.width(64.dp).height(42.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                PiconBox(
+                    imageLoader = imageLoader,
+                    piconPath = piconPath,
+                    modifier = Modifier.fillMaxSize(),
                 )
-            } else {
-                RecordingStatusIndicator(state = entry.state)
+                if (problem) {
+                    Icon(
+                        Icons.Filled.Warning,
+                        contentDescription = stringResource(R.string.recordings_problems),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.BottomEnd).size(18.dp),
+                    )
+                } else {
+                    RecordingStatusIndicator(
+                        state = entry.state,
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    )
+                }
             }
         },
         scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("recording-list-entry-${entry.id}")
             .then(if (selected) Modifier.focusRequester(selectedFocus) else Modifier)
             .onFocusChanged { if (it.isFocused) onFocused() },
     )
@@ -827,3 +1233,26 @@ private fun dvrActionResultLabel(result: DvrActionResult): String = stringResour
 private fun Long.recordingDateTime(): String = Instant.ofEpochSecond(this)
     .atZone(ZoneId.systemDefault())
     .format(DateTimeFormatter.ofPattern("EEE d MMM HH:mm"))
+
+private fun Long.recordingDate(): String = Instant.ofEpochSecond(this)
+    .atZone(ZoneId.systemDefault())
+    .format(DateTimeFormatter.ofPattern("d MMM yyyy"))
+
+private fun formatFileSize(sizeBytes: Long): String = when {
+    sizeBytes >= 1_000_000_000_000L -> String.format(
+        Locale.getDefault(),
+        "%.1f TB",
+        sizeBytes / 1_000_000_000_000.0,
+    )
+    sizeBytes >= 1_000_000_000L -> String.format(
+        Locale.getDefault(),
+        "%.1f GB",
+        sizeBytes / 1_000_000_000.0,
+    )
+    sizeBytes >= 1_000_000L -> String.format(
+        Locale.getDefault(),
+        "%.1f MB",
+        sizeBytes / 1_000_000.0,
+    )
+    else -> String.format(Locale.getDefault(), "%.1f KB", sizeBytes / 1_000.0)
+}
