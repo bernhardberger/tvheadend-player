@@ -15,7 +15,11 @@ sealed interface RecordingPlaybackAvailability {
 }
 
 fun recordingPlaybackAvailability(entry: DvrEntry): RecordingPlaybackAvailability {
-    if (entry.state != DvrState.COMPLETED && entry.state != DvrState.RECORDING) {
+    if (
+        entry.state != DvrState.COMPLETED &&
+        entry.state != DvrState.RECORDING &&
+        entry.state != DvrState.FAILED
+    ) {
         return RecordingPlaybackAvailability.NotReady
     }
     val file = entry.files.firstOrNull { !it.path.isNullOrBlank() }

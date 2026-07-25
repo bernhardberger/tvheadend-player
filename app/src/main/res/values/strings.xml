@@ -128,6 +128,7 @@
 
     <!-- ===== EPG ===== -->
     <string name="epg_title">EPG</string>
+    <string name="epg_channels_heading">Channels</string>
     <string name="epg_schedule">Schedule</string>
     <string name="epg_loading">Loading EPG…</string>
     <string name="epg_jump">Jump to time</string>
@@ -159,11 +160,11 @@
     <string name="watch_from_start">Watch from start</string>
     <string name="record">Record</string>
     <string name="cancel_recording">Cancel recording</string>
-    <string name="record_confirm_title">Record this programme?</string>
+    <string name="record_confirm_title">Record “%1$s”?</string>
     <string name="record_confirm_message">TVHeadend will schedule this event with the selected server recording configuration.</string>
     <string name="recording_config_title">Choose a recording configuration</string>
     <string name="recording_config_message">This server has several available recording configurations.</string>
-    <string name="cancel_recording_confirm_title">Cancel this recording?</string>
+    <string name="cancel_recording_confirm_title">Stop “%1$s”?</string>
     <string name="cancel_recording_confirm_message">TVHeadend will stop or remove the scheduled recording.</string>
     <string name="recording_status">Recording: %1$s</string>
     <string name="recording_failure_reason">Reason: %1$s</string>
@@ -179,6 +180,17 @@
     <string name="recording_action_rejected">TVHeadend rejected the recording request.</string>
     <string name="recording_action_connection">The recording request could not reach TVHeadend.</string>
     <string name="recordings_title">Recordings</string>
+    <string name="recordings_archive">Archive</string>
+    <string name="recordings_schedule">Schedule</string>
+    <string name="recordings_problems">Problems</string>
+    <string name="recordings_schedule_summary">Active and upcoming recordings</string>
+    <string name="recordings_problems_summary">Failed and cancelled recordings</string>
+    <string name="recordings_archive_empty">No playable recordings in this folder.</string>
+    <string name="recordings_schedule_empty">Nothing is recording or scheduled.</string>
+    <string name="recordings_problems_empty">No recording problems.</string>
+    <string name="recordings_folder_items">%1$d items</string>
+    <string name="recordings_recording_now">Recording now</string>
+    <string name="recordings_later">Later</string>
     <string name="recordings_upcoming_active">Upcoming and active</string>
     <string name="recordings_completed">Completed</string>
     <string name="recordings_failed_cancelled">Failed and cancelled</string>
@@ -187,7 +199,7 @@
     <string name="recordings_reconnecting">Reconnecting. Saved recording information may be out of date…</string>
     <string name="recordings_server_failure">Recordings are unavailable. Retry the server connection.</string>
     <string name="delete_recording">Delete recording</string>
-    <string name="delete_recording_confirm_title">Delete this recording?</string>
+    <string name="delete_recording_confirm_title">Delete “%1$s”?</string>
     <string name="delete_recording_confirm_message">TVHeadend will permanently delete this completed recording.</string>
     <string name="recording_unavailable_title">Recording unavailable</string>
     <string name="recording_not_ready">This recording has not started yet.</string>

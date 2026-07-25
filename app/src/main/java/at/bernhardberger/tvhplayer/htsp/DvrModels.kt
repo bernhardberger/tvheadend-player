@@ -36,6 +36,21 @@ data class DvrEntry(
     val failureReason: String? = null,
     val configId: String? = null,
     val files: List<DvrFile> = emptyList(),
+    val owner: String? = null,
+    val creator: String? = null,
+    val path: String? = null,
+    val channelName: String? = null,
+    val image: String? = null,
+    val fanartImage: String? = null,
+    val playPosition: Long? = null,
+    val playCount: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val episodeCount: Int? = null,
+    val partNumber: Int? = null,
+    val partCount: Int? = null,
+    val autorecId: String? = null,
+    val timerecId: String? = null,
 )
 
 fun dvrState(value: String?, error: String? = null): DvrState {

@@ -170,6 +170,15 @@ fun adjacentChannelId(
     The strict native release-provenance gate must also pass.
 12. The operator UI can follow the system language or explicitly select German
     or English, and can hide the main EPG menu without disabling playback.
+13. The EPG uses one shared horizontal time axis with fixed channel rows. Cards
+    never overlap, the focused programme remains fully visible, Up/Down changes
+    channel, Left/Right changes time, and CH+/CH- pages channel rows without
+    tuning. OK opens programme details before any playback or recording action.
+14. Recordings are separated into Archive, Schedule, and Problems. Archive shows
+    only playable completed recordings in the sanitized TVHeadend folder
+    hierarchy; Schedule isolates active and future entries; Problems isolates
+    failed and cancelled entries. Recording, stop, and delete operations require
+    confirmation with the safe action focused by default.
 
 ## Open questions
 

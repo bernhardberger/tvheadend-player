@@ -31,6 +31,7 @@ fun ChannelRow(
     imageLoader: ImageLoader,
     piconPath: String?,
     focused: Boolean,
+    recordingNow: Boolean = false,
     onFocus: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -78,6 +79,11 @@ fun ChannelRow(
                         .height(40.dp),
                 )
             }
+        },
+        trailingContent = if (recordingNow) {
+            { RecordingStatusIndicator(state = at.bernhardberger.tvhplayer.htsp.DvrState.RECORDING) }
+        } else {
+            null
         },
         scale = ListItemDefaults.scale(
             focusedScale = 1f,

@@ -114,6 +114,7 @@
     <string name="stop_playback">Wiedergabe beenden</string>
 
     <string name="epg_title">Programm</string>
+    <string name="epg_channels_heading">Sender</string>
     <string name="epg_schedule">Programmübersicht</string>
     <string name="epg_loading">Programm wird geladen…</string>
     <string name="epg_jump">Zu Datum und Zeit</string>
@@ -145,11 +146,11 @@
     <string name="watch_from_start">Von Anfang ansehen</string>
     <string name="record">Aufnehmen</string>
     <string name="cancel_recording">Aufnahme abbrechen</string>
-    <string name="record_confirm_title">Diese Sendung aufnehmen?</string>
+    <string name="record_confirm_title">„%1$s“ aufnehmen?</string>
     <string name="record_confirm_message">TVHeadend plant die Sendung mit der gewählten Aufnahmekonfiguration des Servers.</string>
     <string name="recording_config_title">Aufnahmekonfiguration wählen</string>
     <string name="recording_config_message">Auf diesem Server sind mehrere Aufnahmekonfigurationen verfügbar.</string>
-    <string name="cancel_recording_confirm_title">Diese Aufnahme abbrechen?</string>
+    <string name="cancel_recording_confirm_title">„%1$s“ stoppen?</string>
     <string name="cancel_recording_confirm_message">TVHeadend beendet oder entfernt die geplante Aufnahme.</string>
     <string name="recording_status">Aufnahme: %1$s</string>
     <string name="recording_failure_reason">Grund: %1$s</string>
@@ -165,6 +166,17 @@
     <string name="recording_action_rejected">TVHeadend hat die Aufnahmeanfrage abgelehnt.</string>
     <string name="recording_action_connection">TVHeadend konnte für die Aufnahmeanfrage nicht erreicht werden.</string>
     <string name="recordings_title">Aufnahmen</string>
+    <string name="recordings_archive">Archiv</string>
+    <string name="recordings_schedule">Zeitplan</string>
+    <string name="recordings_problems">Probleme</string>
+    <string name="recordings_schedule_summary">Laufende und geplante Aufnahmen</string>
+    <string name="recordings_problems_summary">Fehlgeschlagene und abgebrochene Aufnahmen</string>
+    <string name="recordings_archive_empty">Keine abspielbaren Aufnahmen in diesem Ordner.</string>
+    <string name="recordings_schedule_empty">Keine laufenden oder geplanten Aufnahmen.</string>
+    <string name="recordings_problems_empty">Keine Aufnahmeprobleme.</string>
+    <string name="recordings_folder_items">%1$d Einträge</string>
+    <string name="recordings_recording_now">Laufende Aufnahme</string>
+    <string name="recordings_later">Später</string>
     <string name="recordings_upcoming_active">Geplant und aktiv</string>
     <string name="recordings_completed">Abgeschlossen</string>
     <string name="recordings_failed_cancelled">Fehlgeschlagen und abgebrochen</string>
@@ -173,7 +185,7 @@
     <string name="recordings_reconnecting">Verbindung wird wiederhergestellt. Gespeicherte Aufnahmedaten können veraltet sein…</string>
     <string name="recordings_server_failure">Aufnahmen sind nicht verfügbar. Serververbindung erneut versuchen.</string>
     <string name="delete_recording">Aufnahme löschen</string>
-    <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
+    <string name="delete_recording_confirm_title">„%1$s“ löschen?</string>
     <string name="delete_recording_confirm_message">TVHeadend löscht diese abgeschlossene Aufnahme dauerhaft.</string>
     <string name="recording_unavailable_title">Aufnahme nicht verfügbar</string>
     <string name="recording_not_ready">Diese Aufnahme hat noch nicht begonnen.</string>

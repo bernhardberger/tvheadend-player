@@ -9,9 +9,10 @@ import org.junit.Test
 
 class RecordingPlaybackPolicyTest {
     @Test
-    fun completedAndGrowingFilesArePlayableWhenServerExposesAPath() {
+    fun completedGrowingAndFailedFilesArePlayableWhenServerExposesAPath() {
         val completed = recording(DvrState.COMPLETED, "/recordings/news.ts", 500L)
         val active = recording(DvrState.RECORDING, "/recordings/live.ts", null)
+        val failed = recording(DvrState.FAILED, "/recordings/partial.ts", 250L)
 
         assertEquals(
             RecordingPlaybackAvailability.Ready(
@@ -28,6 +29,14 @@ class RecordingPlaybackPolicyTest {
                 growing = true,
             ),
             recordingPlaybackAvailability(active),
+        )
+        assertEquals(
+            RecordingPlaybackAvailability.Ready(
+                path = "/recordings/partial.ts",
+                size = 250L,
+                growing = false,
+            ),
+            recordingPlaybackAvailability(failed),
         )
     }
 

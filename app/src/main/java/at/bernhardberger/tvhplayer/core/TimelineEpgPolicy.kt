@@ -22,49 +22,74 @@ enum class EpgFocusDirection {
     RIGHT,
 }
 
-data class EpgFocusMove(
+data class TimelineEpgFocusMove(
     val target: EpgFocusTarget,
-    val focusDayStrip: Boolean = false,
+    val focusHeader: Boolean = false,
+    val pageChannels: Boolean = false,
     val extendTimeFrontier: Boolean = false,
-    val pageColumns: Boolean = false,
 )
 
-fun moveMagazineEpgFocus(
-    columns: List<EpgFocusColumn>,
+data class TimelineEventSpan(
+    val startFraction: Float,
+    val endFraction: Float,
+)
+
+fun moveTimelineEpgFocus(
+    rows: List<EpgFocusColumn>,
     current: EpgFocusTarget,
     direction: EpgFocusDirection,
-    visibleColumnRange: IntRange = columns.indices,
-): EpgFocusMove {
-    val column = columns.getOrNull(current.channelIndex)
-        ?: return EpgFocusMove(current)
-    val sorted = column.events.sortedBy { it.start }
-    val currentIndex = sorted.indexOfFirst { it.eventId == current.eventId }
-    val currentEvent = sorted.getOrNull(currentIndex) ?: return EpgFocusMove(current)
+    visibleChannelRange: IntRange = rows.indices,
+): TimelineEpgFocusMove {
+    val row = rows.getOrNull(current.channelIndex)
+        ?: return TimelineEpgFocusMove(current)
+    val events = row.events.sortedBy { it.start }
+    val currentIndex = events.indexOfFirst { it.eventId == current.eventId }
+    val currentEvent = events.getOrNull(currentIndex)
+        ?: return TimelineEpgFocusMove(current)
 
-    if (direction == EpgFocusDirection.UP || direction == EpgFocusDirection.DOWN) {
-        val eventIndex = currentIndex + if (direction == EpgFocusDirection.UP) -1 else 1
-        val event = sorted.getOrNull(eventIndex)
-        return when {
-            event != null -> EpgFocusMove(current.copy(eventId = event.eventId))
-            direction == EpgFocusDirection.UP ->
-                EpgFocusMove(current, focusDayStrip = true)
-            else -> EpgFocusMove(current, extendTimeFrontier = true)
-        }
+    if (direction == EpgFocusDirection.LEFT || direction == EpgFocusDirection.RIGHT) {
+        val eventIndex = currentIndex + if (direction == EpgFocusDirection.LEFT) -1 else 1
+        val event = events.getOrNull(eventIndex) ?: return TimelineEpgFocusMove(
+            target = current,
+            extendTimeFrontier = direction == EpgFocusDirection.RIGHT,
+        )
+        return TimelineEpgFocusMove(current.copy(eventId = event.eventId))
     }
 
     val channelIndex = current.channelIndex +
-        if (direction == EpgFocusDirection.LEFT) -1 else 1
-    val adjacent = columns.getOrNull(channelIndex) ?: return EpgFocusMove(current)
+        if (direction == EpgFocusDirection.UP) -1 else 1
+    if (channelIndex < 0) {
+        return TimelineEpgFocusMove(current, focusHeader = true)
+    }
+    val adjacent = rows.getOrNull(channelIndex) ?: return TimelineEpgFocusMove(current)
     val best = adjacent.events.maxWithOrNull(
         compareBy<EpgEventEntry>(
             { overlapSeconds(currentEvent, it) },
             { -abs(midpoint(currentEvent) - midpoint(it)) },
         )
-    ) ?: return EpgFocusMove(current)
+    ) ?: return TimelineEpgFocusMove(current)
 
-    return EpgFocusMove(
+    return TimelineEpgFocusMove(
         target = EpgFocusTarget(channelIndex, best.eventId),
-        pageColumns = channelIndex !in visibleColumnRange,
+        pageChannels = channelIndex !in visibleChannelRange,
+    )
+}
+
+fun timelineEventSpan(
+    eventStartSec: Long,
+    eventEndSec: Long,
+    windowStartSec: Long,
+    windowEndSec: Long,
+): TimelineEventSpan? {
+    val windowDuration = windowEndSec - windowStartSec
+    if (windowDuration <= 0L || eventEndSec <= windowStartSec || eventStartSec >= windowEndSec) {
+        return null
+    }
+    val visibleStart = max(eventStartSec, windowStartSec)
+    val visibleEnd = min(eventEndSec, windowEndSec)
+    return TimelineEventSpan(
+        startFraction = (visibleStart - windowStartSec).toFloat() / windowDuration,
+        endFraction = (visibleEnd - windowStartSec).toFloat() / windowDuration,
     )
 }
 

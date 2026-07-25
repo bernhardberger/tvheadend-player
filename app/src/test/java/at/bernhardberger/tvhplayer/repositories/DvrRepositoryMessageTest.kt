@@ -6,6 +6,7 @@ import at.bernhardberger.tvhplayer.htsp.HtspService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DvrRepositoryMessageTest {
@@ -39,6 +40,65 @@ class DvrRepositoryMessageTest {
 
         repository.acceptDvrMessage(message("dvrEntryDelete", "id" to 4))
         assertEquals(emptyList<Any>(), repository.entries.value)
+    }
+
+    @Test
+    fun entryMessagesRetainFolderOwnershipArtworkAndEpisodeMetadata() = runBlocking {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        repository.acceptDvrMessage(
+            message(
+                "dvrEntryAdd",
+                "id" to 9,
+                "eventId" to 99,
+                "channel" to 7,
+                "channelName" to "Channel Seven",
+                "start" to 100L,
+                "stop" to 200L,
+                "title" to "Programme",
+                "state" to "completed",
+                "owner" to "viewer",
+                "creator" to "viewer",
+                "path" to "Sport/Formula 1/Programme.ts",
+                "image" to "image-ref",
+                "fanartImage" to "fanart-ref",
+                "playposition" to 42L,
+                "playcount" to 3,
+                "seasonNumber" to 2,
+                "episodeNumber" to 5,
+                "episodeCount" to 10,
+                "partNumber" to 1,
+                "partCount" to 2,
+                "autorecId" to "auto-id",
+                "timerecId" to "time-id",
+                "files" to listOf(mapOf("filename" to "Sport/Formula 1/Programme.ts")),
+            )
+        )
+        repository.acceptDvrMessage(message("initialSyncCompleted"))
+
+        val entry = repository.entries.value.single()
+        assertEquals(7, entry.channelId)
+        assertEquals("Channel Seven", entry.channelName)
+        assertEquals("viewer", entry.owner)
+        assertEquals("viewer", entry.creator)
+        assertEquals("Sport/Formula 1/Programme.ts", entry.path)
+        assertEquals("image-ref", entry.image)
+        assertEquals("fanart-ref", entry.fanartImage)
+        assertEquals(42L, entry.playPosition)
+        assertEquals(3, entry.playCount)
+        assertEquals(2, entry.seasonNumber)
+        assertEquals(5, entry.episodeNumber)
+        assertEquals(10, entry.episodeCount)
+        assertEquals(1, entry.partNumber)
+        assertEquals(2, entry.partCount)
+        assertEquals("auto-id", entry.autorecId)
+        assertEquals("time-id", entry.timerecId)
+
+        repository.acceptDvrMessage(message("dvrEntryUpdate", "id" to 9, "playposition" to 84L))
+        assertEquals(84L, repository.entries.value.single().playPosition)
+        assertNull(repository.entries.value.single().failureReason)
     }
 
     private fun message(method: String, vararg fields: Pair<String, Any?>) =

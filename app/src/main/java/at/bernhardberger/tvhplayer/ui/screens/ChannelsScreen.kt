@@ -58,6 +58,8 @@ import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
+import at.bernhardberger.tvhplayer.htsp.DvrState
+import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
@@ -81,12 +83,14 @@ fun ChannelsScreen(
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
+    dvrRepository: DvrRepository = koinInject(),
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
     val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
+    val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
@@ -282,6 +286,11 @@ fun ChannelsScreen(
                                 imageLoader = imageLoader,
                                 piconPath = ch.icon,
                                 focused = isSelected,
+                                recordingNow = now?.eventId?.let { eventId ->
+                                    dvrEntries.any {
+                                        it.eventId == eventId && it.state == DvrState.RECORDING
+                                    }
+                                } == true,
                                 onFocus = {
                                     if (!isRestoring) selection.setSelected(ch.id)
                                 },

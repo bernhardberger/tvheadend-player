@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,11 +18,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +57,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
+import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
@@ -73,9 +79,10 @@ import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
-import at.bernhardberger.tvhplayer.core.moveMagazineEpgFocus
+import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.nearestProgrammeAt
 import at.bernhardberger.tvhplayer.core.programmeActions
+import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
@@ -97,6 +104,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import coil3.ImageLoader
@@ -110,12 +118,11 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import kotlin.math.max
 
-private const val VISIBLE_WINDOW_SEC = 4 * 3600L
-private const val FRONTIER_STEP_SEC = 4 * 3600L
-private const val COLUMN_PAGE_SIZE = 4
-private val PROGRAMME_DP_PER_MINUTE = 1.8.dp
-private val PROGRAMME_CANVAS_HEIGHT = 450.dp
-private val CHANNEL_COLUMN_WIDTH = 270.dp
+private const val VISIBLE_WINDOW_SEC = 3 * 3600L
+private const val FRONTIER_STEP_SEC = 3 * 3600L
+private const val CHANNEL_PAGE_SIZE = 6
+private val CHANNEL_HEADER_WIDTH = 190.dp
+private val TIMELINE_ROW_HEIGHT = 76.dp
 
 @Composable
 fun EpgGridScreen(
@@ -142,9 +149,9 @@ fun EpgGridScreen(
     val timeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
-    val lazyRowState = rememberLazyListState()
+    val channelListState = rememberLazyListState()
     val selectedFocus = remember { FocusRequester() }
-    val dayStripFocus = remember { FocusRequester() }
+    val guideHeaderFocus = remember { FocusRequester() }
 
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
     var nowSec by remember { mutableLongStateOf(openedAtSec) }
@@ -185,9 +192,9 @@ fun EpgGridScreen(
 
     fun requestVisibleWindow(anchorSec: Long, channelIndex: Int) {
         if (channels.isEmpty()) return
-        val pageStart = (channelIndex.coerceAtLeast(0) / COLUMN_PAGE_SIZE) * COLUMN_PAGE_SIZE
+        val pageStart = (channelIndex.coerceAtLeast(0) / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
         val ids = channels
-            .subList(pageStart, (pageStart + COLUMN_PAGE_SIZE).coerceAtMost(channels.size))
+            .subList(pageStart, (pageStart + CHANNEL_PAGE_SIZE).coerceAtMost(channels.size))
             .map { it.id }
         repository.requestEpgAtFrontier(ids, anchorSec)
     }
@@ -216,9 +223,9 @@ fun EpgGridScreen(
         requestVisibleWindow(windowStartSec, channelIndex)
         if (event != null) {
             selectedTarget = EpgFocusTarget(channelIndex, event.eventId)
-            lazyRowState.scrollToItem(
+            channelListState.scrollToItem(
                 restored?.firstVisibleColumn?.coerceIn(channels.indices)
-                    ?: (channelIndex / COLUMN_PAGE_SIZE) * COLUMN_PAGE_SIZE
+                    ?: (channelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
             )
         }
         initialPositionDone = true
@@ -260,9 +267,13 @@ fun EpgGridScreen(
                 eventId = event.eventId,
                 eventStartSec = event.start,
                 windowStartSec = windowStartSec,
-                firstVisibleColumn = lazyRowState.firstVisibleItemIndex,
+                firstVisibleColumn = channelListState.firstVisibleItemIndex,
             )
         )
+        val visibleRows = channelListState.layoutInfo.visibleItemsInfo.map { it.index }
+        if (visibleRows.isNotEmpty() && target.channelIndex !in visibleRows) {
+            channelListState.animateScrollToItem(target.channelIndex)
+        }
         delay(80)
         runCatching { selectedFocus.requestFocus() }
     }
@@ -286,8 +297,13 @@ fun EpgGridScreen(
     fun pageColumns(direction: Int) {
         if (channels.isEmpty()) return
         val current = selectedTarget ?: return
-        val targetIndex = (current.channelIndex + direction * COLUMN_PAGE_SIZE)
-            .coerceIn(0, channels.lastIndex)
+        val visibleCount = channelListState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(2)
+        val targetIndex = ChannelNavigation.pageTargetIndex(
+            itemCount = channels.size,
+            currentIndex = current.channelIndex,
+            visibleItemCount = visibleCount,
+            direction = direction,
+        ) ?: return
         val currentEvent = repository.epgForChannel(
             channels[current.channelIndex].id
         ).value.firstOrNull { it.eventId == current.eventId } ?: return
@@ -297,29 +313,27 @@ fun EpgGridScreen(
         selectedTarget = EpgFocusTarget(targetIndex, targetEvent.eventId)
         requestVisibleWindow(windowStartSec, targetIndex)
         coroutineScope.launch {
-            lazyRowState.animateScrollToItem(
-                (targetIndex / COLUMN_PAGE_SIZE) * COLUMN_PAGE_SIZE
-            )
+            channelListState.animateScrollToItem(targetIndex)
         }
     }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
         val current = selectedTarget ?: return false
-        val visibleIndices = lazyRowState.layoutInfo.visibleItemsInfo.map { it.index }
+        val visibleIndices = channelListState.layoutInfo.visibleItemsInfo.map { it.index }
         val visibleRange = if (visibleIndices.isEmpty()) {
             current.channelIndex..current.channelIndex
         } else {
             visibleIndices.min()..visibleIndices.max()
         }
-        val move = moveMagazineEpgFocus(
-            columns = focusColumns(),
+        val move = moveTimelineEpgFocus(
+            rows = focusColumns(),
             current = current,
             direction = direction,
-            visibleColumnRange = visibleRange,
+            visibleChannelRange = visibleRange,
         )
         when {
-            move.focusDayStrip -> {
-                dayStripFocus.requestFocus()
+            move.focusHeader -> {
+                guideHeaderFocus.requestFocus()
                 return true
             }
             move.extendTimeFrontier -> {
@@ -335,12 +349,9 @@ fun EpgGridScreen(
             }
             move.target != current -> {
                 selectedTarget = move.target
-                if (move.pageColumns) {
+                if (move.pageChannels) {
                     coroutineScope.launch {
-                        val pageStart = (
-                            move.target.channelIndex / COLUMN_PAGE_SIZE * COLUMN_PAGE_SIZE
-                        )
-                        lazyRowState.animateScrollToItem(pageStart)
+                        channelListState.animateScrollToItem(move.target.channelIndex)
                         requestVisibleWindow(windowStartSec, move.target.channelIndex)
                     }
                 }
@@ -377,58 +388,69 @@ fun EpgGridScreen(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
                     text = stringResource(R.string.epg_title),
                     style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.weight(1f),
                 )
-                OutlinedButton(onClick = { showJumpDialog = true }) {
-                    Text(stringResource(R.string.epg_jump))
+                OutlinedButton(
+                    onClick = { showJumpDialog = true },
+                    modifier = Modifier
+                        .focusRequester(guideHeaderFocus)
+                        .onPreviewKeyEvent { event ->
+                            if (
+                                event.type == KeyEventType.KeyDown &&
+                                event.key == Key.DirectionDown &&
+                                selectedTarget != null
+                            ) {
+                                selectedFocus.requestFocus()
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                ) {
+                    Text(windowStartSec.formatDateTime())
+                }
+                OutlinedButton(
+                    onClick = {
+                        windowStartSec = floorToHour(nowSec)
+                        requestVisibleWindow(
+                            windowStartSec,
+                            selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
+                        )
+                        selectedTarget = nearestTargetAt(
+                            channels,
+                            repository,
+                            selectedTarget?.channelIndex ?: 0,
+                            nowSec,
+                        )
+                    },
+                ) {
+                    Text(stringResource(R.string.now))
+                }
+                if (
+                    channelScope.tags.size +
+                    (if (channelScope.allChannelsVisible) 1 else 0) > 1
+                ) {
+                    ChannelTagSelector(
+                        tags = channelScope.tags,
+                        activeTagId = channelScope.activeTagId,
+                        onSelectTag = channelViewModel::selectTag,
+                        allChannelsVisible = channelScope.allChannelsVisible,
+                        modifier = Modifier.width(240.dp),
+                    )
                 }
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             UnavailableTagNotice(
                 visible = tagNotice,
                 onDismiss = channelViewModel::dismissUnavailableTagNotice,
             )
             if (tagNotice) Spacer(Modifier.height(8.dp))
-            if (channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1) {
-                ChannelTagSelector(
-                    tags = channelScope.tags,
-                    activeTagId = channelScope.activeTagId,
-                    onSelectTag = channelViewModel::selectTag,
-                    allChannelsVisible = channelScope.allChannelsVisible,
-                )
-                Spacer(Modifier.height(10.dp))
-            }
-            DayStrip(
-                activeStartSec = windowStartSec,
-                focusRequester = dayStripFocus,
-                onSelect = { dayStart ->
-                    windowStartSec = dayStart
-                    requestVisibleWindow(
-                        dayStart,
-                        selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
-                    )
-                    selectedTarget = nearestTargetAt(
-                        channels,
-                        repository,
-                        selectedTarget?.channelIndex ?: 0,
-                        dayStart,
-                    )
-                },
-                onJump = { showJumpDialog = true },
-                onReturnToProgramme = {
-                    if (selectedTarget != null) {
-                        selectedFocus.requestFocus()
-                        true
-                    } else {
-                        false
-                    }
-                },
-            )
-            Spacer(Modifier.height(10.dp))
 
             if (channels.isEmpty()) {
                 GuideEmptyState(
@@ -437,17 +459,20 @@ fun EpgGridScreen(
                     onRetry = onRetry,
                 )
             } else {
-                LazyRow(
-                    state = lazyRowState,
-                    contentPadding = PaddingValues(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                TimelineTimeRuler(windowStartSec = windowStartSec)
+                Spacer(Modifier.height(4.dp))
+                LazyColumn(
+                    state = channelListState,
+                    contentPadding = PaddingValues(vertical = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
-                        .fillMaxSize()
+                        .weight(1f)
+                        .fillMaxWidth()
                         .focusGroup(),
                 ) {
                     itemsIndexed(channels, key = { _, channel -> channel.id }) {
                             channelIndex, channel ->
-                        MagazineChannelColumn(
+                        TimelineChannelRow(
                             channel = channel,
                             channelIndex = channelIndex,
                             allChannels = channels,
@@ -543,6 +568,7 @@ fun EpgGridScreen(
             val recording = dvrEntries.firstOrNull { it.eventId == confirmationEvent.eventId }
             ConfirmProgrammeActionDialog(
                 action = confirmationAction,
+                programmeTitle = confirmationEvent.title,
                 onDismiss = { pendingAction = null },
                 onConfirm = {
                     pendingAction = null
@@ -600,7 +626,69 @@ fun EpgGridScreen(
 }
 
 @Composable
-private fun MagazineChannelColumn(
+private fun TimelineTimeRuler(windowStartSec: Long) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(38.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            modifier = Modifier
+                .width(CHANNEL_HEADER_WIDTH)
+                .fillMaxHeight(),
+            shape = MaterialTheme.shapes.small,
+            colors = SurfaceDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+        ) {
+            Box(contentAlignment = Alignment.CenterStart) {
+                Text(
+                    text = stringResource(R.string.epg_channels_heading),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        BoxWithConstraints(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
+        ) {
+            repeat(6) { markerIndex ->
+                val markerOffset = maxWidth * (markerIndex / 6f)
+                Column(
+                    modifier = Modifier
+                        .offset(x = markerOffset)
+                        .fillMaxHeight(),
+                ) {
+                    Text(
+                        text = formatHm(windowStartSec + markerIndex * 30 * 60L),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 6.dp, top = 4.dp),
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Box(
+                        Modifier
+                            .width(1.dp)
+                            .weight(1f)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineChannelRow(
     channel: ChannelUi,
     channelIndex: Int,
     allChannels: List<ChannelUi>,
@@ -633,32 +721,36 @@ private fun MagazineChannelColumn(
     val orderedIds = remember(allChannels) { allChannels.map { it.id } }
     val numbers = remember(allChannels) { allChannels.associate { it.id to it.number } }
 
-    Column(
+    Row(
         modifier = Modifier
-            .width(CHANNEL_COLUMN_WIDTH)
-            .fillMaxHeight(),
+            .fillMaxWidth()
+            .height(TIMELINE_ROW_HEIGHT),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        MagazineChannelHeader(
+        TimelineChannelHeader(
             channel = channel,
             number = ChannelNavigation.numberForId(orderedIds, numbers, channel.id),
             imageLoader = imageLoader,
+            selected = selectedTarget?.channelIndex == channelIndex,
         )
-        Spacer(Modifier.height(6.dp))
-        Box(
+        Spacer(Modifier.width(4.dp))
+        BoxWithConstraints(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(PROGRAMME_CANVAS_HEIGHT)
-                .clip(MaterialTheme.shapes.medium),
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvEpgPanelAlpha)),
         ) {
             visibleEvents.forEach { event ->
-                val top = PROGRAMME_DP_PER_MINUTE *
-                    minutesBetween(windowStartSec, max(event.start, windowStartSec))
-                val durationMinutes = minutesBetween(
-                    max(event.start, windowStartSec),
-                    minOf(event.stop, windowEndSec),
-                )
-                val height = maxOf(54.dp, PROGRAMME_DP_PER_MINUTE * durationMinutes)
-                ProgrammeCell(
+                val span = timelineEventSpan(
+                    eventStartSec = event.start,
+                    eventEndSec = event.stop,
+                    windowStartSec = windowStartSec,
+                    windowEndSec = windowEndSec,
+                ) ?: return@forEach
+                val start = maxWidth * span.startFraction
+                val width = maxWidth * (span.endFraction - span.startFraction)
+                TimelineProgrammeCell(
                     event = event,
                     channel = channel,
                     recording = recordingForEvent(event.eventId),
@@ -669,25 +761,31 @@ private fun MagazineChannelColumn(
                     onFocused = { onFocused(event) },
                     onOpenDetails = { onOpenDetails(event) },
                     onMoveFocus = onMoveFocus,
+                    width = width,
                     modifier = Modifier
-                        .offset(y = top)
-                        .height(height)
-                        .fillMaxWidth(),
+                        .offset(x = start)
+                        .width(width)
+                        .fillMaxHeight(),
                 )
             }
 
-            if (state != EpgColumnDataState.READY || frontierLoading) {
-                ColumnStateOverlay(
+            if (visibleEvents.isEmpty()) {
+                TimelineRowState(
                     state = if (frontierLoading) EpgColumnDataState.LOADING else state,
-                    hasUsableEvents = visibleEvents.isNotEmpty(),
                     onRetry = onRetry,
-                    modifier = Modifier.align(
-                        if (visibleEvents.isNotEmpty()) {
-                            Alignment.BottomCenter
-                        } else {
-                            Alignment.Center
-                        }
-                    ),
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+
+            if (nowSec in windowStartSec until windowEndSec) {
+                val nowFraction = (nowSec - windowStartSec).toFloat() /
+                    (windowEndSec - windowStartSec)
+                Box(
+                    modifier = Modifier
+                        .offset(x = maxWidth * nowFraction)
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary),
                 )
             }
         }
@@ -695,36 +793,44 @@ private fun MagazineChannelColumn(
 }
 
 @Composable
-internal fun MagazineChannelHeader(
+internal fun TimelineChannelHeader(
     channel: ChannelUi,
     number: Int?,
     imageLoader: ImageLoader,
+    selected: Boolean = false,
 ) {
     Surface(
+            modifier = Modifier
+                .width(CHANNEL_HEADER_WIDTH)
+                .fillMaxHeight(),
             colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                containerColor = if (selected) {
+                    MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                },
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.small,
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(74.dp)
-                    .padding(10.dp),
+                    .fillMaxHeight()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = number?.toString().orEmpty(),
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.width(34.dp),
+                    modifier = Modifier.width(28.dp),
                 )
                 PiconBox(
                     imageLoader = imageLoader,
                     piconPath = channel.icon,
                     modifier = Modifier
-                        .width(54.dp)
-                        .height(38.dp),
+                        .width(44.dp)
+                        .height(30.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -738,7 +844,7 @@ internal fun MagazineChannelHeader(
 }
 
 @Composable
-private fun ProgrammeCell(
+internal fun TimelineProgrammeCell(
     event: EpgEventEntry,
     channel: ChannelUi,
     recording: DvrEntry?,
@@ -748,6 +854,7 @@ private fun ProgrammeCell(
     onFocused: () -> Unit,
     onOpenDetails: () -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
+    width: Dp,
     modifier: Modifier,
 ) {
     val stateText = when {
@@ -755,7 +862,6 @@ private fun ProgrammeCell(
         event.start > nowSec -> stringResource(R.string.epg_state_future)
         else -> stringResource(R.string.epg_state_past)
     }
-    val recordingText = recording?.state?.let { dvrStateLabel(it) }
     val description = stringResource(
         R.string.epg_cell_description,
         channel.name,
@@ -765,55 +871,69 @@ private fun ProgrammeCell(
         stateText,
     )
 
-    ListItem(
-        selected = selected,
-        onClick = onOpenDetails,
-        headlineContent = {
-            Text(
-                text = event.title,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        supportingContent = {
-            Text(
-                text = buildString {
-                    append("${formatHm(event.start)}–${formatHm(event.stop)}")
-                    recordingText?.let {
-                        append(" • ")
-                        append(it)
-                    }
-                },
-                maxLines = 1,
-            )
-        },
-        scale = ListItemDefaults.scale(
-            focusedScale = 1f,
-            focusedSelectedScale = 1f,
-        ),
-        modifier = modifier
-            .alpha(if (event.stop <= nowSec) 0.62f else 1f)
-            .padding(2.dp)
-            .then(if (selected) Modifier.focusRequester(selectedFocusRequester) else Modifier)
-            .onFocusChanged { if (it.isFocused) onFocused() }
-            .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (keyEvent.key) {
-                    Key.DirectionUp -> onMoveFocus(EpgFocusDirection.UP)
-                    Key.DirectionDown -> onMoveFocus(EpgFocusDirection.DOWN)
-                    Key.DirectionLeft -> onMoveFocus(EpgFocusDirection.LEFT)
-                    Key.DirectionRight -> onMoveFocus(EpgFocusDirection.RIGHT)
-                    else -> false
+    Box(modifier = modifier) {
+        ListItem(
+            selected = selected,
+            onClick = onOpenDetails,
+            headlineContent = {
+                Text(
+                    text = if (width >= 38.dp) event.title else "",
+                    maxLines = if (width >= 100.dp) 2 else 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            },
+            supportingContent = if (width >= 112.dp) {
+                {
+                    Text(
+                        text = "${formatHm(event.start)}–${formatHm(event.stop)}",
+                        maxLines = 1,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
-            }
-            .semantics { contentDescription = description },
-    )
+            } else {
+                null
+            },
+            scale = ListItemDefaults.scale(
+                focusedScale = 1f,
+                focusedSelectedScale = 1f,
+            ),
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(if (event.stop <= nowSec) 0.62f else 1f)
+                .padding(horizontal = 1.dp, vertical = 2.dp)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f))
+                .then(if (selected) Modifier.focusRequester(selectedFocusRequester) else Modifier)
+                .onFocusChanged { if (it.isFocused) onFocused() }
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (keyEvent.key) {
+                        Key.DirectionUp -> onMoveFocus(EpgFocusDirection.UP)
+                        Key.DirectionDown -> onMoveFocus(EpgFocusDirection.DOWN)
+                        Key.DirectionLeft -> onMoveFocus(EpgFocusDirection.LEFT)
+                        Key.DirectionRight -> onMoveFocus(EpgFocusDirection.RIGHT)
+                        else -> false
+                    }
+                }
+                .semantics { contentDescription = description },
+        )
+        recording?.takeIf {
+            it.state == DvrState.RECORDING || it.state == DvrState.SCHEDULED
+        }?.let {
+            RecordingStatusIndicator(
+                state = it.state,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp),
+            )
+        }
+    }
 }
 
 @Composable
-private fun ColumnStateOverlay(
+private fun TimelineRowState(
     state: EpgColumnDataState,
-    hasUsableEvents: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -830,86 +950,23 @@ private fun ColumnStateOverlay(
             EpgColumnDataState.SERVER_FAILURE -> R.string.epg_server_failure
         }
     )
-    Surface(
-        modifier = modifier
-            .widthIn(max = 248.dp),
-        colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                alpha = if (hasUsableEvents) 0.92f else 1f
-            ),
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
+    Row(
+        modifier = modifier.padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (
+            state == EpgColumnDataState.SERVER_FAILURE ||
+            state == EpgColumnDataState.PERMISSION_DENIED
         ) {
-            Text(text = text, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            if (
-                state == EpgColumnDataState.SERVER_FAILURE ||
-                state == EpgColumnDataState.PERMISSION_DENIED
-            ) {
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = onRetry) {
-                    Text(stringResource(R.string.retry))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DayStrip(
-    activeStartSec: Long,
-    focusRequester: FocusRequester,
-    onSelect: (Long) -> Unit,
-    onJump: () -> Unit,
-    onReturnToProgramme: () -> Boolean,
-) {
-    val zone = ZoneId.systemDefault()
-    val today = Instant.now().atZone(zone).toLocalDate()
-    val activeDate = Instant.ofEpochSecond(activeStartSec).atZone(zone).toLocalDate()
-    val activeInStrip = activeDate in today.minusDays(1)..today.plusDays(6)
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .focusGroup()
-            .onPreviewKeyEvent { event ->
-                event.type == KeyEventType.KeyDown &&
-                    event.key == Key.DirectionDown &&
-                    onReturnToProgramme()
-            },
-    ) {
-        items(8) { itemIndex ->
-            val offset = itemIndex - 1
-            val date = today.plusDays(offset.toLong())
-            val label = when (offset) {
-                -1 -> stringResource(R.string.yesterday)
-                0 -> stringResource(R.string.today)
-                1 -> stringResource(R.string.tomorrow)
-                else -> date.format(DateTimeFormatter.ofPattern("EEE d MMM"))
-            }
-            val modifier = if (date == activeDate || (!activeInStrip && itemIndex == 0)) {
-                Modifier.focusRequester(focusRequester)
-            } else {
-                Modifier
-            }
-            if (date == activeDate) {
-                Button(
-                    onClick = { onSelect(date.atStartOfDay(zone).toEpochSecond()) },
-                    modifier = modifier,
-                ) { Text(label) }
-            } else {
-                OutlinedButton(
-                    onClick = { onSelect(date.atStartOfDay(zone).toEpochSecond()) },
-                    modifier = modifier,
-                ) { Text(label) }
-            }
-        }
-        item {
-            OutlinedButton(onClick = onJump) {
-                Text(stringResource(R.string.epg_jump))
+            OutlinedButton(onClick = onRetry) {
+                Text(stringResource(R.string.retry))
             }
         }
     }
@@ -1012,17 +1069,8 @@ private fun ProgrammeDetailsPanel(
         Text(
             text = "${channel?.name.orEmpty()} • ${event.start.formatDateTime()}–${
                 formatHm(event.stop)
-            }",
+            } • ${(event.stop - event.start).coerceAtLeast(0L) / 60L} min",
             style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = stringResource(
-                R.string.epg_time_duration,
-                formatHm(event.start),
-                formatHm(event.stop),
-                ((event.stop - event.start).coerceAtLeast(0L) / 60L),
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         programmeMetadata(event)?.let {
             Text(it, style = MaterialTheme.typography.titleSmall)
@@ -1055,14 +1103,12 @@ private fun ProgrammeDetailsPanel(
                 },
             )
         }
-        Text(
-            text = if (actions.isEmpty()) {
-                stringResource(R.string.epg_no_actions)
-            } else {
-                stringResource(R.string.epg_details_action_hint)
-            },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (actions.isEmpty()) {
+            Text(
+                text = stringResource(R.string.epg_no_actions),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             actions.forEachIndexed { index, action ->
                 Button(
@@ -1132,13 +1178,14 @@ private fun DvrConfigDialog(
 }
 
 @Composable
-private fun ConfirmProgrammeActionDialog(
+internal fun ConfirmProgrammeActionDialog(
     action: ProgrammeAction,
+    programmeTitle: String,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val confirmFocus = remember { FocusRequester() }
-    LaunchedEffect(action) { confirmFocus.requestFocus() }
+    val safeFocus = remember { FocusRequester() }
+    LaunchedEffect(action) { safeFocus.requestFocus() }
     BackHandler(onBack = onDismiss)
     DialogScrim {
         Text(
@@ -1147,24 +1194,29 @@ private fun ConfirmProgrammeActionDialog(
                     R.string.record_confirm_title
                 } else {
                     R.string.cancel_recording_confirm_title
-                }
+                },
+                programmeTitle,
             ),
             style = MaterialTheme.typography.headlineSmall,
         )
-        Text(
-            stringResource(
-                if (action == ProgrammeAction.RECORD) {
-                    R.string.record_confirm_message
-                } else {
-                    R.string.cancel_recording_confirm_message
-                }
-            )
-        )
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = onConfirm,
-                modifier = Modifier.focusRequester(confirmFocus),
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.focusRequester(safeFocus),
             ) {
+                Text(stringResource(R.string.back))
+            }
+            Button(onClick = onConfirm) {
+                Icon(
+                    imageVector = if (action == ProgrammeAction.RECORD) {
+                        Icons.Filled.FiberManualRecord
+                    } else {
+                        Icons.Filled.Stop
+                    },
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
                 Text(
                     stringResource(
                         if (action == ProgrammeAction.RECORD) {
@@ -1174,9 +1226,6 @@ private fun ConfirmProgrammeActionDialog(
                         }
                     )
                 )
-            }
-            OutlinedButton(onClick = onDismiss) {
-                Text(stringResource(R.string.back))
             }
         }
     }
@@ -1302,9 +1351,6 @@ private fun nearestTargetAt(
 
 private fun overlapSeconds(left: EpgEventEntry, right: EpgEventEntry): Long =
     max(0L, minOf(left.stop, right.stop) - max(left.start, right.start))
-
-private fun minutesBetween(startSec: Long, stopSec: Long): Float =
-    (stopSec - startSec).coerceAtLeast(0L) / 60f
 
 private fun floorToHour(epochSec: Long): Long = epochSec - epochSec.mod(3600L)
 

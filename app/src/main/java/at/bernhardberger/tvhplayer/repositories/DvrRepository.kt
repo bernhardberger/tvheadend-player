@@ -129,7 +129,8 @@ class DvrRepository(
         return DvrEntry(
             id = id,
             eventId = message.int("eventId") ?: existing?.eventId,
-            channelId = message.int("channelId") ?: existing?.channelId ?: 0,
+            channelId = message.int("channelId") ?: message.int("channel")
+                ?: existing?.channelId ?: 0,
             start = message.long("start") ?: existing?.start ?: 0L,
             stop = message.long("stop") ?: existing?.stop ?: 0L,
             title = message.str("title") ?: existing?.title ?: "—",
@@ -143,6 +144,23 @@ class DvrRepository(
             failureReason = error,
             configId = message.str("configId") ?: existing?.configId,
             files = message.list("files")?.mapNotNull(::dvrFile) ?: existing?.files.orEmpty(),
+            owner = message.str("owner") ?: existing?.owner,
+            creator = message.str("creator") ?: existing?.creator,
+            path = message.str("path") ?: existing?.path,
+            channelName = message.str("channelName") ?: existing?.channelName,
+            image = message.str("image") ?: existing?.image,
+            fanartImage = message.str("fanartImage") ?: existing?.fanartImage,
+            playPosition = message.long("playposition") ?: message.long("playPosition")
+                ?: existing?.playPosition,
+            playCount = message.int("playcount") ?: message.int("playCount")
+                ?: existing?.playCount,
+            seasonNumber = message.int("seasonNumber") ?: existing?.seasonNumber,
+            episodeNumber = message.int("episodeNumber") ?: existing?.episodeNumber,
+            episodeCount = message.int("episodeCount") ?: existing?.episodeCount,
+            partNumber = message.int("partNumber") ?: existing?.partNumber,
+            partCount = message.int("partCount") ?: existing?.partCount,
+            autorecId = message.str("autorecId") ?: existing?.autorecId,
+            timerecId = message.str("timerecId") ?: existing?.timerecId,
         )
     }
 

@@ -55,6 +55,16 @@
 - Persist a per-device channel-scope allowlist. An unconfigured device exposes
   All Channels and every current server tag; after customization, at least one
   scope remains enabled and newly introduced tags stay hidden until selected.
+- Present EPG data as a widescreen TV timeline: channels are virtualized vertical
+  rows, time runs horizontally on one shared ruler, programme widths remain
+  strictly proportional, and compact date/Now/group controls replace the
+  multi-row magazine header. Keep the existing bounded cache and details-first
+  action model.
+- Preserve HTSP DVR owner, path, channel, artwork, playback, and episode metadata.
+  Build the Archive from sanitized server-relative file parents, preserve nested
+  folders and focus/scroll restoration, and keep Schedule and Problems as
+  separate modes. Treat TVHeadend access control as the recording-visibility
+  security boundary; client grouping is presentation, not authorization.
 - Support app-specific German and English selection and persist the
   operator preference for showing the main EPG menu.
 - Retry interrupted playback through the serialized player command gate with
