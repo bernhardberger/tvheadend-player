@@ -5,7 +5,7 @@
     <string name="previous_channel_tag">Vorherige Sendergruppe</string>
     <string name="next_channel_tag">Nächste Sendergruppe</string>
     <string name="empty_channel_tag">Diese Sendergruppe ist leer. Wählen Sie eine andere Gruppe oder Alle Sender.</string>
-    <string name="active_tag_unavailable">Die gewählte Sendergruppe ist nicht mehr verfügbar. Alle Sender werden angezeigt.</string>
+    <string name="active_tag_unavailable">Die gewählte Sendergruppe ist nicht mehr verfügbar. Eine andere verfügbare Gruppe wird angezeigt.</string>
     <string name="dismiss">Ausblenden</string>
     <string name="nav_channels">Sender</string>
     <string name="nav_epg">Programm</string>
@@ -28,6 +28,10 @@
     <string name="settings_language_nav">Sprache</string>
     <string name="settings_options">Einstellungen – Optionen</string>
     <string name="settings_options_nav">Optionen</string>
+    <string name="settings_channel_tags_nav">Sendergruppen</string>
+    <string name="settings_channel_tags">Einstellungen – Sendergruppen</string>
+    <string name="settings_channel_tags_description">Wählen Sie, welche Sendergruppen auf diesem Fernseher unter Sender und Programm verfügbar sind.</string>
+    <string name="settings_channel_tags_required">Mindestens eine Sendergruppe muss aktiviert bleiben.</string>
     <string name="show_epg_menu">Programmmenü anzeigen</string>
     <string name="show_epg_menu_enabled">Programmmenü anzeigen: Ein</string>
     <string name="show_epg_menu_disabled">Programmmenü anzeigen: Aus</string>

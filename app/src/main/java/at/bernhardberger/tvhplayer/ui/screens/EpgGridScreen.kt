@@ -393,12 +393,15 @@ fun EpgGridScreen(
                 onDismiss = channelViewModel::dismissUnavailableTagNotice,
             )
             if (tagNotice) Spacer(Modifier.height(8.dp))
-            ChannelTagSelector(
-                tags = channelScope.tags,
-                activeTagId = channelScope.activeTagId,
-                onSelectTag = channelViewModel::selectTag,
-            )
-            Spacer(Modifier.height(10.dp))
+            if (channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1) {
+                ChannelTagSelector(
+                    tags = channelScope.tags,
+                    activeTagId = channelScope.activeTagId,
+                    onSelectTag = channelViewModel::selectTag,
+                    allChannelsVisible = channelScope.allChannelsVisible,
+                )
+                Spacer(Modifier.height(10.dp))
+            }
             DayStrip(
                 activeStartSec = windowStartSec,
                 focusRequester = dayStripFocus,

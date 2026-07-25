@@ -190,12 +190,13 @@ fun ChannelsScreen(
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
             )
-            if (channelScope.tags.isNotEmpty()) {
+            if (channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1) {
                 ChannelTagSelector(
                     tags = channelScope.tags,
                     activeTagId = channelScope.activeTagId,
                     onSelectTag = channelViewModel::selectTag,
                     modifier = Modifier.width(300.dp),
+                    allChannelsVisible = channelScope.allChannelsVisible,
                 )
             }
         }

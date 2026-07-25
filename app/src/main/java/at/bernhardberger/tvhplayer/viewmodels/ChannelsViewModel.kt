@@ -24,6 +24,7 @@ class ChannelsViewModel(
         repo.channelsUi,
         repo.tagsUi,
         tagSettings.activeTagId,
+        tagSettings.scopeVisibility,
         ::resolveChannelScope,
     ).stateIn(
         scope = viewModelScope,
@@ -43,11 +44,40 @@ class ChannelsViewModel(
         viewModelScope.launch {
             combine(scope, repo.metadataReady, tagSettings.activeTagId) {
                     currentScope, metadataReady, requestedTagId ->
-                metadataReady &&
-                    requestedTagId != null &&
-                    currentScope.fallback == TagScopeFallback.TAG_UNAVAILABLE
-            }.collect { shouldFallback ->
-                if (shouldFallback) tagSettings.fallbackToAllChannels()
+                if (metadataReady && currentScope.activeTagId != requestedTagId) {
+                    currentScope
+                } else {
+                    null
+                }
+            }.collect { fallbackScope ->
+                fallbackScope ?: return@collect
+                if (fallbackScope.fallback == TagScopeFallback.TAG_UNAVAILABLE) {
+                    tagSettings.fallbackToScope(fallbackScope.activeTagId)
+                } else {
+                    tagSettings.selectTag(fallbackScope.activeTagId)
+                }
+            }
+        }
+        viewModelScope.launch {
+            combine(repo.tagsUi, repo.metadataReady, tagSettings.scopeVisibility) {
+                    tags, metadataReady, visibility ->
+                if (
+                    metadataReady &&
+                    visibility.configured &&
+                    !visibility.allChannelsVisible &&
+                    tags.none { visibility.isTagVisible(it.id) }
+                ) {
+                    tags.mapTo(mutableSetOf()) { it.id }
+                } else {
+                    null
+                }
+            }.collect { availableTagIds ->
+                availableTagIds ?: return@collect
+                tagSettings.setScopeVisible(
+                    tagId = null,
+                    visible = true,
+                    availableTagIds = availableTagIds,
+                )
             }
         }
     }

@@ -52,6 +52,9 @@
   Android Keystore-backed store. Release builds expose no importer or component.
 - Preserve TVHeadend channel numbers through the UI and direct-entry policy;
   fall back to one-based positions only for servers with no channel numbers.
+- Persist a per-device channel-scope allowlist. An unconfigured device exposes
+  All Channels and every current server tag; after customization, at least one
+  scope remains enabled and newly introduced tags stay hidden until selected.
 - Support app-specific German and English selection and persist the
   operator preference for showing the main EPG menu.
 - Retry interrupted playback through the serialized player command gate with

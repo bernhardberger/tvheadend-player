@@ -54,6 +54,106 @@ class ChannelScopePolicyTest {
     }
 
     @Test
+    fun allChannelsOnlyHidesTagNavigationWithoutFilteringChannels() {
+        val scope = resolveChannelScope(
+            channels = channels,
+            tags = listOf(news, sport),
+            requestedTagId = null,
+            visibility = ChannelScopeVisibility(
+                configured = true,
+                allChannelsVisible = true,
+                visibleTagIds = emptySet(),
+            ),
+        )
+
+        assertEquals(true, scope.allChannelsVisible)
+        assertEquals(emptyList<ChannelTagUi>(), scope.tags)
+        assertNull(scope.activeTagId)
+        assertEquals(listOf(1, 2, 3), scope.visibleChannels.map { it.id })
+    }
+
+    @Test
+    fun hidingAllChannelsSelectsFirstVisibleTag() {
+        val scope = resolveChannelScope(
+            channels = channels,
+            tags = listOf(news, sport),
+            requestedTagId = null,
+            visibility = ChannelScopeVisibility(
+                configured = true,
+                allChannelsVisible = false,
+                visibleTagIds = setOf(20),
+            ),
+        )
+
+        assertEquals(false, scope.allChannelsVisible)
+        assertEquals(listOf(sport), scope.tags)
+        assertEquals(20, scope.activeTagId)
+        assertEquals(listOf(2), scope.visibleChannels.map { it.id })
+        assertEquals(TagScopeFallback.SCOPE_HIDDEN, scope.fallback)
+    }
+
+    @Test
+    fun customVisibilityStartsFromAllAvailableScopesAndBecomesAnAllowlist() {
+        val visibility = updateChannelScopeVisibility(
+            current = ChannelScopeVisibility(),
+            availableTagIds = setOf(10, 20),
+            tagId = 20,
+            visible = false,
+        )
+
+        assertEquals(true, visibility.configured)
+        assertEquals(true, visibility.allChannelsVisible)
+        assertEquals(setOf(10), visibility.visibleTagIds)
+        assertEquals(false, visibility.isTagVisible(30))
+    }
+
+    @Test
+    fun finalVisibleScopeCannotBeDisabled() {
+        val allOnly = ChannelScopeVisibility(
+            configured = true,
+            allChannelsVisible = true,
+            visibleTagIds = emptySet(),
+        )
+        val sportOnly = ChannelScopeVisibility(
+            configured = true,
+            allChannelsVisible = false,
+            visibleTagIds = setOf(20),
+        )
+
+        assertEquals(
+            allOnly,
+            updateChannelScopeVisibility(allOnly, setOf(10, 20), tagId = null, visible = false),
+        )
+        assertEquals(
+            sportOnly,
+            updateChannelScopeVisibility(sportOnly, setOf(10, 20), tagId = 20, visible = false),
+        )
+    }
+
+    @Test
+    fun enablingAllChannelsRecoversFromMissingConfiguredTags() {
+        val staleTagOnly = ChannelScopeVisibility(
+            configured = true,
+            allChannelsVisible = false,
+            visibleTagIds = setOf(99),
+        )
+
+        assertEquals(
+            ChannelScopeVisibility(
+                configured = true,
+                allChannelsVisible = true,
+                visibleTagIds = emptySet(),
+            ),
+            updateChannelScopeVisibility(
+                current = staleTagOnly,
+                availableTagIds = setOf(10, 20),
+                tagId = null,
+                visible = true,
+            ),
+        )
+    }
+
+    @Test
     fun browsingFocusMovesToFirstVisibleWithoutChangingPlayback() {
         assertEquals(2, browsingFocusChannelId(listOf(channels[1]), currentFocusId = 1))
         assertEquals(2, browsingFocusChannelId(listOf(channels[1]), currentFocusId = 2))
@@ -77,6 +177,30 @@ class ChannelScopePolicyTest {
         assertNull(adjacentTagId(tags, activeTagId = null, direction = -1))
         assertEquals(20, adjacentTagId(tags, activeTagId = 20, direction = 1))
         assertNull(adjacentTagId(emptyList(), activeTagId = null, direction = 1))
+    }
+
+    @Test
+    fun tagNavigationCanExcludeAllChannels() {
+        val tags = listOf(news, sport)
+
+        assertEquals(
+            20,
+            adjacentTagId(
+                tags = tags,
+                activeTagId = 10,
+                direction = 1,
+                allChannelsVisible = false,
+            ),
+        )
+        assertEquals(
+            10,
+            adjacentTagId(
+                tags = tags,
+                activeTagId = 10,
+                direction = -1,
+                allChannelsVisible = false,
+            ),
+        )
     }
 
     private fun channel(id: Int, number: Int, tags: Set<Int>) = ChannelUi(

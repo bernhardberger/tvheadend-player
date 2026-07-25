@@ -62,16 +62,21 @@ fun ChannelTagSelector(
     activeTagId: Int?,
     onSelectTag: (Int?) -> Unit,
     modifier: Modifier = Modifier,
+    allChannelsVisible: Boolean = true,
 ) {
     var showChooser by remember { mutableStateOf(false) }
-    val activeIndex = tags.indexOfFirst { it.id == activeTagId }
-    val activeName = if (activeTagId == null || activeIndex < 0) {
+    val orderedTagIds = buildList<Int?> {
+        if (allChannelsVisible) add(null)
+        addAll(tags.map { it.id })
+    }
+    val activeIndex = orderedTagIds.indexOf(activeTagId).coerceAtLeast(0)
+    val activeName = if (activeTagId == null) {
         stringResource(R.string.all_channels)
     } else {
-        tags[activeIndex].name
+        tags.firstOrNull { it.id == activeTagId }?.name.orEmpty()
     }
-    val canMoveLeft = activeTagId != null
-    val canMoveRight = activeIndex < tags.lastIndex
+    val canMoveLeft = activeIndex > 0
+    val canMoveRight = activeIndex < orderedTagIds.lastIndex
 
     Button(
         onClick = { showChooser = true },
@@ -85,7 +90,12 @@ fun ChannelTagSelector(
                     Key.DirectionRight -> 1
                     else -> return@onPreviewKeyEvent false
                 }
-                val targetTagId = adjacentTagId(tags, activeTagId, direction)
+                val targetTagId = adjacentTagId(
+                    tags = tags,
+                    activeTagId = activeTagId,
+                    direction = direction,
+                    allChannelsVisible = allChannelsVisible,
+                )
                 if (targetTagId != activeTagId) onSelectTag(targetTagId)
                 true
             },
@@ -128,6 +138,7 @@ fun ChannelTagSelector(
         ChannelTagChooser(
             tags = tags,
             activeTagId = activeTagId,
+            allChannelsVisible = allChannelsVisible,
             onSelectTag = {
                 onSelectTag(it)
                 showChooser = false
@@ -141,6 +152,7 @@ fun ChannelTagSelector(
 private fun ChannelTagChooser(
     tags: List<ChannelTagUi>,
     activeTagId: Int?,
+    allChannelsVisible: Boolean,
     onSelectTag: (Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -148,7 +160,8 @@ private fun ChannelTagChooser(
     val selectedIndex = if (activeTagId == null) {
         0
     } else {
-        tags.indexOfFirst { it.id == activeTagId }.coerceAtLeast(0) + 1
+        tags.indexOfFirst { it.id == activeTagId }.coerceAtLeast(0) +
+            if (allChannelsVisible) 1 else 0
     }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
     LaunchedEffect(activeTagId, tags) {
@@ -190,13 +203,15 @@ private fun ChannelTagChooser(
                             .heightIn(max = 420.dp)
                             .focusGroup(),
                     ) {
-                        item(key = "all-channels") {
-                            TagChoice(
-                                text = stringResource(R.string.all_channels),
-                                selected = activeTagId == null,
-                                selectedFocus = selectedFocus,
-                                onClick = { onSelectTag(null) },
-                            )
+                        if (allChannelsVisible) {
+                            item(key = "all-channels") {
+                                TagChoice(
+                                    text = stringResource(R.string.all_channels),
+                                    selected = activeTagId == null,
+                                    selectedFocus = selectedFocus,
+                                    onClick = { onSelectTag(null) },
+                                )
+                            }
                         }
                         items(tags, key = { it.id }) { tag ->
                             TagChoice(

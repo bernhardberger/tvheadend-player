@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tune
@@ -99,6 +100,7 @@ fun SettingsSubRail(
 private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
     val languageLabel = stringResource(R.string.settings_language_nav)
     val optionsLabel = stringResource(R.string.settings_options_nav)
+    val channelTagsLabel = stringResource(R.string.settings_channel_tags_nav)
     val connectionLabel = stringResource(R.string.settings_connection_nav)
     val playerLabel = stringResource(R.string.settings_player_nav)
     val applianceLabel = stringResource(R.string.settings_appliance_nav)
@@ -106,6 +108,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
     return remember(
         languageLabel,
         optionsLabel,
+        channelTagsLabel,
         connectionLabel,
         playerLabel,
         applianceLabel,
@@ -120,6 +123,10 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
             add(
             RailItem(SettingsRoutes.OPTIONS, optionsLabel) {
                 Icon(Icons.Filled.Tune, null, Modifier.size(24.dp))
+            })
+            add(
+            RailItem(SettingsRoutes.CHANNEL_TAGS, channelTagsLabel) {
+                Icon(Icons.Filled.FilterList, null, Modifier.size(24.dp))
             })
             add(
             RailItem(SettingsRoutes.CONNECTION, connectionLabel) {

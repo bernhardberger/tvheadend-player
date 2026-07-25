@@ -7,7 +7,7 @@
     <string name="previous_channel_tag">Previous channel tag</string>
     <string name="next_channel_tag">Next channel tag</string>
     <string name="empty_channel_tag">This channel tag is empty. Choose another tag or All channels.</string>
-    <string name="active_tag_unavailable">The selected channel tag is no longer available. Showing All channels.</string>
+    <string name="active_tag_unavailable">The selected channel group is no longer available. Showing another available group.</string>
     <string name="dismiss">Dismiss</string>
     <string name="nav_channels">Channels</string>
     <string name="nav_epg">Guide</string>
@@ -32,6 +32,10 @@
     <string name="settings_language_nav">Language</string>
     <string name="settings_options">Settings - Options</string>
     <string name="settings_options_nav">Options</string>
+    <string name="settings_channel_tags_nav">Channel groups</string>
+    <string name="settings_channel_tags">Settings - Channel groups</string>
+    <string name="settings_channel_tags_description">Choose which channel groups are available in Channels and Guide on this TV.</string>
+    <string name="settings_channel_tags_required">At least one channel group must remain enabled.</string>
     <string name="show_epg_menu">Show guide menu</string>
     <string name="show_epg_menu_enabled">Show guide menu: On</string>
     <string name="show_epg_menu_disabled">Show guide menu: Off</string>

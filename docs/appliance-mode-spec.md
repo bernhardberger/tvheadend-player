@@ -142,6 +142,8 @@ fun adjacentChannelId(
 3. During fullscreen playback, physical `CH+` and `CH-` switch to adjacent
    visible channels and wrap at the ends of the list. When a channel browser is
    focused, they page that list without tuning until the user confirms a row.
+   The owner can independently limit each TV to All Channels, selected TVHeadend
+   channel tags, or a mixture, with at least one browsing scope always enabled.
 4. Physical `0`-`9` keys show a channel-number overlay and select the matching
    TVHeadend channel number after 1 to 3 digits. Positional numbering is used only
    when the server supplies no channel numbers at all.

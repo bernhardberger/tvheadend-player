@@ -27,6 +27,7 @@ import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnection
+import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsChannelTags
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsLanguage
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsOptions
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer
@@ -40,6 +41,7 @@ object SettingsRoutes {
     const val GENERAL = "settings/general"
     const val PLAYER = "settings/player"
     const val OPTIONS = "settings/options"
+    const val CHANNEL_TAGS = "settings/channel-tags"
     const val CONNECTION = "settings/connection"
     const val APPLIANCE = "settings/appliance"
     const val SIMPLE_TV = "settings/simple-tv"
@@ -119,6 +121,10 @@ fun SettingsScreen(onBack: () -> Unit) {
 
                     composable(SettingsRoutes.OPTIONS) {
                         SettingsOptions()
+                    }
+
+                    composable(SettingsRoutes.CHANNEL_TAGS) {
+                        SettingsChannelTags()
                     }
 
                     composable(SettingsRoutes.PLAYER) {
