@@ -8,11 +8,20 @@
   </defs>
   <rect width="960" height="300" fill="url(#bg)"/>
   <rect x="55" y="55" width="190" height="190" rx="42" fill="#101d33" stroke="#324a6b" stroke-width="4"/>
-  <rect x="89" y="103" width="84" height="14" rx="7" fill="#f4f7fb"/>
-  <rect x="89" y="131" width="101" height="14" rx="7" fill="#59c3ff"/>
-  <rect x="89" y="160" width="65" height="14" rx="7" fill="#657cff"/>
-  <rect x="89" y="188" width="91" height="14" rx="7" fill="#f4f7fb"/>
-  <rect x="196" y="93" width="13" height="118" rx="7" fill="#ffb454"/>
+  <!-- TV chassis -->
+  <rect x="81.6" y="77.8" width="136.8" height="98.8" rx="19" fill="#00BCFA"/>
+  <!-- Screen -->
+  <rect x="95.9" y="92.1" width="108.3" height="70.3" rx="10.5" fill="#0A1A2E"/>
+  <!-- Orange diamond -->
+  <g transform="translate(150 127.2) rotate(45)">
+    <rect x="-29.5" y="-29.5" width="58.9" height="58.9" rx="11.4" fill="#FA7F00"/>
+  </g>
+  <!-- Play cutout -->
+  <polygon points="138.5,109.3 138.5,145.1 174.2,127.2" fill="#0A1A2E"/>
+  <!-- Neck -->
+  <rect x="143.4" y="174.7" width="13.3" height="21.9" rx="4" fill="#00BCFA"/>
+  <!-- Base -->
+  <rect x="112" y="195.6" width="76" height="14.3" rx="7.1" fill="#FA7F00"/>
   <text x="290" y="145" fill="#f4f7fb" font-family="DejaVu Sans, sans-serif" font-size="54" font-weight="700">TVHeadend Player</text>
   <text x="290" y="190" fill="#b5c1d4" font-family="DejaVu Sans, sans-serif" font-size="18">Live TV client for TVHeadend servers</text>
 </svg>
