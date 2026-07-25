@@ -253,13 +253,23 @@ def read_device_properties(adb: str, serial: str) -> dict[str, str]:
         "android": "ro.build.version.release",
         "abis": "ro.product.cpu.abilist",
     }
-    return {
-        label: run(
-            adb_command(adb, serial, "shell", "getprop", property_name),
-            capture=True,
-        ).stdout.strip()
-        for label, property_name in names.items()
-    }
+    result = run(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "sh",
+            "-c",
+            'for property do getprop "$property"; done',
+            "get-device-properties",
+            *names.values(),
+        ),
+        capture=True,
+    )
+    values = result.stdout.splitlines()
+    if len(values) != len(names):
+        fail("device returned an unexpected property response")
+    return dict(zip(names, values, strict=True))
 
 
 def verify_configured_identity(

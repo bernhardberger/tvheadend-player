@@ -17,6 +17,7 @@ load_credential_payload = DEVICE["load_credential_payload"]
 capture_screenshot = DEVICE["capture_screenshot"]
 resolve_screenshot_output = DEVICE["resolve_screenshot_output"]
 run = DEVICE["run"]
+read_device_properties = DEVICE["read_device_properties"]
 key_events = DEVICE["KEY_EVENTS"]
 
 
@@ -161,6 +162,30 @@ class DevicePolicyTest(unittest.TestCase):
                 "device product 'G08_4K_GB' does not match expected 'G10_4K_GB'",
             ],
         )
+
+    def test_device_properties_are_read_in_one_adb_call(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="TCL\nSmart TV Pro\nG10\nG10_4K_GB\n12\narmeabi-v7a\n",
+            stderr="",
+        )
+
+        with patch.object(DEVICE["subprocess"], "run", return_value=completed) as run_mock:
+            properties = read_device_properties("adb", "test-device")
+
+        self.assertEqual(
+            properties,
+            {
+                "manufacturer": "TCL",
+                "model": "Smart TV Pro",
+                "device": "G10",
+                "product": "G10_4K_GB",
+                "android": "12",
+                "abis": "armeabi-v7a",
+            },
+        )
+        run_mock.assert_called_once()
 
     def test_missing_credential_file_is_rejected_without_secret_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
