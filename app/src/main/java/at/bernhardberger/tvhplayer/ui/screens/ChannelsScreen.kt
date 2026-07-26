@@ -306,6 +306,7 @@ fun ChannelsScreen(
                                         it.eventId == eventId && it.state == DvrState.RECORDING
                                     }
                                 } == true,
+                                progress = now?.progress(nowSec),
                             )
                         }
                     }

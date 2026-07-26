@@ -18,10 +18,12 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -44,6 +46,8 @@ data class ChannelCardModel(
     val programmeTitle: String,
     val playingNow: Boolean = false,
     val recordingNow: Boolean = false,
+    /** 0–1 programme progress when EPG is known; null omits the bar. */
+    val progress: Float? = null,
 )
 
 /**
@@ -199,6 +203,15 @@ fun ChannelCard(
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
+            item.progress?.let { progress ->
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(MaterialTheme.shapes.small),
+                )
+            }
         }
     }
 }

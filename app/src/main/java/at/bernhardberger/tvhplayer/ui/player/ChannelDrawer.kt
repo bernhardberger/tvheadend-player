@@ -214,6 +214,7 @@ fun ChannelDrawer(
                         ),
                         programmeTitle = now?.title ?: noEpg,
                         playingNow = ch.id == playingChannelId,
+                        progress = now?.progress(nowSec),
                     )
                 }
             }
