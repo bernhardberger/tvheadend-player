@@ -100,10 +100,11 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TvEpgPanelAlpha
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
+import at.bernhardberger.tvhplayer.core.programmeHasAired
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -459,7 +460,11 @@ fun EpgGridScreen(
                     onRetry = onRetry,
                 )
             } else {
-                TimelineTimeRuler(windowStartSec = windowStartSec)
+                TimelineTimeRuler(
+                    windowStartSec = windowStartSec,
+                    windowEndSec = windowStartSec + VISIBLE_WINDOW_SEC,
+                    nowSec = nowSec,
+                )
                 Spacer(Modifier.height(4.dp))
                 LazyColumn(
                     state = channelListState,
@@ -626,7 +631,11 @@ fun EpgGridScreen(
 }
 
 @Composable
-private fun TimelineTimeRuler(windowStartSec: Long) {
+private fun TimelineTimeRuler(
+    windowStartSec: Long,
+    windowEndSec: Long,
+    nowSec: Long,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -682,6 +691,28 @@ private fun TimelineTimeRuler(windowStartSec: Long) {
                             )
                     )
                 }
+            }
+            if (nowSec in windowStartSec until windowEndSec) {
+                val nowFraction = (nowSec - windowStartSec).toFloat() /
+                    (windowEndSec - windowStartSec).coerceAtLeast(1L)
+                Box(
+                    modifier = Modifier
+                        .offset(x = maxWidth * nowFraction - 5.dp)
+                        .width(10.dp)
+                        .height(10.dp)
+                        .align(Alignment.TopStart)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = MaterialTheme.shapes.extraSmall,
+                        ),
+                )
+                Box(
+                    modifier = Modifier
+                        .offset(x = maxWidth * nowFraction)
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.primary),
+                )
             }
         }
     }
@@ -783,7 +814,7 @@ private fun TimelineChannelRow(
                 Box(
                     modifier = Modifier
                         .offset(x = maxWidth * nowFraction)
-                        .width(2.dp)
+                        .width(4.dp)
                         .fillMaxHeight()
                         .background(MaterialTheme.colorScheme.primary),
                 )
@@ -877,13 +908,14 @@ internal fun TimelineProgrammeCell(
             onClick = onOpenDetails,
             headlineContent = {
                 Text(
-                    text = if (width >= 38.dp) event.title else "",
+                    // Always render a label so no focusable cell is visually blank.
+                    text = event.title,
                     maxLines = if (width >= 100.dp) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
                 )
             },
-            supportingContent = if (width >= 112.dp) {
+            supportingContent = if (width >= 90.dp) {
                 {
                     Text(
                         text = "${formatHm(event.start)}–${formatHm(event.stop)}",
@@ -1059,80 +1091,81 @@ private fun ProgrammeDetailsPanel(
     }
     LaunchedEffect(event.eventId, actions) { initialFocus.requestFocus() }
     BackHandler(onBack = onClose)
-    DialogScrim {
-        Text(
-            text = event.title,
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "${channel?.name.orEmpty()} • ${event.start.formatDateTime()}–${
-                formatHm(event.stop)
-            } • ${(event.stop - event.start).coerceAtLeast(0L) / 60L} min",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        programmeMetadata(event)?.let {
-            Text(it, style = MaterialTheme.typography.titleSmall)
-        }
-        event.summary?.takeIf { it.isNotBlank() }?.let {
-            Text(it, maxLines = 3, overflow = TextOverflow.Ellipsis)
-        }
-        event.description
-            ?.takeIf { it.isNotBlank() && it != event.summary }
-            ?.let { Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis) }
-        recording?.let {
-            Text(
-                text = stringResource(R.string.recording_status, dvrStateLabel(it.state)),
-                color = MaterialTheme.colorScheme.primary,
-            )
-            it.failureReason?.takeIf(String::isNotBlank)?.let { reason ->
-                Text(
-                    text = stringResource(R.string.recording_failure_reason, reason),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-        actionResult?.let {
-            Text(
-                text = dvrActionResultLabel(it),
-                color = if (it is DvrActionResult.Failed) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-            )
-        }
-        if (actions.isEmpty()) {
-            Text(
-                text = stringResource(R.string.epg_no_actions),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            actions.forEachIndexed { index, action ->
-                Button(
-                    onClick = { onAction(action) },
-                    modifier = if (index == 0) {
+    val subtitle = buildString {
+        append(channel?.name.orEmpty())
+        if (isNotEmpty()) append(" • ")
+        append(event.start.formatDateTime())
+        append("–")
+        append(formatHm(event.stop))
+        append(" • ")
+        append((event.stop - event.start).coerceAtLeast(0L) / 60L)
+        append(" min")
+    }
+    DialogScrim(wide = true) {
+        ProgrammeContentDetails(
+            event = event,
+            subtitle = subtitle,
+            footer = {
+                recording?.let {
+                    Text(
+                        text = stringResource(R.string.recording_status, dvrStateLabel(it.state)),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    it.failureReason?.takeIf(String::isNotBlank)?.let { reason ->
+                        Text(
+                            text = stringResource(R.string.recording_failure_reason, reason),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                actionResult?.let {
+                    Text(
+                        text = dvrActionResultLabel(it),
+                        color = if (it is DvrActionResult.Failed) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
+                }
+                if (actions.isEmpty()) {
+                    Text(
+                        text = stringResource(
+                            if (programmeHasAired(event, nowSec)) {
+                                R.string.epg_already_aired
+                            } else {
+                                R.string.epg_no_actions
+                            }
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            actions = {
+                actions.forEachIndexed { index, action ->
+                    Button(
+                        onClick = { onAction(action) },
+                        modifier = if (index == 0) {
+                            Modifier.focusRequester(initialFocus)
+                        } else {
+                            Modifier
+                        },
+                    ) {
+                        Text(programmeActionLabel(action))
+                    }
+                }
+                OutlinedButton(
+                    onClick = onClose,
+                    modifier = if (actions.isEmpty()) {
                         Modifier.focusRequester(initialFocus)
                     } else {
                         Modifier
                     },
                 ) {
-                    Text(programmeActionLabel(action))
+                    Text(stringResource(R.string.close))
                 }
-            }
-            OutlinedButton(
-                onClick = onClose,
-                modifier = if (actions.isEmpty()) {
-                    Modifier.focusRequester(initialFocus)
-                } else {
-                    Modifier
-                },
-            ) {
-                Text(stringResource(R.string.close))
-            }
-        }
+            },
+        )
     }
 }
 
@@ -1267,7 +1300,10 @@ private fun dvrActionResultLabel(result: DvrActionResult): String = stringResour
 )
 
 @Composable
-private fun DialogScrim(content: @Composable ColumnScope.() -> Unit) {
+private fun DialogScrim(
+    wide: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1276,7 +1312,7 @@ private fun DialogScrim(content: @Composable ColumnScope.() -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.width(720.dp),
+            modifier = Modifier.width(if (wide) 880.dp else 720.dp),
             shape = MaterialTheme.shapes.large,
             colors = SurfaceDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.surface,

@@ -180,7 +180,7 @@
 
 
     <!-- ===== EPG ===== -->
-    <string name="epg_title">EPG</string>
+    <string name="epg_title">Guide</string>
     <string name="epg_channels_heading">Channels</string>
     <string name="epg_schedule">Schedule</string>
     <string name="epg_loading">Loading EPG…</string>
@@ -209,6 +209,7 @@
     <string name="epg_cell_description">%1$s, %2$s to %3$s, %4$s, %5$s</string>
     <string name="epg_details_action_hint">Programme actions are shown in this panel. Playback never starts directly from the guide.</string>
     <string name="epg_no_actions">There are no available actions for this programme.</string>
+    <string name="epg_already_aired">This programme has already aired. Details remain available for reference.</string>
     <string name="watch">Watch</string>
     <string name="watch_from_start">Watch from start</string>
     <string name="record">Record</string>

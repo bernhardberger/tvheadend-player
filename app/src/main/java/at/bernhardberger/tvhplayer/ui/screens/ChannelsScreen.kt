@@ -62,6 +62,7 @@ import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
+import at.bernhardberger.tvhplayer.core.programmeSummaryText
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.common.progress
@@ -573,33 +574,30 @@ private fun EpgDetailPane(
     piconPath: String? = null,
 ) {
     val progress = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
+    val summaryText = remember(now) { now?.let { programmeSummaryText(it) } }
+    val metadata = remember(now) { now?.let { programmeMetadata(it) } }
     Column(Modifier.padding(24.dp)) {
-
         Row(
             Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-
             Column(Modifier.weight(1f)) {
                 Text(
                     text = channelName,
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.titleLarge,
                 )
-
                 Spacer(Modifier.height(4.dp))
-
                 Text(
                     text = now?.title ?: stringResource(R.string.no_epg),
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
-
             Box(
                 modifier = Modifier
                     .width(92.dp)
                     .height(64.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 PiconBox(imageLoader = imageLoader, piconPath = piconPath)
             }
@@ -608,38 +606,27 @@ private fun EpgDetailPane(
         Spacer(Modifier.height(10.dp))
 
         if (now != null) {
-            val start = remember(now) { now.start }
-            val end = remember(now) { now.stop }
+            val start = now.start
+            val end = now.stop
             val durMin = ((end - start) / 60).coerceAtLeast(0)
-
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(
-                        R.string.epg_time_duration,
-                        formatHm(start),
-                        formatHm(end),
-                        durMin.toInt()
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
+            Text(
+                text = stringResource(
+                    R.string.epg_time_duration,
+                    formatHm(start),
+                    formatHm(end),
+                    durMin.toInt(),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(6.dp))
-
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(6.dp)
-                    .clip(MaterialTheme.shapes.small)
+                    .clip(MaterialTheme.shapes.small),
             )
-
-            val metadata = remember(now) { programmeMetadata(now) }
             if (metadata != null) {
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -648,55 +635,31 @@ private fun EpgDetailPane(
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        if (now?.summary != null) {
-            Text(
-                text = now.summary,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(8.dp))
-        }
-
-        if (now?.description != null) {
-            Text(
-                text = now.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        if (next != null) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.End
-            ) {
-
+            if (summaryText != null) {
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    text = stringResource(R.string.epg_next, formatHm(next.start)),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(Modifier.height(2.dp))
-
-                Text(
-                    text = next.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = summaryText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
+        }
+
+        if (next != null) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.epg_next, formatHm(next.start)),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = next.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

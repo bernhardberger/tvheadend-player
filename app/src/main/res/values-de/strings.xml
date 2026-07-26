@@ -8,7 +8,7 @@
     <string name="active_tag_unavailable">Die gewählte Sendergruppe ist nicht mehr verfügbar. Eine andere verfügbare Gruppe wird angezeigt.</string>
     <string name="dismiss">Ausblenden</string>
     <string name="nav_channels">Sender</string>
-    <string name="nav_epg">Programm</string>
+    <string name="nav_epg">Programmführer</string>
     <string name="nav_recordings">Aufnahmen</string>
     <string name="nav_settings">Einstellungen</string>
 
@@ -166,7 +166,7 @@
     <string name="stats_thermal_emergency">Notfall</string>
     <string name="stats_thermal_shutdown">Abschaltung</string>
 
-    <string name="epg_title">Programm</string>
+    <string name="epg_title">Programmführer</string>
     <string name="epg_channels_heading">Sender</string>
     <string name="epg_schedule">Programmübersicht</string>
     <string name="epg_loading">Programm wird geladen…</string>
@@ -195,6 +195,7 @@
     <string name="epg_cell_description">%1$s, %2$s bis %3$s, %4$s, %5$s</string>
     <string name="epg_details_action_hint">Sendungsaktionen erscheinen in diesem Bereich. Die Wiedergabe startet nie direkt aus dem Programm.</string>
     <string name="epg_no_actions">Für diese Sendung sind keine Aktionen verfügbar.</string>
+    <string name="epg_already_aired">Diese Sendung ist bereits ausgestrahlt. Die Details bleiben zur Information verfügbar.</string>
     <string name="watch">Ansehen</string>
     <string name="watch_from_start">Von Anfang ansehen</string>
     <string name="record">Aufnehmen</string>
