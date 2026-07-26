@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -54,6 +55,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,6 +69,7 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Tab
+import androidx.tv.material3.TabDefaults
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
@@ -235,7 +239,9 @@ fun RecordingsScreen(
                 text = stringResource(R.string.recordings_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { heading() },
             )
             RecordingModeTabs(
                 selected = mode,
@@ -447,11 +453,24 @@ private fun RecordingModeTabs(
                     onMoveToContent().let { true }
             },
     ) {
+        val scheme = MaterialTheme.colorScheme
+        val tabColors = TabDefaults.pillIndicatorTabColors(
+            // Raise unselected contrast so Archive/Schedule/Problems all read as enabled.
+            contentColor = scheme.onSurface.copy(alpha = 0.88f),
+            inactiveContentColor = scheme.onSurface.copy(alpha = 0.88f),
+            selectedContentColor = scheme.onSurface,
+            focusedContentColor = scheme.inverseOnSurface,
+            focusedSelectedContentColor = scheme.inverseOnSurface,
+            disabledContentColor = scheme.onSurface.copy(alpha = 0.38f),
+            disabledInactiveContentColor = scheme.onSurface.copy(alpha = 0.38f),
+            disabledSelectedContentColor = scheme.onSurface.copy(alpha = 0.38f),
+        )
         DvrLibraryMode.entries.forEach { mode ->
             Tab(
                 selected = selected == mode,
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
+                colors = tabColors,
             ) {
                 Text(
                     text = stringResource(
@@ -704,7 +723,7 @@ private fun FolderRecentRecordingRow(
         selected = selected,
         onClick = onClick,
         headlineContent = {
-            Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
         },
         supportingContent = {
             Text(
@@ -1037,7 +1056,7 @@ private fun RecordingListRow(
     ListItem(
         selected = selected,
         onClick = onClick,
-        headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Text(
                 text = if (active) {
@@ -1091,32 +1110,32 @@ private fun RecordingSectionHeader(text: String) {
         text = text,
         style = MaterialTheme.typography.titleLarge,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 2.dp),
+        modifier = Modifier
+            .padding(start = 12.dp, top = 8.dp, bottom = 2.dp)
+            .semantics { heading() },
     )
 }
 
 @Composable
 private fun RecordingDateTime(start: Long) {
     Column(
-        modifier = Modifier.width(120.dp),
+        // Size to content within a bounded range so titles keep more width.
+        modifier = Modifier.widthIn(min = 72.dp, max = 110.dp),
         horizontalAlignment = Alignment.End,
     ) {
-        Text(start.recordingDay(), maxLines = 1)
-        Text(
-            formatHm(start),
-            maxLines = 1,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // Inherit ListItem content colour so focused rows stay readable.
+        Text(start.recordingDay(), maxLines = 1, color = Color.Unspecified)
+        Text(formatHm(start), maxLines = 1, color = Color.Unspecified)
     }
 }
 
 @Composable
 private fun ScheduleTime(entry: DvrEntry) {
     Column(
-        modifier = Modifier.width(160.dp),
+        modifier = Modifier.widthIn(min = 88.dp, max = 140.dp),
         horizontalAlignment = Alignment.End,
     ) {
-        Text(formatHm(entry.start), maxLines = 1)
+        Text(formatHm(entry.start), maxLines = 1, color = Color.Unspecified)
         Text(
             text = stringResource(
                 R.string.recordings_schedule_end_duration,
@@ -1124,7 +1143,7 @@ private fun ScheduleTime(entry: DvrEntry) {
                 (entry.stop - entry.start).coerceAtLeast(0L) / 60L,
             ),
             maxLines = 1,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Color.Unspecified,
         )
     }
 }
@@ -1150,7 +1169,12 @@ private fun RecordingDetailsPanel(
     }
     BackHandler(onBack = onClose)
     RecordingDetailsSurface {
-        Text(entry.title, style = MaterialTheme.typography.headlineSmall, maxLines = 2)
+        Text(
+            entry.title,
+            style = MaterialTheme.typography.headlineSmall,
+            maxLines = 2,
+            modifier = Modifier.semantics { heading() },
+        )
         entry.subtitle?.takeIf(String::isNotBlank)?.let {
             Text(it, style = MaterialTheme.typography.titleMedium)
         }
@@ -1272,34 +1296,44 @@ private fun RecordingConfirmationDialog(
     LaunchedEffect(action) { safeFocus.requestFocus() }
     BackHandler(onBack = onDismiss)
     RecordingDialogSurface {
-        Text(
-            text = stringResource(
-                if (action == PendingRecordingAction.CANCEL) {
-                    R.string.cancel_recording_confirm_title
-                } else {
-                    R.string.delete_recording_confirm_title
-                },
-                title,
-            ),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.focusRequester(safeFocus),
-            ) {
-                Text(stringResource(R.string.back))
-            }
-            Button(onClick = onConfirm) {
-                Text(
-                    stringResource(
-                        if (action == PendingRecordingAction.CANCEL) {
-                            R.string.cancel_recording
-                        } else {
-                            R.string.delete_recording
-                        }
+        // Actions template: guidance left, safe default + destructive right.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(
+                    if (action == PendingRecordingAction.CANCEL) {
+                        R.string.cancel_recording_confirm_title
+                    } else {
+                        R.string.delete_recording_confirm_title
+                    },
+                    title,
+                ),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { heading() },
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.focusRequester(safeFocus),
+                ) {
+                    Text(stringResource(R.string.back))
+                }
+                Button(onClick = onConfirm) {
+                    Text(
+                        stringResource(
+                            if (action == PendingRecordingAction.CANCEL) {
+                                R.string.cancel_recording
+                            } else {
+                                R.string.delete_recording
+                            }
+                        )
                     )
-                )
+                }
             }
         }
     }
