@@ -19,6 +19,7 @@ project instructions, agents, skills, and commands.
 | `.opencode/opencode.json` | Project config; selects the Android TV agent, disables sharing and subagent spawning |
 | `.opencode/agents/android-tv.md` | Default implementation agent |
 | `.opencode/agents/android-reviewer.md` | Directly selectable read-only review agent |
+| `.opencode/agents/tv-ux-reviewer.md` | Screenshot-first product UX and Material for TV reviewer |
 | `.opencode/skills/android-tv-device-testing/` | Safe TCL/ADB/runtime verification workflow |
 | `.opencode/skills/tvhstream-upstream-contribution/` | Upstream sync and contribution boundary workflow |
 | `.opencode/commands/` | `/verify`, `/device-check`, and `/upstream-review` shortcuts |
@@ -33,22 +34,24 @@ safety rules in Git.
 
 Automatic/background subagents remain disabled for the tracked OpenCode agents.
 Codex Ultra mode has a narrow exception in `AGENTS.md` and may use subagents for
-bounded parallel work. In OpenCode, get an independent review by switching
-directly to `android-reviewer` or running `/upstream-review`.
+bounded parallel work. In OpenCode, switch directly to `android-reviewer` for a
+broad correctness, security, and release review, or use `tv-ux-reviewer` for a
+screenshot-first product UX and Material for TV review. `/upstream-review`
+remains the generic-contribution review shortcut.
 
 The harness treats Compose for TV as the focusable UI default, the accepted
 Media3/HTSP path as a regression boundary, incomplete native provenance as a
 signed-release blocker, and read-only GitHub CI as the only enabled automation
 until signing and publication are separately approved.
 
-Dedicated TV UX sections in `AGENTS.md`, `android-tv`, and
-`android-reviewer` make Google TV and Android TV design guidance, Compose for TV,
+Dedicated TV UX sections in `AGENTS.md`, `android-tv`, `android-reviewer`, and
+`tv-ux-reviewer` make Google TV and Android TV design guidance, Compose for TV,
 and Material for TV guidance a standing implementation and review gate. Google
 TV defines the target product experience; Android TV OS and Compose for TV remain
 the platform and implementation APIs. `tools/check-ai-harness` requires those
 sections so future harness edits cannot silently remove the focus, ten-foot
-readability, safe-area, key-dispatch, accessibility, video-scrim, and physical-TV
-validation expectations.
+readability, safe-area, key-dispatch, accessibility, video-scrim, evidence, and
+physical-TV validation expectations.
 
 ## Local device configuration
 

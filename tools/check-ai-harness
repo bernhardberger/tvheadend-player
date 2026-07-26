@@ -20,6 +20,7 @@ REQUIRED_FILES = (
     ".opencode/opencode.json",
     ".opencode/agents/android-tv.md",
     ".opencode/agents/android-reviewer.md",
+    ".opencode/agents/tv-ux-reviewer.md",
     ".opencode/skills/android-tv-device-testing/SKILL.md",
     ".opencode/skills/tvhstream-upstream-contribution/SKILL.md",
     ".opencode/commands/verify.md",
@@ -43,6 +44,7 @@ REQUIRED_TV_UX_SECTIONS = {
     "AGENTS.md": "## TV UX and UI requirements",
     ".opencode/agents/android-tv.md": "## TV UX implementation checklist",
     ".opencode/agents/android-reviewer.md": "## TV UX review gates",
+    ".opencode/agents/tv-ux-reviewer.md": "## UX review method",
 }
 
 

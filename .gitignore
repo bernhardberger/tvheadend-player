@@ -65,3 +65,6 @@ __pycache__/
 # Temporary adb screencap files used during local screenshot/debug sessions
 /_shot_*.png
 /_stage_*.png
+
+# Local AI-generated UX review artifacts
+/artifacts/ux-screen-inventory/review/
