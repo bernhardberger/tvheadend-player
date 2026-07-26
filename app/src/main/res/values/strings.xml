@@ -334,7 +334,6 @@
     <string name="simple_tv_guide_return_disclosure">When appliance entry is enabled, the TV/GUIDE button can return to the app. It does not read screen content.</string>
     <string name="simple_tv_start_confirm_title">Start Simple TV now?</string>
     <string name="simple_tv_start_confirm_message">The full interface will be locked for this session. Exit later from More → Exit Simple TV.</string>
-    <string name="simple_tv_active_chip">Simple TV · More to exit</string>
     <string name="simple_tv_recovery_connection">Television is unavailable right now.</string>
     <string name="simple_tv_recovery_playback">This channel could not start.</string>
     <string name="simple_tv_recovery_hint">Press Retry to try again. An owner can exit Simple TV from More.</string>

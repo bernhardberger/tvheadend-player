@@ -925,25 +925,6 @@ fun VideoPlayerScreen(
             )
         }
 
-        if (simpleTvProfile.active && !controlsVisible && optionsPage == null) {
-            Surface(
-                colors = SurfaceDefaults.colors(
-                    containerColor = Color.Black.copy(alpha = 0.55f),
-                    contentColor = Color.White,
-                ),
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 48.dp, top = 36.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.simple_tv_active_chip),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                )
-            }
-        }
-
         AnimatedVisibility(
             visible = channelNumberInput.isNotEmpty(),
             enter = fadeIn(),

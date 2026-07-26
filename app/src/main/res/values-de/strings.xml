@@ -320,7 +320,6 @@
     <string name="simple_tv_guide_return_disclosure">Wenn TV-Start aktiviert ist, kann die TV-/GUIDE-Taste zur App zurückkehren. Der Dienst liest keine Bildschirminhalte.</string>
     <string name="simple_tv_start_confirm_title">Einfaches TV jetzt starten?</string>
     <string name="simple_tv_start_confirm_message">Die vollständige Oberfläche wird für diese Sitzung gesperrt. Später über Mehr → Einfaches TV verlassen beenden.</string>
-    <string name="simple_tv_active_chip">Einfaches TV · Mehr zum Verlassen</string>
     <string name="simple_tv_recovery_connection">Fernsehen ist gerade nicht verfügbar.</string>
     <string name="simple_tv_recovery_playback">Dieser Sender konnte nicht starten.</string>
     <string name="simple_tv_recovery_hint">Drücken Sie Erneut versuchen. Ein Besitzer kann Einfaches TV über Mehr verlassen.</string>
