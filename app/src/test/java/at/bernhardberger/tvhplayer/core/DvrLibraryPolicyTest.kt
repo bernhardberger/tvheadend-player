@@ -7,6 +7,7 @@ import at.bernhardberger.tvhplayer.htsp.DvrState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 import java.time.ZoneId
 
 class DvrLibraryPolicyTest {
@@ -70,7 +71,7 @@ class DvrLibraryPolicyTest {
     }
 
     @Test
-    fun scheduleUsesRecordingNowTodayTomorrowAndLaterBuckets() {
+    fun scheduleUsesNamedNearTermSectionsAndIndividualLaterDates() {
         val zone = ZoneId.of("UTC")
         val now = 1_700_000_000L
         val todayStart = java.time.Instant.ofEpochSecond(now).atZone(zone)
@@ -82,12 +83,51 @@ class DvrLibraryPolicyTest {
             entry(4, DvrState.SCHEDULED, todayStart + 2 * 86_400 + 60),
         )
 
-        val groups = groupDvrSchedule(entries, now, zone)
+        val sections = groupDvrSchedule(entries, now, zone)
 
-        assertEquals(listOf(1), groups.getValue(DvrScheduleBucket.RECORDING_NOW).map { it.id })
-        assertEquals(listOf(2), groups.getValue(DvrScheduleBucket.TODAY).map { it.id })
-        assertEquals(listOf(3), groups.getValue(DvrScheduleBucket.TOMORROW).map { it.id })
-        assertEquals(listOf(4), groups.getValue(DvrScheduleBucket.LATER).map { it.id })
+        assertEquals(
+            listOf(
+                DvrScheduleSection(DvrScheduleSectionKind.RECORDING_NOW, null, listOf(entries[0])),
+                DvrScheduleSection(DvrScheduleSectionKind.TODAY, null, listOf(entries[1])),
+                DvrScheduleSection(DvrScheduleSectionKind.TOMORROW, null, listOf(entries[2])),
+                DvrScheduleSection(
+                    DvrScheduleSectionKind.DATE,
+                    LocalDate.ofEpochDay(todayStart / 86_400 + 2),
+                    listOf(entries[3]),
+                ),
+            ),
+            sections,
+        )
+    }
+
+    @Test
+    fun laterScheduleEntriesOnTheSameDateShareASection() {
+        val zone = ZoneId.of("UTC")
+        val todayStart = LocalDate.of(2026, 7, 26).atStartOfDay(zone).toEpochSecond()
+        val entries = listOf(
+            entry(1, DvrState.SCHEDULED, todayStart + 2 * 86_400 + 60),
+            entry(2, DvrState.SCHEDULED, todayStart + 2 * 86_400 + 120),
+            entry(3, DvrState.SCHEDULED, todayStart + 3 * 86_400 + 60),
+        )
+
+        val dated = groupDvrSchedule(entries, todayStart + 1, zone)
+            .filter { it.kind == DvrScheduleSectionKind.DATE }
+
+        assertEquals(listOf(listOf(1, 2), listOf(3)), dated.map { section ->
+            section.entries.map { it.id }
+        })
+    }
+
+    @Test
+    fun problemsAreGroupedByActionableStateRatherThanFailureText() {
+        val failedA = entry(1, DvrState.FAILED, 100).copy(failureReason = "Disk full")
+        val cancelled = entry(2, DvrState.CANCELLED, 300)
+        val failedB = entry(3, DvrState.FAILED, 200).copy(failureReason = "No adapter")
+
+        val groups = groupDvrProblems(listOf(failedA, cancelled, failedB))
+
+        assertEquals(listOf(3, 1), groups.getValue(DvrProblemBucket.FAILED).map { it.id })
+        assertEquals(listOf(2), groups.getValue(DvrProblemBucket.CANCELLED).map { it.id })
     }
 
     @Test
@@ -106,21 +146,22 @@ class DvrLibraryPolicyTest {
         )
 
         assertEquals(
-            "Qualifying • Sat 25 Jul 15:55 • ORF 1",
-            recordingListMetadata(recording, "Sat 25 Jul 15:55"),
+            "Qualifying",
+            recordingListMetadata(recording),
         )
     }
 
     @Test
-    fun compactRecordingMetadataFallsBackToTimeAndChannel() {
+    fun compactRecordingMetadataFallsBackToSummaryWithoutRepeatingChannel() {
         val recording = entry(1, DvrState.COMPLETED, 100).copy(
             subtitle = " ",
+            summary = "Programme summary",
             channelName = "ORF 1",
         )
 
         assertEquals(
-            "Sat 25 Jul 15:55 • ORF 1",
-            recordingListMetadata(recording, "Sat 25 Jul 15:55"),
+            "Programme summary",
+            recordingListMetadata(recording),
         )
     }
 
@@ -134,8 +175,8 @@ class DvrLibraryPolicyTest {
         )
 
         assertEquals(
-            "No free adapter • Qualifying • Sat 25 Jul 15:55 • ORF 1",
-            recordingListMetadata(recording, "Sat 25 Jul 15:55", problem = true),
+            "No free adapter • Qualifying",
+            recordingListMetadata(recording, problem = true),
         )
     }
 

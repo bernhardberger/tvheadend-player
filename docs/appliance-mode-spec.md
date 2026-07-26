@@ -202,12 +202,17 @@ fun adjacentChannelId(
     only playable completed recordings in the sanitized TVHeadend folder
     hierarchy; Schedule isolates active and future entries; Problems isolates
     failed and cancelled entries. Recording, stop, and delete operations require
-    confirmation with the safe action focused by default. Recording folders and
-    entries use a newest-first list with an opaque persistent metadata pane;
-    focused rows do not scale or clip, and folder changes transfer focus directly
-    into the destination rather than falling back to the main navigation. Folder
-    panes summarize descendant recordings with count, storage, date range, and
-    a focusable newest-first recording list that opens normal recording details.
+    confirmation with the safe action focused by default. Archive uses a
+    newest-first folder list with an opaque persistent context pane; focused rows
+    do not scale or clip, and folder changes transfer focus directly into the
+    destination rather than falling back to the main navigation. Folder rows
+    summarize descendant recording count and storage, while the context pane
+    exposes five focusable recent descendants. Schedule is a full-width agenda
+    grouped by Recording now, Today, Tomorrow, and explicit later dates. Problems
+    is a full-width triage list grouped into Failed and Cancelled. Recording rows
+    reserve a trailing date/time column so subtitles cannot displace time, and
+    Schedule and Problems reveal metadata and labeled actions in a right-side
+    overlay that restores row focus when closed.
     Returning from playback restores the previous mode, folder, scroll position,
     and focused item rather than resetting the recordings browser.
     Recording playback uses an auto-hiding TV overlay with metadata, elapsed and

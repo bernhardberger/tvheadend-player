@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.htsp.DvrConfig
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 enum class DvrLibraryMode {
@@ -12,11 +13,22 @@ enum class DvrLibraryMode {
     PROBLEMS,
 }
 
-enum class DvrScheduleBucket {
+enum class DvrScheduleSectionKind {
     RECORDING_NOW,
     TODAY,
     TOMORROW,
-    LATER,
+    DATE,
+}
+
+data class DvrScheduleSection(
+    val kind: DvrScheduleSectionKind,
+    val date: LocalDate?,
+    val entries: List<DvrEntry>,
+)
+
+enum class DvrProblemBucket {
+    FAILED,
+    CANCELLED,
 }
 
 data class DvrLibraryPartition(
@@ -111,24 +123,41 @@ fun groupDvrSchedule(
     entries: List<DvrEntry>,
     nowSec: Long,
     zoneId: ZoneId = ZoneId.systemDefault(),
-): Map<DvrScheduleBucket, List<DvrEntry>> {
+): List<DvrScheduleSection> {
     val today = Instant.ofEpochSecond(nowSec).atZone(zoneId).toLocalDate()
-    return DvrScheduleBucket.entries.associateWith { bucket ->
-        entries.filter { entry ->
-            when (bucket) {
-                DvrScheduleBucket.RECORDING_NOW -> entry.state == DvrState.RECORDING
-                DvrScheduleBucket.TODAY -> entry.state == DvrState.SCHEDULED &&
-                    Instant.ofEpochSecond(entry.start).atZone(zoneId).toLocalDate() <= today
-                DvrScheduleBucket.TOMORROW -> entry.state == DvrState.SCHEDULED &&
-                    Instant.ofEpochSecond(entry.start).atZone(zoneId).toLocalDate() ==
-                    today.plusDays(1)
-                DvrScheduleBucket.LATER -> entry.state == DvrState.SCHEDULED &&
-                    Instant.ofEpochSecond(entry.start).atZone(zoneId).toLocalDate() >
-                    today.plusDays(1)
+    val recordingNow = entries.filter { it.state == DvrState.RECORDING }.sortedBy { it.start }
+    val scheduledByDate = entries.filter { it.state == DvrState.SCHEDULED }
+        .sortedBy { it.start }
+        .groupBy { Instant.ofEpochSecond(it.start).atZone(zoneId).toLocalDate() }
+    return buildList {
+        if (recordingNow.isNotEmpty()) {
+            add(DvrScheduleSection(DvrScheduleSectionKind.RECORDING_NOW, null, recordingNow))
+        }
+        scheduledByDate.filterKeys { it <= today }.values.flatten().sortedBy { it.start }
+            .takeIf { it.isNotEmpty() }?.let {
+                add(DvrScheduleSection(DvrScheduleSectionKind.TODAY, null, it))
             }
-        }.sortedBy { it.start }
+        scheduledByDate[today.plusDays(1)]?.let {
+            add(DvrScheduleSection(DvrScheduleSectionKind.TOMORROW, null, it))
+        }
+        scheduledByDate.entries
+            .filter { (date) -> date > today.plusDays(1) }
+            .sortedBy { (date) -> date }
+            .forEach { (date, datedEntries) ->
+                add(DvrScheduleSection(DvrScheduleSectionKind.DATE, date, datedEntries))
+            }
     }
 }
+
+fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEntry>> =
+    DvrProblemBucket.entries.associateWith { bucket ->
+        entries.filter {
+            when (bucket) {
+                DvrProblemBucket.FAILED -> it.state == DvrState.FAILED
+                DvrProblemBucket.CANCELLED -> it.state == DvrState.CANCELLED
+            }
+        }.sortedByDescending { it.start }
+    }
 
 fun recordingListPageTargetIndex(
     itemCount: Int,
@@ -143,15 +172,17 @@ fun recordingListPageTargetIndex(
 
 fun recordingListMetadata(
     entry: DvrEntry,
-    formattedStart: String,
     problem: Boolean = false,
 ): String = buildList {
     if (problem) entry.failureReason?.takeIf(String::isNotBlank)?.let(::add)
     entry.subtitle
         ?.takeIf { it.isNotBlank() && !it.equals(entry.title, ignoreCase = true) }
         ?.let(::add)
-    formattedStart.takeIf(String::isNotBlank)?.let(::add)
-    entry.channelName?.takeIf(String::isNotBlank)?.let(::add)
+    if (isEmpty()) {
+        entry.summary
+            ?.takeIf { it.isNotBlank() && !it.equals(entry.title, ignoreCase = true) }
+            ?.let(::add)
+    }
 }.joinToString(" • ")
 
 private fun recordingFolderPath(entry: DvrEntry): List<String>? {

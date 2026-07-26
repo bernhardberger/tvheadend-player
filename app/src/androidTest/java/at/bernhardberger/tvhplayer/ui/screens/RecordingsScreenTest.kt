@@ -7,6 +7,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -172,8 +173,17 @@ class RecordingsScreenTest {
         composeRule.onAllNodesWithText("Future Show").assertCountEquals(0)
         composeRule.onAllNodesWithText("Failed Show").assertCountEquals(0)
         composeRule.onNodeWithText("Schedule").performClick()
+        composeRule.onNodeWithTag("recordings-schedule-list").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("recording-metadata-pane").assertCountEquals(0)
         composeRule.onNodeWithText("Future Show").assertIsDisplayed()
+        composeRule.onNodeWithTag("recording-list-entry-2").performClick()
+        composeRule.onNodeWithTag("recording-details-panel").assertIsDisplayed()
+        composeRule.onNodeWithText("Cancel recording").assertIsDisplayed()
+        composeRule.onNodeWithText("Close").performClick()
         composeRule.onNodeWithText("Problems").performClick()
+        composeRule.onNodeWithTag("recordings-problems-list").assertIsDisplayed()
+        composeRule.onNodeWithText("Failed").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("recording-metadata-pane").assertCountEquals(0)
         composeRule.onNodeWithText("Failed Show").assertIsDisplayed()
     }
 

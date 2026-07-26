@@ -66,10 +66,14 @@
   folders and focus/scroll restoration, sort each archive level newest-first,
   and present it as a non-scaling list with persistent full metadata beside it.
   Join DVR channel IDs to channel picons, prefer HTSP-cached programme artwork,
-  and use recursive folder summaries with count, size, timeframe, and directly
-  selectable recent recordings rather than repeating folder labels.
-  Keep Schedule and Problems as separate, opaque modes over live video and move
-  focus directly between folder levels without a navigation-rail fallback.
+  and use recursive folder summaries with descendant count, size, and five
+  directly selectable recent recordings. Keep Archive's persistent two-pane
+  hierarchy, but use full-width, opaque lists for Schedule and Problems: Schedule
+  groups active and upcoming entries by Recording now, Today, Tomorrow, and
+  explicit calendar date; Problems groups entries into Failed and Cancelled.
+  Reserve a trailing date/time column in every recording row, and expose details
+  plus labeled actions in a right-side overlay with focus restoration. Move focus
+  directly between folder levels without a navigation-rail fallback.
   Treat TVHeadend access control as the recording-visibility security boundary;
   client grouping is presentation, not authorization.
 - Support app-specific German and English selection and persist the
