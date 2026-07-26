@@ -32,8 +32,6 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsLanguage
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsOptions
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsSimpleTv
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import org.koin.compose.koinInject
 
@@ -49,15 +47,14 @@ object SettingsRoutes {
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onStartSimpleTv: () -> Unit,
+) {
     val nav = rememberNavController()
-    val simpleTvStore: SimpleTvSettingsStore = koinInject()
     val simpleTvSession: SimpleTvSession = koinInject()
-    val simpleTvSettings by simpleTvStore.settings.collectAsStateWithLifecycle(
-        initialValue = SimpleTvSettings()
-    )
-    val simpleTvUnlocked by simpleTvSession.unlocked.collectAsStateWithLifecycle()
-    val showSimpleTvSettings = !simpleTvSettings.enabled || simpleTvUnlocked
+    val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
+    val showSimpleTvSettings = !simpleTvActive
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -136,7 +133,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
 
                     composable(SettingsRoutes.SIMPLE_TV) {
-                        SettingsSimpleTv()
+                        SettingsSimpleTv(onStartSimpleTv = onStartSimpleTv)
                     }
                 }
             }

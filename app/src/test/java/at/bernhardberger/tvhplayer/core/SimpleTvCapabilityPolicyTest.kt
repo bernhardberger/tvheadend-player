@@ -6,25 +6,19 @@ import org.junit.Test
 
 class SimpleTvCapabilityPolicyTest {
     @Test
-    fun normalModeAndUnlockedOwnerAllowEveryCapability() {
+    fun inactiveModeAllowsEveryCapability() {
         SimpleTvCapability.entries.forEach {
-            assertTrue(simpleTvProfile(SimpleTvSettings(), unlocked = false).allows(it))
-            assertTrue(
-                simpleTvProfile(
-                    SimpleTvSettings(enabled = true),
-                    unlocked = true,
-                ).allows(it)
-            )
+            assertTrue(simpleTvProfile(SimpleTvSettings(enabled = true), active = false).allows(it))
         }
     }
 
     @Test
-    fun lockedDefaultsExposeOnlyLiveChannelsAndUnlock() {
-        val profile = simpleTvProfile(SimpleTvSettings(enabled = true), unlocked = false)
+    fun activeModeIsConfinedToLiveTvAndExit() {
+        val profile = simpleTvProfile(SimpleTvSettings(enabled = true), active = true)
 
         assertTrue(profile.allows(SimpleTvCapability.LIVE_TV))
-        assertTrue(profile.allows(SimpleTvCapability.CHANNEL_LIST))
         assertTrue(profile.allows(SimpleTvCapability.UNLOCK))
+        assertFalse(profile.allows(SimpleTvCapability.CHANNEL_LIST))
         assertFalse(profile.allows(SimpleTvCapability.EPG))
         assertFalse(profile.allows(SimpleTvCapability.RECORDINGS))
         assertFalse(profile.allows(SimpleTvCapability.TIMESHIFT))
@@ -34,7 +28,7 @@ class SimpleTvCapabilityPolicyTest {
     }
 
     @Test
-    fun ownerFlagsIndependentlyEnableLockedCapabilities() {
+    fun activeModeOnlyHonorsTimeshiftOption() {
         val profile = simpleTvProfile(
             SimpleTvSettings(
                 enabled = true,
@@ -45,24 +39,24 @@ class SimpleTvCapabilityPolicyTest {
                 settings = true,
                 appExit = true,
             ),
-            unlocked = false,
+            active = true,
         )
 
-        assertTrue(profile.allows(SimpleTvCapability.EPG))
-        assertTrue(profile.allows(SimpleTvCapability.RECORDINGS))
         assertTrue(profile.allows(SimpleTvCapability.TIMESHIFT))
-        assertTrue(profile.allows(SimpleTvCapability.STOP))
-        assertTrue(profile.allows(SimpleTvCapability.SETTINGS))
-        assertTrue(profile.allows(SimpleTvCapability.APP_EXIT))
+        assertFalse(profile.allows(SimpleTvCapability.EPG))
+        assertFalse(profile.allows(SimpleTvCapability.RECORDINGS))
+        assertFalse(profile.allows(SimpleTvCapability.STOP))
+        assertFalse(profile.allows(SimpleTvCapability.SETTINGS))
+        assertFalse(profile.allows(SimpleTvCapability.APP_EXIT))
     }
 
     @Test
     fun routeGuardRejectsDisabledDeepLinks() {
-        val profile = simpleTvProfile(SimpleTvSettings(enabled = true), unlocked = false)
+        val profile = simpleTvProfile(SimpleTvSettings(enabled = true), active = true)
 
-        assertTrue(profile.allowsRoute(SimpleTvRoute.CHANNELS))
         assertTrue(profile.allowsRoute(SimpleTvRoute.PLAYER))
         assertTrue(profile.allowsRoute(SimpleTvRoute.UNLOCK))
+        assertFalse(profile.allowsRoute(SimpleTvRoute.CHANNELS))
         assertFalse(profile.allowsRoute(SimpleTvRoute.EPG))
         assertFalse(profile.allowsRoute(SimpleTvRoute.RECORDINGS))
         assertFalse(profile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER))

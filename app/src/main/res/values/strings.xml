@@ -229,15 +229,19 @@
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Allow this client to request a server timeshift buffer for live TV.</string>
     <string name="simple_tv_enabled">Enable Simple TV mode</string>
+    <string name="simple_tv_startup">Start in Simple TV mode</string>
+    <string name="simple_tv_startup_explanation">On a fresh app launch, play the last channel and remain in the live TV player.</string>
+    <string name="simple_tv_start_now">Start Simple TV now</string>
+    <string name="simple_tv_back_for_exit">Back for exit options</string>
     <string name="simple_tv_epg">Allow Guide</string>
     <string name="simple_tv_recordings">Allow Recordings</string>
     <string name="simple_tv_timeshift">Allow timeshift controls</string>
     <string name="simple_tv_stop">Allow Stop</string>
     <string name="simple_tv_settings_access">Allow Settings</string>
     <string name="simple_tv_app_exit">Allow exiting the app</string>
-    <string name="simple_tv_unlock">Unlock controls</string>
-    <string name="simple_tv_unlock_title">Unlock owner controls</string>
-    <string name="simple_tv_unlock_session">Unlocking restores all controls for this app session only.</string>
+    <string name="simple_tv_unlock">Exit Simple TV</string>
+    <string name="simple_tv_unlock_title">Exit Simple TV</string>
+    <string name="simple_tv_unlock_session">Enter the owner PIN to continue to the exit confirmation.</string>
     <string name="simple_tv_unlock_required">Unlock owner controls before changing Simple TV mode.</string>
     <string name="simple_tv_pin">4-digit owner PIN</string>
     <string name="simple_tv_pin_explanation">The optional PIN is a convenience barrier for household use, not a security boundary.</string>
@@ -250,6 +254,11 @@
     <string name="simple_tv_pin_invalid">Enter exactly four digits.</string>
     <string name="simple_tv_pin_wrong">That PIN is incorrect.</string>
     <string name="simple_tv_no_pin">No PIN is configured. Unlocking requires only confirmation.</string>
+    <string name="simple_tv_continue_to_exit">Continue</string>
+    <string name="simple_tv_exit_confirm_title">Exit Simple TV?</string>
+    <string name="simple_tv_exit_confirm_message">This restores the full TVHeadend Player interface for the current app session. Startup behavior is not changed.</string>
+    <string name="simple_tv_keep_watching">Keep watching</string>
+    <string name="simple_tv_exit">Exit Simple TV</string>
 
     <string name="play">Play</string>
 

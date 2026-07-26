@@ -23,7 +23,7 @@ class SimpleTvSideRailTest {
                     showEpgMenu = true,
                     simpleTvProfile = simpleTvProfile(
                         SimpleTvSettings(enabled = true),
-                        unlocked = false,
+                        active = true,
                     ),
                     onNavigate = {},
                     content = {},
@@ -31,13 +31,13 @@ class SimpleTvSideRailTest {
             }
         }
 
-        assertEquals(1, composeRule.onAllNodesWithText("Channels").fetchSemanticsNodes().size)
+        assertEquals(0, composeRule.onAllNodesWithText("Channels").fetchSemanticsNodes().size)
         assertEquals(0, composeRule.onAllNodesWithText("Guide").fetchSemanticsNodes().size)
         assertEquals(0, composeRule.onAllNodesWithText("Recordings").fetchSemanticsNodes().size)
         assertEquals(0, composeRule.onAllNodesWithText("Settings").fetchSemanticsNodes().size)
         assertEquals(
             1,
-            composeRule.onAllNodesWithText("Unlock controls").fetchSemanticsNodes().size,
+            composeRule.onAllNodesWithText("Exit Simple TV").fetchSemanticsNodes().size,
         )
     }
 }

@@ -657,7 +657,7 @@ fun VideoPlayerScreen(
                     }
                 },
                 showStop = simpleTvProfile.allows(SimpleTvCapability.STOP),
-                showUnlock = simpleTvProfile.settings.enabled && !simpleTvProfile.unlocked,
+                showUnlock = simpleTvProfile.active,
                 onUnlock = onUnlock,
             )
         }

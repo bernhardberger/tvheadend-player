@@ -59,9 +59,11 @@ fun SideRail(
         simpleTvProfile,
     ) {
         buildList {
-            add(RailItem(Routes.CHANNELS, channelsLabel) {
-                Icon(Icons.AutoMirrored.Filled.List, null, Modifier.size(24.dp))
-            })
+            if (simpleTvProfile.allows(SimpleTvCapability.CHANNEL_LIST)) {
+                add(RailItem(Routes.CHANNELS, channelsLabel) {
+                    Icon(Icons.AutoMirrored.Filled.List, null, Modifier.size(24.dp))
+                })
+            }
             if (showEpgMenu && simpleTvProfile.allows(SimpleTvCapability.EPG)) {
                 add(RailItem(Routes.EPG, epgLabel) {
                     Icon(Icons.Filled.Event, null, Modifier.size(24.dp))
@@ -80,7 +82,7 @@ fun SideRail(
         simpleTvProfile,
     ) {
         buildList {
-            if (simpleTvProfile.settings.enabled && !simpleTvProfile.unlocked) {
+            if (simpleTvProfile.active) {
                 add(RailItem(Routes.UNLOCK, unlockLabel) {
                     Icon(Icons.Filled.LockOpen, null, Modifier.size(24.dp))
                 })

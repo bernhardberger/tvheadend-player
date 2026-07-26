@@ -38,20 +38,20 @@ data class SimpleTvSettings(
 
 data class SimpleTvProfile(
     val settings: SimpleTvSettings,
-    val unlocked: Boolean,
+    val active: Boolean,
 ) {
     fun allows(capability: SimpleTvCapability): Boolean {
-        if (!settings.enabled || unlocked) return true
+        if (!active) return true
         return when (capability) {
             SimpleTvCapability.LIVE_TV,
-            SimpleTvCapability.CHANNEL_LIST,
             SimpleTvCapability.UNLOCK -> true
-            SimpleTvCapability.EPG -> settings.epg
-            SimpleTvCapability.RECORDINGS -> settings.recordings
             SimpleTvCapability.TIMESHIFT -> settings.timeshift
-            SimpleTvCapability.STOP -> settings.stop
-            SimpleTvCapability.SETTINGS -> settings.settings
-            SimpleTvCapability.APP_EXIT -> settings.appExit
+            SimpleTvCapability.CHANNEL_LIST,
+            SimpleTvCapability.EPG,
+            SimpleTvCapability.RECORDINGS,
+            SimpleTvCapability.STOP,
+            SimpleTvCapability.SETTINGS,
+            SimpleTvCapability.APP_EXIT -> false
         }
     }
 
@@ -68,8 +68,8 @@ data class SimpleTvProfile(
     )
 }
 
-fun simpleTvProfile(settings: SimpleTvSettings, unlocked: Boolean): SimpleTvProfile =
-    SimpleTvProfile(settings, unlocked)
+fun simpleTvProfile(settings: SimpleTvSettings, active: Boolean): SimpleTvProfile =
+    SimpleTvProfile(settings, active)
 
 fun isValidSimpleTvPin(pin: String): Boolean = pin.length == 4 && pin.all(Char::isDigit)
 

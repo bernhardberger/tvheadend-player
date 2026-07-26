@@ -80,6 +80,7 @@ object Routes {
 @Composable
 fun AppRoot(
     applianceLaunchRequests: ApplianceLaunchRequests,
+    applyStartupMode: Boolean,
     onPlayerVisibilityChanged: (Boolean) -> Unit,
 ) {
     val serverSettingsStore: ServerSettingsStore = koinInject()
@@ -121,32 +122,35 @@ fun AppRoot(
     )
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
-    LaunchedEffect(uiSettingsStore) {
-        applianceLaunchRequests.requestStartup(
-            uiSettingsStore.settings.first().autoStartPlayback
-        )
-    }
     val simpleTvStore: SimpleTvSettingsStore = koinInject()
     val simpleTvSession: SimpleTvSession = koinInject()
     val simpleTvSettings by simpleTvStore.settings.collectAsStateWithLifecycle(
         initialValue = SimpleTvSettings()
     )
-    val simpleTvUnlocked by simpleTvSession.unlocked.collectAsStateWithLifecycle()
-    val capabilityProfile = simpleTvProfile(simpleTvSettings, simpleTvUnlocked)
+    val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
+    val capabilityProfile = simpleTvProfile(simpleTvSettings, simpleTvActive)
     val applianceLaunchRequest by applianceLaunchRequests.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(uiSettingsStore, simpleTvStore, applyStartupMode) {
+        val startSimpleTv = applyStartupMode && simpleTvStore.settings.first().enabled
+        if (startSimpleTv) simpleTvSession.start()
+        applianceLaunchRequests.requestStartup(
+            uiSettingsStore.settings.first().autoStartPlayback || startSimpleTv
+        )
+    }
 
     val backStackEntry by nav.currentBackStackEntryAsState()
 
     val currentRoute = backStackEntry?.destination?.route
     val topRoute = currentRoute?.substringBefore("/")
-    val showRail = topRoute != Routes.PLAYER && topRoute != Routes.RECORDING_PLAYER
+    val showRail = !simpleTvActive &&
+        topRoute != Routes.PLAYER && topRoute != Routes.RECORDING_PLAYER
 
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
         currentRoute?.startsWith(Routes.RECORDING_PLAYER) == true
 
     LaunchedEffect(topRoute, capabilityProfile) {
         val route = topRoute.toSimpleTvRoute() ?: return@LaunchedEffect
-        if (!capabilityProfile.allowsRoute(route)) {
+        if (!capabilityProfile.allowsRoute(route) && route != SimpleTvRoute.CHANNELS) {
             nav.navigate(Routes.CHANNELS) {
                 popUpTo(Routes.CHANNELS) { inclusive = true }
                 launchSingleTop = true
@@ -177,6 +181,7 @@ fun AppRoot(
         val pendingRequest = applianceLaunchRequest
         if (pendingRequest != null) {
             applianceLaunchRequests.cancel(pendingRequest)
+            if (simpleTvActive) nav.navigate(Routes.UNLOCK) { launchSingleTop = true }
             return@BackHandler
         }
 
@@ -288,7 +293,13 @@ fun AppRoot(
                     composable(Routes.SETTINGS) {
                         if (capabilityProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
                             ContentContainer {
-                                SettingsScreen(onBack = { nav.popBackStack() })
+                                SettingsScreen(
+                                    onBack = { nav.popBackStack() },
+                                    onStartSimpleTv = {
+                                        applianceLaunchRequests.request()
+                                        simpleTvSession.start()
+                                    },
+                                )
                             }
                         }
                     }
@@ -296,12 +307,17 @@ fun AppRoot(
                     composable(Routes.UNLOCK) {
                         ContentContainer {
                             SimpleTvUnlockScreen(
-                                onUnlocked = {
+                                onExited = {
                                     nav.navigate(Routes.CHANNELS) {
                                         popUpTo(Routes.UNLOCK) { inclusive = true }
                                     }
                                 },
-                                onBack = { nav.popBackStack() },
+                                onBack = {
+                                    nav.popBackStack()
+                                    if (simpleTvActive && activeServiceId == null) {
+                                        applianceLaunchRequests.request()
+                                    }
+                                },
                             )
                         }
                     }
@@ -324,7 +340,9 @@ fun AppRoot(
                             serviceId = serviceId,
                             simpleTvProfile = capabilityProfile,
                             onUnlock = { nav.navigate(Routes.UNLOCK) },
-                            onClose = { nav.popBackStack() }
+                            onClose = {
+                                if (!simpleTvActive) nav.popBackStack()
+                            }
                         )
                     }
 
@@ -357,7 +375,13 @@ fun AppRoot(
                             R.string.appliance_connection_recovering
                         }
                     ),
-                    hint = stringResource(R.string.appliance_back_for_menu),
+                    hint = stringResource(
+                        if (simpleTvActive) {
+                            R.string.simple_tv_back_for_exit
+                        } else {
+                            R.string.appliance_back_for_menu
+                        }
+                    ),
                 )
             }
     }

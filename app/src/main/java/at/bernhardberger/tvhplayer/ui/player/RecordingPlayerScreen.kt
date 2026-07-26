@@ -99,7 +99,7 @@ fun RecordingPlayerScreen(
     val rootFocus = remember { FocusRequester() }
     val unavailableFocus = remember { FocusRequester() }
     val showStop = simpleTvProfile.allows(SimpleTvCapability.STOP)
-    val showUnlock = simpleTvProfile.settings.enabled && !simpleTvProfile.unlocked
+    val showUnlock = simpleTvProfile.active
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(C.TIME_UNSET) }
     var isPlaying by remember { mutableStateOf(false) }

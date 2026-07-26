@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity() {
             TVHeadendPlayerTheme {
                 AppRoot(
                     applianceLaunchRequests = applianceLaunchRequests,
+                    applyStartupMode = savedInstanceState == null,
                     onPlayerVisibilityChanged = { isPlayerVisible = it },
                 )
             }

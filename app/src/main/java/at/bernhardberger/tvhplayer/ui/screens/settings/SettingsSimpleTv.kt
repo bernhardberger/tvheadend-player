@@ -26,7 +26,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.isValidSimpleTvPin
 import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
-import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import kotlinx.coroutines.launch
@@ -35,72 +34,34 @@ import org.koin.compose.koinInject
 @Composable
 fun SettingsSimpleTv(
     store: SimpleTvSettingsStore = koinInject(),
-    session: SimpleTvSession = koinInject(),
+    onStartSimpleTv: () -> Unit,
 ) {
     val settings by store.settings.collectAsStateWithLifecycle(
         initialValue = SimpleTvSettings()
     )
-    val unlocked by session.unlocked.collectAsStateWithLifecycle()
-    val ownerAccess = !settings.enabled || unlocked
     val scope = rememberCoroutineScope()
     var pin by remember { mutableStateOf("") }
     var editingId by remember { mutableStateOf<String?>(null) }
     var pinResult by remember { mutableStateOf<Int?>(null) }
 
     SettingsPane(title = stringResource(R.string.settings_simple_tv)) {
-        if (!ownerAccess) {
-            Text(stringResource(R.string.simple_tv_unlock_required))
-            return@SettingsPane
-        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
         ) {
             SimpleTvToggle(
-                label = stringResource(R.string.simple_tv_enabled),
+                label = stringResource(R.string.simple_tv_startup),
                 checked = settings.enabled,
                 onClick = {
-                    scope.launch {
-                        if (settings.enabled) {
-                            store.setEnabled(false)
-                            session.lock()
-                        } else {
-                            store.setEnabled(true)
-                            session.unlock()
-                        }
-                    }
+                    scope.launch { store.setEnabled(!settings.enabled) }
                 },
             )
-            SimpleTvToggle(
-                label = stringResource(R.string.simple_tv_epg),
-                checked = settings.epg,
-                onClick = { scope.launch { store.setEpg(!settings.epg) } },
-            )
-            SimpleTvToggle(
-                label = stringResource(R.string.simple_tv_recordings),
-                checked = settings.recordings,
-                onClick = { scope.launch { store.setRecordings(!settings.recordings) } },
-            )
+            Text(stringResource(R.string.simple_tv_startup_explanation))
             SimpleTvToggle(
                 label = stringResource(R.string.simple_tv_timeshift),
                 checked = settings.timeshift,
                 onClick = { scope.launch { store.setTimeshift(!settings.timeshift) } },
-            )
-            SimpleTvToggle(
-                label = stringResource(R.string.simple_tv_stop),
-                checked = settings.stop,
-                onClick = { scope.launch { store.setStop(!settings.stop) } },
-            )
-            SimpleTvToggle(
-                label = stringResource(R.string.simple_tv_settings_access),
-                checked = settings.settings,
-                onClick = { scope.launch { store.setSettings(!settings.settings) } },
-            )
-            SimpleTvToggle(
-                label = stringResource(R.string.simple_tv_app_exit),
-                checked = settings.appExit,
-                onClick = { scope.launch { store.setAppExit(!settings.appExit) } },
             )
             Text(stringResource(R.string.simple_tv_pin_explanation))
             Text(stringResource(R.string.simple_tv_pin_recovery))
@@ -147,6 +108,9 @@ fun SettingsSimpleTv(
                 }
             }
             pinResult?.let { Text(stringResource(it)) }
+            Button(onClick = onStartSimpleTv) {
+                Text(stringResource(R.string.simple_tv_start_now))
+            }
         }
     }
 }

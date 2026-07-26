@@ -4,14 +4,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class SimpleTvSession {
-    private val _unlocked = MutableStateFlow(false)
-    val unlocked = _unlocked.asStateFlow()
+    private val _active = MutableStateFlow(false)
+    val active = _active.asStateFlow()
 
-    fun unlock() {
-        _unlocked.value = true
+    fun start() {
+        _active.value = true
     }
 
-    fun lock() {
-        _unlocked.value = false
+    fun exit() {
+        _active.value = false
     }
 }
