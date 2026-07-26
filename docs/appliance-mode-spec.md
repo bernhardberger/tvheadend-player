@@ -111,7 +111,11 @@ fun adjacentChannelId(
 - Keep the operator UI on one overscan-safe TV layout grid. Use TV Material
   navigation drawers and list items rather than hand-built focusable replicas;
   focused rows must remain unclipped, and the playback channel sheet must attach
-  to the screen edge instead of floating like a dialog.
+  to the screen edge instead of floating like a dialog. The global navigation
+  rail uses a modal overlay so expanding it does not reflow browse content.
+  Settings hides the global rail and keeps only its category rail with symmetric
+  full-screen safe margins; onboarding and unlock use the same full-screen
+  padding. Collapsed rail icons expose destination content descriptions.
 - Reveal hidden playback controls with OK or D-pad Down. Picking the channel that
   is already playing from the playback channel sheet closes the sheet without
   rebuilding or restarting the player session.

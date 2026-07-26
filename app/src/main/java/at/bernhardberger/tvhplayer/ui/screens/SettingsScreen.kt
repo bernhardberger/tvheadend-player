@@ -23,7 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import at.bernhardberger.tvhplayer.core.BackAction
 import at.bernhardberger.tvhplayer.core.nestedBackAction
 import at.bernhardberger.tvhplayer.ui.components.SettingsSubRail
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnection
@@ -83,7 +83,8 @@ fun SettingsScreen(
         Row(
             Modifier
                 .fillMaxSize()
-                .padding(TvScreenPadding)
+                // Settings drops the global rail; use symmetric full-screen safe margins.
+                .padding(TvFullScreenPadding)
         ) {
             SettingsSubRail(
                 currentRoute = currentRoute,

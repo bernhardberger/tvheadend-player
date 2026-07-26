@@ -40,7 +40,7 @@ import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.isValidSimpleTvPin
 import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.stores.SimpleTvSession
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -78,7 +78,7 @@ fun SimpleTvUnlockScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(TvScreenPadding),
+            .padding(TvFullScreenPadding),
     ) {
         Text(
             stringResource(R.string.simple_tv_unlock_title),

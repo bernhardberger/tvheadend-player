@@ -38,7 +38,7 @@ import at.bernhardberger.tvhplayer.core.ConnectionProbeResult
 import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import kotlinx.coroutines.launch
@@ -91,7 +91,7 @@ fun OnboardingIntroduction(onContinue: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(TvScreenPadding),
+            .padding(TvFullScreenPadding),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
@@ -147,7 +147,7 @@ private fun OnboardingConnection(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(TvScreenPadding)
+            .padding(TvFullScreenPadding)
             .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {

@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Language
@@ -117,34 +117,68 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
     ) {
         buildList {
             add(
-            RailItem(SettingsRoutes.GENERAL, languageLabel) {
-                Icon(Icons.Filled.Language, null, Modifier.size(24.dp))
-            })
+                RailItem(SettingsRoutes.GENERAL, languageLabel) {
+                    Icon(
+                        Icons.Filled.Language,
+                        contentDescription = languageLabel,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+            )
             add(
-            RailItem(SettingsRoutes.OPTIONS, optionsLabel) {
-                Icon(Icons.Filled.Tune, null, Modifier.size(24.dp))
-            })
+                RailItem(SettingsRoutes.OPTIONS, optionsLabel) {
+                    Icon(
+                        Icons.Filled.Tune,
+                        contentDescription = optionsLabel,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+            )
             add(
-            RailItem(SettingsRoutes.CHANNEL_TAGS, channelTagsLabel) {
-                Icon(Icons.Filled.FilterList, null, Modifier.size(24.dp))
-            })
+                RailItem(SettingsRoutes.CHANNEL_TAGS, channelTagsLabel) {
+                    Icon(
+                        Icons.Filled.FilterList,
+                        contentDescription = channelTagsLabel,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+            )
             add(
-            RailItem(SettingsRoutes.CONNECTION, connectionLabel) {
-                Icon(Icons.AutoMirrored.Filled.List, null, Modifier.size(24.dp))
-            })
+                RailItem(SettingsRoutes.CONNECTION, connectionLabel) {
+                    Icon(
+                        Icons.Filled.Cloud,
+                        contentDescription = connectionLabel,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+            )
             add(
-            RailItem(SettingsRoutes.PLAYER, playerLabel) {
-                Icon(Icons.Filled.PlayArrow, null, Modifier.size(24.dp))
-            })
+                RailItem(SettingsRoutes.PLAYER, playerLabel) {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = playerLabel,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+            )
             add(
-            RailItem(SettingsRoutes.APPLIANCE, applianceLabel) {
-                Icon(Icons.Filled.Home, null, Modifier.size(24.dp))
-            })
+                RailItem(SettingsRoutes.APPLIANCE, applianceLabel) {
+                    Icon(
+                        Icons.Filled.Home,
+                        contentDescription = applianceLabel,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+            )
             if (showSimpleTv) {
                 add(
                     RailItem(SettingsRoutes.SIMPLE_TV, simpleTvLabel) {
-                        Icon(Icons.Filled.AccessibilityNew, null, Modifier.size(24.dp))
-                    }
+                        Icon(
+                            Icons.Filled.AccessibilityNew,
+                            contentDescription = simpleTvLabel,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    },
                 )
             }
         }

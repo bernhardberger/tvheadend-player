@@ -39,10 +39,13 @@
   channel/EPG snapshot while a same-server reconnect stages its replacement.
 - Use TV Material for focusable Compose controls. Retain mobile Material only
   for primitives not supplied by TV Material 1.1.0, under one coordinated theme.
-- Use TV Material's standard navigation drawer and list-item geometry on a
-  shared 48/32 dp overscan-safe grid. Disable focus scaling where rows sit in a
-  clipped scrolling viewport, and present playback channel selection as a
-  full-height edge sheet with a cinematic scrim rather than an inset card.
+- Use TV Material's modal navigation drawer and list-item geometry on a shared
+  48/32 dp overscan-safe grid so expanded navigation overlays content without
+  resizing it. Hide the global rail on Settings routes; keep only the Settings
+  category rail and symmetric full-screen padding. Disable focus scaling where
+  rows sit in a clipped scrolling viewport, and present playback channel
+  selection as a full-height edge sheet with a cinematic scrim rather than an
+  inset card.
 - Serialize HTSP teardown and player commands, keep repository flow creation
   thread-safe, and test timeout/Back/key policies independently of Android UI.
 - Keep credential input transient, disable app backup/device transfer, and make

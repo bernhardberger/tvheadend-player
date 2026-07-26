@@ -34,6 +34,7 @@ import at.bernhardberger.tvhplayer.core.clearWarmReturn
 import at.bernhardberger.tvhplayer.core.consumeWarmReturn
 import at.bernhardberger.tvhplayer.core.rearmWarmReturn
 import at.bernhardberger.tvhplayer.core.rootBackAction
+import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
@@ -153,8 +154,13 @@ fun AppRoot(
 
     val currentRoute = backStackEntry?.destination?.route
     val topRoute = currentRoute?.substringBefore("/")
-    val showRail = !simpleTvActive &&
-        topRoute != Routes.PLAYER && topRoute != Routes.RECORDING_PLAYER
+    val showRail = showGlobalNavigationRail(
+        simpleTvActive = simpleTvActive,
+        topRoute = topRoute,
+        playerRoute = Routes.PLAYER,
+        recordingPlayerRoute = Routes.RECORDING_PLAYER,
+        settingsRoute = Routes.SETTINGS,
+    )
 
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
         currentRoute?.startsWith(Routes.RECORDING_PLAYER) == true
