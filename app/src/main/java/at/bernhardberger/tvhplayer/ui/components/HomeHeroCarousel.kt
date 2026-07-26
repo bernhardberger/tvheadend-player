@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -82,7 +83,17 @@ fun HomeHeroCarousel(
     ) {
         Carousel(
             itemCount = slides.size,
-            modifier = Modifier.fillMaxSize(),
+            // Carousel puts a focusable box in front of its content, so arriving from a
+            // row lands on that box: no visible focus, and the action unreachable. Push
+            // focus straight through to the slide's button. Left/Right still bubble up
+            // from the button to Carousel's own key handler, so slides keep changing.
+            modifier = Modifier
+                .fillMaxSize()
+                .onFocusChanged { state ->
+                    if (state.isFocused) {
+                        runCatching { actionFocus.requestFocus() }
+                    }
+                },
             carouselState = carouselState,
             autoScrollDurationMillis = autoScrollMs,
             carouselIndicator = {
@@ -148,7 +159,11 @@ private fun HeroSlideVisual(
     imageLoader: ImageLoader,
     pageLabel: String,
 ) {
-    val accent = remember(slide.accentSeed) { channelAccentColor(slide.accentSeed) }
+    val accent = rememberChannelAccent(
+        imageLoader = imageLoader,
+        piconPath = slide.piconPath,
+        channelId = slide.channelId,
+    )
     val initials = remember(slide.channelName) { channelInitials(slide.channelName) }
     val overline = when (slide.kind) {
         HomeSlideKind.LIVE -> stringResource(R.string.home_slide_live)

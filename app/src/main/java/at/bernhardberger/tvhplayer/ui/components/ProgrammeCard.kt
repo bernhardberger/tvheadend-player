@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,7 +43,11 @@ fun ProgrammeCard(
     testTag: String = item.key,
 ) {
     val initials = remember(item.channelName) { channelInitials(item.channelName) }
-    val accent = remember(item.accentSeed) { channelAccentColor(item.accentSeed) }
+    val accent = rememberChannelAccent(
+        imageLoader = imageLoader,
+        piconPath = item.piconPath,
+        channelId = item.channelId,
+    )
     Card(
         onClick = onClick,
         scale = CardDefaults.scale(focusedScale = 1.06f),
@@ -178,12 +181,3 @@ private fun programmeTimeLabel(item: HomeCardItem): String? {
     }
 }
 
-/** Deterministic dark-theme accent from a 0–359 hue seed. */
-fun channelAccentColor(seed: Int): Color {
-    val hue = ((seed % 360) + 360) % 360
-    return Color.hsv(
-        hue = hue.toFloat(),
-        saturation = 0.48f,
-        value = 0.38f,
-    )
-}

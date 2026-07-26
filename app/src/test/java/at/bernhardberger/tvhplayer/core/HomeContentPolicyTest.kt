@@ -42,7 +42,6 @@ class HomeContentPolicyTest {
                             channelNumber = 1,
                             channelName = "ORF1",
                             piconPath = null,
-                            accentSeed = 0,
                             title = "Later",
                             remainingMinutes = null,
                             progress = null,
@@ -288,20 +287,6 @@ class HomeContentPolicyTest {
         assertEquals(HomeFocusTarget.STATUS_ACTION, homeInitialFocusTarget(denied))
     }
 
-    @Test
-    fun channelAccentSeedIsStableForTheSameName() {
-        assertEquals(channelAccentSeed("ORF1 HD"), channelAccentSeed("ORF1 HD"))
-        assertEquals(channelAccentSeed("ServusTV"), channelAccentSeed("ServusTV"))
-        val a = channelAccentSeed("ORF1 HD")
-        val b = channelAccentSeed("ORF2 HD")
-        assertTrue(a in 0..359)
-        assertTrue(b in 0..359)
-        assertTrue(a != b)
-        // Exact fold values — not String.hashCode().
-        assertEquals(expectedAccent("ORF1 HD"), a)
-        assertEquals(expectedAccent("ORF2 HD"), b)
-        assertEquals(expectedAccent("ServusTV"), channelAccentSeed("ServusTV"))
-    }
 
     @Test
     fun recentChannelsDedupAndCap() {
@@ -532,7 +517,6 @@ class HomeContentPolicyTest {
         channelNumber = channelId,
         channelName = "Ch$channelId",
         piconPath = null,
-        accentSeed = 0,
         title = title,
         subtitle = null,
         startSec = null,

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
@@ -12,11 +13,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -44,6 +47,7 @@ import at.bernhardberger.tvhplayer.ui.components.HomeHeroCarousel
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeCard
 import at.bernhardberger.tvhplayer.viewmodels.HomeViewModel
 import org.koin.androidx.compose.koinViewModel
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
 
@@ -89,6 +93,8 @@ fun HomeDashboard(
     onOpenRecordings: () -> Unit,
     onOpenChannels: () -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val initialFocus = remember { FocusRequester() }
     val initialFocusTarget = remember(model) { homeInitialFocusTarget(model) }
     // Per-target latch with bounded frame retries until the requester is attached.
@@ -114,10 +120,11 @@ fun HomeDashboard(
         ),
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(TvScreenPadding),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             item {
@@ -130,7 +137,16 @@ fun HomeDashboard(
 
             if (model.hero.isNotEmpty()) {
                 item(key = "hero-section") {
+                    // The action sits at the hero's bottom edge, so bringing just that
+                    // into view leaves the title and channel scrolled off the top —
+                    // the identity disappears exactly when OK is about to be pressed.
+                    // Whenever the hero holds focus, show all of it.
                     HomeHeroCarousel(
+                        modifier = Modifier.onFocusChanged { state ->
+                            if (state.hasFocus) {
+                                scope.launch { listState.animateScrollToItem(0) }
+                            }
+                        },
                         slides = model.hero,
                         imageLoader = imageLoader,
                         primaryActionFocusRequester = if (

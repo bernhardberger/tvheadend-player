@@ -1,5 +1,16 @@
 import org.gradle.kotlin.dsl.implementation
 
+val releaseSigningEnvironment = mapOf(
+    "storeFile" to System.getenv("TVHPLAYER_RELEASE_STORE_FILE"),
+    "storePassword" to System.getenv("TVHPLAYER_RELEASE_STORE_PASSWORD"),
+    "keyAlias" to System.getenv("TVHPLAYER_RELEASE_KEY_ALIAS"),
+    "keyPassword" to System.getenv("TVHPLAYER_RELEASE_KEY_PASSWORD"),
+)
+val releaseSigningConfigured = releaseSigningEnvironment.values.all { !it.isNullOrBlank() }
+if (releaseSigningEnvironment.values.any { !it.isNullOrBlank() } && !releaseSigningConfigured) {
+    throw GradleException("Release signing environment is incomplete")
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -24,8 +35,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = rootProject.file(releaseSigningEnvironment.getValue("storeFile")!!)
+                storePassword = releaseSigningEnvironment.getValue("storePassword")
+                keyAlias = releaseSigningEnvironment.getValue("keyAlias")
+                keyPassword = releaseSigningEnvironment.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -76,11 +101,12 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.kotlinx.coroutines.core)
 
+    implementation(libs.androidx.palette)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
 
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+    implementation(files("libs/lib-decoder-ffmpeg-release.aar"))
 
     // Unit tests (JVM)
     testImplementation(libs.junit)

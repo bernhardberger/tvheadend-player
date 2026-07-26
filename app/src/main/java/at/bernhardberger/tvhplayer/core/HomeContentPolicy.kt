@@ -19,7 +19,6 @@ data class HomeHeroSlide(
     val channelNumber: Int?,
     val channelName: String,
     val piconPath: String?,
-    val accentSeed: Int,
     val title: String,
     val subtitle: String?,
     val startSec: Long?,
@@ -37,7 +36,6 @@ data class HomeCardItem(
     val channelNumber: Int?,
     val channelName: String,
     val piconPath: String?,
-    val accentSeed: Int,
     val title: String,
     /** Remaining programme minutes when known; UI formats the unit string. */
     val remainingMinutes: Int?,
@@ -67,18 +65,6 @@ enum class HomeFocusTarget {
 
 fun homeInitialFocusTarget(model: HomeDashboardModel): HomeFocusTarget =
     if (model.hero.isNotEmpty()) HomeFocusTarget.HERO else HomeFocusTarget.STATUS_ACTION
-
-/**
- * Deterministic hue seed in 0..359 for channel accent washes.
- * Explicit fold — not [String.hashCode] — so unit tests can assert exact values.
- */
-fun channelAccentSeed(name: String): Int {
-    var hash = 0
-    for (ch in name) {
-        hash = (hash * 31 + ch.code) and 0x7fff_ffff
-    }
-    return hash % 360
-}
 
 fun buildHomeDashboard(
     channelsById: Map<Int, ChannelUi>,
@@ -443,7 +429,6 @@ private fun liveOrContinueSlide(
         channelNumber = channel?.number,
         channelName = name,
         piconPath = channel?.icon,
-        accentSeed = channelAccentSeed(name),
         title = resolvedTitle,
         subtitle = null,
         startSec = event?.start,
@@ -475,7 +460,6 @@ private fun recordingSlide(
         channelNumber = channel?.number,
         channelName = name,
         piconPath = channel?.icon,
-        accentSeed = channelAccentSeed(name),
         title = entry.title.ifBlank { name }.ifBlank { entry.title },
         subtitle = name.takeIf { it.isNotBlank() },
         startSec = entry.start,
@@ -500,7 +484,6 @@ private fun channelCard(
     channelNumber = channel.number,
     channelName = channel.name,
     piconPath = channel.icon,
-    accentSeed = channelAccentSeed(channel.name),
     title = title,
     remainingMinutes = event?.let { remainingMinutes(it.stop, nowSec) },
     progress = event?.let { eventProgress(it, nowSec) },
@@ -532,7 +515,6 @@ private fun recordingCard(
         channelNumber = channel?.number,
         channelName = name,
         piconPath = channel?.icon,
-        accentSeed = channelAccentSeed(name),
         title = entry.title,
         remainingMinutes = remaining,
         progress = progress,
