@@ -28,6 +28,37 @@ class HomeContentPolicyTest {
     }
 
     @Test
+    fun heroEmptyWithRowsStillReportsStatusAction() {
+        // Records the state that strands focus if the empty-state block is also hidden.
+        val model = HomeDashboardModel(
+            hero = emptyList(),
+            rows = listOf(
+                HomeRow(
+                    kind = HomeRowKind.SCHEDULED,
+                    items = listOf(
+                        HomeCardItem(
+                            key = "rec-9",
+                            channelId = 1,
+                            channelNumber = 1,
+                            channelName = "ORF1",
+                            piconPath = null,
+                            accentSeed = 0,
+                            title = "Later",
+                            remainingMinutes = null,
+                            progress = null,
+                            recordingId = 9,
+                            recordingNow = false,
+                            playable = false,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        assertEquals(HomeFocusTarget.STATUS_ACTION, homeInitialFocusTarget(model))
+        assertTrue(model.rows.isNotEmpty())
+    }
+
+    @Test
     fun heroPutsActiveSessionFirst() {
         val channels = mapOf(
             1 to channel(1, "ORF1"),
@@ -104,6 +135,24 @@ class HomeContentPolicyTest {
     }
 
     @Test
+    fun heroSkipsBlankActiveSessionWhenChannelsNotSynced() {
+        val model = buildHomeDashboard(
+            channelsById = emptyMap(),
+            activeServiceId = 42,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
+            recentChannelIds = emptyList(),
+            onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
+            recordings = emptyList(),
+            nowSec = nowSec,
+        )
+        assertTrue(model.hero.isEmpty())
+        assertEquals(HomeFocusTarget.STATUS_ACTION, homeInitialFocusTarget(model))
+    }
+
+    @Test
     fun heroIsCappedAtFourSlides() {
         val channels = (1..6).associateWith { channel(it, "Ch$it") }
         val recent = (1..6).toList()
@@ -120,8 +169,8 @@ class HomeContentPolicyTest {
             onNowEvents = onNow,
             nextEvents = emptyMap(),
             recordings = listOf(
-                dvr(100, 1, DvrState.RECORDING, "Rec A", start = 900, stop = 1_200),
-                dvr(101, 2, DvrState.RECORDING, "Rec B", start = 910, stop = 1_200),
+                dvr(100, 1, DvrState.RECORDING, "Rec A", start = 900, stop = 1_200, withFile = true),
+                dvr(101, 2, DvrState.RECORDING, "Rec B", start = 910, stop = 1_200, withFile = true),
             ),
             nowSec = nowSec,
         )
@@ -157,8 +206,8 @@ class HomeContentPolicyTest {
         // Recent channel 2 is promoted into the hero as ON_NOW, so it is not repeated.
         assertTrue(2 in heroIds)
 
-        val recent = model.rows.firstOrNull { it.kind == HomeRowKind.RECENT }
-        assertTrue(recent == null || recent.items.isEmpty())
+        // Empty rows are omitted entirely, not rendered with zero items.
+        assertNull(model.rows.firstOrNull { it.kind == HomeRowKind.RECENT })
 
         val onNow = model.rows.firstOrNull { it.kind == HomeRowKind.ON_NOW }
         // Channels 1–2 are hero; 2 is also recent; only 3 remains for on-now.
@@ -173,7 +222,7 @@ class HomeContentPolicyTest {
     fun recordingRowsAreDroppedWhenRecordingsAreNotAllowed() {
         val channels = mapOf(1 to channel(1, "ORF1"))
         val recordings = listOf(
-            dvr(9, 1, DvrState.RECORDING, "Live rec", start = 900, stop = 1_200),
+            dvr(9, 1, DvrState.RECORDING, "Live rec", start = 900, stop = 1_200, withFile = true),
             dvr(10, 1, DvrState.COMPLETED, "Done", start = 700, stop = 800, withFile = true),
             dvr(11, 1, DvrState.SCHEDULED, "Later", start = 2_000, stop = 2_100),
         )
@@ -197,6 +246,47 @@ class HomeContentPolicyTest {
     }
 
     @Test
+    fun allowRecordingsFalseUsesNonRecordingFallbackInsteadOfEmptyHero() {
+        // Recording-only content with allowRecordings=false must not leave rows without a hero
+        // (the post-filter failure mode). Rebuilding with the flag yields an empty dashboard.
+        val recordings = listOf(
+            dvr(9, 1, DvrState.RECORDING, "Live rec", start = 900, stop = 1_200, withFile = true),
+        )
+        val allowed = buildHomeDashboard(
+            channelsById = emptyMap(),
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
+            recentChannelIds = emptyList(),
+            onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
+            recordings = recordings,
+            nowSec = nowSec,
+            allowRecordings = true,
+        )
+        assertEquals(listOf(9), allowed.hero.mapNotNull { it.recordingId })
+        assertTrue(allowed.hero.isNotEmpty())
+
+        val denied = buildHomeDashboard(
+            channelsById = emptyMap(),
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
+            recentChannelIds = emptyList(),
+            onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
+            recordings = recordings,
+            nowSec = nowSec,
+            allowRecordings = false,
+        )
+        assertTrue(denied.hero.isEmpty())
+        assertTrue(denied.rows.isEmpty())
+        assertEquals(HomeFocusTarget.STATUS_ACTION, homeInitialFocusTarget(denied))
+    }
+
+    @Test
     fun channelAccentSeedIsStableForTheSameName() {
         assertEquals(channelAccentSeed("ORF1 HD"), channelAccentSeed("ORF1 HD"))
         assertEquals(channelAccentSeed("ServusTV"), channelAccentSeed("ServusTV"))
@@ -204,7 +294,11 @@ class HomeContentPolicyTest {
         val b = channelAccentSeed("ORF2 HD")
         assertTrue(a in 0..359)
         assertTrue(b in 0..359)
-        assertTrue(a != b || "ORF1 HD" == "ORF2 HD")
+        assertTrue(a != b)
+        // Exact fold values — not String.hashCode().
+        assertEquals(expectedAccent("ORF1 HD"), a)
+        assertEquals(expectedAccent("ORF2 HD"), b)
+        assertEquals(expectedAccent("ServusTV"), channelAccentSeed("ServusTV"))
     }
 
     @Test
@@ -268,11 +362,31 @@ class HomeContentPolicyTest {
             ),
             nowSec = nowSec,
         )
-        // Hero takes recording-now first when nothing else is available.
+        // Hero takes playable recording-now first when nothing else is available.
         assertEquals(listOf(3), model.hero.mapNotNull { it.recordingId })
+        assertTrue(model.hero.single().playable)
         val recRow = model.rows.firstOrNull { it.kind == HomeRowKind.RECORDINGS }
         // Recording 3 is in the hero; completed-with-file remains in the row.
         assertEquals(listOf(1), recRow?.items?.mapNotNull { it.recordingId }.orEmpty())
+    }
+
+    @Test
+    fun heroOmitsUnplayableRecordingNowWithoutFile() {
+        val model = buildHomeDashboard(
+            channelsById = mapOf(1 to channel(1, "ORF1")),
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
+            recentChannelIds = emptyList(),
+            onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
+            recordings = listOf(
+                dvr(3, 1, DvrState.RECORDING, "No file yet", start = 900, stop = 1_200, withFile = false),
+            ),
+            nowSec = nowSec,
+        )
+        assertTrue(model.hero.none { it.recordingId == 3 })
     }
 
     @Test
@@ -295,6 +409,40 @@ class HomeContentPolicyTest {
         // Fallback promotes current on-now into the hero when there is no history.
         assertEquals(listOf("Live show"), model.hero.map { it.title })
         assertTrue(model.rows.none { it.kind == HomeRowKind.ON_NOW })
+    }
+
+    @Test
+    fun remainingMinutesIsCeilOfSecondsLeft() {
+        val live = channel(1, "ORF1")
+        val other = channel(2, "ORF2")
+        // Active live on channel 1; channel 2 only appears in the on-now row.
+        val model = buildHomeDashboard(
+            channelsById = mapOf(1 to live, 2 to other),
+            activeServiceId = 1,
+            activeRecordingId = null,
+            activeProgrammeTitle = "Live",
+            lastWatchedChannelId = 1,
+            recentChannelIds = emptyList(),
+            onNowEvents = listOf(
+                live to event(1, 1, 900, 1_100, "Live"),
+                other to event(2, 2, 900, 1_061, "Other"),
+            ),
+            nextEvents = emptyMap(),
+            recordings = emptyList(),
+            nowSec = nowSec,
+        )
+        val onNowItem = model.rows.single { it.kind == HomeRowKind.ON_NOW }.items.single()
+        assertEquals(2, onNowItem.channelId)
+        // 61 seconds left -> 2 minutes (ceil).
+        assertEquals(2, onNowItem.remainingMinutes)
+    }
+
+    private fun expectedAccent(name: String): Int {
+        var hash = 0
+        for (ch in name) {
+            hash = (hash * 31 + ch.code) and 0x7fff_ffff
+        }
+        return hash % 360
     }
 
     private fun channel(id: Int, name: String) = ChannelUi(

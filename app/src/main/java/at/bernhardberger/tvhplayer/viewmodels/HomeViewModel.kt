@@ -14,6 +14,7 @@ import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -27,6 +28,16 @@ class HomeViewModel(
     private val playerSession: PlayerSession,
     private val lastPlayedStore: LastPlayedChannelStore,
 ) : ViewModel() {
+    /**
+     * Capability gate written by [at.bernhardberger.tvhplayer.ui.screens.HomeScreen] from
+     * the session [at.bernhardberger.tvhplayer.core.SimpleTvProfile] — not from settings alone.
+     */
+    private val allowRecordings = MutableStateFlow(true)
+
+    fun setAllowRecordings(value: Boolean) {
+        allowRecordings.value = value
+    }
+
     private val browsingScope = combine(
         repo.channelsUi,
         repo.tagsUi,
@@ -56,20 +67,28 @@ class HomeViewModel(
         )
     }
 
+    private val recordingsAndCapability = combine(
+        dvrRepository.entries,
+        allowRecordings,
+    ) { recordings, allow ->
+        RecordingsAndCapability(recordings = recordings, allowRecordings = allow)
+    }
+
     val dashboard: StateFlow<HomeDashboardModel> = combine(
         browsingScope,
         playbackAndHistory,
-        dvrRepository.entries,
+        recordingsAndCapability,
         ticker,
-    ) { browsing, playback, recordings, nowSec ->
+    ) { browsing, playback, dvr, nowSec ->
         buildDashboard(
             visibleChannels = browsing.visibleChannels,
             activeServiceId = playback.activeServiceId,
             activeRecordingId = playback.activeRecordingId,
             lastWatchedChannelId = playback.lastWatchedChannelId,
             recentChannelIds = playback.recentChannelIds,
-            recordings = recordings,
+            recordings = dvr.recordings,
             nowSec = nowSec,
+            allowRecordings = dvr.allowRecordings,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -85,6 +104,7 @@ class HomeViewModel(
         recentChannelIds: List<Int>,
         recordings: List<DvrEntry>,
         nowSec: Long,
+        allowRecordings: Boolean,
     ): HomeDashboardModel {
         val channelsById = visibleChannels.associateBy { it.id }.toMutableMap()
         // Keep resume targets even if they sit outside the active tag scope.
@@ -99,6 +119,7 @@ class HomeViewModel(
             }
         }
 
+        // Point-read only channels the hero/rows actually need — not the full visible list.
         val candidateIds = buildSet {
             activeServiceId?.let(::add)
             lastWatchedChannelId?.let(::add)
@@ -107,29 +128,32 @@ class HomeViewModel(
         }
 
         val nextEvents = HashMap<Int, EpgEventEntry>(candidateIds.size)
+        val scopedOnNow = ArrayList<Pair<ChannelUi, EpgEventEntry>>(candidateIds.size)
+        val seenOnNow = HashSet<Int>(candidateIds.size)
         for (channelId in candidateIds) {
+            val channel = channelsById[channelId] ?: continue
+            val event = repo.nowEvent(channelId, nowSec)
+            if (event != null && event.start <= nowSec && nowSec < event.stop && channelId !in seenOnNow) {
+                scopedOnNow += channel to event
+                seenOnNow += channelId
+            }
             repo.nextEvent(channelId, nowSec)?.let { nextEvents[channelId] = it }
         }
-
-        val scopedOnNow = ArrayList<Pair<ChannelUi, EpgEventEntry>>(visibleChannels.size)
+        // Preserve visible-channel order for the on-now row among the candidates we read.
+        val orderedOnNow = ArrayList<Pair<ChannelUi, EpgEventEntry>>(scopedOnNow.size)
+        val byId = scopedOnNow.associateBy { it.first.id }
         for (channel in visibleChannels) {
-            val event = repo.nowEvent(channel.id, nowSec) ?: continue
-            if (event.start <= nowSec && nowSec < event.stop) {
-                scopedOnNow += channel to event
-            }
+            byId[channel.id]?.let(orderedOnNow::add)
         }
-        // Ensure active / last-watched / recent also contribute on-now pairs when in scope map.
-        for (channelId in candidateIds) {
-            if (scopedOnNow.any { it.first.id == channelId }) continue
-            val channel = channelsById[channelId] ?: continue
-            val event = repo.nowEvent(channelId, nowSec) ?: continue
-            if (event.start <= nowSec && nowSec < event.stop) {
-                scopedOnNow += channel to event
+        for (pair in scopedOnNow) {
+            if (orderedOnNow.none { it.first.id == pair.first.id }) {
+                orderedOnNow += pair
             }
         }
 
         val activeProgrammeTitle = activeServiceId?.let { id ->
-            repo.nowEvent(id, nowSec)?.title
+            scopedOnNow.firstOrNull { it.first.id == id }?.second?.title
+                ?: repo.nowEvent(id, nowSec)?.title
         }
 
         return buildHomeDashboard(
@@ -139,12 +163,11 @@ class HomeViewModel(
             activeProgrammeTitle = activeProgrammeTitle,
             lastWatchedChannelId = lastWatchedChannelId,
             recentChannelIds = recentChannelIds,
-            onNowEvents = scopedOnNow,
+            onNowEvents = orderedOnNow,
             nextEvents = nextEvents,
             recordings = recordings,
             nowSec = nowSec,
-            // Screen applies Simple TV capability via allowRecordings on the model.
-            allowRecordings = true,
+            allowRecordings = allowRecordings,
         )
     }
 
@@ -153,6 +176,11 @@ class HomeViewModel(
         val activeRecordingId: Int?,
         val lastWatchedChannelId: Int?,
         val recentChannelIds: List<Int>,
+    )
+
+    private data class RecordingsAndCapability(
+        val recordings: List<DvrEntry>,
+        val allowRecordings: Boolean,
     )
 
     companion object {

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -44,7 +43,6 @@ import at.bernhardberger.tvhplayer.core.HomeHeroSlide
 import at.bernhardberger.tvhplayer.core.HomeRowKind
 import at.bernhardberger.tvhplayer.core.HomeSlideKind
 import at.bernhardberger.tvhplayer.core.homeInitialFocusTarget
-import at.bernhardberger.tvhplayer.core.withRecordingsAllowed
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
@@ -64,20 +62,23 @@ fun HomeScreen(
     homeVm: HomeViewModel = koinViewModel(),
     imageLoader: ImageLoader = koinInject(),
 ) {
-    val dashboard by homeVm.dashboard.collectAsStateWithLifecycle()
-    val model = remember(dashboard, allowRecordings) {
-        dashboard.withRecordingsAllowed(allowRecordings)
+    // Rebuild through the ViewModel so allowRecordings=false uses the full fallback chain.
+    LaunchedEffect(allowRecordings) {
+        homeVm.setAllowRecordings(allowRecordings)
     }
+    val model by homeVm.dashboard.collectAsStateWithLifecycle()
 
     val initialFocus = remember { FocusRequester() }
     val initialFocusTarget = remember(model) { homeInitialFocusTarget(model) }
-    // One-shot focus claim: request once successfully, then never again when EPG lands
-    // or the computed target changes (would steal focus from Retry).
-    var didRequestInitialFocus by remember { mutableStateOf(false) }
-    LaunchedEffect(model.hero.isNotEmpty(), model.rows.isNotEmpty(), connectionUiState) {
-        if (didRequestInitialFocus) return@LaunchedEffect
-        val attached = runCatching { initialFocus.requestFocus() }.isSuccess
-        if (attached) didRequestInitialFocus = true
+    // Per-target latch: re-arm when empty STATUS_ACTION becomes HERO after data lands,
+    // but never re-request within the same target (EPG refresh must not steal focus).
+    // model emptiness is only a retry key until the requester is attached for the target.
+    var claimedTarget by remember { mutableStateOf<HomeFocusTarget?>(null) }
+    LaunchedEffect(initialFocusTarget, model.hero.isNotEmpty(), model.rows.isNotEmpty()) {
+        if (claimedTarget == initialFocusTarget) return@LaunchedEffect
+        if (runCatching { initialFocus.requestFocus() }.isSuccess) {
+            claimedTarget = initialFocusTarget
+        }
     }
 
     Surface(
@@ -127,9 +128,12 @@ fun HomeScreen(
                                 },
                                 onClick = {
                                     when {
-                                        slide.kind == HomeSlideKind.RECORDING -> {
-                                            slide.recordingId?.let(onPlayRecording)
+                                        slide.kind == HomeSlideKind.RECORDING &&
+                                            slide.playable &&
+                                            slide.recordingId != null -> {
+                                            onPlayRecording(slide.recordingId)
                                         }
+                                        slide.kind == HomeSlideKind.RECORDING -> onOpenRecordings()
                                         else -> {
                                             onPlayChannel(
                                                 slide.channelId,

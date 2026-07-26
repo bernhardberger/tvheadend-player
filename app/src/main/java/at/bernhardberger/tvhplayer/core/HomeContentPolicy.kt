@@ -39,7 +39,8 @@ data class HomeCardItem(
     val piconPath: String?,
     val accentSeed: Int,
     val title: String,
-    val timeLabel: String?,
+    /** Remaining programme minutes when known; UI formats the unit string. */
+    val remainingMinutes: Int?,
     val progress: Float?,
     val recordingId: Int?,
     val recordingNow: Boolean,
@@ -63,17 +64,6 @@ enum class HomeFocusTarget {
 
 fun homeInitialFocusTarget(model: HomeDashboardModel): HomeFocusTarget =
     if (model.hero.isNotEmpty()) HomeFocusTarget.HERO else HomeFocusTarget.STATUS_ACTION
-
-/** Drop recording hero slides and recording rows when Simple TV disallows recordings. */
-fun HomeDashboardModel.withRecordingsAllowed(allowRecordings: Boolean): HomeDashboardModel {
-    if (allowRecordings) return this
-    return copy(
-        hero = hero.filter { it.kind != HomeSlideKind.RECORDING },
-        rows = rows.filter {
-            it.kind != HomeRowKind.RECORDINGS && it.kind != HomeRowKind.SCHEDULED
-        },
-    )
-}
 
 /**
  * Deterministic hue seed in 0..359 for channel accent washes.
@@ -109,8 +99,8 @@ fun buildHomeDashboard(
     val heroChannelIds = linkedSetOf<Int>()
     val heroRecordingIds = linkedSetOf<Int>()
 
-    fun addSlide(slide: HomeHeroSlide) {
-        if (hero.size >= HOME_HERO_LIMIT) return
+    fun addSlide(slide: HomeHeroSlide?) {
+        if (slide == null || hero.size >= HOME_HERO_LIMIT) return
         if (slide.recordingId != null) {
             if (slide.recordingId in heroRecordingIds) return
             heroRecordingIds += slide.recordingId
@@ -187,14 +177,12 @@ fun buildHomeDashboard(
         )
     }
 
-    // 4. Recording now
+    // 4. Recording now — only entries that can actually play
     if (allowRecordings) {
-        recordings
-            .asSequence()
-            .filter { it.state == DvrState.RECORDING }
-            .sortedByDescending { it.start }
+        topRecordingNow(recordings, limit = HOME_HERO_LIMIT)
             .forEach { entry ->
                 if (hero.size >= HOME_HERO_LIMIT) return@forEach
+                if (entry.id in heroRecordingIds) return@forEach
                 addSlide(recordingSlide(entry, channelsById, nowSec))
             }
     }
@@ -236,14 +224,7 @@ fun buildHomeDashboard(
         }
     }
     if (hero.isEmpty() && allowRecordings) {
-        recordings
-            .asSequence()
-            .filter {
-                it.state == DvrState.COMPLETED &&
-                    recordingPlaybackAvailability(it) is RecordingPlaybackAvailability.Ready
-            }
-            .sortedByDescending { it.start }
-            .take(HOME_HERO_LIMIT)
+        topCompletedPlayable(recordings, limit = HOME_HERO_LIMIT)
             .forEach { entry ->
                 addSlide(recordingSlide(entry, channelsById, nowSec))
             }
@@ -292,33 +273,43 @@ fun buildHomeDashboard(
         }
 
         if (allowRecordings) {
-            val recordingItems = buildList {
-                recordings
-                    .asSequence()
-                    .filter { it.state == DvrState.RECORDING }
-                    .filter { it.id !in heroRecordingIds }
-                    .sortedByDescending { it.start }
-                    .map { recordingCard(it, channelsById, recordingNow = true, playable = true) }
-                    .forEach { add(it) }
-                recordings
-                    .asSequence()
-                    .filter { it.state == DvrState.COMPLETED }
-                    .filter { recordingPlaybackAvailability(it) is RecordingPlaybackAvailability.Ready }
-                    .filter { it.id !in heroRecordingIds }
-                    .sortedByDescending { it.start }
-                    .map { recordingCard(it, channelsById, recordingNow = false, playable = true) }
-                    .forEach { add(it) }
-            }.take(HOME_RECORDING_LIMIT)
+            val recordingItems = ArrayList<HomeCardItem>(HOME_RECORDING_LIMIT)
+            for (entry in topRecordingNow(recordings, limit = HOME_RECORDING_LIMIT + heroRecordingIds.size)) {
+                if (recordingItems.size >= HOME_RECORDING_LIMIT) break
+                if (entry.id in heroRecordingIds) continue
+                recordingItems += recordingCard(
+                    entry = entry,
+                    channelsById = channelsById,
+                    recordingNow = true,
+                    playable = true,
+                )
+            }
+            for (entry in topCompletedPlayable(
+                recordings,
+                limit = HOME_RECORDING_LIMIT + heroRecordingIds.size,
+            )) {
+                if (recordingItems.size >= HOME_RECORDING_LIMIT) break
+                if (entry.id in heroRecordingIds) continue
+                recordingItems += recordingCard(
+                    entry = entry,
+                    channelsById = channelsById,
+                    recordingNow = false,
+                    playable = true,
+                )
+            }
             if (recordingItems.isNotEmpty()) {
                 add(HomeRow(HomeRowKind.RECORDINGS, recordingItems))
             }
 
-            val scheduledItems = recordings
+            val scheduledItems = topScheduled(
+                recordings,
+                nowSec = nowSec,
+                limit = HOME_RECORDING_LIMIT + heroRecordingIds.size,
+            )
                 .asSequence()
-                .filter { it.state == DvrState.SCHEDULED && it.start >= nowSec }
-                .sortedBy { it.start }
-                .map { recordingCard(it, channelsById, recordingNow = false, playable = false) }
+                .filter { it.id !in heroRecordingIds }
                 .take(HOME_RECORDING_LIMIT)
+                .map { recordingCard(it, channelsById, recordingNow = false, playable = false) }
                 .toList()
             if (scheduledItems.isNotEmpty()) {
                 add(HomeRow(HomeRowKind.SCHEDULED, scheduledItems))
@@ -335,6 +326,94 @@ fun pushRecentChannelId(
     limit: Int = HOME_RECENT_CHANNEL_LIMIT,
 ): List<Int> = (listOf(channelId) + current.filterNot { it == channelId }).take(limit)
 
+/**
+ * Keep only the [limit] highest-[selector] entries without sorting the whole list.
+ */
+private fun <T> topBy(
+    items: List<T>,
+    limit: Int,
+    preferLarger: Boolean,
+    selector: (T) -> Long,
+): List<T> {
+    if (limit <= 0 || items.isEmpty()) return emptyList()
+    if (items.size <= limit) {
+        return if (preferLarger) {
+            items.sortedByDescending(selector)
+        } else {
+            items.sortedBy(selector)
+        }
+    }
+    val selected = ArrayList<T>(limit)
+    val selectedKeys = LongArray(limit)
+    var size = 0
+    for (item in items) {
+        val key = selector(item)
+        if (size < limit) {
+            selected += item
+            selectedKeys[size] = key
+            size++
+            if (size == limit) {
+                // Heap-order not required; linear scan for worst is fine at small limit.
+            }
+            continue
+        }
+        var replaceAt = -1
+        if (preferLarger) {
+            var worst = Long.MAX_VALUE
+            for (i in 0 until size) {
+                if (selectedKeys[i] < worst) {
+                    worst = selectedKeys[i]
+                    replaceAt = i
+                }
+            }
+            if (replaceAt >= 0 && key > selectedKeys[replaceAt]) {
+                selected[replaceAt] = item
+                selectedKeys[replaceAt] = key
+            }
+        } else {
+            var worst = Long.MIN_VALUE
+            for (i in 0 until size) {
+                if (selectedKeys[i] > worst) {
+                    worst = selectedKeys[i]
+                    replaceAt = i
+                }
+            }
+            if (replaceAt >= 0 && key < selectedKeys[replaceAt]) {
+                selected[replaceAt] = item
+                selectedKeys[replaceAt] = key
+            }
+        }
+    }
+    return if (preferLarger) {
+        selected.sortedByDescending(selector)
+    } else {
+        selected.sortedBy(selector)
+    }
+}
+
+private fun topRecordingNow(recordings: List<DvrEntry>, limit: Int): List<DvrEntry> {
+    val candidates = recordings.filter { entry ->
+        entry.state == DvrState.RECORDING &&
+            recordingPlaybackAvailability(entry) is RecordingPlaybackAvailability.Ready
+    }
+    return topBy(candidates, limit, preferLarger = true) { it.start }
+}
+
+private fun topCompletedPlayable(recordings: List<DvrEntry>, limit: Int): List<DvrEntry> {
+    val candidates = recordings.filter { entry ->
+        entry.state == DvrState.COMPLETED &&
+            recordingPlaybackAvailability(entry) is RecordingPlaybackAvailability.Ready
+    }
+    return topBy(candidates, limit, preferLarger = true) { it.start }
+}
+
+private fun topScheduled(recordings: List<DvrEntry>, nowSec: Long, limit: Int): List<DvrEntry> {
+    val candidates = recordings.filter {
+        it.state == DvrState.SCHEDULED && it.start >= nowSec
+    }
+    return topBy(candidates, limit, preferLarger = false) { it.start }
+}
+
 private fun liveOrContinueSlide(
     kind: HomeSlideKind,
     channel: ChannelUi?,
@@ -343,8 +422,11 @@ private fun liveOrContinueSlide(
     event: EpgEventEntry?,
     next: EpgEventEntry?,
     nowSec: Long,
-): HomeHeroSlide {
+): HomeHeroSlide? {
     val name = channel?.name.orEmpty()
+    val resolvedTitle = title.ifBlank { name }
+    // Skip blank slides (cold start with a restored session before channels sync).
+    if (resolvedTitle.isBlank() && name.isBlank()) return null
     return HomeHeroSlide(
         kind = kind,
         channelId = channelId,
@@ -352,7 +434,7 @@ private fun liveOrContinueSlide(
         channelName = name,
         piconPath = channel?.icon,
         accentSeed = channelAccentSeed(name),
-        title = title.ifBlank { name },
+        title = resolvedTitle,
         subtitle = null,
         startSec = event?.start,
         stopSec = event?.stop,
@@ -384,7 +466,7 @@ private fun recordingSlide(
         channelName = name,
         piconPath = channel?.icon,
         accentSeed = channelAccentSeed(name),
-        title = entry.title,
+        title = entry.title.ifBlank { name }.ifBlank { entry.title },
         subtitle = name.takeIf { it.isNotBlank() },
         startSec = entry.start,
         stopSec = entry.stop,
@@ -410,7 +492,7 @@ private fun channelCard(
     piconPath = channel.icon,
     accentSeed = channelAccentSeed(channel.name),
     title = title,
-    timeLabel = event?.let { remainingTimeLabel(it.stop, nowSec) },
+    remainingMinutes = event?.let { remainingMinutes(it.stop, nowSec) },
     progress = event?.let { eventProgress(it, nowSec) },
     recordingId = null,
     recordingNow = false,
@@ -433,7 +515,7 @@ private fun recordingCard(
         piconPath = channel?.icon,
         accentSeed = channelAccentSeed(name),
         title = entry.title,
-        timeLabel = null,
+        remainingMinutes = null,
         progress = null,
         recordingId = entry.id,
         recordingNow = recordingNow,
@@ -450,10 +532,8 @@ private fun eventProgress(start: Long, stop: Long, nowSec: Long): Float {
     return (pos.toFloat() / dur.toFloat()).coerceIn(0f, 1f)
 }
 
-/** Locale-neutral remaining minutes for policy-level cards; UI formats in presentation. */
-private fun remainingTimeLabel(stopSec: Long, nowSec: Long): String? {
+private fun remainingMinutes(stopSec: Long, nowSec: Long): Int? {
     val remaining = stopSec - nowSec
     if (remaining <= 0L) return null
-    val minutes = ((remaining + 59) / 60).toInt().coerceAtLeast(1)
-    return minutes.toString()
+    return ((remaining + 59) / 60).toInt().coerceAtLeast(1)
 }
