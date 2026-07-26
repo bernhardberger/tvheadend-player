@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.input.key.Key
+import androidx.compose.runtime.mutableStateOf
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
@@ -82,6 +83,52 @@ class RecordingsScreenTest {
             .assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Delete “Evening News”?").assertIsDisplayed()
         composeRule.onNodeWithText("Back").assertIsFocused()
+    }
+
+    @Test
+    fun browserLocationAndFocusSurviveLeavingAndReturningToTheScreen() {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 7,
+                        "channelId" to 1,
+                        "start" to 100L,
+                        "stop" to 200L,
+                        "title" to "Evening News",
+                        "state" to "completed",
+                        "files" to listOf(
+                            mapOf("filename" to "News/evening-news.ts", "size" to 500L)
+                        ),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+        val screenState = RecordingsScreenState()
+        val visible = mutableStateOf(true)
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                if (visible.value) {
+                    RecordingsScreen(repository = repository, state = screenState)
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("recordings-folder-News").performClick()
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
+        composeRule.runOnIdle { visible.value = false }
+        composeRule.runOnIdle { visible.value = true }
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsDisplayed().assertIsFocused()
     }
 
     @Test

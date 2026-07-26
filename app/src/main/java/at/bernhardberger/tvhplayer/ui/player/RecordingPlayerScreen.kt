@@ -373,14 +373,7 @@ fun RecordingPlayerScreen(
                     isPlaying = isPlaying,
                     controlsVisible = controlsVisible,
                     optionsOpen = optionsPage != null,
-                    onTogglePlayPause = {
-                        if (playbackState is PlaybackSessionState.Finished) {
-                            player.seekTo(0L)
-                            player.play()
-                        } else {
-                            player.togglePlayPause()
-                        }
-                    },
+                    onTogglePlayPause = player::togglePlayPause,
                     onSeek = ::seekBy,
                     onStopPlayback = ::stopAndClose,
                     onUserInteraction = { interactionToken++ },

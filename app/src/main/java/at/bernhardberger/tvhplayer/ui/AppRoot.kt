@@ -31,6 +31,8 @@ import at.bernhardberger.tvhplayer.core.rootBackAction
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
+import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
+import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
@@ -54,6 +56,7 @@ import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
+import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.SimpleTvUnlockScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
@@ -103,6 +106,7 @@ fun AppRoot(
     }
 
     val nav = rememberNavController()
+    val recordingsScreenState = remember { RecordingsScreenState() }
     val context = LocalContext.current
     val activity = context as? Activity
     val focusManager = LocalFocusManager.current
@@ -147,6 +151,23 @@ fun AppRoot(
 
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
         currentRoute?.startsWith(Routes.RECORDING_PLAYER) == true
+
+    LaunchedEffect(playbackState, activeRecordingId, topRoute) {
+        when (
+            recordingFinishedAction(
+                recordingFinished = playbackState is PlaybackSessionState.Finished,
+                activeRecordingId = activeRecordingId,
+                recordingPlayerVisible = topRoute == Routes.RECORDING_PLAYER,
+            )
+        ) {
+            RecordingFinishedAction.NONE -> Unit
+            RecordingFinishedAction.STOP -> playerSession.stop()
+            RecordingFinishedAction.STOP_AND_CLOSE_PLAYER -> {
+                playerSession.stop()
+                nav.popBackStack()
+            }
+        }
+    }
 
     LaunchedEffect(topRoute, capabilityProfile) {
         val route = topRoute.toSimpleTvRoute() ?: return@LaunchedEffect
@@ -285,6 +306,7 @@ fun AppRoot(
                                     onPlayRecording = { recordingId ->
                                         nav.navigate(Routes.recordingPlayer(recordingId))
                                     },
+                                    state = recordingsScreenState,
                                 )
                             }
                         }

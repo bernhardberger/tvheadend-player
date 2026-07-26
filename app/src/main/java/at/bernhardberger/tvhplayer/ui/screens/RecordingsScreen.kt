@@ -124,6 +124,13 @@ private sealed interface ArchiveListItem {
 private fun DvrArchiveFolder.listItems(): List<ArchiveListItem> =
     folders.map(ArchiveListItem::Folder) + recordings.map(ArchiveListItem::Recording)
 
+class RecordingsScreenState {
+    val selectedKeys = mutableStateMapOf<String, String>()
+    val archiveScrollPositions = mutableStateMapOf<String, Int>()
+    val mode = mutableStateOf(DvrLibraryMode.ARCHIVE)
+    val archivePath = mutableStateOf<List<String>>(emptyList())
+}
+
 @Composable
 fun RecordingsScreen(
     repository: DvrRepository = koinInject(),
@@ -132,6 +139,7 @@ fun RecordingsScreen(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (Int) -> Unit = {},
+    state: RecordingsScreenState? = null,
 ) {
     val entries by repository.entries.collectAsStateWithLifecycle()
     val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
@@ -139,12 +147,13 @@ fun RecordingsScreen(
     val library = remember(entries) { partitionDvrLibrary(entries) }
     val archive = remember(library.archive) { buildDvrArchive(library.archive) }
     val scope = rememberCoroutineScope()
+    val screenState = state ?: remember { RecordingsScreenState() }
     val contentFocus = remember { FocusRequester() }
     val folderPreviewFocus = remember { FocusRequester() }
-    val selectedKeys = remember { mutableStateMapOf<String, String>() }
-    val archiveScrollPositions = remember { mutableStateMapOf<String, Int>() }
-    var mode by remember { mutableStateOf(DvrLibraryMode.ARCHIVE) }
-    var archivePath by remember { mutableStateOf(emptyList<String>()) }
+    val selectedKeys = screenState.selectedKeys
+    val archiveScrollPositions = screenState.archiveScrollPositions
+    var mode by screenState.mode
+    var archivePath by screenState.archivePath
     var requestContentFocus by remember { mutableStateOf(true) }
     var folderPreviewFocused by remember { mutableStateOf(false) }
     var folderPreviewRecordingId by remember { mutableStateOf<Int?>(null) }

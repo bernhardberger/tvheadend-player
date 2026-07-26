@@ -26,6 +26,12 @@ enum class RecordingPlaybackKeyAction {
     SEEK_FORWARD_LONG,
 }
 
+enum class RecordingFinishedAction {
+    NONE,
+    STOP,
+    STOP_AND_CLOSE_PLAYER,
+}
+
 fun recordingPlaybackKeyAction(
     controlsVisible: Boolean,
     keyCode: Int,
@@ -50,6 +56,16 @@ fun recordingPlaybackSuppressesRevealingKey(
     revealingKeyCode: Int?,
     keyCode: Int,
 ): Boolean = revealingKeyCode == keyCode
+
+fun recordingFinishedAction(
+    recordingFinished: Boolean,
+    activeRecordingId: Int?,
+    recordingPlayerVisible: Boolean,
+): RecordingFinishedAction = when {
+    !recordingFinished || activeRecordingId == null -> RecordingFinishedAction.NONE
+    recordingPlayerVisible -> RecordingFinishedAction.STOP_AND_CLOSE_PLAYER
+    else -> RecordingFinishedAction.STOP
+}
 
 fun recordingPlaybackAvailability(entry: DvrEntry): RecordingPlaybackAvailability {
     if (

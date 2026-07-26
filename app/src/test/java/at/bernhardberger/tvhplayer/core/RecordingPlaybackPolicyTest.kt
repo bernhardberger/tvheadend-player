@@ -224,6 +224,42 @@ class RecordingPlaybackPolicyTest {
         )
     }
 
+    @Test
+    fun finishedRecordingAlwaysStopsAndOnlyClosesAVisiblePlayer() {
+        assertEquals(
+            RecordingFinishedAction.STOP_AND_CLOSE_PLAYER,
+            recordingFinishedAction(
+                recordingFinished = true,
+                activeRecordingId = 7,
+                recordingPlayerVisible = true,
+            ),
+        )
+        assertEquals(
+            RecordingFinishedAction.STOP,
+            recordingFinishedAction(
+                recordingFinished = true,
+                activeRecordingId = 7,
+                recordingPlayerVisible = false,
+            ),
+        )
+        assertEquals(
+            RecordingFinishedAction.NONE,
+            recordingFinishedAction(
+                recordingFinished = false,
+                activeRecordingId = 7,
+                recordingPlayerVisible = false,
+            ),
+        )
+        assertEquals(
+            RecordingFinishedAction.NONE,
+            recordingFinishedAction(
+                recordingFinished = true,
+                activeRecordingId = null,
+                recordingPlayerVisible = false,
+            ),
+        )
+    }
+
     private fun recording(state: DvrState, path: String?, size: Long?) = DvrEntry(
         id = 1,
         eventId = 2,

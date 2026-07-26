@@ -88,7 +88,9 @@
   dispatch one seek after a short debounce, keeping feedback visible while the
   player buffers and briefly after playback resumes. Back hides visible controls
   before a subsequent Back returns to the recordings library while playback
-  remains warm; only the explicit Stop control tears down the session.
+  remains warm. Explicit Stop and natural end tear down the session and return to
+  the recordings library. Preserve the previous recordings mode, folder, scroll,
+  and focused item across that navigation.
 - Use one shared full-height Playback options sheet for live TV and recordings.
   Move Audio, Subtitles, and explicit display-mode choices out of the primary
   controls, and keep Exit Simple TV as a deliberately secondary sheet action that

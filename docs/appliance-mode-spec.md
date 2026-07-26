@@ -208,6 +208,8 @@ fun adjacentChannelId(
     into the destination rather than falling back to the main navigation. Folder
     panes summarize descendant recordings with count, storage, date range, and
     a focusable newest-first recording list that opens normal recording details.
+    Returning from playback restores the previous mode, folder, scroll position,
+    and focused item rather than resetting the recordings browser.
     Recording playback uses an auto-hiding TV overlay with metadata, elapsed and
     total time, a seek bar, icon-based transport, Playback options, and stable
     focus. With controls hidden, Left/Right seek 30 seconds and Down/Up seek 10
@@ -216,7 +218,8 @@ fun adjacentChannelId(
     through buffering and briefly after playback resumes. With controls visible,
     D-pad navigation moves focus normally. Back dismisses visible controls before
     a subsequent Back returns to the recordings library without stopping
-    playback. Only the explicit Stop control tears down the recording session.
+    playback. Explicit Stop and natural end tear down the recording session and
+    return to the recordings library.
 
 ## Open questions
 
