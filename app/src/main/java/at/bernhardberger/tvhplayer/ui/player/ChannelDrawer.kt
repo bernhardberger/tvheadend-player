@@ -83,7 +83,7 @@ fun ChannelDrawer(
         onFocusChannel(targetId)
         coroutineScope.launch {
             try {
-                listState.animateScrollToItem(targetIndex)
+                listState.scrollToItem(targetIndex)
                 snapshotFlow {
                     listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
                 }.filter { it }.first()
@@ -123,7 +123,7 @@ fun ChannelDrawer(
 
     Box(
         modifier = Modifier
-            .width(460.dp)
+            .width(520.dp)
             .fillMaxHeight()
             .background(
                 Brush.horizontalGradient(

@@ -123,7 +123,7 @@ fun ChannelsScreen(
         selection.setSelected(targetId)
         coroutineScope.launch {
             try {
-                listState.animateScrollToItem(targetIndex)
+                listState.scrollToItem(targetIndex)
                 snapshotFlow {
                     listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
                 }.filter { it }.first()
