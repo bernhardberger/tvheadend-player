@@ -12,17 +12,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -55,12 +49,13 @@ import coil3.ImageLoader
 const val HOME_HERO_AUTO_SCROLL_MS = 8_000L
 
 /**
- * Featured Home hero using [Carousel]. Single primary action per slide.
+ * Featured Home hero using [Carousel] for slide chrome only.
  *
- * Left/Right on the primary action change slides (they do not escape into the
- * side rail). The library keeps move APIs module-internal; we drive the public
- * [CarouselState.activeItemIndex] through a small bridge so D-pad matches the
- * ten-foot expectation.
+ * The primary action is a **stable** sibling of the carousel, not a child of the
+ * animated slide. Putting the Button inside the slide remounted it on every
+ * index change, dropped focus, and the nearest focusable was the side rail —
+ * which opens [ModalNavigationDrawer]. Left/Right are consumed on that stable
+ * button so they change slides instead of searching left into the rail.
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -75,91 +70,83 @@ fun HomeHeroCarousel(
 
     val carouselState = rememberCarouselState()
     val autoScrollMs = if (slides.size <= 1) Long.MAX_VALUE else HOME_HERO_AUTO_SCROLL_MS
-    // Shared requester so L/R slide changes keep focus on the primary action.
     val actionFocus = primaryActionFocusRequester ?: remember { FocusRequester() }
-    var actionFocused by remember { mutableStateOf(false) }
-    // After a programmatic slide change the old Button leaves composition — re-claim.
-    LaunchedEffect(carouselState.activeItemIndex) {
-        if (actionFocused) {
-            runCatching { actionFocus.requestFocus() }
-        }
-    }
+    val activeIndex = carouselState.activeItemIndex.coerceIn(0, slides.lastIndex)
+    val activeSlide = slides[activeIndex]
 
-    Carousel(
-        itemCount = slides.size,
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .height(HomeHeroHeight)
             .testTag("home-hero-carousel"),
-        carouselState = carouselState,
-        autoScrollDurationMillis = autoScrollMs,
-        carouselIndicator = {
-            if (slides.size > 1) {
-                val pageDescription = stringResource(
-                    R.string.home_carousel_page,
-                    carouselState.activeItemIndex + 1,
-                    slides.size,
-                )
-                CarouselDefaults.IndicatorRow(
-                    itemCount = slides.size,
-                    activeItemIndex = carouselState.activeItemIndex,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 16.dp)
-                        .testTag("home-hero-indicator")
-                        .semantics { contentDescription = pageDescription },
-                )
-            }
-        },
-    ) { index ->
-        val slide = slides[index]
-        HeroSlideContent(
-            slide = slide,
-            imageLoader = imageLoader,
-            pageLabel = stringResource(
-                R.string.home_carousel_page,
-                index + 1,
-                slides.size,
-            ),
-            // Only the active slide hosts the focus target (and the L/R interceptor).
-            primaryActionFocusRequester = if (index == carouselState.activeItemIndex) {
-                actionFocus
-            } else {
-                null
-            },
-            interceptHorizontalDpad = index == carouselState.activeItemIndex && slides.size > 1,
-            onActionFocusChanged = { focused ->
-                if (index == carouselState.activeItemIndex) {
-                    actionFocused = focused
+    ) {
+        Carousel(
+            itemCount = slides.size,
+            modifier = Modifier.fillMaxSize(),
+            carouselState = carouselState,
+            autoScrollDurationMillis = autoScrollMs,
+            carouselIndicator = {
+                if (slides.size > 1) {
+                    val pageDescription = stringResource(
+                        R.string.home_carousel_page,
+                        activeIndex + 1,
+                        slides.size,
+                    )
+                    CarouselDefaults.IndicatorRow(
+                        itemCount = slides.size,
+                        activeItemIndex = activeIndex,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp, bottom = 16.dp)
+                            .testTag("home-hero-indicator")
+                            .semantics { contentDescription = pageDescription },
+                    )
                 }
             },
+        ) { index ->
+            // Visual only — no focusable children inside the animated slide.
+            HeroSlideVisual(
+                slide = slides[index],
+                imageLoader = imageLoader,
+                pageLabel = stringResource(
+                    R.string.home_carousel_page,
+                    index + 1,
+                    slides.size,
+                ),
+            )
+        }
+
+        // Stable action chrome overlaid on the active slide layout.
+        HeroPrimaryAction(
+            slide = activeSlide,
+            focusRequester = actionFocus,
+            multiSlide = slides.size > 1,
             onHorizontalDpad = { goLeft ->
+                if (slides.size <= 1) {
+                    // Single slide: swallow Left so focus does not enter the rail.
+                    return@HeroPrimaryAction goLeft
+                }
                 val current = carouselState.activeItemIndex
                 val target = if (goLeft) current - 1 else current + 1
                 if (target in slides.indices) {
-                    actionFocused = true
                     carouselState.seekToItem(target)
-                    true
-                } else {
-                    // Clamp at ends — do not leak focus into the side rail.
-                    true
                 }
+                // Always consume — clamp at ends, never leak into the drawer.
+                true
             },
-            onPrimaryAction = { onPrimaryAction(slide) },
+            onPrimaryAction = { onPrimaryAction(activeSlide) },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 28.dp + 140.dp + 24.dp, bottom = 22.dp),
         )
     }
 }
 
 @Composable
-private fun HeroSlideContent(
+private fun HeroSlideVisual(
     slide: HomeHeroSlide,
     imageLoader: ImageLoader,
     pageLabel: String,
-    primaryActionFocusRequester: FocusRequester?,
-    interceptHorizontalDpad: Boolean,
-    onActionFocusChanged: (Boolean) -> Unit,
-    onHorizontalDpad: (goLeft: Boolean) -> Boolean,
-    onPrimaryAction: () -> Unit,
 ) {
     val accent = remember(slide.accentSeed) { channelAccentColor(slide.accentSeed) }
     val initials = remember(slide.channelName) { channelInitials(slide.channelName) }
@@ -168,14 +155,6 @@ private fun HeroSlideContent(
         HomeSlideKind.CONTINUE -> stringResource(R.string.home_slide_continue)
         HomeSlideKind.ON_NOW -> stringResource(R.string.home_slide_on_now)
         HomeSlideKind.RECORDING -> stringResource(R.string.home_slide_recording)
-    }
-    // Resume only for the active live session. Everything else is a fresh Watch.
-    val actionLabel = when {
-        slide.kind == HomeSlideKind.LIVE -> stringResource(R.string.home_resume)
-        slide.kind == HomeSlideKind.RECORDING && !slide.playable -> {
-            stringResource(R.string.nav_recordings)
-        }
-        else -> stringResource(R.string.home_watch)
     }
 
     Box(
@@ -294,56 +273,57 @@ private fun HeroSlideContent(
                         )
                     }
                 }
-
-                Button(
-                    onClick = onPrimaryAction,
-                    modifier = Modifier
-                        .then(
-                            primaryActionFocusRequester?.let { Modifier.focusRequester(it) }
-                                ?: Modifier,
-                        )
-                        .onFocusChanged { onActionFocusChanged(it.isFocused) }
-                        .then(
-                            if (interceptHorizontalDpad) {
-                                // Block default focus search to the side rail; we own L/R.
-                                Modifier
-                                    .focusProperties {
-                                        left = FocusRequester.Cancel
-                                        right = FocusRequester.Cancel
-                                    }
-                                    .onPreviewKeyEvent { event ->
-                                        if (event.type != KeyEventType.KeyDown) {
-                                            return@onPreviewKeyEvent false
-                                        }
-                                        when (event.key) {
-                                            Key.DirectionLeft -> onHorizontalDpad(true)
-                                            Key.DirectionRight -> onHorizontalDpad(false)
-                                            else -> false
-                                        }
-                                    }
-                            } else {
-                                // Single-slide hero: still block Left so focus does not dump
-                                // into the rail from the only featured action.
-                                Modifier.focusProperties {
-                                    left = FocusRequester.Cancel
-                                }
-                            },
-                        )
-                        .testTag("home-hero-primary"),
-                ) {
-                    Text(actionLabel)
-                }
+                // Reserve the same vertical slot the overlay button occupies.
+                Box(Modifier.height(48.dp))
             }
         }
     }
 }
 
+@Composable
+private fun HeroPrimaryAction(
+    slide: HomeHeroSlide,
+    focusRequester: FocusRequester,
+    multiSlide: Boolean,
+    onHorizontalDpad: (goLeft: Boolean) -> Boolean,
+    onPrimaryAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Resume only for the active live session. Everything else is Watch.
+    val actionLabel = when {
+        slide.kind == HomeSlideKind.LIVE -> stringResource(R.string.home_resume)
+        slide.kind == HomeSlideKind.RECORDING && !slide.playable -> {
+            stringResource(R.string.nav_recordings)
+        }
+        else -> stringResource(R.string.home_watch)
+    }
+
+    Button(
+        onClick = onPrimaryAction,
+        modifier = modifier
+            .focusRequester(focusRequester)
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionLeft -> onHorizontalDpad(true)
+                    Key.DirectionRight -> {
+                        // Right only special-cased when there are multiple slides;
+                        // otherwise let focus move down-stream naturally.
+                        if (multiSlide) onHorizontalDpad(false) else false
+                    }
+                    else -> false
+                }
+            }
+            .testTag("home-hero-primary"),
+    ) {
+        Text(actionLabel)
+    }
+}
+
 /**
- * Bridge to CarouselState's module-internal index setter.
- * The public API only exposes [CarouselState.activeItemIndex] as a getter; the
- * Carousel key handler is the stock path, but it does not run while a child
- * Button holds focus — so Left leaks to the side rail. Drive the JVM-visible
- * internal setter instead of hand-rolling the carousel chrome.
+ * Bridge to CarouselState's module-internal index setter (JVM-visible).
+ * Used only so a focused child can still change slides — the stock Carousel
+ * key handler does not run while a sibling Button holds focus.
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 private fun CarouselState.seekToItem(index: Int) {
