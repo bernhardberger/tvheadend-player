@@ -352,9 +352,6 @@ private fun <T> topBy(
             selected += item
             selectedKeys[size] = key
             size++
-            if (size == limit) {
-                // Heap-order not required; linear scan for worst is fine at small limit.
-            }
             continue
         }
         var replaceAt = -1

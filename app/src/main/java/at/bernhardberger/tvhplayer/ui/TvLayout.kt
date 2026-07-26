@@ -33,3 +33,12 @@ val TvPlaybackPadding = PaddingValues(
     end = 24.dp,
     bottom = 32.dp,
 )
+
+/** Featured Home hero carousel height (canvas 960×540 dp). */
+val HomeHeroHeight = 288.dp
+
+/** 16:9 programme card width for Home content rows. */
+val HomeCardWidth = 176.dp
+
+/** 16:9 media area height for [HomeCardWidth] cards. */
+val HomeCardMediaHeight = 99.dp

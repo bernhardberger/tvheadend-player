@@ -27,12 +27,14 @@ class HomeViewModel(
     private val dvrRepository: DvrRepository,
     private val playerSession: PlayerSession,
     private val lastPlayedStore: LastPlayedChannelStore,
+    initialAllowRecordings: Boolean = true,
 ) : ViewModel() {
     /**
-     * Capability gate written by [at.bernhardberger.tvhplayer.ui.screens.HomeScreen] from
-     * the session [at.bernhardberger.tvhplayer.core.SimpleTvProfile] — not from settings alone.
+     * Capability gate from the session [at.bernhardberger.tvhplayer.core.SimpleTvProfile]
+     * (not settings alone). Seeded at construction so Simple TV does not flash recording
+     * content for a frame; [setAllowRecordings] covers later capability changes.
      */
-    private val allowRecordings = MutableStateFlow(true)
+    private val allowRecordings = MutableStateFlow(initialAllowRecordings)
 
     fun setAllowRecordings(value: Boolean) {
         allowRecordings.value = value

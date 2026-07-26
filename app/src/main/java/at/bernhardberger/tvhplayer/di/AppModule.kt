@@ -77,13 +77,14 @@ val appModule = module {
     }
     viewModel { VideoPlayerViewModel(playerSession = get(), repo = get(), htspService = get()) }
     viewModel { ChannelsViewModel(repo = get(), tagSettings = get()) }
-    viewModel {
+    viewModel { params ->
         HomeViewModel(
             repo = get(),
             tagSettings = get(),
             dvrRepository = get(),
             playerSession = get(),
             lastPlayedStore = get(),
+            initialAllowRecordings = params.getOrNull<Boolean>() ?: true,
         )
     }
     viewModel {
