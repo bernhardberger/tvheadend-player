@@ -116,6 +116,9 @@ fun adjacentChannelId(
   Settings hides the global rail and keeps only its category rail with symmetric
   full-screen safe margins; onboarding and unlock use the same full-screen
   padding. Collapsed rail icons expose destination content descriptions.
+- Normal non-autoplay launches open an in-app Home dashboard. Channels may use
+  List with details (default) or Large cards. Simple TV quick select uses the
+  large-card grid. Player Info reuses the shared Content Details composition.
 - Reveal hidden playback controls with OK or D-pad Down. Picking the channel that
   is already playing from the playback channel sheet closes the sheet without
   rebuilding or restarting the player session.
