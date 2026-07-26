@@ -14,11 +14,12 @@ fun RoundIconButton(
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
     focusRequester: FocusRequester,
-    onFocused: () -> Unit
+    onFocused: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .size(48.dp)
             .focusRequester(focusRequester)
             .onFocusChanged { st ->

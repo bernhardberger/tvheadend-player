@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Forward30
@@ -31,11 +31,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -51,10 +57,12 @@ import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward
 import at.bernhardberger.tvhplayer.core.initialPlaybackOverlayFocus
+import at.bernhardberger.tvhplayer.core.shouldShowProgrammeTimeline
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
+import at.bernhardberger.tvhplayer.core.timeshiftEpgBoundaryFractions
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
+import at.bernhardberger.tvhplayer.ui.components.PiconBox
 
 @Composable
 fun OverlayControlsTv(
@@ -89,6 +97,7 @@ fun OverlayControlsTv(
     val backFocus = remember { FocusRequester() }
     val forwardFocus = remember { FocusRequester() }
     val liveFocus = remember { FocusRequester() }
+    val seekbarFocus = remember { FocusRequester() }
     val canSeekBack = canSeekTimeshiftBackward(timeshiftState)
     val canSeekForward = canSeekTimeshiftForward(timeshiftState)
 
@@ -132,10 +141,26 @@ fun OverlayControlsTv(
         nowEvent?.progress(playbackSec) ?: 0f
     }
     val title = remember(nowEvent) { nowEvent?.title.orEmpty() }
-    val eventTimeRange = remember(nowEvent) {
-        nowEvent?.let { "${formatClock(it.start)}-${formatClock(it.stop)}" }.orEmpty()
-    }
     val clock = remember(nowSec) { formatClock(nowSec) }
+    val showProgrammeTimeline = shouldShowProgrammeTimeline(
+        state = timeshiftState,
+        hasCurrentProgramme = nowEvent != null,
+    )
+    val programmeDurationMs = nowEvent?.let { (it.stop - it.start).coerceAtLeast(0L) * 1_000L }
+    val programmePositionMs = nowEvent?.let {
+        ((playbackSec - it.start) * 1_000L).coerceIn(0L, programmeDurationMs ?: 0L)
+    }
+    val epgBoundaryFractions = remember(timeshiftState, nowEvent, nextEvent, nowSec) {
+        timeshiftEpgBoundaryFractions(
+            state = timeshiftState,
+            nowEpochSec = nowSec,
+            boundaryEpochSec = listOfNotNull(
+                nowEvent?.start,
+                nowEvent?.stop,
+                nextEvent?.stop,
+            ),
+        )
+    }
 
     fun focused(key: String) {
         lastFocused = key
@@ -151,146 +176,213 @@ fun OverlayControlsTv(
     val infoLabel = stringResource(R.string.player_info)
     val moreLabel = stringResource(R.string.playback_options)
     val stopLabel = stringResource(R.string.stop_playback)
-    val focusedLabel = when (lastFocused) {
-        "channels" -> channelsLabel
-        "back" -> seekBackLabel
-        "forward" -> seekForwardLabel
-        "pause" -> if (timeshiftState.paused) playLabel else pauseLabel
-        "live" -> goLiveLabel
-        "info" -> infoLabel
-        "options" -> moreLabel
-        "stop" -> stopLabel
-        else -> null
-    }
-
     Box(Modifier.fillMaxSize()) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(bottomGradient)
-                .padding(start = 56.dp, end = 56.dp, top = 96.dp, bottom = 32.dp),
+                .align(Alignment.TopCenter)
+                .background(topGradient)
+                .padding(start = 56.dp, end = 56.dp, top = 32.dp, bottom = 72.dp),
+            verticalAlignment = Alignment.Top,
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                // Programme title is primary; channel identity secondary; times/up-next tertiary.
+                PiconBox(
+                    imageLoader = imageLoader,
+                    piconPath = piconPath,
+                    modifier = Modifier
+                        .width(160.dp)
+                        .height(90.dp)
+                        .testTag("player-picon"),
+                )
+                Spacer(Modifier.width(22.dp))
                 Column(Modifier.weight(1f)) {
+                    Text(
+                        text = listOfNotNull(channelNumber?.toString(), channelName)
+                            .joinToString("  "),
+                        color = Color.White.copy(alpha = 0.88f),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("player-channel-identity"),
+                    )
+                    Spacer(Modifier.height(4.dp))
                     Text(
                         text = title.ifEmpty { channelName },
                         color = Color.White,
                         style = MaterialTheme.typography.headlineMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("player-programme-title"),
                     )
-                    Text(
-                        text = listOfNotNull(channelNumber?.toString(), channelName)
-                            .joinToString("  "),
-                        color = Color.White.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (eventTimeRange.isNotEmpty()) {
-                            Text(
-                                text = eventTimeRange,
-                                color = Color.White.copy(alpha = 0.72f),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                        }
-                        if (nextEvent != null) {
-                            Text(
-                                text = stringResource(R.string.player_next_event, nextEvent.title),
-                                color = Color.White.copy(alpha = 0.72f),
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                    if (nextEvent != null) {
+                        Text(
+                            text = stringResource(
+                                R.string.player_next_event_at,
+                                formatClock(nextEvent.start),
+                                nextEvent.title,
+                            ),
+                            color = Color.White.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.testTag("player-next-programme"),
+                        )
                     }
                 }
+            }
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = clock,
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.displaySmall,
+                    modifier = Modifier.testTag("player-clock"),
                 )
-            }
-
-            Spacer(Modifier.height(14.dp))
-            if (timeshiftState.available) {
-                PlaybackSeekbar(
-                    range = timeshiftSeekbarRange(timeshiftState),
-                    onSeekTo = { target ->
-                        onUserInteraction()
-                        onSeekTimeshift(target - timeshiftState.positionMs)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else if (nowEvent != null) {
-                Row(Modifier.fillMaxWidth()) {
+                nowEvent?.let {
                     Text(
-                        text = formatClock(nowEvent.start),
-                        color = Color.White.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        text = formatClock(nowEvent.stop),
-                        color = Color.White.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.labelLarge,
+                        text = stringResource(
+                            R.string.player_ends_in,
+                            formatClock(it.stop),
+                        ),
+                        color = Color.White.copy(alpha = 0.88f),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.testTag("player-programme-end"),
                     )
                 }
-                // Non-seekable programme progress: informational only.
-                ProgrammeProgressBar(progress = progress)
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(bottomGradient)
+                .padding(start = 56.dp, end = 56.dp, top = 80.dp, bottom = 28.dp),
+        ) {
+            if (timeshiftState.available) {
+                Column(Modifier.testTag("player-timeline")) {
+                    if (canSeekForward) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    onUserInteraction()
+                                    onGoLive()
+                                    seekbarFocus.requestFocus()
+                                },
+                                modifier = Modifier
+                                    .testTag("player-go-live")
+                                    .focusProperties { down = seekbarFocus }
+                                    .focusRequester(liveFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("live") },
+                            ) {
+                                Text(goLiveLabel, style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                        Spacer(Modifier.height(2.dp))
+                    }
+                    PlaybackSeekbar(
+                        range = timeshiftSeekbarRange(timeshiftState),
+                        onSeekTo = { target ->
+                            onUserInteraction()
+                            onSeekTimeshift(target - timeshiftState.positionMs)
+                        },
+                        epgBoundaryFractions = epgBoundaryFractions,
+                        programmePositionMs = programmePositionMs.takeIf {
+                            showProgrammeTimeline
+                        },
+                        programmeDurationMs = programmeDurationMs.takeIf {
+                            showProgrammeTimeline
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("player-seekbar")
+                            .focusRequester(seekbarFocus)
+                            .focusProperties {
+                                down = pauseFocus
+                                if (canSeekForward) right = liveFocus
+                            },
+                    )
+                }
+            } else if (nowEvent != null) {
+                Column(Modifier.testTag("player-timeline")) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = "${formatPlaybackClock(programmePositionMs ?: 0L)} / " +
+                                formatPlaybackClock(programmeDurationMs ?: 0L),
+                            color = Color.White.copy(alpha = 0.82f),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.testTag("player-programme-progress"),
+                        )
+                    }
+                    ProgrammeProgressBar(progress = progress)
+                }
             }
             timeshiftFeedback?.let {
                 Spacer(Modifier.height(6.dp))
                 Text(it, color = MaterialTheme.colorScheme.primary)
             }
 
-            Spacer(Modifier.height(18.dp))
-            // Single right-aligned control cluster so Right always moves to an adjacent control.
-            // Focused control label is anchored above the cluster (JetStream-style).
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.End,
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("player-actions")
+                    .onPreviewKeyEvent { event ->
+                        if (
+                            timeshiftState.available &&
+                            event.type == KeyEventType.KeyDown &&
+                            event.key == Key.DirectionUp
+                        ) {
+                            seekbarFocus.requestFocus()
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                focusedLabel?.let { label ->
-                    Text(
-                        text = label,
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelLarge,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .padding(bottom = 8.dp, end = 8.dp)
-                            .background(
-                                Color.Black.copy(alpha = 0.55f),
-                                shape = MaterialTheme.shapes.small,
-                            )
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                            .widthIn(max = 220.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Row(
+                        modifier = Modifier.testTag("player-navigation-actions"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(
+                            onClick = { onUserInteraction(); onOpenChannels() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("player-channels")
+                                .focusProperties {
+                                    if (timeshiftState.available) {
+                                        up = seekbarFocus
+                                        right = if (canSeekBack) backFocus else pauseFocus
+                                    } else {
+                                        right = infoFocus
+                                    }
+                                }
+                                .focusRequester(channelsFocus)
+                                .onFocusChanged { if (it.isFocused) focused("channels") },
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.List, channelsLabel)
+                        }
+                    }
                 }
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.testTag("player-transport-actions"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(
-                        onClick = { onUserInteraction(); onOpenChannels() },
-                        modifier = Modifier
-                            .size(52.dp)
-                            .focusRequester(channelsFocus)
-                            .onFocusChanged { if (it.isFocused) focused("channels") },
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.List, channelsLabel)
-                    }
                     if (timeshiftState.available) {
                         if (canSeekBack) {
                             IconButton(
@@ -301,7 +393,12 @@ fun OverlayControlsTv(
                                     )
                                 },
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(48.dp)
+                                    .focusProperties {
+                                        up = seekbarFocus
+                                        left = channelsFocus
+                                        right = pauseFocus
+                                    }
                                     .focusRequester(backFocus)
                                     .onFocusChanged { if (it.isFocused) focused("back") },
                             ) {
@@ -311,7 +408,12 @@ fun OverlayControlsTv(
                         IconButton(
                             onClick = { onUserInteraction(); onToggleTimeshiftPause() },
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(48.dp)
+                                .focusProperties {
+                                    up = seekbarFocus
+                                    left = if (canSeekBack) backFocus else channelsFocus
+                                    right = if (canSeekForward) forwardFocus else infoFocus
+                                }
                                 .focusRequester(pauseFocus)
                                 .onFocusChanged { if (it.isFocused) focused("pause") },
                         ) {
@@ -333,48 +435,86 @@ fun OverlayControlsTv(
                                     )
                                 },
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(48.dp)
+                                    .focusProperties {
+                                        up = seekbarFocus
+                                        left = pauseFocus
+                                        right = infoFocus
+                                    }
                                     .focusRequester(forwardFocus)
                                     .onFocusChanged { if (it.isFocused) focused("forward") },
                             ) {
                                 Icon(Icons.Filled.Forward30, seekForwardLabel)
                             }
-                            OutlinedButton(
-                                onClick = { onUserInteraction(); onGoLive() },
-                                modifier = Modifier
-                                    .focusRequester(liveFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("live") },
-                            ) {
-                                Text(goLiveLabel)
-                            }
                         }
                     }
-                    IconButton(
-                        onClick = { onUserInteraction(); onOpenInfo() },
-                        modifier = Modifier
-                            .size(52.dp)
-                            .focusRequester(infoFocus)
-                            .onFocusChanged { if (it.isFocused) focused("info") },
+                }
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.Info, infoLabel)
-                    }
-                    RoundIconButton(
-                        icon = {
-                            Icon(Icons.Filled.MoreVert, moreLabel)
-                        },
-                        onClick = { onUserInteraction(); onOpenOptions() },
-                        focusRequester = optionsFocus,
-                        onFocused = { focused("options") },
-                    )
-                    if (showStop) {
-                        IconButton(
-                            onClick = { onUserInteraction(); onStopPlayback() },
-                            modifier = Modifier
-                                .size(52.dp)
-                                .focusRequester(stopFocus)
-                                .onFocusChanged { if (it.isFocused) focused("stop") },
+                        Row(
+                            modifier = Modifier.testTag("player-utility-actions"),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.Filled.Stop, stopLabel)
+                            IconButton(
+                                onClick = { onUserInteraction(); onOpenInfo() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .focusProperties {
+                                        if (timeshiftState.available) up = seekbarFocus
+                                        left = when {
+                                            canSeekForward -> forwardFocus
+                                            timeshiftState.available -> pauseFocus
+                                            else -> channelsFocus
+                                        }
+                                        right = optionsFocus
+                                    }
+                                    .focusRequester(infoFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("info") },
+                            ) {
+                                Icon(Icons.Filled.Info, infoLabel)
+                            }
+                            IconButton(
+                                onClick = { onUserInteraction(); onOpenOptions() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .focusProperties {
+                                        if (timeshiftState.available) up = seekbarFocus
+                                        left = infoFocus
+                                        if (showStop) right = stopFocus
+                                    }
+                                    .focusRequester(optionsFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("options") },
+                            ) {
+                                Icon(Icons.Filled.MoreVert, moreLabel)
+                            }
+                        }
+                        if (showStop) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(start = 16.dp)
+                                    .testTag("player-terminal-actions"),
+                            ) {
+                                IconButton(
+                                    onClick = { onUserInteraction(); onStopPlayback() },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .focusProperties {
+                                            if (timeshiftState.available) up = seekbarFocus
+                                            left = optionsFocus
+                                        }
+                                        .focusRequester(stopFocus)
+                                        .onFocusChanged { if (it.isFocused) focused("stop") },
+                                ) {
+                                    Icon(Icons.Filled.Stop, stopLabel)
+                                }
+                            }
                         }
                     }
                 }

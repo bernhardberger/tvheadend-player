@@ -119,15 +119,46 @@ fun adjacentChannelId(
 - Normal non-autoplay launches open an in-app Home dashboard. Channels may use
   List with details (default) or Large cards. Simple TV quick select uses the
   large-card grid. Player Info reuses the shared Content Details composition.
-- Reveal hidden playback controls with OK or D-pad Down. Picking the channel that
-  is already playing from the playback channel sheet closes the sheet without
-  rebuilding or restarting the player session.
+- Reveal hidden playback controls with OK or vertical D-pad. Programme info is an
+  explicit player action rather than a hidden D-pad Up shortcut. Picking the
+  channel that is already playing from the playback channel sheet closes the
+  sheet without rebuilding or restarting the player session.
+- Standard Android TV Info opens the explicit programme-details surface. TV
+  Contents Menu and TV Number Entry keys open the channel drawer when Android
+  delivers them to the app. On the current TCL target, its Bluetooth remote's
+  Linux `KEY_LIST` is delivered to apps as `KEYCODE_BOOKMARK`; that key also
+  opens the channel drawer. Programme details include channel identity,
+  full available EPG metadata, and recording status/action. Back remains the
+  canonical dismiss action even when an explicit Close action is also present.
+- The transient player overlay balances the screen rather than stacking all
+  information at the bottom: channel or recording identity and a large wall clock
+  share a broad top scrim, while the bottom scrim contains the timeline followed
+  by split navigation, transport, and utility control groups. Live timeshift shows
+  **Go live** as a compact timeline action only while playback is behind live.
+  At the live edge, the timeline shows current-programme elapsed/duration and
+  progress; pausing, moving meaningfully behind live, or focusing the timeline
+  switches that same region to the timeshift buffer presentation. The channel
+  identity precedes the programme title, while the clock is paired with the
+  programme end time and **Up next**, including its start time, remains in the top
+  metadata group. Successful return to live is conveyed by the timeline without
+  an additional text notice.
+  A focused seekable timeline always displays a high-contrast thumb, including at
+  the live edge.
+- Ordinary channel tuning uses a delayed, non-focusable unboxed status indicator centered
+  over the video area. It must not compete with top metadata or bottom controls;
+  connection loss and genuine playback recovery continue to use the full recovery
+  presentation.
 - Live and recording playback expose one **Playback options** action in the main
-  controls. An opaque popover anchored above the bottom-end control cluster
-  switches laterally among Audio, Subtitles, Display, and Stats categories and
-  shows the current value without a nested drill-down. Opening the popover
-  suspends control auto-hide; Back closes it and restores focus to the cluster.
-  Focused player icon controls show an anchored label chip.
+  controls. An opaque compact overlay anchored above the bottom-end controls
+  presents a structured root menu for Audio, Subtitles, Display, and Stats.
+  Selecting Audio, Subtitles, or Display replaces the root with that category's
+  choices; Back returns to the root before closing the overlay and restoring
+  focus to the cluster. Opening the overlay suspends control auto-hide.
+  Player icon controls use recognizable symbols and accessible content
+  descriptions without reserving a separate visible label row.
+- Explicit Stop remains directly reachable as the terminal player action. It is
+  visually separated from Info and Playback options rather than placed inside
+  the options overlay.
 - Stats for nerds is a non-focusable, one-second diagnostic overlay. It may show
   playback state/timing, selected formats, decoder names, rendered/dropped frame
   counters, audio underruns, measured HTSP stream/file read rate, display output,

@@ -33,9 +33,9 @@ enum class RecordingFinishedAction {
 }
 
 /**
- * Recording player keys follow the shared player contract: Up opens info, Down
- * reveals controls, Left/Right seek. The old hidden Up/Down ten-minute seek
- * mapping is intentionally retired.
+ * Recording player keys follow the shared player contract: vertical D-pad
+ * reveals controls and Left/Right seek. The old hidden Up/Down ten-minute seek
+ * mapping is intentionally retired; programme info remains an explicit action.
  */
 fun recordingPlaybackKeyAction(
     controlsVisible: Boolean,

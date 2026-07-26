@@ -69,6 +69,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
+import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
 import coil3.ImageLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -111,10 +112,12 @@ fun RecordingPlayerScreen(
     val player = remember { session.getOrCreatePlayer(context) }
     val rootFocus = remember { FocusRequester() }
     val unavailableFocus = remember { FocusRequester() }
+    val infoFocus = remember { FocusRequester() }
     val showStop = simpleTvProfile.allows(SimpleTvCapability.STOP)
     val showUnlock = simpleTvProfile.active
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(C.TIME_UNSET) }
+    var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1_000L) }
     var isPlaying by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
     var interactionToken by remember { mutableIntStateOf(0) }
@@ -123,6 +126,7 @@ fun RecordingPlayerScreen(
     var pendingSeekOriginMs by remember { mutableStateOf<Long?>(null) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var statsVisible by remember { mutableStateOf(false) }
+    var infoOpen by remember { mutableStateOf(false) }
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
 
@@ -192,9 +196,8 @@ fun RecordingPlayerScreen(
             true
         }
         RecordingPlaybackKeyAction.OPEN_INFO -> {
-            // Info surface is introduced with the player composition overhaul;
-            // reveal controls as the interim discoverable path.
-            showControls()
+            controlsVisible = false
+            infoOpen = true
             true
         }
         RecordingPlaybackKeyAction.SEEK_BACK -> {
@@ -208,8 +211,16 @@ fun RecordingPlayerScreen(
     }
 
     fun applyAuxiliaryBack(): Boolean = when (
-        playbackAuxiliaryBackAction(optionsPage, statsVisible)
+        playbackAuxiliaryBackAction(optionsPage, statsVisible, infoOpen)
     ) {
+        PlaybackAuxiliaryBackAction.CLOSE_INFO -> {
+            infoOpen = false
+            true
+        }
+        PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT -> {
+            optionsPage = PlaybackOptionsPage.ROOT
+            true
+        }
         PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
             optionsPage = null
             interactionToken++
@@ -245,6 +256,7 @@ fun RecordingPlayerScreen(
             positionMs = pendingSeekTargetMs ?: player.currentPosition.coerceAtLeast(0L)
             durationMs = player.duration
             isPlaying = player.isPlaying
+            nowSec = System.currentTimeMillis() / 1_000L
             delay(250L)
         }
     }
@@ -264,6 +276,10 @@ fun RecordingPlayerScreen(
         } else if (availability !is RecordingPlaybackAvailability.Ready) {
             unavailableFocus.requestFocus()
         }
+    }
+
+    LaunchedEffect(infoOpen) {
+        if (infoOpen) runCatching { infoFocus.requestFocus() }
     }
 
     LaunchedEffect(seekFeedbackToken) {
@@ -312,12 +328,11 @@ fun RecordingPlayerScreen(
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
-                if (
-                    keyCode == AndroidKeyEvent.KEYCODE_BACK &&
-                    applyAuxiliaryBack()
-                ) {
-                    return@onPreviewKeyEvent true
-                }
+                // Back is owned by BackHandler so one key cycle cannot both hide
+                // controls and close the player after state changes.
+                if (keyCode == AndroidKeyEvent.KEYCODE_BACK) return@onPreviewKeyEvent false
+
+                if (infoOpen) return@onPreviewKeyEvent false
                 if (optionsPage != null) return@onPreviewKeyEvent false
 
                 val mediaAction = mediaPlaybackAction(
@@ -380,6 +395,7 @@ fun RecordingPlayerScreen(
                     channelName = entry?.channelName,
                     positionMs = positionMs,
                     durationMs = durationMs,
+                    nowSec = nowSec,
                     isPlaying = isPlaying,
                     controlsVisible = controlsVisible,
                     optionsOpen = optionsPage != null,
@@ -389,13 +405,43 @@ fun RecordingPlayerScreen(
                     onUserInteraction = { interactionToken++ },
                     showStop = showStop,
                     onOpenOptions = {
-                        optionsPage = PlaybackOptionsPage.AUDIO
+                        optionsPage = PlaybackOptionsPage.ROOT
                         controlsVisible = true
+                    },
+                    onOpenInfo = {
+                        controlsVisible = false
+                        infoOpen = true
                     },
                 )
             }
 
-            if (statsVisible && optionsPage == null) {
+            if (infoOpen && entry != null) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 48.dp, vertical = 32.dp),
+                    colors = SurfaceDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    RecordingContentDetails(
+                        entry = entry,
+                        modifier = Modifier.padding(28.dp),
+                        actions = {
+                            Button(
+                                onClick = { infoOpen = false },
+                                modifier = Modifier.focusRequester(infoFocus),
+                            ) {
+                                Text(stringResource(R.string.player_info_close))
+                            }
+                        },
+                    )
+                }
+            }
+
+            if (statsVisible && !controlsVisible && optionsPage == null && !infoOpen) {
                 PlaybackStatsOverlay(
                     diagnostics = diagnostics,
                     aspectRatio = aspectRatio,
@@ -493,7 +539,7 @@ fun RecordingPlayerScreen(
                         Text(stringResource(R.string.close))
                     }
                     if (showUnlock) {
-                        Button(onClick = { optionsPage = PlaybackOptionsPage.AUDIO }) {
+                        Button(onClick = { optionsPage = PlaybackOptionsPage.ROOT }) {
                             Text(stringResource(R.string.playback_options))
                         }
                     }

@@ -24,6 +24,7 @@ data class HomeRecentChannel(
 
 data class HomeRecordingItem(
     val id: Int,
+    val channelId: Int,
     val title: String,
     val subtitle: String?,
     val playable: Boolean,
@@ -37,6 +38,26 @@ data class HomeDashboardModel(
     val recordingNow: List<HomeRecordingItem>,
     val upcomingRecordings: List<HomeRecordingItem>,
 )
+
+enum class HomeFocusTarget {
+    NOW_PLAYING,
+    RECENT_CHANNEL,
+    ON_NOW,
+    RECORDING_NOW,
+    LATEST_RECORDING,
+    UPCOMING_RECORDING,
+    STATUS_ACTION,
+}
+
+fun homeInitialFocusTarget(model: HomeDashboardModel): HomeFocusTarget = when {
+    model.nowPlaying != null -> HomeFocusTarget.NOW_PLAYING
+    model.recentChannels.isNotEmpty() -> HomeFocusTarget.RECENT_CHANNEL
+    model.onNow.isNotEmpty() -> HomeFocusTarget.ON_NOW
+    model.recordingNow.isNotEmpty() -> HomeFocusTarget.RECORDING_NOW
+    model.latestRecordings.isNotEmpty() -> HomeFocusTarget.LATEST_RECORDING
+    model.upcomingRecordings.isNotEmpty() -> HomeFocusTarget.UPCOMING_RECORDING
+    else -> HomeFocusTarget.STATUS_ACTION
+}
 
 fun buildHomeDashboard(
     channelsById: Map<Int, ChannelUi>,
@@ -98,14 +119,14 @@ fun buildHomeDashboard(
 
     val playable = recordings
         .asSequence()
-        .filter {
-            it.state == DvrState.COMPLETED || it.state == DvrState.FAILED || it.state == DvrState.RECORDING
-        }
+        .filter { it.state == DvrState.COMPLETED }
+        .filter { recordingPlaybackAvailability(it) is RecordingPlaybackAvailability.Ready }
         .sortedByDescending { it.start }
         .take(HOME_RECORDING_LIMIT)
         .map {
             HomeRecordingItem(
                 id = it.id,
+                channelId = it.channelId,
                 title = it.title,
                 subtitle = it.channelName,
                 playable = true,
@@ -121,6 +142,7 @@ fun buildHomeDashboard(
         .map {
             HomeRecordingItem(
                 id = it.id,
+                channelId = it.channelId,
                 title = it.title,
                 subtitle = it.channelName,
                 playable = true,
@@ -136,6 +158,7 @@ fun buildHomeDashboard(
         .map {
             HomeRecordingItem(
                 id = it.id,
+                channelId = it.channelId,
                 title = it.title,
                 subtitle = it.channelName,
                 playable = false,

@@ -305,6 +305,9 @@ fun AppRoot(
                                 onOpenRecordings = {
                                     nav.navigate(Routes.RECORDINGS) { launchSingleTop = true }
                                 },
+                                onOpenChannels = {
+                                    nav.navigate(Routes.CHANNELS) { launchSingleTop = true }
+                                },
                             )
                         }
                     }

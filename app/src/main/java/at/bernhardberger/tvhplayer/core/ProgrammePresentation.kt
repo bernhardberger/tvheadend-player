@@ -4,9 +4,9 @@ import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 
 /** Summary with description fallback for compact detail panes. */
 fun programmeSummaryText(event: EpgEventEntry): String? {
-    val summary = event.summary?.takeIf { it.isNotBlank() }
+    val summary = event.summary?.programmeDisplayText()?.takeIf { it.isNotBlank() }
     if (summary != null) return summary
-    return event.description?.takeIf { it.isNotBlank() }
+    return event.description?.programmeDisplayText()?.takeIf { it.isNotBlank() }
 }
 
 /**
@@ -14,8 +14,8 @@ fun programmeSummaryText(event: EpgEventEntry): String? {
  * information beyond the summary.
  */
 fun programmeDetailsBody(event: EpgEventEntry): String? {
-    val summary = event.summary?.takeIf { it.isNotBlank() }
-    val description = event.description?.takeIf { it.isNotBlank() }
+    val summary = event.summary?.programmeDisplayText()?.takeIf { it.isNotBlank() }
+    val description = event.description?.programmeDisplayText()?.takeIf { it.isNotBlank() }
     return when {
         summary != null && description != null && description != summary ->
             "$summary\n\n$description"
@@ -23,6 +23,9 @@ fun programmeDetailsBody(event: EpgEventEntry): String? {
         else -> description
     }
 }
+
+private fun String.programmeDisplayText(): String =
+    replace("\\r\\n", "\n").replace("\\n", "\n").trim()
 
 fun programmeHasAired(event: EpgEventEntry, nowSec: Long): Boolean =
     event.stop <= nowSec

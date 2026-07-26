@@ -33,6 +33,17 @@ class ProgrammePresentationTest {
     }
 
     @Test
+    fun escapedLineBreaksAreRenderedAsLineBreaks() {
+        val event = sample(
+            summary = "First line\\nSecond line",
+            description = "First line\\nSecond line",
+        )
+
+        assertEquals("First line\nSecond line", programmeSummaryText(event))
+        assertEquals("First line\nSecond line", programmeDetailsBody(event))
+    }
+
+    @Test
     fun emptyMetadataYieldsNullBody() {
         assertNull(programmeSummaryText(sample(summary = "  ", description = null)))
         assertNull(programmeDetailsBody(sample(summary = null, description = null)))

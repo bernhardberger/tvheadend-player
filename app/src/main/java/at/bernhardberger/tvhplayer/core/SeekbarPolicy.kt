@@ -50,6 +50,23 @@ fun timeshiftSeekbarRange(state: TimeshiftState): SeekbarRange =
         positionMs = state.positionMs.coerceIn(state.bufferStartMs, state.liveEdgeMs),
     )
 
+fun timeshiftEpgBoundaryFractions(
+    state: TimeshiftState,
+    nowEpochSec: Long,
+    boundaryEpochSec: List<Long>,
+): List<Float> {
+    val duration = state.liveEdgeMs - state.bufferStartMs
+    if (!state.available || duration <= 0L) return emptyList()
+    return boundaryEpochSec
+        .asSequence()
+        .map { (it - nowEpochSec) * 1_000L }
+        .filter { it in state.bufferStartMs..state.liveEdgeMs }
+        .map { ((it - state.bufferStartMs).toFloat() / duration).coerceIn(0f, 1f) }
+        .distinct()
+        .sorted()
+        .toList()
+}
+
 /**
  * Deterministic repeat acceleration for held Left/Right on a seekbar or hidden
  * seek gesture.

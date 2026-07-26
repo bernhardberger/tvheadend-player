@@ -98,11 +98,32 @@
   remains warm. Explicit Stop and natural end tear down the session and return to
   the recordings library. Preserve the previous recordings mode, folder, scroll,
   and focused item across that navigation.
-- Use one shared anchored Playback options popover for live TV and recordings.
-  Switch Audio, Subtitles, Display, and Stats laterally with Left/Right, show the
-  current value in the category header, and keep Exit Simple TV as a secondary
+- Keep transient player identity separate from transport: a large picon and
+  programme or recording metadata occupy the top-left under a broad top scrim,
+  with the wall clock at top-right. The bottom scrim presents the timeline first
+  and a split navigation/transport/utility row beneath it. Timeshift exposes
+  **Go live** at the timeline edge rather than adding it to the transport cluster;
+  successful return to live is conveyed by the timeline without a text notice.
+  Normal live playback presents programme elapsed/duration and progress; the same
+  focusable timeline changes to the timeshift buffer while focused, paused, or
+  meaningfully behind live. Keep **Up next** and its start time with top metadata,
+  pair the clock with the programme end time, and center delayed unboxed ordinary
+  tuning status over video.
+  Map standard hardware Info to programme details and TV Contents Menu/TV Number
+  Entry to the channel drawer. The G10 List/123 button is physically confirmed as
+  app-visible `KEYCODE_BOOKMARK` and opens that drawer; validate other remote
+  models independently. Keep drawer focus surfaces wholly inside its opaque
+  content region and reserve the trailing width for the video fade.
+- Use one shared compact Playback options overlay for live TV and recordings,
+  anchored near More rather than using the independent-action right-overlay
+  template. Present Audio, Subtitles, Display, and Stats as a structured root;
+  replace it with category choices after selection, show current values in the
+  root rows and detail header, and keep Exit Simple TV as a secondary
   owner action with the existing PIN and confirmation flow. Back closes the
-  popover, then stats, before player Back. Focused transport icons show a label.
+  detail, overlay, then stats, before player Back. Player controls use recognizable icons
+  and accessible descriptions without a dedicated visible label row. Keep Stop
+  directly reachable at the terminal end, separated from the ordinary utility
+  actions.
 - Keep Stats for nerds session-only and non-focusable. `PlayerSession` samples
   Media3 formats, decoder names, playback timing, decoder counters, and audio
   underruns no more than once per second while enabled. Custom HTSP data sources

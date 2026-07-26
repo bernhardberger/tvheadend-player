@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 import kotlin.math.absoluteValue
 
 const val TIMESHIFT_SEEK_STEP_MS = 30_000L
+const val TIMESHIFT_LIVE_EDGE_TOLERANCE_MS = 5_000L
 const val REQUESTED_TIMESHIFT_PERIOD_SEC = 7_200
 
 data class TimeshiftState(
@@ -25,10 +26,19 @@ fun canSeekTimeshiftBackward(state: TimeshiftState): Boolean =
     state.available && state.positionMs - state.bufferStartMs > 1_000L
 
 fun canSeekTimeshiftForward(state: TimeshiftState): Boolean =
-    state.available && state.liveEdgeMs - state.positionMs > 1_000L
+    state.available &&
+        state.liveEdgeMs - state.positionMs > TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
 
 fun isTimeshiftActive(state: TimeshiftState): Boolean =
-    state.available && (state.paused || state.liveEdgeMs - state.positionMs > 1_000L)
+    state.available && (
+        state.paused ||
+            state.liveEdgeMs - state.positionMs > TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
+        )
+
+fun shouldShowProgrammeTimeline(
+    state: TimeshiftState,
+    hasCurrentProgramme: Boolean,
+): Boolean = hasCurrentProgramme && !isTimeshiftActive(state)
 
 fun timeshiftStateFromStatus(
     advertisedPeriodSec: Int,

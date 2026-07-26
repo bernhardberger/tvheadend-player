@@ -64,6 +64,7 @@ fun shouldRevealPlaybackControls(controlsVisible: Boolean, keyCode: Int): Boolea
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,
         KeyEvent.KEYCODE_NUMPAD_ENTER,
+        KeyEvent.KEYCODE_DPAD_UP,
         KeyEvent.KEYCODE_DPAD_DOWN -> true
         else -> false
     }
@@ -73,6 +74,18 @@ fun playbackSuppressesRevealingKey(
     revealingKeyCode: Int?,
     keyCode: Int,
 ): Boolean = revealingKeyCode == keyCode
+
+fun playerParentConsumesRecoveryKey(keyCode: Int): Boolean = when (keyCode) {
+    KeyEvent.KEYCODE_DPAD_CENTER,
+    KeyEvent.KEYCODE_ENTER,
+    KeyEvent.KEYCODE_NUMPAD_ENTER,
+    KeyEvent.KEYCODE_DPAD_UP,
+    KeyEvent.KEYCODE_DPAD_DOWN,
+    KeyEvent.KEYCODE_DPAD_LEFT,
+    KeyEvent.KEYCODE_DPAD_RIGHT,
+    KeyEvent.KEYCODE_BACK -> false
+    else -> true
+}
 
 /**
  * Hidden-control player key contract.
@@ -85,6 +98,23 @@ fun playerKeyAction(
     context: PlayerKeyContext,
     keyCode: Int,
 ): PlayerKeyAction {
+    if (context.infoOpen && keyCode != KeyEvent.KEYCODE_BACK) {
+        return PlayerKeyAction.PASS_THROUGH
+    }
+    if (keyCode == KeyEvent.KEYCODE_INFO) return PlayerKeyAction.OPEN_INFO
+    if (
+        keyCode == KeyEvent.KEYCODE_TV_CONTENTS_MENU ||
+        keyCode == KeyEvent.KEYCODE_TV_NUMBER_ENTRY ||
+        keyCode == KeyEvent.KEYCODE_BOOKMARK
+    ) {
+        return if (
+            context.surface == PlayerSurface.LIVE && !context.simpleTvActive
+        ) {
+            PlayerKeyAction.OPEN_CHANNELS
+        } else {
+            PlayerKeyAction.PASS_THROUGH
+        }
+    }
     if (context.seekbarFocused) {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> PlayerKeyAction.SEEK_BACK
@@ -128,8 +158,8 @@ fun playerKeyAction(
                 PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE
             else -> PlayerKeyAction.REVEAL_CONTROLS
         }
+        KeyEvent.KEYCODE_DPAD_UP,
         KeyEvent.KEYCODE_DPAD_DOWN -> PlayerKeyAction.REVEAL_CONTROLS
-        KeyEvent.KEYCODE_DPAD_UP -> PlayerKeyAction.OPEN_INFO
         KeyEvent.KEYCODE_DPAD_LEFT -> when {
             context.surface == PlayerSurface.RECORDING || context.timeshiftAvailable ->
                 PlayerKeyAction.SEEK_BACK

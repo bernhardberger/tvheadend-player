@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
@@ -69,6 +73,16 @@ fun ChannelRow(
         },
         leadingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (playingNow) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(R.string.player_on_now),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                } else {
+                    Spacer(Modifier.width(20.dp))
+                }
                 Text(
                     text = number?.toString().orEmpty(),
                     style = MaterialTheme.typography.labelLarge,
@@ -88,15 +102,6 @@ fun ChannelRow(
                 {
                     RecordingStatusIndicator(
                         state = at.bernhardberger.tvhplayer.htsp.DvrState.RECORDING,
-                    )
-                }
-            }
-            playingNow -> {
-                {
-                    Text(
-                        text = stringResource(R.string.player_on_now),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }

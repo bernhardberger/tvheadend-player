@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.view.KeyEvent as AndroidKeyEvent
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -50,11 +50,14 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
@@ -151,7 +154,7 @@ fun EpgGridScreen(
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
     val channelListState = rememberLazyListState()
-    val selectedFocus = remember { FocusRequester() }
+    val eventFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
     val guideHeaderFocus = remember { FocusRequester() }
 
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
@@ -165,6 +168,7 @@ fun EpgGridScreen(
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
+    var restoreDetailsFocus by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
     var configChoices by remember { mutableStateOf<List<DvrConfig>?>(null) }
     var selectedRecordConfigId by remember { mutableStateOf<String?>(null) }
@@ -276,7 +280,9 @@ fun EpgGridScreen(
             channelListState.animateScrollToItem(target.channelIndex)
         }
         delay(80)
-        runCatching { selectedFocus.requestFocus() }
+        eventFocusRequesters[target.eventId]?.let { requester ->
+            runCatching { requester.requestFocus() }
+        }
     }
 
     LaunchedEffect(selectedChannelEvents, frontierAfterSec, frontierLoading) {
@@ -362,13 +368,19 @@ fun EpgGridScreen(
         }
     }
 
-    BackHandler(enabled = detailsEvent != null || showJumpDialog) {
-        detailsEvent = null
-        showJumpDialog = false
-        coroutineScope.launch {
-            delay(80)
-            runCatching { selectedFocus.requestFocus() }
+    LaunchedEffect(detailsEvent, restoreDetailsFocus) {
+        if (detailsEvent == null && restoreDetailsFocus) {
+            withFrameNanos { }
+            selectedTarget?.eventId?.let(eventFocusRequesters::get)?.let { requester ->
+                runCatching { requester.requestFocus() }
+            }
+            restoreDetailsFocus = false
         }
+    }
+
+    fun closeDetails() {
+        detailsEvent = null
+        restoreDetailsFocus = true
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -407,7 +419,9 @@ fun EpgGridScreen(
                                 event.key == Key.DirectionDown &&
                                 selectedTarget != null
                             ) {
-                                selectedFocus.requestFocus()
+                                selectedTarget?.eventId
+                                    ?.let(eventFocusRequesters::get)
+                                    ?.requestFocus()
                                 true
                             } else {
                                 false
@@ -482,7 +496,7 @@ fun EpgGridScreen(
                             channelIndex = channelIndex,
                             allChannels = channels,
                             selectedTarget = selectedTarget,
-                            selectedFocusRequester = selectedFocus,
+                            eventFocusRequesters = eventFocusRequesters,
                             windowStartSec = windowStartSec,
                             windowEndSec = windowEndSec,
                             nowSec = nowSec,
@@ -498,6 +512,7 @@ fun EpgGridScreen(
                                 dvrEntries.firstOrNull { it.eventId == eventId }
                             },
                             onOpenDetails = {
+                                selectedTarget = EpgFocusTarget(channelIndex, it.eventId)
                                 detailsEvent = it
                                 actionResult = null
                             },
@@ -557,13 +572,7 @@ fun EpgGridScreen(
                         ProgrammeAction.CANCEL_RECORDING -> pendingAction = action
                     }
                 },
-                onClose = {
-                    detailsEvent = null
-                    coroutineScope.launch {
-                        delay(80)
-                        runCatching { selectedFocus.requestFocus() }
-                    }
-                },
+                onClose = ::closeDetails,
             )
         }
 
@@ -724,7 +733,7 @@ private fun TimelineChannelRow(
     channelIndex: Int,
     allChannels: List<ChannelUi>,
     selectedTarget: EpgFocusTarget?,
-    selectedFocusRequester: FocusRequester,
+    eventFocusRequesters: MutableMap<Int, FocusRequester>,
     windowStartSec: Long,
     windowEndSec: Long,
     nowSec: Long,
@@ -788,7 +797,9 @@ private fun TimelineChannelRow(
                     nowSec = nowSec,
                     selected = selectedTarget?.channelIndex == channelIndex &&
                         selectedTarget.eventId == event.eventId,
-                    selectedFocusRequester = selectedFocusRequester,
+                    focusRequester = eventFocusRequesters.getOrPut(event.eventId) {
+                        FocusRequester()
+                    },
                     onFocused = { onFocused(event) },
                     onOpenDetails = { onOpenDetails(event) },
                     onMoveFocus = onMoveFocus,
@@ -881,7 +892,7 @@ internal fun TimelineProgrammeCell(
     recording: DvrEntry?,
     nowSec: Long,
     selected: Boolean,
-    selectedFocusRequester: FocusRequester,
+    focusRequester: FocusRequester,
     onFocused: () -> Unit,
     onOpenDetails: () -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
@@ -910,7 +921,7 @@ internal fun TimelineProgrammeCell(
                 Text(
                     // Always render a label so no focusable cell is visually blank.
                     text = event.title,
-                    maxLines = if (width >= 100.dp) 2 else 1,
+                    maxLines = if (width >= 140.dp) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
                 )
@@ -936,7 +947,7 @@ internal fun TimelineProgrammeCell(
                 .padding(horizontal = 1.dp, vertical = 2.dp)
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f))
-                .then(if (selected) Modifier.focusRequester(selectedFocusRequester) else Modifier)
+                .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
                 .onPreviewKeyEvent { keyEvent ->
                     if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -957,6 +968,7 @@ internal fun TimelineProgrammeCell(
                 state = it.state,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .zIndex(2f)
                     .padding(6.dp),
             )
         }
@@ -1014,8 +1026,7 @@ private fun JumpToTimeDialog(
     var targetSec by remember(initialSec) { mutableLongStateOf(initialSec) }
     val initialFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { initialFocus.requestFocus() }
-    BackHandler(onBack = onDismiss)
-    DialogScrim {
+    DialogScrim(onDismissRequest = onDismiss) {
         Text(
             text = stringResource(R.string.epg_jump_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -1090,7 +1101,6 @@ private fun ProgrammeDetailsPanel(
         }
     }
     LaunchedEffect(event.eventId, actions) { initialFocus.requestFocus() }
-    BackHandler(onBack = onClose)
     val subtitle = buildString {
         append(channel?.name.orEmpty())
         if (isNotEmpty()) append(" • ")
@@ -1101,16 +1111,25 @@ private fun ProgrammeDetailsPanel(
         append((event.stop - event.start).coerceAtLeast(0L) / 60L)
         append(" min")
     }
-    DialogScrim(wide = true) {
+    DialogScrim(onDismissRequest = onClose, wide = true) {
         ProgrammeContentDetails(
             event = event,
             subtitle = subtitle,
             footer = {
                 recording?.let {
-                    Text(
-                        text = stringResource(R.string.recording_status, dvrStateLabel(it.state)),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RecordingStatusIndicator(state = it.state)
+                        Text(
+                            text = stringResource(
+                                R.string.recording_status,
+                                dvrStateLabel(it.state),
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     it.failureReason?.takeIf(String::isNotBlank)?.let { reason ->
                         Text(
                             text = stringResource(R.string.recording_failure_reason, reason),
@@ -1177,8 +1196,7 @@ private fun DvrConfigDialog(
 ) {
     val initialFocus = remember { FocusRequester() }
     LaunchedEffect(configs) { initialFocus.requestFocus() }
-    BackHandler(onBack = onDismiss)
-    DialogScrim {
+    DialogScrim(onDismissRequest = onDismiss) {
         Text(
             text = stringResource(R.string.recording_config_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -1219,8 +1237,7 @@ internal fun ConfirmProgrammeActionDialog(
 ) {
     val safeFocus = remember { FocusRequester() }
     LaunchedEffect(action) { safeFocus.requestFocus() }
-    BackHandler(onBack = onDismiss)
-    DialogScrim {
+    DialogScrim(onDismissRequest = onDismiss) {
         Text(
             text = stringResource(
                 if (action == ProgrammeAction.RECORD) {
@@ -1301,29 +1318,44 @@ private fun dvrActionResultLabel(result: DvrActionResult): String = stringResour
 
 @Composable
 private fun DialogScrim(
+    onDismissRequest: () -> Unit,
     wide: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .focusGroup(),
-        contentAlignment = Alignment.Center,
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+        ),
     ) {
-        Surface(
-            modifier = Modifier.width(if (wide) 880.dp else 720.dp),
-            shape = MaterialTheme.shapes.large,
-            colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.72f))
+                .focusGroup()
+                .then(if (wide) Modifier.padding(TvScreenPadding) else Modifier),
+            contentAlignment = if (wide) Alignment.CenterEnd else Alignment.Center,
         ) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                content = content,
-            )
+            Surface(
+                modifier = if (wide) {
+                    Modifier.width(680.dp).fillMaxHeight()
+                } else {
+                    Modifier.width(720.dp)
+                },
+                shape = MaterialTheme.shapes.large,
+                colors = SurfaceDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(28.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    content = content,
+                )
+            }
         }
     }
 }

@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -110,15 +110,15 @@ fun ChannelCard(
         ),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+                    .height(72.dp)
                     .background(
                         MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
                         shape = MaterialTheme.shapes.small,
@@ -137,7 +137,7 @@ fun ChannelCard(
                         piconPath = item.channel.icon,
                         modifier = Modifier
                             .fillMaxWidth(0.7f)
-                            .aspectRatio(16f / 10f),
+                            .height(56.dp),
                     )
                 }
                 if (item.playingNow || item.recordingNow) {
@@ -174,7 +174,7 @@ fun ChannelCard(
             Text(
                 text = item.programmeTitle,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = if (selected) {
                     MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.86f)

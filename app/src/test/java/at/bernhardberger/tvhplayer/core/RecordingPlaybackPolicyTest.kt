@@ -154,7 +154,7 @@ class RecordingPlaybackPolicyTest {
     }
 
     @Test
-    fun hiddenPlayerUsesInfoControlsAndSeekContract() {
+    fun hiddenPlayerUsesControlsAndSeekContract() {
         assertEquals(
             RecordingPlaybackKeyAction.SEEK_BACK,
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_LEFT),
@@ -164,7 +164,7 @@ class RecordingPlaybackPolicyTest {
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_RIGHT),
         )
         assertEquals(
-            RecordingPlaybackKeyAction.OPEN_INFO,
+            RecordingPlaybackKeyAction.REVEAL_CONTROLS,
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_UP),
         )
         assertEquals(

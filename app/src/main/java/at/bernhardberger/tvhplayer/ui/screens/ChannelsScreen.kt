@@ -82,6 +82,7 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -167,11 +168,16 @@ fun ChannelsScreen(
     }
 
     val focusedChannel = channels.firstOrNull { it.id == selectedId }
-    val focusedNow = remember(selectedId, nowSec) {
-        focusedChannel?.let { channelViewModel.nowEvent(it.id, nowSec) }
+    val emptyFocusedEvents = remember { MutableStateFlow<List<EpgEventEntry>>(emptyList()) }
+    val focusedEventsFlow = focusedChannel?.let { channelViewModel.epgForChannel(it.id) }
+        ?: emptyFocusedEvents
+    val focusedEvents by focusedEventsFlow.collectAsStateWithLifecycle()
+    val focusedNow = remember(focusedEvents, nowSec) {
+        focusedEvents.firstOrNull { it.start <= nowSec && nowSec < it.stop }
+            ?: focusedEvents.minByOrNull { kotlin.math.abs(it.start - nowSec) }
     }
-    val focusedNext = remember(selectedId, nowSec) {
-        focusedChannel?.let { channelViewModel.nextEvent(it.id, nowSec) }
+    val focusedNext = remember(focusedEvents, nowSec) {
+        focusedEvents.firstOrNull { it.start > nowSec }
     }
 
     LaunchedEffect(Unit) {
@@ -668,7 +674,11 @@ private fun EpgDetailPane(
     val progress = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
     val summaryText = remember(now) { now?.let { programmeSummaryText(it) } }
     val metadata = remember(now) { now?.let { programmeMetadata(it) } }
-    Column(Modifier.padding(24.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+    ) {
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -733,12 +743,15 @@ private fun EpgDetailPane(
                     text = summaryText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
 
+        Spacer(Modifier.weight(1f))
+
         if (next != null) {
-            Spacer(Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.epg_next, formatHm(next.start)),
                 style = MaterialTheme.typography.labelLarge,

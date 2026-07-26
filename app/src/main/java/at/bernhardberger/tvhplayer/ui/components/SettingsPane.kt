@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -30,7 +31,9 @@ fun SettingsPane(
         ),
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier
+                .padding(24.dp)
+                .focusGroup(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(

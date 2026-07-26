@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
+import at.bernhardberger.tvhplayer.htsp.DvrFile
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import org.junit.Assert.assertEquals
@@ -11,6 +12,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeContentPolicyTest {
+    @Test
+    fun initialFocusUsesFirstAvailableAction() {
+        val empty = HomeDashboardModel(
+            nowPlaying = null,
+            recentChannels = emptyList(),
+            onNow = emptyList(),
+            latestRecordings = emptyList(),
+            recordingNow = emptyList(),
+            upcomingRecordings = emptyList(),
+        )
+        assertEquals(HomeFocusTarget.STATUS_ACTION, homeInitialFocusTarget(empty))
+        assertEquals(
+            HomeFocusTarget.ON_NOW,
+            homeInitialFocusTarget(
+                empty.copy(
+                    onNow = listOf(HomeRecentChannel(1, "ORF1", "News")),
+                )
+            ),
+        )
+        assertEquals(
+            HomeFocusTarget.RECENT_CHANNEL,
+            homeInitialFocusTarget(
+                empty.copy(
+                    recentChannels = listOf(HomeRecentChannel(1, "ORF1", "News")),
+                    onNow = listOf(HomeRecentChannel(2, "ORF2", "Weather")),
+                )
+            ),
+        )
+    }
+
     @Test
     fun omitsEmptySectionsAndBuildsNowPlaying() {
         val channels = mapOf(1 to ChannelUi(id = 1, name = "ORF1", number = 1, icon = null))
@@ -66,6 +97,39 @@ class HomeContentPolicyTest {
         assertEquals(1, model.upcomingRecordings.size)
         assertFalse(model.upcomingRecordings.first().playable)
         assertNull(model.nowPlaying)
+    }
+
+    @Test
+    fun latestContainsOnlyCompletedRecordingsWithAvailableFiles() {
+        fun entry(id: Int, state: DvrState, withFile: Boolean) = DvrEntry(
+            id = id,
+            eventId = id,
+            channelId = 1,
+            start = 900L + id,
+            stop = 1_100L + id,
+            title = "Recording $id",
+            state = state,
+            files = if (withFile) listOf(DvrFile(path = "/recording-$id.ts")) else emptyList(),
+        )
+        val model = buildHomeDashboard(
+            channelsById = emptyMap(),
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            recentChannelIds = emptyList(),
+            onNowEvents = emptyList(),
+            recordings = listOf(
+                entry(1, DvrState.COMPLETED, withFile = true),
+                entry(2, DvrState.COMPLETED, withFile = false),
+                entry(3, DvrState.RECORDING, withFile = true),
+                entry(4, DvrState.FAILED, withFile = true),
+            ),
+            nowSec = 1_000L,
+        )
+
+        assertEquals(listOf(1), model.latestRecordings.map { it.id })
+        assertEquals(listOf(1), model.latestRecordings.map { it.channelId })
+        assertEquals(listOf(3), model.recordingNow.map { it.id })
     }
 
     @Test

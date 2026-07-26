@@ -33,6 +33,24 @@ class SeekbarPolicyTest {
     }
 
     @Test
+    fun timeshiftProgrammeBoundariesMapIntoSeekableRange() {
+        val state = TimeshiftState(
+            available = true,
+            bufferStartMs = -600_000,
+            positionMs = -120_000,
+            liveEdgeMs = 0,
+        )
+        assertEquals(
+            listOf(0.5f, 0.9f),
+            timeshiftEpgBoundaryFractions(
+                state = state,
+                nowEpochSec = 1_000L,
+                boundaryEpochSec = listOf(700L, 940L, 1_100L),
+            ),
+        )
+    }
+
+    @Test
     fun repeatAccelerationGrowsFromThirtySecondsToFiveMinutes() {
         assertEquals(30_000L, seekStepMs(0))
         assertEquals(30_000L, seekStepMs(3))

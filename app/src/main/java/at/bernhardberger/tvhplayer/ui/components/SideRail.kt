@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -153,12 +154,11 @@ fun SideRail(
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    // Keep collapsed icons and focus rings inside the 48 dp TV-safe edge.
-                    .padding(start = 12.dp)
                     .background(
                         MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha)
                     )
-                    .padding(start = 12.dp, end = 12.dp, top = 32.dp, bottom = 32.dp)
+                    // The surface reaches the edge; content retains the same safe inset.
+                    .padding(start = 24.dp, end = 12.dp, top = 32.dp, bottom = 32.dp)
                     .selectableGroup(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -187,6 +187,14 @@ fun SideRail(
                 }
             }
         },
-        content = content,
+        content = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 80.dp),
+            ) {
+                content()
+            }
+        },
     )
 }

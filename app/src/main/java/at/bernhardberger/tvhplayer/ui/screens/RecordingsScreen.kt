@@ -6,6 +6,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1200,15 +1201,17 @@ private fun RecordingDetailsPanel(
                     else MaterialTheme.colorScheme.primary,
             )
         }
-        Column(
+        Spacer(Modifier.weight(1f))
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             var firstActionAssigned = false
             if (canPlay) {
                 Button(
                     onClick = onPlay,
-                    modifier = Modifier.fillMaxWidth().focusRequester(initialFocus),
+                    modifier = Modifier.focusRequester(initialFocus),
                 ) {
                     Icon(Icons.Filled.PlayArrow, stringResource(R.string.play))
                     Spacer(Modifier.width(8.dp))
@@ -1219,7 +1222,7 @@ private fun RecordingDetailsPanel(
             if (canCancel) {
                 Button(
                     onClick = onCancel,
-                    modifier = Modifier.fillMaxWidth().then(
+                    modifier = Modifier.then(
                         if (!firstActionAssigned) Modifier.focusRequester(initialFocus) else Modifier
                     ),
                 ) {
@@ -1232,7 +1235,7 @@ private fun RecordingDetailsPanel(
             if (canDelete) {
                 Button(
                     onClick = onDelete,
-                    modifier = Modifier.fillMaxWidth().then(
+                    modifier = Modifier.then(
                         if (!firstActionAssigned) Modifier.focusRequester(initialFocus) else Modifier
                     ),
                 ) {
@@ -1243,7 +1246,7 @@ private fun RecordingDetailsPanel(
             }
             OutlinedButton(
                 onClick = onClose,
-                modifier = Modifier.fillMaxWidth().focusRequester(closeFocus),
+                modifier = Modifier.focusRequester(closeFocus),
             ) {
                 Icon(Icons.Filled.Close, stringResource(R.string.close))
                 Spacer(Modifier.width(8.dp))
@@ -1254,7 +1257,7 @@ private fun RecordingDetailsPanel(
 }
 
 @Composable
-private fun RecordingDetailsSurface(content: @Composable () -> Unit) {
+private fun RecordingDetailsSurface(content: @Composable ColumnScope.() -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1296,44 +1299,39 @@ private fun RecordingConfirmationDialog(
     LaunchedEffect(action) { safeFocus.requestFocus() }
     BackHandler(onBack = onDismiss)
     RecordingDialogSurface {
-        // Actions template: guidance left, safe default + destructive right.
+        Text(
+            text = stringResource(
+                if (action == PendingRecordingAction.CANCEL) {
+                    R.string.cancel_recording_confirm_title
+                } else {
+                    R.string.delete_recording_confirm_title
+                },
+                title,
+            ),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.semantics { heading() },
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(
-                    if (action == PendingRecordingAction.CANCEL) {
-                        R.string.cancel_recording_confirm_title
-                    } else {
-                        R.string.delete_recording_confirm_title
-                    },
-                    title,
-                ),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { heading() },
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.focusRequester(safeFocus),
-                ) {
-                    Text(stringResource(R.string.back))
-                }
-                Button(onClick = onConfirm) {
-                    Text(
-                        stringResource(
-                            if (action == PendingRecordingAction.CANCEL) {
-                                R.string.cancel_recording
-                            } else {
-                                R.string.delete_recording
-                            }
-                        )
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.focusRequester(safeFocus),
+            ) {
+                Text(stringResource(R.string.back))
+            }
+            Button(onClick = onConfirm) {
+                Text(
+                    stringResource(
+                        if (action == PendingRecordingAction.CANCEL) {
+                            R.string.cancel_recording
+                        } else {
+                            R.string.delete_recording
+                        }
                     )
-                }
+                )
             }
         }
     }

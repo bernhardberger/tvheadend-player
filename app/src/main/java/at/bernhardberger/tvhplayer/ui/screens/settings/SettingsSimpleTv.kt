@@ -1,8 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -29,10 +31,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
+import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
@@ -63,30 +69,39 @@ fun SettingsSimpleTv(
     var pinResultKind by remember { mutableStateOf(PinFeedbackKind.SUCCESS) }
     var confirmStart by remember { mutableStateOf(false) }
     val pinValid = isValidSimpleTvPin(pin)
-    val cancelFocus = remember { androidx.compose.ui.focus.FocusRequester() }
 
     SettingsPane(title = stringResource(R.string.settings_simple_tv)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = stringResource(R.string.simple_tv_mode_disclosure),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(R.string.simple_tv_home_disclosure),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(R.string.simple_tv_guide_return_disclosure),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                colors = SurfaceDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.simple_tv_mode_disclosure),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.simple_tv_home_disclosure),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        text = stringResource(R.string.simple_tv_guide_return_disclosure),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
             SettingsSwitchRow(
                 label = stringResource(R.string.simple_tv_startup),
                 checked = settings.enabled,
@@ -103,8 +118,16 @@ fun SettingsSimpleTv(
             )
 
             SettingsSectionTitle(stringResource(R.string.simple_tv_pin_section))
-            Text(stringResource(R.string.simple_tv_pin_explanation))
-            Text(stringResource(R.string.simple_tv_pin_recovery))
+            Text(
+                text = stringResource(R.string.simple_tv_pin_explanation),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.simple_tv_pin_recovery),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             TvOutlinedTextField(
                 id = "simple-tv-pin",
                 editingId = editingId,
@@ -168,31 +191,64 @@ fun SettingsSimpleTv(
             }
         }
         if (confirmStart) {
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                runCatching { cancelFocus.requestFocus() }
-            }
-            ActionsTemplate(
-                title = stringResource(R.string.simple_tv_start_confirm_title),
-                subtitle = stringResource(R.string.simple_tv_start_confirm_message),
-                modifier = Modifier.padding(top = 8.dp),
-                actions = {
-                    androidx.tv.material3.OutlinedButton(
-                        onClick = { confirmStart = false },
-                        modifier = Modifier.focusRequester(cancelFocus),
-                    ) {
-                        Text(stringResource(R.string.back))
-                    }
-                    Button(
-                        onClick = {
-                            confirmStart = false
-                            onStartSimpleTv()
-                        },
-                    ) {
-                        Text(stringResource(R.string.simple_tv_start_now))
-                    }
+            SimpleTvStartConfirmation(
+                onCancel = { confirmStart = false },
+                onConfirm = {
+                    confirmStart = false
+                    onStartSimpleTv()
                 },
             )
         }
+    }
+}
+
+@Composable
+internal fun SimpleTvStartConfirmation(
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val cancelFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    Dialog(
+        onDismissRequest = onCancel,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            colors = SurfaceDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 96.dp, vertical = 64.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                ActionsTemplate(
+                    title = stringResource(R.string.simple_tv_start_confirm_title),
+                    subtitle = stringResource(R.string.simple_tv_start_confirm_message),
+                    actions = {
+                        androidx.tv.material3.OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier.focusRequester(cancelFocus),
+                        ) {
+                            Text(stringResource(R.string.back))
+                        }
+                        Button(onClick = onConfirm) {
+                            Text(stringResource(R.string.simple_tv_start_now))
+                        }
+                    },
+                )
+            }
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        runCatching { cancelFocus.requestFocus() }
     }
 }
 

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -29,11 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -51,14 +46,10 @@ import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
-import at.bernhardberger.tvhplayer.core.adjacentPlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 
 /**
- * Anchored opaque playback-options popover.
- *
- * Sits above the bottom-end control cluster so focus stays local and controls
- * cannot ghost through the surface. Categories switch laterally.
+ * Compact playback-dependent overlay with a structured root and detail pages.
  */
 @Composable
 internal fun PlaybackOptionsSheet(
@@ -74,7 +65,6 @@ internal fun PlaybackOptionsSheet(
     onSimpleTvExit: () -> Unit,
 ) {
     val initialFocus = remember(page) { FocusRequester() }
-    val categoryFocus = remember { FocusRequester() }
     val unknownLanguage = stringResource(R.string.track_unknown_language)
     val mono = stringResource(R.string.track_mono)
     val stereo = stringResource(R.string.track_stereo)
@@ -107,170 +97,162 @@ internal fun PlaybackOptionsSheet(
             channelsLabel = { count -> channelsTemplate.format(count) },
         )
     }
-    val currentValue = when (page) {
-        PlaybackOptionsPage.AUDIO ->
-            audioTracks.firstOrNull { it.selected }?.label ?: noneAudio
-        PlaybackOptionsPage.SUBTITLES ->
-            textTracks.firstOrNull { it.selected }?.label ?: noneSubs
-        PlaybackOptionsPage.DISPLAY -> when (aspectRatio) {
-            AspectRatioMode.FIT -> stringResource(R.string.display_mode_auto)
-            AspectRatioMode.FORCE_16_9 -> stringResource(R.string.display_mode_16_9)
-            AspectRatioMode.FORCE_4_3 -> stringResource(R.string.display_mode_4_3)
-        }
-        PlaybackOptionsPage.STATS -> stringResource(
-            if (statsVisible) R.string.stats_on else R.string.stats_off
-        )
-    }
-    val categoryTitle = stringResource(
-        when (page) {
-            PlaybackOptionsPage.AUDIO -> R.string.audio_track
-            PlaybackOptionsPage.SUBTITLES -> R.string.subtitles
-            PlaybackOptionsPage.DISPLAY -> R.string.display_mode
-            PlaybackOptionsPage.STATS -> R.string.stats_for_nerds
+    val audioValue = audioTracks.firstOrNull { it.selected }?.label ?: noneAudio
+    val subtitlesValue = textTracks.firstOrNull { it.selected }?.label ?: noneSubs
+    val displayValue = stringResource(
+        when (aspectRatio) {
+            AspectRatioMode.FIT -> R.string.display_mode_auto
+            AspectRatioMode.FORCE_16_9 -> R.string.display_mode_16_9
+            AspectRatioMode.FORCE_4_3 -> R.string.display_mode_4_3
         }
     )
+    val statsValue = stringResource(if (statsVisible) R.string.stats_on else R.string.stats_off)
 
     LaunchedEffect(page) {
-        // Prefer content focus; category header remains reachable with Up.
         runCatching { initialFocus.requestFocus() }
-            .recoverCatching { categoryFocus.requestFocus() }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.22f)),
-        contentAlignment = Alignment.BottomEnd,
-    ) {
-        Box(
-            modifier = Modifier
-                .padding(end = 48.dp, bottom = 108.dp)
-                .widthIn(min = 360.dp, max = 440.dp)
-                .width(420.dp)
-                .heightIn(max = 420.dp)
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (event.key) {
-                        Key.DirectionLeft -> {
-                            onPageChange(
-                                adjacentPlaybackOptionsPage(page, -1, simpleTvActive),
-                            )
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            onPageChange(
-                                adjacentPlaybackOptionsPage(page, 1, simpleTvActive),
-                            )
-                            true
-                        }
-                        else -> false
-                    }
-                },
+    PlaybackOptionsOverlayFrame {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Surface(
-                // Compact anchored popover — not a full-height sheet.
-                shape = MaterialTheme.shapes.large,
-                colors = SurfaceDefaults.colors(
-                    containerColor = Color(0xFF0D1117),
-                    contentColor = Color.White,
+            OptionsHeader(
+                title = stringResource(
+                    when (page) {
+                        PlaybackOptionsPage.ROOT -> R.string.playback_options
+                        PlaybackOptionsPage.AUDIO -> R.string.audio_track
+                        PlaybackOptionsPage.SUBTITLES -> R.string.subtitles
+                        PlaybackOptionsPage.DISPLAY -> R.string.display_mode
+                        PlaybackOptionsPage.STATS -> R.string.stats_for_nerds
+                    }
                 ),
-            ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                CategoryHeader(
-                    title = categoryTitle,
-                    currentValue = currentValue,
-                    focusRequester = categoryFocus,
-                    onPrevious = {
-                        onPageChange(adjacentPlaybackOptionsPage(page, -1, simpleTvActive))
-                    },
-                    onNext = {
-                        onPageChange(adjacentPlaybackOptionsPage(page, 1, simpleTvActive))
+                currentValue = when (page) {
+                    PlaybackOptionsPage.ROOT -> null
+                    PlaybackOptionsPage.AUDIO -> audioValue
+                    PlaybackOptionsPage.SUBTITLES -> subtitlesValue
+                    PlaybackOptionsPage.DISPLAY -> displayValue
+                    PlaybackOptionsPage.STATS -> statsValue
+                },
+                onBack = if (page == PlaybackOptionsPage.ROOT) {
+                    null
+                } else {
+                    { onPageChange(PlaybackOptionsPage.ROOT) }
+                },
+            )
+
+            when (page) {
+                PlaybackOptionsPage.ROOT -> PlaybackOptionsRoot(
+                    audioValue = audioValue,
+                    subtitlesValue = subtitlesValue,
+                    displayValue = displayValue,
+                    statsVisible = statsVisible,
+                    simpleTvActive = simpleTvActive,
+                    initialFocus = initialFocus,
+                    onPageChange = onPageChange,
+                    onStatsVisibleChange = onStatsVisibleChange,
+                )
+                PlaybackOptionsPage.AUDIO -> TrackOptions(
+                    tracks = audioTracks,
+                    subtitles = false,
+                    initialFocus = initialFocus,
+                    onSelect = { track ->
+                        selectAudioTrack(player, track)
                     },
                 )
-
-                when (page) {
-                    PlaybackOptionsPage.AUDIO -> TrackOptions(
-                        tracks = audioTracks,
-                        subtitles = false,
-                        initialFocus = initialFocus,
-                        onSelect = { track ->
-                            selectAudioTrack(player, track)
-                        },
-                    )
-                    PlaybackOptionsPage.SUBTITLES -> TrackOptions(
-                        tracks = textTracks,
-                        subtitles = true,
-                        initialFocus = initialFocus,
-                        onSelectOff = {
-                            selectTextTrack(player, null)
-                        },
-                        onSelect = { track ->
-                            selectTextTrack(player, track)
-                        },
-                    )
-                    PlaybackOptionsPage.DISPLAY -> DisplayOptions(
-                        selected = aspectRatio,
-                        initialFocus = initialFocus,
-                        onSelect = onAspectRatioChange,
-                    )
-                    PlaybackOptionsPage.STATS -> {
-                        PlaybackOptionRow(
-                            label = stringResource(R.string.stats_for_nerds),
-                            selected = statsVisible,
-                            onClick = { onStatsVisibleChange(!statsVisible) },
-                            showSwitch = true,
-                            modifier = Modifier.focusRequester(initialFocus),
-                        )
-                    }
-                }
-
-                if (showSimpleTvExit) {
-                    Text(
-                        text = stringResource(R.string.simple_tv_owner_section),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.72f),
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .semantics { heading() },
-                    )
+                PlaybackOptionsPage.SUBTITLES -> TrackOptions(
+                    tracks = textTracks,
+                    subtitles = true,
+                    initialFocus = initialFocus,
+                    onSelectOff = {
+                        selectTextTrack(player, null)
+                    },
+                    onSelect = { track ->
+                        selectTextTrack(player, track)
+                    },
+                )
+                PlaybackOptionsPage.DISPLAY -> DisplayOptions(
+                    selected = aspectRatio,
+                    initialFocus = initialFocus,
+                    onSelect = onAspectRatioChange,
+                )
+                PlaybackOptionsPage.STATS -> {
                     PlaybackOptionRow(
-                        label = stringResource(R.string.simple_tv_unlock),
-                        onClick = onSimpleTvExit,
-                        leadingLock = true,
+                        label = stringResource(R.string.stats_for_nerds),
+                        selected = statsVisible,
+                        onClick = { onStatsVisibleChange(!statsVisible) },
+                        showSwitch = true,
+                        modifier = Modifier.focusRequester(initialFocus),
                     )
                 }
             }
+
+            if (showSimpleTvExit && page == PlaybackOptionsPage.ROOT) {
+                Text(
+                    text = stringResource(R.string.simple_tv_owner_section),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.72f),
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .semantics { heading() },
+                )
+                PlaybackOptionRow(
+                    label = stringResource(R.string.simple_tv_unlock),
+                    onClick = onSimpleTvExit,
+                    leadingLock = true,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CategoryHeader(
+internal fun PlaybackOptionsOverlayFrame(
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.22f)),
+        contentAlignment = Alignment.BottomEnd,
+    ) {
+        Surface(
+            modifier = Modifier
+                .padding(end = 48.dp, bottom = 108.dp)
+                .width(420.dp)
+                .heightIn(max = 420.dp)
+                .testTag("playback-options-overlay"),
+            shape = MaterialTheme.shapes.large,
+            colors = SurfaceDefaults.colors(
+                containerColor = Color(0xFF0D1117),
+                contentColor = Color.White,
+            ),
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun OptionsHeader(
     title: String,
-    currentValue: String,
-    focusRequester: FocusRequester,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
+    currentValue: String?,
+    onBack: (() -> Unit)?,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .focusRequester(focusRequester),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconButton(onClick = onPrevious) {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = stringResource(R.string.playback_options_previous_category),
-            )
+        if (onBack != null) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.back),
+                )
+            }
         }
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.weight(1f),
         ) {
             Text(
@@ -278,17 +260,55 @@ private fun CategoryHeader(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(
-                text = currentValue,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.78f),
-                maxLines = 1,
-            )
+            currentValue?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.78f),
+                    maxLines = 1,
+                )
+            }
         }
-        IconButton(onClick = onNext) {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.playback_options_next_category),
+    }
+}
+
+@Composable
+private fun PlaybackOptionsRoot(
+    audioValue: String,
+    subtitlesValue: String,
+    displayValue: String,
+    statsVisible: Boolean,
+    simpleTvActive: Boolean,
+    initialFocus: FocusRequester,
+    onPageChange: (PlaybackOptionsPage) -> Unit,
+    onStatsVisibleChange: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        PlaybackOptionRow(
+            label = stringResource(R.string.audio_track),
+            supportingLabel = audioValue,
+            onClick = { onPageChange(PlaybackOptionsPage.AUDIO) },
+            showChevron = true,
+            modifier = Modifier.focusRequester(initialFocus),
+        )
+        PlaybackOptionRow(
+            label = stringResource(R.string.subtitles),
+            supportingLabel = subtitlesValue,
+            onClick = { onPageChange(PlaybackOptionsPage.SUBTITLES) },
+            showChevron = true,
+        )
+        if (!simpleTvActive) {
+            PlaybackOptionRow(
+                label = stringResource(R.string.display_mode),
+                supportingLabel = displayValue,
+                onClick = { onPageChange(PlaybackOptionsPage.DISPLAY) },
+                showChevron = true,
+            )
+            PlaybackOptionRow(
+                label = stringResource(R.string.stats_for_nerds),
+                selected = statsVisible,
+                onClick = { onStatsVisibleChange(!statsVisible) },
+                showSwitch = true,
             )
         }
     }
@@ -307,7 +327,7 @@ private fun TrackOptions(
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 260.dp),
+            .heightIn(max = 236.dp),
     ) {
         if (subtitles && onSelectOff != null) {
             item {
@@ -397,6 +417,7 @@ private fun PlaybackOptionRow(
     modifier: Modifier = Modifier,
     supportingLabel: String? = null,
     selected: Boolean = false,
+    showChevron: Boolean = false,
     showSwitch: Boolean = false,
     leadingLock: Boolean = false,
 ) {
@@ -405,7 +426,7 @@ private fun PlaybackOptionRow(
         onClick = onClick,
         headlineContent = { Text(label) },
         supportingContent = supportingLabel?.let { text ->
-            { Text(text, color = Color.White.copy(alpha = 0.72f)) }
+            { Text(text) }
         },
         leadingContent = if (leadingLock) {
             {
@@ -421,6 +442,10 @@ private fun PlaybackOptionRow(
         trailingContent = {
             when {
                 showSwitch -> Switch(checked = selected, onCheckedChange = null)
+                showChevron -> Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                )
                 selected -> Icon(Icons.Filled.Check, contentDescription = null)
             }
         },

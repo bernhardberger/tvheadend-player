@@ -5,9 +5,21 @@ import org.junit.Test
 
 class PlaybackOptionsPolicyTest {
     @Test
-    fun backClosesOpenOptionsPopoverBeforeStatsOrPlayer() {
+    fun backClosesInfoBeforeOptionsStatsOrPlayer() {
         assertEquals(
-            PlaybackAuxiliaryBackAction.CLOSE_OPTIONS,
+            PlaybackAuxiliaryBackAction.CLOSE_INFO,
+            playbackAuxiliaryBackAction(
+                optionsPage = PlaybackOptionsPage.AUDIO,
+                statsVisible = true,
+                infoOpen = true,
+            ),
+        )
+    }
+
+    @Test
+    fun backNavigatesOptionsHierarchyBeforeStatsOrPlayer() {
+        assertEquals(
+            PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT,
             playbackAuxiliaryBackAction(
                 optionsPage = PlaybackOptionsPage.AUDIO,
                 statsVisible = true,
@@ -16,7 +28,7 @@ class PlaybackOptionsPolicyTest {
         assertEquals(
             PlaybackAuxiliaryBackAction.CLOSE_OPTIONS,
             playbackAuxiliaryBackAction(
-                optionsPage = PlaybackOptionsPage.DISPLAY,
+                optionsPage = PlaybackOptionsPage.ROOT,
                 statsVisible = false,
             ),
         )

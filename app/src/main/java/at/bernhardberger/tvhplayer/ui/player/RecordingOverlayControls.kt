@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -31,11 +32,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
@@ -58,6 +64,7 @@ internal fun RecordingOverlayControls(
     channelName: String?,
     positionMs: Long,
     durationMs: Long,
+    nowSec: Long,
     isPlaying: Boolean,
     controlsVisible: Boolean,
     optionsOpen: Boolean,
@@ -67,6 +74,7 @@ internal fun RecordingOverlayControls(
     onUserInteraction: () -> Unit,
     showStop: Boolean,
     onOpenOptions: () -> Unit,
+    onOpenInfo: () -> Unit,
 ) {
     var lastFocused by rememberSaveable { mutableStateOf("playPause") }
     val playPauseFocus = remember { FocusRequester() }
@@ -74,12 +82,15 @@ internal fun RecordingOverlayControls(
     val forwardFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
     val optionsFocus = remember { FocusRequester() }
+    val infoFocus = remember { FocusRequester() }
+    val seekbarFocus = remember { FocusRequester() }
     val focusTargets = mapOf(
         "playPause" to playPauseFocus,
         "back" to backFocus,
         "forward" to forwardFocus,
         "stop" to stopFocus,
         "options" to optionsFocus,
+        "info" to infoFocus,
     )
 
     LaunchedEffect(controlsVisible, showStop, optionsOpen) {
@@ -90,6 +101,7 @@ internal fun RecordingOverlayControls(
                 put("forward", forwardFocus)
                 if (showStop) put("stop", stopFocus)
                 put("options", optionsFocus)
+                put("info", infoFocus)
             }
             (availableTargets[lastFocused] ?: playPauseFocus).requestFocus()
         }
@@ -106,53 +118,71 @@ internal fun RecordingOverlayControls(
     val playLabel = stringResource(R.string.play)
     val pauseLabel = stringResource(R.string.pause)
     val moreLabel = stringResource(R.string.playback_options)
+    val infoLabel = stringResource(R.string.player_info)
     val stopLabel = stringResource(R.string.stop_playback)
-    val focusedLabel = when (lastFocused) {
-        "back" -> seekBackLabel
-        "forward" -> seekForwardLabel
-        "playPause" -> if (isPlaying) pauseLabel else playLabel
-        "options" -> moreLabel
-        "stop" -> stopLabel
-        else -> null
-    }
-
+    val clock = remember(nowSec) { at.bernhardberger.tvhplayer.ui.common.formatClock(nowSec) }
     Box(Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .background(topGradient)
+                .padding(start = 56.dp, end = 56.dp, top = 32.dp, bottom = 72.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PiconBox(
+                    imageLoader = imageLoader,
+                    piconPath = piconPath,
+                    modifier = Modifier.width(160.dp).height(90.dp),
+                )
+                Spacer(Modifier.width(22.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    channelName?.takeIf(String::isNotBlank)?.let {
+                        Text(
+                            text = it,
+                            color = Color.White.copy(alpha = 0.88f),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    subtitle?.takeIf(String::isNotBlank)?.let {
+                        Text(
+                            text = it,
+                            color = Color.White.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            Text(
+                text = clock,
+                color = Color.White,
+                style = MaterialTheme.typography.displaySmall,
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .background(bottomGradient)
-                .padding(start = 56.dp, end = 56.dp, top = 104.dp, bottom = 32.dp),
+                .padding(start = 56.dp, end = 56.dp, top = 80.dp, bottom = 28.dp),
         ) {
-            Column(Modifier.fillMaxWidth()) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                channelName?.takeIf(String::isNotBlank)?.let {
-                    Text(
-                        text = it,
-                        color = Color.White.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                subtitle?.takeIf(String::isNotBlank)?.let {
-                    Text(
-                        text = it,
-                        color = Color.White.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(14.dp))
             PlaybackSeekbar(
                 range = recordingSeekbarRange(
                     positionMs = positionMs.coerceAtLeast(0L),
@@ -162,38 +192,41 @@ internal fun RecordingOverlayControls(
                     onUserInteraction()
                     onSeek(target - positionMs)
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(seekbarFocus)
+                    .focusProperties { down = playPauseFocus },
             )
-            Spacer(Modifier.height(16.dp))
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.End,
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { event ->
+                        if (
+                            event.type == KeyEventType.KeyDown &&
+                            event.key == Key.DirectionUp
+                        ) {
+                            seekbarFocus.requestFocus()
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                focusedLabel?.let { label ->
-                    Text(
-                        text = label,
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelLarge,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .padding(bottom = 8.dp, end = 8.dp)
-                            .background(
-                                Color.Black.copy(alpha = 0.55f),
-                                shape = MaterialTheme.shapes.small,
-                            )
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                Spacer(Modifier.weight(1f))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
                         onClick = { onUserInteraction(); onSeek(-30_000L) },
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(48.dp)
+                            .focusProperties {
+                                up = seekbarFocus
+                                right = playPauseFocus
+                            }
                             .focusRequester(backFocus)
                             .onFocusChanged { if (it.isFocused) focused("back") },
                     ) {
@@ -202,7 +235,12 @@ internal fun RecordingOverlayControls(
                     IconButton(
                         onClick = { onUserInteraction(); onTogglePlayPause() },
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(48.dp)
+                            .focusProperties {
+                                up = seekbarFocus
+                                left = backFocus
+                                right = forwardFocus
+                            }
                             .focusRequester(playPauseFocus)
                             .onFocusChanged { if (it.isFocused) focused("playPause") },
                     ) {
@@ -214,30 +252,75 @@ internal fun RecordingOverlayControls(
                     IconButton(
                         onClick = { onUserInteraction(); onSeek(30_000L) },
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(48.dp)
+                            .focusProperties {
+                                up = seekbarFocus
+                                left = playPauseFocus
+                                right = infoFocus
+                            }
                             .focusRequester(forwardFocus)
                             .onFocusChanged { if (it.isFocused) focused("forward") },
                     ) {
                         Icon(Icons.Filled.Forward30, seekForwardLabel)
                     }
-                    IconButton(
-                        onClick = { onUserInteraction(); onOpenOptions() },
-                        modifier = Modifier
-                            .size(52.dp)
-                            .focusRequester(optionsFocus)
-                            .onFocusChanged { if (it.isFocused) focused("options") },
+                }
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Filled.MoreVert, moreLabel)
-                    }
-                    if (showStop) {
-                        IconButton(
-                            onClick = { onUserInteraction(); onStopPlayback() },
-                            modifier = Modifier
-                                .size(52.dp)
-                                .focusRequester(stopFocus)
-                                .onFocusChanged { if (it.isFocused) focused("stop") },
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.Filled.Stop, stopLabel)
+                            IconButton(
+                                onClick = { onUserInteraction(); onOpenInfo() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .focusProperties {
+                                        up = seekbarFocus
+                                        left = forwardFocus
+                                        right = optionsFocus
+                                    }
+                                    .focusRequester(infoFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("info") },
+                            ) {
+                                Icon(Icons.Filled.Info, infoLabel)
+                            }
+                            IconButton(
+                                onClick = { onUserInteraction(); onOpenOptions() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .focusProperties {
+                                        up = seekbarFocus
+                                        left = infoFocus
+                                        if (showStop) right = stopFocus
+                                    }
+                                    .focusRequester(optionsFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("options") },
+                            ) {
+                                Icon(Icons.Filled.MoreVert, moreLabel)
+                            }
+                        }
+                        if (showStop) {
+                            Row(modifier = Modifier.padding(start = 16.dp)) {
+                                IconButton(
+                                    onClick = { onUserInteraction(); onStopPlayback() },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .focusProperties {
+                                            up = seekbarFocus
+                                            left = optionsFocus
+                                        }
+                                        .focusRequester(stopFocus)
+                                        .onFocusChanged { if (it.isFocused) focused("stop") },
+                                ) {
+                                    Icon(Icons.Filled.Stop, stopLabel)
+                                }
+                            }
                         }
                     }
                 }

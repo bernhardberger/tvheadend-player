@@ -28,12 +28,12 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun hiddenControlsAreRevealedByOkAndDpadDown() {
+    fun hiddenControlsAreRevealedByOkAndVerticalDpad() {
         assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_DPAD_CENTER))
         assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_ENTER))
         assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_NUMPAD_ENTER))
         assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_DPAD_DOWN))
-        assertFalse(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_DPAD_UP))
+        assertTrue(shouldRevealPlaybackControls(false, KeyEvent.KEYCODE_DPAD_UP))
         assertFalse(shouldRevealPlaybackControls(true, KeyEvent.KEYCODE_DPAD_CENTER))
     }
 
@@ -81,7 +81,7 @@ class PlaybackKeyPolicyTest {
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
         )
         assertEquals(
-            PlayerKeyAction.OPEN_INFO,
+            PlayerKeyAction.REVEAL_CONTROLS,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP),
         )
         assertEquals(
@@ -118,7 +118,7 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun recordingReplacesTenMinuteUpDownSeekWithInfoAndControls() {
+    fun recordingUsesVerticalDpadToRevealControls() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.RECORDING,
             controlsVisible = false,
@@ -131,7 +131,7 @@ class PlaybackKeyPolicyTest {
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
         )
         assertEquals(
-            PlayerKeyAction.OPEN_INFO,
+            PlayerKeyAction.REVEAL_CONTROLS,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP),
         )
         assertEquals(
@@ -145,6 +145,53 @@ class PlaybackKeyPolicyTest {
         assertEquals(
             PlayerKeyAction.SEEK_FORWARD,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
+        )
+    }
+
+    @Test
+    fun openInfoLetsItsFocusedButtonHandleCenter() {
+        val ctx = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = true,
+            simpleTvActive = false,
+            infoOpen = true,
+        )
+        assertEquals(
+            PlayerKeyAction.PASS_THROUGH,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+    }
+
+    @Test
+    fun dedicatedTvRemoteKeysOpenInfoAndChannels() {
+        val live = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = true,
+            simpleTvActive = false,
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_INFO,
+            playerKeyAction(live, KeyEvent.KEYCODE_INFO),
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_CHANNELS,
+            playerKeyAction(live, KeyEvent.KEYCODE_TV_CONTENTS_MENU),
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_CHANNELS,
+            playerKeyAction(live, KeyEvent.KEYCODE_TV_NUMBER_ENTRY),
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_INFO,
+            playerKeyAction(live.copy(controlsVisible = true), KeyEvent.KEYCODE_INFO),
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_CHANNELS,
+            playerKeyAction(live, KeyEvent.KEYCODE_BOOKMARK),
         )
     }
 
@@ -218,6 +265,17 @@ class PlaybackKeyPolicyTest {
     fun pickingCurrentChannelClosesDrawerWithoutRetuning() {
         assertEquals(ChannelPickAction.CLOSE_DRAWER, channelPickAction(33, 33))
         assertEquals(ChannelPickAction.TUNE, channelPickAction(33, 34))
+    }
+
+    @Test
+    fun recoveryParentLetsFocusedRetryReceiveNavigationAndCenter() {
+        assertFalse(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_DPAD_CENTER))
+        assertFalse(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_DPAD_UP))
+        assertFalse(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_DPAD_DOWN))
+        assertFalse(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_DPAD_LEFT))
+        assertFalse(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertTrue(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_CHANNEL_UP))
+        assertTrue(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_1))
     }
 
     @Test

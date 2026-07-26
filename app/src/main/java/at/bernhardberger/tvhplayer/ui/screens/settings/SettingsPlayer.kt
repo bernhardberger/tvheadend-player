@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,9 +55,7 @@ fun SettingsPlayer(
             )
             is ProfilesUiState.Ready -> {
                 Column(
-                    modifier = Modifier
-                        .width(480.dp)
-                        .focusGroup(),
+                    modifier = Modifier.width(480.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     profiles.items.forEach { profile ->

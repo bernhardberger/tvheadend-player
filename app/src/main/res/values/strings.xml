@@ -22,8 +22,9 @@
     <string name="nav_recordings">Recordings</string>
     <string name="nav_settings">Settings</string>
 
-    <string name="player_ends_in">Ends at: %1$s</string>
+    <string name="player_ends_in">Ends at %1$s</string>
     <string name="player_next_event">Up next: %1$s</string>
+    <string name="player_next_event_at">Up next at %1$s: %2$s</string>
     <string name="player_next_event_with_range">Up next: %1$s • %2$s</string>
 
     <string name="options">Options</string>
@@ -116,6 +117,7 @@
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
     <string name="player_tuning_channel">Tuning %1$s…</string>
+    <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
     <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>
     <string name="player_playback_recovering">Playback interrupted. Retrying automatically…</string>
 
@@ -252,6 +254,7 @@
     <string name="recording_action_conflict">TVHeadend reported a recording or tuner conflict.</string>
     <string name="recording_action_rejected">TVHeadend rejected the recording request.</string>
     <string name="recording_action_connection">The recording request could not reach TVHeadend.</string>
+    <string name="recording_already_scheduled">This programme is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>
     <string name="recordings_archive">Archive</string>
     <string name="recordings_schedule">Schedule</string>
@@ -305,14 +308,13 @@
     <string name="timeshift_behind_live">%1$s behind live</string>
     <string name="timeshift_go_live">Go live</string>
     <string name="timeshift_seek_clamped">Reached the available buffer limit.</string>
-    <string name="timeshift_at_live">Returned to live television.</string>
     <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
     <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Allow this client to request a server timeshift buffer for live TV.</string>
     <string name="simple_tv_enabled">Enable Simple TV mode</string>
     <string name="simple_tv_startup">Start in Simple TV mode</string>
-    <string name="simple_tv_startup_explanation">On a fresh app launch, play the last channel and remain in the live TV player. Channels, Guide, Recordings, Settings, Stop, and normal app exit stay unavailable until an owner exits Simple TV.</string>
+    <string name="simple_tv_startup_explanation">On a fresh app launch, play the last channel directly in Simple TV.</string>
     <string name="simple_tv_start_now">Start Simple TV now</string>
     <string name="simple_tv_mode_disclosure">Simple TV is a player-only mode. Channels, Guide, Recordings, Settings, Stop, and normal app exit are unavailable until an owner exits through More.</string>
     <string name="simple_tv_home_disclosure">Android HOME can still leave the app. This mode cannot block the system HOME key.</string>

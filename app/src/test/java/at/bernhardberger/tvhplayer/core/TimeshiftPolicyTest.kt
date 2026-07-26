@@ -128,6 +128,9 @@ class TimeshiftPolicyTest {
         assertTrue(canSeekTimeshiftBackward(atLive))
         assertFalse(canSeekTimeshiftForward(atLive))
 
+        val normalLiveLatency = atLive.copy(positionMs = -4_000)
+        assertFalse(canSeekTimeshiftForward(normalLiveLatency))
+
         val behindLive = atLive.copy(positionMs = -30_000)
         assertTrue(canSeekTimeshiftBackward(behindLive))
         assertTrue(canSeekTimeshiftForward(behindLive))
@@ -145,7 +148,31 @@ class TimeshiftPolicyTest {
         val live = TimeshiftState(available = true, bufferStartMs = -60_000)
         assertFalse(isTimeshiftActive(live))
         assertTrue(isTimeshiftActive(live.copy(paused = true)))
-        assertTrue(isTimeshiftActive(live.copy(positionMs = -2_000)))
+        assertFalse(isTimeshiftActive(live.copy(positionMs = -4_000)))
+        assertTrue(isTimeshiftActive(live.copy(positionMs = -6_000)))
+    }
+
+    @Test
+    fun programmeTimelineIsTheRestingLivePresentation() {
+        val live = TimeshiftState(
+            available = true,
+            bufferStartMs = -60_000,
+            positionMs = -4_000,
+        )
+        assertTrue(shouldShowProgrammeTimeline(live, hasCurrentProgramme = true))
+        assertFalse(
+            shouldShowProgrammeTimeline(
+                live.copy(positionMs = -30_000),
+                hasCurrentProgramme = true,
+            ),
+        )
+        assertFalse(
+            shouldShowProgrammeTimeline(
+                live.copy(paused = true),
+                hasCurrentProgramme = true,
+            ),
+        )
+        assertFalse(shouldShowProgrammeTimeline(live, hasCurrentProgramme = false))
     }
 
     @Test

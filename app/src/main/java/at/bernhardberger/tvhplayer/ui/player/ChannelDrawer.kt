@@ -153,16 +153,17 @@ fun ChannelDrawer(
         isRestoring = false
     }
 
-    val drawerWidth = if (largeCards) 720.dp else 440.dp
+    val drawerWidth = if (largeCards) 720.dp else 480.dp
     Box(
         modifier = Modifier
-            // Gradient width matches the list/card content rather than a wide empty band.
+            // Keep the focusable list inside the opaque region; fade only over video.
             .width(drawerWidth)
             .fillMaxHeight()
             .background(
                 Brush.horizontalGradient(
                     0f to Color.Black.copy(alpha = 0.96f),
-                    0.88f to Color.Black.copy(alpha = 0.92f),
+                    (if (largeCards) 0.88f else 0.82f) to
+                        Color.Black.copy(alpha = 0.92f),
                     1f to Color.Transparent,
                 )
             )
@@ -183,7 +184,7 @@ fun ChannelDrawer(
         if (channels.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .width(420.dp)
+                    .width(400.dp)
                     .fillMaxSize()
                     .padding(TvPlaybackPadding),
                 contentAlignment = Alignment.Center,
@@ -225,7 +226,7 @@ fun ChannelDrawer(
                 state = listState,
                 contentPadding = TvPlaybackPadding,
                 modifier = Modifier
-                    .width(420.dp)
+                    .width(400.dp)
                     .fillMaxHeight()
                     .focusGroup()
                     .focusRestorer()

@@ -132,12 +132,12 @@ Before UX-review implementation:
 
 | State | Center/OK | Left/Right | Up/Down | Back |
 |---|---|---|---|---|
-| Live, no timeshift, controls hidden | Reveal controls and consume the key cycle | Left opens channels; Right has no hidden action | Up opens programme info; Down reveals controls | Return to browse unless Simple TV is active |
-| Live, timeshift available, controls hidden | Toggle pause/play and reveal controls | Seek within the server buffer | Up opens info; Down reveals controls | Return to browse unless Simple TV is active |
-| Recording, controls hidden | Toggle pause/play and reveal controls | Seek the recording | Up opens info; Down reveals controls | Return to Recordings |
+| Live, no timeshift, controls hidden | Reveal controls and consume the key cycle | Left opens channels; Right has no hidden action | Reveal controls | Return to browse unless Simple TV is active |
+| Live, timeshift available, controls hidden | Toggle pause/play and reveal controls | Seek within the server buffer | Reveal controls | Return to browse unless Simple TV is active |
+| Recording, controls hidden | Toggle pause/play and reveal controls | Seek the recording | Reveal controls | Return to Recordings |
 | Controls visible | Activate the focused control | Normal focus movement | Normal focus movement | Hide controls |
 | Seekbar focused | No implicit playback action | Scrub with acceleration | Leave the seekbar toward adjacent UI | Unwind visible player UI |
-| Simple TV | Same playback behavior | Same available channel/seek behavior | Same info/control behavior | Dismiss overlays only |
+| Simple TV | Same playback behavior | Same available channel/seek behavior | Same control behavior | Dismiss overlays only |
 
 Replace the old hidden recording Up/Down ten-minute seek mapping with the
 reviewed information/control behavior. Preserve dedicated media keys, CH+/CH-,

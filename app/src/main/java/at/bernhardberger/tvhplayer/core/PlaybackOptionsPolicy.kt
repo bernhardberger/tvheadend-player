@@ -1,10 +1,10 @@
 package at.bernhardberger.tvhplayer.core
 
 /**
- * Playback options categories shown in the anchored player popover.
- * Lateral Left/Right on the category header moves between these.
+ * Playback options root and detail pages shown in the compact player overlay.
  */
 enum class PlaybackOptionsPage {
+    ROOT,
     AUDIO,
     SUBTITLES,
     DISPLAY,
@@ -12,6 +12,8 @@ enum class PlaybackOptionsPage {
 }
 
 enum class PlaybackAuxiliaryBackAction {
+    CLOSE_INFO,
+    RETURN_TO_OPTIONS_ROOT,
     CLOSE_OPTIONS,
     HIDE_STATS,
     PASS_THROUGH,
@@ -43,9 +45,12 @@ fun adjacentPlaybackOptionsPage(
 fun playbackAuxiliaryBackAction(
     optionsPage: PlaybackOptionsPage?,
     statsVisible: Boolean,
+    infoOpen: Boolean = false,
 ): PlaybackAuxiliaryBackAction = when {
-    // Lateral categories have no nested drill-down; Back closes the popover.
-    optionsPage != null -> PlaybackAuxiliaryBackAction.CLOSE_OPTIONS
+    infoOpen -> PlaybackAuxiliaryBackAction.CLOSE_INFO
+    optionsPage != null && optionsPage != PlaybackOptionsPage.ROOT ->
+        PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT
+    optionsPage == PlaybackOptionsPage.ROOT -> PlaybackAuxiliaryBackAction.CLOSE_OPTIONS
     statsVisible -> PlaybackAuxiliaryBackAction.HIDE_STATS
     else -> PlaybackAuxiliaryBackAction.PASS_THROUGH
 }
