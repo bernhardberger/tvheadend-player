@@ -1,30 +1,132 @@
 package at.bernhardberger.tvhplayer.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackNavigationPolicyTest {
     @Test
-    fun rootStartDestinationFinishesActivity() {
+    fun rootStartDestinationFinishesActivityWithoutWarmReturn() {
         assertEquals(
             BackAction.FINISH_ACTIVITY,
-            rootBackAction(isStartDestination = true, hasActivePlayback = false),
+            rootBackAction(
+                isStartDestination = true,
+                warmReturn = WarmReturnOpportunity(),
+            ),
         )
     }
 
     @Test
-    fun rootStartDestinationReturnsToActivePlayback() {
+    fun rootStartDestinationReturnsToArmedWarmPlayback() {
         assertEquals(
             BackAction.RETURN_TO_PLAYER,
-            rootBackAction(isStartDestination = true, hasActivePlayback = true),
+            rootBackAction(
+                isStartDestination = true,
+                warmReturn = armWarmReturn(WarmPlaybackTarget.LIVE),
+            ),
         )
     }
 
     @Test
-    fun rootChildDestinationPopsNavigation() {
+    fun rootStartDestinationReturnsToArmedWarmRecording() {
+        assertEquals(
+            BackAction.RETURN_TO_PLAYER,
+            rootBackAction(
+                isStartDestination = true,
+                warmReturn = armWarmReturn(WarmPlaybackTarget.RECORDING),
+            ),
+        )
+    }
+
+    @Test
+    fun rootStartDestinationFinishesWhenWarmPlaybackExistsButReturnWasConsumed() {
+        val consumed = consumeWarmReturn(armWarmReturn(WarmPlaybackTarget.LIVE))
+        assertFalse(consumed.canReturn)
+        assertEquals(WarmPlaybackTarget.LIVE, consumed.target)
+        assertEquals(
+            BackAction.FINISH_ACTIVITY,
+            rootBackAction(isStartDestination = true, warmReturn = consumed),
+        )
+    }
+
+    @Test
+    fun rootChildDestinationPopsNavigationEvenWhenWarmReturnArmed() {
         assertEquals(
             BackAction.POP_NAVIGATION,
-            rootBackAction(isStartDestination = false, hasActivePlayback = true),
+            rootBackAction(
+                isStartDestination = false,
+                warmReturn = armWarmReturn(WarmPlaybackTarget.LIVE),
+            ),
+        )
+    }
+
+    @Test
+    fun warmReturnIsOneShotAcrossBrowsePlayerBrowseCycle() {
+        var warm = armWarmReturn(WarmPlaybackTarget.LIVE)
+
+        // First root Back returns to the warm player and consumes the token.
+        assertEquals(
+            BackAction.RETURN_TO_PLAYER,
+            rootBackAction(isStartDestination = true, warmReturn = warm),
+        )
+        warm = consumeWarmReturn(warm)
+
+        // Player Back leaves playback warm but must not re-arm by itself.
+        assertFalse(warm.canReturn)
+        assertEquals(WarmPlaybackTarget.LIVE, warm.target)
+
+        // Second root Back finishes instead of looping.
+        assertEquals(
+            BackAction.FINISH_ACTIVITY,
+            rootBackAction(isStartDestination = true, warmReturn = warm),
+        )
+    }
+
+    @Test
+    fun deliberateNavigationRearmsOneWarmReturn() {
+        var warm = consumeWarmReturn(armWarmReturn(WarmPlaybackTarget.LIVE))
+        assertFalse(warm.canReturn)
+
+        warm = rearmWarmReturn(WarmPlaybackTarget.LIVE)
+        assertTrue(warm.canReturn)
+        assertEquals(
+            BackAction.RETURN_TO_PLAYER,
+            rootBackAction(isStartDestination = true, warmReturn = warm),
+        )
+    }
+
+    @Test
+    fun newPlaybackArmsWarmReturn() {
+        val warm = armWarmReturn(WarmPlaybackTarget.RECORDING)
+        assertTrue(warm.canReturn)
+        assertEquals(WarmPlaybackTarget.RECORDING, warm.target)
+    }
+
+    @Test
+    fun explicitStopClearsWarmReturn() {
+        val warm = clearWarmReturn()
+        assertFalse(warm.canReturn)
+        assertEquals(WarmPlaybackTarget.NONE, warm.target)
+        assertEquals(
+            BackAction.FINISH_ACTIVITY,
+            rootBackAction(isStartDestination = true, warmReturn = warm),
+        )
+    }
+
+    @Test
+    fun warmPlaybackTargetPrefersLiveOverRecording() {
+        assertEquals(
+            WarmPlaybackTarget.LIVE,
+            warmPlaybackTarget(activeServiceId = 7, activeRecordingId = 3),
+        )
+        assertEquals(
+            WarmPlaybackTarget.RECORDING,
+            warmPlaybackTarget(activeServiceId = null, activeRecordingId = 3),
+        )
+        assertEquals(
+            WarmPlaybackTarget.NONE,
+            warmPlaybackTarget(activeServiceId = null, activeRecordingId = null),
         )
     }
 

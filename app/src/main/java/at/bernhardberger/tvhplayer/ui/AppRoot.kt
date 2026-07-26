@@ -27,6 +27,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.BackAction
+import at.bernhardberger.tvhplayer.core.WarmPlaybackTarget
+import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
+import at.bernhardberger.tvhplayer.core.armWarmReturn
+import at.bernhardberger.tvhplayer.core.clearWarmReturn
+import at.bernhardberger.tvhplayer.core.consumeWarmReturn
+import at.bernhardberger.tvhplayer.core.rearmWarmReturn
 import at.bernhardberger.tvhplayer.core.rootBackAction
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
@@ -34,6 +40,7 @@ import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
+import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
 import at.bernhardberger.tvhplayer.player.PlayerSession
@@ -152,6 +159,20 @@ fun AppRoot(
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
         currentRoute?.startsWith(Routes.RECORDING_PLAYER) == true
 
+    // One-shot warm-player return: armed when a service/recording becomes active
+    // or the user navigates deliberately while playback remains warm; consumed
+    // before returning to the player so root Back cannot loop. Player Back alone
+    // does not re-arm.
+    var warmReturn by remember { mutableStateOf(WarmReturnOpportunity()) }
+    val currentWarmTarget = warmPlaybackTarget(activeServiceId, activeRecordingId)
+    LaunchedEffect(activeServiceId, activeRecordingId) {
+        warmReturn = when {
+            activeServiceId != null -> armWarmReturn(WarmPlaybackTarget.LIVE)
+            activeRecordingId != null -> armWarmReturn(WarmPlaybackTarget.RECORDING)
+            else -> clearWarmReturn()
+        }
+    }
+
     LaunchedEffect(playbackState, activeRecordingId, topRoute) {
         when (
             recordingFinishedAction(
@@ -206,51 +227,48 @@ fun AppRoot(
             return@BackHandler
         }
 
-        when (rootBackAction(
-            isStartDestination = currentRoute == Routes.CHANNELS,
-            hasActivePlayback = activeServiceId != null,
-        )) {
+        when (
+            rootBackAction(
+                isStartDestination = currentRoute == Routes.CHANNELS,
+                warmReturn = warmReturn,
+            )
+        ) {
             BackAction.FINISH_ACTIVITY -> {
                 if (capabilityProfile.allows(SimpleTvCapability.APP_EXIT)) {
                     activity?.finish()
-                } else {
-                    val serviceId = activeServiceId
-                    val recordingId = activeRecordingId
-                    when {
-                        serviceId != null -> {
-                            val channel = channelsVm.allChannels.value
-                                .firstOrNull { it.id == serviceId }
-                            nav.navigate(
-                                Routes.player(
-                                    channelId = channel?.id ?: serviceId,
-                                    serviceId = serviceId,
-                                    channelName = channel?.name.orEmpty(),
-                                )
-                            ) { launchSingleTop = true }
-                        }
-                        recordingId != null ->
-                            nav.navigate(Routes.recordingPlayer(recordingId)) {
-                                launchSingleTop = true
-                            }
-                        else -> Unit
-                    }
                 }
+                // Simple TV never exits through Back; ignore when exit is gated.
             }
             BackAction.POP_NAVIGATION -> {
                 if (!nav.popBackStack()) activity?.finish()
             }
             BackAction.RETURN_TO_PARENT -> Unit
             BackAction.RETURN_TO_PLAYER -> {
-                val serviceId = activeServiceId ?: return@BackHandler
-                val channel = channelsVm.allChannels.value.firstOrNull { it.id == serviceId }
-                nav.navigate(
-                    Routes.player(
-                        channelId = channel?.id ?: serviceId,
-                        serviceId = serviceId,
-                        channelName = channel?.name.orEmpty(),
-                    )
-                ) {
-                    launchSingleTop = true
+                // Consume before navigation so player→browse→Back cannot loop.
+                val target = warmReturn.target
+                warmReturn = consumeWarmReturn(warmReturn)
+                when (target) {
+                    WarmPlaybackTarget.LIVE -> {
+                        val serviceId = activeServiceId ?: return@BackHandler
+                        val channel = channelsVm.allChannels.value
+                            .firstOrNull { it.id == serviceId }
+                        nav.navigate(
+                            Routes.player(
+                                channelId = channel?.id ?: serviceId,
+                                serviceId = serviceId,
+                                channelName = channel?.name.orEmpty(),
+                            )
+                        ) {
+                            launchSingleTop = true
+                        }
+                    }
+                    WarmPlaybackTarget.RECORDING -> {
+                        val recordingId = activeRecordingId ?: return@BackHandler
+                        nav.navigate(Routes.recordingPlayer(recordingId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                    WarmPlaybackTarget.NONE -> Unit
                 }
             }
         }
@@ -438,6 +456,12 @@ fun AppRoot(
                     if (current == route) {
                         focusManager.moveFocus(FocusDirection.Right)
                     } else {
+                        // Deliberate rail navigation re-arms one warm return while
+                        // playback remains active. Returning from the player via
+                        // Back does not go through this path and must not re-arm.
+                        if (currentWarmTarget != WarmPlaybackTarget.NONE) {
+                            warmReturn = rearmWarmReturn(currentWarmTarget)
+                        }
                         nav.navigate(route) {
                             popUpTo(Routes.CHANNELS) { inclusive = false }
                             launchSingleTop = true

@@ -176,14 +176,18 @@ fun adjacentChannelId(
    opens the normal UI. If playback is already visible, the entry intent must
    not restart it.
 7. Back reveals the normal TVHeadend Player UI without an autoplay loop and keeps the
-   foreground live session and video surface warm behind a readable navigation
-   scrim. Back from the root Channel List returns to that fullscreen session,
-   and selecting the same channel does so without retuning. Root Back exits to
-   Google TV normally when no playback is active; leaving the activity stops the
-   session.
+   foreground live or recording session and video surface warm behind a readable
+   navigation scrim. Root Back may return to that warm fullscreen session once
+   (one-shot). The return opportunity is consumed before navigating to the player
+   so a subsequent root Back finishes the activity instead of looping. Returning
+   from the player to browse does not re-arm the opportunity; deliberate browse
+   navigation or newly started playback may re-arm one warm return. Selecting the
+   same channel does so without retuning. Root Back exits to Google TV when no
+   warm-return opportunity remains; leaving the activity stops the session.
+   Simple TV never exits through Back.
 8. The player Stop control completes serialized playback teardown before it
-   returns to the operator UI. It must not leave a warm session that redirects
-   root Back to playback.
+   returns to the operator UI. It clears the warm-return opportunity so root Back
+   cannot redirect to a torn-down session.
 9. The accessibility service ignores every key except Android GUIDE and the
    captured TCL TV key code, does not subscribe to accessibility events or
    window content, and does not interfere with keys while disabled.

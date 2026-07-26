@@ -119,11 +119,16 @@
 - Keep the active service warm while Back exposes the foreground Channel List.
   A same-service player request is idempotent, while `MainActivity.onStop` remains
   the hard boundary that stops playback for HOME or other background transitions.
-- At the root Channel List, route Back to the warm fullscreen player when one
-  exists. Preserve normal Android root exit when playback is idle rather than
-  adding a routine confirmation dialog or non-standard Quit menu item.
+- At the browse root, route Back to the warm fullscreen live or recording player
+  at most once. Consume the warm-return token before player navigation so
+  player→browse→Back cannot loop. Re-arm only on deliberate browse navigation or
+  newly started playback; player Back alone must not re-arm. Preserve normal
+  Android root exit when the opportunity is spent or playback is idle rather than
+  adding a routine confirmation dialog or non-standard Quit menu item. Simple TV
+  never exits through Back.
 - Treat the player Stop control as explicit serialized teardown: await the stop
-  command before leaving the player route so navigation cannot cancel cleanup.
+  command before leaving the player route so navigation cannot cancel cleanup,
+  and clear the warm-return opportunity with the torn-down session.
 - Mount the Media3 `PlayerView` at the app root so operator screens retain live
   video as well as audio under a dark navigation scrim. Player controls remain a
   player-route concern; navigation does not detach or recreate the stream surface.
