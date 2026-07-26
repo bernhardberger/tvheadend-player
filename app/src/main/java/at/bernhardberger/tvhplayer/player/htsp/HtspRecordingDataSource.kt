@@ -9,6 +9,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import at.bernhardberger.tvhplayer.core.recordingReadLength
 import at.bernhardberger.tvhplayer.htsp.HtspService
+import at.bernhardberger.tvhplayer.player.PlaybackReadMetrics
 import java.io.Closeable
 import kotlinx.coroutines.runBlocking
 
@@ -24,6 +25,7 @@ class HtspRecordingDataSource private constructor(
     private val htsp: HtspService,
     private val path: String,
     private val knownSize: Long?,
+    private val readMetrics: PlaybackReadMetrics,
 ) : DataSource, Closeable {
     private var uri: Uri? = null
     private var fileId: Int? = null
@@ -34,12 +36,14 @@ class HtspRecordingDataSource private constructor(
         private val path: String,
         private val knownSize: Long?,
     ) : DataSource.Factory {
+        internal val readMetrics = PlaybackReadMetrics()
         private var current: HtspRecordingDataSource? = null
 
         override fun createDataSource(): DataSource = HtspRecordingDataSource(
             htsp = htsp,
             path = path,
             knownSize = knownSize,
+            readMetrics = readMetrics,
         ).also { current = it }
 
         fun releaseCurrentDataSource() {
@@ -75,6 +79,7 @@ class HtspRecordingDataSource private constructor(
         val count = minOf(bytes.size, requested)
         bytes.copyInto(buffer, destinationOffset = offset, endIndex = count)
         bytesRemaining = bytesRemaining?.let { (it - count).coerceAtLeast(0L) }
+        readMetrics.record(count)
         return count
     }
 

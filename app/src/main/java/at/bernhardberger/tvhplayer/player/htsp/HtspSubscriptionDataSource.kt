@@ -17,6 +17,11 @@ import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftAbsoluteTargetUs
 import at.bernhardberger.tvhplayer.core.timeshiftSeek
 import at.bernhardberger.tvhplayer.core.timeshiftStateFromStatus
+import at.bernhardberger.tvhplayer.player.PlaybackReadMetrics
+import at.bernhardberger.tvhplayer.player.PlaybackQueueDiagnostics
+import at.bernhardberger.tvhplayer.player.PlaybackTransportDiagnostics
+import at.bernhardberger.tvhplayer.player.PlaybackTunerDiagnostics
+import at.bernhardberger.tvhplayer.player.relativeSignalPercent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -53,6 +58,40 @@ internal fun <C, M> CoroutineScope.launchSubscriptionEventPump(
     }
 }
 
+internal fun updatePlaybackTransportDiagnostics(
+    current: PlaybackTransportDiagnostics,
+    message: HtspMessage,
+    subscriptionId: Int,
+): PlaybackTransportDiagnostics {
+    if (message.int("subscriptionId") != subscriptionId) return current
+    return when (message.method) {
+        "signalStatus" -> current.copy(
+            tuner = PlaybackTunerDiagnostics(
+                status = message.str("feStatus"),
+                signalPercent = relativeSignalPercent(message.long("feSignal")),
+                signalMilliDbm = message.long("feAbsoluteSignal"),
+                snrPercent = relativeSignalPercent(message.long("feSNR")),
+                snrMilliDb = message.long("feAbsoluteSNR"),
+                bitErrorRate = message.long("feBER"),
+                uncorrectedBlocks = message.long("feUNC"),
+            )
+        )
+
+        "queueStatus" -> current.copy(
+            queue = PlaybackQueueDiagnostics(
+                packets = message.long("packets"),
+                bytes = message.long("bytes"),
+                delayMicros = message.long("delay"),
+                bFrameDrops = message.long("Bdrops"),
+                pFrameDrops = message.long("Pdrops"),
+                iFrameDrops = message.long("Idrops"),
+            )
+        )
+
+        else -> current
+    }
+}
+
 @OptIn(UnstableApi::class)
 class HtspSubscriptionDataSource private constructor(
     private val context: Context,
@@ -60,6 +99,8 @@ class HtspSubscriptionDataSource private constructor(
     private val streamProfile: String?,
     private val timeshiftEnabled: Boolean,
     private val sharedTimeshiftState: MutableStateFlow<TimeshiftState>,
+    private val readMetrics: PlaybackReadMetrics,
+    private val sharedTransportDiagnostics: MutableStateFlow<PlaybackTransportDiagnostics>,
 ) : DataSource, Closeable, HtspDataSourceInterface {
 
     private var dataSpec: DataSpec? = null
@@ -103,9 +144,13 @@ class HtspSubscriptionDataSource private constructor(
         private val streamProfile: String?,
         private val timeshiftEnabled: Boolean,
     ) : DataSource.Factory {
+        internal val readMetrics = PlaybackReadMetrics()
         private var dataSource: HtspSubscriptionDataSource? = null
         private val _timeshiftState = MutableStateFlow(TimeshiftState())
         val timeshiftState: StateFlow<TimeshiftState> = _timeshiftState.asStateFlow()
+        private val _transportDiagnostics = MutableStateFlow(PlaybackTransportDiagnostics())
+        internal val transportDiagnostics: StateFlow<PlaybackTransportDiagnostics> =
+            _transportDiagnostics.asStateFlow()
 
         override fun createDataSource(): DataSource {
             Timber.d("Created new data source from factory")
@@ -115,6 +160,8 @@ class HtspSubscriptionDataSource private constructor(
                 streamProfile,
                 timeshiftEnabled,
                 _timeshiftState,
+                readMetrics,
+                _transportDiagnostics,
             )
             return dataSource!!
         }
@@ -127,6 +174,7 @@ class HtspSubscriptionDataSource private constructor(
             dataSource?.release()
             dataSource = null
             _timeshiftState.value = TimeshiftState()
+            _transportDiagnostics.value = PlaybackTransportDiagnostics()
         }
     }
 
@@ -223,6 +271,11 @@ class HtspSubscriptionDataSource private constructor(
                 val msg = (ev as? HtspEvent.ServerMessage)?.msg ?: return@control
                 val msgSubId = msg.int("subscriptionId")
                 if (msgSubId != null && msgSubId != subscriptionId) return@control
+                sharedTransportDiagnostics.value = updatePlaybackTransportDiagnostics(
+                    current = sharedTransportDiagnostics.value,
+                    message = msg,
+                    subscriptionId = subscriptionId,
+                )
 
                 when (msg.method) {
                     "timeshiftStatus" -> {
@@ -325,6 +378,7 @@ class HtspSubscriptionDataSource private constructor(
             val toRead = min(readLength, ring.size())
             val actuallyRead = ring.read(buffer, offset, toRead)
             if (actuallyRead > 0) {
+                readMetrics.record(actuallyRead)
                 notFull.signalAll()
             }
             return actuallyRead

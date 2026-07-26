@@ -1,6 +1,12 @@
 package at.bernhardberger.tvhplayer.player
 
+import android.app.ActivityManager
 import android.content.Context
+import android.hardware.display.DisplayManager
+import android.os.Build
+import android.os.PowerManager
+import android.os.Process
+import android.view.Display
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -9,6 +15,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.util.EventLogger
@@ -70,6 +77,7 @@ class PlayerSession(
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commands = PlayerCommandGate()
     private var player: ExoPlayer? = null
+    private var applicationContext: Context? = null
     private var dataSourceFactory: HtspSubscriptionDataSource.Factory? = null
     private var recordingDataSourceFactory: HtspRecordingDataSource.Factory? = null
 
@@ -86,6 +94,12 @@ class PlayerSession(
     private var retryJob: Job? = null
     private var timeshiftStateJob: Job? = null
     private var recoveryEventsEnabled = false
+    private var diagnosticsJob: Job? = null
+    private var videoDecoder: String? = null
+    private var audioDecoder: String? = null
+    private var audioUnderruns = 0
+    private var renderedFramesBaseline = 0
+    private var droppedFramesBaseline = 0
 
     private val _state = MutableStateFlow<PlaybackSessionState>(PlaybackSessionState.Idle)
     val state: StateFlow<PlaybackSessionState> = _state
@@ -96,6 +110,8 @@ class PlayerSession(
     val activeRecordingId: StateFlow<Int?> = _activeRecordingId
     private val _timeshiftState = MutableStateFlow(TimeshiftState())
     val timeshiftState: StateFlow<TimeshiftState> = _timeshiftState
+    private val _diagnostics = MutableStateFlow(PlaybackDiagnosticsSnapshot())
+    val diagnostics: StateFlow<PlaybackDiagnosticsSnapshot> = _diagnostics
 
     private var playWhenReadyState = true
     private var currentItem = 0
@@ -146,6 +162,40 @@ class PlayerSession(
         }
     }
 
+    @OptIn(UnstableApi::class)
+    private val diagnosticsListener = object : AnalyticsListener {
+        override fun onVideoDecoderInitialized(
+            eventTime: AnalyticsListener.EventTime,
+            decoderName: String,
+            initializedTimestampMs: Long,
+            initializationDurationMs: Long,
+        ) {
+            videoDecoder = decoderName
+            player?.videoDecoderCounters?.let { counters ->
+                renderedFramesBaseline = counters.renderedOutputBufferCount
+                droppedFramesBaseline = counters.droppedBufferCount
+            }
+        }
+
+        override fun onAudioDecoderInitialized(
+            eventTime: AnalyticsListener.EventTime,
+            decoderName: String,
+            initializedTimestampMs: Long,
+            initializationDurationMs: Long,
+        ) {
+            audioDecoder = decoderName
+        }
+
+        override fun onAudioUnderrun(
+            eventTime: AnalyticsListener.EventTime,
+            bufferSize: Int,
+            bufferSizeMs: Long,
+            elapsedSinceLastFeedMs: Long,
+        ) {
+            audioUnderruns++
+        }
+    }
+
     private companion object {
         // If playback is still BUFFERING with the position not advancing this long
         // after start, a renderer (typically an audio track the hardware decoder can't
@@ -157,6 +207,7 @@ class PlayerSession(
     @OptIn(UnstableApi::class)
     fun getOrCreatePlayer(context: Context): ExoPlayer {
         val appContext = context.applicationContext
+        applicationContext = appContext
         // Hardware decoders everywhere (MODE_ON) so AAC keeps its 5.1 channels and
         // AC3/EAC3 can still pass through to an AVR. The one exception is MPEG-1/2 audio
         // (MP1/MP2): the Amlogic platform decoder advertises support but fails valid
@@ -172,6 +223,7 @@ class PlayerSession(
             .build()
             .also { p ->
                 p.addAnalyticsListener(EventLogger())
+                p.addAnalyticsListener(diagnosticsListener)
                 p.addListener(playerListener)
                 player = p
 
@@ -193,6 +245,7 @@ class PlayerSession(
                 recoveryEventsEnabled = false
                 consecutiveFailures = 0
                 ActivePlayback(appContext, serviceId, ++playbackGeneration).also {
+                    resetDiagnosticsCounters()
                     activePlayback = it
                     _activeServiceId.value = serviceId
                     _activeRecordingId.value = null
@@ -217,6 +270,7 @@ class PlayerSession(
                 _activeServiceId.value = null
                 _activeRecordingId.value = recordingId
                 playbackGeneration++
+                resetDiagnosticsCounters()
                 retryJob?.cancel()
                 retryJob = null
                 watchdogJob?.cancel()
@@ -448,6 +502,7 @@ class PlayerSession(
                     _activeServiceId.value = null
                     _activeRecordingId.value = null
                     playbackGeneration++
+                    setDiagnosticsEnabled(false)
                     retryJob?.cancel()
                     retryJob = null
                     watchdogJob?.cancel()
@@ -459,6 +514,7 @@ class PlayerSession(
                     player?.let { p ->
                         updateState(p)
                         p.removeListener(playerListener)
+                        p.removeAnalyticsListener(diagnosticsListener)
                         p.release()
                     }
                     player = null
@@ -525,5 +581,130 @@ class PlayerSession(
         playWhenReadyState = p.playWhenReady
         currentItem = p.currentMediaItemIndex
         playbackPosition = p.currentPosition
+    }
+
+    fun setDiagnosticsEnabled(enabled: Boolean) {
+        diagnosticsJob?.cancel()
+        diagnosticsJob = null
+        if (!enabled) {
+            _diagnostics.value = PlaybackDiagnosticsSnapshot()
+            return
+        }
+
+        diagnosticsJob = mainScope.launch {
+            var previousBytes = currentReadBytes()
+            var previousSampleTime = System.currentTimeMillis()
+            while (true) {
+                delay(1_000L)
+                val currentBytes = currentReadBytes()
+                val currentSampleTime = System.currentTimeMillis()
+                publishDiagnostics(
+                    previousBytes,
+                    previousSampleTime,
+                    currentBytes,
+                    currentSampleTime,
+                )
+                previousBytes = currentBytes
+                previousSampleTime = currentSampleTime
+            }
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun publishDiagnostics(
+        previousBytes: Long,
+        previousSampleTime: Long,
+        currentBytes: Long = currentReadBytes(),
+        currentSampleTime: Long = System.currentTimeMillis(),
+    ) {
+        val p = player ?: return
+        val videoCounters = p.videoDecoderCounters
+        val rendered = decoderCounterDelta(
+            videoCounters?.renderedOutputBufferCount ?: 0,
+            renderedFramesBaseline,
+        )
+        val dropped = decoderCounterDelta(
+            videoCounters?.droppedBufferCount ?: 0,
+            droppedFramesBaseline,
+        )
+        _diagnostics.value = PlaybackDiagnosticsSnapshot(
+            source = when {
+                _activeRecordingId.value != null -> PlaybackDiagnosticsSource.RECORDING
+                _activeServiceId.value != null -> PlaybackDiagnosticsSource.LIVE_TV
+                else -> PlaybackDiagnosticsSource.NONE
+            },
+            state = _state.value,
+            isPlaying = p.isPlaying,
+            positionMs = p.currentPosition.coerceAtLeast(0L),
+            durationMs = p.duration.takeIf { it != C.TIME_UNSET && it >= 0L },
+            bufferedMs = (p.bufferedPosition - p.currentPosition).coerceAtLeast(0L),
+            video = p.videoFormat?.toPlaybackFormatDiagnostics(),
+            videoDecoder = videoDecoder,
+            renderedFrames = rendered,
+            droppedFrames = dropped,
+            audio = p.audioFormat?.toPlaybackFormatDiagnostics(),
+            audioDecoder = audioDecoder,
+            audioUnderruns = audioUnderruns,
+            readRateBitsPerSecond = readRateBitsPerSecond(
+                previousBytes,
+                currentBytes,
+                currentSampleTime - previousSampleTime,
+            ),
+            transport = dataSourceFactory?.transportDiagnostics?.value,
+            system = collectSystemDiagnostics(),
+        )
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun resetDiagnosticsCounters() {
+        val counters = player?.videoDecoderCounters
+        renderedFramesBaseline = counters?.renderedOutputBufferCount ?: 0
+        droppedFramesBaseline = counters?.droppedBufferCount ?: 0
+        videoDecoder = null
+        audioDecoder = null
+        audioUnderruns = 0
+        _diagnostics.value = PlaybackDiagnosticsSnapshot()
+    }
+
+    private fun currentReadBytes(): Long =
+        dataSourceFactory?.readMetrics?.totalBytesRead()
+            ?: recordingDataSourceFactory?.readMetrics?.totalBytesRead()
+            ?: 0L
+
+    private fun collectSystemDiagnostics(): PlaybackSystemDiagnostics? {
+        val context = applicationContext ?: return null
+        val activityManager = context.getSystemService(ActivityManager::class.java)
+        val memoryInfo = ActivityManager.MemoryInfo()
+        activityManager?.getMemoryInfo(memoryInfo)
+        val appPssBytes = activityManager
+            ?.getProcessMemoryInfo(intArrayOf(Process.myPid()))
+            ?.firstOrNull()
+            ?.totalPss
+            ?.toLong()
+            ?.times(1_024L)
+
+        val mode = context.getSystemService(DisplayManager::class.java)
+            ?.getDisplay(Display.DEFAULT_DISPLAY)
+            ?.mode
+        val thermalLevel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            context.getSystemService(PowerManager::class.java)
+                ?.currentThermalStatus
+                ?.let(::playbackThermalLevel)
+        } else {
+            null
+        }
+
+        return PlaybackSystemDiagnostics(
+            outputMode = mode?.let {
+                PlaybackOutputMode(
+                    width = it.physicalWidth,
+                    height = it.physicalHeight,
+                    refreshRateHz = it.refreshRate,
+                )
+            },
+            thermalLevel = thermalLevel,
+            appPssBytes = appPssBytes,
+            lowMemory = activityManager?.let { memoryInfo.lowMemory },
+        )
     }
 }
