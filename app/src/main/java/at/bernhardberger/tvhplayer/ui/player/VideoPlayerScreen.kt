@@ -67,6 +67,7 @@ import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.playbackAuxiliaryBackAction
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
+import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.shouldRevealPlaybackControls
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
@@ -161,6 +162,7 @@ fun VideoPlayerScreen(
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var statsVisible by remember { mutableStateOf(false) }
+    var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
     val drawerFocus = remember { FocusRequester() }
 
     val showDrawer = drawerOpen && !controlsVisible
@@ -392,6 +394,11 @@ fun VideoPlayerScreen(
             .fillMaxSize()
             .focusable()
             .onPreviewKeyEvent { event ->
+                val keyCode = event.nativeKeyEvent.keyCode
+                if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
+                    if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
+                    return@onPreviewKeyEvent true
+                }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
                 if (event.key == Key.Back) {
@@ -527,9 +534,10 @@ fun VideoPlayerScreen(
 
                 if (shouldRevealPlaybackControls(
                         controlsVisible = controlsVisible,
-                        keyCode = event.nativeKeyEvent.keyCode,
+                        keyCode = keyCode,
                     )
                 ) {
+                    revealingKeyCode = keyCode
                     showControls()
                     return@onPreviewKeyEvent true
                 }

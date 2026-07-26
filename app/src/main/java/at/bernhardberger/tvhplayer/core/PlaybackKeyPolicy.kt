@@ -42,6 +42,11 @@ fun shouldRevealPlaybackControls(controlsVisible: Boolean, keyCode: Int): Boolea
     }
 }
 
+fun playbackSuppressesRevealingKey(
+    revealingKeyCode: Int?,
+    keyCode: Int,
+): Boolean = revealingKeyCode == keyCode
+
 fun channelPickAction(currentChannelId: Int, pickedChannelId: Int): ChannelPickAction =
     if (currentChannelId == pickedChannelId) {
         ChannelPickAction.CLOSE_DRAWER

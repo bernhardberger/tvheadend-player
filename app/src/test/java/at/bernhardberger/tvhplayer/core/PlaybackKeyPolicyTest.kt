@@ -38,6 +38,28 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
+    fun revealingKeyCycleIsSuppressedUntilItsMatchingKeyUp() {
+        assertTrue(
+            playbackSuppressesRevealingKey(
+                revealingKeyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+                keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            )
+        )
+        assertFalse(
+            playbackSuppressesRevealingKey(
+                revealingKeyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+                keyCode = KeyEvent.KEYCODE_DPAD_LEFT,
+            )
+        )
+        assertFalse(
+            playbackSuppressesRevealingKey(
+                revealingKeyCode = null,
+                keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            )
+        )
+    }
+
+    @Test
     fun pickingCurrentChannelClosesDrawerWithoutRetuning() {
         assertEquals(ChannelPickAction.CLOSE_DRAWER, channelPickAction(33, 33))
         assertEquals(ChannelPickAction.TUNE, channelPickAction(33, 34))
