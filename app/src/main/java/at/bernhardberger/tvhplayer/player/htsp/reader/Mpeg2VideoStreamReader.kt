@@ -33,6 +33,7 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         baseFormat = fmt
         t.format(fmt)
 
+        // Provisional SAR is not "configured" — keep probing for the real header.
         configured = false
         lastPixelRatio = fmt.pixelWidthHeightRatio
     }
@@ -48,6 +49,14 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
             else
                 Format.NO_VALUE.toFloat()
 
+        // MPEG-2 SAR lives in sequence headers that often arrive only with the
+        // first GOP — provisional 16:9 for common SD rasters avoids the 4:3 flash.
+        val provisionalSar = if (width > 0 && height > 0) {
+            AspectRatioUtils.provisionalSarWhenUnknown(width, height)
+        } else {
+            null
+        }
+
         return Format.Builder()
             .setId(streamIndex.toString())
             .setSampleMimeType(MimeTypes.VIDEO_MPEG2)
@@ -55,6 +64,13 @@ internal class Mpeg2VideoStreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
             .setHeight(height)
             .apply {
                 if (frameRate != Format.NO_VALUE.toFloat()) setFrameRate(frameRate)
+                if (provisionalSar != null) {
+                    setPixelWidthHeightRatio(provisionalSar)
+                    Timber.d(
+                        "Provisional MPEG-2 SAR=$provisionalSar for ${width}x$height " +
+                            "(awaiting sequence header)",
+                    )
+                }
             }
             .build()
     }

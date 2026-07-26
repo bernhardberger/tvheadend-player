@@ -37,7 +37,8 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         baseFormat = fmt
         t.format(fmt)
 
-        configured = (fmt.pixelWidthHeightRatio != Format.NO_VALUE.toFloat())
+        // Provisional / meta SAR still re-confirmed from in-band SPS when possible.
+        configured = false
         lastPixelRatio = fmt.pixelWidthHeightRatio
         lastFormatUpdatePts = Long.MIN_VALUE
     }
@@ -77,6 +78,17 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         val width = stream.int("width") ?: Format.NO_VALUE
         val height = stream.int("height") ?: Format.NO_VALUE
 
+        if (
+            (pixelRatio == Format.NO_VALUE.toFloat() || pixelRatio <= 0f || !pixelRatio.isFinite()) &&
+            width > 0 &&
+            height > 0
+        ) {
+            AspectRatioUtils.provisionalSarWhenUnknown(width, height)?.let {
+                pixelRatio = it
+                Timber.d("Provisional H.265 SAR=$it for ${width}x$height (awaiting SPS VUI)")
+            }
+        }
+
         val duration = stream.int("duration") ?: Format.NO_VALUE
         val frameRate =
             if (duration != Format.NO_VALUE)
@@ -107,13 +119,10 @@ internal class H265StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         val frameType = message.int("frametype") ?: -1
         val isKey = (frameType == -1 || frameType == 73) // tvh I-frame
 
-        if (lastFormatUpdatePts == Long.MIN_VALUE) {
-            lastFormatUpdatePts = pts + FORMAT_UPDATE_COOLDOWN_US
-        }
-
-        val shouldProbe =
-            (!configured && (isKey || lastFormatUpdatePts == Long.MIN_VALUE)) ||
-                    ((pts - lastFormatUpdatePts) >= FORMAT_UPDATE_COOLDOWN_US && isKey)
+        val shouldProbe = !configured ||
+            (isKey && lastFormatUpdatePts != Long.MIN_VALUE &&
+                (pts - lastFormatUpdatePts) >= FORMAT_UPDATE_COOLDOWN_US) ||
+            (isKey && lastFormatUpdatePts == Long.MIN_VALUE)
 
         if (shouldProbe) {
             val spsNal = extractFirstHevcSpsNalAnnexB(payload)

@@ -38,7 +38,8 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         baseFormat = fmt
         t.format(fmt)
 
-        configured = (fmt.pixelWidthHeightRatio != Format.NO_VALUE.toFloat())
+        // Provisional SAR from coded size is not stream-confirmed yet.
+        configured = false
         lastPixelRatio = fmt.pixelWidthHeightRatio
         lastFormatUpdatePts = Long.MIN_VALUE
     }
@@ -65,6 +66,26 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
 
         val width = stream.int("width") ?: Format.NO_VALUE
         val height = stream.int("height") ?: Format.NO_VALUE
+
+        if (
+            pixelRatio != Format.NO_VALUE.toFloat() &&
+            pixelRatio > 0f &&
+            pixelRatio.isFinite() &&
+            width > 0 &&
+            height > 0
+        ) {
+            // Parity with HEVC: refine active-width broadcast SAR at init.
+            pixelRatio = AspectRatioUtils.adjustSarForBroadcast(
+                codedW = width,
+                codedH = height,
+                sar = pixelRatio,
+            ) { Timber.d(it) }
+        } else if (width > 0 && height > 0) {
+            AspectRatioUtils.provisionalSarWhenUnknown(width, height)?.let {
+                pixelRatio = it
+                Timber.d("Provisional H.264 SAR=$it for ${width}x$height (awaiting SPS VUI)")
+            }
+        }
 
         val duration = stream.int("duration") ?: Format.NO_VALUE
         val frameRate =
@@ -97,13 +118,12 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
 
         val isKey = (frameType == -1 || frameType == 73)
 
-        if (lastFormatUpdatePts == Long.MIN_VALUE) {
-            lastFormatUpdatePts = pts + FORMAT_UPDATE_COOLDOWN_US
-        }
-
-        val shouldProbe =
-            (!configured && isKey) ||
-                    (isKey && (pts - lastFormatUpdatePts) >= FORMAT_UPDATE_COOLDOWN_US)
+        // Until stream SAR is confirmed, probe every sample (SPS can lag the first
+        // few frames). After that, re-check on keyframes with a cooldown.
+        val shouldProbe = !configured ||
+            (isKey && lastFormatUpdatePts != Long.MIN_VALUE &&
+                (pts - lastFormatUpdatePts) >= FORMAT_UPDATE_COOLDOWN_US) ||
+            (isKey && lastFormatUpdatePts == Long.MIN_VALUE)
 
         if (shouldProbe) {
             val sps = extractFirstSpsNal(payload)
