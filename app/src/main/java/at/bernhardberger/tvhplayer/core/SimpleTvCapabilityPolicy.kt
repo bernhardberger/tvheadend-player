@@ -25,14 +25,15 @@ enum class SimpleTvRoute {
     UNLOCK,
 }
 
+/**
+ * Simple TV remains a strict player-only mode.
+ *
+ * Only startup enablement, optional timeshift, and PIN state are configurable.
+ * Granular EPG/recordings/stop/settings/app-exit flags were inert and removed.
+ */
 data class SimpleTvSettings(
     val enabled: Boolean = false,
-    val epg: Boolean = false,
-    val recordings: Boolean = false,
     val timeshift: Boolean = false,
-    val stop: Boolean = false,
-    val settings: Boolean = false,
-    val appExit: Boolean = false,
     val pinConfigured: Boolean = false,
 )
 

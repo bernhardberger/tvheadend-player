@@ -18,25 +18,17 @@ import kotlinx.coroutines.flow.map
 class SimpleTvSettingsStore(private val context: Context) {
     private object Keys {
         val ENABLED = booleanPreferencesKey("simpleTv.enabled")
-        val EPG = booleanPreferencesKey("simpleTv.epg")
-        val RECORDINGS = booleanPreferencesKey("simpleTv.recordings")
         val TIMESHIFT = booleanPreferencesKey("simpleTv.timeshift")
-        val STOP = booleanPreferencesKey("simpleTv.stop")
-        val SETTINGS = booleanPreferencesKey("simpleTv.settings")
-        val APP_EXIT = booleanPreferencesKey("simpleTv.appExit")
         val PIN_SALT = stringPreferencesKey("simpleTv.pinSalt")
         val PIN_HASH = stringPreferencesKey("simpleTv.pinHash")
+        // Obsolete pre-release keys (epg/recordings/stop/settings/appExit) are
+        // intentionally unread; no migration bridge is required.
     }
 
     val settings: Flow<SimpleTvSettings> = context.dataStore.data.map(::settingsFrom)
 
     suspend fun setEnabled(value: Boolean) = set(Keys.ENABLED, value)
-    suspend fun setEpg(value: Boolean) = set(Keys.EPG, value)
-    suspend fun setRecordings(value: Boolean) = set(Keys.RECORDINGS, value)
     suspend fun setTimeshift(value: Boolean) = set(Keys.TIMESHIFT, value)
-    suspend fun setStop(value: Boolean) = set(Keys.STOP, value)
-    suspend fun setSettings(value: Boolean) = set(Keys.SETTINGS, value)
-    suspend fun setAppExit(value: Boolean) = set(Keys.APP_EXIT, value)
 
     suspend fun setPin(pin: String): Boolean {
         if (!isValidSimpleTvPin(pin)) return false
@@ -69,12 +61,7 @@ class SimpleTvSettingsStore(private val context: Context) {
 
     private fun settingsFrom(preferences: Preferences) = SimpleTvSettings(
         enabled = preferences[Keys.ENABLED] ?: false,
-        epg = preferences[Keys.EPG] ?: false,
-        recordings = preferences[Keys.RECORDINGS] ?: false,
         timeshift = preferences[Keys.TIMESHIFT] ?: false,
-        stop = preferences[Keys.STOP] ?: false,
-        settings = preferences[Keys.SETTINGS] ?: false,
-        appExit = preferences[Keys.APP_EXIT] ?: false,
         pinConfigured = preferences[Keys.PIN_SALT] != null &&
             preferences[Keys.PIN_HASH] != null,
     )

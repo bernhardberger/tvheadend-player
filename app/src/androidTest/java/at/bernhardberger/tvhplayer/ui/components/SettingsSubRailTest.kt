@@ -42,6 +42,8 @@ class SettingsSubRailTest {
         composeTestRule.onNodeWithText("Options").performKeyInput {
             pressKey(Key.DirectionDown)
         }
-        composeTestRule.onNodeWithText("Connection").assertIsFocused()
+        // Focus stays on the category rail after activation; Down moves to the
+        // next rail item (Channel groups) without jumping into content.
+        composeTestRule.onNodeWithText("Channel groups").assertIsFocused()
     }
 }

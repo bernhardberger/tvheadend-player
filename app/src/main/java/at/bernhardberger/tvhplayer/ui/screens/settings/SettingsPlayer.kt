@@ -14,10 +14,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
+import at.bernhardberger.tvhplayer.ui.components.SettingsSectionTitle
+import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
 import at.bernhardberger.tvhplayer.viewmodels.ProfilesUiState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -27,32 +29,20 @@ fun SettingsPlayer(
     vm: SettingsPlayerViewModel = koinViewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val directStreamingLabel = stringResource(R.string.profile_direct_streaming)
 
     SettingsPane(title = stringResource(R.string.settings_player)) {
-        ListItem(
-            selected = ui.timeshiftEnabled,
+        SettingsSwitchRow(
+            label = stringResource(R.string.timeshift_setting),
+            checked = ui.timeshiftEnabled,
+            supportingText = stringResource(R.string.timeshift_setting_description),
             onClick = { vm.onTimeshiftEnabledChanged(!ui.timeshiftEnabled) },
-            headlineContent = { Text(stringResource(R.string.timeshift_setting)) },
-            supportingContent = { Text(stringResource(R.string.timeshift_setting_description)) },
-            trailingContent = {
-                Switch(
-                    checked = ui.timeshiftEnabled,
-                    onCheckedChange = null,
-                )
-            },
-            scale = ListItemDefaults.scale(
-                focusedScale = 1f,
-                focusedSelectedScale = 1f,
-            ),
             modifier = Modifier
                 .width(480.dp)
                 .fillMaxWidth(),
         )
 
-        Text(
-            text = stringResource(R.string.profile),
-            style = MaterialTheme.typography.titleMedium,
-        )
+        SettingsSectionTitle(stringResource(R.string.profile))
 
         when (val profiles = ui.profiles) {
             ProfilesUiState.Idle -> Text(
@@ -72,10 +62,17 @@ fun SettingsPlayer(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     profiles.items.forEach { profile ->
+                        val presentation = streamProfilePresentation(
+                            profileName = profile.name,
+                            directStreamingLabel = directStreamingLabel,
+                        )
                         ListItem(
                             selected = profile.id == ui.selectedProfileUuid,
                             onClick = { vm.onProfileSelected(profile) },
-                            headlineContent = { Text(profile.name) },
+                            headlineContent = { Text(presentation.primaryLabel) },
+                            supportingContent = presentation.secondaryLabel?.let { secondary ->
+                                { Text(secondary) }
+                            },
                             scale = ListItemDefaults.scale(
                                 focusedScale = 1f,
                                 focusedSelectedScale = 1f,

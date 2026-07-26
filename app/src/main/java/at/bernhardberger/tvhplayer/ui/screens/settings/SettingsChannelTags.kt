@@ -11,15 +11,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
-import androidx.tv.material3.Switch
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
+import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -37,33 +34,39 @@ fun SettingsChannelTags(
     val allChannelsVisible = visibility.isAllChannelsVisible()
     val visibleTagCount = tags.count { visibility.isTagVisible(it.id) }
     val visibleScopeCount = visibleTagCount + if (allChannelsVisible) 1 else 0
+    val lastEnabledReason = stringResource(R.string.settings_channel_tags_last_enabled)
 
     SettingsPane(title = stringResource(R.string.settings_channel_tags)) {
-        Text(stringResource(R.string.settings_channel_tags_description))
-        Text(stringResource(R.string.settings_channel_tags_required))
+        SettingsSwitchRow(
+            label = stringResource(R.string.all_channels),
+            checked = allChannelsVisible,
+            enabled = !allChannelsVisible || visibleScopeCount > 1,
+            supportingText = when {
+                allChannelsVisible && visibleScopeCount <= 1 -> lastEnabledReason
+                else -> stringResource(R.string.settings_channel_tags_description)
+            },
+            onClick = {
+                scope.launch {
+                    settingsStore.setScopeVisible(
+                        tagId = null,
+                        visible = !allChannelsVisible,
+                        availableTagIds = availableTagIds,
+                    )
+                }
+            },
+            modifier = Modifier
+                .width(640.dp)
+                .fillMaxWidth(),
+        )
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            item(key = "all-channels") {
-                ChannelScopeToggle(
-                    label = stringResource(R.string.all_channels),
-                    checked = allChannelsVisible,
-                    enabled = !allChannelsVisible || visibleScopeCount > 1,
-                    onClick = {
-                        scope.launch {
-                            settingsStore.setScopeVisible(
-                                tagId = null,
-                                visible = !allChannelsVisible,
-                                availableTagIds = availableTagIds,
-                            )
-                        }
-                    },
-                )
-            }
             items(tags, key = { it.id }) { tag ->
                 val checked = visibility.isTagVisible(tag.id)
-                ChannelScopeToggle(
+                val enabled = !checked || visibleScopeCount > 1
+                SettingsSwitchRow(
                     label = tag.name,
                     checked = checked,
-                    enabled = !checked || visibleScopeCount > 1,
+                    enabled = enabled,
+                    supportingText = if (!enabled) lastEnabledReason else null,
                     onClick = {
                         scope.launch {
                             settingsStore.setScopeVisible(
@@ -73,37 +76,11 @@ fun SettingsChannelTags(
                             )
                         }
                     },
+                    modifier = Modifier
+                        .width(640.dp)
+                        .fillMaxWidth(),
                 )
             }
         }
     }
-}
-
-@Composable
-private fun ChannelScopeToggle(
-    label: String,
-    checked: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        selected = checked,
-        enabled = enabled,
-        onClick = onClick,
-        headlineContent = { Text(label) },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                enabled = enabled,
-                onCheckedChange = null,
-            )
-        },
-        scale = ListItemDefaults.scale(
-            focusedScale = 1f,
-            focusedSelectedScale = 1f,
-        ),
-        modifier = Modifier
-            .width(640.dp)
-            .fillMaxWidth(),
-    )
 }

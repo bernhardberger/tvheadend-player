@@ -32,12 +32,7 @@ class SimpleTvCapabilityPolicyTest {
         val profile = simpleTvProfile(
             SimpleTvSettings(
                 enabled = true,
-                epg = true,
-                recordings = true,
                 timeshift = true,
-                stop = true,
-                settings = true,
-                appExit = true,
             ),
             active = true,
         )

@@ -18,15 +18,11 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -46,24 +42,16 @@ fun SettingsSubRail(
     showSimpleTv: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    var railFocused by remember { mutableStateOf(false) }
     val items = rememberSettingsItems(
         showSimpleTv = showSimpleTv,
     )
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
 
-    var didInit by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        if (!didInit) {
-            didInit = true
-            (itemFocus[currentRoute] ?: itemFocus[items.first().route])?.requestFocus()
-        }
-    }
-
-    LaunchedEffect(railFocused, currentRoute) {
-        if (railFocused) {
-            (itemFocus[currentRoute] ?: itemFocus[items.first().route])?.requestFocus()
-        }
+    // Keep focus on the active category after activation. Content receives focus
+    // only when the user presses Right; NavHost recomposition must not leave the
+    // screen with no focused target.
+    LaunchedEffect(currentRoute, items) {
+        (itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route])?.requestFocus()
     }
 
     Column(
@@ -74,8 +62,7 @@ fun SettingsSubRail(
             .background(
                 MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha)
             )
-            .padding(8.dp)
-            .onFocusChanged { railFocused = it.hasFocus },
+            .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items.forEach { item ->

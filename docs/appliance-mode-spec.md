@@ -134,9 +134,11 @@ fun adjacentChannelId(
   overlay uses a screen-safe multi-column layout and must not expose server
   addresses, recording paths, credentials, identifiers, raw errors, or logs.
   Back hides stats before normal player Back behavior.
-- Simple TV mode is a player-only session. Its startup toggle affects only fresh
-  launches, while **Start Simple TV now** enters it explicitly. Back may dismiss
-  overlays but must not leave playback while the mode is active.
+- Simple TV mode is a strict player-only session. Configurable state is limited to
+  startup enablement, optional timeshift, and an optional owner PIN. Granular
+  EPG/recordings/stop/settings/app-exit flags are not offered. Its startup toggle
+  affects only fresh launches, while **Start Simple TV now** enters it explicitly.
+  Back may dismiss overlays but must not leave playback while the mode is active.
 - Exiting Simple TV is deliberately secondary inside Playback options rather than
   a primary transport action. It requires optional owner-PIN verification and a
   separate cancellable confirmation even when no PIN is set. Confirmed exit
