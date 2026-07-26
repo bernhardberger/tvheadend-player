@@ -35,6 +35,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
@@ -100,6 +101,20 @@ internal fun RecordingOverlayControls(
     }
 
     val knownDuration = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
+    val seekBackLabel = stringResource(R.string.seek_back_30)
+    val seekForwardLabel = stringResource(R.string.seek_forward_30)
+    val playLabel = stringResource(R.string.play)
+    val pauseLabel = stringResource(R.string.pause)
+    val moreLabel = stringResource(R.string.playback_options)
+    val stopLabel = stringResource(R.string.stop_playback)
+    val focusedLabel = when (lastFocused) {
+        "back" -> seekBackLabel
+        "forward" -> seekForwardLabel
+        "playPause" -> if (isPlaying) pauseLabel else playLabel
+        "options" -> moreLabel
+        "stop" -> stopLabel
+        else -> null
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -109,44 +124,31 @@ internal fun RecordingOverlayControls(
                 .background(bottomGradient)
                 .padding(start = 56.dp, end = 56.dp, top = 104.dp, bottom = 32.dp),
         ) {
-            Row(verticalAlignment = Alignment.Top) {
-                PiconBox(
-                    imageLoader = imageLoader,
-                    piconPath = piconPath,
-                    modifier = Modifier
-                        .width(72.dp)
-                        .height(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(Color.White.copy(alpha = 0.10f))
-                        .padding(6.dp),
+            Column(Modifier.fillMaxWidth()) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    channelName?.takeIf(String::isNotBlank)?.let {
-                        Text(
-                            text = it,
-                            color = Color.White.copy(alpha = 0.76f),
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                channelName?.takeIf(String::isNotBlank)?.let {
                     Text(
-                        text = title,
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
+                        text = it,
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    subtitle?.takeIf(String::isNotBlank)?.let {
-                        Text(
-                            text = it,
-                            color = Color.White.copy(alpha = 0.76f),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                }
+                subtitle?.takeIf(String::isNotBlank)?.let {
+                    Text(
+                        text = it,
+                        color = Color.White.copy(alpha = 0.72f),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
 
@@ -163,28 +165,29 @@ internal fun RecordingOverlayControls(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(16.dp))
-            Box(Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.align(Alignment.CenterStart),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (showStop) {
-                        IconButton(
-                            onClick = { onUserInteraction(); onStopPlayback() },
-                            modifier = Modifier
-                                .size(52.dp)
-                                .focusRequester(stopFocus)
-                                .onFocusChanged { if (it.isFocused) focused("stop") },
-                        ) {
-                            Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
-                        }
-                    }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.End,
+            ) {
+                focusedLabel?.let { label ->
+                    Text(
+                        text = label,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(bottom = 8.dp, end = 8.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.55f),
+                                shape = MaterialTheme.shapes.small,
+                            )
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-
                 Row(
-                    modifier = Modifier.align(Alignment.Center),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
@@ -194,18 +197,18 @@ internal fun RecordingOverlayControls(
                             .focusRequester(backFocus)
                             .onFocusChanged { if (it.isFocused) focused("back") },
                     ) {
-                        Icon(Icons.Filled.Replay30, stringResource(R.string.seek_back_30))
+                        Icon(Icons.Filled.Replay30, seekBackLabel)
                     }
                     IconButton(
                         onClick = { onUserInteraction(); onTogglePlayPause() },
                         modifier = Modifier
-                            .size(64.dp)
+                            .size(56.dp)
                             .focusRequester(playPauseFocus)
                             .onFocusChanged { if (it.isFocused) focused("playPause") },
                     ) {
                         Icon(
                             if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            stringResource(if (isPlaying) R.string.pause else R.string.play),
+                            if (isPlaying) pauseLabel else playLabel,
                         )
                     }
                     IconButton(
@@ -215,15 +218,8 @@ internal fun RecordingOverlayControls(
                             .focusRequester(forwardFocus)
                             .onFocusChanged { if (it.isFocused) focused("forward") },
                     ) {
-                        Icon(Icons.Filled.Forward30, stringResource(R.string.seek_forward_30))
+                        Icon(Icons.Filled.Forward30, seekForwardLabel)
                     }
-                }
-
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
                     IconButton(
                         onClick = { onUserInteraction(); onOpenOptions() },
                         modifier = Modifier
@@ -231,7 +227,18 @@ internal fun RecordingOverlayControls(
                             .focusRequester(optionsFocus)
                             .onFocusChanged { if (it.isFocused) focused("options") },
                     ) {
-                        Icon(Icons.Filled.MoreVert, stringResource(R.string.playback_options))
+                        Icon(Icons.Filled.MoreVert, moreLabel)
+                    }
+                    if (showStop) {
+                        IconButton(
+                            onClick = { onUserInteraction(); onStopPlayback() },
+                            modifier = Modifier
+                                .size(52.dp)
+                                .focusRequester(stopFocus)
+                                .onFocusChanged { if (it.isFocused) focused("stop") },
+                        ) {
+                            Icon(Icons.Filled.Stop, stopLabel)
+                        }
                     }
                 }
             }

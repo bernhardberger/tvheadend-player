@@ -123,10 +123,11 @@ fun adjacentChannelId(
   is already playing from the playback channel sheet closes the sheet without
   rebuilding or restarting the player session.
 - Live and recording playback expose one **Playback options** action in the main
-  controls. Its full-height right-edge sheet contains Audio, Subtitles, explicit
-  Auto/16:9/4:3 display modes, and a session-only **Stats for nerds** toggle.
-  Opening the sheet suspends control auto-hide; Back returns nested pages to the
-  sheet root, then closes the sheet and restores focus to Playback options.
+  controls. An opaque popover anchored above the bottom-end control cluster
+  switches laterally among Audio, Subtitles, Display, and Stats categories and
+  shows the current value without a nested drill-down. Opening the popover
+  suspends control auto-hide; Back closes it and restores focus to the cluster.
+  Focused player icon controls show an anchored label chip.
 - Stats for nerds is a non-focusable, one-second diagnostic overlay. It may show
   playback state/timing, selected formats, decoder names, rendered/dropped frame
   counters, audio underruns, measured HTSP stream/file read rate, display output,

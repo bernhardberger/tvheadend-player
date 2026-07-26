@@ -426,10 +426,6 @@ fun VideoPlayerScreen(
 
                 if (event.key == Key.Back) {
                     when (playbackAuxiliaryBackAction(optionsPage, statsVisible)) {
-                        PlaybackAuxiliaryBackAction.SHOW_OPTIONS_ROOT -> {
-                            optionsPage = PlaybackOptionsPage.ROOT
-                            return@onPreviewKeyEvent true
-                        }
                         PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
                             optionsPage = null
                             interactionToken++
@@ -697,7 +693,7 @@ fun VideoPlayerScreen(
                 },
                 onUserInteraction = { interactionToken++ },
                 onOpenOptions = {
-                    optionsPage = PlaybackOptionsPage.ROOT
+                    optionsPage = PlaybackOptionsPage.AUDIO
                     controlsVisible = true
                 },
                 timeshiftState = effectiveTimeshiftState,

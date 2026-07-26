@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Forward30
@@ -24,19 +24,18 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -55,7 +54,6 @@ import at.bernhardberger.tvhplayer.core.initialPlaybackOverlayFocus
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
 
 @Composable
@@ -142,6 +140,27 @@ fun OverlayControlsTv(
     fun focused(key: String) {
         lastFocused = key
         onUserInteraction()
+    }
+
+    val channelsLabel = stringResource(R.string.nav_channels)
+    val seekBackLabel = stringResource(R.string.seek_back_30)
+    val seekForwardLabel = stringResource(R.string.seek_forward_30)
+    val playLabel = stringResource(R.string.play)
+    val pauseLabel = stringResource(R.string.pause)
+    val goLiveLabel = stringResource(R.string.timeshift_go_live)
+    val infoLabel = stringResource(R.string.player_info)
+    val moreLabel = stringResource(R.string.playback_options)
+    val stopLabel = stringResource(R.string.stop_playback)
+    val focusedLabel = when (lastFocused) {
+        "channels" -> channelsLabel
+        "back" -> seekBackLabel
+        "forward" -> seekForwardLabel
+        "pause" -> if (timeshiftState.paused) playLabel else pauseLabel
+        "live" -> goLiveLabel
+        "info" -> infoLabel
+        "options" -> moreLabel
+        "stop" -> stopLabel
+        else -> null
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -236,11 +255,29 @@ fun OverlayControlsTv(
 
             Spacer(Modifier.height(18.dp))
             // Single right-aligned control cluster so Right always moves to an adjacent control.
-            Row(
+            // Focused control label is anchored above the cluster (JetStream-style).
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.End,
             ) {
+                focusedLabel?.let { label ->
+                    Text(
+                        text = label,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(bottom = 8.dp, end = 8.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.55f),
+                                shape = MaterialTheme.shapes.small,
+                            )
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .widthIn(max = 220.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -252,24 +289,23 @@ fun OverlayControlsTv(
                             .focusRequester(channelsFocus)
                             .onFocusChanged { if (it.isFocused) focused("channels") },
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.List,
-                            stringResource(R.string.nav_channels),
-                        )
+                        Icon(Icons.AutoMirrored.Filled.List, channelsLabel)
                     }
                     if (timeshiftState.available) {
                         if (canSeekBack) {
                             IconButton(
                                 onClick = {
                                     onUserInteraction()
-                                    onSeekTimeshift(-at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
+                                    onSeekTimeshift(
+                                        -at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS,
+                                    )
                                 },
                                 modifier = Modifier
                                     .size(52.dp)
                                     .focusRequester(backFocus)
                                     .onFocusChanged { if (it.isFocused) focused("back") },
                             ) {
-                                Icon(Icons.Filled.Replay30, stringResource(R.string.seek_back_30))
+                                Icon(Icons.Filled.Replay30, seekBackLabel)
                             }
                         }
                         IconButton(
@@ -285,26 +321,23 @@ fun OverlayControlsTv(
                                 } else {
                                     Icons.Filled.Pause
                                 },
-                                stringResource(
-                                    if (timeshiftState.paused) R.string.play else R.string.pause
-                                ),
+                                if (timeshiftState.paused) playLabel else pauseLabel,
                             )
                         }
                         if (canSeekForward) {
                             IconButton(
                                 onClick = {
                                     onUserInteraction()
-                                    onSeekTimeshift(at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS)
+                                    onSeekTimeshift(
+                                        at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS,
+                                    )
                                 },
                                 modifier = Modifier
                                     .size(52.dp)
                                     .focusRequester(forwardFocus)
                                     .onFocusChanged { if (it.isFocused) focused("forward") },
                             ) {
-                                Icon(
-                                    Icons.Filled.Forward30,
-                                    stringResource(R.string.seek_forward_30),
-                                )
+                                Icon(Icons.Filled.Forward30, seekForwardLabel)
                             }
                             OutlinedButton(
                                 onClick = { onUserInteraction(); onGoLive() },
@@ -312,7 +345,7 @@ fun OverlayControlsTv(
                                     .focusRequester(liveFocus)
                                     .onFocusChanged { if (it.isFocused) focused("live") },
                             ) {
-                                Text(stringResource(R.string.timeshift_go_live))
+                                Text(goLiveLabel)
                             }
                         }
                     }
@@ -323,11 +356,11 @@ fun OverlayControlsTv(
                             .focusRequester(infoFocus)
                             .onFocusChanged { if (it.isFocused) focused("info") },
                     ) {
-                        Icon(Icons.Filled.Info, stringResource(R.string.player_info))
+                        Icon(Icons.Filled.Info, infoLabel)
                     }
                     RoundIconButton(
                         icon = {
-                            Icon(Icons.Filled.MoreVert, stringResource(R.string.playback_options))
+                            Icon(Icons.Filled.MoreVert, moreLabel)
                         },
                         onClick = { onUserInteraction(); onOpenOptions() },
                         focusRequester = optionsFocus,
@@ -341,7 +374,7 @@ fun OverlayControlsTv(
                                 .focusRequester(stopFocus)
                                 .onFocusChanged { if (it.isFocused) focused("stop") },
                         ) {
-                            Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
+                            Icon(Icons.Filled.Stop, stopLabel)
                         }
                     }
                 }

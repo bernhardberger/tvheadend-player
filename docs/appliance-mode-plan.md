@@ -98,11 +98,11 @@
   remains warm. Explicit Stop and natural end tear down the session and return to
   the recordings library. Preserve the previous recordings mode, folder, scroll,
   and focused item across that navigation.
-- Use one shared full-height Playback options sheet for live TV and recordings.
-  Move Audio, Subtitles, and explicit display-mode choices out of the primary
-  controls, and keep Exit Simple TV as a deliberately secondary sheet action that
-  retains the existing PIN and confirmation flow. Sheet pages have deterministic
-  initial focus and Back unwinds nested page, sheet, then stats before player Back.
+- Use one shared anchored Playback options popover for live TV and recordings.
+  Switch Audio, Subtitles, Display, and Stats laterally with Left/Right, show the
+  current value in the category header, and keep Exit Simple TV as a secondary
+  owner action with the existing PIN and confirmation flow. Back closes the
+  popover, then stats, before player Back. Focused transport icons show a label.
 - Keep Stats for nerds session-only and non-focusable. `PlayerSession` samples
   Media3 formats, decoder names, playback timing, decoder counters, and audio
   underruns no more than once per second while enabled. Custom HTSP data sources

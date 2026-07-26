@@ -210,10 +210,6 @@ fun RecordingPlayerScreen(
     fun applyAuxiliaryBack(): Boolean = when (
         playbackAuxiliaryBackAction(optionsPage, statsVisible)
     ) {
-        PlaybackAuxiliaryBackAction.SHOW_OPTIONS_ROOT -> {
-            optionsPage = PlaybackOptionsPage.ROOT
-            true
-        }
         PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
             optionsPage = null
             interactionToken++
@@ -393,7 +389,7 @@ fun RecordingPlayerScreen(
                     onUserInteraction = { interactionToken++ },
                     showStop = showStop,
                     onOpenOptions = {
-                        optionsPage = PlaybackOptionsPage.ROOT
+                        optionsPage = PlaybackOptionsPage.AUDIO
                         controlsVisible = true
                     },
                 )
@@ -497,7 +493,7 @@ fun RecordingPlayerScreen(
                         Text(stringResource(R.string.close))
                     }
                     if (showUnlock) {
-                        Button(onClick = { optionsPage = PlaybackOptionsPage.ROOT }) {
+                        Button(onClick = { optionsPage = PlaybackOptionsPage.AUDIO }) {
                             Text(stringResource(R.string.playback_options))
                         }
                     }

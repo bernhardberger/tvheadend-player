@@ -147,6 +147,10 @@
     <string name="close">Close</string>
     <string name="stop_playback">Stop playback</string>
     <string name="playback_options">Playback options</string>
+    <string name="playback_options_previous_category">Previous options category</string>
+    <string name="playback_options_next_category">Next options category</string>
+    <string name="stats_on">On</string>
+    <string name="stats_off">Off</string>
     <string name="display_mode">Display mode</string>
     <string name="display_mode_auto">Auto (original aspect)</string>
     <string name="display_mode_16_9">Fill 16:9</string>

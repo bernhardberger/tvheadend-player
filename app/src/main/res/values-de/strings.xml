@@ -135,6 +135,10 @@
     <string name="close">Schließen</string>
     <string name="stop_playback">Wiedergabe beenden</string>
     <string name="playback_options">Wiedergabeoptionen</string>
+    <string name="playback_options_previous_category">Vorherige Optionskategorie</string>
+    <string name="playback_options_next_category">Nächste Optionskategorie</string>
+    <string name="stats_on">Ein</string>
+    <string name="stats_off">Aus</string>
     <string name="display_mode">Bildformat</string>
     <string name="display_mode_auto">Automatisch (Originalformat)</string>
     <string name="display_mode_16_9">16:9 ausfüllen</string>
