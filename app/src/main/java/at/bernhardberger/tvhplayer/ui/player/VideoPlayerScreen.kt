@@ -761,6 +761,7 @@ fun VideoPlayerScreen(
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
                 showSimpleTvExit = simpleTvProfile.active,
+                simpleTvActive = simpleTvProfile.active,
                 onPageChange = { optionsPage = it },
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
@@ -772,6 +773,25 @@ fun VideoPlayerScreen(
                     onUnlock()
                 },
             )
+        }
+
+        if (simpleTvProfile.active && !controlsVisible && optionsPage == null) {
+            Surface(
+                colors = SurfaceDefaults.colors(
+                    containerColor = Color.Black.copy(alpha = 0.55f),
+                    contentColor = Color.White,
+                ),
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 48.dp, top = 36.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.simple_tv_active_chip),
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -834,11 +854,34 @@ fun VideoPlayerScreen(
             visible = recoveryVisible,
             message = stringResource(
                 when {
+                    simpleTvProfile.active && connState !is ConnectionState.Connected ->
+                        R.string.simple_tv_recovery_connection
+                    simpleTvProfile.active -> R.string.simple_tv_recovery_playback
                     connState !is ConnectionState.Connected -> R.string.player_connection_recovering
                     else -> R.string.player_playback_recovering
                 }
             ),
-            opaque = false,
+            hint = if (simpleTvProfile.active) {
+                stringResource(R.string.simple_tv_recovery_hint)
+            } else {
+                null
+            },
+            opaque = simpleTvProfile.active,
+            retryLabel = if (simpleTvProfile.active) {
+                stringResource(R.string.retry)
+            } else {
+                null
+            },
+            onRetry = if (simpleTvProfile.active) {
+                {
+                    scope.launch {
+                        // Retry through the existing serialized playback owner.
+                        videoPlayerViewModel.playService(ctx, currentServiceId)
+                    }
+                }
+            } else {
+                null
+            },
         )
     }
 }

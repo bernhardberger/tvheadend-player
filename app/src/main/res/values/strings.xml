@@ -295,6 +295,15 @@
     <string name="simple_tv_startup">Start in Simple TV mode</string>
     <string name="simple_tv_startup_explanation">On a fresh app launch, play the last channel and remain in the live TV player. Channels, Guide, Recordings, Settings, Stop, and normal app exit stay unavailable until an owner exits Simple TV.</string>
     <string name="simple_tv_start_now">Start Simple TV now</string>
+    <string name="simple_tv_mode_disclosure">Simple TV is a player-only mode. Channels, Guide, Recordings, Settings, Stop, and normal app exit are unavailable until an owner exits through More.</string>
+    <string name="simple_tv_home_disclosure">Android HOME can still leave the app. This mode cannot block the system HOME key.</string>
+    <string name="simple_tv_guide_return_disclosure">When appliance entry is enabled, the TV/GUIDE button can return to the app. It does not read screen content.</string>
+    <string name="simple_tv_start_confirm_title">Start Simple TV now?</string>
+    <string name="simple_tv_start_confirm_message">The full interface will be locked for this session. Exit later from More → Exit Simple TV.</string>
+    <string name="simple_tv_active_chip">Simple TV · More to exit</string>
+    <string name="simple_tv_recovery_connection">Television is unavailable right now.</string>
+    <string name="simple_tv_recovery_playback">This channel could not start.</string>
+    <string name="simple_tv_recovery_hint">Press Retry to try again. An owner can exit Simple TV from More.</string>
     <string name="simple_tv_back_for_exit">Back for exit options</string>
     <string name="simple_tv_timeshift">Allow timeshift controls</string>
     <string name="simple_tv_timeshift_explanation">When on, pause and seek are available if the server supports timeshift. When off, live TV plays without timeshift controls.</string>

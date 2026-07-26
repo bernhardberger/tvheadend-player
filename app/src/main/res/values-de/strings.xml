@@ -281,6 +281,15 @@
     <string name="simple_tv_startup">Mit Einfachem TV starten</string>
     <string name="simple_tv_startup_explanation">Bei einem neuen App-Start den letzten Sender abspielen und im Live-TV-Player bleiben. Sender, Programmführer, Aufnahmen, Einstellungen, Stopp und normales Beenden der App bleiben gesperrt, bis ein Besitzer Einfaches TV verlässt.</string>
     <string name="simple_tv_start_now">Einfaches TV jetzt starten</string>
+    <string name="simple_tv_mode_disclosure">Einfaches TV ist ein reiner Player-Modus. Sender, Programmführer, Aufnahmen, Einstellungen, Stopp und normales Beenden der App sind gesperrt, bis ein Besitzer über Mehr verlässt.</string>
+    <string name="simple_tv_home_disclosure">Die Android-HOME-Taste kann die App weiterhin verlassen. Dieser Modus kann die System-HOME-Taste nicht blockieren.</string>
+    <string name="simple_tv_guide_return_disclosure">Wenn TV-Start aktiviert ist, kann die TV-/GUIDE-Taste zur App zurückkehren. Der Dienst liest keine Bildschirminhalte.</string>
+    <string name="simple_tv_start_confirm_title">Einfaches TV jetzt starten?</string>
+    <string name="simple_tv_start_confirm_message">Die vollständige Oberfläche wird für diese Sitzung gesperrt. Später über Mehr → Einfaches TV verlassen beenden.</string>
+    <string name="simple_tv_active_chip">Einfaches TV · Mehr zum Verlassen</string>
+    <string name="simple_tv_recovery_connection">Fernsehen ist gerade nicht verfügbar.</string>
+    <string name="simple_tv_recovery_playback">Dieser Sender konnte nicht starten.</string>
+    <string name="simple_tv_recovery_hint">Drücken Sie Erneut versuchen. Ein Besitzer kann Einfaches TV über Mehr verlassen.</string>
     <string name="simple_tv_back_for_exit">Zurück für Optionen zum Verlassen</string>
     <string name="simple_tv_timeshift">Timeshift-Steuerung erlauben</string>
     <string name="simple_tv_timeshift_explanation">Wenn aktiv, sind Pause und Suche verfügbar, sofern der Server Timeshift unterstützt. Wenn inaktiv, läuft Live-TV ohne Timeshift-Steuerung.</string>

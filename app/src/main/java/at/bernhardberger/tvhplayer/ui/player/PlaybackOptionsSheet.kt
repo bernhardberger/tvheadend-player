@@ -58,6 +58,7 @@ internal fun PlaybackOptionsSheet(
     aspectRatio: AspectRatioMode,
     statsVisible: Boolean,
     showSimpleTvExit: Boolean,
+    simpleTvActive: Boolean = false,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
     onStatsVisibleChange: (Boolean) -> Unit,
@@ -102,6 +103,7 @@ internal fun PlaybackOptionsSheet(
                     PlaybackOptionsPage.ROOT -> PlaybackOptionsRoot(
                         statsVisible = statsVisible,
                         showSimpleTvExit = showSimpleTvExit,
+                        simpleTvActive = simpleTvActive,
                         initialFocus = initialFocus,
                         initialItem = lastRootItem,
                         onFocused = { lastRootItem = it },
@@ -139,6 +141,7 @@ internal fun PlaybackOptionsSheet(
 private fun PlaybackOptionsRoot(
     statsVisible: Boolean,
     showSimpleTvExit: Boolean,
+    simpleTvActive: Boolean,
     initialFocus: FocusRequester,
     initialItem: PlaybackOptionsRootItem,
     onFocused: (PlaybackOptionsRootItem) -> Unit,
@@ -180,39 +183,42 @@ private fun PlaybackOptionsRoot(
                     },
                 showChevron = true,
         )
-        PlaybackOptionRow(
-                label = stringResource(R.string.display_mode),
-                onClick = { onPageChange(PlaybackOptionsPage.DISPLAY) },
-                modifier = Modifier
-                    .then(
-                        if (initialItem == PlaybackOptionsRootItem.DISPLAY) {
-                            Modifier.focusRequester(initialFocus)
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .onFocusChanged {
-                        if (it.isFocused) onFocused(PlaybackOptionsRootItem.DISPLAY)
-                    },
-                showChevron = true,
-        )
-        PlaybackOptionRow(
-                label = stringResource(R.string.stats_for_nerds),
-                selected = statsVisible,
-                onClick = { onStatsVisibleChange(!statsVisible) },
-                modifier = Modifier
-                    .then(
-                        if (initialItem == PlaybackOptionsRootItem.STATS) {
-                            Modifier.focusRequester(initialFocus)
-                        } else {
-                            Modifier
-                        }
-                    )
-                    .onFocusChanged {
-                        if (it.isFocused) onFocused(PlaybackOptionsRootItem.STATS)
-                    },
-                showSwitch = true,
-        )
+        // Hide owner-level Display and Stats during Simple TV.
+        if (!simpleTvActive) {
+            PlaybackOptionRow(
+                    label = stringResource(R.string.display_mode),
+                    onClick = { onPageChange(PlaybackOptionsPage.DISPLAY) },
+                    modifier = Modifier
+                        .then(
+                            if (initialItem == PlaybackOptionsRootItem.DISPLAY) {
+                                Modifier.focusRequester(initialFocus)
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .onFocusChanged {
+                            if (it.isFocused) onFocused(PlaybackOptionsRootItem.DISPLAY)
+                        },
+                    showChevron = true,
+            )
+            PlaybackOptionRow(
+                    label = stringResource(R.string.stats_for_nerds),
+                    selected = statsVisible,
+                    onClick = { onStatsVisibleChange(!statsVisible) },
+                    modifier = Modifier
+                        .then(
+                            if (initialItem == PlaybackOptionsRootItem.STATS) {
+                                Modifier.focusRequester(initialFocus)
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .onFocusChanged {
+                            if (it.isFocused) onFocused(PlaybackOptionsRootItem.STATS)
+                        },
+                    showSwitch = true,
+            )
+        }
         if (showSimpleTvExit) {
             Text(
                 text = stringResource(R.string.simple_tv_owner_section),

@@ -17,10 +17,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,7 +60,9 @@ fun SettingsSimpleTv(
     var editingId by remember { mutableStateOf<String?>(null) }
     var pinResult by remember { mutableStateOf<Int?>(null) }
     var pinResultKind by remember { mutableStateOf(PinFeedbackKind.SUCCESS) }
+    var confirmStart by remember { mutableStateOf(false) }
     val pinValid = isValidSimpleTvPin(pin)
+    val cancelFocus = remember { androidx.compose.ui.focus.FocusRequester() }
 
     SettingsPane(title = stringResource(R.string.settings_simple_tv)) {
         Column(
@@ -66,6 +71,21 @@ fun SettingsSimpleTv(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            Text(
+                text = stringResource(R.string.simple_tv_mode_disclosure),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.simple_tv_home_disclosure),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.simple_tv_guide_return_disclosure),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             SettingsSwitchRow(
                 label = stringResource(R.string.simple_tv_startup),
                 checked = settings.enabled,
@@ -142,8 +162,45 @@ fun SettingsSimpleTv(
                     kind = pinResultKind,
                 )
             }
-            Button(onClick = onStartSimpleTv) {
+            Button(onClick = { confirmStart = true }) {
                 Text(stringResource(R.string.simple_tv_start_now))
+            }
+        }
+        if (confirmStart) {
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                runCatching { cancelFocus.requestFocus() }
+            }
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(R.string.simple_tv_start_confirm_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics {
+                            heading()
+                        },
+                    )
+                    Text(stringResource(R.string.simple_tv_start_confirm_message))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        androidx.tv.material3.OutlinedButton(
+                            onClick = { confirmStart = false },
+                            modifier = Modifier.focusRequester(cancelFocus),
+                        ) {
+                            Text(stringResource(R.string.back))
+                        }
+                        Button(
+                            onClick = {
+                                confirmStart = false
+                                onStartSimpleTv()
+                            },
+                        ) {
+                            Text(stringResource(R.string.simple_tv_start_now))
+                        }
+                    }
+                }
             }
         }
     }
