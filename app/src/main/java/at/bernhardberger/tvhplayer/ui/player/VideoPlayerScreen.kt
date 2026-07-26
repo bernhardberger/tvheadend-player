@@ -30,7 +30,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -163,7 +162,6 @@ fun VideoPlayerScreen(
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var statsVisible by remember { mutableStateOf(false) }
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
-    val drawerFocus = remember { FocusRequester() }
 
     val showDrawer = drawerOpen && !controlsVisible
 
@@ -346,13 +344,6 @@ fun VideoPlayerScreen(
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) drawerOpen = false
-    }
-
-    LaunchedEffect(showDrawer) {
-        if (showDrawer) {
-            delay(200L)
-            drawerFocus.requestFocus()
-        }
     }
 
     LaunchedEffect(connState, screenActive) {
@@ -595,7 +586,6 @@ fun VideoPlayerScreen(
                 imageLoader = imageLoader,
                 onFocusChannel = { selectedId = it },
                 onPickChannel = { tuneChannel(it) },
-                focusRequester = drawerFocus,
                 onCloseDrawer = { drawerOpen = false },
             )
         }

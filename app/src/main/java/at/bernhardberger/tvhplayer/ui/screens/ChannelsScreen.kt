@@ -46,6 +46,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -94,6 +95,9 @@ fun ChannelsScreen(
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val rowFocusRequesters = remember(orderedChannelIds) {
+        orderedChannelIds.associateWith { FocusRequester() }
+    }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
     var didInitialRestore by remember { mutableStateOf(false) }
@@ -103,8 +107,8 @@ fun ChannelsScreen(
 
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
-    val selectedRowFocus = remember { FocusRequester() }
     var pageGeneration by remember { mutableIntStateOf(0) }
 
     fun pageChannels(direction: Int): Boolean {
@@ -118,8 +122,10 @@ fun ChannelsScreen(
         if (targetIndex == currentIndex) return true
 
         val targetId = channels[targetIndex].id
+        val targetFocus = rowFocusRequesters[targetId] ?: return true
         val generation = ++pageGeneration
         isRestoring = true
+        focusManager.clearFocus(force = true)
         selection.setSelected(targetId)
         coroutineScope.launch {
             try {
@@ -128,7 +134,7 @@ fun ChannelsScreen(
                     listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
                 }.filter { it }.first()
                 withFrameNanos { }
-                selectedRowFocus.requestFocus()
+                targetFocus.requestFocus()
                 withFrameNanos { }
             } finally {
                 if (pageGeneration == generation) isRestoring = false
@@ -175,7 +181,7 @@ fun ChannelsScreen(
         }.filter { it }.first()
 
         withFrameNanos { }
-        selectedRowFocus.requestFocus()
+        rowFocusRequesters[id]?.requestFocus()
         withFrameNanos { }
 
         didInitialRestore = true
@@ -274,7 +280,9 @@ fun ChannelsScreen(
                             val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
 
                             ChannelRow(
-                                modifier = if (isSelected) Modifier.focusRequester(selectedRowFocus) else Modifier,
+                                modifier = Modifier.focusRequester(
+                                    rowFocusRequesters.getValue(ch.id)
+                                ),
                                 number = ChannelNavigation.numberForId(
                                     orderedChannelIds,
                                     channelNumbers,

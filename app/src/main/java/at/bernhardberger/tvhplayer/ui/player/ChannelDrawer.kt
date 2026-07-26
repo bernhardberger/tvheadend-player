@@ -31,6 +31,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
@@ -55,12 +56,15 @@ fun ChannelDrawer(
     imageLoader: ImageLoader,
     onFocusChannel: (Int) -> Unit,
     onPickChannel: (ChannelUi) -> Unit,
-    focusRequester: FocusRequester,
     onCloseDrawer: () -> Unit
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val rowFocusRequesters = remember(orderedChannelIds) {
+        orderedChannelIds.associateWith { FocusRequester() }
+    }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
 
     var didInitialRestore by remember { mutableStateOf(false) }
@@ -78,8 +82,10 @@ fun ChannelDrawer(
         if (targetIndex == currentIndex) return true
 
         val targetId = channels[targetIndex].id
+        val targetFocus = rowFocusRequesters[targetId] ?: return true
         val generation = ++pageGeneration
         isRestoring = true
+        focusManager.clearFocus(force = true)
         onFocusChannel(targetId)
         coroutineScope.launch {
             try {
@@ -88,7 +94,7 @@ fun ChannelDrawer(
                     listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
                 }.filter { it }.first()
                 withFrameNanos { }
-                focusRequester.requestFocus()
+                targetFocus.requestFocus()
                 withFrameNanos { }
             } finally {
                 if (pageGeneration == generation) isRestoring = false
@@ -114,7 +120,7 @@ fun ChannelDrawer(
         }.filter { it }.first()
 
         withFrameNanos { }
-        focusRequester.requestFocus()
+        rowFocusRequesters[id]?.requestFocus()
         withFrameNanos { }
 
         didInitialRestore = true
@@ -173,11 +179,9 @@ fun ChannelDrawer(
                     val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
 
                     ChannelRow(
-                        modifier = if (isSelected) {
-                            Modifier.focusRequester(focusRequester)
-                        } else {
-                            Modifier
-                        },
+                        modifier = Modifier.focusRequester(
+                            rowFocusRequesters.getValue(ch.id)
+                        ),
                         number = ChannelNavigation.numberForId(
                             orderedChannelIds,
                             channelNumbers,
