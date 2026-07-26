@@ -200,6 +200,30 @@ class RecordingPlaybackPolicyTest {
         }
     }
 
+    @Test
+    fun revealingKeyCycleIsSuppressedUntilItsMatchingKeyUp() {
+        assertTrue(
+            recordingPlaybackSuppressesRevealingKey(
+                revealingKeyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+                keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            )
+        )
+        assertEquals(
+            false,
+            recordingPlaybackSuppressesRevealingKey(
+                revealingKeyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+                keyCode = KeyEvent.KEYCODE_DPAD_LEFT,
+            ),
+        )
+        assertEquals(
+            false,
+            recordingPlaybackSuppressesRevealingKey(
+                revealingKeyCode = null,
+                keyCode = KeyEvent.KEYCODE_DPAD_CENTER,
+            ),
+        )
+    }
+
     private fun recording(state: DvrState, path: String?, size: Long?) = DvrEntry(
         id = 1,
         eventId = 2,

@@ -59,10 +59,13 @@ import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
+import at.bernhardberger.tvhplayer.core.PlaybackAuxiliaryBackAction
+import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.core.coalesceTimeshiftSeekDelta
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
+import at.bernhardberger.tvhplayer.core.playbackAuxiliaryBackAction
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.shouldRevealPlaybackControls
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
@@ -72,7 +75,6 @@ import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -133,6 +135,7 @@ fun VideoPlayerScreen(
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
     val timeshiftState by videoPlayerViewModel.timeshiftState.collectAsStateWithLifecycle()
+    val diagnostics by videoPlayerViewModel.diagnostics.collectAsStateWithLifecycle()
     val effectiveTimeshiftState = if (
         simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT)
     ) {
@@ -156,6 +159,8 @@ fun VideoPlayerScreen(
     var pendingTimeshiftSeekMs by remember { mutableLongStateOf(0L) }
     var timeshiftSeekJob by remember { mutableStateOf<Job?>(null) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
+    var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
+    var statsVisible by remember { mutableStateOf(false) }
     val drawerFocus = remember { FocusRequester() }
 
     val showDrawer = drawerOpen && !controlsVisible
@@ -175,6 +180,13 @@ fun VideoPlayerScreen(
 
     LaunchedEffect(settings.aspectRatio) {
         aspectRatio = settings.aspectRatio
+    }
+
+    DisposableEffect(statsVisible) {
+        videoPlayerViewModel.setDiagnosticsEnabled(statsVisible)
+        onDispose {
+            if (statsVisible) videoPlayerViewModel.setDiagnosticsEnabled(false)
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -284,8 +296,8 @@ fun VideoPlayerScreen(
         tuneEnteredChannel()
     }
 
-    LaunchedEffect(controlsVisible, interactionToken) {
-        if (!controlsVisible) return@LaunchedEffect
+    LaunchedEffect(controlsVisible, interactionToken, optionsPage) {
+        if (!controlsVisible || optionsPage != null) return@LaunchedEffect
         delay(autoHideMs)
         hideControls()
     }
@@ -381,6 +393,26 @@ fun VideoPlayerScreen(
             .focusable()
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+                if (event.key == Key.Back) {
+                    when (playbackAuxiliaryBackAction(optionsPage, statsVisible)) {
+                        PlaybackAuxiliaryBackAction.SHOW_OPTIONS_ROOT -> {
+                            optionsPage = PlaybackOptionsPage.ROOT
+                            return@onPreviewKeyEvent true
+                        }
+                        PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
+                            optionsPage = null
+                            interactionToken++
+                            return@onPreviewKeyEvent true
+                        }
+                        PlaybackAuxiliaryBackAction.HIDE_STATS -> {
+                            statsVisible = false
+                            return@onPreviewKeyEvent true
+                        }
+                        PlaybackAuxiliaryBackAction.PASS_THROUGH -> Unit
+                    }
+                }
+                if (optionsPage != null) return@onPreviewKeyEvent false
 
                 val mediaAction = mediaPlaybackAction(
                     keyCode = event.nativeKeyEvent.keyCode,
@@ -567,7 +599,6 @@ fun VideoPlayerScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             OverlayControlsTv(
-                player = player,
                 imageLoader = imageLoader,
                 channelNumber = currentChannelNumber,
                 channelName = currentChannelName,
@@ -576,6 +607,7 @@ fun VideoPlayerScreen(
                 nextEvent = nextEvent,
                 nowSec = nowSec,
                 controlsVisible = controlsVisible,
+                optionsOpen = optionsPage != null,
                 onOpenChannels = {
                     selectedId = browsingFocusChannelId(
                         visibleChannels = channels,
@@ -593,14 +625,9 @@ fun VideoPlayerScreen(
                     }
                 },
                 onUserInteraction = { interactionToken++ },
-                aspectRatio = aspectRatio,
-                onAspectRatioChange = {
-                    aspectRatio = when (aspectRatio) {
-                        AspectRatioMode.FIT -> AspectRatioMode.FORCE_16_9
-                        AspectRatioMode.FORCE_16_9 -> AspectRatioMode.FORCE_4_3
-                        AspectRatioMode.FORCE_4_3 -> AspectRatioMode.FIT
-                    }
-                    scope.launch { settingsStore.setAspectRatio(aspectRatio) }
+                onOpenOptions = {
+                    optionsPage = PlaybackOptionsPage.ROOT
+                    controlsVisible = true
                 },
                 timeshiftState = effectiveTimeshiftState,
                 timeshiftFeedback = timeshiftFeedback,
@@ -657,8 +684,42 @@ fun VideoPlayerScreen(
                     }
                 },
                 showStop = simpleTvProfile.allows(SimpleTvCapability.STOP),
-                showUnlock = simpleTvProfile.active,
-                onUnlock = onUnlock,
+            )
+        }
+
+        if (
+            statsVisible &&
+            optionsPage == null &&
+            channelNumberInput.isEmpty() &&
+            !showDrawer
+        ) {
+            PlaybackStatsOverlay(
+                diagnostics = diagnostics,
+                aspectRatio = aspectRatio,
+                timeshiftState = effectiveTimeshiftState,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 36.dp, end = 48.dp),
+            )
+        }
+
+        optionsPage?.let { page ->
+            PlaybackOptionsSheet(
+                page = page,
+                player = player,
+                aspectRatio = aspectRatio,
+                statsVisible = statsVisible,
+                showSimpleTvExit = simpleTvProfile.active,
+                onPageChange = { optionsPage = it },
+                onAspectRatioChange = { mode ->
+                    aspectRatio = mode
+                    scope.launch { settingsStore.setAspectRatio(mode) }
+                },
+                onStatsVisibleChange = { statsVisible = it },
+                onSimpleTvExit = {
+                    optionsPage = null
+                    onUnlock()
+                },
             )
         }
 

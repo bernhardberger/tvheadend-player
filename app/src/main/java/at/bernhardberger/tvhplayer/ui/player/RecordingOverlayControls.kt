@@ -13,13 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay30
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,11 +38,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
-import androidx.media3.common.Player
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatHms
@@ -52,7 +49,6 @@ import coil3.ImageLoader
 
 @Composable
 internal fun RecordingOverlayControls(
-    player: Player,
     imageLoader: ImageLoader,
     piconPath: String?,
     title: String,
@@ -62,44 +58,36 @@ internal fun RecordingOverlayControls(
     durationMs: Long,
     isPlaying: Boolean,
     controlsVisible: Boolean,
+    optionsOpen: Boolean,
     onTogglePlayPause: () -> Unit,
     onSeek: (Long) -> Unit,
     onStopPlayback: () -> Unit,
     onUserInteraction: () -> Unit,
     showStop: Boolean,
-    showUnlock: Boolean,
-    onUnlock: () -> Unit,
+    onOpenOptions: () -> Unit,
 ) {
-    var showAudio by remember { mutableStateOf(false) }
-    var showSubs by remember { mutableStateOf(false) }
     var lastFocused by rememberSaveable { mutableStateOf("playPause") }
     val playPauseFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val forwardFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
-    val unlockFocus = remember { FocusRequester() }
-    val audioFocus = remember { FocusRequester() }
-    val subtitleFocus = remember { FocusRequester() }
+    val optionsFocus = remember { FocusRequester() }
     val focusTargets = mapOf(
         "playPause" to playPauseFocus,
         "back" to backFocus,
         "forward" to forwardFocus,
         "stop" to stopFocus,
-        "unlock" to unlockFocus,
-        "audio" to audioFocus,
-        "subtitles" to subtitleFocus,
+        "options" to optionsFocus,
     )
 
-    LaunchedEffect(controlsVisible, showStop, showUnlock) {
-        if (controlsVisible) {
+    LaunchedEffect(controlsVisible, showStop, optionsOpen) {
+        if (controlsVisible && !optionsOpen) {
             val availableTargets = buildMap {
                 put("playPause", playPauseFocus)
                 put("back", backFocus)
                 put("forward", forwardFocus)
                 if (showStop) put("stop", stopFocus)
-                if (showUnlock) put("unlock", unlockFocus)
-                put("audio", audioFocus)
-                put("subtitles", subtitleFocus)
+                put("options", optionsFocus)
             }
             (availableTargets[lastFocused] ?: playPauseFocus).requestFocus()
         }
@@ -204,16 +192,6 @@ internal fun RecordingOverlayControls(
                             Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
                         }
                     }
-                    if (showUnlock) {
-                        OutlinedButton(
-                            onClick = { onUserInteraction(); onUnlock() },
-                            modifier = Modifier
-                                .focusRequester(unlockFocus)
-                                .onFocusChanged { if (it.isFocused) focused("unlock") },
-                        ) {
-                            Text(stringResource(R.string.simple_tv_unlock))
-                        }
-                    }
                 }
 
                 Row(
@@ -259,30 +237,18 @@ internal fun RecordingOverlayControls(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
-                        onClick = { onUserInteraction(); showAudio = true },
+                        onClick = { onUserInteraction(); onOpenOptions() },
                         modifier = Modifier
                             .size(52.dp)
-                            .focusRequester(audioFocus)
-                            .onFocusChanged { if (it.isFocused) focused("audio") },
+                            .focusRequester(optionsFocus)
+                            .onFocusChanged { if (it.isFocused) focused("options") },
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, stringResource(R.string.audio_track))
-                    }
-                    IconButton(
-                        onClick = { onUserInteraction(); showSubs = true },
-                        modifier = Modifier
-                            .size(52.dp)
-                            .focusRequester(subtitleFocus)
-                            .onFocusChanged { if (it.isFocused) focused("subtitles") },
-                    ) {
-                        Icon(Icons.Filled.Subtitles, stringResource(R.string.subtitles))
+                        Icon(Icons.Filled.MoreVert, stringResource(R.string.playback_options))
                     }
                 }
             }
         }
     }
-
-    if (showAudio) AudioTrackDialog(player = player, onDismiss = { showAudio = false })
-    if (showSubs) SubtitleTrackDialog(player = player, onDismiss = { showSubs = false })
 }
 
 @Composable

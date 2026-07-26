@@ -46,6 +46,11 @@ fun recordingPlaybackKeyAction(
     else -> RecordingPlaybackKeyAction.PASS_THROUGH
 }
 
+fun recordingPlaybackSuppressesRevealingKey(
+    revealingKeyCode: Int?,
+    keyCode: Int,
+): Boolean = revealingKeyCode == keyCode
+
 fun recordingPlaybackAvailability(entry: DvrEntry): RecordingPlaybackAvailability {
     if (
         entry.state != DvrState.COMPLETED &&

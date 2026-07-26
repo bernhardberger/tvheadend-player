@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -43,14 +44,18 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
+import at.bernhardberger.tvhplayer.core.PlaybackAuxiliaryBackAction
+import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
+import at.bernhardberger.tvhplayer.core.playbackAuxiliaryBackAction
 import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
+import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.recordingSeekFeedbackSettled
 import at.bernhardberger.tvhplayer.core.recordingStackedSeekTarget
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
@@ -59,6 +64,8 @@ import at.bernhardberger.tvhplayer.player.PlaybackSessionState
 import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import coil3.ImageLoader
@@ -81,6 +88,7 @@ fun RecordingPlayerScreen(
     channelRepository: TvhRepository = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     session: PlayerSession = koinInject(),
+    settingsStore: PlayerSettingsStore = koinInject(),
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     onUnlock: () -> Unit = {},
     onClose: () -> Unit,
@@ -88,6 +96,10 @@ fun RecordingPlayerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val playbackState by session.state.collectAsStateWithLifecycle()
+    val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
+    val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
+        initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
+    )
     val entries by repository.entries.collectAsStateWithLifecycle()
     val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
     val channelsById = remember(channels) { channels.associateBy(ChannelUi::id) }
@@ -108,6 +120,21 @@ fun RecordingPlayerScreen(
     var seekFeedbackToken by remember { mutableIntStateOf(0) }
     var pendingSeekTargetMs by remember { mutableStateOf<Long?>(null) }
     var pendingSeekOriginMs by remember { mutableStateOf<Long?>(null) }
+    var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
+    var statsVisible by remember { mutableStateOf(false) }
+    var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
+    var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(settings.aspectRatio) {
+        aspectRatio = settings.aspectRatio
+    }
+
+    DisposableEffect(statsVisible) {
+        session.setDiagnosticsEnabled(statsVisible)
+        onDispose {
+            if (statsVisible) session.setDiagnosticsEnabled(false)
+        }
+    }
 
     fun stopAndClose() {
         scope.launch {
@@ -173,6 +200,25 @@ fun RecordingPlayerScreen(
         }
     }
 
+    fun applyAuxiliaryBack(): Boolean = when (
+        playbackAuxiliaryBackAction(optionsPage, statsVisible)
+    ) {
+        PlaybackAuxiliaryBackAction.SHOW_OPTIONS_ROOT -> {
+            optionsPage = PlaybackOptionsPage.ROOT
+            true
+        }
+        PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
+            optionsPage = null
+            interactionToken++
+            true
+        }
+        PlaybackAuxiliaryBackAction.HIDE_STATS -> {
+            statsVisible = false
+            true
+        }
+        PlaybackAuxiliaryBackAction.PASS_THROUGH -> false
+    }
+
     LaunchedEffect(recordingId, ready?.path) {
         ready ?: return@LaunchedEffect
         if (
@@ -200,10 +246,11 @@ fun RecordingPlayerScreen(
         }
     }
 
-    LaunchedEffect(controlsVisible, interactionToken) {
+    LaunchedEffect(controlsVisible, interactionToken, optionsPage) {
         if (!controlsVisible || availability !is RecordingPlaybackAvailability.Ready) {
             return@LaunchedEffect
         }
+        if (optionsPage != null) return@LaunchedEffect
         delay(RECORDING_CONTROLS_AUTO_HIDE_MS)
         hideControls()
     }
@@ -238,12 +285,14 @@ fun RecordingPlayerScreen(
     }
 
     BackHandler {
-        applyKeyAction(
-            recordingPlaybackKeyAction(
-                controlsVisible = controlsVisible,
-                keyCode = AndroidKeyEvent.KEYCODE_BACK,
+        if (!applyAuxiliaryBack()) {
+            applyKeyAction(
+                recordingPlaybackKeyAction(
+                    controlsVisible = controlsVisible,
+                    keyCode = AndroidKeyEvent.KEYCODE_BACK,
+                )
             )
-        )
+        }
     }
     KeepScreenOn(enabled = availability is RecordingPlaybackAvailability.Ready)
 
@@ -253,10 +302,23 @@ fun RecordingPlayerScreen(
             .focusRequester(rootFocus)
             .focusable()
             .onPreviewKeyEvent { event ->
+                val keyCode = event.nativeKeyEvent.keyCode
+                if (recordingPlaybackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
+                    if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
+                    return@onPreviewKeyEvent true
+                }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
+                if (
+                    keyCode == AndroidKeyEvent.KEYCODE_BACK &&
+                    applyAuxiliaryBack()
+                ) {
+                    return@onPreviewKeyEvent true
+                }
+                if (optionsPage != null) return@onPreviewKeyEvent false
+
                 val mediaAction = mediaPlaybackAction(
-                    keyCode = event.nativeKeyEvent.keyCode,
+                    keyCode = keyCode,
                     playKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
                     pauseKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
                     toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
@@ -272,7 +334,7 @@ fun RecordingPlayerScreen(
                     return@onPreviewKeyEvent true
                 }
 
-                when (event.nativeKeyEvent.keyCode) {
+                when (keyCode) {
                     AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
                         seekBy(-RECORDING_SHORT_SEEK_MS)
                         return@onPreviewKeyEvent true
@@ -283,12 +345,14 @@ fun RecordingPlayerScreen(
                     }
                 }
 
-                applyKeyAction(
-                    recordingPlaybackKeyAction(
-                        controlsVisible = controlsVisible,
-                        keyCode = event.nativeKeyEvent.keyCode,
-                    )
+                val keyAction = recordingPlaybackKeyAction(
+                    controlsVisible = controlsVisible,
+                    keyCode = keyCode,
                 )
+                if (keyAction == RecordingPlaybackKeyAction.REVEAL_CONTROLS) {
+                    revealingKeyCode = keyCode
+                }
+                applyKeyAction(keyAction)
             },
     ) {
         if (availability is RecordingPlaybackAvailability.Ready) {
@@ -299,7 +363,6 @@ fun RecordingPlayerScreen(
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 RecordingOverlayControls(
-                    player = player,
                     imageLoader = imageLoader,
                     piconPath = entry?.let { channelsById[it.channelId]?.icon },
                     title = entry?.title ?: stringResource(R.string.recording_unavailable_title),
@@ -309,6 +372,7 @@ fun RecordingPlayerScreen(
                     durationMs = durationMs,
                     isPlaying = isPlaying,
                     controlsVisible = controlsVisible,
+                    optionsOpen = optionsPage != null,
                     onTogglePlayPause = {
                         if (playbackState is PlaybackSessionState.Finished) {
                             player.seekTo(0L)
@@ -321,8 +385,20 @@ fun RecordingPlayerScreen(
                     onStopPlayback = ::stopAndClose,
                     onUserInteraction = { interactionToken++ },
                     showStop = showStop,
-                    showUnlock = showUnlock,
-                    onUnlock = onUnlock,
+                    onOpenOptions = {
+                        optionsPage = PlaybackOptionsPage.ROOT
+                        controlsVisible = true
+                    },
+                )
+            }
+
+            if (statsVisible && optionsPage == null) {
+                PlaybackStatsOverlay(
+                    diagnostics = diagnostics,
+                    aspectRatio = aspectRatio,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 36.dp, end = 48.dp),
                 )
             }
 
@@ -414,12 +490,31 @@ fun RecordingPlayerScreen(
                         Text(stringResource(R.string.close))
                     }
                     if (showUnlock) {
-                        Button(onClick = onUnlock) {
-                            Text(stringResource(R.string.simple_tv_unlock))
+                        Button(onClick = { optionsPage = PlaybackOptionsPage.ROOT }) {
+                            Text(stringResource(R.string.playback_options))
                         }
                     }
                 }
             }
+        }
+        optionsPage?.let { page ->
+            PlaybackOptionsSheet(
+                page = page,
+                player = player,
+                aspectRatio = aspectRatio,
+                statsVisible = statsVisible,
+                showSimpleTvExit = showUnlock,
+                onPageChange = { optionsPage = it },
+                onAspectRatioChange = { mode ->
+                    aspectRatio = mode
+                    scope.launch { settingsStore.setAspectRatio(mode) }
+                },
+                onStatsVisibleChange = { statsVisible = it },
+                onSimpleTvExit = {
+                    optionsPage = null
+                    onUnlock()
+                },
+            )
         }
     }
 }

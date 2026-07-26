@@ -115,6 +115,28 @@ fun adjacentChannelId(
 - Reveal hidden playback controls with OK or D-pad Down. Picking the channel that
   is already playing from the playback channel sheet closes the sheet without
   rebuilding or restarting the player session.
+- Live and recording playback expose one **Playback options** action in the main
+  controls. Its full-height right-edge sheet contains Audio, Subtitles, explicit
+  Auto/16:9/4:3 display modes, and a session-only **Stats for nerds** toggle.
+  Opening the sheet suspends control auto-hide; Back returns nested pages to the
+  sheet root, then closes the sheet and restores focus to Playback options.
+- Stats for nerds is a non-focusable, one-second diagnostic overlay. It may show
+  playback state/timing, selected formats, decoder names, rendered/dropped frame
+  counters, audio underruns, measured HTSP stream/file read rate, display output,
+  thermal state, and app memory. Live TV conditionally adds TVHeadend tuner signal,
+  SNR, reception errors, queue depth/delay, and server-side frame drops only when
+  the active adapter reports them; recordings never imply a tuner. Unavailable
+  scan type and deinterlacing details are omitted rather than guessed. The
+  overlay uses a screen-safe multi-column layout and must not expose server
+  addresses, recording paths, credentials, identifiers, raw errors, or logs.
+  Back hides stats before normal player Back behavior.
+- Simple TV mode is a player-only session. Its startup toggle affects only fresh
+  launches, while **Start Simple TV now** enters it explicitly. Back may dismiss
+  overlays but must not leave playback while the mode is active.
+- Exiting Simple TV is deliberately secondary inside Playback options rather than
+  a primary transport action. It requires optional owner-PIN verification and a
+  separate cancellable confirmation even when no PIN is set. Confirmed exit
+  unlocks only the current app session and does not change startup.
 - Consume only Android GUIDE and the captured TCL TV key code in the
   accessibility service; boot/wake entry must not subscribe to accessibility
   events or inspect window content.
@@ -187,7 +209,7 @@ fun adjacentChannelId(
     panes summarize descendant recordings with count, storage, date range, and
     a focusable newest-first recording list that opens normal recording details.
     Recording playback uses an auto-hiding TV overlay with metadata, elapsed and
-    total time, a seek bar, icon-based playback and track controls, and stable
+    total time, a seek bar, icon-based transport, Playback options, and stable
     focus. With controls hidden, Left/Right seek 30 seconds and Down/Up seek 10
     minutes. Rapid steps accumulate on screen and dispatch as one seek after a
     short input pause; the seek timeline and cumulative step remain visible

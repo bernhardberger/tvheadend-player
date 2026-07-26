@@ -125,6 +125,52 @@
     <!-- Common -->
     <string name="close">Close</string>
     <string name="stop_playback">Stop playback</string>
+    <string name="playback_options">Playback options</string>
+    <string name="display_mode">Display mode</string>
+    <string name="display_mode_auto">Auto (original aspect)</string>
+    <string name="display_mode_16_9">Fill 16:9</string>
+    <string name="display_mode_4_3">Fill 4:3</string>
+    <string name="stats_for_nerds">Stats for nerds</string>
+    <string name="stats_source">Source</string>
+    <string name="stats_source_live">Live TV</string>
+    <string name="stats_source_recording">Recording</string>
+    <string name="stats_state">State</string>
+    <string name="stats_timing">Position</string>
+    <string name="stats_video">Video</string>
+    <string name="stats_video_decoder">Video decoder</string>
+    <string name="stats_frames">Frames</string>
+    <string name="stats_audio">Audio</string>
+    <string name="stats_audio_decoder">Audio decoder</string>
+    <string name="stats_underruns">Audio underruns</string>
+    <string name="stats_stream_read_rate">Stream read rate</string>
+    <string name="stats_file_read_rate">File read rate</string>
+    <string name="stats_unavailable">Unavailable</string>
+    <string name="stats_playback">Playback</string>
+    <string name="stats_tuner">Tuner</string>
+    <string name="stats_tuner_status">Frontend</string>
+    <string name="stats_signal">Signal</string>
+    <string name="stats_snr">SNR</string>
+    <string name="stats_ber">Bit error rate</string>
+    <string name="stats_uncorrected_blocks">Uncorrected blocks</string>
+    <string name="stats_server_queue">TVHeadend queue</string>
+    <string name="stats_queued">Queued</string>
+    <string name="stats_queue_delay">Queue delay</string>
+    <string name="stats_packet_count">%1$s packets</string>
+    <string name="stats_server_drops">Server frame drops</string>
+    <string name="stats_system">System</string>
+    <string name="stats_output">Display output</string>
+    <string name="stats_thermal">Thermal</string>
+    <string name="stats_app_memory">App memory</string>
+    <string name="stats_low_memory">Low-memory state</string>
+    <string name="stats_yes">Yes</string>
+    <string name="stats_no">No</string>
+    <string name="stats_thermal_none">None</string>
+    <string name="stats_thermal_light">Light</string>
+    <string name="stats_thermal_moderate">Moderate</string>
+    <string name="stats_thermal_severe">Severe</string>
+    <string name="stats_thermal_critical">Critical</string>
+    <string name="stats_thermal_emergency">Emergency</string>
+    <string name="stats_thermal_shutdown">Shutdown</string>
 
 
     <!-- ===== EPG ===== -->

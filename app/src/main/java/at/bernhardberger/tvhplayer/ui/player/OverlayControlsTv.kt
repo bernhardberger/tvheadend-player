@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,13 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay30
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,19 +35,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.media3.common.Player
 import androidx.tv.material3.Icon
-import androidx.tv.material3.Button
 import androidx.tv.material3.IconButton
-import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
@@ -61,7 +52,6 @@ import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward
 import at.bernhardberger.tvhplayer.core.initialPlaybackOverlayFocus
-import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -69,7 +59,6 @@ import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
 
 @Composable
 fun OverlayControlsTv(
-    player: Player,
     imageLoader: ImageLoader,
     channelNumber: Int?,
     channelName: String,
@@ -78,34 +67,27 @@ fun OverlayControlsTv(
     nextEvent: EpgEventEntry?,
     nowSec: Long,
     controlsVisible: Boolean,
+    optionsOpen: Boolean,
     onOpenChannels: () -> Unit,
     onStopPlayback: () -> Unit,
     onUserInteraction: () -> Unit,
-    aspectRatio: AspectRatioMode,
-    onAspectRatioChange: () -> Unit,
+    onOpenOptions: () -> Unit,
     timeshiftState: TimeshiftState,
     timeshiftFeedback: String?,
     onToggleTimeshiftPause: () -> Unit,
     onSeekTimeshift: (Long) -> Unit,
     onGoLive: () -> Unit,
     showStop: Boolean = true,
-    showUnlock: Boolean = false,
-    onUnlock: () -> Unit = {},
 ) {
-    var showAudio by remember { mutableStateOf(false) }
-    var showSubs by remember { mutableStateOf(false) }
     var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
 
     val channelsFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
-    val aspectFocus = remember { FocusRequester() }
-    val audioFocus = remember { FocusRequester() }
-    val subtitleFocus = remember { FocusRequester() }
+    val optionsFocus = remember { FocusRequester() }
     val pauseFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val forwardFocus = remember { FocusRequester() }
     val liveFocus = remember { FocusRequester() }
-    val unlockFocus = remember { FocusRequester() }
     val canSeekBack = canSeekTimeshiftBackward(timeshiftState)
     val canSeekForward = canSeekTimeshiftForward(timeshiftState)
 
@@ -115,9 +97,9 @@ fun OverlayControlsTv(
         canSeekBack,
         canSeekForward,
         showStop,
-        showUnlock,
+        optionsOpen,
     ) {
-        if (controlsVisible) {
+        if (controlsVisible && !optionsOpen) {
             val requesters = buildMap {
                 put("channels", channelsFocus)
                 if (timeshiftState.available) {
@@ -128,10 +110,7 @@ fun OverlayControlsTv(
                         put("live", liveFocus)
                     }
                 }
-                put("aspect", aspectFocus)
-                put("audio", audioFocus)
-                put("subtitles", subtitleFocus)
-                if (showUnlock) put("unlock", unlockFocus)
+                put("options", optionsFocus)
                 if (showStop) put("stop", stopFocus)
             }
             val initialKey = when (initialPlaybackOverlayFocus(timeshiftState.available)) {
@@ -286,16 +265,6 @@ fun OverlayControlsTv(
                             Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
                         }
                     }
-                    if (showUnlock) {
-                        OutlinedButton(
-                            onClick = { onUserInteraction(); onUnlock() },
-                            modifier = Modifier
-                                .focusRequester(unlockFocus)
-                                .onFocusChanged { if (it.isFocused) focused("unlock") },
-                        ) {
-                            Text(stringResource(R.string.simple_tv_unlock))
-                        }
-                    }
                 }
 
                 if (timeshiftState.available) {
@@ -371,64 +340,14 @@ fun OverlayControlsTv(
                 ) {
                     RoundIconButton(
                         icon = {
-                            Icon(
-                                Icons.AutoMirrored.Filled.VolumeUp,
-                                stringResource(R.string.audio_track),
-                            )
+                            Icon(Icons.Filled.MoreVert, stringResource(R.string.playback_options))
                         },
-                        onClick = { onUserInteraction(); showAudio = true },
-                        focusRequester = audioFocus,
-                        onFocused = { focused("audio") },
-                    )
-                    RoundIconButton(
-                        icon = {
-                            Icon(Icons.Filled.Subtitles, stringResource(R.string.subtitles))
-                        },
-                        onClick = { onUserInteraction(); showSubs = true },
-                        focusRequester = subtitleFocus,
-                        onFocused = { focused("subtitles") },
-                    )
-                    RoundIconButton(
-                        icon = { AspectRatioIcon(aspectRatio) },
-                        onClick = { onUserInteraction(); onAspectRatioChange() },
-                        focusRequester = aspectFocus,
-                        onFocused = { focused("aspect") },
+                        onClick = { onUserInteraction(); onOpenOptions() },
+                        focusRequester = optionsFocus,
+                        onFocused = { focused("options") },
                     )
                 }
             }
         }
-    }
-
-    if (showAudio) AudioTrackDialog(player = player, onDismiss = { showAudio = false })
-    if (showSubs) SubtitleTrackDialog(player = player, onDismiss = { showSubs = false })
-}
-
-@Composable
-private fun AspectRatioIcon(aspectRatio: AspectRatioMode) {
-    val color = LocalContentColor.current
-    Box(contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.size(28.dp)) {
-            val strokeWidth = 2.5f
-            val cap = StrokeCap.Round
-            val inset = size.width * 0.28f
-            drawLine(color, Offset(0f, inset), Offset(0f, 0f), strokeWidth, cap)
-            drawLine(color, Offset(0f, 0f), Offset(inset, 0f), strokeWidth, cap)
-            drawLine(color, Offset(size.width - inset, 0f), Offset(size.width, 0f), strokeWidth, cap)
-            drawLine(color, Offset(size.width, 0f), Offset(size.width, inset), strokeWidth, cap)
-            drawLine(color, Offset(0f, size.height - inset), Offset(0f, size.height), strokeWidth, cap)
-            drawLine(color, Offset(0f, size.height), Offset(inset, size.height), strokeWidth, cap)
-            drawLine(color, Offset(size.width - inset, size.height), Offset(size.width, size.height), strokeWidth, cap)
-            drawLine(color, Offset(size.width, size.height - inset), Offset(size.width, size.height), strokeWidth, cap)
-        }
-        Text(
-            text = when (aspectRatio) {
-                AspectRatioMode.FIT -> "AUTO"
-                AspectRatioMode.FORCE_16_9 -> "16:9"
-                AspectRatioMode.FORCE_4_3 -> "4:3"
-            },
-            color = color,
-            fontSize = 7.sp,
-            fontWeight = FontWeight.Bold,
-        )
     }
 }

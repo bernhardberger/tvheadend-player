@@ -82,13 +82,31 @@
   playback recovery, not every non-playing state.
 - Give recording playback the same auto-hiding cinematic control language as
   live TV, with recording metadata, a progress bar, icon-based transport and
-  track controls, and focus restoration. Hidden controls use Kodi-style direct
+  focus restoration. Hidden controls use Kodi-style direct
   seeks: Left/Right move 30 seconds and Down/Up move 10 minutes; visible controls
   retain normal D-pad focus navigation. Accumulate rapid fixed-step inputs and
   dispatch one seek after a short debounce, keeping feedback visible while the
   player buffers and briefly after playback resumes. Back hides visible controls
   before a subsequent Back returns to the recordings library while playback
   remains warm; only the explicit Stop control tears down the session.
+- Use one shared full-height Playback options sheet for live TV and recordings.
+  Move Audio, Subtitles, and explicit display-mode choices out of the primary
+  controls, and keep Exit Simple TV as a deliberately secondary sheet action that
+  retains the existing PIN and confirmation flow. Sheet pages have deterministic
+  initial focus and Back unwinds nested page, sheet, then stats before player Back.
+- Keep Stats for nerds session-only and non-focusable. `PlayerSession` samples
+  Media3 formats, decoder names, playback timing, decoder counters, and audio
+  underruns no more than once per second while enabled. Custom HTSP data sources
+  count successful reads so the UI can report stream/file read rate rather than a
+  misleading connection-speed estimate. The active live subscription also maps
+  optional `signalStatus` and `queueStatus` messages without retaining or exposing
+  the subscription ID; recordings omit tuner data. Sample display mode, thermal
+  state, app PSS, and Android low-memory state in the same opt-in job. Omit scan
+  type and deinterlacing unless future codec parsing or Android APIs can prove
+  them; never infer either from resolution, frame rate, or decoder name. Use a
+  multi-column overlay to remain inside the TV safe area as optional sections
+  appear. Diagnostic snapshots contain no server, path, credential, identifier,
+  raw-error, or log fields.
 - Consume OK and D-pad Down when they reveal hidden playback controls so the same
   key event cannot activate a newly focused control. Treat selection of the
   current playback channel as a drawer-close action rather than a tune request.
@@ -319,7 +337,7 @@ and an approved cold reboot with enabled-service and app-op state rechecked.
 - Back still reaches operator UI.
 - Google Basic TV and both rollback clients still launch directly.
 
-## Future profile: Simple TV mode
+## Simple TV mode
 
 Use **Simple TV mode** as the user-facing name and a restricted appliance
 profile as the internal concept. Do not call the first implementation Android
@@ -327,46 +345,31 @@ kiosk mode: Android lock-task/device-owner kiosk behavior controls the whole
 device, can suppress HOME and other apps, and conflicts with the current
 reversibility and rollback requirements.
 
-Simple TV mode is an app-level navigation and capability profile:
+Simple TV mode is an app-level, player-only session profile:
 
-- Persist whether the profile is enabled and enter live TV on startup using the
-  existing one-shot launch and last-played-channel policies.
-- Define allowed destinations centrally with pure policy, initially live TV and
-  the Channel List. Make EPG optional and add future recordings or other
-  features as independent capabilities rather than scattered visibility flags.
-- Remove unavailable destinations from navigation and focus traversal. Do not
-  leave disabled or dead focus targets, and do not rely only on hiding buttons;
-  route guards must reject disallowed deep or restored destinations too.
-- Keep Back inside the profile: fullscreen playback returns to the allowed
-  operator UI, and root UI returns to warm playback. Stopping playback may show
-  the allowed Channel List, but must not silently unlock the full app.
-- Provide a visible **Unlock controls** action in the restricted navigation
-  surface. Unlock the full UI for the current foreground session; the profile
-  becomes restricted again on the next fresh launch.
-- Offer an optional owner PIN for households that need child resistance. Treat
-  it as protection against casual UI access, not as a security boundary. Avoid
-  hidden key sequences or long-press-only escape gestures.
-- Allow permanent disable only from the full settings UI after unlocking. Keep
-  normal Android Back exit available in the full profile and retain Google TV
-  plus rollback clients.
+- Persist **Start in Simple TV mode** independently from whether the current
+  foreground session is restricted. Changing the startup toggle never enters
+  the mode immediately.
+- A fresh launch with that preference enabled uses the existing one-shot launch
+  and last-played-channel policies, enters the restricted session, and plays the
+  last valid channel. **Start Simple TV now** performs the same entry explicitly.
+- While active, retain fullscreen live TV, channel keys, number entry, the player
+  channel drawer, and optionally timeshift. Do not expose the Channel List, EPG,
+  recordings, Settings, Stop, or app-exit navigation.
+- Back dismisses player overlays but cannot leave fullscreen playback. HOME
+  remains normal Android behavior; this is not lock-task or device-owner kiosk
+  mode.
+- Provide a visible **Exit Simple TV** player action. If an owner PIN is
+  configured, verify it first. Always show a separate cancellable confirmation,
+  including when no PIN is configured, with the safe keep-watching action focused.
+- Confirmed exit restores the full UI only for the current app session. It does
+  not change the persisted startup preference; the owner can re-enter through
+  **Start Simple TV now**, and the next fresh launch restricts the app again.
+- Treat the optional PIN as protection against casual UI access, not as a
+  security boundary. Do not use a hidden sequence or long-press-only escape.
 
-Suggested implementation slices:
-
-1. Add a JVM-tested `UiCapabilities`/profile policy and persisted profile store.
-2. Add full-settings controls for enabled state and optional EPG/future feature
-   capabilities, plus an explicit action to enter Simple TV mode now.
-3. Enforce the route allowlist and deterministic startup/Back/focus behavior.
-4. Add session-only Unlock controls, then optional local PIN verification.
-5. Validate cold launch, stop, Back, HOME, wake, reboot, long labels, and every
-   enabled/disabled capability on the physical TV.
-
-Open product choices before implementation:
-
-- Whether EPG is enabled by default in Simple TV mode.
-- Whether Stop remains visible, and what idle screen it should reveal.
-- Whether an owner PIN is required, optional, or omitted for the first slice.
-- Whether the eventual public name is Simple TV mode, Restricted mode, or an
-  appliance profile under the final product identity.
+Physical-TV validation remains required for cold launch, explicit start, Back,
+exit cancellation, correct/incorrect PIN, HOME, wake, reboot, and focus behavior.
 
 ## Phase 5: Durable release and deployment
 
