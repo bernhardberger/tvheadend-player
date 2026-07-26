@@ -11,6 +11,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -46,7 +48,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
@@ -165,9 +170,10 @@ fun VideoPlayerScreen(
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var statsVisible by remember { mutableStateOf(false) }
+    var infoOpen by remember { mutableStateOf(false) }
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
 
-    val showDrawer = drawerOpen && !controlsVisible
+    val showDrawer = drawerOpen && !controlsVisible && !infoOpen
 
     var currentChannelId by remember { mutableIntStateOf(channelId) }
     var currentServiceId by remember { mutableIntStateOf(serviceId) }
@@ -558,13 +564,24 @@ fun VideoPlayerScreen(
                         simpleTvActive = simpleTvProfile.active,
                         optionsOpen = optionsPage != null,
                         statsOpen = statsVisible,
+                        infoOpen = infoOpen,
                         drawerOpen = showDrawer,
                     ),
                     keyCode = keyCode,
                 )
                 when (keyAction) {
+                    PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
+                        when {
+                            infoOpen -> {
+                                infoOpen = false
+                                return@onPreviewKeyEvent true
+                            }
+                            else -> return@onPreviewKeyEvent true
+                        }
+                    }
                     PlayerKeyAction.REVEAL_CONTROLS -> {
                         revealingKeyCode = keyCode
+                        infoOpen = false
                         showControls()
                         return@onPreviewKeyEvent true
                     }
@@ -593,9 +610,9 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_INFO -> {
-                        // Info surface lands with the player composition overhaul.
                         revealingKeyCode = keyCode
-                        showControls()
+                        infoOpen = true
+                        hideControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SEEK_BACK -> {
@@ -612,9 +629,6 @@ fun VideoPlayerScreen(
                     }
                     PlayerKeyAction.CLOSE_PLAYER -> {
                         onClose()
-                        return@onPreviewKeyEvent true
-                    }
-                    PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.PASS_THROUGH -> Unit
@@ -640,6 +654,8 @@ fun VideoPlayerScreen(
                 onFocusChannel = { selectedId = it },
                 onPickChannel = { tuneChannel(it) },
                 onCloseDrawer = { drawerOpen = false },
+                // Simple TV uses the shared large-card grid for quick select.
+                largeCards = simpleTvProfile.active,
             )
         }
 
@@ -666,6 +682,10 @@ fun VideoPlayerScreen(
                     ) ?: -1
                     hideControls()
                     drawerOpen = true
+                },
+                onOpenInfo = {
+                    infoOpen = true
+                    hideControls()
                 },
                 onStopPlayback = {
                     scope.launch {
@@ -738,11 +758,70 @@ fun VideoPlayerScreen(
             )
         }
 
+        if (infoOpen && nowEvent != null) {
+            val infoFocus = remember { FocusRequester() }
+            LaunchedEffect(infoOpen, nowEvent.eventId) {
+                runCatching { infoFocus.requestFocus() }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.78f)
+                        .padding(48.dp),
+                ) {
+                    Surface(
+                        shape = MaterialTheme.shapes.large,
+                        colors = SurfaceDefaults.colors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    ) {
+                        at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails(
+                            event = nowEvent,
+                            subtitle = buildString {
+                                append(currentChannelName)
+                                append(" • ")
+                                append(
+                                    at.bernhardberger.tvhplayer.ui.common.formatClock(
+                                        nowEvent.start,
+                                    )
+                                )
+                                append("–")
+                                append(
+                                    at.bernhardberger.tvhplayer.ui.common.formatClock(
+                                        nowEvent.stop,
+                                    )
+                                )
+                            },
+                            modifier = Modifier.padding(28.dp),
+                            actions = {
+                                OutlinedButton(
+                                    onClick = { infoOpen = false },
+                                    modifier = Modifier.focusRequester(infoFocus),
+                                ) {
+                                    Text(stringResource(R.string.player_info_close))
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        } else if (infoOpen && nowEvent == null) {
+            // No EPG: close immediately rather than trapping the user.
+            LaunchedEffect(Unit) { infoOpen = false }
+        }
+
         if (
             statsVisible &&
             optionsPage == null &&
             channelNumberInput.isEmpty() &&
-            !showDrawer
+            !showDrawer &&
+            !infoOpen
         ) {
             PlaybackStatsOverlay(
                 diagnostics = diagnostics,

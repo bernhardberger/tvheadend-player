@@ -39,6 +39,7 @@ import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
+import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import kotlinx.coroutines.launch
@@ -94,30 +95,25 @@ fun OnboardingIntroduction(onContinue: () -> Unit) {
             .padding(TvFullScreenPadding),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = stringResource(R.string.onboarding_title),
-            style = MaterialTheme.typography.displaySmall,
+        ActionsTemplate(
+            title = stringResource(R.string.onboarding_title),
+            subtitle = stringResource(R.string.onboarding_requirement),
+            body = {
+                Text(
+                    text = stringResource(R.string.trusted_network_guidance),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            actions = {
+                Button(
+                    onClick = onContinue,
+                    modifier = Modifier.focusRequester(continueFocus),
+                ) {
+                    Text(stringResource(R.string.onboarding_continue))
+                }
+            },
         )
-        Spacer(Modifier.height(20.dp))
-        Text(
-            text = stringResource(R.string.onboarding_requirement),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.width(820.dp),
-        )
-        Spacer(Modifier.height(18.dp))
-        Text(
-            text = stringResource(R.string.trusted_network_guidance),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(820.dp),
-        )
-        Spacer(Modifier.height(32.dp))
-        Button(
-            onClick = onContinue,
-            modifier = Modifier.focusRequester(continueFocus),
-        ) {
-            Text(stringResource(R.string.onboarding_continue))
-        }
     }
 }
 

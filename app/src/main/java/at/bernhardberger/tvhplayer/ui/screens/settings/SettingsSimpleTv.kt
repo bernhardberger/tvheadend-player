@@ -40,6 +40,7 @@ import at.bernhardberger.tvhplayer.core.isValidSimpleTvPin
 import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.SettingsSectionTitle
+import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import kotlinx.coroutines.launch
@@ -170,38 +171,27 @@ fun SettingsSimpleTv(
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 runCatching { cancelFocus.requestFocus() }
             }
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = stringResource(R.string.simple_tv_start_confirm_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.semantics {
-                            heading()
-                        },
-                    )
-                    Text(stringResource(R.string.simple_tv_start_confirm_message))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        androidx.tv.material3.OutlinedButton(
-                            onClick = { confirmStart = false },
-                            modifier = Modifier.focusRequester(cancelFocus),
-                        ) {
-                            Text(stringResource(R.string.back))
-                        }
-                        Button(
-                            onClick = {
-                                confirmStart = false
-                                onStartSimpleTv()
-                            },
-                        ) {
-                            Text(stringResource(R.string.simple_tv_start_now))
-                        }
+            ActionsTemplate(
+                title = stringResource(R.string.simple_tv_start_confirm_title),
+                subtitle = stringResource(R.string.simple_tv_start_confirm_message),
+                modifier = Modifier.padding(top = 8.dp),
+                actions = {
+                    androidx.tv.material3.OutlinedButton(
+                        onClick = { confirmStart = false },
+                        modifier = Modifier.focusRequester(cancelFocus),
+                    ) {
+                        Text(stringResource(R.string.back))
                     }
-                }
-            }
+                    Button(
+                        onClick = {
+                            confirmStart = false
+                            onStartSimpleTv()
+                        },
+                    ) {
+                        Text(stringResource(R.string.simple_tv_start_now))
+                    }
+                },
+            )
         }
     }
 }

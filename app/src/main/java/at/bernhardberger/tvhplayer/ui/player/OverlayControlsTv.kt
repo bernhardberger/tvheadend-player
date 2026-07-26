@@ -15,12 +15,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay30
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +70,7 @@ fun OverlayControlsTv(
     controlsVisible: Boolean,
     optionsOpen: Boolean,
     onOpenChannels: () -> Unit,
+    onOpenInfo: () -> Unit = {},
     onStopPlayback: () -> Unit,
     onUserInteraction: () -> Unit,
     onOpenOptions: () -> Unit,
@@ -83,6 +84,7 @@ fun OverlayControlsTv(
     var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
 
     val channelsFocus = remember { FocusRequester() }
+    val infoFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
     val optionsFocus = remember { FocusRequester() }
     val pauseFocus = remember { FocusRequester() }
@@ -111,6 +113,7 @@ fun OverlayControlsTv(
                         put("live", liveFocus)
                     }
                 }
+                put("info", infoFocus)
                 put("options", optionsFocus)
                 if (showStop) put("stop", stopFocus)
             }
@@ -312,6 +315,15 @@ fun OverlayControlsTv(
                                 Text(stringResource(R.string.timeshift_go_live))
                             }
                         }
+                    }
+                    IconButton(
+                        onClick = { onUserInteraction(); onOpenInfo() },
+                        modifier = Modifier
+                            .size(52.dp)
+                            .focusRequester(infoFocus)
+                            .onFocusChanged { if (it.isFocused) focused("info") },
+                    ) {
+                        Icon(Icons.Filled.Info, stringResource(R.string.player_info))
                     }
                     RoundIconButton(
                         icon = {
