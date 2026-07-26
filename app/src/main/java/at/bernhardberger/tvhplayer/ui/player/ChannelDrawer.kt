@@ -51,6 +51,7 @@ import kotlinx.coroutines.launch
 fun ChannelDrawer(
     channels: List<ChannelUi>,
     selectedId: Int,
+    playingChannelId: Int,
     nowSec: Long,
     channelsVm: ChannelsViewModel,
     imageLoader: ImageLoader,
@@ -129,12 +130,13 @@ fun ChannelDrawer(
 
     Box(
         modifier = Modifier
-            .width(520.dp)
+            // Gradient width matches the list content rather than a wide empty band.
+            .width(440.dp)
             .fillMaxHeight()
             .background(
                 Brush.horizontalGradient(
                     0f to Color.Black.copy(alpha = 0.96f),
-                    0.82f to Color.Black.copy(alpha = 0.92f),
+                    0.88f to Color.Black.copy(alpha = 0.92f),
                     1f to Color.Transparent,
                 )
             )
@@ -193,6 +195,7 @@ fun ChannelDrawer(
                         imageLoader = imageLoader,
                         piconPath = ch.icon,
                         focused = isSelected,
+                        playingNow = ch.id == playingChannelId,
                         onFocus = { if (!isRestoring) onFocusChannel(ch.id) },
                         onConfirm = { onPickChannel(ch) }
                     )

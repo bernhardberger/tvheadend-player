@@ -261,6 +261,14 @@
     <string name="timeshift_live">Live</string>
     <string name="player_seekbar_recording_description">Wiedergabeposition %1$s von %2$s</string>
     <string name="player_seekbar_timeshift_description">Timeshift-Position %1$s hinter Live</string>
+    <string name="player_on_now">Läuft jetzt</string>
+    <string name="simple_tv_owner_section">Besitzer</string>
+    <string name="track_unknown_language">Unbekannte Sprache</string>
+    <string name="track_mono">Mono</string>
+    <string name="track_stereo">Stereo</string>
+    <string name="track_surround_5_1">5.1</string>
+    <string name="track_surround_7_1">7.1</string>
+    <string name="track_channels_count">%1$d Kanäle</string>
     <string name="timeshift_behind_live">%1$s hinter Live</string>
     <string name="timeshift_go_live">Zu Live</string>
     <string name="timeshift_seek_clamped">Grenze des verfügbaren Puffers erreicht.</string>

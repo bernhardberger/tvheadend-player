@@ -15,10 +15,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.R
 import coil3.ImageLoader
 
 @Composable
@@ -32,6 +34,7 @@ fun ChannelRow(
     piconPath: String?,
     focused: Boolean,
     recordingNow: Boolean = false,
+    playingNow: Boolean = false,
     onFocus: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -80,10 +83,24 @@ fun ChannelRow(
                 )
             }
         },
-        trailingContent = if (recordingNow) {
-            { RecordingStatusIndicator(state = at.bernhardberger.tvhplayer.htsp.DvrState.RECORDING) }
-        } else {
-            null
+        trailingContent = when {
+            recordingNow -> {
+                {
+                    RecordingStatusIndicator(
+                        state = at.bernhardberger.tvhplayer.htsp.DvrState.RECORDING,
+                    )
+                }
+            }
+            playingNow -> {
+                {
+                    Text(
+                        text = stringResource(R.string.player_on_now),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            else -> null
         },
         scale = ListItemDefaults.scale(
             focusedScale = 1f,

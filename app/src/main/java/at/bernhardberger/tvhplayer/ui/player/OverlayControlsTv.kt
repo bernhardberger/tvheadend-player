@@ -153,30 +153,20 @@ fun OverlayControlsTv(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
             ) {
-                PiconBox(
-                    imageLoader = imageLoader,
-                    piconPath = piconPath,
-                    modifier = Modifier
-                        .width(72.dp)
-                        .height(48.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(Color.White.copy(alpha = 0.10f))
-                        .padding(6.dp),
-                )
-                Spacer(Modifier.width(16.dp))
+                // Programme title is primary; channel identity secondary; times/up-next tertiary.
                 Column(Modifier.weight(1f)) {
+                    Text(
+                        text = title.ifEmpty { channelName },
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text(
                         text = listOfNotNull(channelNumber?.toString(), channelName)
                             .joinToString("  "),
                         color = Color.White.copy(alpha = 0.82f),
                         style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = title.ifEmpty { channelName },
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -242,12 +232,14 @@ fun OverlayControlsTv(
             }
 
             Spacer(Modifier.height(18.dp))
-            Box(
+            // Single right-aligned control cluster so Right always moves to an adjacent control.
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    modifier = Modifier.align(Alignment.CenterStart),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
@@ -262,25 +254,7 @@ fun OverlayControlsTv(
                             stringResource(R.string.nav_channels),
                         )
                     }
-                    if (showStop) {
-                        IconButton(
-                            onClick = { onUserInteraction(); onStopPlayback() },
-                            modifier = Modifier
-                                .size(52.dp)
-                                .focusRequester(stopFocus)
-                                .onFocusChanged { if (it.isFocused) focused("stop") },
-                        ) {
-                            Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
-                        }
-                    }
-                }
-
-                if (timeshiftState.available) {
-                    Row(
-                        modifier = Modifier.align(Alignment.Center),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    if (timeshiftState.available) {
                         if (canSeekBack) {
                             IconButton(
                                 onClick = {
@@ -298,7 +272,7 @@ fun OverlayControlsTv(
                         IconButton(
                             onClick = { onUserInteraction(); onToggleTimeshiftPause() },
                             modifier = Modifier
-                                .size(64.dp)
+                                .size(56.dp)
                                 .focusRequester(pauseFocus)
                                 .onFocusChanged { if (it.isFocused) focused("pause") },
                         ) {
@@ -339,13 +313,6 @@ fun OverlayControlsTv(
                             }
                         }
                     }
-                }
-
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
                     RoundIconButton(
                         icon = {
                             Icon(Icons.Filled.MoreVert, stringResource(R.string.playback_options))
@@ -354,6 +321,17 @@ fun OverlayControlsTv(
                         focusRequester = optionsFocus,
                         onFocused = { focused("options") },
                     )
+                    if (showStop) {
+                        IconButton(
+                            onClick = { onUserInteraction(); onStopPlayback() },
+                            modifier = Modifier
+                                .size(52.dp)
+                                .focusRequester(stopFocus)
+                                .onFocusChanged { if (it.isFocused) focused("stop") },
+                        ) {
+                            Icon(Icons.Filled.Stop, stringResource(R.string.stop_playback))
+                        }
+                    }
                 }
             }
         }

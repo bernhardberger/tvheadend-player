@@ -77,7 +77,8 @@ internal fun PlaybackOptionsSheet(
                 .fillMaxHeight()
                 .width(420.dp),
             colors = SurfaceDefaults.colors(
-                containerColor = Color(0xF20D1117),
+                // Fully opaque so player controls cannot ghost through the sheet.
+                containerColor = Color(0xFF0D1117),
                 contentColor = Color.White,
             ),
         ) {
@@ -213,11 +214,16 @@ private fun PlaybackOptionsRoot(
                 showSwitch = true,
         )
         if (showSimpleTvExit) {
+            Text(
+                text = stringResource(R.string.simple_tv_owner_section),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White.copy(alpha = 0.72f),
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+            )
             PlaybackOptionRow(
                 label = stringResource(R.string.simple_tv_unlock),
                 onClick = onSimpleTvExit,
                 modifier = Modifier
-                    .padding(top = 12.dp)
                     .then(
                         if (initialItem == PlaybackOptionsRootItem.EXIT_SIMPLE_TV) {
                             Modifier.focusRequester(initialFocus)
@@ -240,11 +246,27 @@ private fun TrackOptions(
     initialFocus: FocusRequester,
     onSelected: () -> Unit,
 ) {
-    val tracks = collectTracks(player.currentTracks, trackType)
+    val unknownLanguage = stringResource(R.string.track_unknown_language)
+    val mono = stringResource(R.string.track_mono)
+    val stereo = stringResource(R.string.track_stereo)
+    val surround51 = stringResource(R.string.track_surround_5_1)
+    val surround71 = stringResource(R.string.track_surround_7_1)
+    val channelsTemplate = stringResource(R.string.track_channels_count)
+    val tracks = collectTracks(
+        tracks = player.currentTracks,
+        trackType = trackType,
+        unknownLanguageLabel = unknownLanguage,
+        monoLabel = mono,
+        stereoLabel = stereo,
+        surround51Label = surround51,
+        surround71Label = surround71,
+        channelsLabel = { count -> channelsTemplate.format(count) },
+    )
     val subtitles = trackType == C.TRACK_TYPE_TEXT
     val selectedIndex = tracks.indexOfFirst(UiTrack::selected).takeIf { it >= 0 } ?: 0
     LaunchedEffect(initialFocus, tracks) {
-        if (subtitles || tracks.isNotEmpty()) initialFocus.requestFocus()
+        // Always request a focusable target, including the empty-state row.
+        initialFocus.requestFocus()
     }
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -270,6 +292,7 @@ private fun TrackOptions(
         itemsIndexed(tracks) { index, track ->
             PlaybackOptionRow(
                 label = track.label,
+                supportingLabel = track.secondaryLabel,
                 selected = track.selected,
                 onClick = {
                     if (subtitles) selectTextTrack(player, track) else selectAudioTrack(player, track)
@@ -286,12 +309,12 @@ private fun TrackOptions(
         }
         if (tracks.isEmpty()) {
             item {
-                Text(
-                    text = stringResource(
+                PlaybackOptionRow(
+                    label = stringResource(
                         if (subtitles) R.string.no_subtitles else R.string.no_audio_tracks
                     ),
-                    color = Color.White.copy(alpha = 0.72f),
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    onClick = { },
+                    modifier = Modifier.focusRequester(initialFocus),
                 )
             }
         }
@@ -344,14 +367,18 @@ private fun PlaybackOptionRow(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    supportingLabel: String? = null,
     selected: Boolean = false,
     showChevron: Boolean = false,
     showSwitch: Boolean = false,
 ) {
     ListItem(
-        selected = selected,
+        selected = if (showSwitch) false else selected,
         onClick = onClick,
         headlineContent = { Text(label) },
+        supportingContent = supportingLabel?.let { text ->
+            { Text(text, color = Color.White.copy(alpha = 0.72f)) }
+        },
         trailingContent = {
             when {
                 showSwitch -> Switch(checked = selected, onCheckedChange = null)

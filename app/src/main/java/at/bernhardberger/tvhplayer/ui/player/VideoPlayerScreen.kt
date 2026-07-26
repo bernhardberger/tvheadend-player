@@ -633,6 +633,7 @@ fun VideoPlayerScreen(
             ChannelDrawer(
                 channels = channels,
                 selectedId = selectedId,
+                playingChannelId = currentChannelId,
                 nowSec = nowSec,
                 channelsVm = channelsVm,
                 imageLoader = imageLoader,
