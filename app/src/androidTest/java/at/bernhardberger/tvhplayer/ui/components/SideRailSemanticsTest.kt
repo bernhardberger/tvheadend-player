@@ -31,6 +31,7 @@ class SideRailSemanticsTest {
             }
         }
 
+        composeRule.onAllNodesWithContentDescription("Home").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Channels").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Guide").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Recordings").assertCountEquals(1)

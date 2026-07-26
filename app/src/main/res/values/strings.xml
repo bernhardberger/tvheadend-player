@@ -9,6 +9,14 @@
     <string name="empty_channel_tag">This channel tag is empty. Choose another tag or All channels.</string>
     <string name="active_tag_unavailable">The selected channel group is no longer available. Showing another available group.</string>
     <string name="dismiss">Dismiss</string>
+    <string name="nav_home">Home</string>
+    <string name="home_now_playing">Now playing</string>
+    <string name="home_recent">Recently played</string>
+    <string name="home_on_now">On now</string>
+    <string name="home_latest_recordings">Latest recordings</string>
+    <string name="home_recording_now">Recording now</string>
+    <string name="home_upcoming_recordings">Upcoming recordings</string>
+    <string name="home_empty">Choose a channel to start watching.</string>
     <string name="nav_channels">Channels</string>
     <string name="nav_epg">Guide</string>
     <string name="nav_recordings">Recordings</string>

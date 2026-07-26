@@ -62,6 +62,7 @@ import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
+import at.bernhardberger.tvhplayer.ui.screens.HomeScreen
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
@@ -76,6 +77,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
 object Routes {
+    const val HOME = "home"
     const val CHANNELS = "channels"
     const val EPG = "epg"
     const val RECORDINGS = "recordings"
@@ -199,8 +201,8 @@ fun AppRoot(
     LaunchedEffect(topRoute, capabilityProfile) {
         val route = topRoute.toSimpleTvRoute() ?: return@LaunchedEffect
         if (!capabilityProfile.allowsRoute(route) && route != SimpleTvRoute.CHANNELS) {
-            nav.navigate(Routes.CHANNELS) {
-                popUpTo(Routes.CHANNELS) { inclusive = true }
+            nav.navigate(Routes.HOME) {
+                popUpTo(Routes.HOME) { inclusive = true }
                 launchSingleTop = true
             }
         }
@@ -235,7 +237,8 @@ fun AppRoot(
 
         when (
             rootBackAction(
-                isStartDestination = currentRoute == Routes.CHANNELS,
+                isStartDestination = currentRoute == Routes.HOME ||
+                    currentRoute == Routes.CHANNELS,
                 warmReturn = warmReturn,
             )
         ) {
@@ -285,8 +288,26 @@ fun AppRoot(
             ) {
                 NavHost(
                     navController = nav,
-                    startDestination = Routes.CHANNELS,
+                    startDestination = Routes.HOME,
                 ) {
+
+                    composable(Routes.HOME) {
+                        ContentContainer {
+                            HomeScreen(
+                                connectionUiState = connectionUiState,
+                                onRetryConnection = appVm::reconnectNow,
+                                onPlayChannel = { channelId, serviceId, name ->
+                                    nav.navigate(Routes.player(channelId, serviceId, name))
+                                },
+                                onPlayRecording = { recordingId ->
+                                    nav.navigate(Routes.recordingPlayer(recordingId))
+                                },
+                                onOpenRecordings = {
+                                    nav.navigate(Routes.RECORDINGS) { launchSingleTop = true }
+                                },
+                            )
+                        }
+                    }
 
                     composable(Routes.CHANNELS) {
                         ContentContainer {
@@ -469,7 +490,7 @@ fun AppRoot(
                             warmReturn = rearmWarmReturn(currentWarmTarget)
                         }
                         nav.navigate(route) {
-                            popUpTo(Routes.CHANNELS) { inclusive = false }
+                            popUpTo(Routes.HOME) { inclusive = false }
                             launchSingleTop = true
                             restoreState = true
                         }
@@ -484,6 +505,7 @@ fun AppRoot(
 }
 
 private fun String?.toSimpleTvRoute(): SimpleTvRoute? = when (this) {
+    Routes.HOME -> SimpleTvRoute.CHANNELS
     Routes.CHANNELS -> SimpleTvRoute.CHANNELS
     Routes.EPG -> SimpleTvRoute.EPG
     Routes.RECORDINGS -> SimpleTvRoute.RECORDINGS

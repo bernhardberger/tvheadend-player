@@ -12,6 +12,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.LockOpen
@@ -50,12 +51,14 @@ fun SideRail(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val homeLabel = stringResource(R.string.nav_home)
     val channelsLabel = stringResource(R.string.nav_channels)
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
     val unlockLabel = stringResource(R.string.simple_tv_unlock)
     val mainItems = remember(
+        homeLabel,
         channelsLabel,
         epgLabel,
         recordingsLabel,
@@ -64,6 +67,13 @@ fun SideRail(
     ) {
         buildList {
             if (simpleTvProfile.allows(SimpleTvCapability.CHANNEL_LIST)) {
+                add(RailItem(Routes.HOME, homeLabel) {
+                    Icon(
+                        Icons.Filled.Home,
+                        contentDescription = homeLabel,
+                        modifier = Modifier.size(24.dp),
+                    )
+                })
                 add(RailItem(Routes.CHANNELS, channelsLabel) {
                     Icon(
                         Icons.AutoMirrored.Filled.List,
