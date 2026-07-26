@@ -565,13 +565,23 @@ fun VideoPlayerScreen(
                 }
 
                 if (showDrawer) {
+                    // List drawer: Right dismisses (edge-of-list exit). Large-card
+                    // Simple TV grid needs Right for horizontal navigation — only
+                    // Back (or a pick) closes there.
+                    val largeCardDrawer = simpleTvProfile.active
                     return@onPreviewKeyEvent when (event.key) {
-                        Key.DirectionRight,
                         Key.Back -> {
                             drawerOpen = false
                             true
                         }
-
+                        Key.DirectionRight -> {
+                            if (largeCardDrawer) {
+                                false
+                            } else {
+                                drawerOpen = false
+                                true
+                            }
+                        }
                         else -> false
                     }
                 }

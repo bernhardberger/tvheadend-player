@@ -107,9 +107,9 @@ fun playerKeyAction(
         keyCode == KeyEvent.KEYCODE_TV_NUMBER_ENTRY ||
         keyCode == KeyEvent.KEYCODE_BOOKMARK
     ) {
-        return if (
-            context.surface == PlayerSurface.LIVE && !context.simpleTvActive
-        ) {
+        // Dedicated list / guide-style remote keys open the channel picker in
+        // both normal and Simple TV live playback.
+        return if (context.surface == PlayerSurface.LIVE) {
             PlayerKeyAction.OPEN_CHANNELS
         } else {
             PlayerKeyAction.PASS_THROUGH
@@ -163,7 +163,11 @@ fun playerKeyAction(
         KeyEvent.KEYCODE_DPAD_LEFT -> when {
             context.surface == PlayerSurface.RECORDING || context.timeshiftAvailable ->
                 PlayerKeyAction.SEEK_BACK
-            context.surface == PlayerSurface.LIVE -> PlayerKeyAction.OPEN_CHANNELS
+            // Simple TV must not steal Left for the channel grid — Left/Right are
+            // needed for in-grid focus. Use the remote list key or the on-screen
+            // channels control instead (Material for TV / remote-first).
+            context.surface == PlayerSurface.LIVE && !context.simpleTvActive ->
+                PlayerKeyAction.OPEN_CHANNELS
             else -> PlayerKeyAction.PASS_THROUGH
         }
         KeyEvent.KEYCODE_DPAD_RIGHT -> when {
