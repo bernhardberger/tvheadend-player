@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.LinearProgressIndicator
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.ChannelBrowseLayout
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
@@ -61,11 +63,15 @@ import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.core.programmeSummaryText
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.common.progress
+import at.bernhardberger.tvhplayer.ui.components.ChannelCardGrid
+import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -86,6 +92,7 @@ fun ChannelsScreen(
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     dvrRepository: DvrRepository = koinInject(),
+    uiSettingsStore: UiSettingsStore = koinInject(),
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
@@ -93,6 +100,7 @@ fun ChannelsScreen(
 ) {
     val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
+    val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
@@ -103,10 +111,12 @@ fun ChannelsScreen(
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
+    val useCards = uiSettings.channelBrowseLayout == ChannelBrowseLayout.LARGE_CARDS
 
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
 
     val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -114,10 +124,15 @@ fun ChannelsScreen(
 
     fun pageChannels(direction: Int): Boolean {
         val currentIndex = channels.indexOfFirst { it.id == selectedId }
+        val visibleCount = if (useCards) {
+            gridState.layoutInfo.visibleItemsInfo.size
+        } else {
+            listState.layoutInfo.visibleItemsInfo.size
+        }
         val targetIndex = ChannelNavigation.pageTargetIndex(
             itemCount = channels.size,
             currentIndex = currentIndex,
-            visibleItemCount = listState.layoutInfo.visibleItemsInfo.size,
+            visibleItemCount = visibleCount,
             direction = direction,
         ) ?: return true
         if (targetIndex == currentIndex) return true
@@ -130,10 +145,17 @@ fun ChannelsScreen(
         selection.setSelected(targetId)
         coroutineScope.launch {
             try {
-                listState.scrollToItem(targetIndex)
-                snapshotFlow {
-                    listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
-                }.filter { it }.first()
+                if (useCards) {
+                    gridState.scrollToItem(targetIndex)
+                    snapshotFlow {
+                        gridState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
+                    }.filter { it }.first()
+                } else {
+                    listState.scrollToItem(targetIndex)
+                    snapshotFlow {
+                        listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
+                    }.filter { it }.first()
+                }
                 withFrameNanos { }
                 targetFocus.requestFocus()
                 withFrameNanos { }
@@ -164,7 +186,7 @@ fun ChannelsScreen(
         if (focusId != selectedId) selection.setSelected(focusId)
     }
 
-    LaunchedEffect(channels, selectedId) {
+    LaunchedEffect(channels, selectedId, useCards) {
         if (didInitialRestore) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
 
@@ -175,11 +197,17 @@ fun ChannelsScreen(
 
         isRestoring = true
 
-        listState.scrollToItem(idx)
-
-        snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo.any { it.key == id }
-        }.filter { it }.first()
+        if (useCards) {
+            gridState.scrollToItem(idx)
+            snapshotFlow {
+                gridState.layoutInfo.visibleItemsInfo.any { it.key == id }
+            }.filter { it }.first()
+        } else {
+            listState.scrollToItem(idx)
+            snapshotFlow {
+                listState.layoutInfo.visibleItemsInfo.any { it.key == id }
+            }.filter { it }.first()
+        }
 
         withFrameNanos { }
         rowFocusRequesters[id]?.requestFocus()
@@ -237,7 +265,7 @@ fun ChannelsScreen(
             Spacer(Modifier.height(12.dp))
         }
 
-        Row(Modifier.fillMaxSize()) {
+        if (useCards) {
             Surface(
                 tonalElevation = 2.dp,
                 shape = MaterialTheme.shapes.medium,
@@ -247,24 +275,46 @@ fun ChannelsScreen(
                     ),
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(0.44f)
+                modifier = Modifier.fillMaxSize(),
             ) {
-                Column(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().padding(8.dp)) {
                     UnavailableTagNotice(
                         visible = tagNotice,
                         onDismiss = channelViewModel::dismissUnavailableTagNotice,
                     )
                     if (tagNotice) Spacer(Modifier.height(8.dp))
-
-                    LazyColumn(
-                        state = listState,
-                        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
+                    val noEpg = stringResource(R.string.no_epg)
+                    val cardItems = remember(channels, nowSec, dvrEntries, noEpg) {
+                        channels.map { ch ->
+                            val now = channelViewModel.nowEvent(ch.id, nowSec)
+                            ChannelCardModel(
+                                channel = ch,
+                                number = ChannelNavigation.numberForId(
+                                    orderedChannelIds,
+                                    channelNumbers,
+                                    ch.id,
+                                ),
+                                programmeTitle = now?.title ?: noEpg,
+                                recordingNow = now?.eventId?.let { eventId ->
+                                    dvrEntries.any {
+                                        it.eventId == eventId && it.state == DvrState.RECORDING
+                                    }
+                                } == true,
+                            )
+                        }
+                    }
+                    ChannelCardGrid(
+                        items = cardItems,
+                        selectedId = selectedId,
+                        imageLoader = imageLoader,
+                        focusRequesters = rowFocusRequesters,
+                        gridState = gridState,
+                        onFocusChannel = {
+                            if (!isRestoring) selection.setSelected(it)
+                        },
+                        onConfirmChannel = { ch -> onPlay(ch.id, ch.id, ch.name) },
                         modifier = Modifier
                             .weight(1f)
-                            .focusGroup()
-                            .focusRestorer()
                             .onPreviewKeyEvent { event ->
                                 if (event.type != KeyEventType.KeyDown) {
                                     return@onPreviewKeyEvent false
@@ -272,68 +322,110 @@ fun ChannelsScreen(
                                 ChannelNavigation.pageDirectionForKeyCode(
                                     event.nativeKeyEvent.keyCode
                                 )?.let(::pageChannels) ?: false
-                            }
-                    ) {
-                        items(channels, key = { ch -> ch.id }) { ch ->
-                            val isSelected = ch.id == selectedId
-                            val now =
-                                remember(ch.id, nowSec) { channelViewModel.nowEvent(ch.id, nowSec) }
-                            val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
+                            },
+                    )
+                }
+            }
+        } else {
+            Row(Modifier.fillMaxSize()) {
+                Surface(
+                    tonalElevation = 2.dp,
+                    shape = MaterialTheme.shapes.medium,
+                    colors = SurfaceDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(
+                            alpha = TvBrowsePanelAlpha
+                        ),
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(0.44f)
+                ) {
+                    Column(Modifier.fillMaxSize()) {
+                        UnavailableTagNotice(
+                            visible = tagNotice,
+                            onDismiss = channelViewModel::dismissUnavailableTagNotice,
+                        )
+                        if (tagNotice) Spacer(Modifier.height(8.dp))
 
-                            ChannelRow(
-                                modifier = Modifier.focusRequester(
-                                    rowFocusRequesters.getValue(ch.id)
-                                ),
-                                number = ChannelNavigation.numberForId(
-                                    orderedChannelIds,
-                                    channelNumbers,
-                                    ch.id,
-                                ),
-                                name = ch.name,
-                                programTitle = now?.title ?: stringResource(R.string.no_epg),
-                                progress = if (now != null) prog else null,
-                                imageLoader = imageLoader,
-                                piconPath = ch.icon,
-                                focused = isSelected,
-                                recordingNow = now?.eventId?.let { eventId ->
-                                    dvrEntries.any {
-                                        it.eventId == eventId && it.state == DvrState.RECORDING
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusGroup()
+                                .focusRestorer()
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type != KeyEventType.KeyDown) {
+                                        return@onPreviewKeyEvent false
                                     }
-                                } == true,
-                                onFocus = {
-                                    if (!isRestoring) selection.setSelected(ch.id)
-                                },
-                                onConfirm = { onPlay(ch.id, ch.id, ch.name) }
-                            )
+                                    ChannelNavigation.pageDirectionForKeyCode(
+                                        event.nativeKeyEvent.keyCode
+                                    )?.let(::pageChannels) ?: false
+                                }
+                        ) {
+                            items(channels, key = { ch -> ch.id }) { ch ->
+                                val isSelected = ch.id == selectedId
+                                val now =
+                                    remember(ch.id, nowSec) {
+                                        channelViewModel.nowEvent(ch.id, nowSec)
+                                    }
+                                val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
 
+                                ChannelRow(
+                                    modifier = Modifier.focusRequester(
+                                        rowFocusRequesters.getValue(ch.id)
+                                    ),
+                                    number = ChannelNavigation.numberForId(
+                                        orderedChannelIds,
+                                        channelNumbers,
+                                        ch.id,
+                                    ),
+                                    name = ch.name,
+                                    programTitle = now?.title ?: stringResource(R.string.no_epg),
+                                    progress = if (now != null) prog else null,
+                                    imageLoader = imageLoader,
+                                    piconPath = ch.icon,
+                                    focused = isSelected,
+                                    recordingNow = now?.eventId?.let { eventId ->
+                                        dvrEntries.any {
+                                            it.eventId == eventId && it.state == DvrState.RECORDING
+                                        }
+                                    } == true,
+                                    onFocus = {
+                                        if (!isRestoring) selection.setSelected(ch.id)
+                                    },
+                                    onConfirm = { onPlay(ch.id, ch.id, ch.name) }
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(Modifier.width(24.dp))
+                Spacer(Modifier.width(24.dp))
 
-            Surface(
-                tonalElevation = 2.dp,
-                shape = MaterialTheme.shapes.medium,
-                colors = SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(
-                        alpha = TvBrowsePanelAlpha
+                Surface(
+                    tonalElevation = 2.dp,
+                    shape = MaterialTheme.shapes.medium,
+                    colors = SurfaceDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(
+                            alpha = TvBrowsePanelAlpha
+                        ),
+                        contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(0.56f)
-            ) {
-                EpgDetailPane(
-                    channelName = focusedChannel?.name ?: "—",
-                    now = focusedNow,
-                    nowSec = nowSec,
-                    next = focusedNext,
-                    imageLoader = imageLoader,
-                    piconPath = focusedChannel?.icon
-                )
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(0.56f)
+                ) {
+                    EpgDetailPane(
+                        channelName = focusedChannel?.name ?: "—",
+                        now = focusedNow,
+                        nowSec = nowSec,
+                        next = focusedNext,
+                        imageLoader = imageLoader,
+                        piconPath = focusedChannel?.icon
+                    )
+                }
             }
         }
     }

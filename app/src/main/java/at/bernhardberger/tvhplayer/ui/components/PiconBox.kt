@@ -58,11 +58,22 @@ fun PiconBox(
 }
 
 @Composable
-private fun PiconPlaceholder() {
-    Icon(
-        imageVector = Icons.Outlined.LiveTv,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.fillMaxSize(0.5f),
-    )
+fun PiconPlaceholder(
+    initials: String? = null,
+    modifier: Modifier = Modifier.fillMaxSize(0.5f),
+) {
+    if (!initials.isNullOrBlank()) {
+        androidx.tv.material3.Text(
+            text = initials,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    } else {
+        Icon(
+            imageVector = Icons.Outlined.LiveTv,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier,
+        )
+    }
 }

@@ -47,6 +47,13 @@
     <string name="settings_channel_tags_last_enabled">Required — at least one group must stay on.</string>
     <string name="show_epg_menu">Show Guide menu</string>
     <string name="show_epg_menu_description">Show Guide in the main navigation rail.</string>
+    <string name="channels_layout_section">Channels layout</string>
+    <string name="channels_layout_list">List with details</string>
+    <string name="channels_layout_list_description">Channel list with a persistent programme details pane.</string>
+    <string name="channels_layout_cards">Large cards</string>
+    <string name="channels_layout_cards_description">A 3-column card grid with larger channel artwork and titles.</string>
+    <string name="player_info">Info</string>
+    <string name="player_info_close">Close info</string>
     <string name="show_epg_menu_enabled">Show Guide menu: On</string>
     <string name="show_epg_menu_disabled">Show Guide menu: Off</string>
     <string name="host">Host</string>
