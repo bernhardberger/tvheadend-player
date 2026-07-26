@@ -141,6 +141,19 @@ fun recordingListPageTargetIndex(
     return (currentIndex + direction * pageSize).coerceIn(0, itemCount - 1)
 }
 
+fun recordingListMetadata(
+    entry: DvrEntry,
+    formattedStart: String,
+    problem: Boolean = false,
+): String = buildList {
+    if (problem) entry.failureReason?.takeIf(String::isNotBlank)?.let(::add)
+    entry.subtitle
+        ?.takeIf { it.isNotBlank() && !it.equals(entry.title, ignoreCase = true) }
+        ?.let(::add)
+    formattedStart.takeIf(String::isNotBlank)?.let(::add)
+    entry.channelName?.takeIf(String::isNotBlank)?.let(::add)
+}.joinToString(" • ")
+
 private fun recordingFolderPath(entry: DvrEntry): List<String>? {
     val fileParents = entry.files.mapNotNull { file ->
         val components = safePathComponents(file.path) ?: return null

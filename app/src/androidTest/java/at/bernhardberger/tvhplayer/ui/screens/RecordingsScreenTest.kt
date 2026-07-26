@@ -204,8 +204,10 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme { RecordingsScreen(repository = repository) }
         }
 
+        composeRule.onNodeWithText("Race highlights").assertIsDisplayed()
         composeRule.onNodeWithTag("recordings-folder-Sport").performClick()
         composeRule.onNodeWithTag("recording-metadata-pane").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Race highlights").assertCountEquals(2)
         composeRule.onNodeWithText("A complete recording title that must remain readable")
             .assertIsDisplayed()
         composeRule.onNodeWithText("ORF SPORT +").assertIsDisplayed()

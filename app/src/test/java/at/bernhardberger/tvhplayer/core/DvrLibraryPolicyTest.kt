@@ -98,6 +98,48 @@ class DvrLibraryPolicyTest {
     }
 
     @Test
+    fun compactRecordingMetadataPrioritizesSubtitleBeforeTimeAndChannel() {
+        val recording = entry(1, DvrState.COMPLETED, 100).copy(
+            title = "Formula 1",
+            subtitle = "Qualifying",
+            channelName = "ORF 1",
+        )
+
+        assertEquals(
+            "Qualifying • Sat 25 Jul 15:55 • ORF 1",
+            recordingListMetadata(recording, "Sat 25 Jul 15:55"),
+        )
+    }
+
+    @Test
+    fun compactRecordingMetadataFallsBackToTimeAndChannel() {
+        val recording = entry(1, DvrState.COMPLETED, 100).copy(
+            subtitle = " ",
+            channelName = "ORF 1",
+        )
+
+        assertEquals(
+            "Sat 25 Jul 15:55 • ORF 1",
+            recordingListMetadata(recording, "Sat 25 Jul 15:55"),
+        )
+    }
+
+    @Test
+    fun compactProblemMetadataPrioritizesFailureBeforeSubtitle() {
+        val recording = entry(1, DvrState.FAILED, 100).copy(
+            title = "Formula 1",
+            subtitle = "Qualifying",
+            failureReason = "No free adapter",
+            channelName = "ORF 1",
+        )
+
+        assertEquals(
+            "No free adapter • Qualifying • Sat 25 Jul 15:55 • ORF 1",
+            recordingListMetadata(recording, "Sat 25 Jul 15:55", problem = true),
+        )
+    }
+
+    @Test
     fun archiveFoldersAndRecordingsAreNewestFirst() {
         val archive = buildDvrArchive(
             listOf(

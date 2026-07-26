@@ -82,6 +82,7 @@ import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
+import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
@@ -725,16 +726,11 @@ private fun FolderRecentRecordingRow(
         selected = selected,
         onClick = onClick,
         headlineContent = {
-            Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         supportingContent = {
             Text(
-                buildString {
-                    append(entry.start.recordingDateTime())
-                    entry.channelName?.takeIf(String::isNotBlank)?.let {
-                        append(" • ").append(it)
-                    }
-                },
+                recordingListMetadata(entry, entry.start.recordingDateTime()),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = Color.Unspecified,
@@ -961,18 +957,14 @@ private fun RecordingListRow(
     ListItem(
         selected = selected,
         onClick = onClick,
-        headlineContent = { Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Text(
-                text = buildString {
-                    append(entry.start.recordingDateTime()).append('–').append(formatHm(entry.stop))
-                    entry.channelName?.let { append(" • ").append(it) }
-                    if (problem) {
-                        entry.failureReason?.takeIf(String::isNotBlank)?.let {
-                            append(" • ").append(it)
-                        }
-                    }
-                },
+                text = recordingListMetadata(
+                    entry = entry,
+                    formattedStart = entry.start.recordingDateTime(),
+                    problem = problem,
+                ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = if (problem) MaterialTheme.colorScheme.error else Color.Unspecified,
