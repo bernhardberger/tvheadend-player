@@ -267,10 +267,14 @@ class AppConnectionViewModel(
                 connectTimeoutMs = 10_000,
                 responseTimeoutMs = 5_000
             )
+            val connectedAfterAuth = htsp.state.value as? ConnectionState.Connected
+            dvrRepository.applyAuthenticatedDvrAccess(connectedAfterAuth?.dvrAccess)
+
             _uiState.value = ConnectionUiState.SyncingChannels
             htsp.enableAsyncMetadataAndWaitInitialSync()
 
             repo.awaitChannelsReady()
+            // Transport failure keeps Unknown/Denied; never optimistically Allowed.
             runCatching { dvrRepository.refreshConfigs() }
                 .onFailure { Timber.w(it, "DVR configurations unavailable") }
             repo.startEpgWorker()

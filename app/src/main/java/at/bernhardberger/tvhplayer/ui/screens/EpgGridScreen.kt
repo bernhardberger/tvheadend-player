@@ -593,7 +593,7 @@ fun EpgGridScreen(
                             ProgrammeAction.RECORD ->
                                 dvrRepository.scheduleEvent(
                                     eventId = confirmationEvent.eventId,
-                                    configId = selectedRecordConfigId,
+                                    configName = selectedRecordConfigId,
                                 )
                             ProgrammeAction.CANCEL_RECORDING -> recording?.let {
                                 dvrRepository.cancelEntry(it.id)

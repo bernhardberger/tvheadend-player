@@ -40,11 +40,20 @@ import kotlin.text.Charsets.UTF_8
 sealed class ConnectionState {
     data object Disconnected : ConnectionState()
     data class Connecting(val host: String, val port: Int) : ConnectionState()
-    data class Connected(val host: String, val port: Int, val htspVersion: Int?) : ConnectionState()
+    /**
+     * @param dvrAccess HTSP `ACCESS_HTSP_RECORDER` from authenticate (version ≥ 26).
+     * null when unauthenticated or the field was not returned.
+     */
+    data class Connected(
+        val host: String,
+        val port: Int,
+        val htspVersion: Int?,
+        val dvrAccess: Boolean? = null,
+    ) : ConnectionState()
     data class Error(val throwable: Throwable) : ConnectionState()
 }
 
-class HtspService(
+open class HtspService(
     ioDispatcher: CoroutineDispatcher
 ) {
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
@@ -166,6 +175,7 @@ class HtspService(
                 val user = username?.trim().orEmpty()
                 val pass = password?.trim().orEmpty()
 
+                var dvrAccess: Boolean? = null
                 if (ConnectionPolicy.shouldAuthenticate(username, password) && challenge != null) {
                     val digest = makeDigest(pass, challenge!!)
                     val auth = request(
@@ -178,9 +188,18 @@ class HtspService(
                     if (auth.int("noaccess") == 1) {
                         throw IllegalStateException("HTSP authentication failed (noaccess=1)")
                     }
+                    // HTSP ≥ 26 includes ACCESS_HTSP_RECORDER as "dvr".
+                    if (negotiatedHtspVersion != null && negotiatedHtspVersion!! > 25) {
+                        dvrAccess = auth.int("dvr")?.let { it == 1 }
+                    }
                 }
 
-                _state.value = ConnectionState.Connected(host, port, negotiatedHtspVersion)
+                _state.value = ConnectionState.Connected(
+                    host = host,
+                    port = port,
+                    htspVersion = negotiatedHtspVersion,
+                    dvrAccess = dvrAccess,
+                )
 
             } catch (t: Throwable) {
                 _state.value = ConnectionState.Error(t)
@@ -213,7 +232,7 @@ class HtspService(
         }
     }
 
-    suspend fun request(
+    open suspend fun request(
         method: String,
         fields: Map<String, Any?> = emptyMap(),
         timeoutMs: Long = 5_000,

@@ -64,6 +64,20 @@ class ProgrammeActionPolicyTest {
     }
 
     @Test
+    fun hidesRecordAndCancelWhileWriteCapabilityIsUnknown() {
+        // Repository maps Unknown → canModifyRecordings=false so UI never flashes dead buttons.
+        assertEquals(
+            emptyList<ProgrammeAction>(),
+            programmeActions(
+                event(200, 300),
+                nowSec = 100,
+                recording = null,
+                canModifyRecordings = false,
+            ),
+        )
+    }
+
+    @Test
     fun pastProgrammeIsInspectOnlyUnlessServerCanStartIt() {
         assertEquals(
             emptyList<ProgrammeAction>(),

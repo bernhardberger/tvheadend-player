@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.repositories
 
 import at.bernhardberger.tvhplayer.core.DvrActionFailure
 import at.bernhardberger.tvhplayer.core.DvrActionResult
+import at.bernhardberger.tvhplayer.core.RecordingWriteCapability
 import at.bernhardberger.tvhplayer.core.dvrActionFailure
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrConfig
@@ -34,11 +35,15 @@ class DvrRepository(
     private val _configs = MutableStateFlow<List<DvrConfig>>(emptyList())
     val configs: StateFlow<List<DvrConfig>> = _configs
     /**
-     * Whether this HTSP user may create, cancel, or delete recordings.
-     * Starts true optimistically; latches false when the server denies DVR write
-     * (`noaccess` / permission errors on getDvrConfigs or dvrEntry*).
+     * Three-state DVR write capability for the current HTSP session.
+     * Starts [RecordingWriteCapability.Unknown] so write UI stays hidden until a
+     * positive probe (auth `dvr` and/or `getDvrConfigs` / write RPC).
      */
-    private val _canModifyRecordings = MutableStateFlow(true)
+    private val _writeCapability =
+        MutableStateFlow(RecordingWriteCapability.Unknown)
+    val writeCapability: StateFlow<RecordingWriteCapability> = _writeCapability
+    /** Convenience for UI: true only when [writeCapability] is [RecordingWriteCapability.Allowed]. */
+    private val _canModifyRecordings = MutableStateFlow(false)
     val canModifyRecordings: StateFlow<Boolean> = _canModifyRecordings
 
     init {
@@ -54,8 +59,20 @@ class DvrRepository(
             store.reset(preservePublished)
             _entries.value = store.publishedSnapshot()
             if (!preservePublished) _configs.value = emptyList()
-            // Re-evaluate on each connection; do not carry a stale deny across users.
-            _canModifyRecordings.value = true
+            // Hide write actions until auth / getDvrConfigs prove access.
+            setWriteCapability(RecordingWriteCapability.Unknown)
+        }
+    }
+
+    /**
+     * Apply ACCESS_HTSP_RECORDER from the authenticate reply (HTSP ≥ 26).
+     * true → [Allowed], false → [Denied], null → leave [Unknown].
+     */
+    fun applyAuthenticatedDvrAccess(dvrAccess: Boolean?) {
+        when (dvrAccess) {
+            true -> setWriteCapability(RecordingWriteCapability.Allowed)
+            false -> setWriteCapability(RecordingWriteCapability.Denied)
+            null -> Unit
         }
     }
 
@@ -68,16 +85,19 @@ class DvrRepository(
         )
         val failure = dvrActionFailure(reply.fields)
         if (failure == DvrActionFailure.PERMISSION_DENIED) {
-            _canModifyRecordings.value = false
+            setWriteCapability(RecordingWriteCapability.Denied)
             _configs.value = emptyList()
             return
         }
+        // Successful probe means this user may use the HTSP recorder API.
+        setWriteCapability(RecordingWriteCapability.Allowed)
         _configs.value = dvrConfigsFromReply(reply)
     }
 
     internal suspend fun acceptDvrMessage(message: HtspMessage) {
         mutex.withLock {
             when (message.method) {
+                // Server→client async notifications keep these names.
                 "dvrEntryAdd", "dvrEntryUpdate" -> {
                     val entry = mergeDvrEntry(message, store) ?: return@withLock
                     store.upsert(entry)?.let { _entries.value = it }
@@ -94,22 +114,26 @@ class DvrRepository(
     fun entryForEvent(eventId: Int): DvrEntry? =
         entries.value.firstOrNull { it.eventId == eventId }
 
-    suspend fun scheduleEvent(eventId: Int, configId: String? = null): DvrActionResult =
+    /**
+     * Schedule a recording for an EPG event.
+     * @param configName DVR profile name/uuid (`configName` in HTSP `addDvrEntry`).
+     */
+    suspend fun scheduleEvent(eventId: Int, configName: String? = null): DvrActionResult =
         performAction(
-            method = "dvrEntryAdd",
+            method = "addDvrEntry",
             fields = buildMap {
                 put("eventId", eventId)
-                if (configId != null) put("configId", configId)
+                if (configName != null) put("configName", configName)
             },
         )
 
     suspend fun cancelEntry(entryId: Int): DvrActionResult = performAction(
-        method = "dvrEntryCancel",
+        method = "cancelDvrEntry",
         fields = mapOf("id" to entryId),
     )
 
     suspend fun deleteEntry(entryId: Int): DvrActionResult = performAction(
-        method = "dvrEntryDelete",
+        method = "deleteDvrEntry",
         fields = mapOf("id" to entryId),
     )
 
@@ -125,10 +149,11 @@ class DvrRepository(
         )
         val failure = dvrActionFailure(reply.fields)
         if (failure == null) {
+            setWriteCapability(RecordingWriteCapability.Allowed)
             DvrActionResult.Accepted(reply.int("id") ?: reply.int("dvrId"))
         } else {
             if (failure == DvrActionFailure.PERMISSION_DENIED) {
-                _canModifyRecordings.value = false
+                setWriteCapability(RecordingWriteCapability.Denied)
             }
             DvrActionResult.Failed(failure)
         }
@@ -138,6 +163,11 @@ class DvrRepository(
         DvrActionResult.Failed(DvrActionFailure.CONNECTION)
     } catch (_: Exception) {
         DvrActionResult.Failed(DvrActionFailure.REJECTED)
+    }
+
+    private fun setWriteCapability(capability: RecordingWriteCapability) {
+        _writeCapability.value = capability
+        _canModifyRecordings.value = capability == RecordingWriteCapability.Allowed
     }
 
     private fun mergeDvrEntry(message: HtspMessage, store: DvrSnapshotStore): DvrEntry? {
