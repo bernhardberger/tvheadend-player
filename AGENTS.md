@@ -142,6 +142,15 @@ The Gradle portion of verification is:
 ./gradlew testDebugUnitTest lintDebug compileDebugAndroidTestKotlin assembleDebug --no-daemon
 ```
 
+On the shared LXC 106 engineering host, keep Gradle state on disk. Never set
+`GRADLE_USER_HOME` to `/tmp` or another tmpfs-backed path: Gradle downloads and
+caches there consume container memory and can make OpenCode, SSH, and other
+agent sessions unresponsive. Use the default disk-backed `$HOME/.gradle`, retain
+`--no-daemon` and the project JVM limit in `gradle.properties`, and do not run
+concurrent full Gradle builds while other agent sessions are active. If SSH or
+the wider LXC becomes sluggish during a build, stop the build rather than
+retrying it or increasing its memory use.
+
 ## Code layout
 
 - `app/src/main/java/at/bernhardberger/tvhplayer/` — application source
