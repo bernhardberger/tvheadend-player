@@ -43,6 +43,7 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.recordingSeekbarRange
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import coil3.ImageLoader
@@ -99,7 +100,6 @@ internal fun RecordingOverlayControls(
     }
 
     val knownDuration = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
-    val progress = knownDuration?.let { positionMs.toFloat() / it } ?: 0f
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -151,28 +151,16 @@ internal fun RecordingOverlayControls(
             }
 
             Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth()) {
-                Text(
-                    text = formatHms(positionMs.coerceAtLeast(0L) / 1_000L),
-                    color = Color.White.copy(alpha = 0.86f),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = knownDuration?.let { formatHms(it / 1_000L) }
-                        ?: stringResource(R.string.recording_duration_unknown),
-                    color = Color.White.copy(alpha = 0.86f),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-            }
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                color = Color.White,
-                trackColor = Color.White.copy(alpha = 0.24f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(MaterialTheme.shapes.small),
+            PlaybackSeekbar(
+                range = recordingSeekbarRange(
+                    positionMs = positionMs.coerceAtLeast(0L),
+                    durationMs = knownDuration,
+                ),
+                onSeekTo = { target ->
+                    onUserInteraction()
+                    onSeek(target - positionMs)
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(16.dp))
             Box(Modifier.fillMaxWidth()) {

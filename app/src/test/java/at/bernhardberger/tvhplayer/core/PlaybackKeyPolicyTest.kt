@@ -60,6 +60,161 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
+    fun liveWithoutTimeshiftUsesRevealAndChannelDrawer() {
+        val ctx = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = false,
+            simpleTvActive = false,
+        )
+        assertEquals(
+            PlayerKeyAction.REVEAL_CONTROLS,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_CHANNELS,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
+        )
+        assertEquals(
+            PlayerKeyAction.PASS_THROUGH,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_INFO,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP),
+        )
+        assertEquals(
+            PlayerKeyAction.REVEAL_CONTROLS,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_DOWN),
+        )
+        assertEquals(
+            PlayerKeyAction.CLOSE_PLAYER,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_BACK),
+        )
+    }
+
+    @Test
+    fun liveWithTimeshiftTogglesPauseAndSeeks() {
+        val ctx = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = true,
+            simpleTvActive = false,
+        )
+        assertEquals(
+            PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+        assertEquals(
+            PlayerKeyAction.SEEK_BACK,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
+        )
+        assertEquals(
+            PlayerKeyAction.SEEK_FORWARD,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
+        )
+    }
+
+    @Test
+    fun recordingReplacesTenMinuteUpDownSeekWithInfoAndControls() {
+        val ctx = PlayerKeyContext(
+            surface = PlayerSurface.RECORDING,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = false,
+            simpleTvActive = false,
+        )
+        assertEquals(
+            PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+        assertEquals(
+            PlayerKeyAction.OPEN_INFO,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP),
+        )
+        assertEquals(
+            PlayerKeyAction.REVEAL_CONTROLS,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_DOWN),
+        )
+        assertEquals(
+            PlayerKeyAction.SEEK_BACK,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
+        )
+        assertEquals(
+            PlayerKeyAction.SEEK_FORWARD,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
+        )
+    }
+
+    @Test
+    fun simpleTvBackOnlyDismissesOverlays() {
+        val ctx = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = false,
+            simpleTvActive = true,
+        )
+        assertEquals(
+            PlayerKeyAction.DISMISS_OVERLAY_ONLY,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_BACK),
+        )
+        val withControls = ctx.copy(controlsVisible = true)
+        assertEquals(
+            PlayerKeyAction.HIDE_CONTROLS,
+            playerKeyAction(withControls, KeyEvent.KEYCODE_BACK),
+        )
+    }
+
+    @Test
+    fun controlsVisibleBackHidesControlsAndPassesOtherKeys() {
+        val ctx = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = true,
+            seekbarFocused = false,
+            timeshiftAvailable = true,
+            simpleTvActive = false,
+        )
+        assertEquals(
+            PlayerKeyAction.HIDE_CONTROLS,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_BACK),
+        )
+        assertEquals(
+            PlayerKeyAction.PASS_THROUGH,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
+        )
+    }
+
+    @Test
+    fun seekbarFocusedScrubsAndLeavesOnUpDown() {
+        val ctx = PlayerKeyContext(
+            surface = PlayerSurface.RECORDING,
+            controlsVisible = true,
+            seekbarFocused = true,
+            timeshiftAvailable = false,
+            simpleTvActive = false,
+        )
+        assertEquals(
+            PlayerKeyAction.SEEK_BACK,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
+        )
+        assertEquals(
+            PlayerKeyAction.SEEK_FORWARD,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
+        )
+        assertEquals(
+            PlayerKeyAction.PASS_THROUGH,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP),
+        )
+        assertEquals(
+            PlayerKeyAction.PASS_THROUGH,
+            playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_DOWN),
+        )
+    }
+
+    @Test
     fun pickingCurrentChannelClosesDrawerWithoutRetuning() {
         assertEquals(ChannelPickAction.CLOSE_DRAWER, channelPickAction(33, 33))
         assertEquals(ChannelPickAction.TUNE, channelPickAction(33, 34))
@@ -72,13 +227,13 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun overlayFocusStartsOnThePrimaryNonDestructiveAction() {
+    fun overlayFocusStartsOnControlCluster() {
         assertEquals(
-            PlaybackOverlayFocusTarget.TIMESHIFT_TOGGLE,
+            PlaybackOverlayFocusTarget.CONTROLS_CLUSTER,
             initialPlaybackOverlayFocus(timeshiftAvailable = true),
         )
         assertEquals(
-            PlaybackOverlayFocusTarget.CHANNELS,
+            PlaybackOverlayFocusTarget.CONTROLS_CLUSTER,
             initialPlaybackOverlayFocus(timeshiftAvailable = false),
         )
     }

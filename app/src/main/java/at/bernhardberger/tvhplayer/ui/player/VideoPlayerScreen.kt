@@ -67,7 +67,11 @@ import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.playbackAuxiliaryBackAction
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
-import at.bernhardberger.tvhplayer.core.shouldRevealPlaybackControls
+import at.bernhardberger.tvhplayer.core.PlayerKeyAction
+import at.bernhardberger.tvhplayer.core.PlayerKeyContext
+import at.bernhardberger.tvhplayer.core.PlayerSurface
+import at.bernhardberger.tvhplayer.core.playerKeyAction
+import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
@@ -235,6 +239,28 @@ fun VideoPlayerScreen(
 
     fun hideControls() {
         controlsVisible = false
+    }
+
+    fun queueTimeshiftSeek(deltaMs: Long) {
+        pendingTimeshiftSeekMs = coalesceTimeshiftSeekDelta(
+            state = effectiveTimeshiftState,
+            pendingDeltaMs = pendingTimeshiftSeekMs,
+            requestedDeltaMs = deltaMs,
+        )
+        timeshiftSeekJob?.cancel()
+        timeshiftSeekJob = scope.launch {
+            delay(TIMESHIFT_SEEK_DEBOUNCE_MS)
+            val coalescedDeltaMs = pendingTimeshiftSeekMs
+            pendingTimeshiftSeekMs = 0L
+            val decision = videoPlayerViewModel.seekTimeshift(coalescedDeltaMs)
+            timeshiftFeedback = if (decision?.clamped == true) {
+                timeshiftSeekClampedText
+            } else if (decision == null) {
+                timeshiftUnavailableText
+            } else {
+                null
+            }
+        }
     }
 
     fun tuneChannel(channel: ChannelUi): Boolean {
@@ -523,51 +549,77 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                if (shouldRevealPlaybackControls(
+                val keyAction = playerKeyAction(
+                    PlayerKeyContext(
+                        surface = PlayerSurface.LIVE,
                         controlsVisible = controlsVisible,
-                        keyCode = keyCode,
-                    )
-                ) {
-                    revealingKeyCode = keyCode
-                    showControls()
-                    return@onPreviewKeyEvent true
-                }
-
-                when (event.key) {
-                    Key.DirectionLeft -> {
-                        if (!controlsVisible) {
-                            selectedId = browsingFocusChannelId(
-                                visibleChannels = channels,
-                                currentFocusId = currentChannelId,
-                            ) ?: -1
-                            drawerOpen = true
-                            true
-                        } else false
-                    }
-
-                    Key.Enter,
-                    Key.NumPadEnter,
-                    Key.DirectionCenter -> {
+                        seekbarFocused = false,
+                        timeshiftAvailable = effectiveTimeshiftState.available,
+                        simpleTvActive = simpleTvProfile.active,
+                        optionsOpen = optionsPage != null,
+                        statsOpen = statsVisible,
+                        drawerOpen = showDrawer,
+                    ),
+                    keyCode = keyCode,
+                )
+                when (keyAction) {
+                    PlayerKeyAction.REVEAL_CONTROLS -> {
+                        revealingKeyCode = keyCode
                         showControls()
-                        false
+                        return@onPreviewKeyEvent true
                     }
-
-                    Key.Back -> {
-                        when {
-                            controlsVisible -> {
-                                hideControls()
-                                true
-                            }
-
-                            else -> {
-                                onClose()
-                                true
+                    PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
+                        revealingKeyCode = keyCode
+                        if (effectiveTimeshiftState.paused || !player.playWhenReady) {
+                            player.play()
+                            scope.launch { videoPlayerViewModel.resumeTimeshift() }
+                        } else {
+                            player.pause()
+                            scope.launch {
+                                if (!videoPlayerViewModel.pauseTimeshift()) {
+                                    player.play()
+                                }
                             }
                         }
+                        showControls()
+                        return@onPreviewKeyEvent true
                     }
-
-                    else -> false
+                    PlayerKeyAction.OPEN_CHANNELS -> {
+                        selectedId = browsingFocusChannelId(
+                            visibleChannels = channels,
+                            currentFocusId = currentChannelId,
+                        ) ?: -1
+                        drawerOpen = true
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.OPEN_INFO -> {
+                        // Info surface lands with the player composition overhaul.
+                        revealingKeyCode = keyCode
+                        showControls()
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.SEEK_BACK -> {
+                        queueTimeshiftSeek(-seekStepMs(event.nativeKeyEvent.repeatCount))
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.SEEK_FORWARD -> {
+                        queueTimeshiftSeek(seekStepMs(event.nativeKeyEvent.repeatCount))
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.HIDE_CONTROLS -> {
+                        hideControls()
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.CLOSE_PLAYER -> {
+                        onClose()
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.PASS_THROUGH -> Unit
                 }
+                false
             }
     ) {
         AnimatedVisibility(

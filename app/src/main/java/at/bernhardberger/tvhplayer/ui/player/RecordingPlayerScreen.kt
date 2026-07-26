@@ -48,6 +48,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackAuxiliaryBackAction
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
+import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
@@ -168,9 +169,17 @@ fun RecordingPlayerScreen(
         seekFeedbackToken++
     }
 
-    fun applyKeyAction(action: RecordingPlaybackKeyAction): Boolean = when (action) {
+    fun applyKeyAction(
+        action: RecordingPlaybackKeyAction,
+        repeatCount: Int = 0,
+    ): Boolean = when (action) {
         RecordingPlaybackKeyAction.PASS_THROUGH -> false
         RecordingPlaybackKeyAction.REVEAL_CONTROLS -> {
+            showControls()
+            true
+        }
+        RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
+            player.togglePlayPause()
             showControls()
             true
         }
@@ -182,20 +191,18 @@ fun RecordingPlayerScreen(
             onClose()
             true
         }
-        RecordingPlaybackKeyAction.SEEK_BACK_SHORT -> {
-            seekBy(-RECORDING_SHORT_SEEK_MS)
+        RecordingPlaybackKeyAction.OPEN_INFO -> {
+            // Info surface is introduced with the player composition overhaul;
+            // reveal controls as the interim discoverable path.
+            showControls()
             true
         }
-        RecordingPlaybackKeyAction.SEEK_FORWARD_SHORT -> {
-            seekBy(RECORDING_SHORT_SEEK_MS)
+        RecordingPlaybackKeyAction.SEEK_BACK -> {
+            seekBy(-seekStepMs(repeatCount))
             true
         }
-        RecordingPlaybackKeyAction.SEEK_BACK_LONG -> {
-            seekBy(-RECORDING_LONG_SEEK_MS)
-            true
-        }
-        RecordingPlaybackKeyAction.SEEK_FORWARD_LONG -> {
-            seekBy(RECORDING_LONG_SEEK_MS)
+        RecordingPlaybackKeyAction.SEEK_FORWARD -> {
+            seekBy(seekStepMs(repeatCount))
             true
         }
     }
@@ -348,11 +355,18 @@ fun RecordingPlayerScreen(
                 val keyAction = recordingPlaybackKeyAction(
                     controlsVisible = controlsVisible,
                     keyCode = keyCode,
+                    simpleTvActive = simpleTvProfile.active,
                 )
-                if (keyAction == RecordingPlaybackKeyAction.REVEAL_CONTROLS) {
+                if (
+                    keyAction == RecordingPlaybackKeyAction.REVEAL_CONTROLS ||
+                    keyAction == RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE
+                ) {
                     revealingKeyCode = keyCode
                 }
-                applyKeyAction(keyAction)
+                applyKeyAction(
+                    action = keyAction,
+                    repeatCount = event.nativeKeyEvent.repeatCount,
+                )
             },
     ) {
         if (availability is RecordingPlaybackAvailability.Ready) {

@@ -52,6 +52,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward
 import at.bernhardberger.tvhplayer.core.initialPlaybackOverlayFocus
+import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -116,6 +117,8 @@ fun OverlayControlsTv(
             val initialKey = when (initialPlaybackOverlayFocus(timeshiftState.available)) {
                 PlaybackOverlayFocusTarget.TIMESHIFT_TOGGLE -> "pause"
                 PlaybackOverlayFocusTarget.CHANNELS -> "channels"
+                PlaybackOverlayFocusTarget.CONTROLS_CLUSTER ->
+                    if (timeshiftState.available) "pause" else "channels"
             }
             (lastFocused?.let(requesters::get)
                 ?: requesters[initialKey]
@@ -207,27 +210,32 @@ fun OverlayControlsTv(
             }
 
             Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth()) {
-                Text(
-                    text = nowEvent?.let { formatClock(it.start) }.orEmpty(),
-                    color = Color.White.copy(alpha = 0.82f),
-                    style = MaterialTheme.typography.labelLarge,
+            if (timeshiftState.available) {
+                PlaybackSeekbar(
+                    range = timeshiftSeekbarRange(timeshiftState),
+                    onSeekTo = { target ->
+                        onUserInteraction()
+                        onSeekTimeshift(target - timeshiftState.positionMs)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = nowEvent?.let { formatClock(it.stop) }.orEmpty(),
-                    color = Color.White.copy(alpha = 0.82f),
-                    style = MaterialTheme.typography.labelLarge,
-                )
+            } else if (nowEvent != null) {
+                Row(Modifier.fillMaxWidth()) {
+                    Text(
+                        text = formatClock(nowEvent.start),
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = formatClock(nowEvent.stop),
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                // Non-seekable programme progress: informational only.
+                ProgrammeProgressBar(progress = progress)
             }
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                color = Color.White,
-                trackColor = Color.White.copy(alpha = 0.24f),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
-            )
             timeshiftFeedback?.let {
                 Spacer(Modifier.height(6.dp))
                 Text(it, color = MaterialTheme.colorScheme.primary)

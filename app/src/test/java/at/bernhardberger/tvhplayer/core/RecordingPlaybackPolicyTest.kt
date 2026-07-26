@@ -154,25 +154,25 @@ class RecordingPlaybackPolicyTest {
     }
 
     @Test
-    fun hiddenPlayerUsesKodiStyleSeekKeysAndTwoStageBack() {
+    fun hiddenPlayerUsesInfoControlsAndSeekContract() {
         assertEquals(
-            RecordingPlaybackKeyAction.SEEK_BACK_SHORT,
+            RecordingPlaybackKeyAction.SEEK_BACK,
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_LEFT),
         )
         assertEquals(
-            RecordingPlaybackKeyAction.SEEK_FORWARD_SHORT,
+            RecordingPlaybackKeyAction.SEEK_FORWARD,
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_RIGHT),
         )
         assertEquals(
-            RecordingPlaybackKeyAction.SEEK_FORWARD_LONG,
+            RecordingPlaybackKeyAction.OPEN_INFO,
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_UP),
         )
         assertEquals(
-            RecordingPlaybackKeyAction.SEEK_BACK_LONG,
+            RecordingPlaybackKeyAction.REVEAL_CONTROLS,
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_DOWN),
         )
         assertEquals(
-            RecordingPlaybackKeyAction.REVEAL_CONTROLS,
+            RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE,
             recordingPlaybackKeyAction(false, KeyEvent.KEYCODE_DPAD_CENTER),
         )
         assertEquals(

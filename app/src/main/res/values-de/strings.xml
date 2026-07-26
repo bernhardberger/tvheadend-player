@@ -259,6 +259,8 @@
     <string name="seek_forward_30">+30 Sekunden</string>
     <string name="timeshift_buffer_start">Puffer: seit %1$s</string>
     <string name="timeshift_live">Live</string>
+    <string name="player_seekbar_recording_description">Wiedergabeposition %1$s von %2$s</string>
+    <string name="player_seekbar_timeshift_description">Timeshift-Position %1$s hinter Live</string>
     <string name="timeshift_behind_live">%1$s hinter Live</string>
     <string name="timeshift_go_live">Zu Live</string>
     <string name="timeshift_seek_clamped">Grenze des verfügbaren Puffers erreicht.</string>

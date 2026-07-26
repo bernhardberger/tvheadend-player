@@ -18,12 +18,12 @@ sealed interface RecordingPlaybackAvailability {
 enum class RecordingPlaybackKeyAction {
     PASS_THROUGH,
     REVEAL_CONTROLS,
+    REVEAL_AND_TOGGLE_PAUSE,
     HIDE_CONTROLS,
     CLOSE,
-    SEEK_BACK_SHORT,
-    SEEK_FORWARD_SHORT,
-    SEEK_BACK_LONG,
-    SEEK_FORWARD_LONG,
+    OPEN_INFO,
+    SEEK_BACK,
+    SEEK_FORWARD,
 }
 
 enum class RecordingFinishedAction {
@@ -32,24 +32,40 @@ enum class RecordingFinishedAction {
     STOP_AND_CLOSE_PLAYER,
 }
 
+/**
+ * Recording player keys follow the shared player contract: Up opens info, Down
+ * reveals controls, Left/Right seek. The old hidden Up/Down ten-minute seek
+ * mapping is intentionally retired.
+ */
 fun recordingPlaybackKeyAction(
     controlsVisible: Boolean,
     keyCode: Int,
-): RecordingPlaybackKeyAction = when {
-    keyCode == KeyEvent.KEYCODE_BACK -> if (controlsVisible) {
-        RecordingPlaybackKeyAction.HIDE_CONTROLS
-    } else {
-        RecordingPlaybackKeyAction.CLOSE
+    simpleTvActive: Boolean = false,
+    seekbarFocused: Boolean = false,
+): RecordingPlaybackKeyAction {
+    val action = playerKeyAction(
+        PlayerKeyContext(
+            surface = PlayerSurface.RECORDING,
+            controlsVisible = controlsVisible,
+            seekbarFocused = seekbarFocused,
+            timeshiftAvailable = false,
+            simpleTvActive = simpleTvActive,
+        ),
+        keyCode,
+    )
+    return when (action) {
+        PlayerKeyAction.PASS_THROUGH -> RecordingPlaybackKeyAction.PASS_THROUGH
+        PlayerKeyAction.REVEAL_CONTROLS -> RecordingPlaybackKeyAction.REVEAL_CONTROLS
+        PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE ->
+            RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE
+        PlayerKeyAction.HIDE_CONTROLS -> RecordingPlaybackKeyAction.HIDE_CONTROLS
+        PlayerKeyAction.CLOSE_PLAYER,
+        PlayerKeyAction.DISMISS_OVERLAY_ONLY -> RecordingPlaybackKeyAction.CLOSE
+        PlayerKeyAction.OPEN_INFO -> RecordingPlaybackKeyAction.OPEN_INFO
+        PlayerKeyAction.SEEK_BACK -> RecordingPlaybackKeyAction.SEEK_BACK
+        PlayerKeyAction.SEEK_FORWARD -> RecordingPlaybackKeyAction.SEEK_FORWARD
+        PlayerKeyAction.OPEN_CHANNELS -> RecordingPlaybackKeyAction.PASS_THROUGH
     }
-    controlsVisible -> RecordingPlaybackKeyAction.PASS_THROUGH
-    keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-        keyCode == KeyEvent.KEYCODE_ENTER ||
-        keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER -> RecordingPlaybackKeyAction.REVEAL_CONTROLS
-    keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> RecordingPlaybackKeyAction.SEEK_BACK_SHORT
-    keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> RecordingPlaybackKeyAction.SEEK_FORWARD_SHORT
-    keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> RecordingPlaybackKeyAction.SEEK_BACK_LONG
-    keyCode == KeyEvent.KEYCODE_DPAD_UP -> RecordingPlaybackKeyAction.SEEK_FORWARD_LONG
-    else -> RecordingPlaybackKeyAction.PASS_THROUGH
 }
 
 fun recordingPlaybackSuppressesRevealingKey(
