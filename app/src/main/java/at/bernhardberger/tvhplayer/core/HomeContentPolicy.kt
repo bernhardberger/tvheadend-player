@@ -42,6 +42,9 @@ data class HomeCardItem(
     /** Remaining programme minutes when known; UI formats the unit string. */
     val remainingMinutes: Int?,
     val progress: Float?,
+    /** Absolute bounds for recordings/scheduled cards; UI formats start/end labels. */
+    val startSec: Long?,
+    val stopSec: Long?,
     val recordingId: Int?,
     val recordingNow: Boolean,
     val playable: Boolean,
@@ -282,6 +285,7 @@ fun buildHomeDashboard(
                     channelsById = channelsById,
                     recordingNow = true,
                     playable = true,
+                    nowSec = nowSec,
                 )
             }
             for (entry in topCompletedPlayable(
@@ -295,6 +299,7 @@ fun buildHomeDashboard(
                     channelsById = channelsById,
                     recordingNow = false,
                     playable = true,
+                    nowSec = nowSec,
                 )
             }
             if (recordingItems.isNotEmpty()) {
@@ -309,7 +314,15 @@ fun buildHomeDashboard(
                 .asSequence()
                 .filter { it.id !in heroRecordingIds }
                 .take(HOME_RECORDING_LIMIT)
-                .map { recordingCard(it, channelsById, recordingNow = false, playable = false) }
+                .map {
+                    recordingCard(
+                        entry = it,
+                        channelsById = channelsById,
+                        recordingNow = false,
+                        playable = false,
+                        nowSec = nowSec,
+                    )
+                }
                 .toList()
             if (scheduledItems.isNotEmpty()) {
                 add(HomeRow(HomeRowKind.SCHEDULED, scheduledItems))
@@ -491,6 +504,8 @@ private fun channelCard(
     title = title,
     remainingMinutes = event?.let { remainingMinutes(it.stop, nowSec) },
     progress = event?.let { eventProgress(it, nowSec) },
+    startSec = event?.start,
+    stopSec = event?.stop,
     recordingId = null,
     recordingNow = false,
     playable = true,
@@ -501,9 +516,16 @@ private fun recordingCard(
     channelsById: Map<Int, ChannelUi>,
     recordingNow: Boolean,
     playable: Boolean,
+    nowSec: Long,
 ): HomeCardItem {
     val channel = channelsById[entry.channelId]
     val name = entry.channelName ?: channel?.name.orEmpty()
+    val progress = if (recordingNow && entry.stop > entry.start) {
+        eventProgress(entry.start, entry.stop, nowSec)
+    } else {
+        null
+    }
+    val remaining = if (recordingNow) remainingMinutes(entry.stop, nowSec) else null
     return HomeCardItem(
         key = "rec-${entry.id}",
         channelId = entry.channelId,
@@ -512,8 +534,10 @@ private fun recordingCard(
         piconPath = channel?.icon,
         accentSeed = channelAccentSeed(name),
         title = entry.title,
-        remainingMinutes = null,
-        progress = null,
+        remainingMinutes = remaining,
+        progress = progress,
+        startSec = entry.start,
+        stopSec = entry.stop,
         recordingId = entry.id,
         recordingNow = recordingNow,
         playable = playable,

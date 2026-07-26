@@ -138,6 +138,8 @@ class HomeScreenTest {
                         title = "Sport",
                         remainingMinutes = 12,
                         progress = 0.4f,
+                        startSec = 900,
+                        stopSec = 1_100,
                         recordingId = null,
                         recordingNow = false,
                         playable = true,

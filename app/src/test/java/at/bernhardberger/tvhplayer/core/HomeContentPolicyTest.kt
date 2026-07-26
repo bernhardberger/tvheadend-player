@@ -46,6 +46,8 @@ class HomeContentPolicyTest {
                             title = "Later",
                             remainingMinutes = null,
                             progress = null,
+                            startSec = 2_000,
+                            stopSec = 2_100,
                             recordingId = 9,
                             recordingNow = false,
                             playable = false,
@@ -331,7 +333,40 @@ class HomeContentPolicyTest {
         val scheduled = model.rows.single { it.kind == HomeRowKind.SCHEDULED }.items
         assertEquals(1, scheduled.size)
         assertFalse(scheduled.first().playable)
+        assertEquals(2_000L, scheduled.first().startSec)
+        assertEquals(2_100L, scheduled.first().stopSec)
         assertTrue(model.hero.isEmpty())
+    }
+
+    @Test
+    fun recordingCardsCarryTimeBounds() {
+        val model = buildHomeDashboard(
+            channelsById = mapOf(1 to channel(1, "ORF1")),
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
+            recentChannelIds = emptyList(),
+            onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
+            recordings = listOf(
+                dvr(3, 1, DvrState.RECORDING, "Live rec", start = 900, stop = 1_200, withFile = true),
+                dvr(1, 1, DvrState.COMPLETED, "Done", start = 700, stop = 800, withFile = true),
+            ),
+            nowSec = nowSec,
+        )
+        // Recording-now is in the hero; completed remains in the row with bounds.
+        val completed = model.rows.single { it.kind == HomeRowKind.RECORDINGS }.items.single()
+        assertEquals(1, completed.recordingId)
+        assertEquals(700L, completed.startSec)
+        assertEquals(800L, completed.stopSec)
+        assertNull(completed.remainingMinutes)
+
+        val liveHero = model.hero.single { it.recordingId == 3 }
+        assertTrue(liveHero.progress != null)
+        // Recording-now also appears only in hero here; if it were a row card it would
+        // carry remaining minutes — assert the completed path at minimum has bounds.
+        assertTrue(completed.startSec != null && completed.stopSec != null)
     }
 
     @Test

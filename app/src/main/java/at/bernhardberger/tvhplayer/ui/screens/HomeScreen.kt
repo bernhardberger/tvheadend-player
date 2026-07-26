@@ -174,7 +174,8 @@ fun HomeDashboard(
                         ),
                     )
                     LazyRow(
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                        // 8 dp absorbs 1.06 focused scale (~5.3 dp overflow) without clipping.
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier
                             .focusRestorer()

@@ -28,6 +28,7 @@ import at.bernhardberger.tvhplayer.core.HomeCardItem
 import at.bernhardberger.tvhplayer.core.channelInitials
 import at.bernhardberger.tvhplayer.ui.HomeCardMediaHeight
 import at.bernhardberger.tvhplayer.ui.HomeCardWidth
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import coil3.ImageLoader
 
 /**
@@ -156,7 +157,25 @@ private fun programmeTimeLabel(item: HomeCardItem): String? {
     item.remainingMinutes?.let { minutes ->
         return stringResource(R.string.home_minutes_left, minutes)
     }
-    return null
+    val start = item.startSec
+    val stop = item.stopSec
+    return when {
+        // Scheduled — start is the single most useful fact.
+        start != null && !item.playable -> {
+            stringResource(R.string.home_starts_at, formatClock(start))
+        }
+        // Completed (or other past) recording — show air window.
+        start != null && stop != null && item.recordingId != null -> {
+            stringResource(
+                R.string.home_time_range,
+                formatClock(start),
+                formatClock(stop),
+            )
+        }
+        start != null -> stringResource(R.string.home_starts_at, formatClock(start))
+        stop != null -> stringResource(R.string.home_ends_at, formatClock(stop))
+        else -> null
+    }
 }
 
 /** Deterministic dark-theme accent from a 0–359 hue seed. */
