@@ -153,6 +153,7 @@ fun EpgGridScreen(
     val timeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
+    val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
     val channelListState = rememberLazyListState()
     val eventFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
     val guideHeaderFocus = remember { FocusRequester() }
@@ -539,6 +540,7 @@ fun EpgGridScreen(
                 nowSec = nowSec,
                 serverTimeshiftCoversEvent = timeshiftCoversEvent,
                 simpleTvProfile = simpleTvProfile,
+                canModifyRecordings = canModifyRecordings,
                 actionResult = actionResult,
                 onAction = { action ->
                     when (action) {
@@ -1076,6 +1078,7 @@ private fun ProgrammeDetailsPanel(
     nowSec: Long,
     serverTimeshiftCoversEvent: Boolean,
     simpleTvProfile: SimpleTvProfile,
+    canModifyRecordings: Boolean,
     actionResult: DvrActionResult?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
@@ -1086,6 +1089,7 @@ private fun ProgrammeDetailsPanel(
         nowSec,
         recording,
         serverTimeshiftCoversEvent = serverTimeshiftCoversEvent,
+        canModifyRecordings = canModifyRecordings,
     ).filter { action ->
         when (action) {
             ProgrammeAction.RECORD,

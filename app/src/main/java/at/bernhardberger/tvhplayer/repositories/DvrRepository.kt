@@ -33,6 +33,13 @@ class DvrRepository(
     val entries: StateFlow<List<DvrEntry>> = _entries
     private val _configs = MutableStateFlow<List<DvrConfig>>(emptyList())
     val configs: StateFlow<List<DvrConfig>> = _configs
+    /**
+     * Whether this HTSP user may create, cancel, or delete recordings.
+     * Starts true optimistically; latches false when the server denies DVR write
+     * (`noaccess` / permission errors on getDvrConfigs or dvrEntry*).
+     */
+    private val _canModifyRecordings = MutableStateFlow(true)
+    val canModifyRecordings: StateFlow<Boolean> = _canModifyRecordings
 
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -47,6 +54,8 @@ class DvrRepository(
             store.reset(preservePublished)
             _entries.value = store.publishedSnapshot()
             if (!preservePublished) _configs.value = emptyList()
+            // Re-evaluate on each connection; do not carry a stale deny across users.
+            _canModifyRecordings.value = true
         }
     }
 
@@ -57,6 +66,12 @@ class DvrRepository(
             timeoutMs = 10_000,
             disconnectOnTimeout = false,
         )
+        val failure = dvrActionFailure(reply.fields)
+        if (failure == DvrActionFailure.PERMISSION_DENIED) {
+            _canModifyRecordings.value = false
+            _configs.value = emptyList()
+            return
+        }
         _configs.value = dvrConfigsFromReply(reply)
     }
 
@@ -112,6 +127,9 @@ class DvrRepository(
         if (failure == null) {
             DvrActionResult.Accepted(reply.int("id") ?: reply.int("dvrId"))
         } else {
+            if (failure == DvrActionFailure.PERMISSION_DENIED) {
+                _canModifyRecordings.value = false
+            }
             DvrActionResult.Failed(failure)
         }
     } catch (_: SocketTimeoutException) {

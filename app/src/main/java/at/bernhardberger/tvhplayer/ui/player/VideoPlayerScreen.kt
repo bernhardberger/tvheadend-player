@@ -174,6 +174,7 @@ fun VideoPlayerScreen(
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
     val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
+    val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
     val selectedInitId by selection.selectedId.collectAsStateWithLifecycle()
@@ -864,7 +865,11 @@ fun VideoPlayerScreen(
                                             Alignment.End,
                                         ),
                                     ) {
-                                        if (currentRecording == null && !simpleTvProfile.active) {
+                                        if (
+                                            currentRecording == null &&
+                                            !simpleTvProfile.active &&
+                                            canModifyRecordings
+                                        ) {
                                             Button(
                                                 onClick = {
                                                     scope.launch {

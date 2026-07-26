@@ -149,6 +149,7 @@ fun RecordingsScreen(
     state: RecordingsScreenState? = null,
 ) {
     val entries by repository.entries.collectAsStateWithLifecycle()
+    val canModifyRecordings by repository.canModifyRecordings.collectAsStateWithLifecycle()
     val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
     val channelsById = remember(channels) { channels.associateBy(ChannelUi::id) }
     val library = remember(entries) { partitionDvrLibrary(entries) }
@@ -398,6 +399,7 @@ fun RecordingsScreen(
         RecordingDetailsPanel(
             entry = authoritative,
             actionResult = actionResult,
+            canModifyRecordings = canModifyRecordings,
             onPlay = { onPlayRecording(authoritative.id) },
             onCancel = { pendingAction = PendingRecordingAction.CANCEL },
             onDelete = { pendingAction = PendingRecordingAction.DELETE },
@@ -1153,6 +1155,7 @@ private fun ScheduleTime(entry: DvrEntry) {
 private fun RecordingDetailsPanel(
     entry: DvrEntry,
     actionResult: DvrActionResult?,
+    canModifyRecordings: Boolean,
     onPlay: () -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
@@ -1160,12 +1163,14 @@ private fun RecordingDetailsPanel(
 ) {
     val initialFocus = remember { FocusRequester() }
     val closeFocus = remember { FocusRequester() }
-    val canCancel = entry.state == DvrState.SCHEDULED || entry.state == DvrState.RECORDING
-    val canDelete = entry.state == DvrState.COMPLETED || entry.state == DvrState.FAILED ||
-        entry.state == DvrState.CANCELLED
+    val canCancel = canModifyRecordings &&
+        (entry.state == DvrState.SCHEDULED || entry.state == DvrState.RECORDING)
+    val canDelete = canModifyRecordings &&
+        (entry.state == DvrState.COMPLETED || entry.state == DvrState.FAILED ||
+            entry.state == DvrState.CANCELLED)
     val playbackAvailability = recordingPlaybackAvailability(entry)
     val canPlay = playbackAvailability is RecordingPlaybackAvailability.Ready
-    LaunchedEffect(entry.id, entry.state) {
+    LaunchedEffect(entry.id, entry.state, canModifyRecordings) {
         if (canPlay || canCancel || canDelete) initialFocus.requestFocus() else closeFocus.requestFocus()
     }
     BackHandler(onBack = onClose)

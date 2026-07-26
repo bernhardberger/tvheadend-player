@@ -32,6 +32,38 @@ class ProgrammeActionPolicyTest {
     }
 
     @Test
+    fun hidesRecordAndCancelWhenServerDeniesDvrWrite() {
+        assertEquals(
+            emptyList<ProgrammeAction>(),
+            programmeActions(
+                event(200, 300),
+                nowSec = 100,
+                recording = null,
+                canModifyRecordings = false,
+            ),
+        )
+        assertEquals(
+            emptyList<ProgrammeAction>(),
+            programmeActions(
+                event(200, 300),
+                nowSec = 100,
+                recording = recording(DvrState.SCHEDULED),
+                canModifyRecordings = false,
+            ),
+        )
+        // Watch-from-start for completed files is playback, not DVR write.
+        assertEquals(
+            listOf(ProgrammeAction.WATCH_FROM_START),
+            programmeActions(
+                event(100, 200),
+                nowSec = 300,
+                recording = recording(DvrState.COMPLETED),
+                canModifyRecordings = false,
+            ),
+        )
+    }
+
+    @Test
     fun pastProgrammeIsInspectOnlyUnlessServerCanStartIt() {
         assertEquals(
             emptyList<ProgrammeAction>(),
