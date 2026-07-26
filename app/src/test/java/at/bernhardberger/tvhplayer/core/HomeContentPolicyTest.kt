@@ -12,52 +12,199 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeContentPolicyTest {
+    private val nowSec = 1_000L
+
     @Test
-    fun initialFocusUsesFirstAvailableAction() {
-        val empty = HomeDashboardModel(
-            nowPlaying = null,
-            recentChannels = emptyList(),
-            onNow = emptyList(),
-            latestRecordings = emptyList(),
-            recordingNow = emptyList(),
-            upcomingRecordings = emptyList(),
-        )
+    fun initialFocusUsesHeroWhenPresentOtherwiseStatusAction() {
+        val empty = HomeDashboardModel(hero = emptyList(), rows = emptyList())
         assertEquals(HomeFocusTarget.STATUS_ACTION, homeInitialFocusTarget(empty))
-        assertEquals(
-            HomeFocusTarget.ON_NOW,
-            homeInitialFocusTarget(
-                empty.copy(
-                    onNow = listOf(HomeRecentChannel(1, "ORF1", "News")),
-                )
+
+        val withHero = empty.copy(
+            hero = listOf(
+                heroSlide(kind = HomeSlideKind.ON_NOW, channelId = 1, title = "News"),
             ),
         )
-        assertEquals(
-            HomeFocusTarget.RECENT_CHANNEL,
-            homeInitialFocusTarget(
-                empty.copy(
-                    recentChannels = listOf(HomeRecentChannel(1, "ORF1", "News")),
-                    onNow = listOf(HomeRecentChannel(2, "ORF2", "Weather")),
-                )
-            ),
-        )
+        assertEquals(HomeFocusTarget.HERO, homeInitialFocusTarget(withHero))
     }
 
     @Test
-    fun omitsEmptySectionsAndBuildsNowPlaying() {
-        val channels = mapOf(1 to ChannelUi(id = 1, name = "ORF1", number = 1, icon = null))
+    fun heroPutsActiveSessionFirst() {
+        val channels = mapOf(
+            1 to channel(1, "ORF1"),
+            2 to channel(2, "ORF2"),
+        )
+        val model = buildHomeDashboard(
+            channelsById = channels,
+            activeServiceId = 2,
+            activeRecordingId = null,
+            activeProgrammeTitle = "Live match",
+            lastWatchedChannelId = 1,
+            recentChannelIds = listOf(1, 2),
+            onNowEvents = listOf(
+                channels.getValue(1) to event(10, 1, 900, 1_100, "News"),
+                channels.getValue(2) to event(11, 2, 900, 1_100, "Live match"),
+            ),
+            nextEvents = emptyMap(),
+            recordings = emptyList(),
+            nowSec = nowSec,
+        )
+        assertEquals(HomeSlideKind.LIVE, model.hero.first().kind)
+        assertEquals(2, model.hero.first().channelId)
+        assertEquals("Live match", model.hero.first().title)
+    }
+
+    @Test
+    fun heroFallsBackToLastWatchedWhenNothingPlaying() {
+        val channels = mapOf(1 to channel(1, "ORF1"))
+        val model = buildHomeDashboard(
+            channelsById = channels,
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = 1,
+            recentChannelIds = listOf(1),
+            onNowEvents = listOf(
+                channels.getValue(1) to event(10, 1, 900, 1_100, "Evening news"),
+            ),
+            nextEvents = mapOf(1 to event(11, 1, 1_100, 1_200, "Weather")),
+            recordings = emptyList(),
+            nowSec = nowSec,
+        )
+        assertEquals(1, model.hero.size)
+        assertEquals(HomeSlideKind.CONTINUE, model.hero.first().kind)
+        assertEquals(1, model.hero.first().channelId)
+        assertEquals("Evening news", model.hero.first().title)
+        assertEquals("Weather", model.hero.first().nextTitle)
+        assertTrue(model.hero.first().progress != null && model.hero.first().progress!! > 0f)
+    }
+
+    @Test
+    fun heroSlideWithoutEpgUsesChannelNameAndNoProgress() {
+        val channels = mapOf(1 to channel(1, "ORF1 HD"))
+        val model = buildHomeDashboard(
+            channelsById = channels,
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = 1,
+            recentChannelIds = listOf(1),
+            onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
+            recordings = emptyList(),
+            nowSec = nowSec,
+        )
+        val slide = model.hero.single()
+        assertEquals(HomeSlideKind.CONTINUE, slide.kind)
+        assertEquals("ORF1 HD", slide.title)
+        assertNull(slide.progress)
+        assertNull(slide.startSec)
+        assertNull(slide.stopSec)
+        assertNull(slide.nextTitle)
+        assertTrue(slide.playable)
+    }
+
+    @Test
+    fun heroIsCappedAtFourSlides() {
+        val channels = (1..6).associateWith { channel(it, "Ch$it") }
+        val recent = (1..6).toList()
+        val onNow = recent.map { id ->
+            channels.getValue(id) to event(id, id, 900, 1_100, "Show $id")
+        }
+        val model = buildHomeDashboard(
+            channelsById = channels,
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = 1,
+            recentChannelIds = recent,
+            onNowEvents = onNow,
+            nextEvents = emptyMap(),
+            recordings = listOf(
+                dvr(100, 1, DvrState.RECORDING, "Rec A", start = 900, stop = 1_200),
+                dvr(101, 2, DvrState.RECORDING, "Rec B", start = 910, stop = 1_200),
+            ),
+            nowSec = nowSec,
+        )
+        assertEquals(HOME_HERO_LIMIT, model.hero.size)
+        assertTrue(model.hero.size <= 4)
+    }
+
+    @Test
+    fun rowsExcludeChannelsAlreadyShownAbove() {
+        val channels = mapOf(
+            1 to channel(1, "ORF1"),
+            2 to channel(2, "ORF2"),
+            3 to channel(3, "ORF3"),
+        )
         val model = buildHomeDashboard(
             channelsById = channels,
             activeServiceId = 1,
             activeRecordingId = null,
             activeProgrammeTitle = "News",
+            lastWatchedChannelId = 1,
+            recentChannelIds = listOf(1, 2),
+            onNowEvents = listOf(
+                channels.getValue(1) to event(10, 1, 900, 1_100, "News"),
+                channels.getValue(2) to event(11, 2, 900, 1_100, "Sport"),
+                channels.getValue(3) to event(12, 3, 900, 1_100, "Film"),
+            ),
+            nextEvents = emptyMap(),
+            recordings = emptyList(),
+            nowSec = nowSec,
+        )
+        val heroIds = model.hero.map { it.channelId }.toSet()
+        assertTrue(1 in heroIds)
+        // Recent channel 2 is promoted into the hero as ON_NOW, so it is not repeated.
+        assertTrue(2 in heroIds)
+
+        val recent = model.rows.firstOrNull { it.kind == HomeRowKind.RECENT }
+        assertTrue(recent == null || recent.items.isEmpty())
+
+        val onNow = model.rows.firstOrNull { it.kind == HomeRowKind.ON_NOW }
+        // Channels 1–2 are hero; 2 is also recent; only 3 remains for on-now.
+        assertEquals(listOf(3), onNow?.items?.map { it.channelId }.orEmpty())
+
+        val allChannelIds = model.hero.map { it.channelId } +
+            model.rows.flatMap { row -> row.items.map { it.channelId } }
+        assertEquals(allChannelIds.toSet().size, allChannelIds.size)
+    }
+
+    @Test
+    fun recordingRowsAreDroppedWhenRecordingsAreNotAllowed() {
+        val channels = mapOf(1 to channel(1, "ORF1"))
+        val recordings = listOf(
+            dvr(9, 1, DvrState.RECORDING, "Live rec", start = 900, stop = 1_200),
+            dvr(10, 1, DvrState.COMPLETED, "Done", start = 700, stop = 800, withFile = true),
+            dvr(11, 1, DvrState.SCHEDULED, "Later", start = 2_000, stop = 2_100),
+        )
+        val model = buildHomeDashboard(
+            channelsById = channels,
+            activeServiceId = null,
+            activeRecordingId = null,
+            activeProgrammeTitle = null,
+            lastWatchedChannelId = 1,
             recentChannelIds = listOf(1),
             onNowEvents = emptyList(),
-            recordings = emptyList(),
-            nowSec = 1_000L,
+            nextEvents = emptyMap(),
+            recordings = recordings,
+            nowSec = nowSec,
+            allowRecordings = false,
         )
-        assertEquals("News", model.nowPlaying?.programmeTitle)
-        assertTrue(model.onNow.isEmpty())
-        assertTrue(model.latestRecordings.isEmpty())
+        assertTrue(model.hero.none { it.kind == HomeSlideKind.RECORDING })
+        assertTrue(model.rows.none { it.kind == HomeRowKind.RECORDINGS })
+        assertTrue(model.rows.none { it.kind == HomeRowKind.SCHEDULED })
+        assertEquals(HomeSlideKind.CONTINUE, model.hero.single().kind)
+    }
+
+    @Test
+    fun channelAccentSeedIsStableForTheSameName() {
+        assertEquals(channelAccentSeed("ORF1 HD"), channelAccentSeed("ORF1 HD"))
+        assertEquals(channelAccentSeed("ServusTV"), channelAccentSeed("ServusTV"))
+        val a = channelAccentSeed("ORF1 HD")
+        val b = channelAccentSeed("ORF2 HD")
+        assertTrue(a in 0..359)
+        assertTrue(b in 0..359)
+        assertTrue(a != b || "ORF1 HD" == "ORF2 HD")
     }
 
     @Test
@@ -72,81 +219,145 @@ class HomeContentPolicyTest {
     }
 
     @Test
-    fun upcomingRecordingsAreNotMarkedPlayable() {
+    fun upcomingScheduledAreNotMarkedPlayable() {
         val model = buildHomeDashboard(
             channelsById = emptyMap(),
             activeServiceId = null,
             activeRecordingId = null,
             activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
             recentChannelIds = emptyList(),
             onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
             recordings = listOf(
-                DvrEntry(
-                    id = 9,
-                    eventId = 1,
-                    channelId = 1,
-                    start = 2_000,
-                    stop = 2_100,
-                    title = "Later",
-                    state = DvrState.SCHEDULED,
-                    channelName = "ORF1",
-                ),
+                dvr(9, 1, DvrState.SCHEDULED, "Later", start = 2_000, stop = 2_100),
             ),
-            nowSec = 1_000L,
+            nowSec = nowSec,
         )
-        assertEquals(1, model.upcomingRecordings.size)
-        assertFalse(model.upcomingRecordings.first().playable)
-        assertNull(model.nowPlaying)
+        val scheduled = model.rows.single { it.kind == HomeRowKind.SCHEDULED }.items
+        assertEquals(1, scheduled.size)
+        assertFalse(scheduled.first().playable)
+        assertTrue(model.hero.isEmpty())
     }
 
     @Test
-    fun latestContainsOnlyCompletedRecordingsWithAvailableFiles() {
-        fun entry(id: Int, state: DvrState, withFile: Boolean) = DvrEntry(
+    fun recordingsRowContainsOnlyPlayableCompletedAndRecordingNow() {
+        fun entry(id: Int, state: DvrState, withFile: Boolean) = dvr(
             id = id,
-            eventId = id,
             channelId = 1,
+            state = state,
+            title = "Recording $id",
             start = 900L + id,
             stop = 1_100L + id,
-            title = "Recording $id",
-            state = state,
-            files = if (withFile) listOf(DvrFile(path = "/recording-$id.ts")) else emptyList(),
+            withFile = withFile,
         )
         val model = buildHomeDashboard(
-            channelsById = emptyMap(),
+            channelsById = mapOf(1 to channel(1, "ORF1")),
             activeServiceId = null,
             activeRecordingId = null,
             activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
             recentChannelIds = emptyList(),
             onNowEvents = emptyList(),
+            nextEvents = emptyMap(),
             recordings = listOf(
                 entry(1, DvrState.COMPLETED, withFile = true),
                 entry(2, DvrState.COMPLETED, withFile = false),
                 entry(3, DvrState.RECORDING, withFile = true),
                 entry(4, DvrState.FAILED, withFile = true),
             ),
-            nowSec = 1_000L,
+            nowSec = nowSec,
         )
-
-        assertEquals(listOf(1), model.latestRecordings.map { it.id })
-        assertEquals(listOf(1), model.latestRecordings.map { it.channelId })
-        assertEquals(listOf(3), model.recordingNow.map { it.id })
+        // Hero takes recording-now first when nothing else is available.
+        assertEquals(listOf(3), model.hero.mapNotNull { it.recordingId })
+        val recRow = model.rows.firstOrNull { it.kind == HomeRowKind.RECORDINGS }
+        // Recording 3 is in the hero; completed-with-file remains in the row.
+        assertEquals(listOf(1), recRow?.items?.mapNotNull { it.recordingId }.orEmpty())
     }
 
     @Test
     fun onNowUsesCurrentEventsOnly() {
-        val channel = ChannelUi(id = 4, name = "Servus", number = 4, icon = null)
-        val now = EpgEventEntry(1, 4, 900, 1_100, "Live show")
-        val past = EpgEventEntry(2, 4, 700, 800, "Past")
+        val channel = channel(4, "Servus")
+        val current = event(1, 4, 900, 1_100, "Live show")
+        val past = event(2, 4, 700, 800, "Past")
         val model = buildHomeDashboard(
             channelsById = mapOf(4 to channel),
             activeServiceId = null,
             activeRecordingId = null,
             activeProgrammeTitle = null,
+            lastWatchedChannelId = null,
             recentChannelIds = emptyList(),
-            onNowEvents = listOf(channel to now, channel to past),
+            onNowEvents = listOf(channel to current, channel to past),
+            nextEvents = emptyMap(),
             recordings = emptyList(),
-            nowSec = 1_000L,
+            nowSec = nowSec,
         )
-        assertEquals(listOf("Live show"), model.onNow.map { it.programmeTitle })
+        // Fallback promotes current on-now into the hero when there is no history.
+        assertEquals(listOf("Live show"), model.hero.map { it.title })
+        assertTrue(model.rows.none { it.kind == HomeRowKind.ON_NOW })
     }
+
+    private fun channel(id: Int, name: String) = ChannelUi(
+        id = id,
+        name = name,
+        number = id,
+        icon = null,
+    )
+
+    private fun event(
+        eventId: Int,
+        channelId: Int,
+        start: Long,
+        stop: Long,
+        title: String,
+    ) = EpgEventEntry(
+        eventId = eventId,
+        channelId = channelId,
+        start = start,
+        stop = stop,
+        title = title,
+    )
+
+    private fun dvr(
+        id: Int,
+        channelId: Int,
+        state: DvrState,
+        title: String,
+        start: Long,
+        stop: Long,
+        withFile: Boolean = false,
+        channelName: String = "ORF1",
+    ) = DvrEntry(
+        id = id,
+        eventId = id,
+        channelId = channelId,
+        start = start,
+        stop = stop,
+        title = title,
+        state = state,
+        channelName = channelName,
+        files = if (withFile) listOf(DvrFile(path = "/recording-$id.ts")) else emptyList(),
+    )
+
+    private fun heroSlide(
+        kind: HomeSlideKind,
+        channelId: Int,
+        title: String,
+    ) = HomeHeroSlide(
+        kind = kind,
+        channelId = channelId,
+        channelNumber = channelId,
+        channelName = "Ch$channelId",
+        piconPath = null,
+        accentSeed = 0,
+        title = title,
+        subtitle = null,
+        startSec = null,
+        stopSec = null,
+        progress = null,
+        nextTitle = null,
+        nextStartSec = null,
+        recordingId = null,
+        playable = true,
+    )
 }

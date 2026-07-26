@@ -308,6 +308,9 @@ fun AppRoot(
                                 onOpenChannels = {
                                     nav.navigate(Routes.CHANNELS) { launchSingleTop = true }
                                 },
+                                allowRecordings = capabilityProfile.allows(
+                                    SimpleTvCapability.RECORDINGS,
+                                ),
                             )
                         }
                     }

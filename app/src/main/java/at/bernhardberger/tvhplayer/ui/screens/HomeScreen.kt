@@ -15,11 +15,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
@@ -38,20 +38,17 @@ import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.HomeNowPlaying
+import at.bernhardberger.tvhplayer.core.HomeCardItem
 import at.bernhardberger.tvhplayer.core.HomeFocusTarget
-import at.bernhardberger.tvhplayer.core.HomeRecentChannel
-import at.bernhardberger.tvhplayer.core.HomeRecordingItem
-import at.bernhardberger.tvhplayer.core.buildHomeDashboard
+import at.bernhardberger.tvhplayer.core.HomeHeroSlide
+import at.bernhardberger.tvhplayer.core.HomeRowKind
+import at.bernhardberger.tvhplayer.core.HomeSlideKind
 import at.bernhardberger.tvhplayer.core.homeInitialFocusTarget
-import at.bernhardberger.tvhplayer.player.PlayerSession
+import at.bernhardberger.tvhplayer.core.withRecordingsAllowed
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
-import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
-import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import kotlinx.coroutines.delay
+import at.bernhardberger.tvhplayer.viewmodels.HomeViewModel
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
@@ -63,62 +60,24 @@ fun HomeScreen(
     onPlayRecording: (recordingId: Int) -> Unit,
     onOpenRecordings: () -> Unit,
     onOpenChannels: () -> Unit,
-    channelsVm: ChannelsViewModel = koinViewModel(),
-    playerSession: PlayerSession = koinInject(),
-    lastPlayedStore: LastPlayedChannelStore = koinInject(),
-    dvrRepository: DvrRepository = koinInject(),
+    allowRecordings: Boolean = true,
+    homeVm: HomeViewModel = koinViewModel(),
     imageLoader: ImageLoader = koinInject(),
 ) {
-    val channels by channelsVm.channels.collectAsStateWithLifecycle()
-    val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
-    val activeServiceId by playerSession.activeServiceId.collectAsStateWithLifecycle()
-    val activeRecordingId by playerSession.activeRecordingId.collectAsStateWithLifecycle()
-    val recentIds by lastPlayedStore.recentChannelIds.collectAsStateWithLifecycle(initialValue = emptyList())
-    val recordings by dvrRepository.entries.collectAsStateWithLifecycle()
-    var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            nowSec = System.currentTimeMillis() / 1000L
-            delay(30_000)
-        }
-    }
-
-    val channelsById = remember(allChannels) { allChannels.associateBy { it.id } }
-    val onNowEvents = remember(channels, nowSec) {
-        channels.mapNotNull { channel ->
-            val event = channelsVm.nowEvent(channel.id, nowSec) ?: return@mapNotNull null
-            channel to event
-        }
-    }
-    val activeProgramme = remember(activeServiceId, nowSec) {
-        activeServiceId?.let { channelsVm.nowEvent(it, nowSec)?.title }
-    }
-    val model = remember(
-        channelsById,
-        activeServiceId,
-        activeRecordingId,
-        activeProgramme,
-        recentIds,
-        onNowEvents,
-        recordings,
-        nowSec,
-    ) {
-        buildHomeDashboard(
-            channelsById = channelsById,
-            activeServiceId = activeServiceId,
-            activeRecordingId = activeRecordingId,
-            activeProgrammeTitle = activeProgramme,
-            recentChannelIds = recentIds,
-            onNowEvents = onNowEvents,
-            recordings = recordings,
-            nowSec = nowSec,
-        )
+    val dashboard by homeVm.dashboard.collectAsStateWithLifecycle()
+    val model = remember(dashboard, allowRecordings) {
+        dashboard.withRecordingsAllowed(allowRecordings)
     }
 
     val initialFocus = remember { FocusRequester() }
     val initialFocusTarget = remember(model) { homeInitialFocusTarget(model) }
-    LaunchedEffect(initialFocusTarget, connectionUiState) {
-        runCatching { initialFocus.requestFocus() }
+    // One-shot focus claim: request once successfully, then never again when EPG lands
+    // or the computed target changes (would steal focus from Retry).
+    var didRequestInitialFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(model.hero.isNotEmpty(), model.rows.isNotEmpty(), connectionUiState) {
+        if (didRequestInitialFocus) return@LaunchedEffect
+        val attached = runCatching { initialFocus.requestFocus() }.isSuccess
+        if (attached) didRequestInitialFocus = true
     }
 
     Surface(
@@ -143,51 +102,85 @@ fun HomeScreen(
                 )
             }
 
-            model.nowPlaying?.let { now ->
-                item(key = "now-playing") {
+            if (model.hero.isNotEmpty()) {
+                item(key = "hero-section") {
                     HomeSectionTitle(stringResource(R.string.home_now_playing))
-                    HomeNowPlayingCard(
-                        item = now,
-                        imageLoader = imageLoader,
-                        piconPath = channelsById[now.channelId]?.icon,
-                        modifier = if (initialFocusTarget == HomeFocusTarget.NOW_PLAYING) {
-                            Modifier.focusRequester(initialFocus)
-                        } else {
-                            Modifier
-                        },
-                        onClick = {
-                            if (now.isRecording) {
-                                activeRecordingId?.let(onPlayRecording)
-                            } else {
-                                val channel = channelsById[now.channelId] ?: return@HomeNowPlayingCard
-                                onPlayChannel(channel.id, channel.id, channel.name)
-                            }
-                        },
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(
+                            model.hero,
+                            key = { _, slide ->
+                                "hero-${slide.kind}-${slide.channelId}-${slide.recordingId}"
+                            },
+                        ) { index, slide ->
+                            HomeHeroCard(
+                                slide = slide,
+                                imageLoader = imageLoader,
+                                modifier = if (
+                                    index == 0 && initialFocusTarget == HomeFocusTarget.HERO
+                                ) {
+                                    Modifier.focusRequester(initialFocus)
+                                } else {
+                                    Modifier
+                                },
+                                onClick = {
+                                    when {
+                                        slide.kind == HomeSlideKind.RECORDING -> {
+                                            slide.recordingId?.let(onPlayRecording)
+                                        }
+                                        else -> {
+                                            onPlayChannel(
+                                                slide.channelId,
+                                                slide.channelId,
+                                                slide.channelName,
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
+            model.rows.forEach { row ->
+                item(key = "row-${row.kind}") {
+                    HomeSectionTitle(
+                        text = stringResource(
+                            when (row.kind) {
+                                HomeRowKind.RECENT -> R.string.home_recent
+                                HomeRowKind.ON_NOW -> R.string.home_on_now
+                                HomeRowKind.RECORDINGS -> R.string.home_latest_recordings
+                                HomeRowKind.SCHEDULED -> R.string.home_upcoming_recordings
+                            },
+                        ),
                     )
-                }
-            }
-
-            if (model.recentChannels.isNotEmpty()) {
-                item(key = "recent-section") {
-                    HomeSectionTitle(stringResource(R.string.home_recent))
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         itemsIndexed(
-                            model.recentChannels,
-                            key = { _, item -> "recent-${item.channelId}" },
-                        ) { index, item ->
-                            HomeChannelCard(
+                            row.items,
+                            key = { _, item -> item.key },
+                        ) { _, item ->
+                            HomeContentCard(
                                 item = item,
                                 imageLoader = imageLoader,
-                                piconPath = channelsById[item.channelId]?.icon,
-                                modifier = if (
-                                    index == 0 && initialFocusTarget == HomeFocusTarget.RECENT_CHANNEL
-                                ) Modifier.focusRequester(initialFocus) else Modifier,
                                 onClick = {
-                                    channelsById[item.channelId]?.let { channel ->
-                                        onPlayChannel(channel.id, channel.id, channel.name)
+                                    when {
+                                        item.recordingId != null && item.playable -> {
+                                            onPlayRecording(item.recordingId)
+                                        }
+                                        item.recordingId != null -> onOpenRecordings()
+                                        else -> {
+                                            onPlayChannel(
+                                                item.channelId,
+                                                item.channelId,
+                                                item.channelName,
+                                            )
+                                        }
                                     }
                                 },
                             )
@@ -196,118 +189,7 @@ fun HomeScreen(
                 }
             }
 
-            if (model.onNow.isNotEmpty()) {
-                item(key = "on-now-section") {
-                    HomeSectionTitle(stringResource(R.string.home_on_now))
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        itemsIndexed(
-                            model.onNow,
-                            key = { _, item -> "onnow-${item.channelId}" },
-                        ) { index, item ->
-                            HomeChannelCard(
-                                item = item,
-                                imageLoader = imageLoader,
-                                piconPath = channelsById[item.channelId]?.icon,
-                                modifier = if (
-                                    index == 0 && initialFocusTarget == HomeFocusTarget.ON_NOW
-                                ) Modifier.focusRequester(initialFocus) else Modifier,
-                                onClick = {
-                                    channelsById[item.channelId]?.let { channel ->
-                                        onPlayChannel(channel.id, channel.id, channel.name)
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (model.recordingNow.isNotEmpty()) {
-                item(key = "recording-now-section") {
-                    HomeSectionTitle(stringResource(R.string.home_recording_now))
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        itemsIndexed(
-                            model.recordingNow,
-                            key = { _, item -> "recnow-${item.id}" },
-                        ) { index, item ->
-                            HomeRecordingCard(
-                                item = item,
-                                imageLoader = imageLoader,
-                                piconPath = channelsById[item.channelId]?.icon,
-                                modifier = if (
-                                    index == 0 && initialFocusTarget == HomeFocusTarget.RECORDING_NOW
-                                ) Modifier.focusRequester(initialFocus) else Modifier,
-                                onClick = { onPlayRecording(item.id) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (model.latestRecordings.isNotEmpty()) {
-                item(key = "latest-section") {
-                    HomeSectionTitle(stringResource(R.string.home_latest_recordings))
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        itemsIndexed(
-                            model.latestRecordings,
-                            key = { _, item -> "latest-${item.id}" },
-                        ) { index, item ->
-                            HomeRecordingCard(
-                                item = item,
-                                imageLoader = imageLoader,
-                                piconPath = channelsById[item.channelId]?.icon,
-                                modifier = if (
-                                    index == 0 && initialFocusTarget == HomeFocusTarget.LATEST_RECORDING
-                                ) Modifier.focusRequester(initialFocus) else Modifier,
-                                onClick = { onPlayRecording(item.id) },
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (model.upcomingRecordings.isNotEmpty()) {
-                item(key = "upcoming-section") {
-                    HomeSectionTitle(stringResource(R.string.home_upcoming_recordings))
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        itemsIndexed(
-                            model.upcomingRecordings,
-                            key = { _, item -> "up-${item.id}" },
-                        ) { index, item ->
-                            HomeRecordingCard(
-                                item = item,
-                                imageLoader = imageLoader,
-                                piconPath = channelsById[item.channelId]?.icon,
-                                modifier = if (
-                                    index == 0 && initialFocusTarget == HomeFocusTarget.UPCOMING_RECORDING
-                                ) Modifier.focusRequester(initialFocus) else Modifier,
-                                onClick = onOpenRecordings,
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (
-                model.nowPlaying == null &&
-                model.recentChannels.isEmpty() &&
-                model.onNow.isEmpty() &&
-                model.latestRecordings.isEmpty() &&
-                model.recordingNow.isEmpty() &&
-                model.upcomingRecordings.isEmpty()
-            ) {
+            if (model.hero.isEmpty() && model.rows.isEmpty()) {
                 item {
                     Column(
                         modifier = Modifier.padding(top = 24.dp),
@@ -327,7 +209,11 @@ fun HomeScreen(
                             connectionUiState is ConnectionUiState.Error
                         Button(
                             onClick = if (retry) onRetryConnection else onOpenChannels,
-                            modifier = Modifier.focusRequester(initialFocus),
+                            modifier = if (initialFocusTarget == HomeFocusTarget.STATUS_ACTION) {
+                                Modifier.focusRequester(initialFocus)
+                            } else {
+                                Modifier
+                            },
                         ) {
                             Text(stringResource(if (retry) R.string.retry else R.string.nav_channels))
                         }
@@ -350,17 +236,16 @@ private fun HomeSectionTitle(text: String) {
 }
 
 @Composable
-private fun HomeNowPlayingCard(
-    item: HomeNowPlaying,
+private fun HomeHeroCard(
+    slide: HomeHeroSlide,
     imageLoader: ImageLoader,
-    piconPath: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
         onClick = onClick,
         scale = CardDefaults.scale(focusedScale = 1.02f),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.width(420.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
@@ -369,25 +254,27 @@ private fun HomeNowPlayingCard(
         ) {
             PiconBox(
                 imageLoader = imageLoader,
-                piconPath = piconPath,
+                piconPath = slide.piconPath,
                 modifier = Modifier.width(88.dp).height(56.dp),
             )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = item.programmeTitle ?: item.channelName,
+                    text = slide.title,
                     style = MaterialTheme.typography.headlineMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = buildString {
-                        append(item.channelName)
-                        if (item.isRecording) {
+                        append(slide.channelName)
+                        if (slide.kind == HomeSlideKind.RECORDING) {
                             append(" • ")
                             append(stringResource(R.string.recordings_recording_now))
                         }
                     },
                     style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -395,12 +282,11 @@ private fun HomeNowPlayingCard(
 }
 
 @Composable
-private fun HomeChannelCard(
-    item: HomeRecentChannel,
+private fun HomeContentCard(
+    item: HomeCardItem,
     imageLoader: ImageLoader,
-    piconPath: String?,
-    modifier: Modifier = Modifier,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
         onClick = onClick,
@@ -414,67 +300,26 @@ private fun HomeChannelCard(
         ) {
             PiconBox(
                 imageLoader = imageLoader,
-                piconPath = piconPath,
+                piconPath = item.piconPath,
                 modifier = Modifier.width(64.dp).height(44.dp),
             )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = item.channelName,
+                    text = if (item.recordingId != null) item.title else item.channelName,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                item.programmeTitle?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeRecordingCard(
-    item: HomeRecordingItem,
-    imageLoader: ImageLoader,
-    piconPath: String?,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
-        scale = CardDefaults.scale(focusedScale = 1.02f),
-        modifier = modifier.width(320.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            PiconBox(
-                imageLoader = imageLoader,
-                piconPath = piconPath,
-                modifier = Modifier.width(64.dp).height(44.dp),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = if (item.recordingId != null) {
+                        item.channelName
+                    } else {
+                        item.title
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                item.subtitle?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
         }
     }
