@@ -14,6 +14,7 @@ DEVICE = runpy.run_path(str(ROOT / "tools/device"), run_name="device_tool")
 action_policy_error = DEVICE["action_policy_error"]
 identity_errors = DEVICE["identity_errors"]
 load_credential_payload = DEVICE["load_credential_payload"]
+resolve_verified_release_apk = DEVICE["resolve_verified_release_apk"]
 capture_screenshot = DEVICE["capture_screenshot"]
 resolve_screenshot_output = DEVICE["resolve_screenshot_output"]
 run = DEVICE["run"]
@@ -76,6 +77,55 @@ class DevicePolicyTest(unittest.TestCase):
             for action in ("connect", "doctor", "current", "package-info"):
                 with self.subTest(role=role, action=action):
                     self.assertIsNone(action_policy_error(role, action))
+
+    def test_release_install_is_available_only_for_production(self) -> None:
+        self.assertIsNone(action_policy_error("production", "install-release"))
+        self.assertIsNotNone(action_policy_error("test", "install-release"))
+        self.assertIsNotNone(action_policy_error("unclassified", "install-release"))
+
+    def test_legacy_uninstall_is_available_only_for_production(self) -> None:
+        self.assertIsNone(action_policy_error("production", "uninstall-legacy"))
+        self.assertIsNotNone(action_policy_error("test", "uninstall-legacy"))
+        self.assertIsNotNone(action_policy_error("unclassified", "uninstall-legacy"))
+
+    def test_release_install_requires_explicit_confirmation(self) -> None:
+        parser = DEVICE["build_parser"]()
+        args = parser.parse_args(
+            ["install-release", "--bundle", "build/release/signed/0.1.0"]
+        )
+
+        self.assertFalse(args.confirm_production_install)
+
+    def test_legacy_uninstall_requires_explicit_confirmation(self) -> None:
+        parser = DEVICE["build_parser"]()
+        args = parser.parse_args(["uninstall-legacy"])
+
+        self.assertFalse(args.confirm_legacy_uninstall)
+        self.assertEqual(DEVICE["LEGACY_PACKAGE"], "at.leoville.tvhstream")
+
+    def test_release_apk_is_taken_from_verified_bundle_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            apk = bundle / "product.apk"
+            apk.write_bytes(b"signed apk")
+            (bundle / "release-manifest.json").write_text(
+                '{"applicationId":"at.bernhardberger.tvhplayer",'
+                '"artifacts":{"signedApk":{"file":"product.apk"}}}',
+                encoding="utf-8",
+            )
+
+            with patch.object(DEVICE["subprocess"], "run") as run_mock:
+                resolved = resolve_verified_release_apk(bundle)
+
+            self.assertEqual(resolved, apk)
+            run_mock.assert_called_once_with(
+                [
+                    str(ROOT / "tools/release"),
+                    "verify-signed",
+                    str(bundle),
+                ],
+                check=True,
+            )
 
     def test_test_mutation_requires_matching_expected_identity(self) -> None:
         self.assertEqual(

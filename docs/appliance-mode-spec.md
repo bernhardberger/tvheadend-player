@@ -48,8 +48,10 @@ on the Android debug keystore.
   remains only in ignored local device configuration, and tooling must verify its
   manufacturer, model, device, and product before every mutation.
 - `tools/device` enforces this boundary: production and unclassified devices
-  reject install, launch, force-stop, smoke, screenshot, synthetic-key, and
-  credential-provisioning actions.
+  reject debug install, launch, force-stop, smoke, screenshot, synthetic-key,
+  and credential-provisioning actions. An exact-identity production device may
+  receive a fully verified product-signed bundle only after explicit owner
+  approval and command-line confirmation.
 - A designated test device may receive TVHeadend credentials through the
   debug-only app-private provisioning path after role and complete live identity
   validation. Secret values travel only over process stdin from an ignored,

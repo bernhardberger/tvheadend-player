@@ -147,6 +147,31 @@ D-pad and physical key behavior, HOME/GUIDE, standby/wake, reboot, and Back/Stop
 checks. Record only package, version, source commit, APK checksum, and signing
 fingerprint. Do not record addresses, credentials, or unrestricted logs.
 
+## Production deployment
+
+Production installation requires explicit owner approval. Configure the ignored
+`.tvhplayer-device.json` for role `production` with the exact expected
+manufacturer, model, device, and product, then run `doctor`. Install only the
+complete signed bundle through the bounded wrapper:
+
+```bash
+./tools/device install-release \
+  --bundle build/release/signed/0.1.0 \
+  --confirm-production-install
+```
+
+The wrapper independently verifies bundle checksums, source continuity, APK
+identity, alignment, and the pinned signing certificate before rechecking all
+four live identity properties and invoking the Android package installer. It
+does not launch the app, inject input, provision credentials, or remove rollback
+clients. Record only the bounded package metadata printed after installation.
+
+Removing the legacy `at.leoville.tvhstream` rollback client is a separate,
+explicitly approved production mutation. After confirming the replacement is
+running, use `./tools/device uninstall-legacy --confirm-legacy-uninstall`. The
+wrapper rechecks exact production identity, requires the replacement package to
+be installed, removes only the fixed legacy package name, and verifies removal.
+
 ## Rollback
 
 For a failed G10 candidate, with the test target identity re-confirmed and no

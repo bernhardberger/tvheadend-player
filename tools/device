@@ -25,7 +25,9 @@ from typing import NoReturn
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
 DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
+LEGACY_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
+RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 DEFAULT_SCREENSHOT = Path("/tmp/tvheadend-player-screenshot.png")
 MAX_CREDENTIAL_FILE_BYTES = 64 * 1024
@@ -52,6 +54,7 @@ TEST_DEVICE_ACTIONS = {
     "screenshot",
     "provision-test-credentials",
 }
+PRODUCTION_DEVICE_ACTIONS = {"install-release", "uninstall-legacy"}
 VALID_ROLES = {"production", "test", "unclassified"}
 
 
@@ -168,6 +171,10 @@ def require_serial(value: str | None) -> str:
 
 
 def action_policy_error(role: str, action: str) -> str | None:
+    if action in PRODUCTION_DEVICE_ACTIONS:
+        if role == "production":
+            return None
+        return f"{action} requires an explicitly classified production device"
     if action not in TEST_DEVICE_ACTIONS:
         return None
     if role == "test":
@@ -329,6 +336,38 @@ def show_package_info(adb: str, serial: str, package_name: str) -> None:
     print("\n".join(dict.fromkeys(lines)))
 
 
+def package_is_installed(adb: str, serial: str, package_name: str) -> bool:
+    result = run(
+        adb_command(adb, serial, "shell", "pm", "path", package_name),
+        capture=True,
+        check=False,
+    )
+    return result.returncode == 0 and any(
+        line.startswith("package:") for line in result.stdout.splitlines()
+    )
+
+
+def resolve_verified_release_apk(bundle: Path) -> Path:
+    bundle = bundle.expanduser().resolve()
+    subprocess.run(
+        [str(RELEASE_TOOL), "verify-signed", str(bundle)],
+        check=True,
+    )
+    try:
+        manifest = json.loads((bundle / "release-manifest.json").read_text(encoding="utf-8"))
+        if manifest.get("applicationId") != DEFAULT_PACKAGE:
+            fail(f"release bundle is not for {DEFAULT_PACKAGE}")
+        apk_name = manifest["artifacts"]["signedApk"]["file"]
+        if not isinstance(apk_name, str) or Path(apk_name).name != apk_name:
+            fail("release bundle has an invalid signed APK path")
+        apk = bundle / apk_name
+        if apk.is_symlink() or not apk.is_file():
+            fail("verified signed APK is missing or is not a regular file")
+        return apk
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, AttributeError) as exc:
+        fail(f"cannot read verified release manifest: {exc}")
+
+
 def resolve_screenshot_output(path: Path) -> Path:
     if path.suffix.lower() != ".png":
         fail("screenshot output must use a .png extension")
@@ -407,6 +446,32 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"APK path (default: {DEFAULT_APK.relative_to(ROOT)})",
     )
 
+    release_parser = subparsers.add_parser(
+        "install-release",
+        help="Install a verified signed release on an exact-identity production device",
+    )
+    release_parser.add_argument(
+        "--bundle",
+        type=Path,
+        required=True,
+        help="Signed release bundle produced by tools/release",
+    )
+    release_parser.add_argument(
+        "--confirm-production-install",
+        action="store_true",
+        help="Confirm explicit owner approval for this production-device mutation",
+    )
+
+    uninstall_parser = subparsers.add_parser(
+        "uninstall-legacy",
+        help=f"Uninstall only the legacy production package {LEGACY_PACKAGE}",
+    )
+    uninstall_parser.add_argument(
+        "--confirm-legacy-uninstall",
+        action="store_true",
+        help="Confirm explicit owner approval to remove the legacy rollback client",
+    )
+
     subparsers.add_parser("launch", help="Launch the Leanback activity")
     subparsers.add_parser("force-stop", help="Force-stop the selected package")
     subparsers.add_parser("current", help="Show only the current/focused activity")
@@ -464,6 +529,10 @@ def main() -> int:
     policy_error = action_policy_error(role, args.action)
     if policy_error:
         fail(policy_error)
+    if args.action == "install-release" and not args.confirm_production_install:
+        fail("install-release requires --confirm-production-install")
+    if args.action == "uninstall-legacy" and not args.confirm_legacy_uninstall:
+        fail("uninstall-legacy requires --confirm-legacy-uninstall")
     if args.action == "screenshot" and not args.confirm_safe_screen:
         fail("screenshot requires --confirm-safe-screen")
 
@@ -486,7 +555,7 @@ def main() -> int:
         )
         return 0
 
-    if args.action in TEST_DEVICE_ACTIONS:
+    if args.action in TEST_DEVICE_ACTIONS | PRODUCTION_DEVICE_ACTIONS:
         require_device_ready(adb, serial)
         properties = read_device_properties(adb, serial)
         verify_configured_identity(properties, config, require_expected=True)
@@ -496,6 +565,25 @@ def main() -> int:
         if not apk.is_file():
             fail(f"APK does not exist: {apk}")
         run(adb_command(adb, serial, "install", "-r", str(apk)))
+        return 0
+
+    if args.action == "install-release":
+        if package_name != DEFAULT_PACKAGE:
+            fail(f"release installation is available only for package {DEFAULT_PACKAGE}")
+        apk = resolve_verified_release_apk(args.bundle)
+        run(adb_command(adb, serial, "install", "-r", str(apk)))
+        show_package_info(adb, serial, package_name)
+        return 0
+
+    if args.action == "uninstall-legacy":
+        if not package_is_installed(adb, serial, DEFAULT_PACKAGE):
+            fail(f"replacement package {DEFAULT_PACKAGE} is not installed")
+        if not package_is_installed(adb, serial, LEGACY_PACKAGE):
+            fail(f"legacy package {LEGACY_PACKAGE} is not installed")
+        run(adb_command(adb, serial, "uninstall", LEGACY_PACKAGE))
+        if package_is_installed(adb, serial, LEGACY_PACKAGE):
+            fail(f"legacy package {LEGACY_PACKAGE} remains installed")
+        print(f"removedPackage={LEGACY_PACKAGE}")
         return 0
 
     if args.action == "provision-test-credentials":
