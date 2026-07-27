@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+import importlib.util
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+MODULE_PATH = ROOT / "tools/release_metadata.py"
+SPEC = importlib.util.spec_from_file_location("release_metadata", MODULE_PATH)
+if SPEC is None or SPEC.loader is None:
+    raise RuntimeError(f"Cannot load {MODULE_PATH}")
+release_metadata = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(release_metadata)
+
+
+class ReleaseMetadataTest(unittest.TestCase):
+    def test_canonical_signing_identity_is_pinned(self) -> None:
+        self.assertEqual(release_metadata.CANONICAL_KEY_ALIAS, "tvhplayer-release")
+        self.assertEqual(
+            release_metadata.CANONICAL_CERTIFICATE_SHA256,
+            "1E:18:48:62:F5:BB:A2:D1:C8:40:6D:6A:7A:79:65:7F:"
+            "F3:A7:3D:25:8C:1E:1B:75:FA:25:02:58:75:E5:AB:C9",
+        )
+
+    def test_fingerprint_normalization_accepts_apksigner_format(self) -> None:
+        compact = "1e184862f5bba2d1c8406d6a7a79657ff3a73d258c1e1b75fa25025875e5abc9"
+        self.assertEqual(
+            release_metadata.normalize_fingerprint(compact),
+            release_metadata.CANONICAL_CERTIFICATE_SHA256,
+        )
+
+    def test_unsigned_manifest_rejects_identity_mismatch(self) -> None:
+        manifest = release_metadata.build_unsigned_manifest(
+            application_id="at.bernhardberger.tvhplayer",
+            version_code=1,
+            version_name="0.1.0",
+            source_commit="a" * 40,
+            artifacts=self._artifacts("unsigned"),
+        )
+
+        with self.assertRaisesRegex(ValueError, "application ID"):
+            release_metadata.validate_unsigned_manifest(
+                manifest,
+                application_id="invalid.application",
+                version_code=1,
+                version_name="0.1.0",
+            )
+
+    def test_manifest_rejects_unsafe_artifact_path(self) -> None:
+        artifacts = self._artifacts("unsigned")
+        artifacts["unsignedApk"]["file"] = "../unsigned.apk"
+
+        with self.assertRaisesRegex(ValueError, "safe file name"):
+            release_metadata.build_unsigned_manifest(
+                application_id="at.bernhardberger.tvhplayer",
+                version_code=1,
+                version_name="0.1.0",
+                source_commit="a" * 40,
+                artifacts=artifacts,
+            )
+
+    def test_sha256_file_matches_known_content(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "artifact"
+            path.write_bytes(b"tvheadend-player\n")
+
+            self.assertEqual(
+                release_metadata.sha256_file(path),
+                "4172e236b4d3ecb9ece97bd090218b288dee86981617b0f441f7eec0636915a1",
+            )
+
+    def test_signed_manifest_rejects_another_certificate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            signed_apk = Path(directory) / "signed.apk"
+            signed_apk.write_bytes(b"signed")
+            unsigned = release_metadata.build_unsigned_manifest(
+                application_id="at.bernhardberger.tvhplayer",
+                version_code=1,
+                version_name="0.1.0",
+                source_commit="a" * 40,
+                artifacts=self._artifacts("unsigned"),
+            )
+
+            with self.assertRaisesRegex(ValueError, "canonical fingerprint"):
+                release_metadata.build_signed_manifest(
+                    unsigned_manifest=unsigned,
+                    signed_apk=signed_apk,
+                    certificate_sha256="00" * 32,
+                    source_tar_gz=signed_apk,
+                    source_zip=signed_apk,
+                    native_source_tar_gz=signed_apk,
+                )
+
+    def test_checksum_file_rejects_paths_outside_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            checksums = bundle / "SHA256SUMS"
+            checksums.write_text(f"{'1' * 64}  ../outside\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "safe file name"):
+                release_metadata.validate_checksum_file(
+                    checksums,
+                    bundle,
+                    {"artifact"},
+                )
+
+    def test_two_stage_scripts_keep_signing_out_of_unsigned_builder(self) -> None:
+        prepare = (ROOT / "tools/prepare-release").read_text(encoding="utf-8")
+        sign = (ROOT / "tools/sign-release").read_text(encoding="utf-8")
+
+        self.assertNotIn("TVHPLAYER_RELEASE_", prepare)
+        self.assertNotIn("apksigner sign", prepare)
+        self.assertIn("apksigner verify", prepare)
+        self.assertIn("--ks-pass", sign)
+        self.assertIn("file:", sign)
+        self.assertNotIn("pass:", sign)
+
+    @staticmethod
+    def _artifacts(stage: str) -> dict[str, dict[str, str]]:
+        apk_name = "unsigned.apk" if stage == "unsigned" else "signed.apk"
+        return {
+            f"{stage}Apk": {"file": apk_name, "sha256": "1" * 64},
+            "sourceTarGz": {"file": "source.tar.gz", "sha256": "2" * 64},
+            "sourceZip": {"file": "source.zip", "sha256": "3" * 64},
+            "nativeSourceTarGz": {
+                "file": "native-source.tar.gz",
+                "sha256": "4" * 64,
+            },
+        }
+
+
+if __name__ == "__main__":
+    unittest.main()

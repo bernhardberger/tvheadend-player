@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+APPLICATION_ID="at.bernhardberger.tvhplayer"
+KEY_ALIAS="tvhplayer-release"
+INCOMING_DIR="${1:-}"
+KEYSTORE="${2:-}"
+OUTPUT_DIR="${3:-}"
+
+if [[ -z "$INCOMING_DIR" || -z "$KEYSTORE" ]]; then
+    printf 'usage: tools/sign-release INCOMING_DIR KEYSTORE [OUTPUT_DIR]\n' >&2
+    exit 2
+fi
+INCOMING_DIR="$(realpath "$INCOMING_DIR")"
+KEYSTORE="$(realpath "$KEYSTORE")"
+if [[ ! -d "$INCOMING_DIR" || ! -f "$INCOMING_DIR/SHA256SUMS" || ! -f "$INCOMING_DIR/release-manifest.json" ]]; then
+    printf 'error: incoming release bundle is incomplete: %s\n' "$INCOMING_DIR" >&2
+    exit 1
+fi
+if [[ -L "$INCOMING_DIR/SHA256SUMS" || -L "$INCOMING_DIR/release-manifest.json" ]]; then
+    printf 'error: incoming checksum and manifest files must not be symbolic links\n' >&2
+    exit 1
+fi
+if [[ ! -f "$KEYSTORE" ]]; then
+    printf 'error: release keystore does not exist: %s\n' "$KEYSTORE" >&2
+    exit 1
+fi
+keystore_mode="$(stat -c '%a' "$KEYSTORE")"
+if [[ "${keystore_mode: -2:1}" != "0" || "${keystore_mode: -1}" != "0" ]]; then
+    printf 'error: release keystore must not be accessible to group or other users\n' >&2
+    exit 1
+fi
+
+apksigner=""
+aapt=""
+zipalign=""
+for build_tools in "$ANDROID_HOME/build-tools/36.0.0" "$ANDROID_HOME/build-tools/35.0.0"; do
+    if [[ -x "$build_tools/apksigner" && -x "$build_tools/aapt" && -x "$build_tools/zipalign" ]]; then
+        apksigner="$build_tools/apksigner"
+        aapt="$build_tools/aapt"
+        zipalign="$build_tools/zipalign"
+        break
+    fi
+done
+if [[ -z "$apksigner" ]]; then
+    printf 'error: apksigner, aapt, and zipalign are required in Android build-tools\n' >&2
+    exit 1
+fi
+
+manifest="$INCOMING_DIR/release-manifest.json"
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-checksums \
+    --checksums "$INCOMING_DIR/SHA256SUMS" \
+    --manifest "$manifest" \
+    --directory "$INCOMING_DIR"
+manifest_application_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["applicationId"])' "$manifest")"
+manifest_version_code="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["versionCode"])' "$manifest")"
+manifest_version_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["versionName"])' "$manifest")"
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-unsigned \
+    --manifest "$manifest" \
+    --directory "$INCOMING_DIR" \
+    --application-id "$manifest_application_id" \
+    --version-code "$manifest_version_code" \
+    --version-name "$manifest_version_name"
+unsigned_apk_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["unsignedApk"]["file"])' "$manifest")"
+source_tar_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["sourceTarGz"]["file"])' "$manifest")"
+source_zip_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["sourceZip"]["file"])' "$manifest")"
+native_source_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["nativeSourceTarGz"]["file"])' "$manifest")"
+unsigned_apk="$INCOMING_DIR/$unsigned_apk_name"
+
+badging="$($aapt dump badging "$unsigned_apk")"
+if [[ ! "$badging" =~ package:\ name=\'([^\']+)\' ]]; then
+    printf 'error: unable to read APK application ID\n' >&2
+    exit 1
+fi
+application_id="${BASH_REMATCH[1]}"
+if [[ "$application_id" != "$APPLICATION_ID" ]]; then
+    printf 'error: unexpected APK application ID: %s\n' "$application_id" >&2
+    exit 1
+fi
+if [[ ! "$badging" =~ versionCode=\'([0-9]+)\' ]]; then
+    printf 'error: unable to read APK versionCode\n' >&2
+    exit 1
+fi
+version_code="${BASH_REMATCH[1]}"
+if [[ ! "$badging" =~ versionName=\'([^\']+)\' ]]; then
+    printf 'error: unable to read APK versionName\n' >&2
+    exit 1
+fi
+version_name="${BASH_REMATCH[1]}"
+
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-unsigned \
+    --manifest "$manifest" \
+    --directory "$INCOMING_DIR" \
+    --application-id "$application_id" \
+    --version-code "$version_code" \
+    --version-name "$version_name"
+"$zipalign" -c -P 16 4 "$unsigned_apk"
+if "$apksigner" verify "$unsigned_apk" >/dev/null 2>&1; then
+    printf 'error: incoming APK is already signed\n' >&2
+    exit 1
+fi
+
+if [[ -z "$OUTPUT_DIR" ]]; then
+    OUTPUT_DIR="$(dirname "$INCOMING_DIR")/signed/$version_name"
+fi
+OUTPUT_DIR="$(realpath -m "$OUTPUT_DIR")"
+if [[ -e "$OUTPUT_DIR" ]]; then
+    printf 'error: signed release output already exists: %s\n' "$OUTPUT_DIR" >&2
+    exit 1
+fi
+
+temporary_dir="$(mktemp -d)"
+trap 'rm -rf "$temporary_dir"; unset store_password key_password' EXIT
+store_password_file="$temporary_dir/store-password"
+key_password_file="$temporary_dir/key-password"
+read -rsp 'Keystore password: ' store_password
+printf '\n' >&2
+read -rsp 'Key password: ' key_password
+printf '\n' >&2
+printf '%s' "$store_password" > "$store_password_file"
+printf '%s' "$key_password" > "$key_password_file"
+unset store_password key_password
+
+signed_apk_name="tvheadend-player-${version_name}.apk"
+signed_apk="$temporary_dir/$signed_apk_name"
+"$apksigner" sign \
+    --ks "$KEYSTORE" \
+    --ks-key-alias "$KEY_ALIAS" \
+    --ks-pass "file:$store_password_file" \
+    --key-pass "file:$key_password_file" \
+    --out "$signed_apk" \
+    "$unsigned_apk"
+rm -f "$store_password_file" "$key_password_file"
+
+"$zipalign" -c -P 16 4 "$signed_apk"
+signature_report="$($apksigner verify --verbose --print-certs "$signed_apk")"
+if [[ ! "$signature_report" =~ Signer\ \#1\ certificate\ SHA-256\ digest:\ ([0-9a-fA-F]+) ]]; then
+    printf 'error: unable to read signing certificate SHA-256 digest\n' >&2
+    exit 1
+fi
+certificate_sha256="${BASH_REMATCH[1]}"
+
+staged_output="$temporary_dir/signed-bundle"
+mkdir "$staged_output"
+cp "$signed_apk" "$staged_output/$signed_apk_name"
+cp "$INCOMING_DIR/$source_tar_name" "$staged_output/$source_tar_name"
+cp "$INCOMING_DIR/$source_zip_name" "$staged_output/$source_zip_name"
+cp "$INCOMING_DIR/$native_source_name" "$staged_output/$native_source_name"
+cp "$manifest" "$staged_output/unsigned-release-manifest.json"
+printf '%s\n' "$signature_report" > "$staged_output/APKSIGNER-VERIFY.txt"
+
+python3 "$ROOT_DIR/tools/release_metadata.py" create-signed \
+    --unsigned-manifest "$manifest" \
+    --application-id "$application_id" \
+    --version-code "$version_code" \
+    --version-name "$version_name" \
+    --signed-apk "$staged_output/$signed_apk_name" \
+    --source-tar-gz "$staged_output/$source_tar_name" \
+    --source-zip "$staged_output/$source_zip_name" \
+    --native-source-tar-gz "$staged_output/$native_source_name" \
+    --certificate-sha256 "$certificate_sha256" \
+    --output "$staged_output/release-manifest.json"
+(
+    cd "$staged_output"
+    sha256sum \
+        "$signed_apk_name" \
+        "$source_tar_name" \
+        "$source_zip_name" \
+        "$native_source_name" \
+        unsigned-release-manifest.json \
+        APKSIGNER-VERIFY.txt \
+        release-manifest.json > SHA256SUMS
+)
+mkdir -p "$(dirname "$OUTPUT_DIR")"
+mv "$staged_output" "$OUTPUT_DIR"
+
+printf 'Signed release bundle created at %s\n' "$OUTPUT_DIR"

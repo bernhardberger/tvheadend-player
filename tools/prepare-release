@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+APPLICATION_ID="at.bernhardberger.tvhplayer"
+NATIVE_SOURCE_NAME="tvheadend-player-native-source-media3-1.9.2-ffmpeg-n6.0.1.tar.gz"
+NATIVE_SOURCE="${1:-$ROOT_DIR/build/native-release/$NATIVE_SOURCE_NAME}"
+
+if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=normal)" ]]; then
+    printf 'error: release preparation requires a clean worktree\n' >&2
+    exit 1
+fi
+if [[ ! -f "$NATIVE_SOURCE" ]]; then
+    printf 'error: native corresponding-source archive does not exist: %s\n' "$NATIVE_SOURCE" >&2
+    printf 'Run tools/build-media3-ffmpeg first.\n' >&2
+    exit 1
+fi
+
+native_source_entries="$(tar -tzf "$NATIVE_SOURCE")"
+required_native_source_entries=(
+    "tvheadend-player-native-source/BUILD.md"
+    "tvheadend-player-native-source/build/media3-ffmpeg-disable-iconv.patch"
+    "tvheadend-player-native-source/licenses/ffmpeg-LGPL-2.1.txt"
+    "tvheadend-player-native-source/licenses/media3-APACHE-2.0.txt"
+)
+for entry in "${required_native_source_entries[@]}"; do
+    if [[ "$native_source_entries" != *"$entry"* ]]; then
+        printf 'error: native corresponding-source archive is missing %s\n' "$entry" >&2
+        exit 1
+    fi
+done
+
+apksigner=""
+aapt=""
+zipalign=""
+for build_tools in "$ANDROID_HOME/build-tools/36.0.0" "$ANDROID_HOME/build-tools/35.0.0"; do
+    if [[ -x "$build_tools/apksigner" && -x "$build_tools/aapt" && -x "$build_tools/zipalign" ]]; then
+        apksigner="$build_tools/apksigner"
+        aapt="$build_tools/aapt"
+        zipalign="$build_tools/zipalign"
+        break
+    fi
+done
+if [[ -z "$apksigner" ]]; then
+    printf 'error: apksigner, aapt, and zipalign are required in Android build-tools\n' >&2
+    exit 1
+fi
+
+temporary_dir="$(mktemp -d)"
+trap 'rm -rf "$temporary_dir"' EXIT
+cp "$NATIVE_SOURCE" "$temporary_dir/$NATIVE_SOURCE_NAME"
+
+cd "$ROOT_DIR"
+./tools/check-native-libs --release
+./tools/verify
+./gradlew clean assembleRelease --no-daemon
+
+built_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
+if [[ ! -f "$built_apk" ]]; then
+    printf 'error: expected unsigned release APK was not produced: %s\n' "$built_apk" >&2
+    exit 1
+fi
+# apksigner verify must fail before and after alignment, proving this host did not sign the APK.
+if "$apksigner" verify "$built_apk" >/dev/null 2>&1; then
+    printf 'error: Gradle unexpectedly produced a signed release APK\n' >&2
+    exit 1
+fi
+
+aligned_apk="$temporary_dir/tvheadend-player-unsigned.apk"
+"$zipalign" -f -P 16 4 "$built_apk" "$aligned_apk"
+"$zipalign" -c -P 16 4 "$aligned_apk"
+if "$apksigner" verify "$aligned_apk" >/dev/null 2>&1; then
+    printf 'error: aligned release APK is unexpectedly signed\n' >&2
+    exit 1
+fi
+
+badging="$($aapt dump badging "$aligned_apk")"
+if [[ ! "$badging" =~ package:\ name=\'([^\']+)\' ]]; then
+    printf 'error: unable to read APK application ID\n' >&2
+    exit 1
+fi
+application_id="${BASH_REMATCH[1]}"
+if [[ "$application_id" != "$APPLICATION_ID" ]]; then
+    printf 'error: unexpected APK application ID: %s\n' "$application_id" >&2
+    exit 1
+fi
+if [[ ! "$badging" =~ versionCode=\'([0-9]+)\' ]]; then
+    printf 'error: unable to read APK versionCode\n' >&2
+    exit 1
+fi
+version_code="${BASH_REMATCH[1]}"
+if [[ ! "$badging" =~ versionName=\'([^\']+)\' ]]; then
+    printf 'error: unable to read APK versionName\n' >&2
+    exit 1
+fi
+version_name="${BASH_REMATCH[1]}"
+
+release_dir="${2:-$ROOT_DIR/build/release/unsigned/$version_name}"
+if [[ -e "$release_dir" ]]; then
+    printf 'error: release output already exists: %s\n' "$release_dir" >&2
+    exit 1
+fi
+mkdir -p "$release_dir"
+
+apk_name="tvheadend-player-${version_name}-unsigned.apk"
+source_tar_name="tvheadend-player-${version_name}-source.tar.gz"
+source_zip_name="tvheadend-player-${version_name}-source.zip"
+cp "$aligned_apk" "$release_dir/$apk_name"
+cp "$temporary_dir/$NATIVE_SOURCE_NAME" "$release_dir/$NATIVE_SOURCE_NAME"
+git archive --format=tar.gz --prefix="tvheadend-player-${version_name}/" \
+    -o "$release_dir/$source_tar_name" HEAD
+git archive --format=zip --prefix="tvheadend-player-${version_name}/" \
+    -o "$release_dir/$source_zip_name" HEAD
+
+python3 tools/release_metadata.py create-unsigned \
+    --application-id "$application_id" \
+    --version-code "$version_code" \
+    --version-name "$version_name" \
+    --source-commit "$(git rev-parse HEAD)" \
+    --unsigned-apk "$release_dir/$apk_name" \
+    --source-tar-gz "$release_dir/$source_tar_name" \
+    --source-zip "$release_dir/$source_zip_name" \
+    --native-source-tar-gz "$release_dir/$NATIVE_SOURCE_NAME" \
+    --output "$release_dir/release-manifest.json"
+(
+    cd "$release_dir"
+    sha256sum \
+        "$apk_name" \
+        "$source_tar_name" \
+        "$source_zip_name" \
+        "$NATIVE_SOURCE_NAME" \
+        release-manifest.json > SHA256SUMS
+)
+
+printf 'Unsigned release bundle created at %s\n' "$release_dir"

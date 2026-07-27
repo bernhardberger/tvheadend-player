@@ -410,6 +410,10 @@ exit cancellation, correct/incorrect PIN, HOME, wake, reboot, and focus behavior
 
 ### Task 7: Sign and install the release build
 
+**Status:** Native provenance and two-stage non-secret release tooling implemented
+on 2026-07-27. The stable owner key is isolated on LXC 117; signed packaging and
+G10 runtime/upgrade validation remain pending before any G08 deployment.
+
 **Acceptance criteria:**
 
 - Release APK uses a stable private product key outside Git.

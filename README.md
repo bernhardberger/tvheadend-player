@@ -59,12 +59,14 @@ Git. The debug-only designated-test-device provisioning flow is documented in
 ## Release status
 
 The intended distribution path is signed GitHub releases first, while retaining
-a path to Google Play requirements. No release automation is enabled. Signed
-binary distribution is currently blocked because bundled native decoder AARs do
-not yet have complete reproducible provenance, corresponding source, and notices.
+a path to Google Play requirements. Release assembly is local and deliberately
+requires an external stable signing key. The bundled FFmpeg extension has pinned
+reproducible provenance; every APK release must include both application and
+native corresponding-source archives and their checksums.
 
-See `docs/appliance-mode-spec.md`, `docs/appliance-mode-plan.md`, and
-`docs/product-identity-plan.md` for behavior and release gates.
+See `docs/appliance-mode-spec.md`, `docs/appliance-mode-plan.md`,
+`docs/product-identity-plan.md`, and `docs/release-process.md` for behavior and
+release gates.
 
 ## Lineage and contributions
 

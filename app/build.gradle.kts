@@ -1,16 +1,5 @@
 import org.gradle.kotlin.dsl.implementation
 
-val releaseSigningEnvironment = mapOf(
-    "storeFile" to System.getenv("TVHPLAYER_RELEASE_STORE_FILE"),
-    "storePassword" to System.getenv("TVHPLAYER_RELEASE_STORE_PASSWORD"),
-    "keyAlias" to System.getenv("TVHPLAYER_RELEASE_KEY_ALIAS"),
-    "keyPassword" to System.getenv("TVHPLAYER_RELEASE_KEY_PASSWORD"),
-)
-val releaseSigningConfigured = releaseSigningEnvironment.values.all { !it.isNullOrBlank() }
-if (releaseSigningEnvironment.values.any { !it.isNullOrBlank() } && !releaseSigningConfigured) {
-    throw GradleException("Release signing environment is incomplete")
-}
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -35,22 +24,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs {
-        if (releaseSigningConfigured) {
-            create("release") {
-                storeFile = rootProject.file(releaseSigningEnvironment.getValue("storeFile")!!)
-                storePassword = releaseSigningEnvironment.getValue("storePassword")
-                keyAlias = releaseSigningEnvironment.getValue("keyAlias")
-                keyPassword = releaseSigningEnvironment.getValue("keyPassword")
-            }
-        }
-    }
-
     buildTypes {
         release {
-            if (releaseSigningConfigured) {
-                signingConfig = signingConfigs.getByName("release")
-            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
