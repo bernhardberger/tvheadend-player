@@ -134,16 +134,15 @@ fun adjacentChannelId(
   canonical dismiss action even when an explicit Close action is also present.
 - The transient player overlay balances the screen rather than stacking all
   information at the bottom: channel or recording identity and a large wall clock
-  share a broad top scrim, while the bottom scrim contains the timeline followed
-  by split navigation, transport, and utility control groups. Live timeshift shows
-  **Go live** as a compact timeline action only while playback is behind live.
-  At the live edge, the timeline shows current-programme elapsed/duration and
-  progress; pausing, moving meaningfully behind live, or focusing the timeline
-  switches that same region to the timeshift buffer presentation. The channel
-  identity precedes the programme title, while the clock is paired with the
-  programme end time and **Up next**, including its start time, remains in the top
-  metadata group. Successful return to live is conveyed by the timeline without
-  an additional text notice.
+  share a baseline-anchored top scrim, while the bottom scrim contains one shared
+  timeline followed by navigation, transport, and utility control groups. Live
+  timeshift keeps the timeline anchored to the current programme so focusing it
+  never changes or rescales its axis. The rewindable window and live edge appear
+  on that axis, and **Go live** is a transport action only while playback is
+  behind live. The channel identity precedes the programme title, while the clock
+  is paired with the programme end time and **Up next**, including its start time,
+  remains in the top metadata group. Successful return to live is conveyed by the
+  timeline without an additional text notice.
   A focused seekable timeline always displays a high-contrast thumb, including at
   the live edge.
 - Ordinary channel tuning uses a delayed, non-focusable unboxed status indicator centered

@@ -35,11 +35,6 @@ fun isTimeshiftActive(state: TimeshiftState): Boolean =
             state.liveEdgeMs - state.positionMs > TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
         )
 
-fun shouldShowProgrammeTimeline(
-    state: TimeshiftState,
-    hasCurrentProgramme: Boolean,
-): Boolean = hasCurrentProgramme && !isTimeshiftActive(state)
-
 fun timeshiftStateFromStatus(
     advertisedPeriodSec: Int,
     shiftMicros: Long?,

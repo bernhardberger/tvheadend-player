@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Forward30
@@ -21,6 +20,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay30
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,7 +34,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -42,12 +41,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
@@ -56,13 +53,20 @@ import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.initialPlaybackOverlayFocus
-import at.bernhardberger.tvhplayer.core.shouldShowProgrammeTimeline
+import at.bernhardberger.tvhplayer.core.programmeAnchoredAxis
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
-import at.bernhardberger.tvhplayer.core.timeshiftEpgBoundaryFractions
+import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
+import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
+import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
+import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
+import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderGradientRunout
+import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
+import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBlockGap
+import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
 
 @Composable
 fun OverlayControlsTv(
@@ -142,26 +146,16 @@ fun OverlayControlsTv(
     }
     val title = remember(nowEvent) { nowEvent?.title.orEmpty() }
     val clock = remember(nowSec) { formatClock(nowSec) }
-    val showProgrammeTimeline = shouldShowProgrammeTimeline(
+    val programmeAxis = programmeAnchoredAxis(
         state = timeshiftState,
-        hasCurrentProgramme = nowEvent != null,
+        nowEpochSec = nowSec,
+        programmeStartSec = nowEvent?.start,
+        programmeStopSec = nowEvent?.stop,
     )
     val programmeDurationMs = nowEvent?.let { (it.stop - it.start).coerceAtLeast(0L) * 1_000L }
     val programmePositionMs = nowEvent?.let {
         ((playbackSec - it.start) * 1_000L).coerceIn(0L, programmeDurationMs ?: 0L)
     }
-    val epgBoundaryFractions = remember(timeshiftState, nowEvent, nextEvent, nowSec) {
-        timeshiftEpgBoundaryFractions(
-            state = timeshiftState,
-            nowEpochSec = nowSec,
-            boundaryEpochSec = listOfNotNull(
-                nowEvent?.start,
-                nowEvent?.stop,
-                nextEvent?.stop,
-            ),
-        )
-    }
-
     fun focused(key: String) {
         lastFocused = key
         onUserInteraction()
@@ -177,153 +171,78 @@ fun OverlayControlsTv(
     val moreLabel = stringResource(R.string.playback_options)
     val stopLabel = stringResource(R.string.stop_playback)
     Box(Modifier.fillMaxSize()) {
-        Row(
+        PlayerIdentityHeader(
+            imageLoader = imageLoader,
+            piconPath = piconPath,
+            eyebrow = listOfNotNull(channelNumber?.toString(), channelName)
+                .joinToString("  "),
+            title = title.ifEmpty { channelName },
+            support = nextEvent?.let {
+                stringResource(R.string.player_next_event_at, formatClock(it.start), it.title)
+            },
+            clock = clock,
+            clockSupport = nowEvent?.let {
+                stringResource(R.string.player_ends_in, formatClock(it.stop))
+            },
+            tags = PlayerHeaderTags(
+                picon = "player-picon",
+                eyebrow = "player-channel-identity",
+                title = "player-programme-title",
+                support = "player-next-programme",
+                clock = "player-clock",
+                clockSupport = "player-programme-end",
+            ),
             modifier = Modifier
-                .fillMaxWidth()
                 .align(Alignment.TopCenter)
                 .background(topGradient)
-                .padding(start = 56.dp, end = 56.dp, top = 32.dp, bottom = 72.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 48.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PiconBox(
-                    imageLoader = imageLoader,
-                    piconPath = piconPath,
-                    modifier = Modifier
-                        .width(160.dp)
-                        .height(90.dp)
-                        .testTag("player-picon"),
-                )
-                Spacer(Modifier.width(22.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = listOfNotNull(channelNumber?.toString(), channelName)
-                            .joinToString("  "),
-                        color = Color.White.copy(alpha = 0.88f),
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.testTag("player-channel-identity"),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = title.ifEmpty { channelName },
-                        color = Color.White,
-                        style = MaterialTheme.typography.headlineMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.testTag("player-programme-title"),
-                    )
-                    if (nextEvent != null) {
-                        Text(
-                            text = stringResource(
-                                R.string.player_next_event_at,
-                                formatClock(nextEvent.start),
-                                nextEvent.title,
-                            ),
-                            color = Color.White.copy(alpha = 0.72f),
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.testTag("player-next-programme"),
-                        )
-                    }
-                }
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = clock,
-                    color = Color.White,
-                    style = MaterialTheme.typography.displaySmall,
-                    modifier = Modifier.testTag("player-clock"),
-                )
-                nowEvent?.let {
-                    Text(
-                        text = stringResource(
-                            R.string.player_ends_in,
-                            formatClock(it.stop),
-                        ),
-                        color = Color.White.copy(alpha = 0.88f),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.testTag("player-programme-end"),
-                    )
-                }
-            }
-        }
+                .padding(
+                    start = TvOverlaySidePadding,
+                    end = TvOverlaySidePadding,
+                    top = TvOverlayTopPadding,
+                    bottom = TvOverlayHeaderGradientRunout,
+                ),
+        )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .background(bottomGradient)
-                .padding(start = 56.dp, end = 56.dp, top = 80.dp, bottom = 28.dp),
+                .padding(
+                    start = TvOverlaySidePadding,
+                    end = TvOverlaySidePadding,
+                    top = TvOverlayFooterGradientRunout,
+                    bottom = TvOverlayBottomPadding,
+                ),
         ) {
-            if (timeshiftState.available) {
+            if (timeshiftState.available || nowEvent != null) {
                 Column(Modifier.testTag("player-timeline")) {
-                    if (canSeekForward) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    onUserInteraction()
-                                    onGoLive()
-                                    seekbarFocus.requestFocus()
-                                },
-                                modifier = Modifier
-                                    .testTag("player-go-live")
-                                    .focusProperties { down = seekbarFocus }
-                                    .focusRequester(liveFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("live") },
-                            ) {
-                                Text(goLiveLabel, style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
-                        Spacer(Modifier.height(2.dp))
-                    }
+                    if (timeshiftState.available) {
                     PlaybackSeekbar(
                         range = timeshiftSeekbarRange(timeshiftState),
                         onSeekTo = { target ->
                             onUserInteraction()
                             onSeekTimeshift(target - timeshiftState.positionMs)
                         },
-                        epgBoundaryFractions = epgBoundaryFractions,
-                        programmePositionMs = programmePositionMs.takeIf {
-                            showProgrammeTimeline
-                        },
-                        programmeDurationMs = programmeDurationMs.takeIf {
-                            showProgrammeTimeline
-                        },
+                        programmeAxis = programmeAxis,
+                        programmePositionMs = programmePositionMs,
+                        programmeDurationMs = programmeDurationMs,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("player-seekbar")
                             .focusRequester(seekbarFocus)
                             .focusProperties {
                                 down = pauseFocus
-                                if (canSeekForward) right = liveFocus
                             },
                     )
-                }
-            } else if (nowEvent != null) {
-                Column(Modifier.testTag("player-timeline")) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            text = "${formatPlaybackClock(programmePositionMs ?: 0L)} / " +
-                                formatPlaybackClock(programmeDurationMs ?: 0L),
-                            color = Color.White.copy(alpha = 0.82f),
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.testTag("player-programme-progress"),
+                    } else {
+                        PlayerTimelineBlock(
+                            progress = progress,
+                            tone = PlayerTimelineTone.AMBIENT,
+                            leadingLabel = formatPlaybackDuration(programmePositionMs ?: 0L),
+                            trailingLabel = formatPlaybackDuration(programmeDurationMs ?: 0L),
+                            leadingLabelTestTag = "player-programme-progress",
                         )
                     }
-                    ProgrammeProgressBar(progress = progress)
                 }
             }
             timeshiftFeedback?.let {
@@ -331,10 +250,9 @@ fun OverlayControlsTv(
                 Text(it, color = MaterialTheme.colorScheme.primary)
             }
 
-            Spacer(Modifier.height(14.dp))
-            Row(
+            Spacer(Modifier.height(TvOverlayTimelineBlockGap))
+            PlayerActionRow(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .testTag("player-actions")
                     .onPreviewKeyEvent { event ->
                         if (
@@ -348,20 +266,14 @@ fun OverlayControlsTv(
                             false
                         }
                     },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
+                navigation = {
                     Row(
                         modifier = Modifier.testTag("player-navigation-actions"),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(
                             onClick = { onUserInteraction(); onOpenChannels() },
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(TvOverlayActionButtonSize)
                                 .testTag("player-channels")
                                 .focusProperties {
                                     if (timeshiftState.available) {
@@ -377,15 +289,16 @@ fun OverlayControlsTv(
                             Icon(Icons.AutoMirrored.Filled.List, channelsLabel)
                         }
                     }
-                }
-                Row(
-                    modifier = Modifier.testTag("player-transport-actions"),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (timeshiftState.available) {
-                        if (canSeekBack) {
-                            IconButton(
+                },
+                transport = if (timeshiftState.available) {
+                    {
+                        Row(
+                            modifier = Modifier.testTag("player-transport-actions"),
+                            horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (canSeekBack) {
+                                IconButton(
                                 onClick = {
                                     onUserInteraction()
                                     onSeekTimeshift(
@@ -393,7 +306,7 @@ fun OverlayControlsTv(
                                     )
                                 },
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(TvOverlayActionButtonSize)
                                     .focusProperties {
                                         up = seekbarFocus
                                         left = channelsFocus
@@ -401,75 +314,90 @@ fun OverlayControlsTv(
                                     }
                                     .focusRequester(backFocus)
                                     .onFocusChanged { if (it.isFocused) focused("back") },
-                            ) {
-                                Icon(Icons.Filled.Replay30, seekBackLabel)
-                            }
-                        }
-                        IconButton(
-                            onClick = { onUserInteraction(); onToggleTimeshiftPause() },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .focusProperties {
-                                    up = seekbarFocus
-                                    left = if (canSeekBack) backFocus else channelsFocus
-                                    right = if (canSeekForward) forwardFocus else infoFocus
+                                ) {
+                                    Icon(Icons.Filled.Replay30, seekBackLabel)
                                 }
-                                .focusRequester(pauseFocus)
-                                .onFocusChanged { if (it.isFocused) focused("pause") },
-                        ) {
-                            Icon(
-                                if (timeshiftState.paused) {
-                                    Icons.Filled.PlayArrow
-                                } else {
-                                    Icons.Filled.Pause
-                                },
-                                if (timeshiftState.paused) playLabel else pauseLabel,
-                            )
-                        }
-                        if (canSeekForward) {
+                            }
                             IconButton(
-                                onClick = {
-                                    onUserInteraction()
-                                    onSeekTimeshift(
-                                        at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS,
-                                    )
-                                },
+                                onClick = { onUserInteraction(); onToggleTimeshiftPause() },
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(TvOverlayActionButtonSize)
                                     .focusProperties {
                                         up = seekbarFocus
-                                        left = pauseFocus
-                                        right = infoFocus
+                                        left = if (canSeekBack) backFocus else channelsFocus
+                                        right = if (canSeekForward) forwardFocus else infoFocus
                                     }
-                                    .focusRequester(forwardFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("forward") },
+                                    .focusRequester(pauseFocus)
+                                    .onFocusChanged { if (it.isFocused) focused("pause") },
                             ) {
-                                Icon(Icons.Filled.Forward30, seekForwardLabel)
+                                Icon(
+                                    if (timeshiftState.paused) {
+                                        Icons.Filled.PlayArrow
+                                    } else {
+                                        Icons.Filled.Pause
+                                    },
+                                    if (timeshiftState.paused) playLabel else pauseLabel,
+                                )
+                            }
+                            if (canSeekForward) {
+                                IconButton(
+                                    onClick = {
+                                        onUserInteraction()
+                                        onSeekTimeshift(
+                                            at.bernhardberger.tvhplayer.core.TIMESHIFT_SEEK_STEP_MS,
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .size(TvOverlayActionButtonSize)
+                                        .focusProperties {
+                                            up = seekbarFocus
+                                            left = pauseFocus
+                                            right = liveFocus
+                                        }
+                                        .focusRequester(forwardFocus)
+                                        .onFocusChanged { if (it.isFocused) focused("forward") },
+                                ) {
+                                    Icon(Icons.Filled.Forward30, seekForwardLabel)
+                                }
+                                IconButton(
+                                    onClick = {
+                                        onUserInteraction()
+                                        onGoLive()
+                                        seekbarFocus.requestFocus()
+                                    },
+                                    modifier = Modifier
+                                        .size(TvOverlayActionButtonSize)
+                                        .testTag("player-go-live")
+                                        .focusProperties {
+                                            up = seekbarFocus
+                                            left = forwardFocus
+                                            right = infoFocus
+                                        }
+                                        .focusRequester(liveFocus)
+                                        .onFocusChanged { if (it.isFocused) focused("live") },
+                                ) {
+                                    Icon(Icons.Outlined.LiveTv, goLiveLabel)
+                                }
                             }
                         }
                     }
-                }
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterEnd,
-                ) {
+                } else {
+                    null
+                },
+                utilities = {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.testTag("player-utility-actions"),
+                        horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            modifier = Modifier.testTag("player-utility-actions"),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
                             IconButton(
                                 onClick = { onUserInteraction(); onOpenInfo() },
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(TvOverlayActionButtonSize)
                                     .focusProperties {
                                         if (timeshiftState.available) up = seekbarFocus
                                         left = when {
-                                            canSeekForward -> forwardFocus
+                                            canSeekForward -> liveFocus
                                             timeshiftState.available -> pauseFocus
                                             else -> channelsFocus
                                         }
@@ -483,7 +411,7 @@ fun OverlayControlsTv(
                             IconButton(
                                 onClick = { onUserInteraction(); onOpenOptions() },
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(TvOverlayActionButtonSize)
                                     .focusProperties {
                                         if (timeshiftState.available) up = seekbarFocus
                                         left = infoFocus
@@ -494,17 +422,15 @@ fun OverlayControlsTv(
                             ) {
                                 Icon(Icons.Filled.MoreVert, moreLabel)
                             }
-                        }
-                        if (showStop) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(start = 16.dp)
-                                    .testTag("player-terminal-actions"),
-                            ) {
+                    }
+                },
+                terminal = if (showStop) {
+                    {
+                        Row(modifier = Modifier.testTag("player-terminal-actions")) {
                                 IconButton(
                                     onClick = { onUserInteraction(); onStopPlayback() },
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(TvOverlayActionButtonSize)
                                         .focusProperties {
                                             if (timeshiftState.available) up = seekbarFocus
                                             left = optionsFocus
@@ -514,11 +440,12 @@ fun OverlayControlsTv(
                                 ) {
                                     Icon(Icons.Filled.Stop, stopLabel)
                                 }
-                            }
                         }
                     }
-                }
-            }
+                } else {
+                    null
+                },
+            )
         }
     }
 }

@@ -100,15 +100,15 @@
   and focused item across that navigation.
 - Keep transient player identity separate from transport: a large picon and
   programme or recording metadata occupy the top-left under a broad top scrim,
-  with the wall clock at top-right. The bottom scrim presents the timeline first
-  and a split navigation/transport/utility row beneath it. Timeshift exposes
-  **Go live** at the timeline edge rather than adding it to the transport cluster;
-  successful return to live is conveyed by the timeline without a text notice.
-  Normal live playback presents programme elapsed/duration and progress; the same
-  focusable timeline changes to the timeshift buffer while focused, paused, or
-  meaningfully behind live. Keep **Up next** and its start time with top metadata,
-  pair the clock with the programme end time, and center delayed unboxed ordinary
-  tuning status over video.
+  with the wall clock at top-right on a shared first-baseline anchor. The bottom
+  scrim presents one timeline first and a left-grouped
+  navigation/transport/utility row beneath it, with Stop separated at the end.
+  Timeshift keeps a programme-anchored axis in every focus and playback state,
+  overlays the rewindable window and live edge, and exposes **Go live** in the
+  transport cluster only while behind live. Successful return to live is conveyed
+  by the timeline without a text notice. Keep **Up next** and its start time with
+  top metadata, pair the clock with the programme end time, and center delayed
+  unboxed ordinary tuning status over video.
   Map standard hardware Info to programme details and TV Contents Menu/TV Number
   Entry to the channel drawer. The G10 List/123 button is physically confirmed as
   app-visible `KEYCODE_BOOKMARK` and opens that drawer; validate other remote

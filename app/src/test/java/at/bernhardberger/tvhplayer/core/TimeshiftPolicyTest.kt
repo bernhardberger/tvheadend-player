@@ -153,29 +153,6 @@ class TimeshiftPolicyTest {
     }
 
     @Test
-    fun programmeTimelineIsTheRestingLivePresentation() {
-        val live = TimeshiftState(
-            available = true,
-            bufferStartMs = -60_000,
-            positionMs = -4_000,
-        )
-        assertTrue(shouldShowProgrammeTimeline(live, hasCurrentProgramme = true))
-        assertFalse(
-            shouldShowProgrammeTimeline(
-                live.copy(positionMs = -30_000),
-                hasCurrentProgramme = true,
-            ),
-        )
-        assertFalse(
-            shouldShowProgrammeTimeline(
-                live.copy(paused = true),
-                hasCurrentProgramme = true,
-            ),
-        )
-        assertFalse(shouldShowProgrammeTimeline(live, hasCurrentProgramme = false))
-    }
-
-    @Test
     fun absoluteSeekTargetUsesTheReportedLiveEdgeTimestamp() {
         val state = TimeshiftState(
             available = true,

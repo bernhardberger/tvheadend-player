@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.runtime.mutableStateOf
 import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -120,11 +121,13 @@ class PlayerOverlayCompositionTest {
         assertTrue(channel.bottom <= title.top)
         assertTrue(title.bottom <= next.top)
         assertTrue(clock.left > title.left)
+        assertTrue(clock.height > 0f)
+        assertEquals(channel.top, clock.top, 1f)
         assertTrue(clock.bottom <= programmeEnd.top)
         assertTrue(title.bottom < timeline.top)
         assertTrue(timeline.bottom <= actions.top)
-        assertTrue(goLive.right <= timeline.right)
-        assertTrue(goLive.bottom <= timeline.bottom)
+        assertTrue(goLive.left >= transport.left)
+        assertTrue(goLive.right <= transport.right)
         assertTrue(navigation.right < transport.left)
         assertTrue(transport.right < utilities.left)
         assertTrue(utilities.right + 8f < terminal.left)
@@ -143,7 +146,7 @@ class PlayerOverlayCompositionTest {
     }
 
     @Test
-    fun liveEdgeUsesProgrammeProgressUntilTimelineIsFocused() {
+    fun timelineKeepsOneAxisWhetherFocusedOrNot() {
         composeRule.setContent {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
@@ -182,22 +185,79 @@ class PlayerOverlayCompositionTest {
         }
 
         composeRule.waitForIdle()
-        assertEquals(
-            1,
-            composeRule.onAllNodesWithText("29:56 / 1:00:00").fetchSemanticsNodes().size,
-        )
+        assertEquals(1, composeRule.onAllNodesWithText("29:56").fetchSemanticsNodes().size)
+        assertEquals(1, composeRule.onAllNodesWithText("1:00:00").fetchSemanticsNodes().size)
 
         composeRule.onNodeWithTag("player-seekbar").requestFocus()
         composeRule.waitForIdle()
         assertEquals(
-            0,
+            1,
             composeRule.onAllNodesWithTag("player-programme-progress")
                 .fetchSemanticsNodes().size,
         )
+        assertEquals(1, composeRule.onAllNodesWithText("29:56").fetchSemanticsNodes().size)
+        assertEquals(1, composeRule.onAllNodesWithText("1:00:00").fetchSemanticsNodes().size)
         assertEquals(
             1,
             composeRule.onAllNodesWithTag("player-seekbar-thumb")
                 .fetchSemanticsNodes().size,
         )
+    }
+
+    @Test
+    fun liveHeaderKeepsItsAnchorsWhenTheTitleWraps() {
+        val eventTitle = mutableStateOf("Short title")
+        composeRule.setContent {
+            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
+            TVHeadendPlayerTheme {
+                OverlayControlsTv(
+                    imageLoader = imageLoader,
+                    channelNumber = 1,
+                    channelName = "Channel",
+                    piconPath = null,
+                    nowEvent = EpgEventEntry(
+                        eventId = 1,
+                        channelId = 1,
+                        start = 3_600,
+                        stop = 7_200,
+                        title = eventTitle.value,
+                    ),
+                    nextEvent = null,
+                    nowSec = 5_400,
+                    controlsVisible = true,
+                    optionsOpen = false,
+                    onOpenChannels = {},
+                    onStopPlayback = {},
+                    onUserInteraction = {},
+                    onOpenOptions = {},
+                    timeshiftState = TimeshiftState(),
+                    timeshiftFeedback = null,
+                    onToggleTimeshiftPause = {},
+                    onSeekTimeshift = {},
+                    onGoLive = {},
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        val shortEyebrow = composeRule.onNodeWithTag("player-channel-identity")
+            .fetchSemanticsNode().boundsInRoot
+        val shortPicon = composeRule.onNodeWithTag("player-picon")
+            .fetchSemanticsNode().boundsInRoot
+
+        composeRule.runOnIdle {
+            eventTitle.value = "A deliberately long programme title that wraps onto a second " +
+                "line without moving the header anchors"
+        }
+        composeRule.waitForIdle()
+        val longEyebrow = composeRule.onNodeWithTag("player-channel-identity")
+            .fetchSemanticsNode().boundsInRoot
+        val longPicon = composeRule.onNodeWithTag("player-picon")
+            .fetchSemanticsNode().boundsInRoot
+        val clock = composeRule.onNodeWithTag("player-clock").fetchSemanticsNode().boundsInRoot
+
+        assertEquals(shortEyebrow.top, longEyebrow.top, 1f)
+        assertEquals(shortPicon.top, longPicon.top, 1f)
+        assertEquals(longEyebrow.top, clock.top, 1f)
     }
 }

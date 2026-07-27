@@ -67,7 +67,7 @@ import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.ui.common.formatHms
+import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
 import coil3.ImageLoader
@@ -380,6 +380,12 @@ fun RecordingPlayerScreen(
                 )
             },
     ) {
+        PlayerVideoSurface(
+            player = player,
+            aspectRatio = aspectRatio,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         if (availability is RecordingPlaybackAvailability.Ready) {
             AnimatedVisibility(
                 visible = controlsVisible,
@@ -452,14 +458,15 @@ fun RecordingPlayerScreen(
             }
 
             if (!controlsVisible && pendingSeekTargetMs != null) {
-                RecordingSeekProgress(
-                    positionMs = requireNotNull(pendingSeekTargetMs),
+                RecordingSeekPreview(
+                    targetMs = requireNotNull(pendingSeekTargetMs),
+                    originMs = pendingSeekOriginMs,
                     durationMs = durationMs,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
 
-            if (pendingSeekTargetMs != null && pendingSeekOriginMs != null) {
+            if (controlsVisible && pendingSeekTargetMs != null && pendingSeekOriginMs != null) {
                 val seekDeltaMs = requireNotNull(pendingSeekTargetMs) -
                     requireNotNull(pendingSeekOriginMs)
                 Surface(
@@ -471,10 +478,7 @@ fun RecordingPlayerScreen(
                     shape = MaterialTheme.shapes.large,
                 ) {
                     Text(
-                        text = buildString {
-                            append(if (seekDeltaMs >= 0L) "+" else "−")
-                            append(formatHms(kotlin.math.abs(seekDeltaMs) / 1_000L))
-                        },
+                        text = formatPlaybackDelta(seekDeltaMs),
                         style = MaterialTheme.typography.headlineMedium,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     )

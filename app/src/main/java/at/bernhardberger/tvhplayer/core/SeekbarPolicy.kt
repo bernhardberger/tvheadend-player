@@ -32,6 +32,37 @@ data class SeekbarRange(
         else ((positionMs - startMs).toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
 }
 
+/** Programme-anchored timeshift axis. Fractions are 0..1 across the programme. */
+data class ProgrammeAxis(
+    val playbackFraction: Float,
+    val liveEdgeFraction: Float,
+    val rewindableStartFraction: Float,
+)
+
+/**
+ * Returns null when there is no usable programme, allowing the caller to fall
+ * back to the timeshift buffer axis.
+ */
+fun programmeAnchoredAxis(
+    state: TimeshiftState,
+    nowEpochSec: Long,
+    programmeStartSec: Long?,
+    programmeStopSec: Long?,
+): ProgrammeAxis? {
+    if (!state.available || programmeStartSec == null || programmeStopSec == null) return null
+    val span = programmeStopSec - programmeStartSec
+    if (span <= 0L) return null
+
+    fun fraction(epochSec: Long): Float =
+        ((epochSec - programmeStartSec).toDouble() / span.toDouble()).toFloat().coerceIn(0f, 1f)
+
+    return ProgrammeAxis(
+        playbackFraction = fraction(nowEpochSec + state.positionMs / 1_000L),
+        liveEdgeFraction = fraction(nowEpochSec),
+        rewindableStartFraction = fraction(nowEpochSec + state.bufferStartMs / 1_000L),
+    )
+}
+
 fun recordingSeekbarRange(positionMs: Long, durationMs: Long?): SeekbarRange {
     val end = durationMs?.coerceAtLeast(0L) ?: positionMs.coerceAtLeast(0L)
     return SeekbarRange(
@@ -49,23 +80,6 @@ fun timeshiftSeekbarRange(state: TimeshiftState): SeekbarRange =
         endMs = state.liveEdgeMs,
         positionMs = state.positionMs.coerceIn(state.bufferStartMs, state.liveEdgeMs),
     )
-
-fun timeshiftEpgBoundaryFractions(
-    state: TimeshiftState,
-    nowEpochSec: Long,
-    boundaryEpochSec: List<Long>,
-): List<Float> {
-    val duration = state.liveEdgeMs - state.bufferStartMs
-    if (!state.available || duration <= 0L) return emptyList()
-    return boundaryEpochSec
-        .asSequence()
-        .map { (it - nowEpochSec) * 1_000L }
-        .filter { it in state.bufferStartMs..state.liveEdgeMs }
-        .map { ((it - state.bufferStartMs).toFloat() / duration).coerceIn(0f, 1f) }
-        .distinct()
-        .sorted()
-        .toList()
-}
 
 /**
  * Deterministic repeat acceleration for held Left/Right on a seekbar or hidden
