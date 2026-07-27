@@ -8,10 +8,11 @@ Publication and production-device mutation still require explicit owner approval
 ## Version policy
 
 `at.bernhardberger.tvhplayer` is a clean application ID. Version `0.1.0`
-(`versionCode` 1) was its first candidate. Version `0.1.1` (`versionCode` 2) is
-the interlaced-playback diagnostic update. Neither updates the predecessor or
-the temporary `at.leoville.tvhstream` diagnostic package. Every subsequently
-distributed or device-installed product build must increase `versionCode`.
+(`versionCode` 1) was its first candidate. Versions `0.1.1` and `0.1.2`
+(`versionCode` 2 and 3) are interlaced-playback diagnostic updates. None update
+the predecessor or temporary `at.leoville.tvhstream` diagnostic package. Every
+subsequently distributed or device-installed product build must increase
+`versionCode`.
 `versionName` follows semantic versioning; do not reuse an APK version for
 different source or native binaries.
 
@@ -61,7 +62,7 @@ commands are:
 ```bash
 ./tools/release prepare
 ./tools/release sign
-./tools/release verify-signed build/release/signed/0.1.1
+./tools/release verify-signed build/release/signed/0.1.2
 ```
 
 `prepare` rebuilds the pinned native dependency and creates the unsigned bundle.
@@ -108,7 +109,7 @@ Run the signing tool from a trusted, reviewed checkout on LXC 117, not from file
 inside the incoming bundle. Identify the incoming bundle and protected keystore:
 
 ```bash
-./tools/sign-release /path/to/incoming/0.1.1 /secure/path/release.jks
+./tools/sign-release /path/to/incoming/0.1.2 /secure/path/release.jks
 ```
 
 The tool uses `umask 077` and verifies incoming checksums, manifest identity,
@@ -157,7 +158,7 @@ complete signed bundle through the bounded wrapper:
 
 ```bash
 ./tools/device install-release \
-  --bundle build/release/signed/0.1.1 \
+  --bundle build/release/signed/0.1.2 \
   --confirm-production-install
 ```
 

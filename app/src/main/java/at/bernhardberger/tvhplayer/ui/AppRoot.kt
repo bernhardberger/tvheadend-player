@@ -41,6 +41,7 @@ import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
+import at.bernhardberger.tvhplayer.core.shouldUseWarmVideoSurface
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
@@ -464,7 +465,11 @@ fun AppRoot(
             .fillMaxSize()
             .background(androidx.tv.material3.MaterialTheme.colorScheme.background)
     ) {
-        if (playbackState !is PlaybackSessionState.Idle) {
+        if (shouldUseWarmVideoSurface(
+                hasActivePlayback = playbackState !is PlaybackSessionState.Idle,
+                isPlayerRoute = isPlayer,
+            )
+        ) {
             PlayerVideoSurface(
                 player = playerSession.getOrCreatePlayer(context),
                 aspectRatio = playerSettings.aspectRatio,

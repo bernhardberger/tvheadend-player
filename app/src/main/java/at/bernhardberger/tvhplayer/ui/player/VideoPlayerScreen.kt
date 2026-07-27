@@ -667,6 +667,12 @@ fun VideoPlayerScreen(
                 false
             }
     ) {
+        PlayerVideoSurface(
+            player = player,
+            aspectRatio = aspectRatio,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         AnimatedVisibility(
             visible = showDrawer,
             enter = slideInHorizontally(tween(180)) { -it },

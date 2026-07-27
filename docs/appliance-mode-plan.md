@@ -420,7 +420,10 @@ looks less smooth and less effectively deinterlaced than the prior production
 build. The G08 reports `c2.mto.avc.decoder`, zero dropped output buffers, and a
 3840x2160 60 Hz display mode; disabling timeshift did not improve motion. A
 `0.1.1` diagnostic candidate restores only the pre-`44ed28c` H.264 format/SAR
-update behavior while retaining the audited FFmpeg audio dependency.
+update behavior while retaining the audited FFmpeg audio dependency. It made no
+visible difference on the same G08 service, falsifying that hypothesis. The next
+diagnostic restores route-owned fullscreen `PlayerView` composition while
+retaining the warm root surface only behind browse UI.
 
 **Acceptance criteria:**
 
