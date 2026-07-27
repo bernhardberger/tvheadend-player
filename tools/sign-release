@@ -114,15 +114,40 @@ fi
 
 temporary_dir="$(mktemp -d)"
 trap 'rm -rf "$temporary_dir"; unset store_password key_password' EXIT
-store_password_file="$temporary_dir/store-password"
-key_password_file="$temporary_dir/key-password"
-read -rsp 'Keystore password: ' store_password
-printf '\n' >&2
-read -rsp 'Key password: ' key_password
-printf '\n' >&2
-printf '%s' "$store_password" > "$store_password_file"
-printf '%s' "$key_password" > "$key_password_file"
-unset store_password key_password
+store_password_file="${TVHPLAYER_SIGNING_STORE_PASS_FILE:-}"
+key_password_file="${TVHPLAYER_SIGNING_KEY_PASS_FILE:-}"
+temporary_password_files=false
+if [[ -n "$store_password_file" || -n "$key_password_file" ]]; then
+    if [[ -z "$store_password_file" || -z "$key_password_file" ]]; then
+        printf 'error: both server-side signing password files must be configured\n' >&2
+        exit 1
+    fi
+    for password_file in "$store_password_file" "$key_password_file"; do
+        if [[ -L "$password_file" || ! -s "$password_file" ]]; then
+            printf 'error: signing password file is missing, empty, or a symbolic link\n' >&2
+            exit 1
+        fi
+        password_mode="$(stat -c '%a' "$password_file")"
+        password_owner="$(stat -c '%u' "$password_file")"
+        if [[ "${password_mode: -2:1}" != "0" || "${password_mode: -1}" != "0" || "$password_owner" != "$(id -u)" ]]; then
+            printf 'error: signing password file must be owner-only and owned by the signing user\n' >&2
+            exit 1
+        fi
+    done
+    store_password_file="$(realpath "$store_password_file")"
+    key_password_file="$(realpath "$key_password_file")"
+else
+    store_password_file="$temporary_dir/store-password"
+    key_password_file="$temporary_dir/key-password"
+    read -rsp 'Keystore password: ' store_password
+    printf '\n' >&2
+    read -rsp 'Key password: ' key_password
+    printf '\n' >&2
+    printf '%s' "$store_password" > "$store_password_file"
+    printf '%s' "$key_password" > "$key_password_file"
+    unset store_password key_password
+    temporary_password_files=true
+fi
 
 signed_apk_name="tvheadend-player-${version_name}.apk"
 signed_apk="$temporary_dir/$signed_apk_name"
@@ -133,7 +158,9 @@ signed_apk="$temporary_dir/$signed_apk_name"
     --key-pass "file:$key_password_file" \
     --out "$signed_apk" \
     "$unsigned_apk"
-rm -f "$store_password_file" "$key_password_file"
+if [[ "$temporary_password_files" == true ]]; then
+    rm -f "$store_password_file" "$key_password_file"
+fi
 
 "$zipalign" -c -P 16 4 "$signed_apk"
 signature_report="$($apksigner verify --verbose --print-certs "$signed_apk")"

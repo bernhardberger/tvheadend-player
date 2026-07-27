@@ -30,6 +30,8 @@ def sha256_file(path: Path) -> str:
 
 
 def normalize_fingerprint(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("certificate SHA-256 fingerprint must be text")
     compact = re.sub(r"[^0-9a-fA-F]", "", value)
     if len(compact) != 64:
         raise ValueError("certificate SHA-256 fingerprint must contain 64 hexadecimal digits")
@@ -67,9 +69,17 @@ def _validate_artifacts(artifacts: dict[str, dict[str, str]], required: set[str]
         if not isinstance(artifact, dict):
             raise ValueError("manifest artifact entries must be JSON objects")
         file_name = artifact.get("file", "")
-        if not file_name or Path(file_name).name != file_name or file_name in {".", ".."}:
+        if (
+            not isinstance(file_name, str)
+            or not file_name
+            or Path(file_name).name != file_name
+            or file_name in {".", ".."}
+        ):
             raise ValueError(f"artifact must use a safe file name: {file_name!r}")
-        digest = artifact.get("sha256", "").lower()
+        digest_value = artifact.get("sha256", "")
+        if not isinstance(digest_value, str):
+            raise ValueError(f"artifact has an invalid SHA-256 digest: {file_name}")
+        digest = digest_value.lower()
         if not _SHA256_PATTERN.fullmatch(digest):
             raise ValueError(f"artifact has an invalid SHA-256 digest: {file_name}")
         artifact["sha256"] = digest
@@ -156,6 +166,32 @@ def validate_unsigned_manifest(
         artifacts,
         {"unsignedApk", "sourceTarGz", "sourceZip", "nativeSourceTarGz"},
     )
+
+
+def validate_signed_manifest(manifest: dict[str, Any]) -> None:
+    if manifest.get("schemaVersion") != SCHEMA_VERSION or manifest.get("stage") != "signed":
+        raise ValueError("not a supported signed release manifest")
+    if not isinstance(manifest.get("applicationId"), str) or not manifest["applicationId"]:
+        raise ValueError("signed manifest application ID is invalid")
+    if not isinstance(manifest.get("versionCode"), int) or manifest["versionCode"] < 1:
+        raise ValueError("signed manifest versionCode is invalid")
+    if not isinstance(manifest.get("versionName"), str) or not manifest["versionName"]:
+        raise ValueError("signed manifest versionName is invalid")
+    source_commit = manifest.get("sourceCommit", "")
+    if not isinstance(source_commit, str) or not _COMMIT_PATTERN.fullmatch(source_commit):
+        raise ValueError("signed manifest source commit is invalid")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise ValueError("signed manifest artifacts are invalid")
+    _validate_artifacts(
+        artifacts,
+        {"signedApk", "sourceTarGz", "sourceZip", "nativeSourceTarGz"},
+    )
+    signing = manifest.get("signing")
+    if not isinstance(signing, dict) or signing.get("keyAlias") != CANONICAL_KEY_ALIAS:
+        raise ValueError("signed manifest key alias is not canonical")
+    if normalize_fingerprint(signing.get("certificateSha256", "")) != CANONICAL_CERTIFICATE_SHA256:
+        raise ValueError("signed manifest certificate is not canonical")
 
 
 def build_signed_manifest(

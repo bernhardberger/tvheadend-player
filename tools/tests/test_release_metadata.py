@@ -117,6 +117,12 @@ class ReleaseMetadataTest(unittest.TestCase):
         self.assertIn("file:", sign)
         self.assertNotIn("pass:", sign)
 
+    def test_signing_supports_server_side_password_files(self) -> None:
+        sign = (ROOT / "tools/sign-release").read_text(encoding="utf-8")
+
+        self.assertIn("TVHPLAYER_SIGNING_STORE_PASS_FILE", sign)
+        self.assertIn("TVHPLAYER_SIGNING_KEY_PASS_FILE", sign)
+
     @staticmethod
     def _artifacts(stage: str) -> dict[str, dict[str, str]]:
         apk_name = "unsigned.apk" if stage == "unsigned" else "signed.apk"

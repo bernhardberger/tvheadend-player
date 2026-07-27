@@ -40,6 +40,41 @@ every installation signed by it.
 
 ## Unsigned preparation on LXC 106
 
+### Guided workflow
+
+Create an owner-only local orchestrator configuration once:
+
+```bash
+cp .tvhplayer-release.example.json .tvhplayer-release.json
+chmod 600 .tvhplayer-release.json
+```
+
+The homelab uses the `tvh-signing` SSH alias for LXC 117. The trusted signing
+checkout has the configured Git remote and branch, while the keystore and release
+staging paths remain outside that checkout. The configuration contains paths and
+host routing only, never passwords or private key data.
+
+After pushing the intended clean commit to its configured upstream, the guided
+commands are:
+
+```bash
+./tools/release prepare
+./tools/release sign
+./tools/release verify-signed build/release/signed/0.1.0
+```
+
+`prepare` rebuilds the pinned native dependency and creates the unsigned bundle.
+`sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
+SSH, fetches the configured trusted branch on LXC 117, checks out the exact source
+commit, and signs non-interactively using owner-only password files configured
+in the LXC 117 SSH environment. It retrieves the signed
+bundle and independently verifies checksums, source continuity, APK identity,
+alignment, and the pinned certificate. It never installs to a TV or publishes a
+release. Use `prepare --reuse-native-source` only when the existing ignored
+native-source archive was produced and reviewed in the current workspace.
+
+The lower-level commands below remain available for diagnosis and manual use.
+
 Install the exact Android and native toolchains listed in `app/libs/README.md`,
 then build the decoder and its corresponding source:
 
@@ -75,11 +110,13 @@ inside the incoming bundle. Identify the incoming bundle and protected keystore:
 ./tools/sign-release /path/to/incoming/0.1.0 /secure/path/release.jks
 ```
 
-The tool uses `umask 077`, verifies incoming checksums, manifest identity,
-version, unsigned state, and 16 KB alignment before it prompts interactively for
-the keystore and key passwords. Passwords are passed to `apksigner` through
-owner-only temporary files and removed immediately after signing. The tool then
-verifies the signature and requires the pinned certificate fingerprint.
+The tool uses `umask 077` and verifies incoming checksums, manifest identity,
+version, unsigned state, and 16 KB alignment. On the isolated signing host,
+`TVHPLAYER_SIGNING_STORE_PASS_FILE` and `TVHPLAYER_SIGNING_KEY_PASS_FILE` may
+name non-empty owner-only files owned by the signing user; otherwise the tool
+falls back to interactive prompts. Passwords are passed to `apksigner` only by
+`file:` reference and never as command arguments. The tool then verifies the
+signature and requires the pinned certificate fingerprint.
 
 The signed output contains:
 

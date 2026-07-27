@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "signingHost": "tvh-signing",
+  "signingRepository": "/srv/android-signing/repository/tvhstream",
+  "signingKeystore": "/srv/android-signing/packages/at.bernhardberger.tvhplayer/private/release.p12",
+  "remoteReleaseRoot": "/srv/android-signing/releases",
+  "signingRemote": "fork",
+  "signingBranch": "main"
+}

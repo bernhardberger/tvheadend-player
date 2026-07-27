@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import os
+import re
+import secrets
+import shlex
+import stat
+import subprocess
+import sys
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parent.parent
+LOCAL_CONFIG = ROOT / ".tvhplayer-release.json"
+APPLICATION_ID = "at.bernhardberger.tvhplayer"
+CONFIG_FIELDS = {
+    "schemaVersion",
+    "signingHost",
+    "signingRepository",
+    "signingKeystore",
+    "remoteReleaseRoot",
+    "signingRemote",
+    "signingBranch",
+}
+SSH_HOST_PATTERN = re.compile(r"(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9][A-Za-z0-9._-]*")
+GIT_NAME_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
+SAFE_VERSION_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+module_path = ROOT / "tools/release_metadata.py"
+module_spec = importlib.util.spec_from_file_location("release_metadata", module_path)
+if module_spec is None or module_spec.loader is None:
+    raise RuntimeError(f"Cannot load {module_path}")
+release_metadata = importlib.util.module_from_spec(module_spec)
+module_spec.loader.exec_module(release_metadata)
+
+
+def validate_config(config: dict[str, Any]) -> dict[str, Any]:
+    if set(config) != CONFIG_FIELDS or config.get("schemaVersion") != 1:
+        raise ValueError("release configuration has unsupported or missing fields")
+    host = config["signingHost"]
+    if not isinstance(host, str) or SSH_HOST_PATTERN.fullmatch(host) is None:
+        raise ValueError("release configuration has an invalid SSH host")
+    for field in ("signingRepository", "signingKeystore", "remoteReleaseRoot"):
+        value = config[field]
+        if (
+            not isinstance(value, str)
+            or not PurePosixPath(value).is_absolute()
+            or ".." in PurePosixPath(value).parts
+            or re.fullmatch(r"[A-Za-z0-9_./-]+", value) is None
+        ):
+            raise ValueError(f"{field} must be a simple absolute remote path")
+    for field in ("signingRemote", "signingBranch"):
+        value = config[field]
+        if not isinstance(value, str) or GIT_NAME_PATTERN.fullmatch(value) is None:
+            raise ValueError(f"release configuration has an invalid {field}")
+    return config
+
+
+def load_config(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"release configuration is missing or not a regular file: {path}")
+    if stat.S_IMODE(path.stat().st_mode) & 0o077:
+        raise ValueError(f"release configuration must be owner-only: {path}")
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError("release configuration must contain a JSON object")
+    return validate_config(loaded)
+
+
+def release_readiness_errors(
+    *,
+    porcelain: str,
+    head: str,
+    upstream_head: str | None,
+    head_is_upstream_ancestor: bool,
+) -> list[str]:
+    errors = []
+    if porcelain:
+        errors.append("worktree is not clean")
+    if not re.fullmatch(r"[0-9a-f]{40}", head):
+        errors.append("HEAD is not a full Git commit")
+    if upstream_head is None:
+        errors.append("current branch has no configured upstream")
+    elif not head_is_upstream_ancestor:
+        errors.append("HEAD is not present on the configured upstream")
+    return errors
+
+
+def _git_output(*arguments: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *arguments],
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+
+def ensure_release_ready() -> str:
+    porcelain = _git_output("status", "--porcelain", "--untracked-files=normal")
+    head = _git_output("rev-parse", "HEAD")
+    try:
+        upstream = _git_output("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
+        upstream_head = _git_output("rev-parse", upstream)
+        ancestor = subprocess.run(
+            ["git", "-C", str(ROOT), "merge-base", "--is-ancestor", head, upstream],
+            check=False,
+        ).returncode == 0
+    except subprocess.CalledProcessError:
+        upstream_head = None
+        ancestor = False
+    errors = release_readiness_errors(
+        porcelain=porcelain,
+        head=head,
+        upstream_head=upstream_head,
+        head_is_upstream_ancestor=ancestor,
+    )
+    if errors:
+        raise ValueError("release preparation refused: " + "; ".join(errors))
+    return head
+
+
+def _run(command: list[str], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
+    print(f"$ {shlex.join(command)}")
+    return subprocess.run(command, check=True, text=True, capture_output=capture)
+
+
+def _load_manifest(path: Path) -> dict[str, Any]:
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError(f"manifest must contain a JSON object: {path}")
+    return loaded
+
+
+def _unsigned_bundle(path: Path | None, source_commit: str) -> tuple[Path, dict[str, Any]]:
+    if path is None:
+        candidates = list((ROOT / "build/release/unsigned").glob("*/release-manifest.json"))
+        matches = [candidate for candidate in candidates if _load_manifest(candidate).get("sourceCommit") == source_commit]
+        if len(matches) != 1:
+            raise ValueError("expected exactly one unsigned bundle for HEAD; pass --unsigned-dir")
+        path = matches[0].parent
+    if path.is_symlink():
+        raise ValueError(f"unsigned release bundle must not be a symbolic link: {path}")
+    path = path.resolve()
+    manifest_path = path / "release-manifest.json"
+    checksums_path = path / "SHA256SUMS"
+    if (
+        not manifest_path.is_file()
+        or manifest_path.is_symlink()
+        or not checksums_path.is_file()
+        or checksums_path.is_symlink()
+    ):
+        raise ValueError(f"unsigned release bundle is incomplete: {path}")
+    manifest = _load_manifest(manifest_path)
+    release_metadata.validate_unsigned_manifest(
+        manifest,
+        application_id=APPLICATION_ID,
+        version_code=manifest.get("versionCode"),
+        version_name=manifest.get("versionName"),
+    )
+    expected = {artifact["file"] for artifact in manifest["artifacts"].values()}
+    expected.add("release-manifest.json")
+    release_metadata.validate_checksum_file(checksums_path, path, expected)
+    if manifest["sourceCommit"] != source_commit:
+        raise ValueError("unsigned bundle source commit does not match HEAD")
+    return path, manifest
+
+
+def _remote_path(value: str) -> str:
+    return shlex.quote(value)
+
+
+def remote_sign_command(
+    *,
+    config: dict[str, Any],
+    source_commit: str,
+    incoming_dir: str,
+    signed_dir: str,
+) -> str:
+    repository = _remote_path(config["signingRepository"])
+    remote = shlex.quote(config["signingRemote"])
+    branch = shlex.quote(config["signingBranch"])
+    commit = shlex.quote(source_commit)
+    return " && ".join(
+        (
+            "set -eu",
+            "umask 077",
+            f"cd {repository}",
+            'test -z "$(git status --porcelain --untracked-files=normal)"',
+            f"git fetch --prune {remote} {branch}",
+            f"git merge-base --is-ancestor {commit} FETCH_HEAD",
+            f"git checkout --detach {commit}",
+            f"test \"$(git rev-parse HEAD)\" = {commit}",
+            f"test -d {_remote_path(incoming_dir)}",
+            f"test ! -e {_remote_path(signed_dir)}",
+            f"./tools/sign-release {_remote_path(incoming_dir)} {_remote_path(config['signingKeystore'])} {_remote_path(signed_dir)}",
+        )
+    )
+
+
+def _find_android_tools() -> tuple[Path, Path, Path]:
+    android_home = Path(os.environ.get("ANDROID_HOME", "/opt/android-sdk"))
+    for version in ("36.0.0", "35.0.0"):
+        directory = android_home / "build-tools" / version
+        tools = directory / "aapt", directory / "apksigner", directory / "zipalign"
+        if all(tool.is_file() and os.access(tool, os.X_OK) for tool in tools):
+            return tools
+    raise ValueError("aapt, apksigner, and zipalign are required in Android build-tools")
+
+
+def verify_signed_bundle(path: Path) -> dict[str, Any]:
+    if path.is_symlink():
+        raise ValueError(f"signed release bundle must not be a symbolic link: {path}")
+    path = path.resolve()
+    manifest_path = path / "release-manifest.json"
+    unsigned_manifest_path = path / "unsigned-release-manifest.json"
+    checksums_path = path / "SHA256SUMS"
+    report_path = path / "APKSIGNER-VERIFY.txt"
+    for required in (manifest_path, unsigned_manifest_path, checksums_path, report_path):
+        if required.is_symlink() or not required.is_file():
+            raise ValueError(f"signed release bundle is incomplete: {required.name}")
+
+    manifest = _load_manifest(manifest_path)
+    release_metadata.validate_signed_manifest(manifest)
+    expected = {artifact["file"] for artifact in manifest["artifacts"].values()}
+    expected.update({"release-manifest.json", "unsigned-release-manifest.json", "APKSIGNER-VERIFY.txt"})
+    release_metadata.validate_checksum_file(checksums_path, path, expected)
+
+    unsigned = _load_manifest(unsigned_manifest_path)
+    release_metadata.validate_unsigned_manifest(
+        unsigned,
+        application_id=manifest["applicationId"],
+        version_code=manifest["versionCode"],
+        version_name=manifest["versionName"],
+    )
+    if unsigned["sourceCommit"] != manifest["sourceCommit"]:
+        raise ValueError("signed and unsigned manifests have different source commits")
+    for name in ("sourceTarGz", "sourceZip", "nativeSourceTarGz"):
+        if unsigned["artifacts"][name] != manifest["artifacts"][name]:
+            raise ValueError(f"signed bundle changed source artifact: {name}")
+
+    apk = path / manifest["artifacts"]["signedApk"]["file"]
+    aapt, apksigner, zipalign = _find_android_tools()
+    _run([str(zipalign), "-c", "-P", "16", "4", str(apk)])
+    signature = _run(
+        [str(apksigner), "verify", "--verbose", "--print-certs", str(apk)],
+        capture=True,
+    ).stdout
+    fingerprint_match = re.search(r"certificate SHA-256 digest: ([0-9a-fA-F]+)", signature)
+    if fingerprint_match is None:
+        raise ValueError("unable to read APK signing certificate")
+    if release_metadata.normalize_fingerprint(fingerprint_match.group(1)) != release_metadata.CANONICAL_CERTIFICATE_SHA256:
+        raise ValueError("APK signing certificate is not canonical")
+    badging = _run([str(aapt), "dump", "badging", str(apk)], capture=True).stdout
+    identity = re.search(r"package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'", badging)
+    if identity is None:
+        raise ValueError("unable to read signed APK identity")
+    application_id, version_code, version_name = identity.groups()
+    if (
+        application_id != manifest["applicationId"]
+        or int(version_code) != manifest["versionCode"]
+        or version_name != manifest["versionName"]
+    ):
+        raise ValueError("signed APK identity does not match release manifest")
+    return manifest
+
+
+def _prepare(args: argparse.Namespace) -> None:
+    source_commit = ensure_release_ready()
+    if not args.reuse_native_source:
+        _run([str(ROOT / "tools/build-media3-ffmpeg")])
+    _run([str(ROOT / "tools/prepare-release")])
+    bundle, _ = _unsigned_bundle(None, source_commit)
+    print(f"unsignedBundle={bundle}")
+
+
+def _sign(args: argparse.Namespace) -> None:
+    source_commit = ensure_release_ready()
+    config = load_config(args.config)
+    unsigned_dir, manifest = _unsigned_bundle(args.unsigned_dir, source_commit)
+    version = manifest["versionName"]
+    if SAFE_VERSION_PATTERN.fullmatch(version) is None:
+        raise ValueError("release version cannot be used as a bundle directory")
+    session = f"{version}-{source_commit[:12]}-{secrets.token_hex(4)}"
+    session_root = f"{config['remoteReleaseRoot'].rstrip('/')}/{session}"
+    incoming_parent = f"{session_root}/incoming"
+    incoming_dir = f"{incoming_parent}/{unsigned_dir.name}"
+    signed_parent = f"{session_root}/signed"
+    signed_dir = f"{signed_parent}/{version}"
+    local_parent = ROOT / "build/release/signed"
+    local_output = local_parent / version
+    if local_output.exists():
+        raise ValueError(f"local signed release output already exists: {local_output}")
+
+    setup = " && ".join(
+        (
+            "set -eu",
+            "umask 077",
+            f"test ! -e {_remote_path(session_root)}",
+            f"mkdir -p {_remote_path(incoming_parent)} {_remote_path(signed_parent)}",
+        )
+    )
+    _run(["ssh", config["signingHost"], setup])
+    _run(["scp", "-r", str(unsigned_dir), f"{config['signingHost']}:{incoming_parent}/"])
+    _run(
+        [
+            "ssh",
+            config["signingHost"],
+            remote_sign_command(
+                config=config,
+                source_commit=source_commit,
+                incoming_dir=incoming_dir,
+                signed_dir=signed_dir,
+            ),
+        ]
+    )
+
+    local_parent.mkdir(parents=True, exist_ok=True)
+    _run(["scp", "-r", f"{config['signingHost']}:{signed_dir}", str(local_parent)])
+    verify_signed_bundle(local_output)
+    print(f"signedBundle={local_output}")
+
+
+def _verify_signed(args: argparse.Namespace) -> None:
+    manifest = verify_signed_bundle(args.bundle)
+    print(f"sourceCommit={manifest['sourceCommit']}")
+    print(f"versionName={manifest['versionName']}")
+    print(f"signedBundle={args.bundle.resolve()}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Guide the isolated TVHeadend Player release workflow")
+    parser.add_argument("--config", type=Path, default=LOCAL_CONFIG)
+    subparsers = parser.add_subparsers(dest="action", required=True)
+
+    prepare = subparsers.add_parser("prepare", help="Build and verify an unsigned release bundle")
+    prepare.add_argument("--reuse-native-source", action="store_true")
+    prepare.set_defaults(handler=_prepare)
+
+    sign = subparsers.add_parser("sign", help="Transfer, sign, retrieve, and verify a bundle")
+    sign.add_argument("--unsigned-dir", type=Path)
+    sign.set_defaults(handler=_sign)
+
+    verify = subparsers.add_parser("verify-signed", help="Independently verify a retrieved signed bundle")
+    verify.add_argument("bundle", type=Path)
+    verify.set_defaults(handler=_verify_signed)
+    return parser
+
+
+def main() -> int:
+    os.umask(0o077)
+    args = build_parser().parse_args()
+    try:
+        args.handler(args)
+    except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
