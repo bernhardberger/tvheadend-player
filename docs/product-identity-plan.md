@@ -45,14 +45,20 @@ during validation, but it is a separate Android application.
 
 ## Visual identity
 
-The mark is a cyan television with Tvheadend’s orange center diamond and a play
-triangle cutout. It reuses official Tvheadend cyan/orange and remains legible at
-launcher scale while reading as a live-TV player.
+The mark is an original segmented cyan widescreen with clipped corners and an
+orange play symbol. Four filled corner blocks retain horizontal and vertical
+gaps, while a centered circular knockout leaves balanced dark whitespace around
+the orange symbol. This preserves the broken visual rhythm associated with
+Tvheadend without reusing its rosette, center diamond, or radial logo geometry.
+It remains legible at launcher scale and reads directly as a live-TV player
+without implying affiliation or endorsement.
 
 - Source and exports live in `artwork/`.
 - `tools/RenderArtwork.java` reproducibly generates the Android launcher layers,
-  density fallbacks, monochrome adaptive layer, 320x180 TV banner, SVG/logo, and
-  GitHub social preview.
+  density fallbacks, monochrome adaptive layer, 512x512 Play listing icon,
+  320x180 TV banner, SVG/logo, and GitHub social preview.
+- The monochrome layer and SVG paths are emitted from the same geometry as the
+  rasters, so themed and colored artwork cannot drift apart.
 - The palette and export procedure are documented in `artwork/README.md`.
 - Public screenshots must not contain private servers, channels, addresses,
   credentials, or household identifiers.

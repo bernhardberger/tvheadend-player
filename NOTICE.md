@@ -6,6 +6,14 @@ retains that project's Git history, copyright, and GNU GPL v3 licensing. The
 predecessor project in turn acknowledges ideas and code from
 [TVHClient](https://github.com/rsiebert/TVHClient).
 
+The original application mark uses a four-part cyan widescreen and an orange
+play symbol isolated by circular dark negative space. Its palette and broken visual
+rhythm recall compatibility with
+[Tvheadend](https://github.com/tvheadend/tvheadend), but it does not reuse the
+Tvheadend logo or its geometry. TVHeadend Player for TV is not affiliated with,
+endorsed by, or sponsored by the Tvheadend project. Artwork generation is
+documented in `artwork/README.md`.
+
 The application uses AndroidX, Jetpack Compose, Compose for TV, Material
 Components, Media3, Kotlin coroutines, Coil, Koin, and Timber. Their own copyright
 and license terms continue to apply; dependency coordinates and exact versions
