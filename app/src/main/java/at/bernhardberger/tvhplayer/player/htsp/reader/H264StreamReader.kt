@@ -16,6 +16,14 @@ import at.bernhardberger.tvhplayer.player.htsp.utils.AspectRatioUtils
 import timber.log.Timber
 import kotlin.math.abs
 
+private const val FORMAT_UPDATE_COOLDOWN_US = 1_000_000L
+
+internal fun shouldProbeH264Sar(
+    configured: Boolean,
+    isKey: Boolean,
+    elapsedUs: Long,
+): Boolean = isKey && (!configured || elapsedUs >= FORMAT_UPDATE_COOLDOWN_US)
+
 @OptIn(UnstableApi::class)
 internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
     private var track: TrackOutput? = null
@@ -26,7 +34,6 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
 
     // aby se payload nescannoval pořád
     private var lastFormatUpdatePts: Long = Long.MIN_VALUE
-    private val FORMAT_UPDATE_COOLDOWN_US = 1_000_000L // 1s
     private val RATIO_EPS = 0.0005f
 
     override fun createTracks(stream: HtspMessage, output: ExtractorOutput) {
@@ -38,8 +45,7 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
         baseFormat = fmt
         t.format(fmt)
 
-        // Provisional SAR from coded size is not stream-confirmed yet.
-        configured = false
+        configured = fmt.pixelWidthHeightRatio != Format.NO_VALUE.toFloat()
         lastPixelRatio = fmt.pixelWidthHeightRatio
         lastFormatUpdatePts = Long.MIN_VALUE
     }
@@ -66,26 +72,6 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
 
         val width = stream.int("width") ?: Format.NO_VALUE
         val height = stream.int("height") ?: Format.NO_VALUE
-
-        if (
-            pixelRatio != Format.NO_VALUE.toFloat() &&
-            pixelRatio > 0f &&
-            pixelRatio.isFinite() &&
-            width > 0 &&
-            height > 0
-        ) {
-            // Parity with HEVC: refine active-width broadcast SAR at init.
-            pixelRatio = AspectRatioUtils.adjustSarForBroadcast(
-                codedW = width,
-                codedH = height,
-                sar = pixelRatio,
-            ) { Timber.d(it) }
-        } else if (width > 0 && height > 0) {
-            AspectRatioUtils.provisionalSarWhenUnknown(width, height)?.let {
-                pixelRatio = it
-                Timber.d("Provisional H.264 SAR=$it for ${width}x$height (awaiting SPS VUI)")
-            }
-        }
 
         val duration = stream.int("duration") ?: Format.NO_VALUE
         val frameRate =
@@ -118,12 +104,15 @@ internal class H264StreamReader : PlainStreamReader(C.TRACK_TYPE_VIDEO) {
 
         val isKey = (frameType == -1 || frameType == 73)
 
-        // Until stream SAR is confirmed, probe every sample (SPS can lag the first
-        // few frames). After that, re-check on keyframes with a cooldown.
-        val shouldProbe = !configured ||
-            (isKey && lastFormatUpdatePts != Long.MIN_VALUE &&
-                (pts - lastFormatUpdatePts) >= FORMAT_UPDATE_COOLDOWN_US) ||
-            (isKey && lastFormatUpdatePts == Long.MIN_VALUE)
+        if (lastFormatUpdatePts == Long.MIN_VALUE) {
+            lastFormatUpdatePts = pts + FORMAT_UPDATE_COOLDOWN_US
+        }
+
+        val shouldProbe = shouldProbeH264Sar(
+            configured = configured,
+            isKey = isKey,
+            elapsedUs = pts - lastFormatUpdatePts,
+        )
 
         if (shouldProbe) {
             val sps = extractFirstSpsNal(payload)

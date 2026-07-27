@@ -418,7 +418,9 @@ client after launching the new app. Runtime validation currently fails the
 interlaced-motion gate: 720p50 remains smooth, but direct 1080i25 AVC playback
 looks less smooth and less effectively deinterlaced than the prior production
 build. The G08 reports `c2.mto.avc.decoder`, zero dropped output buffers, and a
-3840x2160 60 Hz display mode; disabling timeshift did not improve motion.
+3840x2160 60 Hz display mode; disabling timeshift did not improve motion. A
+`0.1.1` diagnostic candidate restores only the pre-`44ed28c` H.264 format/SAR
+update behavior while retaining the audited FFmpeg audio dependency.
 
 **Acceptance criteria:**
 
