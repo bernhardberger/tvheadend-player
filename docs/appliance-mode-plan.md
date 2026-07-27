@@ -423,7 +423,14 @@ build. The G08 reports `c2.mto.avc.decoder`, zero dropped output buffers, and a
 update behavior while retaining the audited FFmpeg audio dependency. It made no
 visible difference on the same G08 service, falsifying that hypothesis. The next
 diagnostic restores route-owned fullscreen `PlayerView` composition while
-retaining the warm root surface only behind browse UI.
+retaining the warm root surface only behind browse UI; `0.1.2` also made no
+visible difference. Both old and rebuilt AARs contain only a stub experimental
+FFmpeg video renderer that reports every format unsupported, and the affected
+service uses AC3 rather than the rebuilt MP1/MP2/MP3 audio path. Stop speculative
+decoder changes pending a direct same-broadcast reference comparison or new
+evidence from the G10. The G10 has previously entered a similar bad render mode
+intermittently and recovered after retuning; on the G08, switching away and back
+and fully force-stopping/reopening `0.1.2` did not restore quality.
 
 **Acceptance criteria:**
 
