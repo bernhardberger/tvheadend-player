@@ -1313,6 +1313,7 @@ private fun dvrActionResultLabel(result: DvrActionResult): String = stringResour
         is DvrActionResult.Accepted -> R.string.recording_action_accepted
         is DvrActionResult.Failed -> when (result.reason) {
             DvrActionFailure.PERMISSION_DENIED -> R.string.recording_action_permission
+            DvrActionFailure.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
             DvrActionFailure.CONFLICT -> R.string.recording_action_conflict
             DvrActionFailure.REJECTED -> R.string.recording_action_rejected
             DvrActionFailure.CONNECTION -> R.string.recording_action_connection

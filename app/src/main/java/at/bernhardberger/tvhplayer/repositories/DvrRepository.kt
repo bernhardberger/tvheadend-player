@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import timber.log.Timber
 
 class DvrRepository(
     private val htsp: HtspService,
@@ -83,15 +84,22 @@ class DvrRepository(
             timeoutMs = 10_000,
             disconnectOnTimeout = false,
         )
-        val failure = dvrActionFailure(reply.fields)
-        if (failure == DvrActionFailure.PERMISSION_DENIED) {
-            setWriteCapability(RecordingWriteCapability.Denied)
-            _configs.value = emptyList()
-            return
+        when (val failure = dvrActionFailure(reply.fields)) {
+            // getDvrConfigs is gated on ACCESS_HTSP_RECORDER, so a bare noaccess=1
+            // is authoritative for every DVR write method too.
+            DvrActionFailure.PERMISSION_DENIED -> {
+                setWriteCapability(RecordingWriteCapability.Denied)
+                _configs.value = emptyList()
+            }
+            null -> {
+                setWriteCapability(RecordingWriteCapability.Allowed)
+                _configs.value = dvrConfigsFromReply(reply)
+            }
+            // Any other error (unknown method on old servers, connection limit,
+            // malformed reply) proves nothing either way: leave the capability alone
+            // rather than reading it as access.
+            else -> Timber.w("getDvrConfigs failed with %s; write capability unchanged", failure)
         }
-        // Successful probe means this user may use the HTSP recorder API.
-        setWriteCapability(RecordingWriteCapability.Allowed)
-        _configs.value = dvrConfigsFromReply(reply)
     }
 
     internal suspend fun acceptDvrMessage(message: HtspMessage) {

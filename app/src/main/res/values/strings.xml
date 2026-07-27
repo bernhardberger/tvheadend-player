@@ -264,6 +264,7 @@
     <string name="recording_state_unknown">Server status unknown</string>
     <string name="recording_action_accepted">Request accepted. Waiting for the server status update…</string>
     <string name="recording_action_permission">This account is not allowed to manage recordings.</string>
+    <string name="recording_action_conn_limit">TVHeadend refused the request: too many connections. Try again shortly.</string>
     <string name="recording_action_conflict">TVHeadend reported a recording or tuner conflict.</string>
     <string name="recording_action_rejected">TVHeadend rejected the recording request.</string>
     <string name="recording_action_connection">The recording request could not reach TVHeadend.</string>

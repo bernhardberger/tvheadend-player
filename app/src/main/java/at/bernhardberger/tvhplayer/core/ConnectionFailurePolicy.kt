@@ -40,7 +40,11 @@ fun connectionFailureKind(error: Throwable): ConnectionFailureKind {
                 return ConnectionFailureKind.UNREACHABLE
             failure is SocketTimeoutException -> return ConnectionFailureKind.TIMEOUT
             failure is IllegalStateException &&
-                failure.message?.contains("authentication failed", ignoreCase = true) == true ->
+                (
+                    failure.message?.contains("authentication failed", ignoreCase = true) == true ||
+                        // Anonymous connect to a server that grants us no HTSP rights.
+                        failure.message?.contains("noaccess=1", ignoreCase = true) == true
+                    ) ->
                 return ConnectionFailureKind.AUTHENTICATION
         }
         current = failure.cause

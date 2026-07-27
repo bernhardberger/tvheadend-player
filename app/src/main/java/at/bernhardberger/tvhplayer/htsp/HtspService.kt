@@ -175,23 +175,37 @@ open class HtspService(
                 val user = username?.trim().orEmpty()
                 val pass = password?.trim().orEmpty()
 
-                var dvrAccess: Boolean? = null
-                if (ConnectionPolicy.shouldAuthenticate(username, password) && challenge != null) {
-                    val digest = makeDigest(pass, challenge!!)
-                    val auth = request(
-                        method = "authenticate",
-                        fields = mapOf("username" to user, "digest" to digest),
-                        timeoutMs = responseTimeoutMs,
-                        flush = true,
-                        disconnectOnTimeout = true
+                // Always call authenticate, even without credentials: the server leaves
+                // address-based anonymous rights untouched when the message carries no
+                // username, and the reply is the only place HTSP reports our rights.
+                val withCredentials =
+                    ConnectionPolicy.shouldAuthenticate(username, password) && challenge != null
+                val authFields = if (withCredentials) {
+                    mapOf("username" to user, "digest" to makeDigest(pass, challenge!!))
+                } else {
+                    emptyMap()
+                }
+                val auth = request(
+                    method = "authenticate",
+                    fields = authFields,
+                    timeoutMs = responseTimeoutMs,
+                    flush = true,
+                    disconnectOnTimeout = true
+                )
+                if (auth.int("noaccess") == 1) {
+                    throw IllegalStateException(
+                        if (withCredentials) {
+                            "HTSP authentication failed (noaccess=1)"
+                        } else {
+                            "HTSP server requires credentials (noaccess=1)"
+                        }
                     )
-                    if (auth.int("noaccess") == 1) {
-                        throw IllegalStateException("HTSP authentication failed (noaccess=1)")
-                    }
-                    // HTSP ≥ 26 includes ACCESS_HTSP_RECORDER as "dvr".
-                    if (negotiatedHtspVersion != null && negotiatedHtspVersion!! > 25) {
-                        dvrAccess = auth.int("dvr")?.let { it == 1 }
-                    }
+                }
+                // HTSP ≥ 26 includes ACCESS_HTSP_RECORDER as "dvr".
+                val dvrAccess = if (negotiatedHtspVersion != null && negotiatedHtspVersion!! > 25) {
+                    auth.int("dvr")?.let { it == 1 }
+                } else {
+                    null
                 }
 
                 _state.value = ConnectionState.Connected(

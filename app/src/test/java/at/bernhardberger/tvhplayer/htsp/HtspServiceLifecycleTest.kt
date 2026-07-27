@@ -1,8 +1,12 @@
 package at.bernhardberger.tvhplayer.htsp
 
+import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.core.connectionFailureKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.Closeable
@@ -101,15 +105,73 @@ class HtspServiceLifecycleTest {
         }
     }
 
+    @Test
+    fun anonymousConnectStillAuthenticatesAndReadsDvrRight() {
+        FakeHtspServer(
+            respondToHello = true,
+            authFields = mapOf("dvr" to 1, "streaming" to 1),
+        ).use { server ->
+            val service = service()
+            runBlocking {
+                service.connect(
+                    host = "127.0.0.1",
+                    port = server.port,
+                    connectTimeoutMs = 1_000,
+                    responseTimeoutMs = 1_000,
+                    soTimeoutMs = 50,
+                )
+
+                val state = service.state.value as ConnectionState.Connected
+                assertEquals(true, state.dvrAccess)
+                assertEquals(listOf("hello", "authenticate"), server.handshakeMethods)
+                // No credentials configured: authenticate must stay bare so the server
+                // keeps the address-based anonymous rights.
+                assertNull(server.handshakeFields["authenticate"]?.get("username"))
+                service.disconnect()
+            }
+        }
+    }
+
+    @Test
+    fun anonymousConnectFailsWhenServerGrantsNoAccess() {
+        FakeHtspServer(
+            respondToHello = true,
+            authFields = mapOf("noaccess" to 1),
+        ).use { server ->
+            val service = service()
+            val failure = runBlocking {
+                runCatching {
+                    service.connect(
+                        host = "127.0.0.1",
+                        port = server.port,
+                        connectTimeoutMs = 1_000,
+                        responseTimeoutMs = 1_000,
+                        soTimeoutMs = 50,
+                    )
+                }.exceptionOrNull()
+            }
+
+            assertNotNull(failure)
+            assertEquals(
+                ConnectionFailureKind.AUTHENTICATION,
+                connectionFailureKind(requireNotNull(failure)),
+            )
+        }
+    }
+
     private fun service() = HtspService(ioDispatcher = Dispatchers.IO)
 
     private class FakeHtspServer(
         private val respondToHello: Boolean,
+        private val authFields: Map<String, Any?> = emptyMap(),
     ) : Closeable {
         private val serverSocket = ServerSocket(0)
         private val stop = CountDownLatch(1)
         @Volatile
         private var clientSocket: Socket? = null
+        /** Methods the client sent during the handshake, in order. */
+        val handshakeMethods = mutableListOf<String>()
+        val handshakeFields = mutableMapOf<String, Map<String, Any?>>()
         private val serverThread = thread(
             start = true,
             isDaemon = true,
@@ -119,16 +181,28 @@ class HtspServiceLifecycleTest {
                 val client = serverSocket.accept()
                 clientSocket = client
                 if (respondToHello) {
-                    val request = HtspCodec.readMessage(client.getInputStream())
-                    HtspCodec.writeMessage(
-                        output = client.getOutputStream(),
-                        method = "hello",
-                        fields = mapOf(
+                    // The client always sends hello then authenticate, with or without
+                    // credentials; anything after that is left unanswered on purpose.
+                    repeat(2) {
+                        val request = HtspCodec.readMessage(client.getInputStream())
+                        val method = requireNotNull(request.method)
+                        handshakeMethods += method
+                        handshakeFields[method] = request.fields
+                        val fields = mutableMapOf<String, Any?>(
                             "seq" to requireNotNull(request.seq),
-                            "htspversion" to 43,
-                        ),
-                    )
-                    client.getOutputStream().flush()
+                        )
+                        if (method == "authenticate") {
+                            fields += authFields
+                        } else {
+                            fields["htspversion"] = 43
+                        }
+                        HtspCodec.writeMessage(
+                            output = client.getOutputStream(),
+                            method = method,
+                            fields = fields,
+                        )
+                        client.getOutputStream().flush()
+                    }
                 }
                 stop.await()
             }

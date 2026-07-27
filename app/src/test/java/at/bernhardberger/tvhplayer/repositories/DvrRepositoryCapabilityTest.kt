@@ -70,6 +70,48 @@ class DvrRepositoryCapabilityTest {
     }
 
     @Test
+    fun getDvrConfigsUnknownMethodLeavesCapabilityUnknown() = runBlocking {
+        val repository = repository { method, _ ->
+            when (method) {
+                "getDvrConfigs" -> message("error" to "Method not found")
+                else -> error("unexpected $method")
+            }
+        }
+        repository.refreshConfigs()
+        // An old server that lacks the probe proves nothing about write access.
+        assertEquals(RecordingWriteCapability.Unknown, repository.writeCapability.value)
+        assertFalse(repository.canModifyRecordings.value)
+    }
+
+    @Test
+    fun getDvrConfigsConnectionLimitDoesNotDenyWrite() = runBlocking {
+        val repository = repository { method, _ ->
+            when (method) {
+                "getDvrConfigs" -> message("noaccess" to 1, "connlimit" to 1)
+                else -> error("unexpected $method")
+            }
+        }
+        repository.applyAuthenticatedDvrAccess(true)
+        repository.refreshConfigs()
+        // connlimit is transient; it must not latch a permission denial.
+        assertEquals(RecordingWriteCapability.Allowed, repository.writeCapability.value)
+        assertTrue(repository.canModifyRecordings.value)
+    }
+
+    @Test
+    fun addDvrEntryConnectionLimitDoesNotDenyWrite() = runBlocking {
+        val repository = repository { _, _ -> message("noaccess" to 1, "connlimit" to 1) }
+        repository.applyAuthenticatedDvrAccess(true)
+
+        val result = repository.scheduleEvent(eventId = 42)
+        assertEquals(
+            DvrActionResult.Failed(DvrActionFailure.CONNECTION_LIMIT),
+            result,
+        )
+        assertEquals(RecordingWriteCapability.Allowed, repository.writeCapability.value)
+    }
+
+    @Test
     fun authenticateDvrFlagInitializesCapability() = runBlocking {
         val repository = repository()
         repository.applyAuthenticatedDvrAccess(true)

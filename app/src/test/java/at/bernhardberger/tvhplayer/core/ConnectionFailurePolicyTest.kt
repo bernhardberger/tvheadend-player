@@ -13,6 +13,12 @@ class ConnectionFailurePolicyTest {
             ConnectionFailureKind.AUTHENTICATION,
             connectionFailureKind(IllegalStateException("HTSP authentication failed (noaccess=1)")),
         )
+        assertEquals(
+            ConnectionFailureKind.AUTHENTICATION,
+            connectionFailureKind(
+                IllegalStateException("HTSP server requires credentials (noaccess=1)"),
+            ),
+        )
         assertEquals(ConnectionFailureKind.DNS, connectionFailureKind(UnknownHostException()))
         assertEquals(ConnectionFailureKind.UNREACHABLE, connectionFailureKind(ConnectException()))
         assertEquals(ConnectionFailureKind.TIMEOUT, connectionFailureKind(SocketTimeoutException()))

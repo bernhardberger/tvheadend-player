@@ -11,6 +11,10 @@ class DvrActionPolicyTest {
             dvrActionFailure(mapOf("noaccess" to 1)),
         )
         assertEquals(
+            DvrActionFailure.CONNECTION_LIMIT,
+            dvrActionFailure(mapOf("noaccess" to 1, "connlimit" to 1)),
+        )
+        assertEquals(
             DvrActionFailure.CONFLICT,
             dvrActionFailure(mapOf("error" to "DVR conflict: no free tuner")),
         )
