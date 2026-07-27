@@ -1,0 +1,19 @@
+diff --git a/libraries/decoder_ffmpeg/src/main/jni/build_ffmpeg.sh b/libraries/decoder_ffmpeg/src/main/jni/build_ffmpeg.sh
+--- a/libraries/decoder_ffmpeg/src/main/jni/build_ffmpeg.sh
++++ b/libraries/decoder_ffmpeg/src/main/jni/build_ffmpeg.sh
+@@ -44,6 +44,7 @@ COMMON_OPTIONS="
+     --extra-ldexeflags=-pie
+     --disable-v4l2-m2m
+     --disable-vulkan
++    --disable-iconv
+     "
+ TOOLCHAIN_PREFIX="${NDK_PATH}/toolchains/llvm/prebuilt/${HOST_PLATFORM}/bin"
+ if [[ ! -d "${TOOLCHAIN_PREFIX}" ]]
+diff --git a/libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt b/libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt
+--- a/libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt
++++ b/libraries/decoder_ffmpeg/src/main/jni/CMakeLists.txt
+@@ -55,2 +55,4 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
+     target_link_options(ffmpegJNI PRIVATE "-Wl,-Bsymbolic")
+ endif()
++# Keep release output reproducible across checkout paths.
++target_link_options(ffmpegJNI PRIVATE "-Wl,--build-id=none")

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "auditDate": "2026-07-23",
+  "auditDate": "2026-07-26",
   "requiredAbis": [
     "arm64-v8a",
     "armeabi-v7a",
@@ -10,52 +10,38 @@
   "minimumElfLoadAlignment": 16384,
   "artifacts": [
     {
-      "file": "lib-decoder-av1-release.aar",
-      "sha256": "987fddaf60aa40212d7a73246efba7b429e898cb944baf99942b6b086ad47e49",
-      "librariesPerAbi": ["libdav1dJNI.so"],
-      "media3Module": "androidx.media3.decoder.av1",
-      "media3Revision": null,
-      "nativeProject": "VideoLAN dav1d and Google cpu_features",
-      "nativeRevision": null,
-      "toolchain": null,
-      "releaseApproved": false,
-      "releaseBlocker": "Exact Media3, dav1d, cpu_features, and NDK revisions are unknown; complete binary notices are absent."
-    },
-    {
       "file": "lib-decoder-ffmpeg-release.aar",
-      "sha256": "edabf3459db72cfc290dbfbbc64e134704ec2f68dc9a4bdb0737e92e98c38d96",
+      "sha256": "de7af29c749a5f15c237d577e27be9b43e40de35da8e9f5694bf7562b01a7c92",
       "librariesPerAbi": ["libffmpegJNI.so"],
       "media3Module": "androidx.media3.decoder.ffmpeg",
-      "media3Revision": null,
+      "media3Tag": "1.9.2",
+      "media3Revision": "630c1af455a16b8eb1ab36f49d82d9db799d7f5e",
       "nativeProject": "FFmpeg",
-      "nativeRevision": null,
-      "toolchain": null,
-      "releaseApproved": false,
-      "releaseBlocker": "Exact Media3 and FFmpeg revisions, configure flags, NDK, effective license mode, corresponding source, and notices are unknown."
-    },
-    {
-      "file": "lib-decoder-iamf-release.aar",
-      "sha256": "783450c477062e2ce51c23270c890a44895766ea8f00e16d76b101506c1c940b",
-      "librariesPerAbi": ["libiamf.so", "libiamfJNI.so"],
-      "media3Module": "androidx.media3.decoder.iamf",
-      "media3Revision": null,
-      "nativeProject": "AOMediaCodec iamf-tools",
-      "nativeRevision": null,
-      "toolchain": null,
-      "releaseApproved": false,
-      "releaseBlocker": "Exact Media3, iamf-tools, dependency, and NDK revisions are unknown; required binary and patent notices are absent."
-    },
-    {
-      "file": "lib-decoder-mpegh-release.aar",
-      "sha256": "1a3ffc224d07e3f42e88737514aff943f50e2220d6488435a9fbe64fd7f7c97e",
-      "librariesPerAbi": ["libmpeghJNI.so"],
-      "media3Module": "androidx.media3.decoder.mpegh",
-      "media3Revision": null,
-      "nativeProject": "Fraunhofer-IIS mpeghdec",
-      "nativeRevision": null,
-      "toolchain": null,
-      "releaseApproved": false,
-      "releaseBlocker": "Exact sources and toolchain are unknown; corresponding-source, complete-license, GPL-compatibility, and patent obligations require review."
+      "nativeTag": "n6.0.1",
+      "nativeRevision": "c41ff724ede7da657762d61097e26fac296c53bf",
+      "enabledDecoders": ["mp1", "mp2", "mp3"],
+      "configureOverrides": ["--disable-iconv"],
+      "linkerOverrides": ["--build-id=none", "-z max-page-size=16384"],
+      "toolchain": {
+        "ffmpegNdk": "26.1.10909125 (r26b)",
+        "jniWrapperNdk": "27.0.12077973 (r27)",
+        "androidApi": 28,
+        "cmake": "3.22.1",
+        "androidGradlePlugin": "8.12.3",
+        "gradle": "8.13",
+        "java": "21"
+      },
+      "buildScript": "tools/build-media3-ffmpeg",
+      "buildPatch": "app/libs/patches/media3-ffmpeg-disable-iconv.patch",
+      "license": "LGPL-2.1-or-later",
+      "licenseFiles": [
+        "app/libs/licenses/media3-APACHE-2.0.txt",
+        "app/libs/licenses/ffmpeg-LGPL-2.1.txt",
+        "app/libs/licenses/ffmpeg-LICENSE.md"
+      ],
+      "correspondingSource": "tools/build-media3-ffmpeg generates the exact Media3 and FFmpeg source archive required beside every APK release",
+      "releaseApproved": true,
+      "releaseBlocker": null
     }
   ]
 }

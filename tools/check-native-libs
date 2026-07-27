@@ -92,6 +92,15 @@ def main() -> int:
 
     errors: list[str] = []
     blockers: list[str] = []
+    provenance_fields = (
+        "media3Revision",
+        "nativeRevision",
+        "toolchain",
+        "buildScript",
+        "license",
+        "licenseFiles",
+        "correspondingSource",
+    )
     required_abis = set(manifest["requiredAbis"])
     minimum_alignment = int(manifest["minimumElfLoadAlignment"])
     declared_files = {artifact["file"] for artifact in manifest["artifacts"]}
@@ -156,7 +165,14 @@ def main() -> int:
         except zipfile.BadZipFile as exc:
             errors.append(f"{relative}: invalid AAR archive: {exc}")
 
-        if not artifact.get("releaseApproved", False):
+        if artifact.get("releaseApproved", False):
+            for field in provenance_fields:
+                if not artifact.get(field):
+                    blockers.append(f"{relative}: approved provenance is missing {field}")
+            for evidence in (artifact.get("buildScript"), *artifact.get("licenseFiles", [])):
+                if evidence and not (ROOT / evidence).is_file():
+                    blockers.append(f"{relative}: provenance evidence does not exist: {evidence}")
+        else:
             blockers.append(f"{relative}: {artifact['releaseBlocker']}")
 
     if args.release:
