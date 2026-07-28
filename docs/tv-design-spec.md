@@ -288,17 +288,23 @@ adopt one of the two, which also gives them 4.2 for free.
 
 ### 6.5 Navigation drawer
 
-Anatomy, per the guidance: **top section** (product mark) → navigation rail, 3–7
-destinations → bottom section, 1–3 actions. The app has no top section.
+The drawer starts with its destinations and keeps Settings and contextual owner
+actions in the bottom section. Material for TV does not require a brand header;
+do not spend the top safe region on a decorative product mark. A top action may
+be added later only for a real product capability such as search or profile
+selection.
 
-The rail and the panel beside it must be visually distinct. They currently
-resolve to the same luminance — `surface` at 0.90 next to `surface` at 0.96 —
-with no gutter between them.
+Use an opaque near-black navigation plane behind the focusable items, matching
+the app canvas when no video is active. Home leaves that canvas visible because
+its hero and cards own their surfaces. Standard drawers place navigation and
+content beside one another; do not add a gradient, hard divider, blur, or
+full-screen navigation scrim without physical evidence that a separate boundary
+treatment is needed.
 
 Use the **standard push drawer**. Expanding the drawer changes the browse
 viewport position while preserving its closed width; the trailing edge clips
 rather than remeasuring each destination narrower. The shell passes the safe
-content inset and keeps navigation and content as adjacent surfaces. Settings
+content inset and keeps navigation and content as adjacent planes. Settings
 remains in this global shell, so entering its content collapses the drawer to the
 icon rail instead of removing it; its temporary category rail is replaced in the
 later component slice.

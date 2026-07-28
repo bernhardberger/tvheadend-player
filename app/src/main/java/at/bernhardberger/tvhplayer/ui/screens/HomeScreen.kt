@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -43,7 +44,6 @@ import at.bernhardberger.tvhplayer.core.HomeFocusTarget
 import at.bernhardberger.tvhplayer.core.HomeRowKind
 import at.bernhardberger.tvhplayer.core.HomeSlideKind
 import at.bernhardberger.tvhplayer.core.homeInitialFocusTarget
-import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
 import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.HomeHeroCarousel
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeCard
@@ -131,8 +131,8 @@ fun HomeDashboard(
             .fillMaxSize()
             .testTag("home-screen"),
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvBrowsePanelAlpha),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onBackground,
         ),
     ) {
         LazyColumn(

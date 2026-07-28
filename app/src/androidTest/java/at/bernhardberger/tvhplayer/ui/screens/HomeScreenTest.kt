@@ -1,10 +1,17 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.input.key.Key
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -108,6 +115,32 @@ class HomeScreenTest {
 
         assertEquals(screenBounds.left, rowBounds.left, 1f)
         assertEquals(screenBounds.right, rowBounds.right, 1f)
+    }
+
+    @Test
+    fun dashboardLeavesTheAppBackdropVisible() {
+        composeRule.setContent {
+            Box(Modifier.fillMaxSize().background(Color.Red)) {
+                TVHeadendPlayerTheme {
+                    HomeDashboard(
+                        model = sampleModel(),
+                        connectionUiState = ConnectionUiState.Ready,
+                        imageLoader = imageLoader,
+                        onRetryConnection = {},
+                        onPlayChannel = { _, _, _ -> },
+                        onPlayRecording = {},
+                        onOpenRecordings = {},
+                        onOpenChannels = {},
+                    )
+                }
+            }
+        }
+
+        val pixels = composeRule.onNodeWithTag("home-screen")
+            .captureToImage()
+            .toPixelMap()
+
+        assertEquals(1f, pixels[1, 1].red, 0.05f)
     }
 
     @Test

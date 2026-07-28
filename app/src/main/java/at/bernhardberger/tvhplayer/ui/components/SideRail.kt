@@ -49,14 +49,13 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseShellBackAction
-import at.bernhardberger.tvhplayer.models.RailItem
-import at.bernhardberger.tvhplayer.ui.Routes
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
-import at.bernhardberger.tvhplayer.ui.TvSettingsPanelAlpha
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
+import at.bernhardberger.tvhplayer.models.RailItem
+import at.bernhardberger.tvhplayer.ui.Routes
+import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 
 private val DrawerStartPadding = 24.dp
 private val DrawerEndPadding = 12.dp
@@ -155,6 +154,7 @@ fun SideRail(
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
     val activeItemFocus = itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route]
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerColor = MaterialTheme.colorScheme.background
     val backAction = browseShellBackAction(
         drawerOpen = drawerState.currentValue == DrawerValue.Open,
         currentRoute = currentRoute,
@@ -202,9 +202,8 @@ fun SideRail(
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha)
-                        )
+                        .background(drawerColor)
+                        .testTag("global-drawer-surface")
                         // The surface reaches the edge; content retains the same safe inset.
                         .padding(
                             start = DrawerStartPadding,

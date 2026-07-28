@@ -231,12 +231,15 @@ edge. It is the only lazy container in the app doing this.
 
 ### Slice 10 — Drawer anatomy
 
-Files: `SideRail.kt`.
+Files: `SideRail.kt`; `HomeScreen.kt`; focused Compose tests.
 
-Spec 6.5. Add the top section carrying the product mark — the app currently ships
-no top section, and the mark in `artwork/` appears nowhere in the running app.
-Give the rail and the adjacent panel distinct surfaces; they resolve to the same
-luminance today.
+Spec 6.5. Keep the top safe region free of a decorative product mark; Material
+for TV does not require a brand header and this product has no search or profile
+action for that position. Give the rail a solid, opaque near-black background
+matching the app canvas, and leave Home's canvas transparent behind its
+self-contained hero and cards. Do not borrow the modal drawer's gradient-scrim
+treatment. Preserve the standard push drawer, focus-driven destination commit,
+Back behavior, and restored content focus.
 
 ### Slice 11 — Components
 
@@ -277,7 +280,8 @@ What the captures establish:
   broader Home redesign beyond slice 9's code-confirmed safe-area correction.
 - The collapsed rail and browse content have a visible boundary in the capture.
   The expanded drawer is unmistakably modal: it overlays a fixed viewport and
-  scrims the content. It still has no top-section product mark.
+  scrims the content. The later standard-drawer decision replaces that behavior;
+  no decorative top-section product mark is required.
 - The captured Channels and Recordings rows use a strong focused-container colour
   with no row scale. A later direct G10 check rejected the proposed inner border
   as redundant and excessive; the captures do not justify adding one.

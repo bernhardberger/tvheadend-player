@@ -356,13 +356,12 @@ makes each screen's viewport **dynamic**, while the modal drawer gives every
 screen a fixed inset. That is the difference between adjusting the shell and
 rewriting its layout contract.
 
-One structural gap against the guidance: the documented drawer anatomy is a **top
-section** (app logo, doubling as profile or search), then the navigation rail of
-3–7 destinations, then a bottom section of 1–3 actions. The app has the rail
-(4 destinations) and the bottom section (Settings, and Unlock in Simple TV), but
-**no top section** — so the collapsed rail begins with a bare Home icon at the
-screen's top-left. This product has an approved mark (`artwork/`) that is exactly
-what that slot is for, and it currently appears nowhere in the running app.
+The guidance shows optional top content such as profile or search, but the TV
+Material drawer API and official sample do not require a brand header. This app
+has neither of those capabilities, so its rail begins with Home after the top
+safe margin and keeps Settings and Unlock in the bottom section. The resolved
+product decision is recorded below: do not turn the approved mark into a
+decorative navigation item.
 
 **Needs the TV:** the resulting gutter and whether rail and panel read as
 separate surfaces at viewing distance.
@@ -524,9 +523,10 @@ lines since those were written.
    content rather than overlaying and scrimming a fixed viewport.
 4. **Home** — in scope by owner decision, but W2 means there is currently no
    evidence to redesign against.
-5. **Drawer top section** — whether the product mark occupies the documented top
-   slot, and whether it is decorative or actionable; the guidance pairs that slot
-   with profile or search, neither of which this product has. See D6.
+5. ~~**Drawer top section**~~ — **decided 2026-07-28: omit it.** Material for TV
+   does not require a brand header, and this product has no search or profile
+   action for that position. Keep the approved mark in identity surfaces rather
+   than turning it into a decorative navigation item. See D6.
 6. **Channel card ratio** — the guidance names 1:1 for channel logos. Adopting it
    changes the channel grid's proportions and column count. See D4.
 

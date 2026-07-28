@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
 import at.bernhardberger.tvhplayer.ui.Routes
@@ -29,6 +32,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.tv.material3.Button
@@ -65,6 +69,35 @@ class SideRailSemanticsTest {
         composeRule.onAllNodesWithContentDescription("Guide").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Recordings").assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Settings").assertCountEquals(1)
+    }
+
+    @Test
+    fun drawerUsesAnOpaqueNearBlackSurface() {
+        composeRule.setContent {
+            Box(Modifier.fillMaxSize().background(Color.Red)) {
+                TVHeadendPlayerTheme {
+                    SideRail(
+                        currentRoute = Routes.HOME,
+                        showEpgMenu = true,
+                        onRootBack = {},
+                        onNavigate = {},
+                        content = { _, _ -> },
+                    )
+                }
+            }
+        }
+
+        val surfacePixels = composeRule.onNodeWithTag("global-drawer-surface")
+            .captureToImage()
+            .toPixelMap()
+        val surfacePixel = surfacePixels[
+            surfacePixels.width / 2,
+            surfacePixels.height / 2,
+        ]
+
+        assertTrue(surfacePixel.red < 0.1f)
+        assertTrue(surfacePixel.green < 0.1f)
+        assertTrue(surfacePixel.blue < 0.1f)
     }
 
     @Test
