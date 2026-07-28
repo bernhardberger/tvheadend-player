@@ -158,14 +158,21 @@ private fun ChannelTagChooser(
     onDismiss: () -> Unit,
 ) {
     val selectedFocus = remember { FocusRequester() }
-    val selectedIndex = if (activeTagId == null) {
+    val activeTagExists = activeTagId != null && tags.any { it.id == activeTagId }
+    val focusTargetTagId = when {
+        activeTagExists -> activeTagId
+        allChannelsVisible -> null
+        else -> tags.firstOrNull()?.id
+    }
+    val selectedIndex = if (focusTargetTagId == null) {
         0
     } else {
-        tags.indexOfFirst { it.id == activeTagId }.coerceAtLeast(0) +
+        tags.indexOfFirst { it.id == focusTargetTagId }.coerceAtLeast(0) +
             if (allChannelsVisible) 1 else 0
     }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
-    LaunchedEffect(activeTagId, tags) {
+    LaunchedEffect(focusTargetTagId, tags, allChannelsVisible) {
+        listState.scrollToItem(selectedIndex)
         withFrameNanos { }
         selectedFocus.requestFocus()
     }
@@ -210,6 +217,7 @@ private fun ChannelTagChooser(
                                 TagChoice(
                                     text = stringResource(R.string.all_channels),
                                     selected = activeTagId == null,
+                                    focusTarget = focusTargetTagId == null,
                                     selectedFocus = selectedFocus,
                                     onClick = { onSelectTag(null) },
                                 )
@@ -219,6 +227,7 @@ private fun ChannelTagChooser(
                             TagChoice(
                                 text = tag.name,
                                 selected = activeTagId == tag.id,
+                                focusTarget = focusTargetTagId == tag.id,
                                 selectedFocus = selectedFocus,
                                 onClick = { onSelectTag(tag.id) },
                             )
@@ -237,6 +246,7 @@ private fun ChannelTagChooser(
 private fun TagChoice(
     text: String,
     selected: Boolean,
+    focusTarget: Boolean,
     selectedFocus: FocusRequester,
     onClick: () -> Unit,
 ) {
@@ -253,7 +263,7 @@ private fun TagChoice(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp)
-            .then(if (selected) Modifier.focusRequester(selectedFocus) else Modifier),
+            .then(if (focusTarget) Modifier.focusRequester(selectedFocus) else Modifier),
     )
 }
 

@@ -220,7 +220,6 @@ fun ChannelDrawer(
             }
             ChannelCardGrid(
                 items = cardItems,
-                selectedId = selectedId,
                 imageLoader = imageLoader,
                 focusRequesters = rowFocusRequesters,
                 gridState = gridState,

@@ -11,7 +11,8 @@ import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 import androidx.tv.material3.lightColorScheme
 
-val TvRecordingColor = Color(0xFFE53935)
+// Bright enough for small recording labels on the product's dark badge surface.
+val TvRecordingColor = Color(0xFFFF5449)
 
 private val DarkColors = darkColorScheme(
     primary = Color(0xFF00BCFA),

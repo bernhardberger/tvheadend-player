@@ -34,12 +34,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,6 +90,7 @@ import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.groupDvrProblems
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
+import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
@@ -168,6 +171,8 @@ fun RecordingsScreen(
     var mode by screenState.mode
     var archivePath by screenState.archivePath
     var requestContentFocus by remember { mutableStateOf(true) }
+    var contentHasFocus by remember { mutableStateOf(false) }
+    var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
     var folderPreviewFocused by remember { mutableStateOf(false) }
     var folderPreviewRecordingId by remember { mutableStateOf<Int?>(null) }
     var detailsOpenedFromFolderPreview by remember { mutableStateOf(false) }
@@ -213,16 +218,20 @@ fun RecordingsScreen(
         requestContentFocus,
         initialFocusEnabled,
     ) {
-        if (!initialFocusEnabled) return@LaunchedEffect
-        if (!requestContentFocus) return@LaunchedEffect
         if (itemKeys.isEmpty()) {
             requestContentFocus = false
             return@LaunchedEffect
         }
         if (selectedKeys[location] !in itemKeys) {
             selectedKeys[location] = itemKeys.first()
+            archiveScrollPositions[location] = 0
+            focusRecoveryGeneration++
+            if (contentHasFocus) requestContentFocus = true
             return@LaunchedEffect
         }
+        if (!initialFocusEnabled) return@LaunchedEffect
+        if (!requestContentFocus) return@LaunchedEffect
+        withFrameNanos { }
         runCatching { contentFocus.requestFocus() }
         requestContentFocus = false
     }
@@ -318,15 +327,23 @@ fun RecordingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     RecordingBrowserSurface(
-                        modifier = Modifier.weight(0.46f).fillMaxHeight(),
+                        modifier = Modifier
+                            .weight(0.46f)
+                            .fillMaxHeight()
+                            .onFocusChanged { contentHasFocus = it.hasFocus },
                     ) {
-                        key(location) {
+                        key(location, focusRecoveryGeneration) {
+                            val generation = focusRecoveryGeneration
                             ArchiveList(
                                 items = archiveItems,
                                 selectedKey = selectedKeys[location],
                                 selectedFocus = contentFocus,
                                 initialScrollIndex = archiveScrollPositions[location] ?: 0,
-                                onScrollChanged = { archiveScrollPositions[location] = it },
+                                onScrollChanged = {
+                                    if (generation == focusRecoveryGeneration) {
+                                        archiveScrollPositions[location] = it
+                                    }
+                                },
                                 onFocused = {
                                     selectedKeys[location] = it
                                     folderPreviewFocused = false
@@ -363,6 +380,7 @@ fun RecordingsScreen(
                                 piconForEntry = { channelsById[it.channelId]?.icon },
                                 previewFocus = folderPreviewFocus,
                                 selectedPreviewId = folderPreviewRecordingId,
+                                restoreFocus = folderPreviewFocused,
                                 onPreviewFocusChanged = { folderPreviewFocused = it },
                                 onPreviewRecordingFocused = { folderPreviewRecordingId = it },
                                 onMoveToFolder = {
@@ -386,9 +404,13 @@ fun RecordingsScreen(
                     }
                 }
                 DvrLibraryMode.SCHEDULE -> RecordingBrowserSurface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onFocusChanged { contentHasFocus = it.hasFocus },
                 ) {
-                    RecordingSchedule(
+                    key(location, focusRecoveryGeneration) {
+                        val generation = focusRecoveryGeneration
+                        RecordingSchedule(
                             groups = scheduleGroups,
                             selectedKey = selectedKeys[location],
                             selectedFocus = contentFocus,
@@ -401,13 +423,22 @@ fun RecordingsScreen(
                             imageLoader = imageLoader,
                             piconForEntry = { channelsById[it.channelId]?.icon },
                             initialScrollIndex = archiveScrollPositions[location] ?: 0,
-                            onScrollChanged = { archiveScrollPositions[location] = it },
+                            onScrollChanged = {
+                                if (generation == focusRecoveryGeneration) {
+                                    archiveScrollPositions[location] = it
+                                }
+                            },
                         )
+                    }
                 }
                 DvrLibraryMode.PROBLEMS -> RecordingBrowserSurface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onFocusChanged { contentHasFocus = it.hasFocus },
                 ) {
-                    RecordingProblems(
+                    key(location, focusRecoveryGeneration) {
+                        val generation = focusRecoveryGeneration
+                        RecordingProblems(
                             groups = problemGroups,
                             selectedKey = selectedKeys[location],
                             selectedFocus = contentFocus,
@@ -420,8 +451,13 @@ fun RecordingsScreen(
                             imageLoader = imageLoader,
                             piconForEntry = { channelsById[it.channelId]?.icon },
                             initialScrollIndex = archiveScrollPositions[location] ?: 0,
-                            onScrollChanged = { archiveScrollPositions[location] = it },
+                            onScrollChanged = {
+                                if (generation == focusRecoveryGeneration) {
+                                    archiveScrollPositions[location] = it
+                                }
+                            },
                         )
+                    }
                 }
             }
         }
@@ -571,6 +607,7 @@ private fun ArchiveList(
     }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
     val scope = rememberCoroutineScope()
+    val focusTargetKey = recordingFocusTargetKey(items.map { it.key }, selectedKey)
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }.collect(onScrollChanged)
     }
@@ -606,10 +643,12 @@ private fun ArchiveList(
     ) {
         items(items, key = { it.key }) { item ->
             val selected = item.key == selectedKey
+            val focusTarget = item.key == focusTargetKey
             when (item) {
                 is ArchiveListItem.Folder -> FolderListRow(
                     folder = item.folder,
                     selected = selected,
+                    focusTarget = focusTarget,
                     selectedFocus = selectedFocus,
                     onFocused = { onFocused(item.key) },
                     onMoveToPreview = onMoveToPreview,
@@ -620,6 +659,7 @@ private fun ArchiveList(
                     piconPath = piconForEntry(item.entry),
                     imageLoader = imageLoader,
                     selected = selected,
+                    focusTarget = focusTarget,
                     selectedFocus = selectedFocus,
                     onFocused = { onFocused(item.key) },
                     onClick = { onOpenRecording(item.entry) },
@@ -633,6 +673,7 @@ private fun ArchiveList(
 private fun FolderListRow(
     folder: DvrArchiveFolder,
     selected: Boolean,
+    focusTarget: Boolean,
     selectedFocus: FocusRequester,
     onFocused: () -> Unit,
     onMoveToPreview: () -> Unit,
@@ -675,7 +716,7 @@ private fun FolderListRow(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("recordings-folder-${folder.path.joinToString("/")}")
-            .then(if (selected) Modifier.focusRequester(selectedFocus) else Modifier)
+            .then(if (focusTarget) Modifier.focusRequester(selectedFocus) else Modifier)
             .onFocusChanged { if (it.isFocused) onFocused() }
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight) {
@@ -695,12 +736,25 @@ private fun FolderMetadataPane(
     piconForEntry: (DvrEntry) -> String?,
     previewFocus: FocusRequester,
     selectedPreviewId: Int?,
+    restoreFocus: Boolean,
     onPreviewFocusChanged: (Boolean) -> Unit,
     onPreviewRecordingFocused: (Int) -> Unit,
     onMoveToFolder: () -> Unit,
     onOpenRecording: (DvrEntry) -> Unit,
 ) {
     val summary = remember(folder) { summarizeDvrFolder(folder) }
+    val focusTargetId = selectedPreviewId
+        ?.takeIf { selectedId -> summary.recentRecordings.any { it.id == selectedId } }
+        ?: summary.recentRecordings.firstOrNull()?.id
+    LaunchedEffect(focusTargetId) {
+        if (focusTargetId != null && focusTargetId != selectedPreviewId) {
+            if (restoreFocus) {
+                withFrameNanos { }
+                previewFocus.requestFocus()
+            }
+            onPreviewRecordingFocused(focusTargetId)
+        }
+    }
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -730,19 +784,16 @@ private fun FolderMetadataPane(
                     },
             ) {
                 itemsIndexed(summary.recentRecordings, key = { _, entry -> entry.id }) {
-                        index, entry ->
+                        _, entry ->
                     FolderRecentRecordingRow(
                         entry = entry,
                         imageLoader = imageLoader,
                         piconPath = piconForEntry(entry),
-                        selected = selectedPreviewId == entry.id ||
-                            (selectedPreviewId == null && index == 0),
+                        selected = focusTargetId == entry.id,
                         modifier = Modifier
                             .testTag("folder-preview-recording-${entry.id}")
                             .then(
-                                if (selectedPreviewId == entry.id ||
-                                    (selectedPreviewId == null && index == 0)
-                                ) {
+                                if (focusTargetId == entry.id) {
                                     Modifier.focusRequester(previewFocus)
                                 } else {
                                     Modifier
@@ -838,7 +889,11 @@ private fun RecordingMetadataPane(
             Text(
                 text = dvrStateLabel(entry.state),
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = when (entry.state) {
+                    DvrState.SCHEDULED, DvrState.RECORDING -> TvRecordingColor
+                    DvrState.FAILED -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
         }
         Text(
@@ -926,6 +981,10 @@ private fun RecordingSchedule(
         return
     }
     val entries = groups.flatMap { it.entries }
+    val focusTargetKey = recordingFocusTargetKey(
+        entries.map { "recording:${it.id}" },
+        selectedKey,
+    )
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
     val scope = rememberCoroutineScope()
     val lazyIndexes = remember(groups) {
@@ -972,7 +1031,10 @@ private fun RecordingSchedule(
     ) {
         groups.forEach { section ->
             item(key = "header-${section.kind}-${section.date}") {
-                RecordingSectionHeader(scheduleSectionLabel(section))
+                RecordingSectionHeader(
+                    text = scheduleSectionLabel(section),
+                    recordingNow = section.kind == DvrScheduleSectionKind.RECORDING_NOW,
+                )
             }
             items(section.entries, key = { it.id }) { entry ->
                 RecordingListRow(
@@ -980,6 +1042,7 @@ private fun RecordingSchedule(
                     piconPath = piconForEntry(entry),
                     imageLoader = imageLoader,
                     selected = selectedKey == "recording:${entry.id}",
+                    focusTarget = focusTargetKey == "recording:${entry.id}",
                     selectedFocus = selectedFocus,
                     onFocused = { onFocused("recording:${entry.id}") },
                     onClick = { onOpen(entry) },
@@ -1009,6 +1072,10 @@ private fun RecordingProblems(
     }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
     val scope = rememberCoroutineScope()
+    val focusTargetKey = recordingFocusTargetKey(
+        entries.map { "recording:${it.id}" },
+        selectedKey,
+    )
     val lazyIndexes = remember(groups) {
         buildMap {
             var index = 0
@@ -1072,6 +1139,7 @@ private fun RecordingProblems(
                         piconPath = piconForEntry(entry),
                         imageLoader = imageLoader,
                         selected = selectedKey == "recording:${entry.id}",
+                        focusTarget = focusTargetKey == "recording:${entry.id}",
                         selectedFocus = selectedFocus,
                         onFocused = { onFocused("recording:${entry.id}") },
                         onClick = { onOpen(entry) },
@@ -1095,6 +1163,7 @@ private fun RecordingListRow(
     piconPath: String?,
     imageLoader: ImageLoader,
     selected: Boolean,
+    focusTarget: Boolean = selected,
     selectedFocus: FocusRequester,
     onFocused: () -> Unit,
     onClick: () -> Unit,
@@ -1106,7 +1175,14 @@ private fun RecordingListRow(
     TvListRow(
         selected = selected,
         onClick = onClick,
-        headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = {
+            Text(
+                text = entry.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("recording-list-headline-${entry.id}"),
+            )
+        },
         supportingContent = {
             Text(
                 text = if (active) {
@@ -1117,8 +1193,7 @@ private fun RecordingListRow(
                 } else metadata,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (problem) MaterialTheme.colorScheme.error
-                    else if (active) TvRecordingColor else Color.Unspecified,
+                color = if (problem) MaterialTheme.colorScheme.error else Color.Unspecified,
             )
         },
         leadingContent = {
@@ -1127,6 +1202,12 @@ private fun RecordingListRow(
                 horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (active) {
+                    RecordingStatusIndicator(
+                        state = DvrState.RECORDING,
+                        announceState = false,
+                    )
+                }
                 if (problem) {
                     Icon(
                         Icons.Filled.Warning,
@@ -1151,21 +1232,35 @@ private fun RecordingListRow(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("recording-list-entry-${entry.id}")
-            .then(if (selected) Modifier.focusRequester(selectedFocus) else Modifier)
+            .then(if (focusTarget) Modifier.focusRequester(selectedFocus) else Modifier)
             .onFocusChanged { if (it.isFocused) onFocused() },
     )
 }
 
 @Composable
-private fun RecordingSectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.onSurface,
+private fun RecordingSectionHeader(
+    text: String,
+    recordingNow: Boolean = false,
+) {
+    Row(
         modifier = Modifier
             .padding(start = 12.dp, top = 8.dp, bottom = 2.dp)
             .semantics { heading() },
-    )
+        horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (recordingNow) {
+            RecordingStatusIndicator(
+                state = DvrState.RECORDING,
+                announceState = false,
+            )
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 @Composable

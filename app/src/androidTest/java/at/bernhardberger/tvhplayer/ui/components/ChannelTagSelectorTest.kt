@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
@@ -55,5 +56,26 @@ class ChannelTagSelectorTest {
             0,
             composeRule.onAllNodesWithText("All channels").fetchSemanticsNodes().size,
         )
+    }
+
+    @Test
+    fun chooserFallsBackToFirstVisibleScopeWhenActiveTagDisappears() {
+        var tags by mutableStateOf(
+            (1..20).map { id -> ChannelTagUi(id = id, name = "Tag $id", index = id) }
+        )
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                ChannelTagSelector(
+                    tags = tags,
+                    activeTagId = 20,
+                    onSelectTag = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Tag 20").performClick()
+        composeRule.onAllNodesWithText("Tag 20")[1].assertIsFocused()
+        composeRule.runOnIdle { tags = tags.dropLast(1) }
+        composeRule.onAllNodesWithText("All channels")[1].assertIsFocused()
     }
 }

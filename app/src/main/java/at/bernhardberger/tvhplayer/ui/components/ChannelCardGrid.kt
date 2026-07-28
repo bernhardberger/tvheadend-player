@@ -19,12 +19,16 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,7 +62,6 @@ data class ChannelCardModel(
 @Composable
 fun ChannelCardGrid(
     items: List<ChannelCardModel>,
-    selectedId: Int,
     imageLoader: ImageLoader,
     onFocusChannel: (Int) -> Unit,
     onConfirmChannel: (ChannelUi) -> Unit,
@@ -79,18 +82,20 @@ fun ChannelCardGrid(
             .focusGroup(),
     ) {
         items(items, key = { it.channel.id }) { item ->
-            val selected = item.channel.id == selectedId
+            var focused by remember(item.channel.id) { mutableStateOf(false) }
             ChannelCard(
                 item = item,
-                selected = selected,
+                focused = focused,
                 imageLoader = imageLoader,
                 modifier = Modifier
+                    .testTag("channel-card-${item.channel.id}")
                     .then(
                         focusRequesters[item.channel.id]?.let { Modifier.focusRequester(it) }
                             ?: Modifier,
                     )
-                    .onFocusChanged {
-                        if (it.isFocused) onFocusChannel(item.channel.id)
+                    .onFocusChanged { focusState ->
+                        focused = focusState.isFocused
+                        if (focusState.isFocused) onFocusChannel(item.channel.id)
                     },
                 onClick = { onConfirmChannel(item.channel) },
             )
@@ -101,7 +106,7 @@ fun ChannelCardGrid(
 @Composable
 fun ChannelCard(
     item: ChannelCardModel,
-    selected: Boolean,
+    focused: Boolean,
     imageLoader: ImageLoader,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -174,7 +179,7 @@ fun ChannelCard(
                             .align(Alignment.TopEnd)
                             .padding(8.dp)
                             .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                MaterialTheme.colorScheme.surface,
                                 shape = MaterialTheme.shapes.extraSmall,
                             )
                             .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -198,7 +203,7 @@ fun ChannelCard(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (selected) {
+                color = if (focused) {
                     MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.86f)
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -207,14 +212,16 @@ fun ChannelCard(
             item.progress?.let { progress ->
                 ProgressStrip(
                     progress = progress,
-                    trackColor = if (selected) {
+                    trackColor = if (focused) {
                         MaterialTheme.colorScheme.inverseOnSurface.copy(
                             alpha = TvTextDisabledAlpha,
                         )
                     } else {
                         MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha)
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("channel-card-progress-${item.channel.id}"),
                 )
             }
         }

@@ -120,8 +120,12 @@ class ChannelRowTest {
         val pixels = image.toPixelMap()
         val y = image.height / 2
         val fill = pixels[image.width / 8, y]
+        val track = pixels[image.width / 2, y]
         val trackEnd = pixels[image.width - 2, y]
 
         assertNotEquals(fill, trackEnd)
+        for (x in image.width / 2 until image.width - 4) {
+            assertEquals("unexpected marker at x=$x", track, pixels[x, y])
+        }
     }
 }

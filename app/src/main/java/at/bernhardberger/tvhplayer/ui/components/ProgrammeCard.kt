@@ -94,7 +94,7 @@ fun ProgrammeCard(
                             .align(Alignment.TopStart)
                             .padding(6.dp)
                             .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                MaterialTheme.colorScheme.surface,
                                 shape = MaterialTheme.shapes.extraSmall,
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp),

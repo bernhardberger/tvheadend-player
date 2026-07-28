@@ -19,19 +19,25 @@ import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 fun RecordingStatusIndicator(
     state: DvrState,
     modifier: Modifier = Modifier,
+    announceState: Boolean = true,
 ) {
     if (state != DvrState.RECORDING && state != DvrState.SCHEDULED) return
-    val description = stringResource(
-        if (state == DvrState.RECORDING) {
-            R.string.recording_state_recording
-        } else {
-            R.string.recording_state_scheduled
-        }
-    )
+    val accessibilityModifier = if (announceState) {
+        val description = stringResource(
+            if (state == DvrState.RECORDING) {
+                R.string.recording_state_recording
+            } else {
+                R.string.recording_state_scheduled
+            }
+        )
+        Modifier.semantics { contentDescription = description }
+    } else {
+        Modifier
+    }
     Box(
         modifier = modifier
             .size(12.dp)
-            .semantics { contentDescription = description }
+            .then(accessibilityModifier)
             .then(
                 if (state == DvrState.RECORDING) {
                     Modifier.background(TvRecordingColor, CircleShape)

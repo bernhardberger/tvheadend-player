@@ -170,6 +170,11 @@ fun recordingListPageTargetIndex(
     return (currentIndex + direction * pageSize).coerceIn(0, itemCount - 1)
 }
 
+fun recordingFocusTargetKey(
+    orderedKeys: List<String>,
+    selectedKey: String?,
+): String? = selectedKey?.takeIf(orderedKeys::contains) ?: orderedKeys.firstOrNull()
+
 fun recordingListMetadata(
     entry: DvrEntry,
     problem: Boolean = false,
