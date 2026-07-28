@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -131,6 +132,7 @@ fun SideRail(
     }
     val items = mainItems + footerItems
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
+    val activeItemFocus = itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route]
     val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     // Modal overlay keeps content bounds fixed when the drawer expands; the
@@ -159,6 +161,9 @@ fun SideRail(
                     )
                     // The surface reaches the edge; content retains the same safe inset.
                     .padding(start = 24.dp, end = 12.dp, top = 32.dp, bottom = 32.dp)
+                    .then(
+                        activeItemFocus?.let { Modifier.focusRestorer(it) } ?: Modifier
+                    )
                     .selectableGroup(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {

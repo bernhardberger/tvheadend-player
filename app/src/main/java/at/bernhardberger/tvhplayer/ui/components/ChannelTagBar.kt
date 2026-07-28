@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -201,7 +202,8 @@ private fun ChannelTagChooser(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 420.dp)
-                            .focusGroup(),
+                            .focusGroup()
+                            .focusRestorer(selectedFocus),
                     ) {
                         if (allChannelsVisible) {
                             item(key = "all-channels") {

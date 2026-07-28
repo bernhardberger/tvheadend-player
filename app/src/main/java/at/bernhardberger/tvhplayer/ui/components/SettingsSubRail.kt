@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -46,6 +47,7 @@ fun SettingsSubRail(
         showSimpleTv = showSimpleTv,
     )
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
+    val activeItemFocus = itemFocus[currentRoute] ?: itemFocus.getValue(items.first().route)
 
     // Keep focus on the active category after activation. Content receives focus
     // only when the user presses Right; NavHost recomposition must not leave the
@@ -62,7 +64,8 @@ fun SettingsSubRail(
             .background(
                 MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha)
             )
-            .padding(8.dp),
+            .padding(8.dp)
+            .focusRestorer(activeItemFocus),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items.forEach { item ->

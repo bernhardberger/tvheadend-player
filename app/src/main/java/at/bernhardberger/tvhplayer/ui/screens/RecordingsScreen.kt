@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -446,10 +447,12 @@ private fun RecordingModeTabs(
     onClick: (DvrLibraryMode) -> Unit,
     onMoveToContent: () -> Unit,
 ) {
+    val selectedFocus = remember { FocusRequester() }
     TabRow(
         selectedTabIndex = selected.ordinal,
         modifier = Modifier
             .width(450.dp)
+            .focusRestorer(selectedFocus)
             .onPreviewKeyEvent { event ->
                 event.type == KeyEventType.KeyDown &&
                     event.key == Key.DirectionDown &&
@@ -474,6 +477,11 @@ private fun RecordingModeTabs(
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
                 colors = tabColors,
+                modifier = if (selected == mode) {
+                    Modifier.focusRequester(selectedFocus)
+                } else {
+                    Modifier
+                },
             ) {
                 Text(
                     text = stringResource(
@@ -537,6 +545,7 @@ private fun ArchiveList(
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
+            .focusRestorer(selectedFocus)
             .testTag("recordings-archive-list")
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -673,6 +682,7 @@ private fun FolderMetadataPane(
                     .weight(1f)
                     .fillMaxWidth()
                     .focusGroup()
+                    .focusRestorer(previewFocus)
                     .onFocusChanged { onPreviewFocusChanged(it.hasFocus) }
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
@@ -901,6 +911,7 @@ private fun RecordingSchedule(
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
+            .focusRestorer(selectedFocus)
             .testTag("recordings-schedule-list")
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -982,6 +993,7 @@ private fun RecordingProblems(
         modifier = Modifier
             .fillMaxSize()
             .focusGroup()
+            .focusRestorer(selectedFocus)
             .testTag("recordings-problems-list")
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
