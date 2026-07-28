@@ -400,6 +400,15 @@ from captures at all.
 
 **Severity:** Low · **Code-confirmed**
 
+**Implementation correction, 2026-07-28:** the first Slice 11 build interpreted
+the persistent Settings category rail as a second standard navigation drawer.
+Direct G10 review rejected the resulting nested collapsing rails. A drawer is an
+app-destination structure; Settings categories are a local master-detail list.
+The accepted pattern follows the official JetStream Profile sample: one stable,
+scrollable TV `ListItem` column beside its detail pane. `ChannelTagBar` still uses
+`TabRow`, but in a dedicated full-width row rather than the old 300/240dp header
+slots.
+
 **Downgraded after reading the component guidance.** An earlier draft called the
 drawer/tabs difference an inconsistency. It is not — see D1; the two components
 are documented to behave differently, and the app matches that.
@@ -409,18 +418,14 @@ are documented to behave differently, and the app matches that.
 | Global rail | `ModalNavigationDrawer` + `NavigationDrawerItem` | selection | yes |
 | Recordings modes | `TabRow` + `Tab` | focus | yes |
 | Archive folders | `ListItem` in a `LazyColumn` | selection | yes — it is a list |
-| **Settings categories** | `ListItem` in a plain `Column` | selection | **no component** |
-| **Channel tags** | `ListItem` + `Button` in `ChannelTagBar` | selection | **no component** |
+| Settings categories | TV `ListItem` in a fixed master column | focus | yes — local navigation, not an app drawer |
+| Channel tags | TV `TabRow` + `Tab` | focus | yes |
 
-The last two are lateral category pickers hand-assembled from `ListItem` in a
-`Column`, with `focusedScale = 1f` and a manual `LaunchedEffect` focus request
-standing in for what a drawer or tab row provides. Settings in particular is a
-persistent left-hand category rail — structurally a navigation drawer — built by
-hand.
-
-This is low severity because it works; it is listed because those two are where
-the focus-restoration bug in D1 has to be fixed by hand rather than by adopting a
-component that already handles it.
+Slice 11 resolved both outstanding picker implementations. Channel scopes now
+use the TV tab component directly. Settings remains a deliberately local
+master-detail list because TV Material does not provide a composite settings
+master pane; its TV `ListItem`s retain stable width and explicit focus
+restoration without adopting app-destination drawer behavior.
 
 ## D9 — The leading inset has two owners, and Home is boxed as a result
 
@@ -465,6 +470,14 @@ boxed page.
 **Remedy:** one owner for the safe area. The shell declares the total inset;
 screens receive it and pass it to `contentPadding`, never to `Modifier.padding`
 on a scrolling container.
+
+**Implementation correction, 2026-07-28:** Slice 9 fixed Home and the Guide
+timeline, but the Slice 11 Channels composition briefly reintroduced the same
+defect by applying the shell padding to its root `Column`. A G10 screenshot
+showed the resulting blank trailing strip clipping the scope row and browse
+viewport. Channels now applies symmetric safe padding only to non-scrolling
+header/status content; its scope and browse viewports keep the leading inset and
+reach the trailing edge. The Guide scope row uses the same rule.
 
 ---
 

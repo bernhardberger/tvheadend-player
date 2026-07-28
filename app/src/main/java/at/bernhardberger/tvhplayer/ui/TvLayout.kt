@@ -60,11 +60,23 @@ val TvPlaybackPadding = PaddingValues(
 /** Featured Home hero carousel height (canvas 960×540 dp). */
 val HomeHeroHeight = 288.dp
 
-/** 16:9 programme card width for Home content rows. */
-val HomeCardWidth = 176.dp
+/** Four-across programme card width on the 960dp guidance canvas. */
+val HomeCardWidth = 196.dp
 
 /** 16:9 media area height for [HomeCardWidth] cards. */
-val HomeCardMediaHeight = 99.dp
+val HomeCardMediaHeight = 110.25.dp
+
+/** Three-across channel card width on the 960dp guidance canvas. */
+val ChannelCardWidth = 268.dp
+
+/** Four-across/fallback card width used by narrower playback surfaces. */
+val CompactChannelCardWidth = 196.dp
+
+/** Material for TV card-lane peek spacing. */
+val TvCardSpacing = 20.dp
+
+/** Stable master-detail width for the local Settings category pane. */
+val SettingsCategoryPaneWidth = 268.dp
 
 /** Non-interactive programme progress on browse cards, rows, and detail panes. */
 val TvProgressStripHeight = 4.dp

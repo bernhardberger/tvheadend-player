@@ -244,13 +244,42 @@ Back behavior, and restored content focus.
 ### Slice 11 — Components
 
 Files: `ProgrammeCard.kt`; `ChannelCardGrid.kt`; `SettingsSubRail.kt`;
-`ChannelTagBar.kt`.
+`ChannelTagBar.kt`; `ChannelsScreen.kt`; `EpgGridScreen.kt`; `SettingsScreen.kt`.
 
 Spec 6.3 and 6.4. Adopt the TV Material card containers and the guidance width
-grid; move the two hand-assembled category pickers onto a real component, which
-also gives them slice 6's entry contract for free.
+grid. Use a dedicated full-width TV `TabRow` for channel scopes on Channels and
+Guide. Keep Settings as a stable master-detail composition modelled on the
+official JetStream Profile sample; do not nest a second collapsing drawer inside
+the global navigation shell.
 
 Last because card widths depend on the settled viewport.
+
+The first G10 build placed the scope tabs in the old 300/240dp trailing header
+slots and nested a second standard drawer inside Settings. Direct owner review
+rejected both: the tabs were hard-clipped and the two independently collapsing
+rails looked structurally wrong. Edge fades are not the correction. The revised
+slice gives tabs their own full browse-width row and keeps Settings categories
+at one stable width while focus moves into content.
+
+The corrected focus graph gates Channels error-action focus until the shell
+enables content entry. Guide restores the last date/Now header control and uses
+programme → Retry → header for initial entry. Scope Down/OK instead uses
+programme → Retry → stay-on-scope, consuming the key while a newly selected
+scope is still resolving. Settings category-list updates do not steal detail
+focus, and removal of the active Simple TV category explicitly restores the
+replacement General category or detail pane according to the pane that owned
+focus.
+
+G10 screenshot review then exposed the same trailing-viewport defect previously
+fixed on Home and the Guide timeline: `ChannelsScreen` applied the shell's end
+inset to the whole screen, leaving a blank strip that clipped the scope row and
+browse content. Channels now keeps the title and non-scrolling status content
+inside both safe edges while its scope and browse viewports retain only the
+leading inset and reach the trailing screen edge. The Guide scope row follows
+the same trailing edge-to-edge rule.
+The non-focusable Channels detail panel still ends at the shell's trailing safe
+inset inside that viewport; edge-to-edge viewport ownership must not make a
+rounded panel look glued to the physical screen edge.
 
 ---
 

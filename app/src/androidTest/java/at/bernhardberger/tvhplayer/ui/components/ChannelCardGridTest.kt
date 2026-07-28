@@ -6,8 +6,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -22,6 +24,7 @@ import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -29,6 +32,39 @@ import org.junit.Test
 class ChannelCardGridTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun browseGridUsesThreeAcrossGuidanceWidth() {
+        var density = 1f
+        composeRule.setContent {
+            density = LocalDensity.current.density
+            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
+            TVHeadendPlayerTheme {
+                ChannelCardGrid(
+                    items = (1..3).map { id ->
+                        ChannelCardModel(
+                            channel = ChannelUi(id, "Channel $id", id, null),
+                            number = id,
+                            programmeTitle = "Programme $id",
+                        )
+                    },
+                    imageLoader = imageLoader,
+                    onFocusChannel = {},
+                    onConfirmChannel = {},
+                    modifier = Modifier.size(900.dp, 300.dp),
+                )
+            }
+        }
+
+        val bounds = (1..3).map { id ->
+            composeRule.onNodeWithTag("channel-card-$id")
+                .assertContentDescriptionEquals("$id Channel $id. Programme $id")
+                .fetchSemanticsNode().boundsInRoot
+        }
+        assertEquals(268f * density, bounds[0].width, 0.5f)
+        assertEquals(20f * density, bounds[1].left - bounds[0].right, 0.5f)
+        assertEquals(20f * density, bounds[2].left - bounds[1].right, 0.5f)
+    }
 
     @Test
     fun progressTrackStopsUsingFocusedColorAfterFocusLeavesTheGrid() {
@@ -48,7 +84,6 @@ class ChannelCardGridTest {
                         imageLoader = imageLoader,
                         onFocusChannel = {},
                         onConfirmChannel = {},
-                        columns = 1,
                         modifier = Modifier.size(300.dp, 240.dp),
                     )
                     Button(
@@ -73,5 +108,10 @@ class ChannelCardGridTest {
             .captureToImage().toPixelMap().let { it[it.width * 3 / 4, it.height / 2] }
 
         assertNotEquals(focusedTrack, unfocusedTrack)
+
+        composeRule.onNodeWithTag("outside-grid").performKeyInput {
+            pressKey(Key.DirectionLeft)
+        }
+        composeRule.onNodeWithTag("channel-card-1").assertIsFocused()
     }
 }

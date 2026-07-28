@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -34,7 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import at.bernhardberger.tvhplayer.ui.components.SettingsSubRail
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
-import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.core.SettingsBackAction
 import at.bernhardberger.tvhplayer.core.settingsBackAction
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
@@ -104,6 +105,7 @@ fun SettingsScreen(
     }
     LaunchedEffect(currentRoute, showSimpleTvSettings) {
         if (currentRoute == SettingsRoutes.SIMPLE_TV && !showSimpleTvSettings) {
+            val restoreContentFocus = contentPaneFocused
             nav.navigate(SettingsRoutes.GENERAL) {
                 popUpTo(nav.graph.id) {
                     inclusive = false
@@ -112,6 +114,13 @@ fun SettingsScreen(
                 launchSingleTop = true
                 restoreState = true
             }
+            withFrameNanos { }
+            val requester = if (restoreContentFocus) {
+                contentFocus.getValue(SettingsRoutes.GENERAL)
+            } else {
+                categoryFocus.getValue(SettingsRoutes.GENERAL)
+            }
+            runCatching { requester.requestFocus() }
         }
     }
     Surface(
@@ -142,10 +151,10 @@ fun SettingsScreen(
                         launchSingleTop = true
                         restoreState = true
                     }
-                }
+                },
             )
 
-            Spacer(Modifier.width(32.dp))
+            Spacer(Modifier.width(TvSpacing32))
 
             Box(
                 Modifier
@@ -155,13 +164,14 @@ fun SettingsScreen(
                     .onKeyEvent { event ->
                         if (
                             event.key != Key.Back ||
-                            event.type != KeyEventType.KeyUp ||
                             !backEnabled ||
                             backAction != SettingsBackAction.FOCUS_CURRENT_CATEGORY
                         ) {
                             return@onKeyEvent false
                         }
-                        focusCurrentCategory()
+                        if (event.type == KeyEventType.KeyUp) {
+                            focusCurrentCategory()
+                        }
                         true
                     }
                     .focusGroup()

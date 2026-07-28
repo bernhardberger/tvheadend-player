@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
@@ -28,14 +30,17 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.models.RailItem
+import at.bernhardberger.tvhplayer.ui.SettingsCategoryPaneWidth
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.screens.SettingsRoutes
 import at.bernhardberger.tvhplayer.ui.TvSettingsPanelAlpha
 
@@ -52,12 +57,13 @@ fun SettingsSubRail(
     val items = rememberSettingsItems(
         showSimpleTv = showSimpleTv,
     )
-    val activeItemFocus = categoryFocusRequesters[currentRoute]
-        ?: categoryFocusRequesters.getValue(items.first().route)
+    val visibleRoutes = items.mapTo(mutableSetOf()) { it.route }
+    val activeRoute = currentRoute?.takeIf(visibleRoutes::contains) ?: items.first().route
+    val activeItemFocus = categoryFocusRequesters.getValue(activeRoute)
 
     // Focus the active category when Settings receives focus from the global
     // drawer. Category changes must not pull focus back out of the content pane.
-    LaunchedEffect(items, initialFocusEnabled) {
+    LaunchedEffect(initialFocusEnabled) {
         if (!initialFocusEnabled) return@LaunchedEffect
         (categoryFocusRequesters[currentRoute]
             ?: categoryFocusRequesters[items.firstOrNull()?.route])?.requestFocus()
@@ -65,23 +71,30 @@ fun SettingsSubRail(
 
     Column(
         modifier = modifier
-            .width(280.dp)
+            .width(SettingsCategoryPaneWidth)
             .fillMaxHeight()
             .clip(MaterialTheme.shapes.medium)
             .background(
                 MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha)
             )
-            .padding(8.dp)
+            .padding(TvSpacing8)
+            .verticalScroll(rememberScrollState())
             .focusRestorer(activeItemFocus)
             .focusGroup(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(TvSpacing8),
     ) {
         items.forEach { item ->
             val contentFocus = contentFocusRequesters.getValue(item.route)
             ListItem(
                 selected = currentRoute == item.route,
                 onClick = { contentFocus.requestFocus() },
-                headlineContent = { Text(item.label) },
+                headlineContent = {
+                    Text(
+                        text = item.label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 leadingContent = { item.icon() },
                 scale = ListItemDefaults.scale(
                     focusedScale = 1f,

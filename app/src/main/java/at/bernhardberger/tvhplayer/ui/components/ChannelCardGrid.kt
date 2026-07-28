@@ -3,14 +3,19 @@ package at.bernhardberger.tvhplayer.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,20 +32,33 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Card
+import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.Glow
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.StandardCardContainer
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.channelInitials
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvhplayer.ui.ChannelCardWidth
+import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
+import at.bernhardberger.tvhplayer.ui.TvCardSpacing
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import coil3.ImageLoader
@@ -69,161 +87,204 @@ fun ChannelCardGrid(
     focusRequesters: Map<Int, FocusRequester> = emptyMap(),
     gridState: LazyGridState = rememberLazyGridState(),
     contentPadding: PaddingValues = PaddingValues(12.dp),
-    columns: Int = 3,
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        state = gridState,
-        contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = modifier
-            .fillMaxSize()
-            .focusGroup(),
-    ) {
-        items(items, key = { it.channel.id }) { item ->
-            var focused by remember(item.channel.id) { mutableStateOf(false) }
-            ChannelCard(
-                item = item,
-                focused = focused,
-                imageLoader = imageLoader,
-                modifier = Modifier
-                    .testTag("channel-card-${item.channel.id}")
-                    .then(
-                        focusRequesters[item.channel.id]?.let { Modifier.focusRequester(it) }
-                            ?: Modifier,
-                    )
-                    .onFocusChanged { focusState ->
-                        focused = focusState.isFocused
-                        if (focusState.isFocused) onFocusChannel(item.channel.id)
-                    },
-                onClick = { onConfirmChannel(item.channel) },
-            )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val layoutDirection = LocalLayoutDirection.current
+        val cardWidth = guidanceCardWidth(
+            availableWidth = maxWidth -
+                contentPadding.calculateStartPadding(layoutDirection) -
+                contentPadding.calculateEndPadding(layoutDirection),
+        )
+        LazyVerticalGrid(
+            columns = GridCells.FixedSize(cardWidth),
+            state = gridState,
+            contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(TvCardSpacing),
+            verticalArrangement = Arrangement.spacedBy(TvCardSpacing),
+            modifier = Modifier
+                .fillMaxSize()
+                .focusGroup()
+                .focusRestorer(),
+        ) {
+            items(items, key = { it.channel.id }) { item ->
+                var focused by remember(item.channel.id) { mutableStateOf(false) }
+                ChannelCard(
+                    item = item,
+                    focused = focused,
+                    imageLoader = imageLoader,
+                    modifier = Modifier.width(cardWidth),
+                    interactiveModifier = Modifier
+                        .testTag("channel-card-${item.channel.id}")
+                        .then(
+                            focusRequesters[item.channel.id]?.let {
+                                Modifier.focusRequester(it)
+                            } ?: Modifier,
+                        )
+                        .onFocusChanged { focusState ->
+                            focused = focusState.isFocused
+                            if (focusState.isFocused) onFocusChannel(item.channel.id)
+                        },
+                    onClick = { onConfirmChannel(item.channel) },
+                )
+            }
         }
     }
 }
 
+private fun guidanceCardWidth(availableWidth: Dp): Dp {
+    val requiredSpacing = TvCardSpacing * 2
+    return if (ChannelCardWidth * 3 + requiredSpacing <= availableWidth) {
+        ChannelCardWidth
+    } else {
+        CompactChannelCardWidth
+    }
+}
+
 @Composable
-fun ChannelCard(
+private fun ChannelCard(
     item: ChannelCardModel,
     focused: Boolean,
     imageLoader: ImageLoader,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    interactiveModifier: Modifier = Modifier,
 ) {
     val initials = remember(item.channel.name) { channelInitials(item.channel.name) }
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        scale = CardDefaults.scale(focusedScale = 1.05f),
-        colors = CardDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-            focusedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
-        ),
-    ) {
-        Column(
-                modifier = Modifier
+    val accessibilityLabel = buildString {
+        item.number?.let {
+            append(it)
+            append(" ")
+        }
+        append(item.channel.name)
+        append(". ")
+        append(item.programmeTitle)
+    }
+    StandardCardContainer(
+        imageCard = { interactionSource ->
+            Card(
+                onClick = onClick,
+                interactionSource = interactionSource,
+                modifier = interactiveModifier
                     .fillMaxWidth()
-                    .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp)
-                    .background(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
-                        shape = MaterialTheme.shapes.small,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (item.channel.icon.isNullOrBlank()) {
-                    Text(
-                        text = initials,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    PiconBox(
-                        imageLoader = imageLoader,
-                        piconPath = item.channel.icon,
-                        modifier = Modifier
-                            .fillMaxWidth(0.7f)
-                            .height(56.dp),
-                    )
-                }
-                // Match ChannelRow: play glyph for the live channel; text only for REC.
-                if (item.playingNow) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = stringResource(R.string.player_on_now),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(22.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                shape = MaterialTheme.shapes.extraSmall,
-                            )
-                            .padding(2.dp),
-                    )
-                } else if (item.recordingNow) {
-                    Text(
-                        text = stringResource(R.string.recordings_recording_now),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TvRecordingColor,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surface,
-                                shape = MaterialTheme.shapes.extraSmall,
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-            }
-            Text(
-                text = buildString {
-                    item.number?.let {
-                        append(it)
-                        append("  ")
-                    }
-                    append(item.channel.name)
-                },
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = item.programmeTitle,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = if (focused) {
-                    MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.86f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-            item.progress?.let { progress ->
-                ProgressStrip(
-                    progress = progress,
-                    trackColor = if (focused) {
-                        MaterialTheme.colorScheme.inverseOnSurface.copy(
+                    .aspectRatio(CardDefaults.HorizontalImageAspectRatio)
+                    .semantics { contentDescription = accessibilityLabel },
+                scale = CardDefaults.scale(focusedScale = 1.05f),
+                glow = CardDefaults.glow(
+                    focusedGlow = Glow(
+                        elevationColor = MaterialTheme.colorScheme.primary.copy(
                             alpha = TvTextDisabledAlpha,
-                        )
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha)
-                    },
+                        ),
+                        elevation = 8.dp,
+                    ),
+                ),
+            ) {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("channel-card-progress-${item.channel.id}"),
-                )
+                        .aspectRatio(CardDefaults.HorizontalImageAspectRatio)
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (item.channel.icon.isNullOrBlank()) {
+                        Text(
+                            text = initials,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        PiconBox(
+                            imageLoader = imageLoader,
+                            piconPath = item.channel.icon,
+                            modifier = Modifier
+                                .fillMaxWidth(0.7f)
+                                .height(56.dp),
+                        )
+                    }
+                    // Match ChannelRow: play glyph for the live channel; text only for REC.
+                    if (item.playingNow) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = stringResource(R.string.player_on_now),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(TvSpacing8)
+                                .size(22.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                )
+                                .padding(TvSpacing4),
+                        )
+                    } else if (item.recordingNow) {
+                        Text(
+                            text = stringResource(R.string.recordings_recording_now),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TvRecordingColor,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(TvSpacing8)
+                                .background(
+                                    MaterialTheme.colorScheme.surface,
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                )
+                                .padding(
+                                    horizontal = TvSpacing8,
+                                    vertical = TvSpacing4,
+                                ),
+                        )
+                    }
+                }
             }
-        }
-    }
+        },
+        title = {
+            Column(modifier = Modifier.padding(top = TvSpacing8)) {
+                Text(
+                    text = buildString {
+                        item.number?.let {
+                            append(it)
+                            append("  ")
+                        }
+                        append(item.channel.name)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = item.programmeTitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (focused) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                item.progress?.let { progress ->
+                    ProgressStrip(
+                        progress = progress,
+                        trackColor = if (focused) {
+                            MaterialTheme.colorScheme.onSurface.copy(
+                                alpha = TvTextDisabledAlpha,
+                            )
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("channel-card-progress-${item.channel.id}"),
+                    )
+                }
+            }
+        },
+        contentColor = CardContainerDefaults.contentColor(
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            focusedContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        modifier = modifier,
+    )
 }

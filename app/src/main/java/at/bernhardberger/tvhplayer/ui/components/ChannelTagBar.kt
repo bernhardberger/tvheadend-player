@@ -1,34 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -38,24 +17,23 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.tv.material3.Button
-import androidx.tv.material3.ButtonDefaults
-import androidx.tv.material3.Icon
-import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
+import androidx.tv.material3.Tab
+import androidx.tv.material3.TabDefaults
+import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.adjacentTagId
 import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
+import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
+import at.bernhardberger.tvhplayer.ui.TvSpacing16
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 
 @Composable
 fun ChannelTagSelector(
@@ -64,207 +42,71 @@ fun ChannelTagSelector(
     onSelectTag: (Int?) -> Unit,
     modifier: Modifier = Modifier,
     allChannelsVisible: Boolean = true,
+    activeFocusRequester: FocusRequester = remember { FocusRequester() },
+    onMoveToContent: () -> Boolean = { false },
 ) {
-    var showChooser by remember { mutableStateOf(false) }
-    val orderedTagIds = buildList<Int?> {
-        if (allChannelsVisible) add(null)
-        addAll(tags.map { it.id })
-    }
-    val activeIndex = orderedTagIds.indexOf(activeTagId).coerceAtLeast(0)
-    val activeName = if (activeTagId == null) {
-        stringResource(R.string.all_channels)
-    } else {
-        tags.firstOrNull { it.id == activeTagId }?.name.orEmpty()
-    }
-    val canMoveLeft = activeIndex > 0
-    val canMoveRight = activeIndex < orderedTagIds.lastIndex
-
-    Button(
-        onClick = { showChooser = true },
-        scale = ButtonDefaults.scale(focusedScale = 1f),
-        modifier = modifier
-            .fillMaxWidth()
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                val direction = when (event.key) {
-                    Key.DirectionLeft -> -1
-                    Key.DirectionRight -> 1
-                    else -> return@onPreviewKeyEvent false
-                }
-                val targetTagId = adjacentTagId(
-                    tags = tags,
-                    activeTagId = activeTagId,
-                    direction = direction,
-                    allChannelsVisible = allChannelsVisible,
-                )
-                if (targetTagId != activeTagId) onSelectTag(targetTagId)
-                true
-            },
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = stringResource(R.string.previous_channel_tag),
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .size(26.dp)
-                    .alpha(if (canMoveLeft) 1f else 0.3f),
-            )
-            Text(
-                text = activeName,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 40.dp),
-            )
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(R.string.next_channel_tag),
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .size(26.dp)
-                    .alpha(if (canMoveRight) 1f else 0.3f),
-            )
+    val allChannelsLabel = stringResource(R.string.all_channels)
+    val scopes = remember(tags, allChannelsVisible, allChannelsLabel) {
+        buildList {
+            if (allChannelsVisible) add(null to allChannelsLabel)
+            addAll(tags.map { it.id to it.name })
         }
     }
+    if (scopes.isEmpty()) return
 
-    if (showChooser) {
-        ChannelTagChooser(
-            tags = tags,
-            activeTagId = activeTagId,
-            allChannelsVisible = allChannelsVisible,
-            onSelectTag = {
-                onSelectTag(it)
-                showChooser = false
+    val activeIndex = scopes.indexOfFirst { it.first == activeTagId }.coerceAtLeast(0)
+    val scheme = MaterialTheme.colorScheme
+    val tabColors = TabDefaults.pillIndicatorTabColors(
+        contentColor = scheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
+        inactiveContentColor = scheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
+        selectedContentColor = scheme.onSurface,
+        focusedContentColor = scheme.inverseOnSurface,
+        focusedSelectedContentColor = scheme.inverseOnSurface,
+        disabledContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
+        disabledInactiveContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
+        disabledSelectedContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
+    )
+    TabRow(
+        selectedTabIndex = activeIndex,
+        modifier = modifier
+            .fillMaxWidth()
+            .focusRestorer(activeFocusRequester)
+            .onPreviewKeyEvent { event ->
+                event.type == KeyEventType.KeyDown &&
+                    event.key == Key.DirectionDown &&
+                    onMoveToContent()
             },
-            onDismiss = { showChooser = false },
-        )
-    }
-}
-
-@Composable
-private fun ChannelTagChooser(
-    tags: List<ChannelTagUi>,
-    activeTagId: Int?,
-    allChannelsVisible: Boolean,
-    onSelectTag: (Int?) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val selectedFocus = remember { FocusRequester() }
-    val activeTagExists = activeTagId != null && tags.any { it.id == activeTagId }
-    val focusTargetTagId = when {
-        activeTagExists -> activeTagId
-        allChannelsVisible -> null
-        else -> tags.firstOrNull()?.id
-    }
-    val selectedIndex = if (focusTargetTagId == null) {
-        0
-    } else {
-        tags.indexOfFirst { it.id == focusTargetTagId }.coerceAtLeast(0) +
-            if (allChannelsVisible) 1 else 0
-    }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
-    LaunchedEffect(focusTargetTagId, tags, allChannelsVisible) {
-        listState.scrollToItem(selectedIndex)
-        withFrameNanos { }
-        selectedFocus.requestFocus()
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.72f))
-                .focusGroup(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Surface(
-                modifier = Modifier.width(620.dp),
-                shape = MaterialTheme.shapes.large,
-                colors = SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
+        scopes.forEachIndexed { index, (tagId, label) ->
+            Tab(
+                selected = index == activeIndex,
+                onFocus = {
+                    if (tagId != activeTagId) onSelectTag(tagId)
+                },
+                onClick = {
+                    if (tagId != activeTagId) onSelectTag(tagId)
+                    onMoveToContent()
+                },
+                colors = tabColors,
+                modifier = if (index == activeIndex) {
+                    Modifier.focusRequester(activeFocusRequester)
+                } else {
+                    Modifier
+                },
             ) {
-                Column(
-                    modifier = Modifier.padding(28.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.choose_channel_tag),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 420.dp)
-                            .focusGroup()
-                            .focusRestorer(selectedFocus),
-                    ) {
-                        if (allChannelsVisible) {
-                            item(key = "all-channels") {
-                                TagChoice(
-                                    text = stringResource(R.string.all_channels),
-                                    selected = activeTagId == null,
-                                    focusTarget = focusTargetTagId == null,
-                                    selectedFocus = selectedFocus,
-                                    onClick = { onSelectTag(null) },
-                                )
-                            }
-                        }
-                        items(tags, key = { it.id }) { tag ->
-                            TagChoice(
-                                text = tag.name,
-                                selected = activeTagId == tag.id,
-                                focusTarget = focusTargetTagId == tag.id,
-                                selectedFocus = selectedFocus,
-                                onClick = { onSelectTag(tag.id) },
-                            )
-                        }
-                    }
-                    OutlinedButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.back))
-                    }
-                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(
+                        horizontal = TvSpacing16,
+                        vertical = TvSpacing8,
+                    ).widthIn(max = CompactChannelCardWidth),
+                )
             }
         }
     }
-}
-
-@Composable
-private fun TagChoice(
-    text: String,
-    selected: Boolean,
-    focusTarget: Boolean,
-    selectedFocus: FocusRequester,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        selected = selected,
-        onClick = onClick,
-        headlineContent = {
-            Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        scale = ListItemDefaults.scale(
-            focusedScale = 1f,
-            focusedSelectedScale = 1f,
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
-            .then(if (focusTarget) Modifier.focusRequester(selectedFocus) else Modifier),
-    )
 }
 
 @Composable

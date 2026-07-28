@@ -1,26 +1,42 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Button
+import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalTestApi::class)
 class ChannelTagSelectorTest {
     @get:Rule
     val composeRule = createComposeRule()
 
     @Test
-    fun chooserSelectsServerTag() {
+    fun tabsCommitServerTagOnFocus() {
         var selectedTagId by mutableStateOf<Int?>(null)
         composeRule.setContent {
             TVHeadendPlayerTheme {
@@ -33,9 +49,83 @@ class ChannelTagSelectorTest {
         }
 
         composeRule.onNodeWithText("All channels").assertIsDisplayed()
-        composeRule.onNodeWithText("All channels").performClick()
-        composeRule.onNodeWithText("News").performClick()
+        composeRule.onNodeWithText("News").assertIsDisplayed()
+        assertEquals(
+            Role.Tab,
+            composeRule.onNodeWithText("News")
+                .fetchSemanticsNode().config[SemanticsProperties.Role],
+        )
+        composeRule.onNodeWithText("All channels").requestFocus()
+        composeRule.onNodeWithText("All channels").performKeyInput {
+            pressKey(Key.DirectionRight)
+        }
+        composeRule.onNodeWithText("News").assertIsFocused()
         composeRule.runOnIdle { assertEquals(7, selectedTagId) }
+    }
+
+    @Test
+    fun lateralEntryRestoresTheActiveTab() {
+        var movedToContent = 0
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                Row {
+                    Button(onClick = {}) { Text("Before scopes") }
+                    ChannelTagSelector(
+                        tags = listOf(ChannelTagUi(id = 7, name = "News", index = 1)),
+                        activeTagId = 7,
+                        onSelectTag = {},
+                        onMoveToContent = {
+                            movedToContent += 1
+                            true
+                        },
+                        modifier = Modifier.width(300.dp),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Before scopes").requestFocus().performKeyInput {
+            pressKey(Key.DirectionRight)
+        }
+        composeRule.onNodeWithText("News").assertIsFocused()
+        composeRule.onNodeWithText("News").performKeyInput {
+            pressKey(Key.DirectionDown)
+        }
+        composeRule.runOnIdle { assertEquals(1, movedToContent) }
+    }
+
+    @Test
+    fun downAndOkMoveFocusToRestoredContent() {
+        lateinit var contentFocus: FocusRequester
+        composeRule.setContent {
+            contentFocus = remember { FocusRequester() }
+            TVHeadendPlayerTheme {
+                Column {
+                    ChannelTagSelector(
+                        tags = listOf(ChannelTagUi(id = 7, name = "News", index = 1)),
+                        activeTagId = 7,
+                        onSelectTag = {},
+                        onMoveToContent = contentFocus::requestFocus,
+                    )
+                    Button(
+                        onClick = {},
+                        modifier = Modifier.focusRequester(contentFocus),
+                    ) {
+                        Text("Restored content")
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("News").requestFocus().performKeyInput {
+            pressKey(Key.DirectionDown)
+        }
+        composeRule.onNodeWithText("Restored content").assertIsFocused()
+
+        composeRule.onNodeWithText("News").requestFocus().performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeRule.onNodeWithText("Restored content").assertIsFocused()
     }
 
     @Test
@@ -51,15 +141,12 @@ class ChannelTagSelectorTest {
             }
         }
 
-        composeRule.onNodeWithText("News").performClick()
-        assertEquals(
-            0,
-            composeRule.onAllNodesWithText("All channels").fetchSemanticsNodes().size,
-        )
+        composeRule.onNodeWithText("News").assertIsDisplayed()
+        composeRule.onNodeWithText("All channels").assertDoesNotExist()
     }
 
     @Test
-    fun chooserFallsBackToFirstVisibleScopeWhenActiveTagDisappears() {
+    fun tabsFallBackToFirstVisibleScopeWhenActiveTagDisappears() {
         var tags by mutableStateOf(
             (1..20).map { id -> ChannelTagUi(id = id, name = "Tag $id", index = id) }
         )
@@ -73,9 +160,8 @@ class ChannelTagSelectorTest {
             }
         }
 
-        composeRule.onNodeWithText("Tag 20").performClick()
-        composeRule.onAllNodesWithText("Tag 20")[1].assertIsFocused()
+        composeRule.onNodeWithText("Tag 20").requestFocus().assertIsFocused()
         composeRule.runOnIdle { tags = tags.dropLast(1) }
-        composeRule.onAllNodesWithText("All channels")[1].assertIsFocused()
+        composeRule.onNodeWithText("All channels").assertIsFocused()
     }
 }

@@ -74,6 +74,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrActionFailure
@@ -82,11 +83,15 @@ import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
+import at.bernhardberger.tvhplayer.core.GuideEntryFocusTarget
+import at.bernhardberger.tvhplayer.core.GuideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
+import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
+import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.nearestProgrammeAt
 import at.bernhardberger.tvhplayer.core.programmeActions
@@ -131,6 +136,11 @@ private const val FRONTIER_STEP_SEC = 3 * 3600L
 private const val CHANNEL_PAGE_SIZE = 6
 private val CHANNEL_HEADER_WIDTH = 190.dp
 private val TIMELINE_ROW_HEIGHT = 76.dp
+
+private enum class GuideHeaderFocus {
+    DATE,
+    NOW,
+}
 
 internal fun guideTimelineContentPadding(
     contentPadding: PaddingValues,
@@ -179,7 +189,12 @@ fun EpgGridScreen(
     val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
     val channelListState = rememberLazyListState()
     val eventFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
-    val guideHeaderFocus = remember { FocusRequester() }
+    val guideDateFocus = remember { FocusRequester() }
+    val guideNowFocus = remember { FocusRequester() }
+    val guideRetryFocus = remember { FocusRequester() }
+    val scopeFocus = remember { FocusRequester() }
+    val scopeCount = channelScope.tags.size + if (channelScope.allChannelsVisible) 1 else 0
+    val hasScopeTabs = scopeCount > 1
 
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
     var nowSec by remember { mutableLongStateOf(openedAtSec) }
@@ -201,6 +216,55 @@ fun EpgGridScreen(
     var frontierAfterSec by remember { mutableStateOf<Long?>(null) }
     var frontierLoading by remember { mutableStateOf(false) }
     var lastPlayedId by remember { mutableStateOf<Int?>(null) }
+    var scopeRowFocused by remember { mutableStateOf(false) }
+    var lastHeaderFocus by remember { mutableStateOf(GuideHeaderFocus.DATE) }
+
+    fun focusGuideHeader(): Boolean = runCatching {
+        when (lastHeaderFocus) {
+            GuideHeaderFocus.DATE -> guideDateFocus.requestFocus()
+            GuideHeaderFocus.NOW -> guideNowFocus.requestFocus()
+        }
+    }.getOrDefault(false)
+
+    fun focusGuideContent(): Boolean {
+        val programmeFocus = selectedTarget?.eventId?.let(eventFocusRequesters::get)
+        val target = guideEntryFocusTarget(
+            hasProgrammeTarget = programmeFocus != null,
+            hasRetryAction = channels.isEmpty() && connectionUiState is ConnectionUiState.Error,
+        )
+        return when (target) {
+            GuideEntryFocusTarget.PROGRAMME -> {
+                runCatching { checkNotNull(programmeFocus).requestFocus() }.getOrDefault(false) ||
+                    focusGuideHeader()
+            }
+            GuideEntryFocusTarget.RETRY -> {
+                runCatching { guideRetryFocus.requestFocus() }.getOrDefault(false) ||
+                    focusGuideHeader()
+            }
+            GuideEntryFocusTarget.HEADER -> focusGuideHeader()
+        }
+    }
+
+    fun leaveGuideScope(): Boolean {
+        val programmeFocus = selectedTarget?.eventId?.let(eventFocusRequesters::get)
+        return when (
+            guideScopeExitFocusTarget(
+                hasProgrammeTarget = programmeFocus != null,
+                hasRetryAction = channels.isEmpty() &&
+                    connectionUiState is ConnectionUiState.Error,
+            )
+        ) {
+            GuideScopeExitFocusTarget.PROGRAMME -> {
+                runCatching { checkNotNull(programmeFocus).requestFocus() }.getOrDefault(false)
+                true
+            }
+            GuideScopeExitFocusTarget.RETRY -> {
+                runCatching { guideRetryFocus.requestFocus() }
+                true
+            }
+            GuideScopeExitFocusTarget.STAY_ON_SCOPE -> true
+        }
+    }
 
     LaunchedEffect(Unit) {
         lastPlayedId = lastPlayedStore.channelId.first()
@@ -278,8 +342,27 @@ fun EpgGridScreen(
         pendingInitialChannelIndex = -1
     }
 
-    LaunchedEffect(selectedTarget, windowStartSec, channels, initialFocusEnabled) {
-        val target = selectedTarget ?: return@LaunchedEffect
+    LaunchedEffect(
+        selectedTarget,
+        windowStartSec,
+        channels,
+        initialFocusEnabled,
+        scopeRowFocused,
+        initialPositionDone,
+        connectionUiState,
+    ) {
+        val target = selectedTarget
+        if (target == null) {
+            if (
+                initialFocusEnabled &&
+                !scopeRowFocused &&
+                (initialPositionDone || channels.isEmpty())
+            ) {
+                withFrameNanos { }
+                focusGuideContent()
+            }
+            return@LaunchedEffect
+        }
         val event = repository.epgForChannel(
             channels.getOrNull(target.channelIndex)?.id ?: return@LaunchedEffect
         ).value.firstOrNull { it.eventId == target.eventId } ?: return@LaunchedEffect
@@ -303,7 +386,7 @@ fun EpgGridScreen(
         if (visibleRows.isNotEmpty() && target.channelIndex !in visibleRows) {
             channelListState.animateScrollToItem(target.channelIndex)
         }
-        if (initialFocusEnabled) {
+        if (initialFocusEnabled && !scopeRowFocused) {
             delay(80)
             eventFocusRequesters[target.eventId]?.let { requester ->
                 runCatching { requester.requestFocus() }
@@ -366,7 +449,11 @@ fun EpgGridScreen(
         )
         when {
             move.focusHeader -> {
-                guideHeaderFocus.requestFocus()
+                if (hasScopeTabs) {
+                    scopeFocus.requestFocus()
+                } else {
+                    focusGuideHeader()
+                }
                 return true
             }
             move.extendTimeFrontier -> {
@@ -443,17 +530,17 @@ fun EpgGridScreen(
                 OutlinedButton(
                     onClick = { showJumpDialog = true },
                     modifier = Modifier
-                        .focusRequester(guideHeaderFocus)
+                        .focusRequester(guideDateFocus)
+                        .onFocusChanged {
+                            if (it.isFocused) lastHeaderFocus = GuideHeaderFocus.DATE
+                        }
                         .onPreviewKeyEvent { event ->
-                            if (
-                                event.type == KeyEventType.KeyDown &&
-                                event.key == Key.DirectionDown &&
-                                selectedTarget != null
-                            ) {
-                                selectedTarget?.eventId
-                                    ?.let(eventFocusRequesters::get)
-                                    ?.requestFocus()
-                                true
+                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                                if (hasScopeTabs) {
+                                    scopeFocus.requestFocus()
+                                } else {
+                                    focusGuideContent()
+                                }
                             } else {
                                 false
                             }
@@ -475,23 +562,51 @@ fun EpgGridScreen(
                             nowSec,
                         )
                     },
+                    modifier = Modifier
+                        .focusRequester(guideNowFocus)
+                        .onFocusChanged {
+                            if (it.isFocused) lastHeaderFocus = GuideHeaderFocus.NOW
+                        }
+                        .onPreviewKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                                if (hasScopeTabs) {
+                                    scopeFocus.requestFocus()
+                                } else {
+                                    focusGuideContent()
+                                }
+                            } else {
+                                false
+                            }
+                        },
                 ) {
                     Text(stringResource(R.string.now))
                 }
-                if (
-                    channelScope.tags.size +
-                    (if (channelScope.allChannelsVisible) 1 else 0) > 1
-                ) {
-                    ChannelTagSelector(
-                        tags = channelScope.tags,
-                        activeTagId = channelScope.activeTagId,
-                        onSelectTag = channelViewModel::selectTag,
-                        allChannelsVisible = channelScope.allChannelsVisible,
-                        modifier = Modifier.width(240.dp),
-                    )
-                }
             }
-            Spacer(Modifier.height(8.dp))
+            if (hasScopeTabs) {
+                Spacer(Modifier.height(TvSpacing8))
+                ChannelTagSelector(
+                    tags = channelScope.tags,
+                    activeTagId = channelScope.activeTagId,
+                    onSelectTag = channelViewModel::selectTag,
+                    allChannelsVisible = channelScope.allChannelsVisible,
+                    activeFocusRequester = scopeFocus,
+                    onMoveToContent = ::leaveGuideScope,
+                    modifier = Modifier
+                        .padding(start = startPadding)
+                        .onFocusChanged { scopeRowFocused = it.hasFocus }
+                        .onPreviewKeyEvent { event ->
+                            if (
+                                event.type == KeyEventType.KeyDown &&
+                                event.key == Key.DirectionUp
+                            ) {
+                                focusGuideHeader()
+                            } else {
+                                false
+                            }
+                        },
+                )
+            }
+            Spacer(Modifier.height(TvSpacing8))
             UnavailableTagNotice(
                 visible = tagNotice,
                 onDismiss = channelViewModel::dismissUnavailableTagNotice,
@@ -504,6 +619,7 @@ fun EpgGridScreen(
                     isEmptyTag = channelScope.activeTagId != null,
                     connectionUiState = connectionUiState,
                     onRetry = onRetry,
+                    retryFocusRequester = guideRetryFocus,
                 )
             } else {
                 TimelineTimeRuler(
@@ -1414,6 +1530,7 @@ private fun GuideEmptyState(
     isEmptyTag: Boolean,
     connectionUiState: ConnectionUiState,
     onRetry: () -> Unit,
+    retryFocusRequester: FocusRequester,
 ) {
     val message = if (isEmptyTag) {
         stringResource(R.string.empty_channel_tag)
@@ -1442,7 +1559,12 @@ private fun GuideEmptyState(
             Text(message, style = MaterialTheme.typography.titleLarge)
             if (connectionUiState is ConnectionUiState.Error) {
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.focusRequester(retryFocusRequester),
+                ) {
+                    Text(stringResource(R.string.retry))
+                }
             }
         }
     }

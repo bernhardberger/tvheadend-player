@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -46,9 +48,11 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
@@ -58,6 +62,7 @@ import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
+import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
@@ -73,6 +78,8 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
@@ -84,6 +91,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+
+internal fun channelsBrowseViewportPadding(
+    contentPadding: PaddingValues,
+    layoutDirection: LayoutDirection,
+): PaddingValues = PaddingValues(
+    start = contentPadding.calculateStartPadding(layoutDirection),
+    end = 0.dp,
+)
+
+internal fun channelsDetailPanePadding(
+    contentPadding: PaddingValues,
+    layoutDirection: LayoutDirection,
+): PaddingValues = PaddingValues(
+    end = contentPadding.calculateEndPadding(layoutDirection),
+)
 
 @Composable
 fun ChannelsScreen(
@@ -99,6 +121,17 @@ fun ChannelsScreen(
     onOpenConnectionSettings: () -> Unit,
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
 ) {
+    val layoutDirection = LocalLayoutDirection.current
+    val startPadding = contentPadding.calculateStartPadding(layoutDirection)
+    val endPadding = contentPadding.calculateEndPadding(layoutDirection)
+    val browseViewportPadding = channelsBrowseViewportPadding(
+        contentPadding = contentPadding,
+        layoutDirection = layoutDirection,
+    )
+    val detailPanePadding = channelsDetailPanePadding(
+        contentPadding = contentPadding,
+        layoutDirection = layoutDirection,
+    )
     val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
@@ -122,6 +155,12 @@ fun ChannelsScreen(
     val focusManager = LocalFocusManager.current
 
     var pageGeneration by remember { mutableIntStateOf(0) }
+
+    fun focusBrowseContent(): Boolean {
+        val id = browsingFocusChannelId(channels, selectedId) ?: return false
+        val requester = rowFocusRequesters[id] ?: return false
+        return runCatching { requester.requestFocus() }.getOrDefault(false)
+    }
 
     fun pageChannels(direction: Int): Boolean {
         val currentIndex = channels.indexOfFirst { it.id == selectedId }
@@ -227,37 +266,49 @@ fun ChannelsScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .padding(contentPadding)
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.channel_list),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f),
+            .padding(
+                top = contentPadding.calculateTopPadding(),
+                bottom = contentPadding.calculateBottomPadding(),
             )
-            if (channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1) {
-                ChannelTagSelector(
-                    tags = channelScope.tags,
-                    activeTagId = channelScope.activeTagId,
-                    onSelectTag = channelViewModel::selectTag,
-                    modifier = Modifier.width(300.dp),
-                    allChannelsVisible = channelScope.allChannelsVisible,
-                )
-            }
+    ) {
+        Text(
+            stringResource(R.string.channel_list),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(start = startPadding, end = endPadding),
+        )
+        if (channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1) {
+            Spacer(Modifier.height(TvSpacing8))
+            ChannelTagSelector(
+                tags = channelScope.tags,
+                activeTagId = channelScope.activeTagId,
+                onSelectTag = channelViewModel::selectTag,
+                onMoveToContent = ::focusBrowseContent,
+                allChannelsVisible = channelScope.allChannelsVisible,
+                modifier = Modifier
+                    .padding(browseViewportPadding)
+                    .fillMaxWidth(),
+            )
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(TvSpacing24))
 
         if (channels.isEmpty()) {
             if (channelScope.allChannels.isNotEmpty() && channelScope.activeTagId != null) {
-                EmptyTagState(Modifier.fillMaxSize())
+                EmptyTagState(
+                    Modifier
+                        .padding(browseViewportPadding)
+                        .fillMaxSize(),
+                )
             } else {
                 EmptyChannelsState(
                     state = connectionUiState,
+                    initialFocusEnabled = initialFocusEnabled,
                     onRetry = onRetryConnection,
                     onOpenSettings = onOpenConnectionSettings,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .padding(browseViewportPadding)
+                        .fillMaxSize(),
                 )
             }
             return@Column
@@ -268,6 +319,7 @@ fun ChannelsScreen(
                 state = connectionUiState,
                 onRetry = onRetryConnection,
                 onOpenSettings = onOpenConnectionSettings,
+                modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
             Spacer(Modifier.height(12.dp))
         }
@@ -282,7 +334,9 @@ fun ChannelsScreen(
                     ),
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .padding(browseViewportPadding)
+                    .fillMaxSize(),
             ) {
                 Column(Modifier.fillMaxSize().padding(8.dp)) {
                     UnavailableTagNotice(
@@ -334,7 +388,11 @@ fun ChannelsScreen(
                 }
             }
         } else {
-            Row(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .padding(browseViewportPadding)
+                    .fillMaxSize(),
+            ) {
                 Surface(
                     tonalElevation = 2.dp,
                     shape = MaterialTheme.shapes.medium,
@@ -421,8 +479,9 @@ fun ChannelsScreen(
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
                     modifier = Modifier
-                        .fillMaxHeight()
                         .weight(0.56f)
+                        .padding(detailPanePadding)
+                        .fillMaxHeight(),
                 ) {
                     EpgDetailPane(
                         channelName = focusedChannel?.name ?: "—",
@@ -462,6 +521,7 @@ private fun EmptyTagState(modifier: Modifier = Modifier) {
 @Composable
 private fun EmptyChannelsState(
     state: ConnectionUiState,
+    initialFocusEnabled: Boolean,
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -472,8 +532,8 @@ private fun EmptyChannelsState(
         state == ConnectionUiState.NeedsConfiguration ||
         state == ConnectionUiState.CredentialUnavailable
 
-    LaunchedEffect(state, hasPrimaryAction) {
-        if (hasPrimaryAction) {
+    LaunchedEffect(state, initialFocusEnabled, hasPrimaryAction) {
+        if (shouldRequestEmptyChannelsAction(initialFocusEnabled, hasPrimaryAction)) {
             withFrameNanos { }
             actionFocus.requestFocus()
         }
@@ -551,6 +611,7 @@ private fun InlineConnectionState(
     state: ConnectionUiState,
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
@@ -558,7 +619,7 @@ private fun InlineConnectionState(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),

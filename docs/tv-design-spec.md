@@ -138,6 +138,10 @@ The shell owns the safe area. Screens do not add their own.
   container insets the viewport and prevents rows from reaching the screen edge.
 - Rows scroll edge to edge. `contentPadding` aligns only the first and last item
   to the safe area; everything between scrolls past it.
+- When an installed TV component such as `TabRow` has no content-padding API,
+  retain the leading safe inset but leave its trailing viewport edge-to-edge;
+  never leave a blank trailing strip that clips a partially visible tab or focus
+  treatment.
 
 `TvScreenPadding`, `TvFullScreenPadding` and `TvPlaybackPadding` are replaced by
 the shell-provided inset. They may survive as the shell's own inputs, not as
@@ -278,13 +282,23 @@ hand-built.
 
 ### 6.4 Category pickers
 
-Use a component; do not assemble one from `ListItem` in a `Column`.
+Use the component and hierarchy appropriate to the scope.
 
-- Persistent left-hand category rail → navigation drawer.
-- Horizontal mode switch → `TabRow`.
+- Horizontal browse scopes use `TabRow` in a dedicated full-width row. Do not
+  squeeze a scrolling tab set into a trailing header slot or hide clipped focus
+  surfaces behind an edge fade.
+- Settings categories are local master-detail navigation, not a second app
+  drawer. Keep one fixed-width, focus-restoring, vertically scrollable column of
+  TV Material `ListItem`s beside the detail pane. Its width must not change when
+  focus crosses between categories and content.
 
-Settings categories and `ChannelTagBar` are currently hand-assembled and must
-adopt one of the two, which also gives them 4.2 for free.
+Channel and Guide scope tabs commit on focus. Down or OK enters the restored
+content item when it is ready. While Guide is still resolving a changed scope,
+the same key is consumed and focus stays on the scope rather than moving backward
+to the header. Guide Up returns to the last-focused date/Now header control, and
+empty/error entry falls back deterministically to Retry or that header. Settings
+category focus previews/commits the category, while Right or OK enters its
+first/last-restored control.
 
 ### 6.5 Navigation drawer
 
@@ -306,8 +320,8 @@ viewport position while preserving its closed width; the trailing edge clips
 rather than remeasuring each destination narrower. The shell passes the safe
 content inset and keeps navigation and content as adjacent planes. Settings
 remains in this global shell, so entering its content collapses the drawer to the
-icon rail instead of removing it; its temporary category rail is replaced in the
-later component slice.
+icon rail instead of removing it. Its local category pane remains fixed and must
+not introduce another collapsing drawer.
 
 ---
 
