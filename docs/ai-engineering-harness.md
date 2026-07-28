@@ -163,9 +163,12 @@ unclassified devices are always rejected. See
 `docs/test-device-credential-provisioning.md` for setup and cleanup.
 
 Test-device screenshots use
-`./tools/device screenshot --confirm-safe-screen`, default to an owner-only PNG
-under `/tmp`, and reject repository output paths. Never run that command while a
-credential or other secret-bearing screen is visible.
+`./tools/device screenshot --confirm-safe-screen --name <descriptive-slug>` and
+default to an owner-only PNG under the ignored workspace path
+`captures/device/<12-char-HEAD>[-dirty]/`. The UTC timestamp and descriptive
+filename keep comparisons identifiable and previewable in OpenCode/OpenChamber;
+repository output paths outside `captures/device/` remain rejected. Never run
+that command while a credential or other secret-bearing screen is visible.
 
 ## Validation
 

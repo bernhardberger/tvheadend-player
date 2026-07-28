@@ -59,16 +59,20 @@ After confirming that no connection, settings, password, or other secret-bearing
 screen is visible, capture the designated test TV with:
 
 ```bash
-./tools/device screenshot --confirm-safe-screen
+./tools/device screenshot --confirm-safe-screen --name channels-trailing-clipping
 ```
 
-The default owner-only output is `/tmp/tvheadend-player-screenshot.png`. Pass
-`--output /tmp/descriptive-name.png` when retaining several comparisons. The
-wrapper requires exact test-device identity, rejects repository output paths,
+The default owner-only output is written beneath the ignored workspace path
+`captures/device/<12-char-HEAD>[-dirty]/` with a UTC timestamp and the sanitized
+`--name` slug. If `--name` is omitted, it falls back to `current-screen`. This
+keeps screenshots previewable in OpenCode/OpenChamber while recording their base
+revision without pretending a dirty working tree exactly matches that commit.
+Pass `--output` only when an exact path is required; repository paths are allowed
+only beneath `captures/device/`. The wrapper requires exact test-device identity,
 validates the PNG, and replaces the output atomically. Use the file-reading tool
-to inspect the resulting image. Screenshots can validate static layout, focus
-appearance, clipping, and text, but cannot establish video visibility or motion
-quality.
+to inspect the printed result path. Screenshots can validate static layout,
+focus appearance, clipping, and text, but cannot establish video visibility or
+motion quality.
 
 ## Test credential provisioning
 

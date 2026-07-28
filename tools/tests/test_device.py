@@ -5,6 +5,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -17,6 +18,8 @@ load_credential_payload = DEVICE["load_credential_payload"]
 resolve_verified_release_apk = DEVICE["resolve_verified_release_apk"]
 capture_screenshot = DEVICE["capture_screenshot"]
 resolve_screenshot_output = DEVICE["resolve_screenshot_output"]
+default_screenshot_output = DEVICE["default_screenshot_output"]
+sanitize_screenshot_name = DEVICE["sanitize_screenshot_name"]
 run = DEVICE["run"]
 read_device_properties = DEVICE["read_device_properties"]
 key_events = DEVICE["KEY_EVENTS"]
@@ -43,7 +46,41 @@ class DevicePolicyTest(unittest.TestCase):
         args = parser.parse_args(["screenshot"])
 
         self.assertFalse(args.confirm_safe_screen)
-        self.assertEqual(args.output, DEVICE["DEFAULT_SCREENSHOT"])
+        self.assertIsNone(args.output)
+        self.assertEqual(args.name, "current-screen")
+
+    def test_default_screenshot_uses_revision_dirty_state_timestamp_and_name(self) -> None:
+        output = default_screenshot_output(
+            "Channels trailing clipping",
+            revision="b5856e7abcde",
+            dirty=True,
+            now=datetime(2026, 7, 28, 21, 15, 30, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(
+            output,
+            ROOT
+            / "captures/device/b5856e7abcde-dirty"
+            / "20260728T211530Z-channels-trailing-clipping.png",
+        )
+        self.assertEqual(
+            default_screenshot_output(
+                "Guide scope tabs",
+                revision="b5856e7abcde",
+                dirty=False,
+                now=datetime(2026, 7, 28, 21, 16, 2, tzinfo=timezone.utc),
+            ),
+            ROOT
+            / "captures/device/b5856e7abcde"
+            / "20260728T211602Z-guide-scope-tabs.png",
+        )
+
+    def test_screenshot_name_is_safe_and_has_a_useful_fallback(self) -> None:
+        self.assertEqual(
+            sanitize_screenshot_name("  Guide / scope tabs?!  "),
+            "guide-scope-tabs",
+        )
+        self.assertEqual(sanitize_screenshot_name("---"), "current-screen")
 
     def test_production_and_unclassified_devices_reject_mutation(self) -> None:
         for role in ("production", "unclassified"):
@@ -315,7 +352,7 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertNotIn("super-secret", output)
         self.assertIn("redacted", output)
 
-    def test_screenshot_output_must_be_png_outside_repository(self) -> None:
+    def test_screenshot_output_allows_only_the_ignored_capture_tree_in_repository(self) -> None:
         with self.assertRaisesRegex(SystemExit, "2"):
             resolve_screenshot_output(ROOT / "screenshot.png")
         with self.assertRaisesRegex(SystemExit, "2"):
@@ -324,6 +361,18 @@ class DevicePolicyTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "screen.png"
             self.assertEqual(resolve_screenshot_output(output), output.resolve())
+
+            project_root = Path(directory) / "project"
+            capture_root = project_root / "captures/device"
+            capture = capture_root / "b5856e7abcde-dirty/screen.png"
+            with patch.dict(
+                resolve_screenshot_output.__globals__,
+                {"ROOT": project_root, "CAPTURE_ROOT": capture_root},
+            ):
+                self.assertEqual(resolve_screenshot_output(capture), capture.resolve())
+            self.assertEqual(stat.S_IMODE((project_root / "captures").stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE(capture_root.stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE(capture.parent.stat().st_mode), 0o700)
 
     def test_screenshot_is_validated_and_written_owner_only(self) -> None:
         png = b"\x89PNG\r\n\x1a\ncontent"
