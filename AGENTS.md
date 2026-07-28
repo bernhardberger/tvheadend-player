@@ -112,6 +112,10 @@ second competing theme or move focusable controls back to mobile Material.
   automatically for bounded read-only research or review. Child agents must not
   delegate again. Spawning the writing-capable `general` agent requires user
   approval and an explicit scope with exclusive file ownership.
+- Every `tv-ux-reviewer` assignment must name exact current-evidence paths or be
+  labeled source-only with a bounded UI-change scope. Repository screenshots and
+  handoffs are historical by default; never ask the reviewer to discover which
+  artifacts are current.
 - Read-only child sessions may run in parallel. Do not run parallel writers in
   the same dirty worktree, or concurrent Gradle builds, device operations, Git
   mutations, signing, publishing, or release operations.

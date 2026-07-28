@@ -64,6 +64,30 @@ REQUIRED_TV_UX_SECTIONS = {
     ".opencode/agents/android-reviewer.md": "## TV UX review gates",
     ".opencode/agents/tv-ux-reviewer.md": "## UX review method",
 }
+REQUIRED_TV_UX_EVIDENCE_RULES = {
+    "AGENTS.md": (
+        "Every `tv-ux-reviewer` assignment must name exact current-evidence paths",
+        "Repository screenshots and handoffs are historical by default",
+    ),
+    ".opencode/agents/android-tv.md": (
+        "When delegating to `tv-ux-reviewer`, name every current evidence path explicitly",
+        "Never ask the reviewer to discover which repository screenshots or handoffs are current",
+    ),
+    ".opencode/agents/repo-maintainer.md": (
+        "When delegating to `tv-ux-reviewer`, name every current evidence path explicitly",
+        "Never ask the reviewer to discover which repository screenshots or handoffs are current",
+    ),
+    ".opencode/agents/tv-ux-reviewer.md": (
+        "Never glob, list, or search the repository for candidate screenshots, images",
+        "Treat every repository screenshot, image, and handoff as historical unless the",
+        "When no current visual evidence is supplied, perform a source-only interaction",
+    ),
+    ".opencode/commands/tv-ux-review.md": (
+        "Use `$ARGUMENTS` as the complete evidence allowlist and review scope",
+        "Never glob, list, or search the repository for additional visual evidence",
+        "For a source-only UI-change review, skip the visual pass",
+    ),
+}
 REQUIRED_PRIMARY_AGENTS = {"android-tv", "repo-maintainer"}
 READ_ONLY_CHILD_AGENTS = {
     "quick-explore",
@@ -270,10 +294,26 @@ def main() -> int:
         if path.is_file() and frontmatter_permission(path, "task") != "deny":
             errors.append(f"{path.relative_to(ROOT)}: must retain task: deny")
 
+    tv_ux_reviewer_path = ROOT / ".opencode/agents/tv-ux-reviewer.md"
+    if (
+        tv_ux_reviewer_path.is_file()
+        and frontmatter_permission(tv_ux_reviewer_path, "glob") != "deny"
+    ):
+        errors.append(
+            ".opencode/agents/tv-ux-reviewer.md: must deny Glob-based evidence discovery"
+        )
+
     for relative, heading in REQUIRED_TV_UX_SECTIONS.items():
         text = (ROOT / relative).read_text(encoding="utf-8")
         if heading not in text:
             errors.append(f"{relative}: missing required section {heading!r}")
+
+    for relative, snippets in REQUIRED_TV_UX_EVIDENCE_RULES.items():
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        normalized_text = " ".join(text.split())
+        for snippet in snippets:
+            if " ".join(snippet.split()) not in normalized_text:
+                errors.append(f"{relative}: missing TV UX evidence rule {snippet!r}")
 
     for path in sorted((ROOT / ".opencode/commands").glob("*.md")):
         metadata = frontmatter(path)
@@ -518,6 +558,14 @@ def main() -> int:
                     tools.get(name) is not False for name in ("bash", "webfetch")
                 ):
                     errors.append("resolved explore agent must remain repository-only")
+
+            tv_ux_reviewer = resolved_agent_details.get("tv-ux-reviewer")
+            if tv_ux_reviewer and effective_permission(
+                tv_ux_reviewer, "glob", "**/*.{png,jpg,jpeg,webp}"
+            ) != "deny":
+                errors.append(
+                    "resolved tv-ux-reviewer must deny Glob-based evidence discovery"
+                )
 
             discovered, skill_error = run_json_command(
                 [opencode, "debug", "skill", "--pure"], environment

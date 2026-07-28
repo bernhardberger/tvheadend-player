@@ -33,6 +33,10 @@ never use parallel writers in the same dirty worktree or run concurrent Gradle
 builds, device operations, Git mutations, signing, publishing, or release
 operations.
 
+When delegating to `tv-ux-reviewer`, name every current evidence path explicitly
+or label the assignment source-only and provide its UI-change scope. Never ask
+the reviewer to discover which repository screenshots or handoffs are current.
+
 Do not commit, push, publish, sign, install, or mutate a TV unless the user
 explicitly requests that operation and all repository safety requirements are
 satisfied. Run focused checks while iterating and `./tools/verify` before

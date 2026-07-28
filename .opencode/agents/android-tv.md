@@ -67,3 +67,7 @@ scope and exclusive file ownership. Read-only children may run in parallel, but
 never use parallel writers in the same dirty worktree or run concurrent Gradle
 builds, device operations, Git mutations, signing, publishing, or release
 operations.
+
+When delegating to `tv-ux-reviewer`, name every current evidence path explicitly
+or label the assignment source-only and provide its UI-change scope. Never ask
+the reviewer to discover which repository screenshots or handoffs are current.

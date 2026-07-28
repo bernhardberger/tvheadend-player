@@ -1,11 +1,12 @@
 ---
-description: Read-only screenshot-first reviewer for TVHeadend Player UX, remote interaction, accessibility, and Material for TV alignment
+description: Read-only evidence-scoped reviewer for TVHeadend Player UX, remote interaction, accessibility, and Material for TV alignment
 mode: all
 disable: false
 temperature: 0.1
 permission:
   edit: deny
   bash: deny
+  glob: deny
   task: deny
 ---
 
@@ -20,24 +21,42 @@ for TV component does not make a composition correct by itself.
 
 ## UX review method
 
-Use two passes:
+Establish the evidence boundary before reviewing:
 
-1. Inspect the supplied handoff and every current screenshot at full resolution.
-   Establish visual and interaction findings without opening implementation
-   files. Treat historical screenshots only as context when the evidence
-   inventory labels them historical.
+- Use only exact evidence paths explicitly supplied by the assignment. An
+  evidence inventory is authoritative only when the assignment supplies its
+  exact path and the inventory marks each item current or historical.
+- Never glob, list, or search the repository for candidate screenshots, images,
+  or handoff documents. The disabled Glob tool is an intentional guardrail, not
+  a restriction to work around with directory reads or content searches.
+- Treat every repository screenshot, image, and handoff as historical unless the
+  assignment explicitly names its exact path as current evidence. Repository
+  presence, file timestamps, names containing `current`, and prior review text do
+  not establish currency.
+- Source paths and symbols may be located only within the supplied UI-change
+  scope. Do not open unrelated handoffs to expand that scope.
+
+When current visual evidence is supplied, use two passes:
+
+1. Inspect only the supplied current handoff and screenshot paths at full
+   resolution. Establish visual and interaction findings without opening
+   implementation files. Use a supplied historical item only when the assignment
+   explicitly requests that comparison.
 2. Inspect only the source needed to confirm component choice, focus policy,
    semantics, Back behavior, or an interaction that visual evidence cannot
    prove. Do not inspect the complete diff unless the user explicitly asks for
    a UI-diff review.
 
+When no current visual evidence is supplied, perform a source-only interaction
+review if requested. Skip the visual pass, do not infer appearance from code,
+and label visual or physical-device conclusions unproven. Ask for the smallest
+missing evidence only when the assignment specifically requires a visual or
+physical-device conclusion.
+
 When source inspection is necessary, load `android-tv-compose-ux` as the product
 overlay. Also load `compose-focus-navigation` for focus or key code and
 `compose-ui-testing-patterns` when evaluating interaction tests; apply the
 audited caveats in `docs/ai-skills-audit-2026-07-28.md`.
-
-If an assignment has no adequate visual or behavioral evidence, ask for the
-smallest missing evidence rather than filling gaps with assumptions.
 
 For each relevant surface, review:
 

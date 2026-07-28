@@ -20,7 +20,7 @@ project instructions, agents, skills, and commands.
 | `.opencode/agents/android-tv.md` | Default implementation agent |
 | `.opencode/agents/repo-maintainer.md` | Repository harness, tooling, CI, documentation, licensing, and release-policy maintainer |
 | `.opencode/agents/android-reviewer.md` | Directly selectable read-only review agent |
-| `.opencode/agents/tv-ux-reviewer.md` | Screenshot-first product UX and Material for TV reviewer |
+| `.opencode/agents/tv-ux-reviewer.md` | Evidence-scoped product UX and Material for TV reviewer |
 | `.opencode/agents/quick-explore.md` | Read-only exact lookup child that escalates ambiguous or consequential investigation |
 | `.opencode/agents/scout.md` | Read-only repository and external-documentation research child |
 | `.agents/skills/` | Reviewed, project-local Kotlin and Compose skills imported from `chrisbanes/skills` |
@@ -62,6 +62,15 @@ independent review. `general` requires user approval; after approval, every
 writing assignment needs an explicit scope and exclusive file ownership. Every
 permitted child has an effective `task: deny`, so recursive spawning remains
 prohibited.
+
+TV UX evidence is allowlisted by the assignment. A delegation must name each
+exact current screenshot, handoff, or evidence-inventory path, or identify the
+work as a source-only interaction review with a bounded UI-change scope. Tracked
+screenshots and handoffs are historical by default. The reviewer cannot use Glob
+and must not replace it with directory listings or repository searches to invent
+a current evidence set. Without supplied visual evidence it skips the visual pass
+and requests more evidence only when the requested conclusion actually requires
+visual or physical-TV proof.
 
 Parallel read-only exploration and research are allowed. Parallel writers must
 not modify the same dirty worktree, and agents must not run concurrent Gradle
