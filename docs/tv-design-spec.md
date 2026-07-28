@@ -149,14 +149,14 @@ things screens import.
 
 ### 4.1 Indication
 
-The guidance offers four indications — scale, border, glow, colour — and expects
-a mix chosen per context. The app currently uses colour alone at fourteen sites
-and has no `Border` or `Glow` anywhere. Per container class:
+The guidance offers four indications — scale, border, glow, and colour — that
+can be mixed by context. It does not require multiple simultaneous indications.
+Use the smallest treatment that remains unmistakable at ten feet:
 
 | Container | Scale | Border | Glow | Colour | Room the container must reserve |
 |---|---|---|---|---|---|
 | Card in a lazy row or grid | 1.05 | — | yes | — | 8dp `contentPadding` on the cross axis |
-| List row in a lazy column | — | 2dp | — | yes | none — the border draws inside bounds |
+| List row in a lazy column | — | — | — | strong focused container | none |
 | Drawer / rail item | — | — | — | yes + active indicator | none |
 | Tab | — | — | — | pill | none |
 | Player icon button | 1.10 | — | — | yes | 4dp inset from the safe edge |
@@ -166,8 +166,11 @@ and has no `Border` or `Glow` anywhere. Per container class:
 it. Never raise a scale without checking the container reserves for it — the
 prior review already reported focused cards clipping at a container edge.
 
-Rows get a border rather than scale deliberately: it fixes the colour-only
-problem without reintroducing clipping inside a `LazyColumn`.
+List rows deliberately stay unscaled to avoid clipping. Their high-contrast
+focused container is sufficient and matches the official JetStream Profile
+pattern (`focusedScale = 1f` plus `inverseSurface`); do not add a redundant
+outline merely to combine indication types. A subtle colour-only change would
+still be unacceptable.
 
 ### 4.2 Entry
 

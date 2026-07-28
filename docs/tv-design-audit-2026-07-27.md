@@ -172,6 +172,15 @@ what makes it worth writing first.
 
 **Severity:** High · **Code-confirmed**
 
+**Implementation correction, 2026-07-28:** the inventory below is accurate, but
+the original conclusion overreached. Official guidance offers focus techniques;
+it does not require stacking more than one. The official JetStream Profile uses
+`focusedScale = 1f` with an `inverseSurface` focused-container colour and no
+border. A 2dp cyan row border was implemented, verified locally, and rejected in
+direct G10 review as redundant and excessive. Strong high-contrast colour is a
+valid row indication; only a subtle or ambiguous colour-only change violates the
+product requirement.
+
 Android's TV focus-system guidance documents scale as one of four focus
 indications, with 1.025, 1.05 and 1.1x as the default values. The app:
 
@@ -184,7 +193,7 @@ indications, with 1.025, 1.05 and 1.1x as the default values. The app:
 **Scale is not the finding, and an earlier draft over-weighted it.** The guidance
 lists four indications — scale, border, glow, colour — and says to "mix and match
 these properties to achieve different effects for different contexts". Disabling
-scale is a legitimate choice. The defect is what replaces it:
+scale is a legitimate choice. The code inventory was:
 
 | Indication | Sites in `ui/` |
 |---|---|
@@ -194,12 +203,10 @@ scale is a legitimate choice. The defect is what replaces it:
 | Colour | everywhere |
 
 There is no `Border` or `Glow` anywhere in the UI — the single `.border` call in
-`RecordingStatusIndicator.kt:41` is an unrelated recording dot. So at all 14
-sites, focus is carried by **container colour alone**, which is exactly what
-AGENTS.md forbids: "subtle color-only state are not acceptable TV interactions."
-
-Restated: the app uses one of the four available focus indications, uniformly,
-and the guidance expects a mix chosen per context.
+`RecordingStatusIndicator.kt:41` is an unrelated recording dot. At the 14 sites,
+focus is carried by container colour. That fact alone is not a defect: the
+relevant requirement prohibits **subtle** colour-only state, while these list
+items use TV Material's high-contrast inverse focused container.
 
 **This finding must not become a slice that sets `focusedScale = 1.05f` in 14
 places.** Several `1f` settings are load-bearing: scale inside a `LazyColumn` or
@@ -212,11 +219,11 @@ already-reported bug.
 only meaningful together with the room its overflow needs, computed from the
 element's own size.
 
-**Remedy:** a focus-indication contract that names, per container class, which of
-scale / border / glow / colour applies **and** the inset the container must
-reserve. Apply it only where the container already reserves room; everything else
-is blocked on device measurement.
-**Needs the TV:** the actual clipping behaviour per list.
+**Remedy:** keep a focus-indication contract per container class and the overflow
+reservation required by any scale. Do not infer that every class needs multiple
+indications. Validate that the chosen treatment is unmistakable on the TV and add
+another indication only when the existing one is genuinely insufficient.
+**Needs the TV:** viewing-distance clarity and clipping for scaled containers.
 
 ## D4 — TV Material's card containers are unused
 

@@ -177,19 +177,23 @@ nearest and silently switches the screen out of Archive.
 
 ### Slice 7 — Focus indication
 
-Files: the 14 `focusedScale = 1f` sites; `ui/TvLayout.kt`.
+Files: review the 14 `focusedScale = 1f` sites; change code only where focus is
+not unmistakable on the G10.
 
-Spec 4.1. Apply the per-container table. Rows get a **2dp border**, not scale —
-that fixes colour-only indication without reintroducing clipping inside a
-`LazyColumn`.
+Spec 4.1. Apply the per-container table. List rows keep `focusedScale = 1f` and
+use the strong focused-container colour supplied by TV Material. Do not add a
+border merely because scale is disabled: official JetStream Profile list items
+use the same no-scale, inverse-surface pattern, and direct G10 review found the
+additional cyan outline excessive.
 
 **Do not raise a scale anywhere the container does not already reserve room for
 the overflow.** The prior review reported focused cards clipping at a container
 edge. Where the room is not there, leave the site alone and list it as blocked on
 the device measurement below.
 
-**Device check, required, per container:** measure focused overflow on the G10 and
-record it. This slice cannot be completed from a build alone.
+**Device check, required, per container:** confirm that focus remains obvious at
+viewing distance and that any scaled container keeps its overflow visible. This
+slice cannot be completed from a build alone.
 
 ### Slice 8 — One recording red
 
@@ -274,9 +278,9 @@ What the captures establish:
 - The collapsed rail and browse content have a visible boundary in the capture.
   The expanded drawer is unmistakably modal: it overlays a fixed viewport and
   scrims the content. It still has no top-section product mark.
-- The captured Channels and Recordings rows use colour alone for focus. No scaled
-  lazy-list row was observed, so these captures support the planned inner border
-  rather than supplying evidence to re-enable row scale.
+- The captured Channels and Recordings rows use a strong focused-container colour
+  with no row scale. A later direct G10 check rejected the proposed inner border
+  as redundant and excessive; the captures do not justify adding one.
 - The Recordings capture reproduces the wrapped-title anchor drift: leading
   artwork, headline and trailing date do not retain one shared top anchor.
 - Ambient progress strips still show the mobile indicator's terminal stop mark,
@@ -328,6 +332,16 @@ The player timeline now reserves product orange `#FA7F00` for playback position.
 Direct G10 review confirmed that the orange seekbar remains clearly readable over
 live video behind the bottom scrim and stays distinct from the white live-edge
 marker and focused thumb. The production G08 was not targeted or modified.
+
+## Slice 7 validation — 2026-07-28
+
+An initial 2dp cyan border implementation passed local verification and did not
+clip on Channels rows, but direct G10 review found it visually redundant and
+excessive beside TV Material's strong focused-container colour. The implementation
+was removed. Official JetStream Profile list items independently use
+`focusedScale = 1f` with `inverseSurface` focus colour and no border. The accepted
+row contract therefore retains the existing high-contrast colour transition with
+no scale or outline; scaled cards remain governed by their reserved overflow.
 
 **Check `adb devices -l` before every hardware run.** The production G08 has been
 observed connected on two transports at once, left over from a deployment. That
