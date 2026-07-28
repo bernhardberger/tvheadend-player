@@ -8,6 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,6 +24,7 @@ import org.koin.compose.koinInject
 
 @Composable
 fun SettingsChannelTags(
+    initialFocusRequester: FocusRequester,
     repository: TvhRepository = koinInject(),
     settingsStore: ChannelTagSettingsStore = koinInject(),
 ) {
@@ -56,7 +59,8 @@ fun SettingsChannelTags(
             },
             modifier = Modifier
                 .width(640.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .focusRequester(initialFocusRequester),
         )
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
             items(tags, key = { it.id }) { tag ->

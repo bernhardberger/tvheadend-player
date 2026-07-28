@@ -31,7 +31,7 @@ const val TvBrowsePanelAlpha = 0.84f
 const val TvEpgPanelAlpha = 0.88f
 const val TvSettingsPanelAlpha = 0.90f
 
-/** Asymmetric padding for content that sits beside the collapsed global rail. */
+/** Browse safe-area input owned and passed down by the global navigation shell. */
 val TvScreenPadding = PaddingValues(
     start = 24.dp,
     top = 32.dp,

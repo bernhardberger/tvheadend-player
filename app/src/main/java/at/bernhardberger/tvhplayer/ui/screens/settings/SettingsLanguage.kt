@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.os.LocaleListCompat
@@ -20,7 +22,7 @@ import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 
 @Composable
-fun SettingsLanguage() {
+fun SettingsLanguage(initialFocusRequester: FocusRequester) {
     val selected = AppLanguage.fromLanguageTags(
         AppCompatDelegate.getApplicationLocales().toLanguageTags()
     )
@@ -37,7 +39,7 @@ fun SettingsLanguage() {
                 .focusGroup(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            options.forEach { (language, label) ->
+            options.forEachIndexed { index, (language, label) ->
                 val onClick = {
                     if (language != selected) {
                         AppCompatDelegate.setApplicationLocales(
@@ -59,7 +61,15 @@ fun SettingsLanguage() {
                         focusedScale = 1f,
                         focusedSelectedScale = 1f,
                     ),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (index == 0) {
+                                Modifier.focusRequester(initialFocusRequester)
+                            } else {
+                                Modifier
+                            }
+                        ),
                 )
             }
         }

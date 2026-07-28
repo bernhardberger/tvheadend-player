@@ -24,6 +24,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -44,6 +46,7 @@ import org.koin.compose.koinInject
 
 @Composable
 fun SettingsConnection(
+    initialFocusRequester: FocusRequester,
     settingsStore: ServerSettingsStore = koinInject(),
     passwordStore: SecurePasswordStore = koinInject(),
     connectionProbe: HtspConnectionProbe = koinInject(),
@@ -97,7 +100,8 @@ fun SettingsConnection(
                     host = it
                     probeState = ConnectionProbeUiState.Idle
                 },
-                label = { Text(stringResource(R.string.host)) }
+                label = { Text(stringResource(R.string.host)) },
+                modifier = Modifier.focusRequester(initialFocusRequester),
             )
 
             Spacer(Modifier.height(12.dp))

@@ -128,6 +128,57 @@ class RecordingsScreenTest {
     }
 
     @Test
+    fun backUnwindsPreviewFolderAndDetailsBeforeLeavingRecordings() {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 7,
+                        "channelId" to 1,
+                        "start" to 100L,
+                        "stop" to 200L,
+                        "title" to "Evening News",
+                        "state" to "completed",
+                        "files" to listOf(mapOf("filename" to "News/evening-news.ts")),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme { RecordingsScreen(repository = repository) }
+        }
+
+        composeRule.onNodeWithTag("recordings-folder-News")
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("folder-preview-recording-7")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.Back) }
+        composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused().performClick()
+        composeRule.onNodeWithTag("recording-list-entry-7")
+            .assertIsFocused()
+            .performClick()
+        composeRule.onNodeWithTag("recording-details-panel").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Play")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.Back) }
+        composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
+        composeRule.onNodeWithTag("recording-list-entry-7")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.Back) }
+        composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused()
+    }
+
+    @Test
     fun browserLocationAndFocusSurviveLeavingAndReturningToTheScreen() {
         val repository = DvrRepository(
             htsp = HtspService(Dispatchers.Unconfined),

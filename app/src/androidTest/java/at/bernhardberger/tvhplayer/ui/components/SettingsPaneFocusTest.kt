@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
@@ -28,12 +31,31 @@ class SettingsPaneFocusTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun rightFromPlayerCategoryEntersFirstSettingBeforeNestedProfileGroup() {
+    fun okFromPlayerCategoryEntersFirstSettingBeforeNestedProfileGroup() {
         composeTestRule.setContent {
+            val contentFocus = remember { FocusRequester() }
+            val contentFocusRequesters = remember {
+                listOf(
+                    SettingsRoutes.GENERAL,
+                    SettingsRoutes.OPTIONS,
+                    SettingsRoutes.CHANNEL_TAGS,
+                    SettingsRoutes.CONNECTION,
+                    SettingsRoutes.PLAYER,
+                    SettingsRoutes.APPLIANCE,
+                    SettingsRoutes.SIMPLE_TV,
+                ).associateWith { route ->
+                    if (route == SettingsRoutes.PLAYER) contentFocus else FocusRequester()
+                }
+            }
+            val categoryFocusRequesters = remember {
+                contentFocusRequesters.keys.associateWith { FocusRequester() }
+            }
             TVHeadendPlayerTheme {
                 Row(Modifier.fillMaxSize()) {
                     SettingsSubRail(
                         currentRoute = SettingsRoutes.PLAYER,
+                        categoryFocusRequesters = categoryFocusRequesters,
+                        contentFocusRequesters = contentFocusRequesters,
                         onNavigate = {},
                     )
                     Spacer(Modifier.width(32.dp))
@@ -42,6 +64,7 @@ class SettingsPaneFocusTest {
                             label = "Timeshift",
                             checked = false,
                             onClick = {},
+                            modifier = Modifier.focusRequester(contentFocus),
                         )
                         Column(Modifier.focusGroup()) {
                             ListItem(
@@ -60,6 +83,14 @@ class SettingsPaneFocusTest {
             }
         }
 
+        composeTestRule.onNodeWithText("Player").assertIsFocused()
+        composeTestRule.onNodeWithText("Player").performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
+        composeTestRule.onNodeWithText("Timeshift").performKeyInput {
+            pressKey(Key.DirectionLeft)
+        }
         composeTestRule.onNodeWithText("Player").assertIsFocused()
         composeTestRule.onNodeWithText("Player").performKeyInput {
             pressKey(Key.DirectionRight)

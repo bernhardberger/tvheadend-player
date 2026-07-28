@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +24,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -41,7 +44,6 @@ import at.bernhardberger.tvhplayer.core.HomeRowKind
 import at.bernhardberger.tvhplayer.core.HomeSlideKind
 import at.bernhardberger.tvhplayer.core.homeInitialFocusTarget
 import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.HomeHeroCarousel
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeCard
@@ -53,6 +55,8 @@ import org.koin.core.parameter.parametersOf
 
 @Composable
 fun HomeScreen(
+    contentPadding: PaddingValues = PaddingValues(),
+    initialFocusEnabled: Boolean = true,
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onPlayChannel: (channelId: Int, serviceId: Int, name: String) -> Unit,
@@ -68,6 +72,8 @@ fun HomeScreen(
     }
     val model by homeVm.dashboard.collectAsStateWithLifecycle()
     HomeDashboard(
+        contentPadding = contentPadding,
+        initialFocusEnabled = initialFocusEnabled,
         model = model,
         connectionUiState = connectionUiState,
         imageLoader = imageLoader,
@@ -84,6 +90,8 @@ fun HomeScreen(
  */
 @Composable
 fun HomeDashboard(
+    contentPadding: PaddingValues = PaddingValues(),
+    initialFocusEnabled: Boolean = true,
     model: HomeDashboardModel,
     connectionUiState: ConnectionUiState,
     imageLoader: ImageLoader,
@@ -93,13 +101,21 @@ fun HomeDashboard(
     onOpenRecordings: () -> Unit,
     onOpenChannels: () -> Unit,
 ) {
+    val layoutDirection = LocalLayoutDirection.current
+    val startPadding = contentPadding.calculateStartPadding(layoutDirection)
+    val endPadding = contentPadding.calculateEndPadding(layoutDirection)
+    val horizontalContentModifier = Modifier.padding(
+        start = startPadding,
+        end = endPadding,
+    )
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val initialFocus = remember { FocusRequester() }
     val initialFocusTarget = remember(model) { homeInitialFocusTarget(model) }
     // Per-target latch with bounded frame retries until the requester is attached.
     var claimedTarget by remember { mutableStateOf<HomeFocusTarget?>(null) }
-    LaunchedEffect(initialFocusTarget) {
+    LaunchedEffect(initialFocusTarget, initialFocusEnabled) {
+        if (!initialFocusEnabled) return@LaunchedEffect
         if (claimedTarget == initialFocusTarget) return@LaunchedEffect
         repeat(5) {
             if (runCatching { initialFocus.requestFocus() }.isSuccess) {
@@ -121,17 +137,18 @@ fun HomeDashboard(
     ) {
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(TvScreenPadding),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = contentPadding.calculateTopPadding() + 8.dp,
+                bottom = contentPadding.calculateBottomPadding() + 32.dp,
+            ),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             item {
                 Text(
                     text = stringResource(R.string.nav_home),
                     style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.semantics { heading() },
+                    modifier = horizontalContentModifier.semantics { heading() },
                 )
             }
 
@@ -142,11 +159,12 @@ fun HomeDashboard(
                     // the identity disappears exactly when OK is about to be pressed.
                     // Whenever the hero holds focus, show all of it.
                     HomeHeroCarousel(
-                        modifier = Modifier.onFocusChanged { state ->
-                            if (state.hasFocus) {
-                                scope.launch { listState.animateScrollToItem(0) }
-                            }
-                        },
+                        modifier = horizontalContentModifier
+                            .onFocusChanged { state ->
+                                if (state.hasFocus) {
+                                    scope.launch { listState.animateScrollToItem(0) }
+                                }
+                            },
                         slides = model.hero,
                         imageLoader = imageLoader,
                         primaryActionFocusRequester = if (
@@ -188,10 +206,16 @@ fun HomeDashboard(
                                 HomeRowKind.SCHEDULED -> R.string.home_upcoming_recordings
                             },
                         ),
+                        modifier = horizontalContentModifier,
                     )
                     LazyRow(
                         // 8 dp absorbs 1.06 focused scale (~5.3 dp overflow) without clipping.
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(
+                            start = startPadding + 8.dp,
+                            top = 8.dp,
+                            end = endPadding + 8.dp,
+                            bottom = 8.dp,
+                        ),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier
                             .focusRestorer()
@@ -240,6 +264,7 @@ fun HomeDashboard(
                     ActionsTemplate(
                         title = title,
                         modifier = Modifier
+                            .then(horizontalContentModifier)
                             .padding(top = 24.dp)
                             .testTag("home-empty-state"),
                         actions = {
@@ -268,11 +293,14 @@ fun HomeDashboard(
 }
 
 @Composable
-private fun HomeSectionTitle(text: String) {
+private fun HomeSectionTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier
+        modifier = modifier
             .padding(top = 8.dp, bottom = 4.dp)
             .semantics { heading() },
     )

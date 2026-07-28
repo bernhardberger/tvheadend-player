@@ -25,8 +25,9 @@ class SimpleTvSideRailTest {
                         SimpleTvSettings(enabled = true),
                         active = true,
                     ),
+                    onRootBack = {},
                     onNavigate = {},
-                    content = {},
+                    content = { _, _ -> },
                 )
             }
         }

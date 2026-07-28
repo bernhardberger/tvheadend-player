@@ -52,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
@@ -98,7 +99,6 @@ import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
@@ -142,6 +142,9 @@ class RecordingsScreenState {
 
 @Composable
 fun RecordingsScreen(
+    contentPadding: PaddingValues = PaddingValues(),
+    initialFocusEnabled: Boolean = true,
+    backEnabled: Boolean = true,
     repository: DvrRepository = koinInject(),
     channelRepository: TvhRepository = koinInject(),
     imageLoader: ImageLoader = koinInject(),
@@ -203,7 +206,14 @@ fun RecordingsScreen(
         }
     }
 
-    LaunchedEffect(location, itemKeys, selectedKeys[location], requestContentFocus) {
+    LaunchedEffect(
+        location,
+        itemKeys,
+        selectedKeys[location],
+        requestContentFocus,
+        initialFocusEnabled,
+    ) {
+        if (!initialFocusEnabled) return@LaunchedEffect
         if (!requestContentFocus) return@LaunchedEffect
         if (itemKeys.isEmpty()) {
             requestContentFocus = false
@@ -221,19 +231,41 @@ fun RecordingsScreen(
         folderPreviewRecordingId = null
     }
 
-    BackHandler(enabled = archivePath.isNotEmpty() && detailsEntry == null) {
-        archivePath = archivePath.dropLast(1)
-        requestContentFocus = true
-    }
-    BackHandler(enabled = folderPreviewFocused && detailsEntry == null) {
-        folderPreviewFocused = false
-        runCatching { contentFocus.requestFocus() }
+    BackHandler(
+        enabled = backEnabled && detailsEntry == null &&
+            (folderPreviewFocused || archivePath.isNotEmpty()),
+    ) {
+        if (folderPreviewFocused) {
+            folderPreviewFocused = false
+            runCatching { contentFocus.requestFocus() }
+        } else {
+            archivePath = archivePath.dropLast(1)
+            requestContentFocus = true
+        }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(TvScreenPadding),
+            .onKeyEvent { event ->
+                if (event.key != Key.Back || event.type != KeyEventType.KeyUp) {
+                    return@onKeyEvent false
+                }
+                when {
+                    folderPreviewFocused && detailsEntry == null -> {
+                        folderPreviewFocused = false
+                        runCatching { contentFocus.requestFocus() }
+                        true
+                    }
+                    archivePath.isNotEmpty() && detailsEntry == null -> {
+                        archivePath = archivePath.dropLast(1)
+                        requestContentFocus = true
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .padding(contentPadding),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -399,9 +431,11 @@ fun RecordingsScreen(
     if (opened != null) {
         val authoritative = entries.firstOrNull { it.id == opened.id } ?: opened
         RecordingDetailsPanel(
+            contentPadding = contentPadding,
             entry = authoritative,
             actionResult = actionResult,
             canModifyRecordings = canModifyRecordings,
+            backEnabled = backEnabled,
             onPlay = { onPlayRecording(authoritative.id) },
             onCancel = { pendingAction = PendingRecordingAction.CANCEL },
             onDelete = { pendingAction = PendingRecordingAction.DELETE },
@@ -427,6 +461,7 @@ fun RecordingsScreen(
         RecordingConfirmationDialog(
             action = action,
             title = target.title,
+            backEnabled = backEnabled,
             onDismiss = { pendingAction = null },
             onConfirm = {
                 pendingAction = null
@@ -1167,9 +1202,11 @@ private fun ScheduleTime(entry: DvrEntry) {
 
 @Composable
 private fun RecordingDetailsPanel(
+    contentPadding: PaddingValues,
     entry: DvrEntry,
     actionResult: DvrActionResult?,
     canModifyRecordings: Boolean,
+    backEnabled: Boolean,
     onPlay: () -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
@@ -1187,8 +1224,11 @@ private fun RecordingDetailsPanel(
     LaunchedEffect(entry.id, entry.state, canModifyRecordings) {
         if (canPlay || canCancel || canDelete) initialFocus.requestFocus() else closeFocus.requestFocus()
     }
-    BackHandler(onBack = onClose)
-    RecordingDetailsSurface {
+    BackHandler(enabled = backEnabled, onBack = onClose)
+    RecordingDetailsSurface(
+        contentPadding = contentPadding,
+        onBack = onClose,
+    ) {
         Text(
             entry.title,
             style = MaterialTheme.typography.headlineSmall,
@@ -1276,13 +1316,25 @@ private fun RecordingDetailsPanel(
 }
 
 @Composable
-private fun RecordingDetailsSurface(content: @Composable ColumnScope.() -> Unit) {
+private fun RecordingDetailsSurface(
+    contentPadding: PaddingValues,
+    onBack: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.64f))
+            .onKeyEvent { event ->
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
+                    onBack()
+                    true
+                } else {
+                    false
+                }
+            }
             .focusGroup()
-            .padding(TvScreenPadding)
+            .padding(contentPadding)
             .padding(vertical = 24.dp),
         contentAlignment = Alignment.CenterEnd,
     ) {
@@ -1311,13 +1363,14 @@ private fun RecordingDetailsSurface(content: @Composable ColumnScope.() -> Unit)
 private fun RecordingConfirmationDialog(
     action: PendingRecordingAction,
     title: String,
+    backEnabled: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
     val safeFocus = remember { FocusRequester() }
     LaunchedEffect(action) { safeFocus.requestFocus() }
-    BackHandler(onBack = onDismiss)
-    RecordingDialogSurface {
+    BackHandler(enabled = backEnabled, onBack = onDismiss)
+    RecordingDialogSurface(onBack = onDismiss) {
         Text(
             text = stringResource(
                 if (action == PendingRecordingAction.CANCEL) {
@@ -1357,11 +1410,22 @@ private fun RecordingConfirmationDialog(
 }
 
 @Composable
-private fun RecordingDialogSurface(content: @Composable () -> Unit) {
+private fun RecordingDialogSurface(
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.76f))
+            .onKeyEvent { event ->
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
+                    onBack()
+                    true
+                } else {
+                    false
+                }
+            }
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {

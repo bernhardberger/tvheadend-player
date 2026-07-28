@@ -181,6 +181,9 @@ still be unacceptable.
 - On re-entry, focus returns to the item that last held it.
 - A `LaunchedEffect` keyed on route is not an entry contract. It handles route
   changes and does nothing for a lateral D-pad move.
+- While the standard drawer owns focus, a newly composed destination initializes
+  its content but defers its automatic initial-focus request until focus leaves
+  the drawer. Page focus must not close the drawer during focus-based navigation.
 
 ### 4.3 Commit model
 
@@ -190,15 +193,28 @@ invent a third.
 | Component | Commits on | Source |
 |---|---|---|
 | Tabs | **focus** | "when moving from one tab to the next the content below also slides" |
-| Navigation drawer | **selection** | "automatically updates to the new destination upon selection" |
+| Standard navigation drawer | **focus** | page content updates as focus moves between destinations |
 | Lists and grids | selection | a list is not a picker |
 
 Focus-driven commit is safe **only** because of 4.2. Without a declared entry
-target, a lateral move lands on a geometric nearest and commits something the
-user did not choose.
+target, a move into a focus-driven component lands on a geometric nearest and
+commits something the user did not choose.
 
 Focus may change what is previewed in a detail pane at any time. That is not a
 commit.
+
+### 4.4 Back through navigation layers
+
+Back unwinds focus layers before changing top-level destination history. From
+browse content it activates the global drawer on the current destination. From
+a non-Home drawer destination, the next Back focuses Home; Back from Home then
+delegates to the existing warm-player or activity-exit policy. Settings adds one
+local layer: content returns to the current category before category focus
+returns to the global drawer on Settings. Focus-previewed drawer destinations do
+not form a Back stack, but their saved screen and focus state is restored when
+the viewer returns. Remote key dispatch consumes the complete Back key cycle at
+the nearest focused layer; dispatcher-backed handling remains available for
+accessibility and system Back actions without a focused key target.
 
 ---
 
@@ -280,9 +296,12 @@ resolve to the same luminance â€” `surface` at 0.90 next to `surface` at 0.96 â€
 with no gutter between them.
 
 Use the **standard push drawer**. Expanding the drawer changes the browse
-viewport; the shell recomputes and passes the resulting content inset rather
-than overlaying or scrimming a fixed viewport. This keeps navigation and content
-as adjacent surfaces and makes their relationship explicit at viewing distance.
+viewport position while preserving its closed width; the trailing edge clips
+rather than remeasuring each destination narrower. The shell passes the safe
+content inset and keeps navigation and content as adjacent surfaces. Settings
+remains in this global shell, so entering its content collapses the drawer to the
+icon rail instead of removing it; its temporary category rail is replaced in the
+later component slice.
 
 ---
 

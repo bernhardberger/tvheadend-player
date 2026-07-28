@@ -3,17 +3,24 @@ package at.bernhardberger.tvhplayer.ui
 import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -117,6 +124,19 @@ fun AppRoot(
     }
 
     val nav = rememberNavController()
+    val navigateTopLevel: (String) -> Unit = { route ->
+        nav.navigate(route) {
+            // Top-level drawer destinations are siblings, not a Back history.
+            // Keeping one Compose destination also prevents NavHost from owning
+            // Back ahead of the focus-driven TV shell.
+            popUpTo(nav.graph.id) {
+                inclusive = false
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     val recordingsScreenState = remember { RecordingsScreenState() }
     val context = LocalContext.current
     val activity = context as? Activity
@@ -162,7 +182,6 @@ fun AppRoot(
         topRoute = topRoute,
         playerRoute = Routes.PLAYER,
         recordingPlayerRoute = Routes.RECORDING_PLAYER,
-        settingsRoute = Routes.SETTINGS,
     )
 
     val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
@@ -228,12 +247,12 @@ fun AppRoot(
         }
     }
 
-    BackHandler {
+    val handleRootBack: () -> Unit = rootBack@{
         val pendingRequest = applianceLaunchRequest
         if (pendingRequest != null) {
             applianceLaunchRequests.cancel(pendingRequest)
             if (simpleTvActive) nav.navigate(Routes.UNLOCK) { launchSingleTop = true }
-            return@BackHandler
+            return@rootBack
         }
 
         when (
@@ -259,7 +278,7 @@ fun AppRoot(
                 warmReturn = consumeWarmReturn(warmReturn)
                 when (target) {
                     WarmPlaybackTarget.LIVE -> {
-                        val serviceId = activeServiceId ?: return@BackHandler
+                        val serviceId = activeServiceId ?: return@rootBack
                         val channel = channelsVm.allChannels.value
                             .firstOrNull { it.id == serviceId }
                         nav.navigate(
@@ -273,7 +292,7 @@ fun AppRoot(
                         }
                     }
                     WarmPlaybackTarget.RECORDING -> {
-                        val recordingId = activeRecordingId ?: return@BackHandler
+                        val recordingId = activeRecordingId ?: return@rootBack
                         nav.navigate(Routes.recordingPlayer(recordingId)) {
                             launchSingleTop = true
                         }
@@ -283,7 +302,10 @@ fun AppRoot(
             }
         }
     }
-    val content: @Composable () -> Unit = {
+    BackHandler(enabled = !showRail, onBack = handleRootBack)
+    var consumePriorityBackKeyUp by remember { mutableStateOf(false) }
+    val content: @Composable (PaddingValues, Boolean) -> Unit = {
+            contentPadding, drawerActive ->
             Box(
                 Modifier.fillMaxSize()
             ) {
@@ -295,6 +317,8 @@ fun AppRoot(
                     composable(Routes.HOME) {
                         ContentContainer {
                             HomeScreen(
+                                contentPadding = contentPadding,
+                                initialFocusEnabled = !drawerActive,
                                 connectionUiState = connectionUiState,
                                 onRetryConnection = appVm::reconnectNow,
                                 onPlayChannel = { channelId, serviceId, name ->
@@ -304,10 +328,10 @@ fun AppRoot(
                                     nav.navigate(Routes.recordingPlayer(recordingId))
                                 },
                                 onOpenRecordings = {
-                                    nav.navigate(Routes.RECORDINGS) { launchSingleTop = true }
+                                    navigateTopLevel(Routes.RECORDINGS)
                                 },
                                 onOpenChannels = {
-                                    nav.navigate(Routes.CHANNELS) { launchSingleTop = true }
+                                    navigateTopLevel(Routes.CHANNELS)
                                 },
                                 allowRecordings = capabilityProfile.allows(
                                     SimpleTvCapability.RECORDINGS,
@@ -319,10 +343,12 @@ fun AppRoot(
                     composable(Routes.CHANNELS) {
                         ContentContainer {
                             ChannelsScreen(
+                                contentPadding = contentPadding,
+                                initialFocusEnabled = !drawerActive,
                                 connectionUiState = connectionUiState,
                                 onRetryConnection = appVm::reconnectNow,
                                 onOpenConnectionSettings = {
-                                    nav.navigate(Routes.SETTINGS) { launchSingleTop = true }
+                                    navigateTopLevel(Routes.SETTINGS)
                                 },
                                 onPlay = { channelId, serviceId, name ->
                                     nav.navigate(Routes.player(channelId, serviceId, name))
@@ -335,6 +361,8 @@ fun AppRoot(
                         if (capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
                             ContentContainer {
                                 EpgGridScreen(
+                                    contentPadding = contentPadding,
+                                    initialFocusEnabled = !drawerActive,
                                     connectionUiState = connectionUiState,
                                     onRetry = appVm::reconnectNow,
                                     simpleTvProfile = capabilityProfile,
@@ -353,6 +381,9 @@ fun AppRoot(
                         if (capabilityProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
                             ContentContainer {
                                 RecordingsScreen(
+                                    contentPadding = contentPadding,
+                                    initialFocusEnabled = !drawerActive,
+                                    backEnabled = applianceLaunchRequest == null,
                                     connectionUiState = connectionUiState,
                                     onRetry = appVm::reconnectNow,
                                     onPlayRecording = { recordingId ->
@@ -368,7 +399,9 @@ fun AppRoot(
                         if (capabilityProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
                             ContentContainer {
                                 SettingsScreen(
-                                    onBack = { nav.popBackStack() },
+                                    initialFocusEnabled = !drawerActive,
+                                    contentPadding = contentPadding,
+                                    backEnabled = applianceLaunchRequest == null,
                                     onStartSimpleTv = {
                                         applianceLaunchRequests.request()
                                         simpleTvSession.start()
@@ -381,10 +414,9 @@ fun AppRoot(
                     composable(Routes.UNLOCK) {
                         ContentContainer {
                             SimpleTvUnlockScreen(
+                                backEnabled = !drawerActive && applianceLaunchRequest == null,
                                 onExited = {
-                                    nav.navigate(Routes.CHANNELS) {
-                                        popUpTo(Routes.UNLOCK) { inclusive = true }
-                                    }
+                                    navigateTopLevel(Routes.CHANNELS)
                                 },
                                 onBack = {
                                     nav.popBackStack()
@@ -463,6 +495,26 @@ fun AppRoot(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (
+                    event.key == Key.Back &&
+                    event.type == KeyEventType.KeyUp &&
+                    consumePriorityBackKeyUp
+                ) {
+                    consumePriorityBackKeyUp = false
+                    return@onPreviewKeyEvent true
+                }
+                if (
+                    event.key == Key.Back &&
+                    event.type == KeyEventType.KeyDown &&
+                    applianceLaunchRequest != null
+                ) {
+                    consumePriorityBackKeyUp = true
+                    handleRootBack()
+                    return@onPreviewKeyEvent true
+                }
+                false
+            }
             .background(androidx.tv.material3.MaterialTheme.colorScheme.background)
     ) {
         if (shouldUseWarmVideoSurface(
@@ -489,6 +541,8 @@ fun AppRoot(
                 currentRoute = topRoute,
                 showEpgMenu = uiSettings.showEpgMenu,
                 simpleTvProfile = capabilityProfile,
+                rootBackPriority = applianceLaunchRequest != null,
+                onRootBack = handleRootBack,
                 onNavigate = { route ->
                     val current = nav.currentBackStackEntry?.destination?.route
                     if (current == route) {
@@ -500,18 +554,23 @@ fun AppRoot(
                         if (currentWarmTarget != WarmPlaybackTarget.NONE) {
                             warmReturn = rearmWarmReturn(currentWarmTarget)
                         }
-                        nav.navigate(route) {
-                            popUpTo(Routes.HOME) { inclusive = false }
-                            launchSingleTop = true
-                            restoreState = true
+                        if (route == Routes.UNLOCK) {
+                            nav.navigate(route) { launchSingleTop = true }
+                        } else {
+                            navigateTopLevel(route)
                         }
                     }
                 },
                 content = content,
             )
         } else {
-            content()
+            content(TvFullScreenPadding, false)
         }
+    }
+    // Registered after all destination handlers so system/accessibility Back
+    // cancels a pending one-shot launch before any nested UI can consume it.
+    key(applianceLaunchRequest) {
+        BackHandler(enabled = applianceLaunchRequest != null, onBack = handleRootBack)
     }
 }
 

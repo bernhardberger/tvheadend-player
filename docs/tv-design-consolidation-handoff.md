@@ -343,6 +343,40 @@ was removed. Official JetStream Profile list items independently use
 row contract therefore retains the existing high-contrast colour transition with
 no scale or outline; scaled cards remain governed by their reserved overflow.
 
+## Slice 9 validation — 2026-07-28 — complete
+
+The verified debug APK was installed on the exact-identity G10. Direct owner
+review confirmed that the standard drawer updates destinations as focus moves,
+keeps drawer focus stable while newly composed pages initialize, and restores the
+current destination directly on drawer entry without flashing Home or traversing
+intermediate items. Home, Channels, Guide, Recordings, and Settings retain their
+closed browse width and translate right rather than reflowing narrower. Entering
+Settings content collapses the global drawer to its icon rail rather than removing
+the shell. Settings categories update their adjacent pane as focus moves, and
+both Right and OK enter that category's first real control without returning to
+the global rail. Home card rows and the Guide timeline use edge-to-edge viewports
+with safe content alignment. Direct owner review accepted the final Guide
+geometry: its leading edge follows the shell safe inset while the continuing
+timeline reaches the trailing viewport edge like the Home card lanes. The
+production G08 was not targeted or modified.
+
+The layered Back correction is implemented, locally verified, and installed on
+the exact-identity G10. Bounded synthetic remote keys plus safe-screen captures
+confirmed Channels content → Channels in the global drawer → Home, Settings
+content → Language category → Settings in the global drawer → Home, and live
+player controls → fullscreen player → Channels. Top-level destinations are
+saved/restored siblings rather than Back history; nested recording surfaces and
+text-field editing consume Back first; dispatcher fallbacks remain alongside
+focused remote-key handling. Direct owner validation with the physical G10
+remote confirmed that three successive presses move exactly one layer each from
+Settings content → Language category → global Settings → Home; no press skipped
+a layer or fell through to Home content.
+
+Deferred follow-up: the owner reported that the Home feature carousel can trap
+D-pad focus and plans to rework Home separately. Treat that as a Home redesign
+concern rather than reopening completed slice 9; give it its own focus graph and
+regression coverage.
+
 **Check `adb devices -l` before every hardware run.** The production G08 has been
 observed connected on two transports at once, left over from a deployment. That
 is harmless for `./tools/device`, which pins the serial and verifies role plus all

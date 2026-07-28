@@ -24,7 +24,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -49,6 +58,7 @@ import org.koin.compose.koinInject
 fun SimpleTvUnlockScreen(
     store: SimpleTvSettingsStore = koinInject(),
     session: SimpleTvSession = koinInject(),
+    backEnabled: Boolean = true,
     onExited: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -62,8 +72,11 @@ fun SimpleTvUnlockScreen(
     var pinAccepted by remember(settings.pinConfigured) {
         mutableStateOf(!settings.pinConfigured)
     }
-    BackHandler(onBack = onBack)
-
+    val pinFocus = remember { FocusRequester() }
+    BackHandler(enabled = backEnabled, onBack = onBack)
+    androidx.compose.runtime.LaunchedEffect(pinAccepted) {
+        if (!pinAccepted) pinFocus.requestFocus()
+    }
     if (pinAccepted) {
         SimpleTvExitConfirmation(
             onCancel = onBack,
@@ -78,11 +91,20 @@ fun SimpleTvUnlockScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .onKeyEvent { event ->
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
+                    onBack()
+                    true
+                } else {
+                    false
+                }
+            }
             .padding(TvFullScreenPadding),
     ) {
         Text(
             stringResource(R.string.simple_tv_unlock_title),
             style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.semantics { heading() },
         )
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.simple_tv_unlock_session))
@@ -100,12 +122,15 @@ fun SimpleTvUnlockScreen(
             label = { Text(stringResource(R.string.simple_tv_pin)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(0.5f),
+            modifier = Modifier
+                .fillMaxWidth(0.5f)
+                .focusRequester(pinFocus),
         )
         if (failed) {
             Text(
                 stringResource(R.string.simple_tv_pin_wrong),
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -117,6 +142,7 @@ fun SimpleTvUnlockScreen(
                         pinAccepted = true
                     } else {
                         failed = true
+                        pinFocus.requestFocus()
                     }
                 }
             },
@@ -141,6 +167,14 @@ private fun SimpleTvExitConfirmation(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.76f))
+            .onKeyEvent { event ->
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
+                    onCancel()
+                    true
+                } else {
+                    false
+                }
+            }
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {
@@ -159,6 +193,7 @@ private fun SimpleTvExitConfirmation(
                 Text(
                     stringResource(R.string.simple_tv_exit_confirm_title),
                     style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(stringResource(R.string.simple_tv_exit_confirm_message))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

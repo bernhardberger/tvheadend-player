@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -25,6 +27,7 @@ import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun SettingsPlayer(
+    initialFocusRequester: FocusRequester,
     vm: SettingsPlayerViewModel = koinViewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -38,7 +41,8 @@ fun SettingsPlayer(
             onClick = { vm.onTimeshiftEnabledChanged(!ui.timeshiftEnabled) },
             modifier = Modifier
                 .width(480.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .focusRequester(initialFocusRequester),
         )
 
         SettingsSectionTitle(stringResource(R.string.profile))

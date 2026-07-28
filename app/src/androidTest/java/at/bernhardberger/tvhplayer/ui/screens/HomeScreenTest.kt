@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.HomeCardItem
 import at.bernhardberger.tvhplayer.core.HomeDashboardModel
@@ -19,6 +21,7 @@ import at.bernhardberger.tvhplayer.core.HomeRowKind
 import at.bernhardberger.tvhplayer.core.HomeSlideKind
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -73,6 +76,38 @@ class HomeScreenTest {
         composeRule.onNodeWithTag("home-hero-primary").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("home-card-recent-2").assertIsFocused()
+    }
+
+    @Test
+    fun contentRowViewportReachesBothScreenEdges() {
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                HomeDashboard(
+                    contentPadding = PaddingValues(
+                        start = 24.dp,
+                        top = 32.dp,
+                        end = 48.dp,
+                        bottom = 32.dp,
+                    ),
+                    model = sampleModel(),
+                    connectionUiState = ConnectionUiState.Ready,
+                    imageLoader = imageLoader,
+                    onRetryConnection = {},
+                    onPlayChannel = { _, _, _ -> },
+                    onPlayRecording = {},
+                    onOpenRecordings = {},
+                    onOpenChannels = {},
+                )
+            }
+        }
+
+        val screenBounds = composeRule.onNodeWithTag("home-screen")
+            .fetchSemanticsNode().boundsInRoot
+        val rowBounds = composeRule.onNodeWithTag("home-row-recent")
+            .fetchSemanticsNode().boundsInRoot
+
+        assertEquals(screenBounds.left, rowBounds.left, 1f)
+        assertEquals(screenBounds.right, rowBounds.right, 1f)
     }
 
     @Test

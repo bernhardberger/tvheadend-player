@@ -55,7 +55,7 @@ const val HOME_HERO_AUTO_SCROLL_MS = 8_000L
  * The primary action is a **stable** sibling of the carousel, not a child of the
  * animated slide. Putting the Button inside the slide remounted it on every
  * index change, dropped focus, and the nearest focusable was the side rail —
- * which opens [ModalNavigationDrawer]. Left/Right are consumed on that stable
+ * which opens the navigation drawer. Left/Right are consumed on that stable
  * button so they change slides instead of searching left into the rail.
  */
 @OptIn(ExperimentalTvMaterial3Api::class)

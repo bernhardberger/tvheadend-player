@@ -8,6 +8,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertTextEquals
@@ -36,8 +40,18 @@ class TvOutlinedTextFieldTest {
         composeTestRule.setContent {
             var editingId by remember { mutableStateOf<String?>(null) }
             var value by remember { mutableStateOf("") }
+            var parentBackCount by remember { mutableStateOf(0) }
             TVHeadendPlayerTheme {
-                Column {
+                Column(
+                    Modifier.onKeyEvent { event ->
+                        if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
+                            parentBackCount += 1
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                ) {
                     TvOutlinedTextField(
                         id = "host",
                         editingId = editingId,
@@ -50,6 +64,10 @@ class TvOutlinedTextFieldTest {
                     Text(
                         text = "editing=${editingId ?: "none"}",
                         modifier = Modifier.testTag("state")
+                    )
+                    Text(
+                        text = "parentBack=$parentBackCount",
+                        modifier = Modifier.testTag("parent-back-state")
                     )
                 }
             }
@@ -71,5 +89,6 @@ class TvOutlinedTextFieldTest {
             pressKey(Key.Back)
         }
         composeTestRule.onNodeWithTag("state").assertTextEquals("editing=none")
+        composeTestRule.onNodeWithTag("parent-back-state").assertTextEquals("parentBack=0")
     }
 }

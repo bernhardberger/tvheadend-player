@@ -51,6 +51,7 @@ fun TvPasswordField(
     val eyeFocus = remember { FocusRequester() }
 
     var passwordVisible by remember { mutableStateOf(false) }
+    var consumeBackKeyUp by remember { mutableStateOf(false) }
 
     val isEditing = editingId == id
 
@@ -88,6 +89,14 @@ fun TvPasswordField(
                 if (!state.isFocused && isEditing) setEditingId(null)
             }
             .onPreviewKeyEvent { ev ->
+                if (
+                    ev.key == Key.Back &&
+                    ev.type == KeyEventType.KeyUp &&
+                    consumeBackKeyUp
+                ) {
+                    consumeBackKeyUp = false
+                    return@onPreviewKeyEvent true
+                }
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
                 when (ev.key) {
@@ -100,6 +109,7 @@ fun TvPasswordField(
 
                     Key.Back -> {
                         if (isEditing) {
+                            consumeBackKeyUp = true
                             setEditingId(null)
                             true
                         } else false

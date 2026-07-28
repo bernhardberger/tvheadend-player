@@ -1,7 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,17 +16,27 @@ import androidx.tv.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import at.bernhardberger.tvhplayer.core.BackAction
-import at.bernhardberger.tvhplayer.core.nestedBackAction
 import at.bernhardberger.tvhplayer.ui.components.SettingsSubRail
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.core.SettingsBackAction
+import at.bernhardberger.tvhplayer.core.settingsBackAction
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnection
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsChannelTags
@@ -48,29 +60,58 @@ object SettingsRoutes {
 
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit,
+    initialFocusEnabled: Boolean = true,
+    contentPadding: PaddingValues = TvFullScreenPadding,
+    backEnabled: Boolean = true,
     onStartSimpleTv: () -> Unit,
 ) {
     val nav = rememberNavController()
+    val settingsRoutes = remember {
+        listOf(
+            SettingsRoutes.GENERAL,
+            SettingsRoutes.OPTIONS,
+            SettingsRoutes.CHANNEL_TAGS,
+            SettingsRoutes.CONNECTION,
+            SettingsRoutes.PLAYER,
+            SettingsRoutes.APPLIANCE,
+            SettingsRoutes.SIMPLE_TV,
+        )
+    }
+    val categoryFocus = remember(settingsRoutes) {
+        settingsRoutes.associateWith { FocusRequester() }
+    }
+    val contentFocus = remember(settingsRoutes) {
+        settingsRoutes.associateWith { FocusRequester() }
+    }
+    var contentPaneFocused by remember { mutableStateOf(false) }
     val simpleTvSession: SimpleTvSession = koinInject()
     val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
     val showSimpleTvSettings = !simpleTvActive
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val backAction = settingsBackAction(
+        contentPaneFocused = contentPaneFocused,
+    )
+    val focusCurrentCategory: () -> Unit = {
+        (categoryFocus[currentRoute]
+            ?: categoryFocus[SettingsRoutes.GENERAL])?.requestFocus()
+    }
+    BackHandler(
+        enabled = backEnabled && backAction == SettingsBackAction.FOCUS_CURRENT_CATEGORY,
+    ) {
+        focusCurrentCategory()
+    }
     LaunchedEffect(currentRoute, showSimpleTvSettings) {
         if (currentRoute == SettingsRoutes.SIMPLE_TV && !showSimpleTvSettings) {
             nav.navigate(SettingsRoutes.GENERAL) {
-                popUpTo(SettingsRoutes.GENERAL) { inclusive = true }
+                popUpTo(nav.graph.id) {
+                    inclusive = false
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
             }
-        }
-    }
-    BackHandler {
-        when (nestedBackAction(hasPreviousEntry = nav.previousBackStackEntry != null)) {
-            BackAction.POP_NAVIGATION -> nav.popBackStack()
-            BackAction.RETURN_TO_PARENT -> onBack()
-            BackAction.RETURN_TO_PLAYER -> Unit
-            BackAction.FINISH_ACTIVITY -> Unit
         }
     }
     Surface(
@@ -83,15 +124,21 @@ fun SettingsScreen(
         Row(
             Modifier
                 .fillMaxSize()
-                // Settings drops the global rail; use symmetric full-screen safe margins.
-                .padding(TvFullScreenPadding)
+                // The shell owns the global rail; Settings owns its inner panel spacing.
+                .padding(contentPadding)
         ) {
             SettingsSubRail(
                 currentRoute = currentRoute,
+                categoryFocusRequesters = categoryFocus,
+                contentFocusRequesters = contentFocus,
+                initialFocusEnabled = initialFocusEnabled,
                 showSimpleTv = showSimpleTvSettings,
                 onNavigate = { route ->
                     nav.navigate(route) {
-                        popUpTo(SettingsRoutes.GENERAL) { inclusive = false }
+                        popUpTo(nav.graph.id) {
+                            inclusive = false
+                            saveState = true
+                        }
                         launchSingleTop = true
                         restoreState = true
                     }
@@ -104,37 +151,56 @@ fun SettingsScreen(
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .onFocusChanged { contentPaneFocused = it.hasFocus }
+                    .onKeyEvent { event ->
+                        if (
+                            event.key != Key.Back ||
+                            event.type != KeyEventType.KeyUp ||
+                            !backEnabled ||
+                            backAction != SettingsBackAction.FOCUS_CURRENT_CATEGORY
+                        ) {
+                            return@onKeyEvent false
+                        }
+                        focusCurrentCategory()
+                        true
+                    }
+                    .focusGroup()
             ) {
                 NavHost(
                     navController = nav,
                     startDestination = SettingsRoutes.GENERAL,
                 ) {
                     composable(SettingsRoutes.GENERAL) {
-                        SettingsLanguage()
+                        SettingsLanguage(contentFocus.getValue(SettingsRoutes.GENERAL))
                     }
 
                     composable(SettingsRoutes.CONNECTION) {
-                        SettingsConnection()
+                        SettingsConnection(contentFocus.getValue(SettingsRoutes.CONNECTION))
                     }
 
                     composable(SettingsRoutes.OPTIONS) {
-                        SettingsOptions()
+                        SettingsOptions(contentFocus.getValue(SettingsRoutes.OPTIONS))
                     }
 
                     composable(SettingsRoutes.CHANNEL_TAGS) {
-                        SettingsChannelTags()
+                        SettingsChannelTags(contentFocus.getValue(SettingsRoutes.CHANNEL_TAGS))
                     }
 
                     composable(SettingsRoutes.PLAYER) {
-                        SettingsPlayer()
+                        SettingsPlayer(contentFocus.getValue(SettingsRoutes.PLAYER))
                     }
 
                     composable(SettingsRoutes.APPLIANCE) {
-                        SettingsAppliance()
+                        SettingsAppliance(contentFocus.getValue(SettingsRoutes.APPLIANCE))
                     }
 
                     composable(SettingsRoutes.SIMPLE_TV) {
-                        SettingsSimpleTv(onStartSimpleTv = onStartSimpleTv)
+                        SettingsSimpleTv(
+                            initialFocusRequester = contentFocus.getValue(
+                                SettingsRoutes.SIMPLE_TV
+                            ),
+                            onStartSimpleTv = onStartSimpleTv,
+                        )
                     }
                 }
             }

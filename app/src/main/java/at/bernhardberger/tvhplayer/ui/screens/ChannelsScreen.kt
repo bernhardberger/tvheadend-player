@@ -75,7 +75,6 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
@@ -88,6 +87,8 @@ import org.koin.compose.koinInject
 
 @Composable
 fun ChannelsScreen(
+    contentPadding: PaddingValues = PaddingValues(),
+    initialFocusEnabled: Boolean = true,
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
@@ -191,7 +192,8 @@ fun ChannelsScreen(
         if (focusId != selectedId) selection.setSelected(focusId)
     }
 
-    LaunchedEffect(channels, selectedId, useCards) {
+    LaunchedEffect(channels, selectedId, useCards, initialFocusEnabled) {
+        if (!initialFocusEnabled) return@LaunchedEffect
         if (didInitialRestore) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
 
@@ -225,7 +227,7 @@ fun ChannelsScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .padding(TvScreenPadding)
+            .padding(contentPadding)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(

@@ -114,10 +114,11 @@ fun adjacentChannelId(
   navigation drawers and list items rather than hand-built focusable replicas;
   focused rows must remain unclipped, and the playback channel sheet must attach
   to the screen edge instead of floating like a dialog. The global navigation
-  rail uses a standard push drawer so expanding it reflows browse content.
-  Settings hides the global rail and keeps only its category rail with symmetric
-  full-screen safe margins; onboarding and unlock use the same full-screen
-  padding. Collapsed rail icons expose destination content descriptions.
+  rail uses a standard push drawer so expanding it translates the closed-width
+  browse viewport instead of reflowing it narrower. Settings retains the
+  collapsed global rail beside its temporary category rail; onboarding and
+  unlock use symmetric full-screen padding. Collapsed rail icons expose
+  destination content descriptions.
 - Normal non-autoplay launches open an in-app Home dashboard. Channels may use
   List with details (default) or Large cards. Simple TV quick select uses the
   large-card grid. Player Info reuses the shared Content Details composition.

@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -56,6 +57,7 @@ private enum class PinFeedbackKind { SUCCESS, ERROR }
 
 @Composable
 fun SettingsSimpleTv(
+    initialFocusRequester: FocusRequester,
     store: SimpleTvSettingsStore = koinInject(),
     onStartSimpleTv: () -> Unit,
 ) {
@@ -109,6 +111,7 @@ fun SettingsSimpleTv(
                 onClick = {
                     scope.launch { store.setEnabled(!settings.enabled) }
                 },
+                modifier = Modifier.focusRequester(initialFocusRequester),
             )
             SettingsSwitchRow(
                 label = stringResource(R.string.simple_tv_timeshift),

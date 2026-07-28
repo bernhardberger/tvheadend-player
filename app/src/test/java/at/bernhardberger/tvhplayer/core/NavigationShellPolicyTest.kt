@@ -1,10 +1,80 @@
 package at.bernhardberger.tvhplayer.core
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NavigationShellPolicyTest {
+    @Test
+    fun backFromBrowseContentFocusesCurrentDrawerDestination() {
+        assertEquals(
+            BrowseShellBackAction.FOCUS_CURRENT_DESTINATION,
+            browseShellBackAction(
+                drawerOpen = false,
+                currentRoute = "settings",
+                homeRoute = "home",
+            ),
+        )
+    }
+
+    @Test
+    fun pendingRootWorkTakesBackPriorityOverBrowseFocus() {
+        assertEquals(
+            BrowseShellBackAction.DELEGATE_TO_ROOT,
+            browseShellBackAction(
+                drawerOpen = false,
+                currentRoute = "channels",
+                homeRoute = "home",
+                rootBackPriority = true,
+            ),
+        )
+    }
+
+    @Test
+    fun backFromNonHomeDrawerDestinationFocusesHome() {
+        assertEquals(
+            BrowseShellBackAction.FOCUS_HOME_DESTINATION,
+            browseShellBackAction(
+                drawerOpen = true,
+                currentRoute = "settings",
+                homeRoute = "home",
+            ),
+        )
+    }
+
+    @Test
+    fun backFromHomeDrawerDestinationDelegatesToRootPolicy() {
+        assertEquals(
+            BrowseShellBackAction.DELEGATE_TO_ROOT,
+            browseShellBackAction(
+                drawerOpen = true,
+                currentRoute = "home",
+                homeRoute = "home",
+            ),
+        )
+    }
+
+    @Test
+    fun backFromSettingsContentFocusesCurrentCategory() {
+        assertEquals(
+            SettingsBackAction.FOCUS_CURRENT_CATEGORY,
+            settingsBackAction(
+                contentPaneFocused = true,
+            ),
+        )
+    }
+
+    @Test
+    fun backFromSettingsCategoryDelegatesToGlobalDrawer() {
+        assertEquals(
+            SettingsBackAction.DELEGATE_TO_GLOBAL_NAVIGATION,
+            settingsBackAction(
+                contentPaneFocused = false,
+            ),
+        )
+    }
+
     @Test
     fun showsRailOnBrowseDestinations() {
         assertTrue(
@@ -13,7 +83,6 @@ class NavigationShellPolicyTest {
                 topRoute = "channels",
                 playerRoute = "player",
                 recordingPlayerRoute = "recording-player",
-                settingsRoute = "settings",
             ),
         )
         assertTrue(
@@ -22,7 +91,6 @@ class NavigationShellPolicyTest {
                 topRoute = "epg",
                 playerRoute = "player",
                 recordingPlayerRoute = "recording-player",
-                settingsRoute = "settings",
             ),
         )
         assertTrue(
@@ -31,20 +99,18 @@ class NavigationShellPolicyTest {
                 topRoute = "recordings",
                 playerRoute = "player",
                 recordingPlayerRoute = "recording-player",
-                settingsRoute = "settings",
             ),
         )
     }
 
     @Test
-    fun hidesRailOnSettingsSoCategoryRailReclaimsWidth() {
-        assertFalse(
+    fun keepsStandardRailOnSettings() {
+        assertTrue(
             showGlobalNavigationRail(
                 simpleTvActive = false,
                 topRoute = "settings",
                 playerRoute = "player",
                 recordingPlayerRoute = "recording-player",
-                settingsRoute = "settings",
             ),
         )
     }
@@ -57,7 +123,6 @@ class NavigationShellPolicyTest {
                 topRoute = "player",
                 playerRoute = "player",
                 recordingPlayerRoute = "recording-player",
-                settingsRoute = "settings",
             ),
         )
         assertFalse(
@@ -66,7 +131,6 @@ class NavigationShellPolicyTest {
                 topRoute = "recording-player",
                 playerRoute = "player",
                 recordingPlayerRoute = "recording-player",
-                settingsRoute = "settings",
             ),
         )
         assertFalse(
@@ -75,7 +139,6 @@ class NavigationShellPolicyTest {
                 topRoute = "channels",
                 playerRoute = "player",
                 recordingPlayerRoute = "recording-player",
-                settingsRoute = "settings",
             ),
         )
     }

@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,6 +30,7 @@ import org.koin.compose.koinInject
 
 @Composable
 fun SettingsOptions(
+    initialFocusRequester: FocusRequester,
     settingsStore: UiSettingsStore = koinInject(),
 ) {
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
@@ -43,7 +46,8 @@ fun SettingsOptions(
             },
             modifier = Modifier
                 .width(480.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .focusRequester(initialFocusRequester),
         )
 
         SettingsSectionTitle(stringResource(R.string.channels_layout_section))

@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.KeyEvent as AndroidKeyEvent
+import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -440,12 +441,69 @@ fun VideoPlayerScreen(
         }
     }
 
+    val handlePlaybackBack: () -> Unit = playbackBack@{
+        if (recoveryVisible) {
+            val recoveryBackAction = playerKeyAction(
+                PlayerKeyContext(
+                    surface = PlayerSurface.LIVE,
+                    controlsVisible = false,
+                    seekbarFocused = false,
+                    timeshiftAvailable = effectiveTimeshiftState.available,
+                    simpleTvActive = simpleTvProfile.active,
+                ),
+                keyCode = AndroidKeyEvent.KEYCODE_BACK,
+            )
+            if (recoveryBackAction == PlayerKeyAction.CLOSE_PLAYER) onClose()
+            return@playbackBack
+        }
+        when (playbackAuxiliaryBackAction(optionsPage, statsVisible, infoOpen)) {
+            PlaybackAuxiliaryBackAction.CLOSE_INFO -> infoOpen = false
+            PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT -> {
+                optionsPage = PlaybackOptionsPage.ROOT
+            }
+            PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
+                optionsPage = null
+                interactionToken++
+            }
+            PlaybackAuxiliaryBackAction.HIDE_STATS -> statsVisible = false
+            PlaybackAuxiliaryBackAction.PASS_THROUGH -> when {
+                channelNumberInput.isNotEmpty() -> channelNumberInput = ""
+                showDrawer -> drawerOpen = false
+                else -> when (
+                    playerKeyAction(
+                        PlayerKeyContext(
+                            surface = PlayerSurface.LIVE,
+                            controlsVisible = controlsVisible,
+                            seekbarFocused = false,
+                            timeshiftAvailable = effectiveTimeshiftState.available,
+                            simpleTvActive = simpleTvProfile.active,
+                            optionsOpen = false,
+                            statsOpen = false,
+                            infoOpen = false,
+                            drawerOpen = false,
+                        ),
+                        keyCode = AndroidKeyEvent.KEYCODE_BACK,
+                    )
+                ) {
+                    PlayerKeyAction.HIDE_CONTROLS -> hideControls()
+                    PlayerKeyAction.CLOSE_PLAYER -> onClose()
+                    else -> Unit
+                }
+            }
+        }
+    }
+    BackHandler(onBack = handlePlaybackBack)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .focusable()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
+                if (event.key == Key.Back) {
+                    if (event.type == KeyEventType.KeyUp) handlePlaybackBack()
+                    return@onPreviewKeyEvent true
+                }
                 if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
                     return@onPreviewKeyEvent true
@@ -453,29 +511,6 @@ fun VideoPlayerScreen(
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (recoveryVisible) {
                     return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
-                }
-
-                if (event.key == Key.Back) {
-                    when (playbackAuxiliaryBackAction(optionsPage, statsVisible, infoOpen)) {
-                        PlaybackAuxiliaryBackAction.CLOSE_INFO -> {
-                            infoOpen = false
-                            return@onPreviewKeyEvent true
-                        }
-                        PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT -> {
-                            optionsPage = PlaybackOptionsPage.ROOT
-                            return@onPreviewKeyEvent true
-                        }
-                        PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
-                            optionsPage = null
-                            interactionToken++
-                            return@onPreviewKeyEvent true
-                        }
-                        PlaybackAuxiliaryBackAction.HIDE_STATS -> {
-                            statsVisible = false
-                            return@onPreviewKeyEvent true
-                        }
-                        PlaybackAuxiliaryBackAction.PASS_THROUGH -> Unit
-                    }
                 }
                 if (infoOpen) return@onPreviewKeyEvent false
                 if (optionsPage != null) return@onPreviewKeyEvent false

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
@@ -22,8 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -39,21 +42,25 @@ import at.bernhardberger.tvhplayer.ui.TvSettingsPanelAlpha
 @Composable
 fun SettingsSubRail(
     currentRoute: String?,
+    categoryFocusRequesters: Map<String, FocusRequester>,
+    contentFocusRequesters: Map<String, FocusRequester>,
     onNavigate: (String) -> Unit,
+    initialFocusEnabled: Boolean = true,
     showSimpleTv: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val items = rememberSettingsItems(
         showSimpleTv = showSimpleTv,
     )
-    val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
-    val activeItemFocus = itemFocus[currentRoute] ?: itemFocus.getValue(items.first().route)
+    val activeItemFocus = categoryFocusRequesters[currentRoute]
+        ?: categoryFocusRequesters.getValue(items.first().route)
 
-    // Keep focus on the active category after activation. Content receives focus
-    // only when the user presses Right; NavHost recomposition must not leave the
-    // screen with no focused target.
-    LaunchedEffect(currentRoute, items) {
-        (itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route])?.requestFocus()
+    // Focus the active category when Settings receives focus from the global
+    // drawer. Category changes must not pull focus back out of the content pane.
+    LaunchedEffect(items, initialFocusEnabled) {
+        if (!initialFocusEnabled) return@LaunchedEffect
+        (categoryFocusRequesters[currentRoute]
+            ?: categoryFocusRequesters[items.firstOrNull()?.route])?.requestFocus()
     }
 
     Column(
@@ -65,13 +72,15 @@ fun SettingsSubRail(
                 MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha)
             )
             .padding(8.dp)
-            .focusRestorer(activeItemFocus),
+            .focusRestorer(activeItemFocus)
+            .focusGroup(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items.forEach { item ->
+            val contentFocus = contentFocusRequesters.getValue(item.route)
             ListItem(
                 selected = currentRoute == item.route,
-                onClick = { onNavigate(item.route) },
+                onClick = { contentFocus.requestFocus() },
                 headlineContent = { Text(item.label) },
                 leadingContent = { item.icon() },
                 scale = ListItemDefaults.scale(
@@ -80,7 +89,13 @@ fun SettingsSubRail(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(itemFocus.getValue(item.route)),
+                    .focusRequester(categoryFocusRequesters.getValue(item.route))
+                    .focusProperties { right = contentFocus }
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused && currentRoute != item.route) {
+                            onNavigate(item.route)
+                        }
+                    },
             )
         }
     }

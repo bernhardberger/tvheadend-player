@@ -15,6 +15,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,7 @@ import org.koin.compose.koinInject
 
 @Composable
 fun SettingsAppliance(
+    initialFocusRequester: FocusRequester,
     settingsStore: UiSettingsStore = koinInject(),
 ) {
     val context = LocalContext.current
@@ -61,6 +64,7 @@ fun SettingsAppliance(
                         settingsStore.setAutoStartPlayback(!settings.autoStartPlayback)
                     }
                 },
+                modifier = Modifier.focusRequester(initialFocusRequester),
             )
 
             SettingsSectionTitle(stringResource(R.string.appliance_section_accessibility))

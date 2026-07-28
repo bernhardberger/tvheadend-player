@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -50,11 +52,14 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -102,7 +107,6 @@ import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TvEpgPanelAlpha
-import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.core.programmeHasAired
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
@@ -128,8 +132,20 @@ private const val CHANNEL_PAGE_SIZE = 6
 private val CHANNEL_HEADER_WIDTH = 190.dp
 private val TIMELINE_ROW_HEIGHT = 76.dp
 
+internal fun guideTimelineContentPadding(
+    contentPadding: PaddingValues,
+    layoutDirection: LayoutDirection,
+): PaddingValues = PaddingValues(
+    start = contentPadding.calculateStartPadding(layoutDirection),
+    top = 2.dp,
+    end = 0.dp,
+    bottom = contentPadding.calculateBottomPadding() + 2.dp,
+)
+
 @Composable
 fun EpgGridScreen(
+    contentPadding: PaddingValues = PaddingValues(),
+    initialFocusEnabled: Boolean = true,
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     repository: TvhRepository = koinInject(),
@@ -144,6 +160,13 @@ fun EpgGridScreen(
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit,
 ) {
+    val layoutDirection = LocalLayoutDirection.current
+    val startPadding = contentPadding.calculateStartPadding(layoutDirection)
+    val endPadding = contentPadding.calculateEndPadding(layoutDirection)
+    val timelineContentPadding = guideTimelineContentPadding(
+        contentPadding = contentPadding,
+        layoutDirection = layoutDirection,
+    )
     val coroutineScope = rememberCoroutineScope()
     val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
     val channels = channelScope.visibleChannels
@@ -255,7 +278,7 @@ fun EpgGridScreen(
         pendingInitialChannelIndex = -1
     }
 
-    LaunchedEffect(selectedTarget, windowStartSec, channels) {
+    LaunchedEffect(selectedTarget, windowStartSec, channels, initialFocusEnabled) {
         val target = selectedTarget ?: return@LaunchedEffect
         val event = repository.epgForChannel(
             channels.getOrNull(target.channelIndex)?.id ?: return@LaunchedEffect
@@ -280,9 +303,11 @@ fun EpgGridScreen(
         if (visibleRows.isNotEmpty() && target.channelIndex !in visibleRows) {
             channelListState.animateScrollToItem(target.channelIndex)
         }
-        delay(80)
-        eventFocusRequesters[target.eventId]?.let { requester ->
-            runCatching { requester.requestFocus() }
+        if (initialFocusEnabled) {
+            delay(80)
+            eventFocusRequesters[target.eventId]?.let { requester ->
+                runCatching { requester.requestFocus() }
+            }
         }
     }
 
@@ -384,11 +409,10 @@ fun EpgGridScreen(
         restoreDetailsFocus = true
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().testTag("epg-screen")) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(TvScreenPadding)
                 .onPreviewKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     ChannelNavigation.pageDirectionForKeyCode(
@@ -400,7 +424,13 @@ fun EpgGridScreen(
                 },
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = startPadding,
+                        top = contentPadding.calculateTopPadding(),
+                        end = endPadding,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -465,6 +495,7 @@ fun EpgGridScreen(
             UnavailableTagNotice(
                 visible = tagNotice,
                 onDismiss = channelViewModel::dismissUnavailableTagNotice,
+                modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
             if (tagNotice) Spacer(Modifier.height(8.dp))
 
@@ -479,16 +510,21 @@ fun EpgGridScreen(
                     windowStartSec = windowStartSec,
                     windowEndSec = windowStartSec + VISIBLE_WINDOW_SEC,
                     nowSec = nowSec,
+                    modifier = Modifier.padding(
+                        start = timelineContentPadding.calculateStartPadding(layoutDirection),
+                        end = timelineContentPadding.calculateEndPadding(layoutDirection),
+                    ),
                 )
                 Spacer(Modifier.height(4.dp))
                 LazyColumn(
                     state = channelListState,
-                    contentPadding = PaddingValues(vertical = 2.dp),
+                    contentPadding = timelineContentPadding,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .focusGroup(),
+                        .focusGroup()
+                        .testTag("epg-programme-viewport"),
                 ) {
                     itemsIndexed(channels, key = { _, channel -> channel.id }) {
                             channelIndex, channel ->
@@ -534,6 +570,7 @@ fun EpgGridScreen(
                 event.stop <= nowSec &&
                 event.start * 1_000L >= nowSec * 1_000L + timeshiftState.bufferStartMs
             ProgrammeDetailsPanel(
+                contentPadding = contentPadding,
                 event = event,
                 channel = channel,
                 recording = recording,
@@ -646,9 +683,10 @@ private fun TimelineTimeRuler(
     windowStartSec: Long,
     windowEndSec: Long,
     nowSec: Long,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(38.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1072,6 +1110,7 @@ private fun JumpToTimeDialog(
 
 @Composable
 private fun ProgrammeDetailsPanel(
+    contentPadding: PaddingValues,
     event: EpgEventEntry,
     channel: ChannelUi?,
     recording: DvrEntry?,
@@ -1115,7 +1154,11 @@ private fun ProgrammeDetailsPanel(
         append((event.stop - event.start).coerceAtLeast(0L) / 60L)
         append(" min")
     }
-    DialogScrim(onDismissRequest = onClose, wide = true) {
+    DialogScrim(
+        onDismissRequest = onClose,
+        wide = true,
+        contentPadding = contentPadding,
+    ) {
         ProgrammeContentDetails(
             event = event,
             subtitle = subtitle,
@@ -1325,6 +1368,7 @@ private fun dvrActionResultLabel(result: DvrActionResult): String = stringResour
 private fun DialogScrim(
     onDismissRequest: () -> Unit,
     wide: Boolean = false,
+    contentPadding: PaddingValues = PaddingValues(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -1340,7 +1384,7 @@ private fun DialogScrim(
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.72f))
                 .focusGroup()
-                .then(if (wide) Modifier.padding(TvScreenPadding) else Modifier),
+                .then(if (wide) Modifier.padding(contentPadding) else Modifier),
             contentAlignment = if (wide) Alignment.CenterEnd else Alignment.Center,
         ) {
             Surface(
