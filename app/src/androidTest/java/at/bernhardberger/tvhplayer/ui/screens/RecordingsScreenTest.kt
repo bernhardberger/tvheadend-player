@@ -272,4 +272,69 @@ class RecordingsScreenTest {
         composeRule.onNodeWithText("A longer recording description shown in the detail pane.")
             .assertIsDisplayed()
     }
+
+    @Test
+    fun longRecordingTitleDoesNotMoveLeadingOrTrailingContent() {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            listOf(
+                1 to "News",
+                2 to "A deliberately long recording title that wraps onto a second line",
+            ).forEach { (id, title) ->
+                repository.acceptDvrMessage(
+                    HtspMessage(
+                        method = "dvrEntryAdd",
+                        seq = null,
+                        fields = mapOf(
+                            "id" to id,
+                            "channelId" to 1,
+                            "start" to 100L,
+                            "stop" to 200L,
+                            "title" to title,
+                            "state" to "completed",
+                            "files" to listOf(mapOf("filename" to "recording-$id.ts")),
+                        ),
+                    )
+                )
+            }
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme { RecordingsScreen(repository = repository) }
+        }
+
+        val shortRow = composeRule.onNodeWithTag("recording-list-entry-1")
+            .fetchSemanticsNode().boundsInRoot
+        val longRow = composeRule.onNodeWithTag("recording-list-entry-2")
+            .fetchSemanticsNode().boundsInRoot
+        val shortLeading = composeRule.onNodeWithTag(
+            "recording-list-leading-1",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNode().boundsInRoot
+        val longLeading = composeRule.onNodeWithTag(
+            "recording-list-leading-2",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNode().boundsInRoot
+        val shortTrailing = composeRule.onNodeWithTag(
+            "recording-list-trailing-1",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNode().boundsInRoot
+        val longTrailing = composeRule.onNodeWithTag(
+            "recording-list-trailing-2",
+            useUnmergedTree = true,
+        )
+            .fetchSemanticsNode().boundsInRoot
+
+        assertEquals(shortLeading.top - shortRow.top, longLeading.top - longRow.top, 1f)
+        assertEquals(shortTrailing.top - shortRow.top, longTrailing.top - longRow.top, 1f)
+    }
 }

@@ -63,8 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
-import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
@@ -99,9 +97,11 @@ import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.TvListRow
 import coil3.ImageLoader
 import java.time.Instant
 import java.time.ZoneId
@@ -594,11 +594,11 @@ private fun FolderListRow(
     onClick: () -> Unit,
 ) {
     val summary = remember(folder) { summarizeDvrFolder(folder) }
-    ListItem(
+    TvListRow(
         selected = selected,
         onClick = onClick,
         headlineContent = {
-            Text(folder.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         supportingContent = {
             Text(
@@ -624,9 +624,9 @@ private fun FolderListRow(
                 Icons.Filled.Folder,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp),
             )
         },
-        scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("recordings-folder-${folder.path.joinToString("/")}")
@@ -722,11 +722,11 @@ private fun FolderRecentRecordingRow(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    ListItem(
+    TvListRow(
         selected = selected,
         onClick = onClick,
         headlineContent = {
-            Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         supportingContent = {
             Text(
@@ -744,7 +744,6 @@ private fun FolderRecentRecordingRow(
             )
         },
         trailingContent = { RecordingDateTime(entry.start) },
-        scale = ListItemDefaults.scale(focusedScale = 1f),
         modifier = modifier.fillMaxWidth(),
     )
 }
@@ -1056,10 +1055,10 @@ private fun RecordingListRow(
     val problem = kind == RecordingRowKind.PROBLEM
     val active = kind == RecordingRowKind.SCHEDULE && entry.state == DvrState.RECORDING
     val metadata = recordingListMetadata(entry, problem = problem)
-    ListItem(
+    TvListRow(
         selected = selected,
         onClick = onClick,
-        headlineContent = { Text(entry.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Text(
                 text = if (active) {
@@ -1076,7 +1075,8 @@ private fun RecordingListRow(
         },
         leadingContent = {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.testTag("recording-list-leading-${entry.id}"),
+                horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (problem) {
@@ -1095,10 +1095,11 @@ private fun RecordingListRow(
             }
         },
         trailingContent = {
-            if (kind == RecordingRowKind.SCHEDULE) ScheduleTime(entry)
-            else RecordingDateTime(entry.start)
+            Box(Modifier.testTag("recording-list-trailing-${entry.id}")) {
+                if (kind == RecordingRowKind.SCHEDULE) ScheduleTime(entry)
+                else RecordingDateTime(entry.start)
+            }
         },
-        scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("recording-list-entry-${entry.id}")
