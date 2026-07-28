@@ -18,6 +18,7 @@ data class PlayerSettings(
     val subtitleLanguage: String?,
     val aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
     val timeshiftEnabled: Boolean = true,
+    val refreshRateMatchingEnabled: Boolean = true,
 )
 
 class PlayerSettingsStore(private val context: Context) {
@@ -28,6 +29,7 @@ class PlayerSettingsStore(private val context: Context) {
         val SUBTITLE_LANGUAGE = stringPreferencesKey("subtitleLanguage")
         val ASPECT_RATIO = stringPreferencesKey("aspectRatio")
         val TIMESHIFT_ENABLED = booleanPreferencesKey("timeshiftEnabled")
+        val REFRESH_RATE_MATCHING_ENABLED = booleanPreferencesKey("refreshRateMatchingEnabled")
     }
 
     val playerSettings: Flow<PlayerSettings> =
@@ -42,6 +44,7 @@ class PlayerSettingsStore(private val context: Context) {
                 subtitleLanguage = p[Keys.SUBTITLE_LANGUAGE]?.takeIf { it.isNotBlank() },
                 aspectRatio = aspect,
                 timeshiftEnabled = p[Keys.TIMESHIFT_ENABLED] ?: true,
+                refreshRateMatchingEnabled = p[Keys.REFRESH_RATE_MATCHING_ENABLED] ?: true,
             )
         }
 
@@ -51,6 +54,7 @@ class PlayerSettingsStore(private val context: Context) {
         subtitleLanguage: String?,
         aspectRatio: AspectRatioMode,
         timeshiftEnabled: Boolean,
+        refreshRateMatchingEnabled: Boolean,
     ) {
         context.dataStore.edit { p ->
             p[Keys.PROFILE] = profile
@@ -58,6 +62,7 @@ class PlayerSettingsStore(private val context: Context) {
             p[Keys.SUBTITLE_LANGUAGE] = subtitleLanguage.orEmpty()
             p[Keys.ASPECT_RATIO] = aspectRatio.name
             p[Keys.TIMESHIFT_ENABLED] = timeshiftEnabled
+            p[Keys.REFRESH_RATE_MATCHING_ENABLED] = refreshRateMatchingEnabled
         }
     }
 
@@ -76,6 +81,12 @@ class PlayerSettingsStore(private val context: Context) {
     suspend fun setTimeshiftEnabled(enabled: Boolean) {
         context.dataStore.edit { p ->
             p[Keys.TIMESHIFT_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setRefreshRateMatchingEnabled(enabled: Boolean) {
+        context.dataStore.edit { p ->
+            p[Keys.REFRESH_RATE_MATCHING_ENABLED] = enabled
         }
     }
 }

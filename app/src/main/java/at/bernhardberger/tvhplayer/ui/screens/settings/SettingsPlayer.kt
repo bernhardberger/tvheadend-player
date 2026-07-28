@@ -45,6 +45,18 @@ fun SettingsPlayer(
                 .focusRequester(initialFocusRequester),
         )
 
+        SettingsSwitchRow(
+            label = stringResource(R.string.refresh_rate_matching_setting),
+            checked = ui.refreshRateMatchingEnabled,
+            supportingText = stringResource(R.string.refresh_rate_matching_setting_description),
+            onClick = {
+                vm.onRefreshRateMatchingEnabledChanged(!ui.refreshRateMatchingEnabled)
+            },
+            modifier = Modifier
+                .width(480.dp)
+                .fillMaxWidth(),
+        )
+
         SettingsSectionTitle(stringResource(R.string.profile))
 
         when (val profiles = ui.profiles) {

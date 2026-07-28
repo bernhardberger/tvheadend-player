@@ -312,6 +312,8 @@
     <string name="timeshift_unavailable">Timeshift ist für diesen Server oder dieses Stream-Profil nicht verfügbar.</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Diesem Client erlauben, für Live-TV einen Timeshift-Puffer vom Server anzufordern.</string>
+    <string name="refresh_rate_matching_setting">Bildwiederholrate anpassen</string>
+    <string name="refresh_rate_matching_setting_description">Android darf die Bildwiederholrate des Displays an das Video anpassen, wenn dies unterstützt wird.</string>
     <string name="simple_tv_enabled">Einfaches TV aktivieren</string>
     <string name="simple_tv_startup">Mit Einfachem TV starten</string>
     <string name="simple_tv_startup_explanation">Bei einem neuen App-Start den letzten Sender direkt in Einfaches TV abspielen.</string>

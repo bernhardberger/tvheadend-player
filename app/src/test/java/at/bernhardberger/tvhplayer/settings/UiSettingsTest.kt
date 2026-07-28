@@ -37,4 +37,14 @@ class UiSettingsTest {
             resolveChannelBrowseLayout(null),
         )
     }
+
+    @Test
+    fun refreshRateMatching_isEnabledByDefault() {
+        val settings = PlayerSettings(
+            audioLanguage = null,
+            subtitleLanguage = null,
+        )
+
+        assertTrue(settings.refreshRateMatchingEnabled)
+    }
 }

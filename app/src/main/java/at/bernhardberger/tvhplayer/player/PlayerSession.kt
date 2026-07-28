@@ -56,6 +56,15 @@ internal class PlayerCommandGate {
 internal fun shouldStartPlayback(activeServiceId: Int?, requestedServiceId: Int): Boolean =
     activeServiceId != requestedServiceId
 
+@C.VideoChangeFrameRateStrategy
+@OptIn(UnstableApi::class)
+internal fun videoChangeFrameRateStrategy(enabled: Boolean): Int =
+    if (enabled) {
+        C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
+    } else {
+        C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
+    }
+
 sealed interface PlaybackSessionState {
     data object Idle : PlaybackSessionState
     data object Starting : PlaybackSessionState
@@ -220,6 +229,7 @@ class PlayerSession(
         return player ?: ExoPlayer.Builder(appContext)
             .setRenderersFactory(renderersFactory)
             .setMediaSourceFactory(DefaultMediaSourceFactory(appContext))
+            .setVideoChangeFrameRateStrategy(videoChangeFrameRateStrategy(enabled = true))
             .build()
             .also { p ->
                 p.addAnalyticsListener(EventLogger())
@@ -289,6 +299,9 @@ class PlayerSession(
                 val settings = playerSettingsStore.playerSettings.first()
                 withContext(Dispatchers.Main.immediate) {
                     val p = getOrCreatePlayer(appContext)
+                    p.setVideoChangeFrameRateStrategy(
+                        videoChangeFrameRateStrategy(settings.refreshRateMatchingEnabled)
+                    )
                     p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().apply {
                         setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
                         settings.audioLanguage?.takeIf { it.isNotBlank() }
@@ -355,6 +368,9 @@ class PlayerSession(
             // unless a subtitle language is configured. Audio is re-enabled here so a
             // previous channel's stuck-audio recovery doesn't keep audio off.
             withContext(Dispatchers.Main.immediate) {
+                p.setVideoChangeFrameRateStrategy(
+                    videoChangeFrameRateStrategy(settings.refreshRateMatchingEnabled)
+                )
                 p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().apply {
                     setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
 
@@ -581,6 +597,15 @@ class PlayerSession(
         playWhenReadyState = p.playWhenReady
         currentItem = p.currentMediaItemIndex
         playbackPosition = p.currentPosition
+    }
+
+    @OptIn(UnstableApi::class)
+    suspend fun setRefreshRateMatchingEnabled(enabled: Boolean) {
+        commands.run {
+            withContext(Dispatchers.Main.immediate) {
+                player?.setVideoChangeFrameRateStrategy(videoChangeFrameRateStrategy(enabled))
+            }
+        }
     }
 
     fun setDiagnosticsEnabled(enabled: Boolean) {

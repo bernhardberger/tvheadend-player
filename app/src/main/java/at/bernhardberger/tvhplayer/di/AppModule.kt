@@ -90,6 +90,7 @@ val appModule = module {
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),
+            playerSession = get(),
             htsp = get(),
             io = get(named("io"))
         )

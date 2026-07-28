@@ -326,6 +326,8 @@
     <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Allow this client to request a server timeshift buffer for live TV.</string>
+    <string name="refresh_rate_matching_setting">Match content frame rate</string>
+    <string name="refresh_rate_matching_setting_description">Let Android match the display refresh rate to the video when supported.</string>
     <string name="simple_tv_enabled">Enable Simple TV mode</string>
     <string name="simple_tv_startup">Start in Simple TV mode</string>
     <string name="simple_tv_startup_explanation">On a fresh app launch, play the last channel directly in Simple TV.</string>

@@ -3,6 +3,11 @@ package at.bernhardberger.tvhplayer.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Switch
@@ -40,6 +45,11 @@ fun SettingsSwitchRow(
             focusedScale = 1f,
             focusedSelectedScale = 1f,
         ),
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Switch
+                toggleableState = ToggleableState(checked)
+            },
     )
 }

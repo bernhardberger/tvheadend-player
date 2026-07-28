@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.htsp.ProfileItem
+import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -29,10 +31,12 @@ data class SettingsPlayerUiState(
     val profiles: ProfilesUiState = ProfilesUiState.Idle,
     val selectedProfileUuid: String? = null,
     val timeshiftEnabled: Boolean = true,
+    val refreshRateMatchingEnabled: Boolean = true,
 )
 
 class SettingsPlayerViewModel(
     private val settingsStore: PlayerSettingsStore,
+    private val playerSession: PlayerSession,
     private val htsp: HtspService,
     private val io: CoroutineDispatcher
 ) : ViewModel() {
@@ -44,10 +48,15 @@ class SettingsPlayerViewModel(
     init {
         viewModelScope.launch {
             settingsStore.playerSettings
-                .map { it.timeshiftEnabled }
+                .map { it.timeshiftEnabled to it.refreshRateMatchingEnabled }
                 .distinctUntilChanged()
-                .collect { enabled ->
-                    _ui.value = _ui.value.copy(timeshiftEnabled = enabled)
+                .collect { (timeshiftEnabled, refreshRateMatchingEnabled) ->
+                    _ui.update {
+                        it.copy(
+                            timeshiftEnabled = timeshiftEnabled,
+                            refreshRateMatchingEnabled = refreshRateMatchingEnabled,
+                        )
+                    }
                 }
         }
 
@@ -108,6 +117,14 @@ class SettingsPlayerViewModel(
         _ui.value = _ui.value.copy(timeshiftEnabled = enabled)
         viewModelScope.launch {
             settingsStore.setTimeshiftEnabled(enabled)
+        }
+    }
+
+    fun onRefreshRateMatchingEnabledChanged(enabled: Boolean) {
+        _ui.update { it.copy(refreshRateMatchingEnabled = enabled) }
+        viewModelScope.launch {
+            settingsStore.setRefreshRateMatchingEnabled(enabled)
+            playerSession.setRefreshRateMatchingEnabled(enabled)
         }
     }
 

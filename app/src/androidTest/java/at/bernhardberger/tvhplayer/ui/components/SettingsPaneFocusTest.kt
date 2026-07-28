@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -66,7 +65,12 @@ class SettingsPaneFocusTest {
                             onClick = {},
                             modifier = Modifier.focusRequester(contentFocus),
                         )
-                        Column(Modifier.focusGroup()) {
+                        SettingsSwitchRow(
+                            label = "Match content frame rate",
+                            checked = true,
+                            onClick = {},
+                        )
+                        Column {
                             ListItem(
                                 selected = false,
                                 onClick = {},
@@ -86,6 +90,22 @@ class SettingsPaneFocusTest {
         composeTestRule.onNodeWithText("Player").assertIsFocused()
         composeTestRule.onNodeWithText("Player").performKeyInput {
             pressKey(Key.DirectionCenter)
+        }
+        composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
+        composeTestRule.onNodeWithText("Timeshift").performKeyInput {
+            pressKey(Key.DirectionDown)
+        }
+        composeTestRule.onNodeWithText("Match content frame rate").assertIsFocused()
+        composeTestRule.onNodeWithText("Match content frame rate").performKeyInput {
+            pressKey(Key.DirectionDown)
+        }
+        composeTestRule.onNodeWithText("Direct streaming").assertIsFocused()
+        composeTestRule.onNodeWithText("Direct streaming").performKeyInput {
+            pressKey(Key.DirectionUp)
+        }
+        composeTestRule.onNodeWithText("Match content frame rate").assertIsFocused()
+        composeTestRule.onNodeWithText("Match content frame rate").performKeyInput {
+            pressKey(Key.DirectionUp)
         }
         composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
         composeTestRule.onNodeWithText("Timeshift").performKeyInput {
