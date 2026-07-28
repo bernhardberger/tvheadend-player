@@ -33,6 +33,9 @@ RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 CAPTURE_ROOT = ROOT / "captures/device"
 DEFAULT_SCREENSHOT_NAME = "current-screen"
+DEBUG_VIDEO_BACKDROP_ACTION = "at.bernhardberger.tvhplayer.action.DEBUG_VIDEO_BACKDROP"
+DEBUG_VIDEO_BACKDROP_EXTRA = "visible"
+DEBUG_VIDEO_BACKDROP_RESULT = -1
 MAX_CREDENTIAL_FILE_BYTES = 64 * 1024
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 KEY_EVENTS = {
@@ -543,6 +546,57 @@ def capture_screenshot(adb: str, serial: str, output_path: Path) -> None:
     print(f"screenshot={output}")
 
 
+def debug_video_backdrop_command(
+    adb: str,
+    serial: str,
+    package_name: str,
+    *,
+    visible: bool,
+) -> list[str]:
+    return adb_command(
+        adb,
+        serial,
+        "shell",
+        "am",
+        "broadcast",
+        "-a",
+        DEBUG_VIDEO_BACKDROP_ACTION,
+        "-p",
+        package_name,
+        "--receiver-foreground",
+        "--ez",
+        DEBUG_VIDEO_BACKDROP_EXTRA,
+        str(visible).lower(),
+    )
+
+
+def debug_video_backdrop_applied(output: str) -> bool:
+    expected = f"Broadcast completed: result={DEBUG_VIDEO_BACKDROP_RESULT}"
+    return any(line.strip().startswith(expected) for line in output.splitlines())
+
+
+def set_debug_video_backdrop(
+    adb: str,
+    serial: str,
+    package_name: str,
+    *,
+    visible: bool,
+) -> None:
+    result = run(
+        debug_video_backdrop_command(
+            adb,
+            serial,
+            package_name,
+            visible=visible,
+        ),
+        capture=True,
+    )
+    if not debug_video_backdrop_applied(result.stdout):
+        fail(
+            "synthetic video backdrop requires the debug build already foreground"
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -630,6 +684,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--confirm-safe-screen",
         action="store_true",
         help="Confirm that no credential or other secret-bearing screen is visible",
+    )
+    screenshot_parser.add_argument(
+        "--synthetic-video-backdrop",
+        action="store_true",
+        help="Temporarily show the debug build's synthetic player frame",
     )
     subparsers.add_parser("smoke", help="Force-stop, launch, and show current focus")
     subparsers.add_parser(
@@ -874,7 +933,25 @@ def main() -> int:
 
     if args.action == "screenshot":
         screenshot_output = args.output or default_screenshot_output(args.name)
-        capture_screenshot(adb, serial, screenshot_output)
+        if args.synthetic_video_backdrop:
+            try:
+                set_debug_video_backdrop(
+                    adb,
+                    serial,
+                    package_name,
+                    visible=True,
+                )
+                time.sleep(0.5)
+                capture_screenshot(adb, serial, screenshot_output)
+            finally:
+                set_debug_video_backdrop(
+                    adb,
+                    serial,
+                    package_name,
+                    visible=False,
+                )
+        else:
+            capture_screenshot(adb, serial, screenshot_output)
         return 0
 
     if args.action == "key":

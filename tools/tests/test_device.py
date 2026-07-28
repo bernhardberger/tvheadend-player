@@ -17,6 +17,8 @@ identity_errors = DEVICE["identity_errors"]
 load_credential_payload = DEVICE["load_credential_payload"]
 resolve_verified_release_apk = DEVICE["resolve_verified_release_apk"]
 capture_screenshot = DEVICE["capture_screenshot"]
+debug_video_backdrop_command = DEVICE["debug_video_backdrop_command"]
+debug_video_backdrop_applied = DEVICE["debug_video_backdrop_applied"]
 resolve_screenshot_output = DEVICE["resolve_screenshot_output"]
 default_screenshot_output = DEVICE["default_screenshot_output"]
 sanitize_screenshot_name = DEVICE["sanitize_screenshot_name"]
@@ -81,6 +83,47 @@ class DevicePolicyTest(unittest.TestCase):
             "guide-scope-tabs",
         )
         self.assertEqual(sanitize_screenshot_name("---"), "current-screen")
+
+    def test_screenshot_can_request_synthetic_video_backdrop(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["screenshot", "--synthetic-video-backdrop"])
+
+        self.assertTrue(args.synthetic_video_backdrop)
+
+    def test_synthetic_video_backdrop_uses_bounded_package_broadcast(self) -> None:
+        self.assertEqual(
+            debug_video_backdrop_command(
+                "adb",
+                "test-device",
+                "at.bernhardberger.tvhplayer",
+                visible=True,
+            ),
+            [
+                "adb",
+                "-s",
+                "test-device",
+                "shell",
+                "am",
+                "broadcast",
+                "-a",
+                DEVICE["DEBUG_VIDEO_BACKDROP_ACTION"],
+                "-p",
+                "at.bernhardberger.tvhplayer",
+                "--receiver-foreground",
+                "--ez",
+                DEVICE["DEBUG_VIDEO_BACKDROP_EXTRA"],
+                "true",
+            ],
+        )
+
+    def test_synthetic_video_backdrop_requires_debug_app_acknowledgement(self) -> None:
+        self.assertTrue(
+            debug_video_backdrop_applied("Broadcast completed: result=-1, data=null")
+        )
+        self.assertFalse(
+            debug_video_backdrop_applied("Broadcast completed: result=0, data=null")
+        )
 
     def test_production_and_unclassified_devices_reject_mutation(self) -> None:
         for role in ("production", "unclassified"):

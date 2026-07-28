@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +28,23 @@ import org.junit.Test
 class PlayerOverlayCompositionTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun debugVideoBackdropExistsOnlyWhenRequested() {
+        val visible = mutableStateOf(false)
+        composeRule.setContent {
+            DebugVideoBackdrop(
+                visible = visible.value,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        composeRule.onNodeWithTag("debug-video-backdrop").assertDoesNotExist()
+
+        visible.value = true
+
+        composeRule.onNodeWithTag("debug-video-backdrop").assertExists()
+    }
 
     @Test
     fun playbackOptionsUseCompactContextualOverlay() {

@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 fun PlayerVideoSurface(
     player: Player,
     aspectRatio: AspectRatioMode,
+    debugVideoBackdropVisible: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -45,6 +46,10 @@ fun PlayerVideoSurface(
                     AspectRatioMode.FORCE_4_3 -> Modifier.aspectRatio(4f / 3f)
                 }
             ),
+        )
+        DebugVideoBackdrop(
+            visible = debugVideoBackdropVisible,
+            modifier = Modifier.matchParentSize(),
         )
     }
 }

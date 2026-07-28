@@ -102,6 +102,7 @@ object Routes {
 fun AppRoot(
     applianceLaunchRequests: ApplianceLaunchRequests,
     applyStartupMode: Boolean,
+    debugVideoBackdropVisible: Boolean = false,
     onPlayerVisibilityChanged: (Boolean) -> Unit,
 ) {
     val serverSettingsStore: ServerSettingsStore = koinInject()
@@ -445,6 +446,7 @@ fun AppRoot(
                             channelName = channelName,
                             serviceId = serviceId,
                             simpleTvProfile = capabilityProfile,
+                            debugVideoBackdropVisible = debugVideoBackdropVisible,
                             onUnlock = { nav.navigate(Routes.UNLOCK) },
                             onClose = {
                                 if (!simpleTvActive) nav.popBackStack()
@@ -465,6 +467,7 @@ fun AppRoot(
                             RecordingPlayerScreen(
                                 recordingId = recordingId,
                                 simpleTvProfile = capabilityProfile,
+                                debugVideoBackdropVisible = debugVideoBackdropVisible,
                                 onUnlock = { nav.navigate(Routes.UNLOCK) },
                                 onClose = { nav.popBackStack() },
                             )
@@ -525,6 +528,7 @@ fun AppRoot(
             PlayerVideoSurface(
                 player = playerSession.getOrCreatePlayer(context),
                 aspectRatio = playerSettings.aspectRatio,
+                debugVideoBackdropVisible = debugVideoBackdropVisible,
                 modifier = Modifier.fillMaxSize(),
             )
             if (showRail) {

@@ -359,3 +359,11 @@ Every rule above is either testable or explicitly a device check.
 
 ADB screenshots cannot prove SurfaceView visibility, focus feel, or motion
 quality. Device checks are not optional and are not satisfied by a passing test.
+The debug build's optional synthetic video backdrop can make player-overlay and
+warm-background geometry and contrast visible in a deterministic ADB capture,
+but it is not evidence about live video, SurfaceView composition, HDR,
+deinterlacing, or motion. Capture it only on the configured test device with:
+
+```bash
+./tools/device screenshot --synthetic-video-backdrop --confirm-safe-screen
+```
