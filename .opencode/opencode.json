@@ -2,9 +2,35 @@
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "android-tv",
   "share": "disabled",
-  "subagent_depth": 0,
+  "subagent_depth": 1,
   "instructions": ["AGENTS.md", "docs/device-targets.md"],
+  "agent": {
+    "build": {
+      "disable": true
+    },
+    "explore": {
+      "permission": {
+        "bash": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+        "task": "deny"
+      }
+    },
+    "general": {
+      "permission": {
+        "task": "deny"
+      }
+    }
+  },
   "permission": {
-    "task": "deny"
+    "task": {
+      "*": "deny",
+      "quick-explore": "allow",
+      "explore": "allow",
+      "scout": "allow",
+      "android-reviewer": "allow",
+      "tv-ux-reviewer": "allow",
+      "general": "ask"
+    }
   }
 }

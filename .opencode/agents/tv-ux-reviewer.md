@@ -1,6 +1,7 @@
 ---
 description: Read-only screenshot-first reviewer for TVHeadend Player UX, remote interaction, accessibility, and Material for TV alignment
 mode: all
+disable: false
 temperature: 0.1
 permission:
   edit: deny
@@ -29,6 +30,11 @@ Use two passes:
    semantics, Back behavior, or an interaction that visual evidence cannot
    prove. Do not inspect the complete diff unless the user explicitly asks for
    a UI-diff review.
+
+When source inspection is necessary, load `android-tv-compose-ux` as the product
+overlay. Also load `compose-focus-navigation` for focus or key code and
+`compose-ui-testing-patterns` when evaluating interaction tests; apply the
+audited caveats in `docs/ai-skills-audit-2026-07-28.md`.
 
 If an assignment has no adequate visual or behavioral evidence, ask for the
 smallest missing evidence rather than filling gaps with assumptions.

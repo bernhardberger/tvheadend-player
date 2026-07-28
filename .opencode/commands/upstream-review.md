@@ -1,6 +1,7 @@
 ---
 description: Review the current branch for a clean generic upstream contribution boundary.
 agent: android-reviewer
+subtask: true
 ---
 
 Apply the `tvhstream-upstream-contribution` skill. Inspect remote URLs, fetch all

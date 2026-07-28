@@ -19,6 +19,13 @@ Components, Media3, Kotlin coroutines, Coil, Koin, and Timber. Their own copyrig
 and license terms continue to apply; dependency coordinates and exact versions
 are recorded in `gradle/libs.versions.toml`.
 
+The project-local Kotlin and Compose engineering skills under `.agents/skills/`
+are selected unmodified files from Chris Banes' `chrisbanes/skills` release
+`2026.7.21`, licensed under Apache License 2.0. Their exact source paths and
+content hashes are recorded in `skills-lock.json`; the Apache License text is
+the same common text retained in
+`app/libs/licenses/media3-APACHE-2.0.txt`.
+
 The bundled decoder AAR is AndroidX Media3's Apache-2.0 FFmpeg extension built
 from Media3 1.9.2. It contains FFmpeg n6.0.1 configured under
 LGPL-2.1-or-later with only MP1, MP2, and MP3 decoders. Exact commits,

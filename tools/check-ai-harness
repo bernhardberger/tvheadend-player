@@ -3,41 +3,59 @@
 
 from __future__ import annotations
 
+import fnmatch
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / ".opencode/opencode.json"
+SKILLS_LOCK_PATH = ROOT / "skills-lock.json"
 REQUIRED_FILES = (
     "AGENTS.md",
+    "NOTICE.md",
     "docs/device-targets.md",
     ".opencode/opencode.json",
     ".opencode/agents/android-tv.md",
+    ".opencode/agents/repo-maintainer.md",
     ".opencode/agents/android-reviewer.md",
+    ".opencode/agents/quick-explore.md",
+    ".opencode/agents/scout.md",
     ".opencode/agents/tv-ux-reviewer.md",
     ".opencode/skills/android-tv-device-testing/SKILL.md",
+    ".opencode/skills/android-tv-compose-ux/SKILL.md",
+    ".opencode/skills/live-tv-dvr-conventions/SKILL.md",
+    ".opencode/skills/media3-htsp-playback-safety/SKILL.md",
     ".opencode/skills/tvhstream-upstream-contribution/SKILL.md",
+    ".opencode/commands/android-review.md",
     ".opencode/commands/verify.md",
     ".opencode/commands/device-check.md",
+    ".opencode/commands/tv-ux-review.md",
     ".opencode/commands/upstream-review.md",
     "docs/ai-engineering-harness.md",
+    "docs/ai-skills-audit-2026-07-28.md",
+    "docs/media3-upgrade-assessment-2026-07-28.md",
     "docs/test-device-credential-provisioning.md",
     "app/src/debug/AndroidManifest.xml",
     "app/src/debug/java/at/bernhardberger/tvhplayer/DebugApp.kt",
     "app/libs/native-dependencies.json",
+    "app/libs/licenses/media3-APACHE-2.0.txt",
     ".github/workflows/build.yml",
     "tools/verify",
     "tools/device",
     "tools/check-native-libs",
     "tools/tests/test_device.py",
+    "skills-lock.json",
 )
 SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+SKILL_HASH = re.compile(r"^[0-9a-f]{64}$")
 PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
 PRIVATE_LAN_IP = re.compile(r"\b(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]))(?:\.\d{1,3}){2}\b")
 REQUIRED_TV_UX_SECTIONS = {
@@ -45,6 +63,56 @@ REQUIRED_TV_UX_SECTIONS = {
     ".opencode/agents/android-tv.md": "## TV UX implementation checklist",
     ".opencode/agents/android-reviewer.md": "## TV UX review gates",
     ".opencode/agents/tv-ux-reviewer.md": "## UX review method",
+}
+REQUIRED_PRIMARY_AGENTS = {"android-tv", "repo-maintainer"}
+READ_ONLY_CHILD_AGENTS = {
+    "quick-explore",
+    "explore",
+    "scout",
+    "android-reviewer",
+    "tv-ux-reviewer",
+}
+ALL_CHILD_AGENTS = READ_ONLY_CHILD_AGENTS | {"general"}
+EXPECTED_TASK_POLICY = {
+    "*": "deny",
+    "quick-explore": "allow",
+    "explore": "allow",
+    "scout": "allow",
+    "android-reviewer": "allow",
+    "tv-ux-reviewer": "allow",
+    "general": "ask",
+}
+ISOLATED_REVIEW_COMMANDS = {
+    "android-review",
+    "tv-ux-review",
+    "upstream-review",
+}
+IMPORTED_SKILL_SOURCE = "chrisbanes/skills"
+IMPORTED_SKILL_REF = "2026.7.21"
+REQUIRED_IMPORTED_SKILLS = {
+    "compose-animations",
+    "compose-focus-navigation",
+    "compose-modifier-and-layout-style",
+    "compose-recomposition-performance",
+    "compose-side-effects",
+    "compose-slot-api-pattern",
+    "compose-stability-diagnostics",
+    "compose-state-authoring",
+    "compose-state-deferred-reads",
+    "compose-state-hoisting",
+    "compose-state-holder-ui-split",
+    "compose-ui-testing-patterns",
+    "kotlin-control-flow",
+    "kotlin-coroutines-structured-concurrency",
+    "kotlin-flow-state-event-modeling",
+    "kotlin-functions",
+    "kotlin-types-value-class",
+}
+EXCLUDED_IMPORTED_SKILLS = {
+    "implement-issue",
+    "kotlin-multiplatform-expect-actual",
+    "shepherd",
+    "using-chrisbanes-skills",
 }
 
 
@@ -60,6 +128,87 @@ def frontmatter(path: Path) -> dict[str, str]:
             key, value = line.split(":", 1)
             values[key.strip()] = value.strip().strip("'\"")
     return values
+
+
+def frontmatter_permission(path: Path, name: str) -> str | None:
+    """Read one scalar permission from an agent's frontmatter."""
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return None
+    in_permission = False
+    for line in text.splitlines()[1:]:
+        if line == "---":
+            break
+        if line == "permission:":
+            in_permission = True
+            continue
+        if in_permission and line and not line.startswith(" "):
+            break
+        if in_permission and line.startswith("  ") and ":" in line:
+            key, value = line.strip().split(":", 1)
+            if key == name:
+                return value.strip().strip("'\"")
+    return None
+
+
+def skill_folder_hash(path: Path) -> str:
+    """Match the Skills CLI hash: sorted relative paths followed by file bytes."""
+    digest = hashlib.sha256()
+    files = sorted(
+        child
+        for child in path.rglob("*")
+        if child.is_file() and not {".git", "node_modules"} & set(child.parts)
+    )
+    for child in files:
+        digest.update(child.relative_to(path).as_posix().encode("utf-8"))
+        digest.update(child.read_bytes())
+    return digest.hexdigest()
+
+
+def run_json_command(
+    command: list[str], environment: dict[str, str]
+) -> tuple[object | None, str | None]:
+    """Run OpenCode with a real output file and decode its JSON response."""
+    with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as output:
+        result = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            stdout=output,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            check=False,
+        )
+        output.seek(0)
+        raw_output = output.read()
+    if result.returncode != 0:
+        detail = result.stderr.strip().splitlines()
+        return None, detail[-1] if detail else f"exit code {result.returncode}"
+    try:
+        return json.loads(raw_output), None
+    except json.JSONDecodeError as exc:
+        return None, f"invalid JSON: {exc}"
+
+
+def effective_permission(agent: dict[str, object], permission: str, pattern: str) -> str | None:
+    """Resolve the last matching permission rule emitted by OpenCode."""
+    action = None
+    rules = agent.get("permission", [])
+    if not isinstance(rules, list):
+        return None
+    for rule in rules:
+        if not isinstance(rule, dict) or rule.get("permission") != permission:
+            continue
+        rule_pattern = rule.get("pattern")
+        rule_action = rule.get("action")
+        if (
+            isinstance(rule_pattern, str)
+            and isinstance(rule_action, str)
+            and fnmatch.fnmatchcase(pattern, rule_pattern)
+        ):
+            action = rule_action
+    return action
 
 
 def main() -> int:
@@ -80,14 +229,25 @@ def main() -> int:
         errors.append(".opencode/opencode.json must declare the official schema")
     if config.get("default_agent") != "android-tv":
         errors.append("default_agent must be android-tv")
+    if config.get("agent", {}).get("build", {}).get("disable") is not True:
+        errors.append("generic built-in build agent must remain disabled")
+    for name in ("explore", "general"):
+        task_override = (
+            config.get("agent", {}).get(name, {}).get("permission", {}).get("task")
+        )
+        if task_override != "deny":
+            errors.append(f"built-in child agent {name} must deny recursive tasks")
     if config.get("share") != "disabled":
         errors.append("project session sharing must remain disabled")
-    if config.get("subagent_depth") != 0:
-        errors.append("automatic subagent depth must remain zero")
+    if config.get("subagent_depth") != 1:
+        errors.append("subagent depth must be exactly one")
     if config.get("instructions") != ["AGENTS.md", "docs/device-targets.md"]:
         errors.append("project instructions must load AGENTS.md and docs/device-targets.md")
-    if config.get("permission", {}).get("task") != "deny":
-        errors.append("project task/subagent permission must remain denied")
+    task_policy = config.get("permission", {}).get("task")
+    if task_policy != EXPECTED_TASK_POLICY:
+        errors.append("project Task policy must exactly match the bounded child allowlist")
+    elif list(task_policy)[0] != "*":
+        errors.append("project Task wildcard denial must precede named exceptions")
 
     for path in sorted((ROOT / ".opencode/agents").glob("*.md")):
         metadata = frontmatter(path)
@@ -95,6 +255,20 @@ def main() -> int:
             errors.append(f"{path.relative_to(ROOT)}: missing description")
         if metadata.get("mode") not in {"primary", "subagent", "all"}:
             errors.append(f"{path.relative_to(ROOT)}: invalid or missing mode")
+
+    for name in REQUIRED_PRIMARY_AGENTS:
+        path = ROOT / ".opencode/agents" / f"{name}.md"
+        if path.is_file():
+            metadata = frontmatter(path)
+            if metadata.get("mode") != "primary":
+                errors.append(f"{path.relative_to(ROOT)}: must remain a primary agent")
+            if frontmatter_permission(path, "task") is not None:
+                errors.append(f"{path.relative_to(ROOT)}: must inherit the project Task policy")
+
+    for name in ("android-reviewer", "tv-ux-reviewer"):
+        path = ROOT / ".opencode/agents" / f"{name}.md"
+        if path.is_file() and frontmatter_permission(path, "task") != "deny":
+            errors.append(f"{path.relative_to(ROOT)}: must retain task: deny")
 
     for relative, heading in REQUIRED_TV_UX_SECTIONS.items():
         text = (ROOT / relative).read_text(encoding="utf-8")
@@ -108,27 +282,83 @@ def main() -> int:
         if not path.read_text(encoding="utf-8").split("---", 2)[-1].strip():
             errors.append(f"{path.relative_to(ROOT)}: missing command body")
 
+    for name in ISOLATED_REVIEW_COMMANDS:
+        path = ROOT / ".opencode/commands" / f"{name}.md"
+        if path.is_file() and frontmatter(path).get("subtask") != "true":
+            errors.append(f"{path.relative_to(ROOT)}: must declare subtask: true")
+
     seen_skills: set[str] = set()
-    for path in sorted((ROOT / ".opencode/skills").glob("*/SKILL.md")):
-        metadata = frontmatter(path)
-        name = metadata.get("name", "")
-        relative = path.relative_to(ROOT)
-        if name != path.parent.name:
-            errors.append(f"{relative}: skill name must match its directory")
-        if not SKILL_NAME.fullmatch(name):
-            errors.append(f"{relative}: invalid skill name {name!r}")
-        if not metadata.get("description"):
-            errors.append(f"{relative}: missing description")
-        if name in seen_skills:
-            errors.append(f"duplicate skill name: {name}")
-        seen_skills.add(name)
+    imported_skills: set[str] = set()
+    skill_roots = (ROOT / ".opencode/skills", ROOT / ".agents/skills")
+    for skill_root in skill_roots:
+        for path in sorted(skill_root.glob("*/SKILL.md")):
+            metadata = frontmatter(path)
+            name = metadata.get("name", "")
+            relative = path.relative_to(ROOT)
+            if name != path.parent.name:
+                errors.append(f"{relative}: skill name must match its directory")
+            if not SKILL_NAME.fullmatch(name):
+                errors.append(f"{relative}: invalid skill name {name!r}")
+            if not metadata.get("description"):
+                errors.append(f"{relative}: missing description")
+            if name in seen_skills:
+                errors.append(f"duplicate skill name: {name}")
+            seen_skills.add(name)
+            if skill_root.name == "skills" and skill_root.parent.name == ".agents":
+                imported_skills.add(name)
+
+    missing_imported = REQUIRED_IMPORTED_SKILLS - imported_skills
+    unexpected_imported = imported_skills - REQUIRED_IMPORTED_SKILLS
+    if missing_imported:
+        errors.append(f"missing reviewed imported skills: {sorted(missing_imported)}")
+    if unexpected_imported:
+        errors.append(f"unreviewed imported skills present: {sorted(unexpected_imported)}")
+    excluded_present = EXCLUDED_IMPORTED_SKILLS & seen_skills
+    if excluded_present:
+        errors.append(f"excluded imported skills present: {sorted(excluded_present)}")
+
+    try:
+        skills_lock = json.loads(SKILLS_LOCK_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"invalid skills lock JSON: {exc}")
+        skills_lock = {}
+    if skills_lock.get("version") != 1:
+        errors.append("skills-lock.json must use schema version 1")
+    locked_skills = skills_lock.get("skills", {})
+    if not isinstance(locked_skills, dict):
+        errors.append("skills-lock.json skills must be an object")
+        locked_skills = {}
+    if set(locked_skills) != imported_skills:
+        errors.append("skills-lock.json entries must exactly match imported skills")
+    for name, entry in locked_skills.items():
+        if not isinstance(entry, dict):
+            errors.append(f"skills-lock.json: invalid entry for {name}")
+            continue
+        if entry.get("source") != IMPORTED_SKILL_SOURCE:
+            errors.append(f"skills-lock.json: unexpected source for {name}")
+        if entry.get("ref") != IMPORTED_SKILL_REF:
+            errors.append(f"skills-lock.json: unexpected ref for {name}")
+        if entry.get("sourceType") != "github":
+            errors.append(f"skills-lock.json: unexpected source type for {name}")
+        if entry.get("skillPath") != f"skills/{name}/SKILL.md":
+            errors.append(f"skills-lock.json: unexpected skill path for {name}")
+        computed_hash = str(entry.get("computedHash", ""))
+        if not SKILL_HASH.fullmatch(computed_hash):
+            errors.append(f"skills-lock.json: invalid computed hash for {name}")
+        elif name in imported_skills:
+            actual_hash = skill_folder_hash(ROOT / ".agents/skills" / name)
+            if computed_hash != actual_hash:
+                errors.append(f"skills-lock.json: content hash mismatch for {name}")
 
     harness_paths = [
         ROOT / "AGENTS.md",
         ROOT / "docs/ai-engineering-harness.md",
+        ROOT / "docs/ai-skills-audit-2026-07-28.md",
         ROOT / "docs/test-device-credential-provisioning.md",
         ROOT / "docs/device-targets.md",
         ROOT / ".tvhplayer-device.example.json",
+        ROOT / "skills-lock.json",
+        *sorted((ROOT / ".agents").rglob("*.md")),
         *sorted((ROOT / ".opencode").rglob("*.md")),
         *sorted(
             path
@@ -198,24 +428,118 @@ def main() -> int:
     if opencode:
         environment = os.environ.copy()
         environment["OPENCODE_PURE"] = "1"
-        result = subprocess.run(
-            [opencode, "debug", "config", "--pure"],
-            cwd=ROOT,
-            env=environment,
-            text=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            timeout=30,
-            check=False,
+        resolved_config, config_error = run_json_command(
+            [opencode, "debug", "config", "--pure"], environment
         )
-        if result.returncode != 0:
-            detail = result.stderr.strip().splitlines()
-            errors.append(
-                "OpenCode rejected the project config"
-                + (f": {detail[-1]}" if detail else "")
+        if config_error:
+            errors.append(f"OpenCode rejected the project config: {config_error}")
+        else:
+            if not isinstance(resolved_config, dict):
+                errors.append("OpenCode resolved config must be a JSON object")
+            else:
+                if resolved_config.get("default_agent") != "android-tv":
+                    errors.append("resolved OpenCode default agent must be android-tv")
+                if resolved_config.get("subagent_depth") != 1:
+                    errors.append("resolved OpenCode subagent depth must be exactly one")
+                resolved_task_policy = resolved_config.get("permission", {}).get("task")
+                if resolved_task_policy != EXPECTED_TASK_POLICY:
+                    errors.append("resolved OpenCode Task policy does not match the allowlist")
+                elif list(resolved_task_policy)[0] != "*":
+                    errors.append("resolved OpenCode Task wildcard denial must come first")
+                resolved_agents = resolved_config.get("agent", {})
+                if not isinstance(resolved_agents, dict):
+                    errors.append("resolved OpenCode agents must be an object")
+                elif resolved_agents.get("build", {}).get("disable") is not True:
+                    errors.append("resolved OpenCode build agent must remain disabled")
+                resolved_commands = resolved_config.get("command", {})
+                if not isinstance(resolved_commands, dict):
+                    errors.append("resolved OpenCode commands must be an object")
+                else:
+                    for name in ISOLATED_REVIEW_COMMANDS:
+                        command = resolved_commands.get(name, {})
+                        if not isinstance(command, dict) or command.get("subtask") is not True:
+                            errors.append(f"resolved command {name} must use an isolated subtask")
+
+            resolved_agent_details: dict[str, dict[str, object]] = {}
+            for name in REQUIRED_PRIMARY_AGENTS | ALL_CHILD_AGENTS:
+                agent, agent_error = run_json_command(
+                    [opencode, "debug", "agent", name, "--pure"], environment
+                )
+                if agent_error:
+                    errors.append(f"OpenCode rejected agent {name}: {agent_error}")
+                elif not isinstance(agent, dict):
+                    errors.append(f"OpenCode agent {name} must resolve to a JSON object")
+                else:
+                    resolved_agent_details[name] = agent
+
+            for name in REQUIRED_PRIMARY_AGENTS:
+                agent = resolved_agent_details.get(name)
+                if not agent:
+                    continue
+                if agent.get("mode") != "primary":
+                    errors.append(f"resolved agent {name} must remain primary")
+                for child, expected_action in EXPECTED_TASK_POLICY.items():
+                    if child == "*":
+                        continue
+                    actual_action = effective_permission(agent, "task", child)
+                    if actual_action != expected_action:
+                        errors.append(
+                            f"resolved agent {name} Task action for {child} must be "
+                            f"{expected_action}, got {actual_action}"
+                        )
+                if effective_permission(agent, "task", "unlisted-child") != "deny":
+                    errors.append(f"resolved agent {name} must deny unlisted children")
+
+            for name in ALL_CHILD_AGENTS:
+                agent = resolved_agent_details.get(name)
+                if not agent:
+                    continue
+                for child in ALL_CHILD_AGENTS | {"unlisted-child"}:
+                    if effective_permission(agent, "task", child) != "deny":
+                        errors.append(f"resolved child agent {name} must prohibit recursion")
+
+            for name in READ_ONLY_CHILD_AGENTS:
+                agent = resolved_agent_details.get(name)
+                if not agent:
+                    continue
+                tools = agent.get("tools", {})
+                mutation_tools = (
+                    [key for key in ("apply_patch", "edit", "write") if key in tools]
+                    if isinstance(tools, dict)
+                    else []
+                )
+                if not mutation_tools or any(tools[key] is not False for key in mutation_tools):
+                    errors.append(f"resolved child agent {name} must remain read-only")
+
+            explore = resolved_agent_details.get("explore")
+            if explore:
+                tools = explore.get("tools", {})
+                if not isinstance(tools, dict) or any(
+                    tools.get(name) is not False for name in ("bash", "webfetch")
+                ):
+                    errors.append("resolved explore agent must remain repository-only")
+
+            discovered, skill_error = run_json_command(
+                [opencode, "debug", "skill", "--pure"], environment
             )
+            if skill_error:
+                errors.append(f"OpenCode rejected project skills: {skill_error}")
+            elif not isinstance(discovered, list):
+                errors.append("OpenCode skill registry must be a JSON array")
+            else:
+                discovered_names = {
+                    entry.get("name")
+                    for entry in discovered
+                    if isinstance(entry, dict) and isinstance(entry.get("name"), str)
+                }
+                missing_runtime_skills = seen_skills - discovered_names
+                if missing_runtime_skills:
+                    errors.append(
+                        "OpenCode did not discover project skills: "
+                        f"{sorted(missing_runtime_skills)}"
+                    )
     else:
-        warnings.append("opencode not found; skipped live config parser check")
+        warnings.append("opencode not found; skipped live parser and skill discovery checks")
 
     for warning in warnings:
         print(f"warning: {warning}")
@@ -226,7 +550,7 @@ def main() -> int:
         return 1
     print(
         "AI harness passed: config, agents, skills, commands, safety scan, "
-        "and OpenCode parser"
+        "and resolved OpenCode permissions/discovery"
     )
     return 0
 

@@ -1,6 +1,7 @@
 ---
 description: Read-only reviewer for TVHeadend Player Android correctness, Compose for TV, security, native provenance, appliance invariants, GPLv3, and upstreamability
 mode: all
+disable: false
 temperature: 0.1
 permission:
   edit: deny
@@ -15,8 +16,12 @@ permission:
 ---
 
 Review TVHeadend Player without editing it. Read `AGENTS.md`, the appliance
-specification, and the implementation plan, then inspect the complete proposed
-diff and relevant tests.
+specification, the implementation plan, and
+`docs/ai-skills-audit-2026-07-28.md`, then inspect the complete proposed diff and
+relevant tests. Load every reviewed Chris Banes skill matching a changed concern
+and use it as the default implementation review guidance. Apply the local TV UX,
+live TV/DVR, or playback-safety skill as the product overlay when that domain is
+present. Product rules and the audit's explicit caveats take precedence.
 
 Prioritize findings in this order:
 

@@ -105,9 +105,16 @@ second competing theme or move focusable controls back to mobile Material.
   build from this fork.
 - Review every diff for secrets, unrelated churn, upstreamability, and GPLv3
   attribution before pushing.
-- Codex Ultra mode may spawn automatic subagents for bounded parallel work.
-  Other project agents must not spawn background or automatic subagents; use
-  direct selection and explicit review sessions instead.
+- OpenCode delegation is limited to one child level. `quick-explore` may be
+  spawned automatically only for exact, low-consequence repository lookups;
+  route architecture, multi-hop tracing, and completeness-sensitive work to
+  `explore`. `scout`, `android-reviewer`, and `tv-ux-reviewer` may be spawned
+  automatically for bounded read-only research or review. Child agents must not
+  delegate again. Spawning the writing-capable `general` agent requires user
+  approval and an explicit scope with exclusive file ownership.
+- Read-only child sessions may run in parallel. Do not run parallel writers in
+  the same dirty worktree, or concurrent Gradle builds, device operations, Git
+  mutations, signing, publishing, or release operations.
 
 Use the project-local skills when relevant:
 
