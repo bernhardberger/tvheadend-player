@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "auditDate": "2026-07-26",
+  "auditDate": "2026-07-28",
   "requiredAbis": [
     "arm64-v8a",
     "armeabi-v7a",
@@ -11,11 +11,11 @@
   "artifacts": [
     {
       "file": "lib-decoder-ffmpeg-release.aar",
-      "sha256": "de7af29c749a5f15c237d577e27be9b43e40de35da8e9f5694bf7562b01a7c92",
+      "sha256": "1716bd964aa4ac3e7cd868ee036161f8d5cfa47fe6564a3d57b3b8723ab3f2e0",
       "librariesPerAbi": ["libffmpegJNI.so"],
       "media3Module": "androidx.media3.decoder.ffmpeg",
-      "media3Tag": "1.9.2",
-      "media3Revision": "630c1af455a16b8eb1ab36f49d82d9db799d7f5e",
+      "media3Tag": "1.10.1",
+      "media3Revision": "5fb306449733dd71595700c1227ad6087578c559",
       "nativeProject": "FFmpeg",
       "nativeTag": "n6.0.1",
       "nativeRevision": "c41ff724ede7da657762d61097e26fac296c53bf",
@@ -26,6 +26,7 @@
         "ffmpegNdk": "26.1.10909125 (r26b)",
         "jniWrapperNdk": "27.0.12077973 (r27)",
         "androidApi": 28,
+        "wrapperCompileSdk": 36,
         "cmake": "3.22.1",
         "androidGradlePlugin": "8.12.3",
         "gradle": "8.13",

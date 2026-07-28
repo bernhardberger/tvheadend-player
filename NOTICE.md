@@ -27,7 +27,7 @@ the same common text retained in
 `app/libs/licenses/media3-APACHE-2.0.txt`.
 
 The bundled decoder AAR is AndroidX Media3's Apache-2.0 FFmpeg extension built
-from Media3 1.9.2. It contains FFmpeg n6.0.1 configured under
+from Media3 1.10.1. It contains FFmpeg n6.0.1 configured under
 LGPL-2.1-or-later with only MP1, MP2, and MP3 decoders. Exact commits,
 toolchains, configuration, hashes, build instructions, and corresponding-source
 packaging are recorded in `app/libs/README.md` and

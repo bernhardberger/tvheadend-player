@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.player.htsp
 
 import androidx.annotation.OptIn
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
@@ -30,6 +31,7 @@ class LegacyRenderer(context: android.content.Context) : DefaultRenderersFactory
         }
     }
 
+    @OptIn(ExperimentalApi::class)
     override fun buildTextRenderers(
         context: android.content.Context,
         output: TextOutput,

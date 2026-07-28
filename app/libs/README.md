@@ -33,20 +33,20 @@ not permission to omit that release artifact.
 | `lib-decoder-ffmpeg-release.aar` | Media3 FFmpeg wrapper with MP1/MP2/MP3 only | Rebuilt and approved from pinned source and toolchains |
 
 The archive contains `armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64`. Its AAR
-metadata requires compile SDK 35 or newer and its manifest declares minimum SDK
+metadata requires compile SDK 36 or newer and its manifest declares minimum SDK
 23. The product itself requires API 28.
 
 ## Pinned Sources
 
-- AndroidX Media `1.9.2`, commit
-  `630c1af455a16b8eb1ab36f49d82d9db799d7f5e`:
+- AndroidX Media `1.10.1`, commit
+  `5fb306449733dd71595700c1227ad6087578c559`:
   https://github.com/androidx/media
 - FFmpeg `n6.0.1`, commit
   `c41ff724ede7da657762d61097e26fac296c53bf`:
   https://github.com/FFmpeg/FFmpeg
 - Media3 FFmpeg static-library build: Android NDK r26b
   (`26.1.10909125`), Android API 28
-- Media3 JNI wrapper build: Android NDK r27 (`27.0.12077973`), Android SDK 35,
+- Media3 JNI wrapper build: Android NDK r27 (`27.0.12077973`), Android SDK 36,
   CMake 3.22.1, Android Gradle Plugin 8.12.3, Gradle 8.13, Java 21
 
 Official Android downloads used for the audited build:
@@ -55,8 +55,8 @@ Official Android downloads used for the audited build:
   `ad73c0370f0b0a87d1671ed2fd5a9ac9acfd1eb5c43a7fbfbd330f85d19dd632`
 - `android-ndk-r27-linux.zip` SHA-256
   `2f17eb8bcbfdc40201c0b36e9a70826fcd2524ab7a2a235e2c71186c302da1dc`
-- `platform-35_r02.zip` SHA-256
-  `0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0`
+- `platform-36_r02.zip` SHA-256
+  `37607369a28c5b640b3a7998868d45898ebcb777565a0e85f9acf36f29631d2e`
 
 Install those SDK packages, then run:
 
@@ -82,7 +82,7 @@ explicitly enabled. This build adds only `--enable-decoder=mp1`,
 Audited output:
 
 - AAR SHA-256:
-  `de7af29c749a5f15c237d577e27be9b43e40de35da8e9f5694bf7562b01a7c92`
+  `1716bd964aa4ac3e7cd868ee036161f8d5cfa47fe6564a3d57b3b8723ab3f2e0`
 - `armeabi-v7a` JNI SHA-256:
   `94acc96f421f3419d56da824bc83160cda934d4a8bb33720d6a553e7eabbeabc`
 - `arm64-v8a` JNI SHA-256:

@@ -4,14 +4,14 @@ Date: 2026-07-28
 
 ## Decision
 
-Keep the production baseline on Media3 `1.9.2`. Use `1.10.1` as the next stable
-candidate only in a dedicated playback compatibility slice after the current UI
-work is complete. Do not adopt `1.11.0-rc01` for production.
+Upgrade the source and packaged native extension from Media3 `1.9.2` to stable
+`1.10.1`. Do not adopt `1.11.0-rc01` for production. Automated compatibility,
+native integrity, and reproducibility gates pass; production deployment remains
+blocked on the designated physical-TV playback matrix.
 
-This is a deferral, not a finding that `1.10.1` is incompatible. A temporary
-dependency-forced compile passed, but the accepted playback path and native
-extension require source-matched rebuilding and physical-TV evidence before the
-catalog can change.
+The upgrade preserves the accepted custom HTSP extractor, data sources,
+renderer policy, and FFmpeg configuration. It changes only the Media3 release
+surface and the explicit opt-ins newly required by `1.10.1`.
 
 ## Current evidence
 
@@ -25,18 +25,15 @@ catalog can change.
 - `1.10.1` includes potentially relevant fixes for decoder-error recovery and
   video codec reuse at frame-rate changes. Those changes are also reasons to run
   the full decoder and motion matrix rather than assuming a low-risk update.
-- Forcing every resolved `androidx.media3` module to `1.10.1` with an external
-  Gradle init script allowed `./gradlew compileDebugKotlin --no-daemon` to pass.
-  No tracked dependency or source file was changed for this check.
-- The repository FFmpeg patch still matches the `1.10.1` tag's
-  `build_ffmpeg.sh` and `CMakeLists.txt` context. A real candidate must still run
-  the complete native build and prove reproducibility rather than relying on
-  source inspection.
+- The tracked dependency graph now resolves every `androidx.media3` module to
+  `1.10.1`; no `1.9.2` Java artifact remains.
+- The repository FFmpeg patch applies to the `1.10.1` tag's `build_ffmpeg.sh`
+  and `CMakeLists.txt`. Two clean four-ABI builds produced byte-identical AARs
+  and corresponding-source archives.
 
-The compile check proves only current Kotlin/Java source compatibility. It does
-not prove binary compatibility with the existing `1.9.2` FFmpeg AAR, successful
-native rebuilding, decoder selection, audio output, video cadence,
-deinterlacing, SurfaceView behavior, or runtime stability.
+`./tools/check-native-libs --release` and `./tools/verify` pass with the rebuilt
+artifact. These automated checks do not prove decoder selection, audio output,
+video cadence, deinterlacing, SurfaceView behavior, or runtime stability.
 
 ## Coupled change surface
 
@@ -76,6 +73,10 @@ resolution alone is insufficient.
    Stop/Back/warm return, standby/wake, and repeated cold starts.
 6. Require direct human comparison for interlaced motion and deinterlacing.
    Decoder names, rendered-frame counters, and screenshots are diagnostic only.
+
+The native rebuild, dependency-resolution, and repository gates in steps 3-4
+passed on 2026-07-28. Steps 5-6 remain mandatory before production deployment
+or a claim that playback quality is unchanged.
 
 ## Sources
 

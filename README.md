@@ -163,7 +163,7 @@ deliberately separated: reproducible unsigned bundles are prepared on the
 engineering host, while the stable private signing key remains on an isolated
 owner-controlled host.
 
-The bundled decoder is a pinned Media3 1.9.2 FFmpeg extension containing only
+The bundled decoder is a pinned Media3 1.10.1 FFmpeg extension containing only
 the MP1, MP2, and MP3 decoders from FFmpeg n6.0.1. Its exact revisions,
 toolchains, configuration, hashes, licenses, build procedure, and corresponding
 source are recorded in [`app/libs/README.md`](app/libs/README.md). Every binary

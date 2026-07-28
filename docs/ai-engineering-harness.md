@@ -32,7 +32,7 @@ project instructions, agents, skills, and commands.
 | `.opencode/skills/tvhstream-upstream-contribution/` | Upstream sync and contribution boundary workflow |
 | `.opencode/commands/` | Verification, device, direct reviewer, TV UX, and upstream-review shortcuts |
 | `docs/ai-skills-audit-2026-07-28.md` | Per-skill decisions, external-guidance caveats, and mandatory routing model |
-| `docs/media3-upgrade-assessment-2026-07-28.md` | Evidence and execution gate for the deferred Media3 1.10.1 candidate |
+| `docs/media3-upgrade-assessment-2026-07-28.md` | Evidence, automated results, and physical-TV gate for the Media3 1.10.1 upgrade |
 | `tools/check-ai-harness` | Static harness/config validation plus live OpenCode parser and skill-discovery checks |
 | `tools/verify` | Native/tool/JVM/lint/Android-test compilation, debug assembly, APK identity/ABI, and 16 KB gate |
 | `tools/check-native-libs` | Audited AAR hashes, ABI/ELF checks, and a strict release-provenance gate |
@@ -113,11 +113,10 @@ Media3/HTSP path as a regression boundary, incomplete native provenance as a
 signed-release blocker, and read-only GitHub CI as the only enabled automation
 until signing and publication are separately approved.
 
-The 2026-07-28 Media3 assessment keeps `1.9.2` as the accepted baseline and
-identifies stable `1.10.1` as a future dedicated compatibility candidate. A
-temporary forced compile passed, but no catalog or native artifact was changed;
-source-matched native rebuilding and the full physical playback matrix remain
-mandatory before adoption.
+The 2026-07-28 Media3 assessment records the source and source-matched native
+upgrade from `1.9.2` to stable `1.10.1`. Automated compatibility, native
+integrity, and reproducibility gates pass; the full physical playback matrix
+remains mandatory before production deployment or playback-quality claims.
 
 Dedicated TV UX sections in `AGENTS.md`, `android-tv`, `android-reviewer`, and
 `tv-ux-reviewer` make Google TV and Android TV design guidance, Compose for TV,
