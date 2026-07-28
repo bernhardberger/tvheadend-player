@@ -12,14 +12,14 @@ import androidx.tv.material3.darkColorScheme
 import androidx.tv.material3.lightColorScheme
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFA8C7FA),
-    onPrimary = Color(0xFF062E6F),
-    primaryContainer = Color(0xFF1F3A5F),
-    onPrimaryContainer = Color(0xFFD7E3FF),
-    secondary = Color(0xFFC2E7FF),
-    onSecondary = Color(0xFF00344B),
-    secondaryContainer = Color(0xFF254B5C),
-    onSecondaryContainer = Color(0xFFC2E7FF),
+    primary = Color(0xFF00BCFA),
+    onPrimary = Color(0xFF00344B),
+    primaryContainer = Color(0xFF003E55),
+    onPrimaryContainer = Color(0xFFC3E8FF),
+    secondary = Color(0xFFC4E8FE),
+    onSecondary = Color(0xFF0D3446),
+    secondaryContainer = Color(0xFF274B5D),
+    onSecondaryContainer = Color(0xFFC4E8FE),
     background = Color(0xFF0F1014),
     onBackground = Color(0xFFE3E3E8),
     surface = Color(0xFF17181D),
