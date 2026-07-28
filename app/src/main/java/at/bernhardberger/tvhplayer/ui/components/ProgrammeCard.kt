@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -101,20 +100,12 @@ fun ProgrammeCard(
                     )
                 }
                 item.progress?.let { progress ->
-                    Box(
+                    ProgressStrip(
+                        progress = progress,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.primary),
-                        )
-                    }
+                            .fillMaxWidth(),
+                    )
                 }
             }
             Column(
@@ -180,4 +171,3 @@ private fun programmeTimeLabel(item: HomeCardItem): String? {
         else -> null
     }
 }
-

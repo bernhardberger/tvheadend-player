@@ -258,25 +258,11 @@ private fun HeroSlideVisual(
                         )
                     }
                     slide.progress?.let { progress ->
-                        Box(
+                        ProgressStrip(
+                            progress = progress,
                             modifier = Modifier
-                                .fillMaxWidth(0.72f)
-                                .height(4.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                ),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                                    .fillMaxSize()
-                                    .background(
-                                        MaterialTheme.colorScheme.primary,
-                                        shape = MaterialTheme.shapes.extraSmall,
-                                    ),
-                            )
-                        }
+                                .fillMaxWidth(0.72f),
+                        )
                     }
                     heroNextLine(slide)?.let { next ->
                         Text(

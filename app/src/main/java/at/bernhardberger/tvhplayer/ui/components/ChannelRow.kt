@@ -10,12 +10,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -25,6 +24,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
+import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import coil3.ImageLoader
 
 @Composable
@@ -61,12 +62,18 @@ fun ChannelRow(
                 )
                 if (progress != null) {
                     Spacer(Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { progress.coerceIn(0f, 1f) },
+                    ProgressStrip(
+                        progress = progress,
+                        trackColor = if (focused) {
+                            MaterialTheme.colorScheme.inverseOnSurface.copy(
+                                alpha = TvTextDisabledAlpha,
+                            )
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(3.dp)
-                            .clip(MaterialTheme.shapes.small),
+                            .testTag("channel-progress"),
                     )
                 }
             }

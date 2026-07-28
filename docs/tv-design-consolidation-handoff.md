@@ -313,6 +313,15 @@ leading, text and trailing content. Folder icons are 32dp. Direct owner review
 on the physical G10 passed row density, hierarchy, focus contrast and vertical
 alignment. The production G08 was not targeted or modified.
 
+## Slice 4 validation — 2026-07-28
+
+All five ambient progress sites now use one `ProgressStrip`. Direct G10 review
+confirmed clean endpoints without the former terminal marker and passed the 4dp
+weight. Focused channel rows retain cyan fill and use a stronger gray track so
+both portions remain legible on the pale focused container. Whether to restore
+Material 3's standard gap and stop indicator remains a reversible product choice
+inside this single component. The production G08 was not targeted or modified.
+
 **Check `adb devices -l` before every hardware run.** The production G08 has been
 observed connected on two transports at once, left over from a deployment. That
 is harmless for `./tools/device`, which pins the serial and verifies role plus all

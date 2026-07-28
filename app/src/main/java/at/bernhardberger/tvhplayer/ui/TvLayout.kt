@@ -66,6 +66,9 @@ val HomeCardWidth = 176.dp
 /** 16:9 media area height for [HomeCardWidth] cards. */
 val HomeCardMediaHeight = 99.dp
 
+/** Non-interactive programme progress on browse cards, rows, and detail panes. */
+val TvProgressStripHeight = 4.dp
+
 // ---- Player overlay geometry ----
 val TvOverlaySidePadding = TvSpacing56
 val TvOverlayTopPadding = TvSpacing32

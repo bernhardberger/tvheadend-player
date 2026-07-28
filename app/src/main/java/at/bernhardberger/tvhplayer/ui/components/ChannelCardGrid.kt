@@ -18,12 +18,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -38,6 +36,8 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.channelInitials
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
+import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import coil3.ImageLoader
 
 data class ChannelCardModel(
@@ -204,12 +204,16 @@ fun ChannelCard(
                 },
             )
             item.progress?.let { progress ->
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(MaterialTheme.shapes.small),
+                ProgressStrip(
+                    progress = progress,
+                    trackColor = if (selected) {
+                        MaterialTheme.colorScheme.inverseOnSurface.copy(
+                            alpha = TvTextDisabledAlpha,
+                        )
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

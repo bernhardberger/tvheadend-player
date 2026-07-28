@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -8,6 +10,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -15,10 +18,12 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -89,5 +94,34 @@ class ChannelRowTest {
         }
         composeTestRule.onNodeWithTag("row-2").assertIsFocused()
         assertEquals(2, focusedNumber)
+    }
+
+    @Test
+    fun ambientProgressDoesNotDrawAStopMarkerAtTheTrackEnd() {
+        composeTestRule.setContent {
+            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
+            TVHeadendPlayerTheme {
+                ChannelRow(
+                    modifier = Modifier.width(400.dp),
+                    number = 1,
+                    name = "Channel",
+                    programTitle = "Programme",
+                    progress = 0.25f,
+                    imageLoader = imageLoader,
+                    piconPath = null,
+                    focused = false,
+                    onFocus = {},
+                    onConfirm = {},
+                )
+            }
+        }
+
+        val image = composeTestRule.onNodeWithTag("channel-progress").captureToImage()
+        val pixels = image.toPixelMap()
+        val y = image.height / 2
+        val fill = pixels[image.width / 8, y]
+        val trackEnd = pixels[image.width - 2, y]
+
+        assertNotEquals(fill, trackEnd)
     }
 }
