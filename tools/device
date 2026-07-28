@@ -53,6 +53,7 @@ TEST_DEVICE_ACTIONS = {
     "key",
     "screenshot",
     "provision-test-credentials",
+    "allow-appliance-autostart",
 }
 PRODUCTION_DEVICE_ACTIONS = {"install-release", "uninstall-legacy"}
 VALID_ROLES = {"production", "test", "unclassified"}
@@ -336,6 +337,75 @@ def show_package_info(adb: str, serial: str, package_name: str) -> None:
     print("\n".join(dict.fromkeys(lines)))
 
 
+def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
+    service_class = f"{package_name}.accessibility.ApplianceEntryAccessibilityService"
+    component = f"{package_name}/{service_class}"
+
+    accessibility_enabled = run(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "settings",
+            "get",
+            "secure",
+            "accessibility_enabled",
+        ),
+        capture=True,
+    ).stdout.strip()
+    enabled_services = run(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "settings",
+            "get",
+            "secure",
+            "enabled_accessibility_services",
+        ),
+        capture=True,
+    ).stdout.strip()
+    service_state = run(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "dumpsys",
+            "activity",
+            "services",
+            component,
+        ),
+        capture=True,
+    ).stdout
+    app_op = run(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "cmd",
+            "appops",
+            "get",
+            package_name,
+            "APP_AUTO_START",
+        ),
+        capture=True,
+        check=False,
+    )
+
+    enabled_components = set(enabled_services.split(":"))
+    auto_start = "unsupported" if app_op.returncode != 0 else "default"
+    for line in app_op.stdout.splitlines():
+        name, separator, value = line.strip().partition(":")
+        if separator and name in {"AUTO_START", "APP_AUTO_START"}:
+            auto_start = value.strip().split(maxsplit=1)[0].rstrip(";")
+            break
+
+    print(f"accessibilityEnabled={str(accessibility_enabled == '1').lower()}")
+    print(f"serviceEnabled={str(component in enabled_components).lower()}")
+    print(f"serviceBound={str(component in service_state).lower()}")
+    print(f"autoStart={auto_start}")
+
+
 def package_is_installed(adb: str, serial: str, package_name: str) -> bool:
     result = run(
         adb_command(adb, serial, "shell", "pm", "path", package_name),
@@ -476,6 +546,19 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("force-stop", help="Force-stop the selected package")
     subparsers.add_parser("current", help="Show only the current/focused activity")
     subparsers.add_parser("package-info", help="Show bounded package metadata")
+    subparsers.add_parser(
+        "appliance-status",
+        help="Show bounded accessibility binding and TCL auto-start state",
+    )
+    auto_start_parser = subparsers.add_parser(
+        "allow-appliance-autostart",
+        help="Allow TCL auto-start after the user enables the accessibility service",
+    )
+    auto_start_parser.add_argument(
+        "--confirm-user-enabled-accessibility",
+        action="store_true",
+        help="Confirm that the user already enabled the scoped service in Android settings",
+    )
     screenshot_parser = subparsers.add_parser(
         "screenshot",
         help="Capture a test-device screen to an owner-only PNG outside the repository",
@@ -535,6 +618,14 @@ def main() -> int:
         fail("uninstall-legacy requires --confirm-legacy-uninstall")
     if args.action == "screenshot" and not args.confirm_safe_screen:
         fail("screenshot requires --confirm-safe-screen")
+    if (
+        args.action == "allow-appliance-autostart"
+        and not args.confirm_user_enabled_accessibility
+    ):
+        fail(
+            "allow-appliance-autostart requires "
+            "--confirm-user-enabled-accessibility"
+        )
 
     if args.action == "connect":
         run([adb, "connect", serial])
@@ -699,6 +790,29 @@ def main() -> int:
 
     if args.action == "package-info":
         show_package_info(adb, serial, package_name)
+        return 0
+
+    if args.action == "appliance-status":
+        show_appliance_status(adb, serial, package_name)
+        return 0
+
+    if args.action == "allow-appliance-autostart":
+        if package_name != DEFAULT_PACKAGE:
+            fail(f"auto-start repair is available only for package {DEFAULT_PACKAGE}")
+        run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "cmd",
+                "appops",
+                "set",
+                package_name,
+                "APP_AUTO_START",
+                "allow",
+            )
+        )
+        show_appliance_status(adb, serial, package_name)
         return 0
 
     if args.action == "screenshot":

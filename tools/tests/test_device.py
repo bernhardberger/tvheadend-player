@@ -55,6 +55,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "key",
                 "screenshot",
                 "provision-test-credentials",
+                "allow-appliance-autostart",
             ):
                 with self.subTest(role=role, action=action):
                     self.assertIsNotNone(action_policy_error(role, action))
@@ -68,15 +69,36 @@ class DevicePolicyTest(unittest.TestCase):
             "key",
             "screenshot",
             "provision-test-credentials",
+            "allow-appliance-autostart",
         ):
             with self.subTest(action=action):
                 self.assertIsNone(action_policy_error("test", action))
 
     def test_read_only_actions_are_allowed_for_every_role(self) -> None:
         for role in ("production", "test", "unclassified"):
-            for action in ("connect", "doctor", "current", "package-info"):
+            for action in (
+                "connect",
+                "doctor",
+                "current",
+                "package-info",
+                "appliance-status",
+            ):
                 with self.subTest(role=role, action=action):
                     self.assertIsNone(action_policy_error(role, action))
+
+    def test_appliance_status_is_a_bounded_read_only_action(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["appliance-status"])
+
+        self.assertEqual(args.action, "appliance-status")
+
+    def test_auto_start_repair_requires_accessibility_confirmation(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["allow-appliance-autostart"])
+
+        self.assertFalse(args.confirm_user_enabled_accessibility)
 
     def test_release_install_is_available_only_for_production(self) -> None:
         self.assertIsNone(action_policy_error("production", "install-release"))
