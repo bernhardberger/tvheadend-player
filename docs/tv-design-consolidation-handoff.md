@@ -322,6 +322,13 @@ both portions remain legible on the pale focused container. Whether to restore
 Material 3's standard gap and stop indicator remains a reversible product choice
 inside this single component. The production G08 was not targeted or modified.
 
+## Slice 5 validation — 2026-07-28
+
+The player timeline now reserves product orange `#FA7F00` for playback position.
+Direct G10 review confirmed that the orange seekbar remains clearly readable over
+live video behind the bottom scrim and stays distinct from the white live-edge
+marker and focused thumb. The production G08 was not targeted or modified.
+
 **Check `adb devices -l` before every hardware run.** The production G08 has been
 observed connected on two transports at once, left over from a deployment. That
 is harmless for `./tools/device`, which pins the serial and verifies role plus all

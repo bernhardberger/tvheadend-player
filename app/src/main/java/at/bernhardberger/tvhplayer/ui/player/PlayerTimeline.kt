@@ -34,6 +34,8 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineThumbSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineTickAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTrackAlpha
 
+private val PlaybackPositionColor = Color(0xFFFA7F00)
+
 enum class PlayerTimelineTone { AMBIENT, INTERACTIVE, ACTIVE, PREVIEW }
 
 @Composable
@@ -107,7 +109,7 @@ fun PlayerTimelineBar(
                 Modifier
                     .fillMaxWidth(currentProgress)
                     .height(barHeight)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .background(PlaybackPositionColor),
             )
             boundaryFractions.forEach { fraction ->
                 Box(
