@@ -97,6 +97,7 @@ import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
@@ -1082,7 +1083,7 @@ private fun RecordingListRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = if (problem) MaterialTheme.colorScheme.error
-                    else if (active) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                    else if (active) TvRecordingColor else Color.Unspecified,
             )
         },
         leadingContent = {

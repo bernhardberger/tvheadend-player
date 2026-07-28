@@ -36,6 +36,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.channelInitials
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import coil3.ImageLoader
@@ -168,7 +169,7 @@ fun ChannelCard(
                     Text(
                         text = stringResource(R.string.recordings_recording_now),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = TvRecordingColor,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(8.dp)

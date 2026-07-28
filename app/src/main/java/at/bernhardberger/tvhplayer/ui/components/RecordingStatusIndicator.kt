@@ -7,15 +7,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.htsp.DvrState
-
-private val RecordingRed = Color(0xFFE53935)
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
 @Composable
 fun RecordingStatusIndicator(
@@ -36,9 +34,9 @@ fun RecordingStatusIndicator(
             .semantics { contentDescription = description }
             .then(
                 if (state == DvrState.RECORDING) {
-                    Modifier.background(RecordingRed, CircleShape)
+                    Modifier.background(TvRecordingColor, CircleShape)
                 } else {
-                    Modifier.border(2.dp, RecordingRed, CircleShape)
+                    Modifier.border(2.dp, TvRecordingColor, CircleShape)
                 }
             )
     )

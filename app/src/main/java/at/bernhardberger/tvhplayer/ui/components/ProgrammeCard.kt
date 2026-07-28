@@ -26,6 +26,7 @@ import at.bernhardberger.tvhplayer.core.HomeCardItem
 import at.bernhardberger.tvhplayer.core.channelInitials
 import at.bernhardberger.tvhplayer.ui.HomeCardMediaHeight
 import at.bernhardberger.tvhplayer.ui.HomeCardWidth
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import coil3.ImageLoader
 
@@ -88,7 +89,7 @@ fun ProgrammeCard(
                     Text(
                         text = stringResource(R.string.home_badge_rec),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.error,
+                        color = TvRecordingColor,
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(6.dp)
