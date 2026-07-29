@@ -321,7 +321,7 @@
     <string name="timeshift_live">Live</string>
     <string name="player_seekbar_recording_description">Playback position %1$s of %2$s</string>
     <string name="player_seekbar_timeshift_description">Timeshift position %1$s behind live</string>
-    <string name="player_on_now">On now</string>
+    <string name="player_on_now">Currently playing</string>
     <string name="simple_tv_owner_section">Owner</string>
     <string name="track_unknown_language">Unknown language</string>
     <string name="track_mono">Mono</string>

@@ -66,6 +66,7 @@ import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.ChannelKeyAction
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.DvrActionFailure
@@ -175,6 +176,7 @@ fun VideoPlayerScreen(
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
     val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
+    val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
@@ -714,6 +716,7 @@ fun VideoPlayerScreen(
                 channels = channels,
                 selectedId = selectedId,
                 playingChannelId = currentChannelId,
+                recordingChannelIds = recordingChannelIds,
                 nowSec = nowSec,
                 channelsVm = channelsVm,
                 imageLoader = imageLoader,

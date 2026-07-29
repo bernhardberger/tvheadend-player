@@ -6,24 +6,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -61,14 +55,11 @@ fun ChannelRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (playingNow) {
+                if (playingNow || recordingNow) {
                     Spacer(Modifier.width(TvSpacing8))
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = stringResource(R.string.player_on_now),
-                        modifier = Modifier
-                            .testTag("channel-playing-indicator")
-                            .size(20.dp),
+                    ChannelNowIndicators(
+                        playingNow = playingNow,
+                        recordingNow = recordingNow,
                     )
                 }
             }
@@ -108,14 +99,6 @@ fun ChannelRow(
                     .height(40.dp),
             )
         },
-        trailingContent = if (recordingNow) {
-            {
-                RecordingStatusIndicator(
-                    state = at.bernhardberger.tvhplayer.htsp.DvrState.RECORDING,
-                    modifier = Modifier.testTag("channel-recording-indicator"),
-                )
-            }
-        } else null,
         scale = ListItemDefaults.scale(
             focusedScale = 1f,
             focusedSelectedScale = 1f,

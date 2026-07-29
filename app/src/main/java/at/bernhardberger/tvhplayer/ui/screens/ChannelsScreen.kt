@@ -58,13 +58,14 @@ import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelBrowseLayout
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
+import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -116,6 +117,7 @@ fun ChannelsScreen(
     imageLoader: ImageLoader = koinInject(),
     dvrRepository: DvrRepository = koinInject(),
     uiSettingsStore: UiSettingsStore = koinInject(),
+    playingChannelId: Int?,
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
@@ -134,6 +136,7 @@ fun ChannelsScreen(
     )
     val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
+    val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
@@ -345,9 +348,20 @@ fun ChannelsScreen(
                     )
                     if (tagNotice) Spacer(Modifier.height(8.dp))
                     val noEpg = stringResource(R.string.no_epg)
-                    val cardItems = remember(channels, nowSec, dvrEntries, noEpg) {
+                    val cardItems = remember(
+                        channels,
+                        nowSec,
+                        playingChannelId,
+                        recordingChannelIds,
+                        noEpg,
+                    ) {
                         channels.map { ch ->
                             val now = channelViewModel.nowEvent(ch.id, nowSec)
+                            val status = channelNowStatus(
+                                channelId = ch.id,
+                                playingChannelId = playingChannelId,
+                                recordingChannelIds = recordingChannelIds,
+                            )
                             ChannelCardModel(
                                 channel = ch,
                                 number = ChannelNavigation.numberForId(
@@ -356,11 +370,8 @@ fun ChannelsScreen(
                                     ch.id,
                                 ),
                                 programmeTitle = now?.title ?: noEpg,
-                                recordingNow = now?.eventId?.let { eventId ->
-                                    dvrEntries.any {
-                                        it.eventId == eventId && it.state == DvrState.RECORDING
-                                    }
-                                } == true,
+                                playingNow = status.playingNow,
+                                recordingNow = status.recordingNow,
                                 progress = now?.progress(nowSec),
                             )
                         }
@@ -436,6 +447,11 @@ fun ChannelsScreen(
                                         channelViewModel.nowEvent(ch.id, nowSec)
                                     }
                                 val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
+                                val status = channelNowStatus(
+                                    channelId = ch.id,
+                                    playingChannelId = playingChannelId,
+                                    recordingChannelIds = recordingChannelIds,
+                                )
 
                                 ChannelRow(
                                     modifier = Modifier.focusRequester(
@@ -452,11 +468,8 @@ fun ChannelsScreen(
                                     imageLoader = imageLoader,
                                     piconPath = ch.icon,
                                     focused = isSelected,
-                                    recordingNow = now?.eventId?.let { eventId ->
-                                        dvrEntries.any {
-                                            it.eventId == eventId && it.state == DvrState.RECORDING
-                                        }
-                                    } == true,
+                                    recordingNow = status.recordingNow,
+                                    playingNow = status.playingNow,
                                     onFocus = {
                                         if (!isRestoring) selection.setSelected(ch.id)
                                     },

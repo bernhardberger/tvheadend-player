@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelCardGrid
@@ -56,6 +57,7 @@ fun ChannelDrawer(
     channels: List<ChannelUi>,
     selectedId: Int,
     playingChannelId: Int,
+    recordingChannelIds: Set<Int>,
     nowSec: Long,
     channelsVm: ChannelsViewModel,
     imageLoader: ImageLoader,
@@ -202,9 +204,20 @@ fun ChannelDrawer(
                 androidx.tv.material3.Text(stringResource(R.string.empty_channel_tag))
             }
         } else if (largeCards) {
-            val cardItems = remember(channels, nowSec, playingChannelId, noEpg) {
+            val cardItems = remember(
+                channels,
+                nowSec,
+                playingChannelId,
+                recordingChannelIds,
+                noEpg,
+            ) {
                 channels.map { ch ->
                     val now = channelsVm.nowEvent(ch.id, nowSec)
+                    val status = channelNowStatus(
+                        channelId = ch.id,
+                        playingChannelId = playingChannelId,
+                        recordingChannelIds = recordingChannelIds,
+                    )
                     ChannelCardModel(
                         channel = ch,
                         number = ChannelNavigation.numberForId(
@@ -213,7 +226,8 @@ fun ChannelDrawer(
                             ch.id,
                         ),
                         programmeTitle = now?.title ?: noEpg,
-                        playingNow = ch.id == playingChannelId,
+                        playingNow = status.playingNow,
+                        recordingNow = status.recordingNow,
                         progress = now?.progress(nowSec),
                     )
                 }
@@ -245,6 +259,11 @@ fun ChannelDrawer(
 
                     val now = remember(ch.id, nowSec) { channelsVm.nowEvent(ch.id, nowSec) }
                     val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
+                    val status = channelNowStatus(
+                        channelId = ch.id,
+                        playingChannelId = playingChannelId,
+                        recordingChannelIds = recordingChannelIds,
+                    )
 
                     ChannelRow(
                         modifier = Modifier.focusRequester(
@@ -261,7 +280,8 @@ fun ChannelDrawer(
                         imageLoader = imageLoader,
                         piconPath = ch.icon,
                         focused = isSelected,
-                        playingNow = ch.id == playingChannelId,
+                        recordingNow = status.recordingNow,
+                        playingNow = status.playingNow,
                         onFocus = { if (!isRestoring) onFocusChannel(ch.id) },
                         onConfirm = { onPickChannel(ch) }
                     )

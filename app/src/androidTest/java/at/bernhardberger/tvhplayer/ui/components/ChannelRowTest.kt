@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -65,25 +66,29 @@ class ChannelRowTest {
     }
 
     @Test
-    fun playingMarkerPreservesProgressWidth_andRecordingStatusCoexists() {
+    fun statusMarkersPreserveProgressWidth_andCoexistWithLongTitle() {
         composeTestRule.setContent {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 Column {
-                    repeat(2) { index ->
+                    repeat(3) { index ->
                         ChannelRow(
                             modifier = Modifier
                                 .width(400.dp)
                                 .testTag("status-row-$index"),
                             number = index + 1,
-                            name = "ČT1 HD",
+                            name = if (index == 2) {
+                                "Short title"
+                            } else {
+                                "A very long localized channel title that must ellipsize"
+                            },
                             programTitle = "Večerní zprávy",
                             progress = 0.5f,
                             imageLoader = imageLoader,
                             piconPath = null,
                             focused = false,
-                            recordingNow = true,
-                            playingNow = index == 0,
+                            recordingNow = index != 1,
+                            playingNow = index != 1,
                             onFocus = {},
                             onConfirm = {},
                         )
@@ -94,14 +99,20 @@ class ChannelRowTest {
 
         composeTestRule.onAllNodesWithTag("channel-picon")[0]
             .assertLeftPositionInRootIsEqualTo(20.dp)
-        composeTestRule.onNodeWithTag("channel-playing-indicator").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("channel-playing-indicator")[0].assertIsDisplayed()
         composeTestRule.onAllNodesWithTag("channel-recording-indicator")[0].assertIsDisplayed()
-        composeTestRule.onNodeWithTag("status-row-0").assertIsSelected()
+        composeTestRule.onNodeWithTag("status-row-0")
+            .assertContentDescriptionEquals("Currently playing", "Recording now")
+            .assertIsSelected()
         composeTestRule.onNodeWithTag("status-row-1").assertIsNotSelected()
         val progressNodes = composeTestRule.onAllNodesWithTag("channel-progress")
-        val playingWidth = progressNodes[0].fetchSemanticsNode().boundsInRoot.width
-        val idleWidth = progressNodes[1].fetchSemanticsNode().boundsInRoot.width
-        assertEquals(idleWidth, playingWidth, 0.5f)
+        val statusWidth = progressNodes[0].fetchSemanticsNode().boundsInRoot.width
+        val plainWidth = progressNodes[1].fetchSemanticsNode().boundsInRoot.width
+        assertEquals(plainWidth, statusWidth, 0.5f)
+        val playingIndicators = composeTestRule.onAllNodesWithTag("channel-playing-indicator")
+        val longTitleIndicatorLeft = playingIndicators[0].fetchSemanticsNode().boundsInRoot.left
+        val shortTitleIndicatorLeft = playingIndicators[1].fetchSemanticsNode().boundsInRoot.left
+        assertEquals(shortTitleIndicatorLeft, longTitleIndicatorLeft, 0.5f)
     }
 
     @OptIn(ExperimentalTestApi::class)

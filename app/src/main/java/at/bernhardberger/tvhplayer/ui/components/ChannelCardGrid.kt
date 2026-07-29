@@ -21,8 +21,6 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +36,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -46,7 +45,6 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Glow
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.StandardCardContainer
 import androidx.tv.material3.Text
@@ -56,7 +54,6 @@ import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.ui.ChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.TvCardSpacing
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
@@ -150,6 +147,8 @@ private fun ChannelCard(
     interactiveModifier: Modifier = Modifier,
 ) {
     val initials = remember(item.channel.name) { channelInitials(item.channel.name) }
+    val playingNowDescription = stringResource(R.string.player_on_now)
+    val recordingNowDescription = stringResource(R.string.recording_state_recording)
     val accessibilityLabel = buildString {
         item.number?.let {
             append(it)
@@ -158,6 +157,14 @@ private fun ChannelCard(
         append(item.channel.name)
         append(". ")
         append(item.programmeTitle)
+        if (item.playingNow) {
+            append(". ")
+            append(playingNowDescription)
+        }
+        if (item.recordingNow) {
+            append(". ")
+            append(recordingNowDescription)
+        }
     }
     StandardCardContainer(
         imageCard = { interactionSource ->
@@ -167,7 +174,10 @@ private fun ChannelCard(
                 modifier = interactiveModifier
                     .fillMaxWidth()
                     .aspectRatio(CardDefaults.HorizontalImageAspectRatio)
-                    .semantics { contentDescription = accessibilityLabel },
+                    .semantics {
+                        contentDescription = accessibilityLabel
+                        selected = item.playingNow
+                    },
                 scale = CardDefaults.scale(focusedScale = 1.05f),
                 glow = CardDefaults.glow(
                     focusedGlow = Glow(
@@ -202,38 +212,20 @@ private fun ChannelCard(
                                 .height(56.dp),
                         )
                     }
-                    // Match ChannelRow: play glyph for the live channel; text only for REC.
-                    if (item.playingNow) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = stringResource(R.string.player_on_now),
-                            tint = MaterialTheme.colorScheme.primary,
+                    if (item.playingNow || item.recordingNow) {
+                        ChannelNowIndicators(
+                            playingNow = item.playingNow,
+                            recordingNow = item.recordingNow,
+                            playingTint = MaterialTheme.colorScheme.primary,
+                            announceState = false,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(TvSpacing8)
-                                .size(22.dp)
                                 .background(
                                     MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                                     shape = MaterialTheme.shapes.extraSmall,
                                 )
                                 .padding(TvSpacing4),
-                        )
-                    } else if (item.recordingNow) {
-                        Text(
-                            text = stringResource(R.string.recordings_recording_now),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = TvRecordingColor,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(TvSpacing8)
-                                .background(
-                                    MaterialTheme.colorScheme.surface,
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                )
-                                .padding(
-                                    horizontal = TvSpacing8,
-                                    vertical = TvSpacing4,
-                                ),
                         )
                     }
                 }

@@ -353,6 +353,7 @@ fun AppRoot(
                             ChannelsScreen(
                                 contentPadding = contentPadding,
                                 initialFocusEnabled = !drawerActive,
+                                playingChannelId = activeServiceId,
                                 connectionUiState = connectionUiState,
                                 onRetryConnection = appVm::reconnectNow,
                                 onOpenConnectionSettings = {

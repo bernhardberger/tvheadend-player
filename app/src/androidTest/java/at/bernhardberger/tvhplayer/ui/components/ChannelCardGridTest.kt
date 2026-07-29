@@ -10,7 +10,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -64,6 +66,38 @@ class ChannelCardGridTest {
         assertEquals(268f * density, bounds[0].width, 0.5f)
         assertEquals(20f * density, bounds[1].left - bounds[0].right, 0.5f)
         assertEquals(20f * density, bounds[2].left - bounds[1].right, 0.5f)
+    }
+
+    @Test
+    fun playingAndRecordingIndicatorsCanCoexist() {
+        composeRule.setContent {
+            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
+            TVHeadendPlayerTheme {
+                ChannelCardGrid(
+                    items = listOf(
+                        ChannelCardModel(
+                            channel = ChannelUi(1, "Channel", 1, null),
+                            number = 1,
+                            programmeTitle = "Programme",
+                            playingNow = true,
+                            recordingNow = true,
+                        )
+                    ),
+                    imageLoader = imageLoader,
+                    onFocusChannel = {},
+                    onConfirmChannel = {},
+                    modifier = Modifier.size(300.dp, 240.dp),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("channel-card-1")
+            .assertContentDescriptionEquals(
+                "1 Channel. Programme. Currently playing. Recording now"
+            )
+            .assertIsSelected()
+        composeRule.onNodeWithTag("channel-playing-indicator").assertIsDisplayed()
+        composeRule.onNodeWithTag("channel-recording-indicator").assertIsDisplayed()
     }
 
     @Test
