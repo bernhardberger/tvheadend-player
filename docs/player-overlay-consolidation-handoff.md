@@ -85,7 +85,7 @@ Never use the bedroom G08 — it is handed-over production.
 ./tools/device doctor                                     # always first; confirm G10_4K_GB + role=test
 ./tools/device install-debug
 ./tools/device key down                                   # reveal player controls
-./tools/device screenshot --confirm-safe-screen --output /tmp/<name>.png
+./tools/device screenshot --confirm-safe-screen --name <descriptive-slug>
 ```
 
 - **Reveal controls with `key down`, never `key center`.** With timeshift available, centre maps to
