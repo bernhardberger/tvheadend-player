@@ -20,14 +20,21 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.util.EventLogger
 import at.bernhardberger.tvhplayer.core.PlaybackRecoveryPolicy
+import at.bernhardberger.tvhplayer.core.RecordingCheckpointTrigger
+import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
+import at.bernhardberger.tvhplayer.core.RECORDING_SEEK_CHECKPOINT_DEBOUNCE_MS
+import at.bernhardberger.tvhplayer.core.RecordingStartDecision
 import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.player.htsp.HtspSubscriptionDataSource
 import at.bernhardberger.tvhplayer.player.htsp.HtspRecordingDataSource
 import at.bernhardberger.tvhplayer.player.htsp.LegacyRenderer
 import at.bernhardberger.tvhplayer.player.htsp.TvheadendExtractorsFactory
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.repositories.RecordingProgressCapability
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +89,7 @@ enum class PlaybackFailureReason {
 class PlayerSession(
     private val htsp: HtspService,
     private val playerSettingsStore: PlayerSettingsStore,
+    private val dvrRepository: DvrRepository,
 ) {
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commands = PlayerCommandGate()
@@ -89,6 +97,18 @@ class PlayerSession(
     private var applicationContext: Context? = null
     private var dataSourceFactory: HtspSubscriptionDataSource.Factory? = null
     private var recordingDataSourceFactory: HtspRecordingDataSource.Factory? = null
+
+    private data class ActiveRecording(
+        val entryId: Int,
+        val generation: Long,
+        val intent: RecordingPlaybackIntent,
+        val startCoordinator: RecordingStartCoordinator,
+        val progressCoordinator: RecordingProgressCoordinator,
+        var dvrState: at.bernhardberger.tvhplayer.htsp.DvrState,
+        var preparationApplied: Boolean = false,
+        var progressStarted: Boolean = false,
+        var clearProgressWhenPlaying: Boolean = false,
+    )
 
     private data class ActivePlayback(
         val context: Context,
@@ -98,12 +118,18 @@ class PlayerSession(
 
     @Volatile
     private var activePlayback: ActivePlayback? = null
+    @Volatile
+    private var activeRecording: ActiveRecording? = null
     private var playbackGeneration = 0L
     private var consecutiveFailures = 0
     private var retryJob: Job? = null
     private var timeshiftStateJob: Job? = null
     private var recoveryEventsEnabled = false
     private var diagnosticsJob: Job? = null
+    private var recordingPreparationJob: Job? = null
+    private var recordingProgressJob: Job? = null
+    private var recordingRemoteJob: Job? = null
+    private var recordingSeekJob: Job? = null
     private var videoDecoder: String? = null
     private var audioDecoder: String? = null
     private var audioUnderruns = 0
@@ -117,6 +143,10 @@ class PlayerSession(
     val activeServiceId: StateFlow<Int?> = _activeServiceId
     private val _activeRecordingId = MutableStateFlow<Int?>(null)
     val activeRecordingId: StateFlow<Int?> = _activeRecordingId
+    private val _recordingProgressSyncState =
+        MutableStateFlow(RecordingProgressSyncState.Inactive)
+    val recordingProgressSyncState: StateFlow<RecordingProgressSyncState> =
+        _recordingProgressSyncState
     private val _timeshiftState = MutableStateFlow(TimeshiftState())
     val timeshiftState: StateFlow<TimeshiftState> = _timeshiftState
     private val _diagnostics = MutableStateFlow(PlaybackDiagnosticsSnapshot())
@@ -131,10 +161,19 @@ class PlayerSession(
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             Timber.e(error, "Playback failed")
-            if (_activeRecordingId.value != null) {
-                _state.value = PlaybackSessionState.Failed(
-                    PlaybackFailureReason.RECORDING_READ_FAILED
-                )
+            val recording = activeRecording
+            if (recording != null) {
+                mainScope.launch {
+                    commands.run {
+                        if (activeRecording?.generation != recording.generation) return@run
+                        finishActiveRecordingLocked(terminalError = true)
+                        if (activeRecording?.generation == recording.generation) {
+                            _state.value = PlaybackSessionState.Failed(
+                                PlaybackFailureReason.RECORDING_READ_FAILED
+                            )
+                        }
+                    }
+                }
             } else if (recoveryEventsEnabled) {
                 scheduleRecovery()
             }
@@ -145,10 +184,23 @@ class PlayerSession(
             val recordingActive = _activeRecordingId.value != null
             if (!liveActive && !recordingActive) return
             when (playbackState) {
-                Player.STATE_READY -> _state.value = PlaybackSessionState.Playing
+                Player.STATE_READY -> {
+                    if (!recordingActive || activeRecording?.preparationApplied == true) {
+                        _state.value = PlaybackSessionState.Playing
+                    }
+                }
                 Player.STATE_ENDED -> {
                     if (recordingActive) {
-                        _state.value = PlaybackSessionState.Finished
+                        val recording = activeRecording ?: return
+                        mainScope.launch {
+                            commands.run {
+                                if (activeRecording?.generation != recording.generation) return@run
+                                finishActiveRecordingLocked(naturalEnd = true)
+                                if (activeRecording?.generation == recording.generation) {
+                                    _state.value = PlaybackSessionState.Finished
+                                }
+                            }
+                        }
                     } else {
                         scheduleRecovery()
                     }
@@ -167,6 +219,27 @@ class PlayerSession(
                 retryJob = null
                 consecutiveFailures = 0
                 _state.value = PlaybackSessionState.Playing
+            }
+            val recording = activeRecording
+            if (
+                isPlaying &&
+                recording?.preparationApplied == true &&
+                !recording.progressStarted
+            ) {
+                recording.progressStarted = true
+                val clearProgress = recording.clearProgressWhenPlaying
+                recording.clearProgressWhenPlaying = false
+                mainScope.launch {
+                    val nowMs = System.currentTimeMillis()
+                    recording.progressCoordinator.playbackStarted(
+                        positionMs = player?.currentPosition ?: 0L,
+                        nowMs = nowMs,
+                    )
+                    if (clearProgress) {
+                        recording.progressCoordinator.startOverStarted(nowMs)
+                    }
+                    publishRecordingProgressState(recording)
+                }
             }
         }
     }
@@ -211,6 +284,9 @@ class PlayerSession(
         // actually play) is blocking; drop audio so the video plays instead of freezing.
         const val STUCK_TIMEOUT_MS = 6_000L
         const val STUCK_POS_MS = 1_000L
+        const val RECORDING_PREPARATION_TIMEOUT_MS = 5_000L
+        const val RECORDING_PREPARATION_POLL_MS = 50L
+        const val RECORDING_PROGRESS_SAMPLE_MS = 1_000L
     }
 
     @OptIn(UnstableApi::class)
@@ -247,8 +323,12 @@ class PlayerSession(
         commands.run {
             if (!shouldStartPlayback(activePlayback?.serviceId, serviceId)) return@run
 
+            finishActiveRecordingLocked()
+
             val appContext = context.applicationContext
             val target = withContext(Dispatchers.Main.immediate) {
+                cancelRecordingJobs()
+                activeRecording = null
                 retryJob?.cancel()
                 retryJob = null
                 watchdogJob?.cancel()
@@ -259,6 +339,7 @@ class PlayerSession(
                     activePlayback = it
                     _activeServiceId.value = serviceId
                     _activeRecordingId.value = null
+                    _recordingProgressSyncState.value = RecordingProgressSyncState.Inactive
                     _state.value = PlaybackSessionState.Starting
                 }
             }
@@ -269,17 +350,55 @@ class PlayerSession(
     @OptIn(UnstableApi::class)
     suspend fun playRecording(
         context: Context,
-        recordingId: Int,
+        entry: DvrEntry,
         path: String,
         knownSize: Long?,
+        intent: RecordingPlaybackIntent = RecordingPlaybackIntent.DefaultPolicy,
     ) {
         commands.run {
+            finishActiveRecordingLocked()
             val appContext = context.applicationContext
-            withContext(Dispatchers.Main.immediate) {
+            val recording = withContext(Dispatchers.Main.immediate) {
+                cancelRecordingJobs()
                 activePlayback = null
                 _activeServiceId.value = null
-                _activeRecordingId.value = recordingId
-                playbackGeneration++
+                val generation = ++playbackGeneration
+                val progressCapability = dvrRepository.progressCapability.value
+                val effectiveIntent = recordingIntentForResumeSupport(
+                    intent = intent,
+                    resumeSupported = progressCapability != RecordingProgressCapability.Unsupported,
+                )
+                val progress = RecordingProgressCoordinator(
+                    initialServerPositionSeconds = entry.playPosition,
+                    capability = progressCapability,
+                    enabled = entry.state == at.bernhardberger.tvhplayer.htsp.DvrState.COMPLETED,
+                    writer = RecordingProgressWriter { write ->
+                        withContext(Dispatchers.IO) {
+                            dvrRepository.updateRecordingProgress(
+                                entryId = entry.id,
+                                playPositionSeconds = write.positionSeconds,
+                                setWatched = write.setWatched,
+                            )
+                        }
+                    },
+                )
+                ActiveRecording(
+                    entryId = entry.id,
+                    generation = generation,
+                    intent = effectiveIntent,
+                    startCoordinator = RecordingStartCoordinator(
+                        generation = generation,
+                        intent = effectiveIntent,
+                        state = entry.state,
+                        serverPositionSeconds = entry.playPosition,
+                        playCount = entry.playCount,
+                    ),
+                    progressCoordinator = progress,
+                    dvrState = entry.state,
+                ).also {
+                    activeRecording = it
+                    _activeRecordingId.value = entry.id
+                }
                 resetDiagnosticsCounters()
                 retryJob?.cancel()
                 retryJob = null
@@ -292,7 +411,9 @@ class PlayerSession(
                     it.stop()
                     it.clearMediaItems()
                 }
+                activeRecording ?: error("Recording context was not installed")
             }
+            publishRecordingProgressState(recording)
             releaseCurrentDataSource()
 
             try {
@@ -322,16 +443,18 @@ class PlayerSession(
                     recordingDataSourceFactory = factory
                     val mediaSource = ProgressiveMediaSource.Factory(factory)
                         .createMediaSource(
-                            MediaItem.fromUri("htsp-file://recording/$recordingId")
+                            MediaItem.fromUri("htsp-file://recording/${entry.id}")
                         )
                     p.setMediaSource(mediaSource)
+                    p.playWhenReady = false
                     p.prepare()
-                    p.playWhenReady = true
+                    startRecordingPreparation(p, recording)
+                    startRecordingRemoteUpdates(recording)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
-                Timber.e(error, "Unable to start recording %d", recordingId)
+                Timber.e(error, "Unable to start recording %d", entry.id)
                 withContext(Dispatchers.Main.immediate) {
                     _state.value = PlaybackSessionState.Failed(
                         PlaybackFailureReason.RECORDING_UNAVAILABLE
@@ -339,6 +462,152 @@ class PlayerSession(
                 }
             }
         }
+    }
+
+    private fun startRecordingPreparation(p: ExoPlayer, recording: ActiveRecording) {
+        recordingPreparationJob?.cancel()
+        recordingPreparationJob = mainScope.launch {
+            val startedAt = System.currentTimeMillis()
+            while (activeRecording?.generation == recording.generation) {
+                val elapsed = System.currentTimeMillis() - startedAt
+                val duration = p.duration.takeIf { it != C.TIME_UNSET && it > 0L }
+                val ready = p.playbackState == Player.STATE_READY
+                val durationRequired = recording.startCoordinator.requiresDuration()
+                if (ready && (!durationRequired || duration != null)) break
+                if (elapsed >= RECORDING_PREPARATION_TIMEOUT_MS) break
+                if (_state.value is PlaybackSessionState.Failed) return@launch
+                delay(RECORDING_PREPARATION_POLL_MS)
+            }
+            val duration = p.duration.takeIf { it != C.TIME_UNSET && it > 0L }
+            when (
+                val decision = recording.startCoordinator.decide(
+                    currentGeneration = playbackGeneration,
+                    durationMs = duration,
+                    waitExpired = true,
+                    preparationFailed = _state.value is PlaybackSessionState.Failed,
+                )
+            ) {
+                RecordingPreparationDecision.Wait,
+                RecordingPreparationDecision.Cancel -> return@launch
+                is RecordingPreparationDecision.Start -> {
+                    if (activeRecording?.generation != recording.generation) return@launch
+                    when (val start = decision.decision) {
+                        RecordingStartDecision.FromBeginning -> p.seekTo(0L)
+                        is RecordingStartDecision.ResumeAt -> p.seekTo(start.positionMs)
+                    }
+                    recording.preparationApplied = true
+                    recording.clearProgressWhenPlaying =
+                        recording.intent == RecordingPlaybackIntent.FromBeginning
+                    p.playWhenReady = true
+                    startRecordingProgressSampler(recording)
+                }
+            }
+        }
+    }
+
+    private fun startRecordingProgressSampler(recording: ActiveRecording) {
+        recordingProgressJob?.cancel()
+        recordingProgressJob = mainScope.launch {
+            while (activeRecording?.generation == recording.generation) {
+                delay(RECORDING_PROGRESS_SAMPLE_MS)
+                val p = player ?: continue
+                recording.progressCoordinator.tick(
+                    positionMs = p.currentPosition,
+                    playing = p.isPlaying,
+                    nowMs = System.currentTimeMillis(),
+                )
+                publishRecordingProgressState(recording)
+            }
+        }
+    }
+
+    private fun startRecordingRemoteUpdates(recording: ActiveRecording) {
+        recordingRemoteJob?.cancel()
+        recordingRemoteJob = mainScope.launch {
+            dvrRepository.entries.collectLatest { entries ->
+                if (activeRecording?.generation != recording.generation) return@collectLatest
+                val entry = entries.firstOrNull { it.id == recording.entryId } ?: return@collectLatest
+                recording.dvrState = entry.state
+                entry.playPosition?.let { recording.progressCoordinator.remoteUpdate(it) }
+                publishRecordingProgressState(recording)
+            }
+        }
+    }
+
+    fun onRecordingSeekSettled() {
+        val recording = activeRecording ?: return
+        recordingSeekJob?.cancel()
+        recordingSeekJob = mainScope.launch {
+            delay(RECORDING_SEEK_CHECKPOINT_DEBOUNCE_MS)
+            if (activeRecording?.generation != recording.generation) return@launch
+            recordingSeekJob = null
+            val position = player?.currentPosition ?: return@launch
+            recording.progressCoordinator.checkpoint(
+                trigger = RecordingCheckpointTrigger.Seek,
+                positionMs = position,
+                nowMs = System.currentTimeMillis(),
+            )
+            publishRecordingProgressState(recording)
+        }
+    }
+
+    fun onRecordingPaused() {
+        val recording = activeRecording ?: return
+        if (!recording.preparationApplied) return
+        val position = player?.currentPosition ?: return
+        mainScope.launch {
+            if (activeRecording?.generation != recording.generation) return@launch
+            recording.progressCoordinator.checkpoint(
+                trigger = RecordingCheckpointTrigger.Pause,
+                positionMs = position,
+                nowMs = System.currentTimeMillis(),
+            )
+            publishRecordingProgressState(recording)
+        }
+    }
+
+    private suspend fun finishActiveRecordingLocked(
+        naturalEnd: Boolean = false,
+        terminalError: Boolean = false,
+    ): Boolean {
+        val recording = activeRecording ?: return false
+        recordingPreparationJob?.cancel()
+        recordingProgressJob?.cancel()
+        recordingSeekJob?.cancel()
+        val playback = withContext(Dispatchers.Main.immediate) {
+            val p = player
+            (p?.currentPosition ?: 0L) to p?.duration?.takeIf {
+                it != C.TIME_UNSET && it > 0L
+            }
+        }
+        val completed = recording.progressCoordinator.finish(
+            positionMs = playback.first,
+            durationMs = playback.second,
+            dvrState = recording.dvrState,
+            naturalEnd = naturalEnd,
+            terminalError = terminalError,
+            nowMs = System.currentTimeMillis(),
+        )
+        publishRecordingProgressState(recording)
+        return completed
+    }
+
+    private suspend fun publishRecordingProgressState(recording: ActiveRecording) {
+        val progressState = recording.progressCoordinator.snapshot().syncState
+        if (activeRecording?.generation == recording.generation) {
+            _recordingProgressSyncState.value = progressState
+        }
+    }
+
+    private fun cancelRecordingJobs() {
+        recordingPreparationJob?.cancel()
+        recordingPreparationJob = null
+        recordingProgressJob?.cancel()
+        recordingProgressJob = null
+        recordingRemoteJob?.cancel()
+        recordingRemoteJob = null
+        recordingSeekJob?.cancel()
+        recordingSeekJob = null
     }
 
     @OptIn(UnstableApi::class)
@@ -485,10 +754,14 @@ class PlayerSession(
     suspend fun stop() {
         commands.run {
             withContext(NonCancellable) {
+                finishActiveRecordingLocked()
                 withContext(Dispatchers.Main.immediate) {
+                    cancelRecordingJobs()
                     activePlayback = null
+                    activeRecording = null
                     _activeServiceId.value = null
                     _activeRecordingId.value = null
+                    _recordingProgressSyncState.value = RecordingProgressSyncState.Inactive
                     playbackGeneration++
                     consecutiveFailures = 0
                     retryJob?.cancel()
@@ -513,10 +786,14 @@ class PlayerSession(
     suspend fun release() {
         commands.run {
             withContext(NonCancellable) {
+                finishActiveRecordingLocked()
                 withContext(Dispatchers.Main.immediate) {
+                    cancelRecordingJobs()
                     activePlayback = null
+                    activeRecording = null
                     _activeServiceId.value = null
                     _activeRecordingId.value = null
+                    _recordingProgressSyncState.value = RecordingProgressSyncState.Inactive
                     playbackGeneration++
                     setDiagnosticsEnabled(false)
                     retryJob?.cancel()

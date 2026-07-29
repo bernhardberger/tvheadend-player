@@ -289,6 +289,23 @@
     <string name="recording_file_unavailable">TVHeadend stellt für diese Aufnahme keine abspielbare Datei bereit.</string>
     <string name="recording_read_failed">TVHeadend konnte diese Aufnahme nicht weiterlesen.</string>
     <string name="recording_growing_playback">Diese Aufnahme wächst noch. Spulen ist möglich, soweit der Server es unterstützt.</string>
+    <string name="recording_resume_from">Fortsetzen ab %1$s</string>
+    <plurals name="recording_duration_hours">
+        <item quantity="one">%1$d Stunde</item>
+        <item quantity="other">%1$d Stunden</item>
+    </plurals>
+    <plurals name="recording_duration_minutes">
+        <item quantity="one">%1$d Minute</item>
+        <item quantity="other">%1$d Minuten</item>
+    </plurals>
+    <plurals name="recording_duration_seconds">
+        <item quantity="one">%1$d Sekunde</item>
+        <item quantity="other">%1$d Sekunden</item>
+    </plurals>
+    <string name="recording_play_from_beginning">Von Anfang an abspielen</string>
+    <string name="recording_progress_read_only">Der vorhandene Wiedergabestand ist verfügbar. Neuer Fortschritt wird nicht gespeichert.</string>
+    <string name="recording_progress_unsupported">Dieser Server unterstützt die Wiedergabe ab Anfang, aber keinen synchronisierten Fortschritt.</string>
+    <string name="recording_progress_save_failed">Der Wiedergabefortschritt konnte nicht gespeichert werden.</string>
     <string name="recording_duration_unknown">Laufende Dauer</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 Sekunden</string>

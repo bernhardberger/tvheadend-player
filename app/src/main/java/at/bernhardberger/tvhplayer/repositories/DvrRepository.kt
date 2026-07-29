@@ -7,12 +7,17 @@ import at.bernhardberger.tvhplayer.core.dvrActionFailure
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrConfig
 import at.bernhardberger.tvhplayer.htsp.DvrFile
+import at.bernhardberger.tvhplayer.htsp.ConnectionState
+import at.bernhardberger.tvhplayer.htsp.DVR_PLAY_COUNT_KEEP
 import at.bernhardberger.tvhplayer.htsp.HtspEvent
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
+import at.bernhardberger.tvhplayer.htsp.HtspRequestTimeoutException
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.htsp.dvrState
+import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -23,6 +28,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
+
+enum class RecordingProgressCapability {
+    Disconnected,
+    Unsupported,
+    ReadOnly,
+    Full,
+}
+
+sealed interface RecordingProgressUpdateResult {
+    data object Accepted : RecordingProgressUpdateResult
+    data object PermissionDenied : RecordingProgressUpdateResult
+    data object Unsupported : RecordingProgressUpdateResult
+    data object Timeout : RecordingProgressUpdateResult
+    data object Disconnected : RecordingProgressUpdateResult
+    data object Rejected : RecordingProgressUpdateResult
+}
 
 class DvrRepository(
     private val htsp: HtspService,
@@ -46,11 +67,29 @@ class DvrRepository(
     /** Convenience for UI: true only when [writeCapability] is [RecordingWriteCapability.Allowed]. */
     private val _canModifyRecordings = MutableStateFlow(false)
     val canModifyRecordings: StateFlow<Boolean> = _canModifyRecordings
+    private val _progressCapability = MutableStateFlow(
+        recordingProgressCapability(htsp.currentConnectionState())
+    )
+    val progressCapability: StateFlow<RecordingProgressCapability> = _progressCapability
+    @Volatile
+    private var progressMethodUnsupported = false
 
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             htsp.controlEvents.collect { event ->
                 if (event is HtspEvent.ServerMessage) acceptDvrMessage(event.msg)
+            }
+        }
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            htsp.state.collect { state ->
+                if (state !is ConnectionState.Connected) progressMethodUnsupported = false
+                _progressCapability.value = if (
+                    progressMethodUnsupported && state is ConnectionState.Connected
+                ) {
+                    RecordingProgressCapability.Unsupported
+                } else {
+                    recordingProgressCapability(state)
+                }
             }
         }
     }
@@ -145,6 +184,79 @@ class DvrRepository(
         fields = mapOf("id" to entryId),
     )
 
+    suspend fun updateRecordingProgress(
+        entryId: Int,
+        playPositionSeconds: Long,
+        setWatched: Boolean,
+        timeoutMs: Long = 2_000L,
+    ): RecordingProgressUpdateResult {
+        if (entryId < 0 || playPositionSeconds < 0L) {
+            return RecordingProgressUpdateResult.Rejected
+        }
+        val connectionState = htsp.currentConnectionState()
+        val capability = if (
+            progressMethodUnsupported && connectionState is ConnectionState.Connected
+        ) {
+            RecordingProgressCapability.Unsupported
+        } else {
+            recordingProgressCapability(connectionState)
+        }
+        return when (capability) {
+            RecordingProgressCapability.Disconnected ->
+                RecordingProgressUpdateResult.Disconnected
+            RecordingProgressCapability.Unsupported ->
+                RecordingProgressUpdateResult.Unsupported
+            RecordingProgressCapability.ReadOnly ->
+                RecordingProgressUpdateResult.PermissionDenied
+            RecordingProgressCapability.Full -> performProgressUpdate(
+                entryId = entryId,
+                playPositionSeconds = playPositionSeconds,
+                setWatched = setWatched,
+                timeoutMs = timeoutMs,
+            )
+        }
+    }
+
+    private suspend fun performProgressUpdate(
+        entryId: Int,
+        playPositionSeconds: Long,
+        setWatched: Boolean,
+        timeoutMs: Long,
+    ): RecordingProgressUpdateResult = try {
+        val reply = htsp.request(
+            method = "updateDvrEntry",
+            fields = mapOf(
+                "id" to entryId,
+                "playposition" to playPositionSeconds,
+                "playcount" to if (setWatched) 1 else DVR_PLAY_COUNT_KEEP,
+            ),
+            timeoutMs = timeoutMs,
+            disconnectOnTimeout = false,
+        )
+        progressUpdateResult(reply).also { result ->
+            if (result == RecordingProgressUpdateResult.Unsupported) {
+                progressMethodUnsupported = true
+                _progressCapability.value = RecordingProgressCapability.Unsupported
+            }
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: HtspRequestTimeoutException) {
+        RecordingProgressUpdateResult.Timeout
+    } catch (_: ConnectException) {
+        RecordingProgressUpdateResult.Disconnected
+    } catch (_: IOException) {
+        RecordingProgressUpdateResult.Disconnected
+    } catch (error: IllegalStateException) {
+        if (error.message == "Not connected") {
+            RecordingProgressUpdateResult.Disconnected
+        } else {
+            RecordingProgressUpdateResult.Rejected
+        }
+    } catch (_: Exception) {
+        RecordingProgressUpdateResult.Rejected
+    }
+
     private suspend fun performAction(
         method: String,
         fields: Map<String, Any?>,
@@ -227,6 +339,34 @@ class DvrRepository(
             path = fields["filename"] as? String ?: fields["path"] as? String,
             size = (fields["size"] as? Number)?.toLong(),
         )
+    }
+}
+
+internal fun recordingProgressCapability(state: ConnectionState): RecordingProgressCapability =
+    when (state) {
+        is ConnectionState.Connected -> when {
+            state.htspVersion == null || state.htspVersion < 27 ->
+                RecordingProgressCapability.Unsupported
+            state.dvrAccess == false -> RecordingProgressCapability.ReadOnly
+            else -> RecordingProgressCapability.Full
+        }
+        ConnectionState.Disconnected,
+        is ConnectionState.Connecting,
+        is ConnectionState.Error -> RecordingProgressCapability.Disconnected
+    }
+
+private fun progressUpdateResult(reply: HtspMessage): RecordingProgressUpdateResult {
+    if (reply.int("success") == 1) return RecordingProgressUpdateResult.Accepted
+    if (reply.int("noaccess") == 1 && reply.int("connlimit") != 1) {
+        return RecordingProgressUpdateResult.PermissionDenied
+    }
+    val error = reply.str("error").orEmpty().lowercase()
+    return when {
+        "method not found" in error || "unknown method" in error ->
+            RecordingProgressUpdateResult.Unsupported
+        "permission" in error || "access denied" in error || "not allowed" in error ->
+            RecordingProgressUpdateResult.PermissionDenied
+        else -> RecordingProgressUpdateResult.Rejected
     }
 }
 

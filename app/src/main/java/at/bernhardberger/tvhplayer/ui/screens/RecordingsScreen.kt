@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -61,6 +63,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,7 +90,9 @@ import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.groupDvrProblems
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
@@ -94,12 +100,15 @@ import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.core.recordingResumeCandidateSeconds
+import at.bernhardberger.tvhplayer.core.recordingSecondsToMediaMilliseconds
 import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.repositories.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -119,6 +128,20 @@ import org.koin.compose.koinInject
 private enum class PendingRecordingAction {
     CANCEL,
     DELETE,
+}
+
+private enum class RecordingDetailsAction {
+    RESUME,
+    BEGINNING,
+    PLAY,
+    CANCEL,
+    DELETE,
+    CLOSE,
+}
+
+private enum class RecordingDetailsReturnTarget {
+    CONTENT,
+    FOLDER_PREVIEW,
 }
 
 private sealed interface ArchiveListItem {
@@ -152,12 +175,15 @@ fun RecordingsScreen(
     channelRepository: TvhRepository = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
+    progressCapabilityOverride: RecordingProgressCapability? = null,
     onRetry: () -> Unit = {},
-    onPlayRecording: (Int) -> Unit = {},
+    onPlayRecording: (Int, RecordingPlaybackIntent) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
 ) {
     val entries by repository.entries.collectAsStateWithLifecycle()
     val canModifyRecordings by repository.canModifyRecordings.collectAsStateWithLifecycle()
+    val observedProgressCapability by repository.progressCapability.collectAsStateWithLifecycle()
+    val progressCapability = progressCapabilityOverride ?: observedProgressCapability
     val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
     val channelsById = remember(channels) { channels.associateBy(ChannelUi::id) }
     val library = remember(entries) { partitionDvrLibrary(entries) }
@@ -177,8 +203,14 @@ fun RecordingsScreen(
     var folderPreviewRecordingId by remember { mutableStateOf<Int?>(null) }
     var detailsOpenedFromFolderPreview by remember { mutableStateOf(false) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
+    var detailsInitialAction by remember {
+        mutableStateOf<RecordingDetailsAction?>(null)
+    }
     var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
     var actionResult by remember { mutableStateOf<DvrActionResult?>(null) }
+    var pendingDetailsReturn by remember {
+        mutableStateOf<RecordingDetailsReturnTarget?>(null)
+    }
 
     val archiveFolder = archive.folderAt(archivePath) ?: archive
     val archiveItems = remember(archiveFolder) { archiveFolder.listItems() }
@@ -239,6 +271,33 @@ fun RecordingsScreen(
         folderPreviewFocused = false
         folderPreviewRecordingId = null
     }
+    LaunchedEffect(
+        detailsEntry,
+        pendingAction,
+        pendingDetailsReturn,
+        location,
+        focusRecoveryGeneration,
+    ) {
+        val target = pendingDetailsReturn ?: return@LaunchedEffect
+        if (detailsEntry != null || pendingAction != null) return@LaunchedEffect
+        repeat(4) {
+            withFrameNanos { }
+            val restored = runCatching {
+                when (target) {
+                    RecordingDetailsReturnTarget.CONTENT -> contentFocus.requestFocus()
+                    RecordingDetailsReturnTarget.FOLDER_PREVIEW -> {
+                        folderPreviewFocused = true
+                        folderPreviewFocus.requestFocus()
+                    }
+                }
+            }.getOrDefault(false)
+            if (restored) {
+                pendingDetailsReturn = null
+                requestContentFocus = false
+                return@LaunchedEffect
+            }
+        }
+    }
 
     BackHandler(
         enabled = backEnabled && detailsEntry == null &&
@@ -256,6 +315,7 @@ fun RecordingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .semantics { if (detailsEntry != null) hideFromAccessibility() }
             .onKeyEvent { event ->
                 if (event.key != Key.Back || event.type != KeyEventType.KeyUp) {
                     return@onKeyEvent false
@@ -362,6 +422,7 @@ fun RecordingsScreen(
                                 },
                                 onOpenRecording = {
                                     detailsOpenedFromFolderPreview = false
+                                    detailsInitialAction = null
                                     detailsEntry = it
                                     actionResult = null
                                 },
@@ -389,6 +450,7 @@ fun RecordingsScreen(
                                 },
                                 onOpenRecording = {
                                     detailsOpenedFromFolderPreview = true
+                                    detailsInitialAction = null
                                     detailsEntry = it
                                     actionResult = null
                                 },
@@ -417,6 +479,7 @@ fun RecordingsScreen(
                             onFocused = { selectedKeys[location] = it },
                             onOpen = {
                                 detailsOpenedFromFolderPreview = false
+                                detailsInitialAction = null
                                 detailsEntry = it
                                 actionResult = null
                             },
@@ -445,6 +508,7 @@ fun RecordingsScreen(
                             onFocused = { selectedKeys[location] = it },
                             onOpen = {
                                 detailsOpenedFromFolderPreview = false
+                                detailsInitialAction = null
                                 detailsEntry = it
                                 actionResult = null
                             },
@@ -464,29 +528,50 @@ fun RecordingsScreen(
     }
 
     val opened = detailsEntry
-    if (opened != null) {
+    if (opened != null && pendingAction == null) {
         val authoritative = entries.firstOrNull { it.id == opened.id } ?: opened
         RecordingDetailsPanel(
             contentPadding = contentPadding,
             entry = authoritative,
             actionResult = actionResult,
             canModifyRecordings = canModifyRecordings,
+            progressCapability = progressCapability,
+            initialAction = detailsInitialAction,
             backEnabled = backEnabled,
-            onPlay = { onPlayRecording(authoritative.id) },
-            onCancel = { pendingAction = PendingRecordingAction.CANCEL },
-            onDelete = { pendingAction = PendingRecordingAction.DELETE },
-            onClose = {
+            onPlay = { intent ->
                 detailsEntry = null
+                detailsInitialAction = null
                 actionResult = null
-                if (detailsOpenedFromFolderPreview) {
-                    folderPreviewFocused = true
-                    scope.launch {
-                        delay(40)
-                        runCatching { folderPreviewFocus.requestFocus() }
-                    }
+                requestContentFocus = true
+                onPlayRecording(authoritative.id, intent)
+            },
+            onCancel = {
+                detailsInitialAction = RecordingDetailsAction.CANCEL
+                pendingAction = PendingRecordingAction.CANCEL
+            },
+            onDelete = {
+                detailsInitialAction = RecordingDetailsAction.DELETE
+                pendingAction = PendingRecordingAction.DELETE
+            },
+            onClose = {
+                val target = if (detailsOpenedFromFolderPreview) {
+                    RecordingDetailsReturnTarget.FOLDER_PREVIEW
                 } else {
-                    requestContentFocus = true
+                    RecordingDetailsReturnTarget.CONTENT
                 }
+                val restoredBeforeDismissal = runCatching {
+                    when (target) {
+                        RecordingDetailsReturnTarget.CONTENT -> contentFocus.requestFocus()
+                        RecordingDetailsReturnTarget.FOLDER_PREVIEW -> {
+                            folderPreviewFocused = true
+                            folderPreviewFocus.requestFocus()
+                        }
+                    }
+                }.getOrDefault(false)
+                pendingDetailsReturn = target.takeUnless { restoredBeforeDismissal }
+                detailsEntry = null
+                detailsInitialAction = null
+                actionResult = null
             },
         )
     }
@@ -1301,14 +1386,20 @@ private fun RecordingDetailsPanel(
     entry: DvrEntry,
     actionResult: DvrActionResult?,
     canModifyRecordings: Boolean,
+    progressCapability: RecordingProgressCapability,
+    initialAction: RecordingDetailsAction?,
     backEnabled: Boolean,
-    onPlay: () -> Unit,
+    onPlay: (RecordingPlaybackIntent) -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val initialFocus = remember { FocusRequester() }
+    val primaryFocus = remember { FocusRequester() }
+    val secondaryFocus = remember { FocusRequester() }
+    val cancelFocus = remember { FocusRequester() }
+    val deleteFocus = remember { FocusRequester() }
     val closeFocus = remember { FocusRequester() }
+    var focusedAction by remember(entry.id) { mutableStateOf<RecordingDetailsAction?>(null) }
     val canCancel = canModifyRecordings &&
         (entry.state == DvrState.SCHEDULED || entry.state == DvrState.RECORDING)
     val canDelete = canModifyRecordings &&
@@ -1316,103 +1407,322 @@ private fun RecordingDetailsPanel(
             entry.state == DvrState.CANCELLED)
     val playbackAvailability = recordingPlaybackAvailability(entry)
     val canPlay = playbackAvailability is RecordingPlaybackAvailability.Ready
-    LaunchedEffect(entry.id, entry.state, canModifyRecordings) {
-        if (canPlay || canCancel || canDelete) initialFocus.requestFocus() else closeFocus.requestFocus()
+    val resumeSeconds = if (
+        canPlay && progressCapability != RecordingProgressCapability.Unsupported
+    ) {
+        recordingResumeCandidateSeconds(entry.state, entry.playPosition)
+    } else {
+        null
     }
-    BackHandler(enabled = backEnabled, onBack = onClose)
+    val primaryAction = when {
+        resumeSeconds != null -> RecordingDetailsAction.RESUME
+        canPlay -> RecordingDetailsAction.PLAY
+        canCancel -> RecordingDetailsAction.CANCEL
+        canDelete -> RecordingDetailsAction.DELETE
+        else -> RecordingDetailsAction.CLOSE
+    }
+    val availableActions = buildSet {
+        if (resumeSeconds != null) {
+            add(RecordingDetailsAction.RESUME)
+            add(RecordingDetailsAction.BEGINNING)
+        } else if (canPlay) {
+            add(RecordingDetailsAction.PLAY)
+        }
+        if (canCancel) add(RecordingDetailsAction.CANCEL)
+        if (canDelete) add(RecordingDetailsAction.DELETE)
+        add(RecordingDetailsAction.CLOSE)
+    }
+    fun requester(action: RecordingDetailsAction): FocusRequester = when (action) {
+        RecordingDetailsAction.RESUME,
+        RecordingDetailsAction.PLAY -> primaryFocus
+        RecordingDetailsAction.BEGINNING -> secondaryFocus
+        RecordingDetailsAction.CANCEL -> cancelFocus
+        RecordingDetailsAction.DELETE -> deleteFocus
+        RecordingDetailsAction.CLOSE -> closeFocus
+    }
+    LaunchedEffect(entry.id, initialAction) {
+        withFrameNanos { }
+        requester(initialAction?.takeIf { it in availableActions } ?: primaryAction).requestFocus()
+    }
+    LaunchedEffect(availableActions, focusedAction) {
+        val focused = focusedAction ?: return@LaunchedEffect
+        if (focused !in availableActions) {
+            withFrameNanos { }
+            requester(primaryAction).requestFocus()
+        }
+    }
     RecordingDetailsSurface(
         contentPadding = contentPadding,
+        backEnabled = backEnabled,
         onBack = onClose,
     ) {
-        Text(
-            entry.title,
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 2,
-            modifier = Modifier.semantics { heading() },
-        )
-        entry.subtitle?.takeIf(String::isNotBlank)?.let {
-            Text(it, style = MaterialTheme.typography.titleMedium)
-        }
-        Text(
-            buildString {
-                append(entry.start.recordingDateTime()).append('–').append(formatHm(entry.stop))
-                entry.channelName?.let { append(" • ").append(it) }
-                append(" • ").append(dvrStateLabel(entry.state))
-            },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        entry.summary?.takeIf(String::isNotBlank)?.let { Text(it, maxLines = 3) }
-        entry.description?.takeIf { it.isNotBlank() && it != entry.summary }?.let {
-            Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis)
-        }
-        entry.failureReason?.takeIf(String::isNotBlank)?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, maxLines = 2)
-        }
-        actionResult?.let {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("recording-details-metadata"),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Text(
-                dvrActionResultLabel(it),
-                color = if (it is DvrActionResult.Failed) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.primary,
+                entry.title,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 2,
+                modifier = Modifier.semantics { heading() },
             )
+            entry.subtitle?.takeIf(String::isNotBlank)?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                buildString {
+                    append(entry.start.recordingDateTime()).append('–').append(formatHm(entry.stop))
+                    entry.channelName?.let { append(" • ").append(it) }
+                    append(" • ").append(dvrStateLabel(entry.state))
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("recording-details-metadata-anchor"),
+            )
+            when {
+                !entry.failureReason.isNullOrBlank() -> Text(
+                    entry.failureReason,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                actionResult != null -> Text(
+                    dvrActionResultLabel(actionResult),
+                    color = if (actionResult is DvrActionResult.Failed) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                progressCapability == RecordingProgressCapability.ReadOnly -> Text(
+                    stringResource(R.string.recording_progress_read_only),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                progressCapability == RecordingProgressCapability.Unsupported -> Text(
+                    stringResource(R.string.recording_progress_unsupported),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (
+                entry.failureReason.isNullOrBlank() &&
+                actionResult == null &&
+                progressCapability != RecordingProgressCapability.ReadOnly &&
+                progressCapability != RecordingProgressCapability.Unsupported
+            ) {
+                val synopsis = entry.summary?.takeIf(String::isNotBlank)
+                    ?: entry.description?.takeIf(String::isNotBlank)
+                synopsis?.let {
+                    Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
-        Spacer(Modifier.weight(1f))
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("recording-details-playback-actions"),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.Start),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            var firstActionAssigned = false
-            if (canPlay) {
+            if (resumeSeconds != null) {
+                val accessibleResumeLabel = stringResource(
+                    R.string.recording_resume_from,
+                    recordingDurationForAccessibility(resumeSeconds),
+                )
                 Button(
-                    onClick = onPlay,
-                    modifier = Modifier.focusRequester(initialFocus),
+                    onClick = { onPlay(RecordingPlaybackIntent.Resume(resumeSeconds)) },
+                    modifier = Modifier
+                        .focusRequester(primaryFocus)
+                        .onFocusChanged {
+                            if (it.isFocused) focusedAction = RecordingDetailsAction.RESUME
+                        }
+                        .focusProperties {
+                            left = FocusRequester.Cancel
+                            right = secondaryFocus
+                            up = FocusRequester.Cancel
+                            down = closeFocus
+                        }
+                        .semantics { contentDescription = accessibleResumeLabel }
+                        .testTag("recording-details-resume"),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, stringResource(R.string.play))
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(
+                            R.string.recording_resume_from,
+                            formatPlaybackDuration(
+                                recordingSecondsToMediaMilliseconds(resumeSeconds) ?: 0L
+                            ),
+                        )
+                    )
+                }
+                Button(
+                    onClick = { onPlay(RecordingPlaybackIntent.FromBeginning) },
+                    modifier = Modifier
+                        .focusRequester(secondaryFocus)
+                        .onFocusChanged {
+                            if (it.isFocused) focusedAction = RecordingDetailsAction.BEGINNING
+                        }
+                        .focusProperties {
+                            left = primaryFocus
+                            right = FocusRequester.Cancel
+                            up = FocusRequester.Cancel
+                            down = when {
+                                canCancel -> cancelFocus
+                                canDelete -> deleteFocus
+                                else -> closeFocus
+                            }
+                        }
+                        .testTag("recording-details-beginning"),
+                ) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.recording_play_from_beginning))
+                }
+            } else if (canPlay) {
+                Button(
+                    onClick = {
+                        onPlay(
+                            if (progressCapability == RecordingProgressCapability.Unsupported) {
+                                RecordingPlaybackIntent.FromBeginning
+                            } else {
+                                RecordingPlaybackIntent.DefaultPolicy
+                            }
+                        )
+                    },
+                    modifier = Modifier
+                        .focusRequester(primaryFocus)
+                        .onFocusChanged {
+                            if (it.isFocused) focusedAction = RecordingDetailsAction.PLAY
+                        }
+                        .focusProperties {
+                            left = FocusRequester.Cancel
+                            right = FocusRequester.Cancel
+                            up = FocusRequester.Cancel
+                            down = closeFocus
+                        }
+                        .testTag("recording-details-play"),
+                ) {
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.play))
                 }
-                firstActionAssigned = true
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.Start),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .focusRequester(closeFocus)
+                    .onFocusChanged {
+                        if (it.isFocused) focusedAction = RecordingDetailsAction.CLOSE
+                    }
+                    .focusProperties {
+                        left = FocusRequester.Cancel
+                        right = when {
+                            canCancel -> cancelFocus
+                            canDelete -> deleteFocus
+                            else -> FocusRequester.Cancel
+                        }
+                        up = primaryFocus
+                        down = FocusRequester.Cancel
+                    }
+                    .testTag("recording-details-close"),
+            ) {
+                Icon(Icons.Filled.Close, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.close))
             }
             if (canCancel) {
                 Button(
                     onClick = onCancel,
-                    modifier = Modifier.then(
-                        if (!firstActionAssigned) Modifier.focusRequester(initialFocus) else Modifier
-                    ),
+                    modifier = Modifier
+                        .focusRequester(cancelFocus)
+                        .onFocusChanged {
+                            if (it.isFocused) focusedAction = RecordingDetailsAction.CANCEL
+                        }
+                        .focusProperties {
+                            left = closeFocus
+                            right = FocusRequester.Cancel
+                            up = if (resumeSeconds != null) secondaryFocus
+                                else if (canPlay) primaryFocus
+                                else FocusRequester.Cancel
+                            down = FocusRequester.Cancel
+                        }
+                        .testTag("recording-details-cancel"),
                 ) {
-                    Icon(Icons.Filled.Stop, stringResource(R.string.cancel_recording))
+                    Icon(Icons.Filled.Stop, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.cancel_recording))
                 }
-                firstActionAssigned = true
             }
             if (canDelete) {
                 Button(
                     onClick = onDelete,
-                    modifier = Modifier.then(
-                        if (!firstActionAssigned) Modifier.focusRequester(initialFocus) else Modifier
-                    ),
+                    modifier = Modifier
+                        .focusRequester(deleteFocus)
+                        .onFocusChanged {
+                            if (it.isFocused) focusedAction = RecordingDetailsAction.DELETE
+                        }
+                        .focusProperties {
+                            left = closeFocus
+                            right = FocusRequester.Cancel
+                            up = if (resumeSeconds != null) secondaryFocus
+                                else if (canPlay) primaryFocus
+                                else FocusRequester.Cancel
+                            down = FocusRequester.Cancel
+                        }
+                        .testTag("recording-details-delete"),
                 ) {
-                    Icon(Icons.Filled.Delete, stringResource(R.string.delete_recording))
+                    Icon(Icons.Filled.Delete, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.delete_recording))
                 }
-            }
-            OutlinedButton(
-                onClick = onClose,
-                modifier = Modifier.focusRequester(closeFocus),
-            ) {
-                Icon(Icons.Filled.Close, stringResource(R.string.close))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.close))
             }
         }
     }
 }
 
 @Composable
+private fun recordingDurationForAccessibility(totalSeconds: Long): String {
+    val safeSeconds = totalSeconds.coerceAtLeast(0L)
+    val hours = safeSeconds / 3_600L
+    val minutes = safeSeconds % 3_600L / 60L
+    val seconds = safeSeconds % 60L
+    return listOfNotNull(
+        hours.takeIf { it > 0L }?.let {
+            pluralStringResource(R.plurals.recording_duration_hours, it.toInt(), it)
+        },
+        minutes.takeIf { it > 0L }?.let {
+            pluralStringResource(R.plurals.recording_duration_minutes, it.toInt(), it)
+        },
+        seconds.takeIf { it > 0L || hours == 0L && minutes == 0L }?.let {
+            pluralStringResource(R.plurals.recording_duration_seconds, it.toInt(), it)
+        },
+    ).joinToString(", ")
+}
+
+@Composable
 private fun RecordingDetailsSurface(
     contentPadding: PaddingValues,
+    backEnabled: Boolean,
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -1420,12 +1730,12 @@ private fun RecordingDetailsSurface(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.64f))
-            .onKeyEvent { event ->
-                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
-                    onBack()
-                    true
-                } else {
+            .onPreviewKeyEvent { event ->
+                if (!backEnabled || event.key != Key.Back) {
                     false
+                } else {
+                    if (event.type == KeyEventType.KeyUp) onBack()
+                    true
                 }
             }
             .focusGroup()
@@ -1436,7 +1746,7 @@ private fun RecordingDetailsSurface(
         Surface(
             modifier = Modifier
                 .width(560.dp)
-                .fillMaxHeight()
+                .heightIn(max = 432.dp)
                 .testTag("recording-details-panel"),
             colors = SurfaceDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -1463,9 +1773,12 @@ private fun RecordingConfirmationDialog(
     onConfirm: () -> Unit,
 ) {
     val safeFocus = remember { FocusRequester() }
+    val confirmFocus = remember { FocusRequester() }
     LaunchedEffect(action) { safeFocus.requestFocus() }
-    BackHandler(enabled = backEnabled, onBack = onDismiss)
-    RecordingDialogSurface(onBack = onDismiss) {
+    RecordingDialogSurface(
+        backEnabled = backEnabled,
+        onBack = onDismiss,
+    ) {
         Text(
             text = stringResource(
                 if (action == PendingRecordingAction.CANCEL) {
@@ -1478,6 +1791,16 @@ private fun RecordingConfirmationDialog(
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.semantics { heading() },
         )
+        Text(
+            text = stringResource(
+                if (action == PendingRecordingAction.CANCEL) {
+                    R.string.cancel_recording_confirm_message
+                } else {
+                    R.string.delete_recording_confirm_message
+                }
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
@@ -1485,11 +1808,30 @@ private fun RecordingConfirmationDialog(
         ) {
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.focusRequester(safeFocus),
+                modifier = Modifier
+                    .focusRequester(safeFocus)
+                    .focusProperties {
+                        left = FocusRequester.Cancel
+                        right = confirmFocus
+                        up = FocusRequester.Cancel
+                        down = FocusRequester.Cancel
+                    }
+                    .testTag("recording-confirmation-back"),
             ) {
                 Text(stringResource(R.string.back))
             }
-            Button(onClick = onConfirm) {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .focusRequester(confirmFocus)
+                    .focusProperties {
+                        left = safeFocus
+                        right = FocusRequester.Cancel
+                        up = FocusRequester.Cancel
+                        down = FocusRequester.Cancel
+                    }
+                    .testTag("recording-confirmation-confirm"),
+            ) {
                 Text(
                     stringResource(
                         if (action == PendingRecordingAction.CANCEL) {
@@ -1506,6 +1848,7 @@ private fun RecordingConfirmationDialog(
 
 @Composable
 private fun RecordingDialogSurface(
+    backEnabled: Boolean,
     onBack: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -1513,12 +1856,12 @@ private fun RecordingDialogSurface(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.76f))
-            .onKeyEvent { event ->
-                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
-                    onBack()
-                    true
-                } else {
+            .onPreviewKeyEvent { event ->
+                if (!backEnabled || event.key != Key.Back) {
                     false
+                } else {
+                    if (event.type == KeyEventType.KeyUp) onBack()
+                    true
                 }
             }
             .focusGroup(),

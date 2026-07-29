@@ -57,7 +57,7 @@ val appModule = module {
     single { GuidePositionStore() }
     single { SimpleTvSession() }
 
-    single { PlayerSession(htsp = get(), playerSettingsStore = get()) }
+    single { PlayerSession(htsp = get(), playerSettingsStore = get(), dvrRepository = get()) }
 
     single<ImageLoader> {
         buildImageLoader(

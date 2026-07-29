@@ -46,6 +46,7 @@ import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
+import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
 import at.bernhardberger.tvhplayer.core.shouldUseWarmVideoSurface
@@ -95,7 +96,17 @@ object Routes {
     const val UNLOCK = "unlock"
     fun player(channelId: Int, serviceId: Int, channelName: String) =
         "player/$channelId/$serviceId/${android.net.Uri.encode(channelName)}"
-    fun recordingPlayer(recordingId: Int) = "recording-player/$recordingId"
+    fun recordingPlayer(
+        recordingId: Int,
+        intent: RecordingPlaybackIntent = RecordingPlaybackIntent.DefaultPolicy,
+    ): String {
+        val (mode, position) = when (intent) {
+            RecordingPlaybackIntent.DefaultPolicy -> "default" to -1L
+            RecordingPlaybackIntent.FromBeginning -> "beginning" to -1L
+            is RecordingPlaybackIntent.Resume -> "resume" to intent.positionSeconds
+        }
+        return "recording-player/$recordingId/$mode/$position"
+    }
 }
 
 @Composable
@@ -387,8 +398,8 @@ fun AppRoot(
                                     backEnabled = applianceLaunchRequest == null,
                                     connectionUiState = connectionUiState,
                                     onRetry = appVm::reconnectNow,
-                                    onPlayRecording = { recordingId ->
-                                        nav.navigate(Routes.recordingPlayer(recordingId))
+                                    onPlayRecording = { recordingId, intent ->
+                                        nav.navigate(Routes.recordingPlayer(recordingId, intent))
                                     },
                                     state = recordingsScreenState,
                                 )
@@ -455,17 +466,26 @@ fun AppRoot(
                     }
 
                     composable(
-                        route = "${Routes.RECORDING_PLAYER}/{recordingId}",
+                        route = "${Routes.RECORDING_PLAYER}/{recordingId}/{startMode}/{startPosition}",
                         arguments = listOf(
                             navArgument("recordingId") { type = NavType.IntType },
+                            navArgument("startMode") { type = NavType.StringType },
+                            navArgument("startPosition") { type = NavType.LongType },
                         ),
                     ) { backStackEntry ->
                         val recordingId = backStackEntry.arguments?.getInt("recordingId") ?: 0
+                        val startPosition = backStackEntry.arguments?.getLong("startPosition") ?: -1L
+                        val intent = when (backStackEntry.arguments?.getString("startMode")) {
+                            "beginning" -> RecordingPlaybackIntent.FromBeginning
+                            "resume" -> RecordingPlaybackIntent.Resume(startPosition)
+                            else -> RecordingPlaybackIntent.DefaultPolicy
+                        }
                         if (
                             capabilityProfile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER)
                         ) {
                             RecordingPlayerScreen(
                                 recordingId = recordingId,
+                                playbackIntent = intent,
                                 simpleTvProfile = capabilityProfile,
                                 debugVideoBackdropVisible = debugVideoBackdropVisible,
                                 onUnlock = { nav.navigate(Routes.UNLOCK) },

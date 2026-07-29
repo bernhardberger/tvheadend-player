@@ -1,13 +1,15 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -19,7 +21,9 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.runtime.mutableStateOf
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
+import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.repositories.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -35,11 +39,11 @@ class RecordingsScreenTest {
 
     @Test
     fun completedRecordingOpensDetailsBeforeDeleteConfirmation() {
-        var playedRecordingId: Int? = null
         val repository = DvrRepository(
             htsp = HtspService(Dispatchers.Unconfined),
             ioDispatcher = Dispatchers.Unconfined,
         )
+        repository.applyAuthenticatedDvrAccess(true)
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -67,7 +71,6 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 RecordingsScreen(
                     repository = repository,
-                    onPlayRecording = { playedRecordingId = it },
                 )
             }
         }
@@ -80,12 +83,28 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsDisplayed().assertIsFocused()
         composeRule.onNodeWithText("Evening News").assertIsDisplayed()
         composeRule.onNodeWithTag("recording-list-entry-7").performClick()
-        composeRule.onNodeWithContentDescription("Play").assertIsDisplayed().performClick()
-        composeRule.runOnIdle { assertEquals(7, playedRecordingId) }
-        composeRule.onNodeWithContentDescription("Delete recording")
-            .assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("recording-details-play").assertIsDisplayed().assertIsFocused()
+        composeRule.onNodeWithTag("recording-details-delete").performClick()
         composeRule.onNodeWithText("Delete “Evening News”?").assertIsDisplayed()
-        composeRule.onNodeWithText("Back").assertIsFocused()
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+            .performKeyInput { pressKey(Key.Back) }
+        composeRule.onNodeWithTag("recording-details-delete").assertIsFocused()
     }
 
     @Test
@@ -170,7 +189,7 @@ class RecordingsScreenTest {
             .assertIsFocused()
             .performClick()
         composeRule.onNodeWithTag("recording-details-panel").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Play")
+        composeRule.onNodeWithTag("recording-details-play")
             .assertIsFocused()
             .performKeyInput { pressKey(Key.Back) }
         composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
@@ -178,6 +197,294 @@ class RecordingsScreenTest {
             .assertIsFocused()
             .performKeyInput { pressKey(Key.Back) }
         composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused()
+    }
+
+    @Test
+    fun closingDetailsRestoresRecordingWhenAutomaticInitialFocusIsDisabled() {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 7,
+                        "channelId" to 1,
+                        "start" to 100L,
+                        "stop" to 200L,
+                        "title" to "Evening News",
+                        "state" to "completed",
+                        "files" to listOf(mapOf("filename" to "evening-news.ts")),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreen(
+                    repository = repository,
+                    initialFocusEnabled = false,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("recording-list-entry-7")
+            .requestFocus()
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
+        composeRule.onNodeWithTag("recording-details-close").performClick()
+
+        composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
+    }
+
+    @Test
+    fun detailsConsumeBackBeforeTheShellAndRestoreTheRecording() {
+        var shellBackCount = 0
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 7,
+                        "channelId" to 1,
+                        "start" to 100L,
+                        "stop" to 200L,
+                        "title" to "Evening News",
+                        "state" to "completed",
+                        "files" to listOf(mapOf("filename" to "evening-news.ts")),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                Box {
+                    RecordingsScreen(repository = repository)
+                    BackHandler { shellBackCount++ }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("recording-list-entry-7").performClick()
+        composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
+            .performKeyInput { pressKey(Key.Back) }
+
+        composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
+        composeRule.runOnIdle { assertEquals(0, shellBackCount) }
+    }
+
+    @Test
+    fun shortDetailsKeepPlaybackActionsAdjacentToMetadata() {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 8,
+                        "channelId" to 1,
+                        "start" to 100L,
+                        "stop" to 200L,
+                        "title" to "Short programme",
+                        "state" to "completed",
+                        "files" to listOf(mapOf("filename" to "short.ts")),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme { RecordingsScreen(repository = repository) }
+        }
+        composeRule.onNodeWithTag("recording-list-entry-8").performClick()
+
+        val metadata = composeRule.onNodeWithTag(
+            "recording-details-metadata-anchor",
+            useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        val playbackActions = composeRule.onNodeWithTag(
+            "recording-details-playback-actions",
+            useUnmergedTree = true,
+        ).fetchSemanticsNode().boundsInRoot
+        val panel = composeRule.onNodeWithTag("recording-details-panel")
+            .fetchSemanticsNode().boundsInRoot
+
+        assertTrue(playbackActions.top - metadata.bottom <= panel.height * 0.12f)
+    }
+
+    @Test
+    fun resumableDetailsKeepSemanticFocusAndSendExplicitStartIntent() {
+        var playbackIntent: RecordingPlaybackIntent? = null
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        repository.applyAuthenticatedDvrAccess(true)
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 7,
+                        "channelId" to 1,
+                        "start" to 100L,
+                        "stop" to 7_300L,
+                        "title" to "Evening News",
+                        "state" to "completed",
+                        "playposition" to 3_723L,
+                        "files" to listOf(mapOf("filename" to "evening-news.ts")),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreen(
+                    repository = repository,
+                    progressCapabilityOverride = RecordingProgressCapability.ReadOnly,
+                    onPlayRecording = { _, intent -> playbackIntent = intent },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("recording-list-entry-7").performClick()
+        composeRule.onNodeWithText(
+            "Existing resume progress is available. New progress won’t be saved."
+        ).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(
+            "Resume from 1 hour, 2 minutes, 3 seconds"
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-details-delete").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-delete").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-details-delete").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-details-close").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-details-close").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused()
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryUpdate",
+                    seq = null,
+                    fields = mapOf("id" to 7, "playposition" to 3_800L),
+                )
+            )
+        }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused().performClick()
+        composeRule.runOnIdle {
+            assertEquals(RecordingPlaybackIntent.FromBeginning, playbackIntent)
+        }
+        composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
+    }
+
+    @Test
+    fun disappearingResumeFallsBackToPlayAndLegacyPlaybackStartsOver() {
+        var playbackIntent: RecordingPlaybackIntent? = null
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryAdd",
+                    seq = null,
+                    fields = mapOf(
+                        "id" to 8,
+                        "channelId" to 1,
+                        "start" to 100L,
+                        "stop" to 3_700L,
+                        "title" to "Documentary",
+                        "state" to "completed",
+                        "playposition" to 600L,
+                        "files" to listOf(mapOf("filename" to "documentary.ts")),
+                    ),
+                )
+            )
+            repository.acceptDvrMessage(
+                HtspMessage(method = "initialSyncCompleted", seq = null, fields = emptyMap())
+            )
+        }
+
+        val capability = mutableStateOf(RecordingProgressCapability.Full)
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreen(
+                    repository = repository,
+                    progressCapabilityOverride = capability.value,
+                    onPlayRecording = { _, intent -> playbackIntent = intent },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("recording-list-entry-8").performClick()
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+        runBlocking {
+            repository.acceptDvrMessage(
+                HtspMessage(
+                    method = "dvrEntryUpdate",
+                    seq = null,
+                    fields = mapOf("id" to 8, "playposition" to 100L),
+                )
+            )
+        }
+        composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
+
+        composeRule.runOnIdle { capability.value = RecordingProgressCapability.Unsupported }
+        composeRule.onNodeWithText(
+            "This server supports playback from the beginning, but not synchronized progress."
+        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("recording-details-play").assertIsFocused().performClick()
+        composeRule.runOnIdle {
+            assertEquals(RecordingPlaybackIntent.FromBeginning, playbackIntent)
+        }
     }
 
     @Test
