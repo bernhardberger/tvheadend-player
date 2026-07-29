@@ -133,20 +133,23 @@ OpenCode loads both `AGENTS.md` and `docs/device-targets.md` as project
 instructions. The tracked target document identifies device roles but contains
 no private address; the ignored local file selects the reachable device.
 
-Copy the tracked example to the ignored local file and set the current ADB
-serial. The example deliberately defaults to `role: "production"`. Change it to
-`role: "test"` only for the assigned dining-room G10 development target and set
-its exact manufacturer, model, device, and product expectations; keep the
-bedroom G08 at `role: "production"`:
+Copy the tracked example to the ignored local file, retain only assigned devices,
+and fill in their local ADB serials. Keep `active_target` set to the G10 for
+routine debug work. The example assigns `role: "test"` only to the designated
+G10 and Shield test targets and keeps the bedroom G08 at `role: "production"`:
 
 ```bash
 cp .tvhplayer-device.example.json .tvhplayer-device.json
+./tools/device doctor
+./tools/device --target nvidia-shield doctor
 ```
 
-The same value can be supplied without a file:
+Select another configured profile for one command or session without changing
+the ignored file:
 
 ```bash
-export TVHPLAYER_ADB_SERIAL='<adb-serial>'
+./tools/device --target nvidia-shield doctor
+export TVHPLAYER_DEVICE_TARGET='nvidia-shield'
 ```
 
 An environment or command-line serial does not override the role policy from

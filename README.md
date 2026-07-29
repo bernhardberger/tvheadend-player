@@ -148,7 +148,14 @@ Device operations use an ignored local configuration and the bounded wrapper:
 ```bash
 cp .tvhplayer-device.example.json .tvhplayer-device.json
 ./tools/device doctor
+./tools/device --target nvidia-shield doctor
 ```
+
+The ignored config can retain named G10, Shield, and production profiles. Its
+`active_target` is used by default; `--target` or
+`TVHPLAYER_DEVICE_TARGET` selects another profile for one command. Every
+restricted operation still verifies that profile's role and all four expected
+identity fields against the live device.
 
 Never put TVHeadend credentials, signing keys, or private device addresses in
 Git. The debug-only designated-test-device provisioning flow is documented in

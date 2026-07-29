@@ -153,13 +153,14 @@ fingerprint. Do not record addresses, credentials, or unrestricted logs.
 
 ## Production deployment
 
-Production installation requires explicit owner approval. Configure the ignored
-`.tvhplayer-device.json` for role `production` with the exact expected
-manufacturer, model, device, and product, then run `doctor`. Install only the
-complete signed bundle through the bounded wrapper:
+Production installation requires explicit owner approval. Select a profile in
+the ignored `.tvhplayer-device.json` whose role is `production` and whose exact
+expected manufacturer, model, device, and product identify the intended TV,
+then run `doctor` with that same target. Install only the complete signed bundle
+through the bounded wrapper:
 
 ```bash
-./tools/device install-release \
+./tools/device --target g08 install-release \
   --bundle build/release/signed/0.1.4 \
   --confirm-release-install
 ```

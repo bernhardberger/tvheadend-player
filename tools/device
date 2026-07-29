@@ -64,6 +64,7 @@ TEST_DEVICE_ACTIONS = {
 RELEASE_DEVICE_ACTIONS = {"install-release"}
 PRODUCTION_DEVICE_ACTIONS = {"uninstall-legacy"}
 VALID_ROLES = {"production", "test", "unclassified"}
+TARGET_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 
 
 def fail(message: str) -> NoReturn:
@@ -71,16 +72,65 @@ def fail(message: str) -> NoReturn:
     raise SystemExit(2)
 
 
-def load_local_config() -> dict[str, str]:
+def normalize_device_config(value: object, *, label: str) -> dict[str, str]:
+    if not isinstance(value, dict):
+        fail(f"{label} must contain a JSON object")
+    config: dict[str, str] = {}
+    for key, item in value.items():
+        if isinstance(item, (dict, list)):
+            fail(f"{label} field {key!r} must be a scalar value")
+        config[str(key)] = str(item)
+    return config
+
+
+def select_device_config(
+    value: object,
+    *,
+    requested_target: str | None,
+) -> tuple[str | None, dict[str, str]]:
+    if not isinstance(value, dict):
+        fail(f"{LOCAL_CONFIG} must contain a JSON object")
+
+    if "targets" not in value:
+        if requested_target:
+            fail("named targets require a profiles-based .tvhplayer-device.json")
+        return None, normalize_device_config(value, label=str(LOCAL_CONFIG))
+
+    targets = value["targets"]
+    if not isinstance(targets, dict):
+        fail(f"{LOCAL_CONFIG} targets must contain a JSON object")
+
+    target_name_value = requested_target or value.get("active_target")
+    if not isinstance(target_name_value, str) or not target_name_value:
+        fail(
+            "device target is required; set active_target, "
+            "TVHPLAYER_DEVICE_TARGET, or pass --target"
+        )
+    target_name = target_name_value.strip()
+    if not TARGET_NAME_PATTERN.fullmatch(target_name):
+        fail(
+            "device target must use lowercase letters, digits, and hyphens "
+            "and be at most 64 characters"
+        )
+    if target_name not in targets:
+        fail(f"device target {target_name!r} is not configured")
+
+    return target_name, normalize_device_config(
+        targets[target_name],
+        label=f"device target {target_name!r}",
+    )
+
+
+def load_local_config(
+    requested_target: str | None,
+) -> tuple[str | None, dict[str, str]]:
     if not LOCAL_CONFIG.exists():
-        return {}
+        return select_device_config({}, requested_target=requested_target)
     try:
         value = json.loads(LOCAL_CONFIG.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot read {LOCAL_CONFIG}: {exc}")
-    if not isinstance(value, dict):
-        fail(f"{LOCAL_CONFIG} must contain a JSON object")
-    return {str(key): str(item) for key, item in value.items()}
+    return select_device_config(value, requested_target=requested_target)
 
 
 def run(
@@ -609,6 +659,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="ADB device serial; overrides TVHPLAYER_ADB_SERIAL and local config",
     )
     parser.add_argument(
+        "--target",
+        help=(
+            "Named local target; overrides TVHPLAYER_DEVICE_TARGET and "
+            "active_target in local config"
+        ),
+    )
+    parser.add_argument(
         "--package",
         dest="package_name",
         help=f"Android package name (default: {DEFAULT_PACKAGE})",
@@ -711,7 +768,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    config = load_local_config()
+    target_name, config = load_local_config(
+        args.target or os.environ.get("TVHPLAYER_DEVICE_TARGET")
+    )
 
     adb = shutil.which("adb")
     if not adb:
@@ -760,6 +819,8 @@ def main() -> int:
         properties = read_device_properties(adb, serial)
         verify_configured_identity(properties, config, require_expected=False)
         print(f"device={serial}")
+        if target_name:
+            print(f"target={target_name}")
         print(f"role={role}")
         print(
             "manufacturer|model|device|product|android|abis="

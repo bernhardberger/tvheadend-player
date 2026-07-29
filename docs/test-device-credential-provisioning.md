@@ -6,9 +6,10 @@ not a release feature or a general credential-import API.
 
 ## Policy
 
-- The local `.tvhplayer-device.json` must set `role` to `test` and contain the
-  exact expected manufacturer, model, device, and product. `tools/device`
-  re-reads all four properties from the connected TV before provisioning.
+- The selected target in local `.tvhplayer-device.json` must set `role` to
+  `test` and contain the exact expected manufacturer, model, device, and
+  product. `tools/device` re-reads all four properties from the connected TV
+  before provisioning.
 - Production and unclassified devices are rejected before the local secret is
   read.
 - Credential values must come from an ignored, owner-only local file. They must
@@ -20,13 +21,15 @@ not a release feature or a general credential-import API.
 
 ## Setup
 
-Copy `.tvhplayer-device.example.json` to the ignored local device file. Change
-the role only for a device explicitly assigned to testing, then fill in the live
-identity reported by `doctor`:
+Copy `.tvhplayer-device.example.json` to the ignored local device file. Retain
+only assigned devices, set `active_target` deliberately, and fill in each local
+ADB serial. Change a profile's role only when that device's lifecycle assignment
+changes, then confirm the live identity reported by `doctor`:
 
 ```bash
 cp .tvhplayer-device.example.json .tvhplayer-device.json
 ./tools/device doctor
+./tools/device --target nvidia-shield doctor
 ```
 
 Create the configured `.tvhplayer-credentials.json` locally with this shape:

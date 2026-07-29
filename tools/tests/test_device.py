@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEVICE = runpy.run_path(str(ROOT / "tools/device"), run_name="device_tool")
 action_policy_error = DEVICE["action_policy_error"]
 identity_errors = DEVICE["identity_errors"]
+select_device_config = DEVICE["select_device_config"]
 load_credential_payload = DEVICE["load_credential_payload"]
 resolve_verified_release_apk = DEVICE["resolve_verified_release_apk"]
 capture_screenshot = DEVICE["capture_screenshot"]
@@ -35,6 +36,81 @@ class DevicePolicyTest(unittest.TestCase):
             DEVICE["DEFAULT_CREDENTIAL_FILE"].name,
             ".tvhplayer-credentials.json",
         )
+
+    def test_active_named_target_is_selected_without_exposing_other_profiles(self) -> None:
+        target_name, config = select_device_config(
+            {
+                "active_target": "g10",
+                "targets": {
+                    "g10": {
+                        "serial": "g10-serial",
+                        "role": "test",
+                        "expected_device": "G10",
+                    },
+                    "nvidia-shield": {
+                        "serial": "shield-serial",
+                        "role": "test",
+                        "expected_device": "darcy",
+                    },
+                },
+            },
+            requested_target=None,
+        )
+
+        self.assertEqual(target_name, "g10")
+        self.assertEqual(
+            config,
+            {
+                "serial": "g10-serial",
+                "role": "test",
+                "expected_device": "G10",
+            },
+        )
+
+    def test_explicit_named_target_overrides_the_active_target(self) -> None:
+        target_name, config = select_device_config(
+            {
+                "active_target": "g10",
+                "targets": {
+                    "g10": {"serial": "g10-serial"},
+                    "nvidia-shield": {"serial": "shield-serial"},
+                },
+            },
+            requested_target="nvidia-shield",
+        )
+
+        self.assertEqual(target_name, "nvidia-shield")
+        self.assertEqual(config["serial"], "shield-serial")
+
+    def test_unknown_or_unsafe_named_target_is_rejected(self) -> None:
+        value = {
+            "active_target": "g10",
+            "targets": {"g10": {"serial": "g10-serial"}},
+        }
+
+        for requested_target in ("missing", "../g10"):
+            with self.subTest(requested_target=requested_target):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    select_device_config(
+                        value,
+                        requested_target=requested_target,
+                    )
+
+    def test_legacy_single_target_config_remains_supported(self) -> None:
+        target_name, config = select_device_config(
+            {"serial": "legacy-serial", "role": "test"},
+            requested_target=None,
+        )
+
+        self.assertIsNone(target_name)
+        self.assertEqual(config, {"serial": "legacy-serial", "role": "test"})
+
+    def test_parser_accepts_a_named_target_before_the_action(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["--target", "g10", "doctor"])
+
+        self.assertEqual(args.target, "g10")
 
     def test_bounded_remote_navigation_keys_are_available(self) -> None:
         self.assertEqual(key_events["up"], "KEYCODE_DPAD_UP")
