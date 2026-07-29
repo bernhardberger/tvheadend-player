@@ -67,6 +67,7 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBlockGap
 import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.progress
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 
 @Composable
 fun OverlayControlsTv(
@@ -174,8 +175,7 @@ fun OverlayControlsTv(
         PlayerIdentityHeader(
             imageLoader = imageLoader,
             piconPath = piconPath,
-            eyebrow = listOfNotNull(channelNumber?.toString(), channelName)
-                .joinToString("  "),
+            eyebrow = channelTitleText(number = channelNumber, name = channelName),
             title = title.ifEmpty { channelName },
             support = nextEvent?.let {
                 stringResource(R.string.player_next_event_at, formatClock(it.start), it.title)

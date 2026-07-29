@@ -121,6 +121,7 @@ import at.bernhardberger.tvhplayer.core.programmeHasAired
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
+import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
@@ -1155,11 +1156,6 @@ internal fun TimelineChannelHeader(
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = number?.toString().orEmpty(),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.width(28.dp),
-                )
                 PiconBox(
                     imageLoader = imageLoader,
                     piconPath = channel.icon,
@@ -1167,12 +1163,13 @@ internal fun TimelineChannelHeader(
                         .width(44.dp)
                         .height(30.dp),
                 )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = channel.name,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                Spacer(Modifier.width(TvSpacing8))
+                ChannelTitle(
+                    number = number,
+                    name = channel.name,
                     style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }

@@ -43,16 +43,9 @@ fun ChannelRow(
         onClick = onConfirm,
         headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = buildString {
-                        number?.let {
-                            append(it)
-                            append("  ")
-                        }
-                        append(name)
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                ChannelTitle(
+                    number = number,
+                    name = name,
                     modifier = Modifier.weight(1f),
                 )
                 if (playingNow || recordingNow) {

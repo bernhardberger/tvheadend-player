@@ -233,17 +233,10 @@ private fun ChannelCard(
         },
         title = {
             Column(modifier = Modifier.padding(top = TvSpacing8)) {
-                Text(
-                    text = buildString {
-                        item.number?.let {
-                            append(it)
-                            append("  ")
-                        }
-                        append(item.channel.name)
-                    },
+                ChannelTitle(
+                    number = item.number,
+                    name = item.channel.name,
                     style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = item.programmeTitle,

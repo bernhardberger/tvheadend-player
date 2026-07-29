@@ -61,7 +61,7 @@ class TimelineEpgPerformanceTest {
         }
 
         composeRule.onNodeWithTag("timeline-rows").performScrollToIndex(299)
-        composeRule.onNodeWithText("Channel 300").assertIsDisplayed()
+        composeRule.onNodeWithText("300  Channel 300").assertIsDisplayed()
     }
 
     @Test
