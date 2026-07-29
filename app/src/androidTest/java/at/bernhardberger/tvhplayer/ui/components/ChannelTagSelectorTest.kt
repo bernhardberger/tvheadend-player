@@ -176,7 +176,7 @@ class ChannelTagSelectorTest {
     }
 
     @Test
-    fun overflowingInactiveTabsFadeAtTheLeadingEdgeButTheFirstTabDoesNot() {
+    fun overflowingInactiveTabsDoNotPaintOverTheBacking() {
         var selectedTagId by mutableStateOf<Int?>(5)
         val tags = longTags()
         composeRule.setContent {
@@ -201,7 +201,7 @@ class ChannelTagSelectorTest {
             .captureToImage()
             .toPixelMap()
         val sampleY = overflowPixels.height - 2
-        assertEquals(0.75f, overflowPixels[1, sampleY].red, 0.08f)
+        assertEquals(1f, overflowPixels[1, sampleY].red, 0.06f)
         assertEquals(1f, overflowPixels[overflowPixels.width - 2, sampleY].red, 0.06f)
 
         composeRule.onNodeWithText("All channels").requestFocus().assertIsFocused()
@@ -213,7 +213,7 @@ class ChannelTagSelectorTest {
     }
 
     @Test
-    fun overflowingInactiveTabsFadeAtTheLogicalLeadingEdgeInRtl() {
+    fun overflowingInactiveTabsDoNotPaintOverTheBackingInRtl() {
         val tags = longTags()
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -239,7 +239,7 @@ class ChannelTagSelectorTest {
             .captureToImage()
             .toPixelMap()
         val sampleY = pixels.height - 2
-        assertEquals(0.75f, pixels[pixels.width - 2, sampleY].red, 0.08f)
+        assertEquals(1f, pixels[pixels.width - 2, sampleY].red, 0.06f)
         assertEquals(1f, pixels[1, sampleY].red, 0.06f)
     }
 

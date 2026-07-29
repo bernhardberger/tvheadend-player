@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
-import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
 import at.bernhardberger.tvhplayer.ui.Routes
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import androidx.compose.ui.focus.FocusRequester
@@ -38,7 +38,6 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.test.requestFocus
 import androidx.tv.material3.Button
 import org.junit.Rule
 import org.junit.Test
@@ -87,20 +86,13 @@ class SideRailSemanticsTest {
                         onRootBack = {},
                         onNavigate = {},
                         content = { _, drawerActive ->
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Red)
-                                    .testTag("rail-surface-test-viewport"),
+                            Button(
+                                onClick = {},
+                                modifier = Modifier
+                                    .focusRequester(contentFocus)
+                                    .testTag("rail-surface-test-content"),
                             ) {
-                                Button(
-                                    onClick = {},
-                                    modifier = Modifier
-                                        .focusRequester(contentFocus)
-                                        .testTag("rail-surface-test-content"),
-                                ) {
-                                    Text("Browse")
-                                }
+                                Text("Browse")
                             }
                             LaunchedEffect(drawerActive) {
                                 if (!drawerActive) contentFocus.requestFocus()
@@ -123,7 +115,7 @@ class SideRailSemanticsTest {
         assertEquals(0.22f, redAt(1), 0.06f)
         assertEquals(0.28f, redAt(31), 0.06f)
         assertEquals(0.45f, redAt(68), 0.06f)
-        assertEquals(0.83f, redAt(97), 0.06f)
+        assertEquals(0.75f, redAt(97), 0.06f)
         assertEquals(1f, redAt(124), 0.06f)
 
         composeRule.onNodeWithTag("rail-surface-test-content")
@@ -145,105 +137,64 @@ class SideRailSemanticsTest {
         assertEquals(0.12f, expandedRedAt(0.35f), 0.06f)
         assertEquals(0.28f, expandedRedAt(0.70f), 0.06f)
         assertEquals(0.65f, expandedRedAt(0.90f), 0.06f)
-        assertEquals(0.65f, expandedRedAt(0.99f), 0.06f)
-
-        val openBrowseBounds = composeRule.onNodeWithTag("rail-surface-test-viewport")
-            .fetchSemanticsNode().boundsInRoot
-        val openShellPixels = composeRule.onNodeWithTag("global-navigation-shell")
-            .captureToImage()
-            .toPixelMap()
-        fun openBrowseRedAt(offset: Int): Float {
-            val sampleX = openBrowseBounds.left.toInt() + with(composeRule.density) {
-                offset.dp.roundToPx()
-            }
-            return openShellPixels[sampleX, sampleY].red
-        }
-
-        assertEquals(0.65f, openBrowseRedAt(1), 0.08f)
-        assertEquals(1f, openBrowseRedAt(16), 0.06f)
-        assertEquals(1f, openBrowseRedAt(31), 0.06f)
+        assertEquals(0.96f, expandedRedAt(0.99f), 0.06f)
     }
 
     @Test
-    fun shellVeilDoesNotCoverTheFirstSelectedOrFocusedScopeTab() {
+    fun edgeFadeMaskMakesOpaqueContentTransparentWithoutPaintingTheScrim() {
         composeRule.setContent {
-            TVHeadendPlayerTheme {
-                SideRail(
-                    currentRoute = Routes.CHANNELS,
-                    showEpgMenu = true,
-                    onRootBack = {},
-                    onNavigate = {},
-                    content = { _, _ ->
-                        ChannelTagSelector(
-                            tags = listOf(
-                                ChannelTagUi(id = 7, name = "News", index = 1),
-                                ChannelTagUi(id = 8, name = "Documentaries", index = 2),
-                            ),
-                            activeTagId = null,
-                            onSelectTag = {},
-                            modifier = Modifier
-                                .height(80.dp)
-                                .background(Color.Red)
-                                .testTag("protected-scope-row"),
-                        )
-                    },
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                Box(
+                    Modifier
+                        .width(160.dp)
+                        .height(80.dp)
+                        .navigationEdgeFadeMask(width = 32.dp)
+                        .background(Color.Red)
+                        .testTag("edge-fade-mask"),
                 )
             }
         }
 
-        composeRule.onNodeWithText("All channels").requestFocus().assertIsFocused()
-        composeRule.waitForIdle()
-        val focusedTabBounds = composeRule.onNodeWithText("All channels")
-            .fetchSemanticsNode().boundsInRoot
-        val shellPixels = composeRule.onNodeWithTag("global-navigation-shell")
-            .captureToImage()
-            .toPixelMap()
-        val sampleX = focusedTabBounds.left.toInt() + with(composeRule.density) {
-            8.dp.roundToPx()
+        val pixels = composeRule.onNodeWithTag("edge-fade-mask").captureToImage().toPixelMap()
+        val sampleY = pixels.height / 2
+        fun redAt(offset: Int): Float {
+            val x = with(composeRule.density) { offset.dp.roundToPx() }
+            return pixels[x, sampleY].red
         }
-        val sampleY = focusedTabBounds.center.y.toInt()
 
-        assertTrue(shellPixels[sampleX, sampleY].red > 0.85f)
+        assertEquals(0.03f, redAt(1), 0.08f)
+        assertEquals(0.50f, redAt(16), 0.08f)
+        assertEquals(1f, redAt(31), 0.06f)
     }
 
     @Test
-    fun collapsedBrowseVeilUsesTheLogicalLeadingEdgeInRtl() {
+    fun edgeFadeMaskUsesTheLogicalLeadingEdgeInRtl() {
         composeRule.setContent {
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl,
             ) {
-                TVHeadendPlayerTheme {
-                    SideRail(
-                        currentRoute = Routes.HOME,
-                        showEpgMenu = true,
-                        onRootBack = {},
-                        onNavigate = {},
-                        content = { _, _ ->
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Red)
-                                    .testTag("rtl-browse-viewport"),
-                            )
-                        },
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    Box(
+                        Modifier
+                            .width(160.dp)
+                            .height(80.dp)
+                            .navigationEdgeFadeMask(width = 32.dp)
+                            .background(Color.Red)
+                            .testTag("rtl-edge-fade-mask"),
                     )
                 }
             }
         }
 
-        val browseBounds = composeRule.onNodeWithTag("rtl-browse-viewport")
-            .fetchSemanticsNode().boundsInRoot
-        val shellPixels = composeRule.onNodeWithTag("global-navigation-shell")
-            .captureToImage()
-            .toPixelMap()
-        val sampleY = shellPixels.height / 2
+        val pixels = composeRule.onNodeWithTag("rtl-edge-fade-mask").captureToImage().toPixelMap()
+        val sampleY = pixels.height / 2
         fun redAtLeadingOffset(offset: Int): Float {
             val offsetPx = with(composeRule.density) { offset.dp.roundToPx() }
-            return shellPixels[(browseBounds.right.toInt() - 1 - offsetPx), sampleY].red
+            return pixels[pixels.width - 1 - offsetPx, sampleY].red
         }
 
-        assertEquals(0.75f, redAtLeadingOffset(1), 0.08f)
-        assertEquals(1f, redAtLeadingOffset(16), 0.06f)
+        assertEquals(0.03f, redAtLeadingOffset(1), 0.08f)
+        assertEquals(0.50f, redAtLeadingOffset(16), 0.08f)
         assertEquals(1f, redAtLeadingOffset(31), 0.06f)
     }
 

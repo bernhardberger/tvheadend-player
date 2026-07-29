@@ -1,14 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,7 +16,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -44,7 +40,6 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
 import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
-import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientLateAlpha
 import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -72,14 +67,7 @@ fun ChannelTagSelector(
 
     val activeIndex = scopes.indexOfFirst { it.first == activeTagId }.coerceAtLeast(0)
     val layoutDirection = LocalLayoutDirection.current
-    val edgeVeilState = remember(scopes) { TabEdgeVeilState() }
-    val shellFocusProtection = LocalNavigationVeilFocusProtection.current
-    SideEffect {
-        edgeVeilState.reportProtectedBounds(activeIndex, shellFocusProtection)
-    }
-    DisposableEffect(shellFocusProtection) {
-        onDispose { shellFocusProtection?.invoke(null) }
-    }
+    val edgeFadeState = remember(scopes) { TabEdgeFadeState() }
     val scheme = MaterialTheme.colorScheme
     val tabColors = TabDefaults.pillIndicatorTabColors(
         contentColor = scheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
@@ -91,7 +79,8 @@ fun ChannelTagSelector(
         disabledInactiveContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
         disabledSelectedContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
     )
-    Box(
+    TabRow(
+        selectedTabIndex = activeIndex,
         modifier = modifier
             .fillMaxWidth()
             .focusRestorer(activeFocusRequester)
@@ -100,12 +89,18 @@ fun ChannelTagSelector(
                     event.key == Key.DirectionDown &&
                     onMoveToContent()
             }
-            .onGloballyPositioned(edgeVeilState::updateViewportBounds)
-            .navigationEdgeVeil(
+            .onGloballyPositioned(edgeFadeState::updateViewportBounds)
+            .navigationEdgeFadeMask(
                 width = TvNavigationRailGradientRunout,
-                startAlpha = TvNavigationRailGradientLateAlpha,
+                maskEnabled = {
+                    edgeFadeState.availableFadeWidthPx(
+                        activeIndex = activeIndex,
+                        layoutDirection = layoutDirection,
+                        maximumWidthPx = Float.MAX_VALUE,
+                    ) > 0f
+                },
                 availableWidthPx = {
-                    edgeVeilState.availableVeilWidthPx(
+                    edgeFadeState.availableFadeWidthPx(
                         activeIndex = activeIndex,
                         layoutDirection = layoutDirection,
                         maximumWidthPx = TvNavigationRailGradientRunout.toPx(),
@@ -113,67 +108,51 @@ fun ChannelTagSelector(
                 },
             ),
     ) {
-        TabRow(
-            selectedTabIndex = activeIndex,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            scopes.forEachIndexed { index, (tagId, label) ->
-                Tab(
-                    selected = index == activeIndex,
-                    onFocus = {
-                        if (tagId != activeTagId) onSelectTag(tagId)
-                    },
-                    onClick = {
-                        if (tagId != activeTagId) onSelectTag(tagId)
-                        onMoveToContent()
-                    },
-                    colors = tabColors,
+        scopes.forEachIndexed { index, (tagId, label) ->
+            Tab(
+                selected = index == activeIndex,
+                onFocus = {
+                    edgeFadeState.updateFocusedIndex(index)
+                    if (tagId != activeTagId) onSelectTag(tagId)
+                },
+                onClick = {
+                    if (tagId != activeTagId) onSelectTag(tagId)
+                    onMoveToContent()
+                },
+                colors = tabColors,
+                modifier = Modifier
+                    .onGloballyPositioned { coordinates ->
+                        edgeFadeState.updateTabBounds(index, coordinates)
+                    }
+                    .then(
+                        if (index == activeIndex) {
+                            Modifier.focusRequester(activeFocusRequester)
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
-                        .onFocusChanged { focusState ->
-                            edgeVeilState.updateFocusedIndex(
-                                index = index,
-                                focused = focusState.isFocused,
-                                activeIndex = activeIndex,
-                                shellFocusProtection = shellFocusProtection,
-                            )
-                        }
-                        .onGloballyPositioned { coordinates ->
-                            edgeVeilState.updateTabBounds(index, coordinates)
-                            edgeVeilState.reportProtectedBounds(
-                                activeIndex,
-                                shellFocusProtection,
-                            )
-                        }
-                        .then(
-                            if (index == activeIndex) {
-                                Modifier.focusRequester(activeFocusRequester)
-                            } else {
-                                Modifier
-                            },
-                        ),
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .padding(
-                                horizontal = TvSpacing16,
-                                vertical = TvSpacing8,
-                            )
-                            .widthIn(max = CompactChannelCardWidth),
-                    )
-                }
+                        .padding(
+                            horizontal = TvSpacing16,
+                            vertical = TvSpacing8,
+                        )
+                        .widthIn(max = CompactChannelCardWidth),
+                )
             }
         }
     }
 }
 
-private class TabEdgeVeilState {
+private class TabEdgeFadeState {
     private val viewportBounds = mutableStateOf(Rect.Zero)
     private val tabBounds = mutableStateMapOf<Int, Rect>()
-    private val focusedIndex = mutableIntStateOf(NoFocusedTab)
+    private val focusedIndex = mutableIntStateOf(-1)
 
     fun updateViewportBounds(coordinates: LayoutCoordinates) {
         viewportBounds.value = coordinates.unclippedBoundsInRoot()
@@ -183,36 +162,11 @@ private class TabEdgeVeilState {
         tabBounds[index] = coordinates.unclippedBoundsInRoot()
     }
 
-    fun updateFocusedIndex(
-        index: Int,
-        focused: Boolean,
-        activeIndex: Int,
-        shellFocusProtection: ((Rect?) -> Unit)?,
-    ) {
-        if (focused) {
-            focusedIndex.intValue = index
-        } else if (focusedIndex.intValue == index) {
-            focusedIndex.intValue = NoFocusedTab
-        }
-        reportProtectedBounds(activeIndex, shellFocusProtection)
+    fun updateFocusedIndex(index: Int) {
+        focusedIndex.intValue = index
     }
 
-    fun reportProtectedBounds(
-        activeIndex: Int,
-        shellFocusProtection: ((Rect?) -> Unit)?,
-    ) {
-        val activeBounds = tabBounds[activeIndex]
-        val focusedBounds = tabBounds[focusedIndex.intValue]
-        shellFocusProtection?.invoke(
-            when {
-                activeBounds == null -> focusedBounds
-                focusedBounds == null -> activeBounds
-                else -> activeBounds.expandToInclude(focusedBounds)
-            },
-        )
-    }
-
-    fun availableVeilWidthPx(
+    fun availableFadeWidthPx(
         activeIndex: Int,
         layoutDirection: LayoutDirection,
         maximumWidthPx: Float,
@@ -238,21 +192,10 @@ private class TabEdgeVeilState {
         }
         return spaceBeforeProtected.coerceIn(0f, maximumWidthPx)
     }
-
-    private companion object {
-        const val NoFocusedTab = -1
-    }
 }
 
 private fun LayoutCoordinates.unclippedBoundsInRoot(): Rect =
     Rect(offset = positionInRoot(), size = Size(size.width.toFloat(), size.height.toFloat()))
-
-private fun Rect.expandToInclude(other: Rect): Rect = Rect(
-    left = minOf(left, other.left),
-    top = minOf(top, other.top),
-    right = maxOf(right, other.right),
-    bottom = maxOf(bottom, other.bottom),
-)
 
 private fun Rect.spaceFromLeadingEdge(
     viewport: Rect,

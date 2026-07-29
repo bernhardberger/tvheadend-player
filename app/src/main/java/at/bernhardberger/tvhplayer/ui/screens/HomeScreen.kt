@@ -1,35 +1,46 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
@@ -47,6 +58,8 @@ import at.bernhardberger.tvhplayer.core.homeInitialFocusTarget
 import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.HomeHeroCarousel
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeCard
+import at.bernhardberger.tvhplayer.ui.components.navigationEdgeFadeMask
+import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
 import at.bernhardberger.tvhplayer.viewmodels.HomeViewModel
 import org.koin.androidx.compose.koinViewModel
 import kotlinx.coroutines.launch
@@ -112,6 +125,7 @@ fun HomeDashboard(
     val scope = rememberCoroutineScope()
     val initialFocus = remember { FocusRequester() }
     val initialFocusTarget = remember(model) { homeInitialFocusTarget(model) }
+    val focusOverflowPx = with(LocalDensity.current) { 8.dp.toPx() }
     // Per-target latch with bounded frame retries until the requester is attached.
     var claimedTarget by remember { mutableStateOf<HomeFocusTarget?>(null) }
     LaunchedEffect(initialFocusTarget, initialFocusEnabled) {
@@ -197,6 +211,9 @@ fun HomeDashboard(
 
             model.rows.forEach { row ->
                 item(key = "row-${row.kind}") {
+                    val edgeFadeState = remember(row.items, focusOverflowPx) {
+                        HomeRowEdgeFadeState(focusOverflowPx)
+                    }
                     HomeSectionTitle(
                         text = stringResource(
                             when (row.kind) {
@@ -208,43 +225,77 @@ fun HomeDashboard(
                         ),
                         modifier = horizontalContentModifier,
                     )
-                    LazyRow(
-                        // 8 dp absorbs 1.06 focused scale (~5.3 dp overflow) without clipping.
-                        contentPadding = PaddingValues(
-                            start = startPadding + 8.dp,
-                            top = 8.dp,
-                            end = endPadding + 8.dp,
-                            bottom = 8.dp,
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    Box(
                         modifier = Modifier
-                            .focusRestorer()
-                            .testTag("home-row-${row.kind.name.lowercase()}"),
+                            .fillMaxWidth()
+                            .onGloballyPositioned(edgeFadeState::updateViewportBounds)
+                            .navigationEdgeFadeMask(
+                                width = TvNavigationRailGradientRunout,
+                                maskEnabled = {
+                                    edgeFadeState.availableFadeWidthPx(
+                                        layoutDirection = layoutDirection,
+                                        maximumWidthPx = Float.MAX_VALUE,
+                                    ) > 0f
+                                },
+                                availableWidthPx = {
+                                    edgeFadeState.availableFadeWidthPx(
+                                        layoutDirection = layoutDirection,
+                                        maximumWidthPx = TvNavigationRailGradientRunout.toPx(),
+                                    )
+                                },
+                            ),
                     ) {
-                        itemsIndexed(
-                            row.items,
-                            key = { _, item -> item.key },
-                        ) { _, item ->
-                            ProgrammeCard(
-                                item = item,
-                                imageLoader = imageLoader,
-                                testTag = "home-card-${item.key}",
-                                onClick = {
-                                    when {
-                                        item.recordingId != null && item.playable -> {
-                                            onPlayRecording(item.recordingId)
-                                        }
-                                        item.recordingId != null -> onOpenRecordings()
-                                        else -> {
-                                            onPlayChannel(
-                                                item.channelId,
-                                                item.channelId,
-                                                item.channelName,
+                        LazyRow(
+                            // 8 dp absorbs 1.06 focused scale (~5.3 dp overflow) without clipping.
+                            contentPadding = PaddingValues(
+                                start = startPadding + 8.dp,
+                                top = 8.dp,
+                                end = endPadding + 8.dp,
+                                bottom = 8.dp,
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier
+                                .focusRestorer()
+                                .testTag("home-row-${row.kind.name.lowercase()}"),
+                        ) {
+                            itemsIndexed(
+                                row.items,
+                                key = { _, item -> item.key },
+                            ) { _, item ->
+                                DisposableEffect(edgeFadeState, item.key) {
+                                    onDispose { edgeFadeState.remove(item.key) }
+                                }
+                                ProgrammeCard(
+                                    item = item,
+                                    imageLoader = imageLoader,
+                                    testTag = "home-card-${item.key}",
+                                    modifier = Modifier
+                                        .onFocusChanged { state ->
+                                            edgeFadeState.updateFocus(
+                                                key = item.key,
+                                                focused = state.hasFocus,
                                             )
                                         }
-                                    }
-                                },
-                            )
+                                        .onGloballyPositioned { coordinates ->
+                                            edgeFadeState.updateBounds(item.key, coordinates)
+                                        },
+                                    onClick = {
+                                        when {
+                                            item.recordingId != null && item.playable -> {
+                                                onPlayRecording(item.recordingId)
+                                            }
+                                            item.recordingId != null -> onOpenRecordings()
+                                            else -> {
+                                                onPlayChannel(
+                                                    item.channelId,
+                                                    item.channelId,
+                                                    item.channelName,
+                                                )
+                                            }
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -290,6 +341,73 @@ fun HomeDashboard(
             }
         }
     }
+}
+
+private class HomeRowEdgeFadeState(
+    private val overflowPx: Float,
+) {
+    private val viewportBounds = mutableStateOf(Rect.Zero)
+    private val boundsByKey = mutableStateMapOf<String, Rect>()
+    private val focusedKey = mutableStateOf<String?>(null)
+
+    fun updateViewportBounds(coordinates: LayoutCoordinates) {
+        viewportBounds.value = coordinates.unclippedBoundsInRoot()
+    }
+
+    fun updateBounds(key: String, coordinates: LayoutCoordinates) {
+        boundsByKey[key] = coordinates.unclippedBoundsInRoot().expandBy(overflowPx)
+    }
+
+    fun updateFocus(key: String, focused: Boolean) {
+        if (focused) {
+            focusedKey.value = key
+        } else if (focusedKey.value == key) {
+            focusedKey.value = null
+        }
+    }
+
+    fun remove(key: String) {
+        boundsByKey.remove(key)
+        if (focusedKey.value == key) focusedKey.value = null
+    }
+
+    fun availableFadeWidthPx(
+        layoutDirection: LayoutDirection,
+        maximumWidthPx: Float,
+    ): Float {
+        val viewport = viewportBounds.value
+        val focusedItemKey = focusedKey.value
+        val hasDepartingInactiveItem = boundsByKey.any { (key, bounds) ->
+            key != focusedItemKey && when (layoutDirection) {
+                LayoutDirection.Ltr -> bounds.left < viewport.left && bounds.right > viewport.left
+                LayoutDirection.Rtl -> bounds.right > viewport.right && bounds.left < viewport.right
+            }
+        }
+        if (!hasDepartingInactiveItem) return 0f
+
+        val spaceBeforeFocused = focusedItemKey?.let(boundsByKey::get)
+            ?.spaceFromLeadingEdge(viewport, layoutDirection)
+            ?: maximumWidthPx
+        return spaceBeforeFocused.coerceIn(0f, maximumWidthPx)
+    }
+}
+
+private fun LayoutCoordinates.unclippedBoundsInRoot(): Rect =
+    Rect(offset = positionInRoot(), size = Size(size.width.toFloat(), size.height.toFloat()))
+
+private fun Rect.expandBy(pixels: Float): Rect = Rect(
+    left = left - pixels,
+    top = top - pixels,
+    right = right + pixels,
+    bottom = bottom + pixels,
+)
+
+private fun Rect.spaceFromLeadingEdge(
+    viewport: Rect,
+    layoutDirection: LayoutDirection,
+): Float = when (layoutDirection) {
+    LayoutDirection.Ltr -> left - viewport.left
+    LayoutDirection.Rtl -> viewport.right - right
 }
 
 @Composable
