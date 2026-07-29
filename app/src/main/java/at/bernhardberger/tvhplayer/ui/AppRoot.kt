@@ -324,77 +324,28 @@ fun AppRoot(
                     navController = nav,
                     startDestination = Routes.CHANNELS,
                     enterTransition = {
-                        playerShellEnterTransition(
-                            initialRoute = initialState.destination.route,
-                            targetRoute = targetState.destination.route,
-                        )
+                        appDestinationEnterTransition()
                     },
                     exitTransition = {
-                        playerShellExitTransition(
-                            initialRoute = initialState.destination.route,
-                            targetRoute = targetState.destination.route,
-                        )
+                        appDestinationExitTransition()
                     },
                     popEnterTransition = {
-                        playerShellEnterTransition(
-                            initialRoute = initialState.destination.route,
-                            targetRoute = targetState.destination.route,
-                        )
+                        appDestinationEnterTransition()
                     },
                     popExitTransition = {
-                        playerShellExitTransition(
-                            initialRoute = initialState.destination.route,
-                            targetRoute = targetState.destination.route,
-                        )
+                        appDestinationExitTransition()
                     },
                 ) {
                     composable(Routes.CHANNELS) {
                         ContentContainer {
-                            ChannelsScreen(
-                                contentPadding = contentPadding,
-                                initialFocusEnabled = !drawerActive,
-                                playingChannelId = activeServiceId,
-                                connectionUiState = connectionUiState,
-                                onRetryConnection = appVm::reconnectNow,
-                                onOpenConnectionSettings = {
-                                    navigateTopLevel(Routes.SETTINGS)
-                                },
-                                onPlay = { channelId, serviceId, name ->
-                                    warmReturn = rearmWarmReturnForPlaybackSelection(
-                                        current = warmReturn,
-                                        currentWarmTarget = currentWarmTarget,
-                                        requestedTarget = WarmPlaybackTarget.LIVE,
-                                        currentIdentity = activeServiceId,
-                                        requestedIdentity = serviceId,
-                                    )
-                                    nav.navigate(Routes.player(channelId, serviceId, name))
-                                }
-                            )
-                        }
-                    }
-
-                    composable(Routes.EPG) {
-                        if (capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
-                            ContentContainer {
-                                EpgGridScreen(
+                                ChannelsScreen(
                                     contentPadding = contentPadding,
                                     initialFocusEnabled = !drawerActive,
+                                    playingChannelId = activeServiceId,
                                     connectionUiState = connectionUiState,
-                                    onRetry = appVm::reconnectNow,
+                                    onRetryConnection = appVm::reconnectNow,
                                     onOpenConnectionSettings = {
                                         navigateTopLevel(Routes.SETTINGS)
-                                    },
-                                    onClearCategory = {},
-                                    simpleTvProfile = capabilityProfile,
-                                    onPlayRecording = { recordingId ->
-                                        warmReturn = rearmWarmReturnForPlaybackSelection(
-                                            current = warmReturn,
-                                            currentWarmTarget = currentWarmTarget,
-                                            requestedTarget = WarmPlaybackTarget.RECORDING,
-                                            currentIdentity = activeRecordingId,
-                                            requestedIdentity = recordingId,
-                                        )
-                                        nav.navigate(Routes.recordingPlayer(recordingId))
                                     },
                                     onPlay = { channelId, serviceId, name ->
                                         warmReturn = rearmWarmReturnForPlaybackSelection(
@@ -407,6 +358,43 @@ fun AppRoot(
                                         nav.navigate(Routes.player(channelId, serviceId, name))
                                     }
                                 )
+                        }
+                    }
+
+                    composable(Routes.EPG) {
+                        if (capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
+                            ContentContainer {
+                                    EpgGridScreen(
+                                        contentPadding = contentPadding,
+                                        initialFocusEnabled = !drawerActive,
+                                        connectionUiState = connectionUiState,
+                                        onRetry = appVm::reconnectNow,
+                                        onOpenConnectionSettings = {
+                                            navigateTopLevel(Routes.SETTINGS)
+                                        },
+                                        onClearCategory = {},
+                                        simpleTvProfile = capabilityProfile,
+                                        onPlayRecording = { recordingId ->
+                                            warmReturn = rearmWarmReturnForPlaybackSelection(
+                                                current = warmReturn,
+                                                currentWarmTarget = currentWarmTarget,
+                                                requestedTarget = WarmPlaybackTarget.RECORDING,
+                                                currentIdentity = activeRecordingId,
+                                                requestedIdentity = recordingId,
+                                            )
+                                            nav.navigate(Routes.recordingPlayer(recordingId))
+                                        },
+                                        onPlay = { channelId, serviceId, name ->
+                                            warmReturn = rearmWarmReturnForPlaybackSelection(
+                                                current = warmReturn,
+                                                currentWarmTarget = currentWarmTarget,
+                                                requestedTarget = WarmPlaybackTarget.LIVE,
+                                                currentIdentity = activeServiceId,
+                                                requestedIdentity = serviceId,
+                                            )
+                                            nav.navigate(Routes.player(channelId, serviceId, name))
+                                        }
+                                    )
                             }
                         }
                     }
@@ -422,40 +410,40 @@ fun AppRoot(
                                 entry.arguments?.getString("category")
                             )
                             ContentContainer {
-                                EpgGridScreen(
-                                    contentPadding = contentPadding,
-                                    initialFocusEnabled = !drawerActive,
-                                    category = category,
-                                    connectionUiState = connectionUiState,
-                                    onRetry = appVm::reconnectNow,
-                                    onOpenConnectionSettings = {
-                                        navigateTopLevel(Routes.SETTINGS)
-                                    },
-                                    onClearCategory = {
-                                        navigateTopLevel(Routes.EPG)
-                                    },
-                                    simpleTvProfile = capabilityProfile,
-                                    onPlayRecording = { recordingId ->
-                                        warmReturn = rearmWarmReturnForPlaybackSelection(
-                                            current = warmReturn,
-                                            currentWarmTarget = currentWarmTarget,
-                                            requestedTarget = WarmPlaybackTarget.RECORDING,
-                                            currentIdentity = activeRecordingId,
-                                            requestedIdentity = recordingId,
-                                        )
-                                        nav.navigate(Routes.recordingPlayer(recordingId))
-                                    },
-                                    onPlay = { channelId, serviceId, name ->
-                                        warmReturn = rearmWarmReturnForPlaybackSelection(
-                                            current = warmReturn,
-                                            currentWarmTarget = currentWarmTarget,
-                                            requestedTarget = WarmPlaybackTarget.LIVE,
-                                            currentIdentity = activeServiceId,
-                                            requestedIdentity = serviceId,
-                                        )
-                                        nav.navigate(Routes.player(channelId, serviceId, name))
-                                    },
-                                )
+                                    EpgGridScreen(
+                                        contentPadding = contentPadding,
+                                        initialFocusEnabled = !drawerActive,
+                                        category = category,
+                                        connectionUiState = connectionUiState,
+                                        onRetry = appVm::reconnectNow,
+                                        onOpenConnectionSettings = {
+                                            navigateTopLevel(Routes.SETTINGS)
+                                        },
+                                        onClearCategory = {
+                                            navigateTopLevel(Routes.EPG)
+                                        },
+                                        simpleTvProfile = capabilityProfile,
+                                        onPlayRecording = { recordingId ->
+                                            warmReturn = rearmWarmReturnForPlaybackSelection(
+                                                current = warmReturn,
+                                                currentWarmTarget = currentWarmTarget,
+                                                requestedTarget = WarmPlaybackTarget.RECORDING,
+                                                currentIdentity = activeRecordingId,
+                                                requestedIdentity = recordingId,
+                                            )
+                                            nav.navigate(Routes.recordingPlayer(recordingId))
+                                        },
+                                        onPlay = { channelId, serviceId, name ->
+                                            warmReturn = rearmWarmReturnForPlaybackSelection(
+                                                current = warmReturn,
+                                                currentWarmTarget = currentWarmTarget,
+                                                requestedTarget = WarmPlaybackTarget.LIVE,
+                                                currentIdentity = activeServiceId,
+                                                requestedIdentity = serviceId,
+                                            )
+                                            nav.navigate(Routes.player(channelId, serviceId, name))
+                                        },
+                                    )
                             }
                         }
                     }
@@ -463,24 +451,26 @@ fun AppRoot(
                     composable(Routes.RECORDINGS) {
                         if (capabilityProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
                             ContentContainer {
-                                RecordingsScreen(
-                                    contentPadding = contentPadding,
-                                    initialFocusEnabled = !drawerActive,
-                                    backEnabled = applianceLaunchRequest == null,
-                                    connectionUiState = connectionUiState,
-                                    onRetry = appVm::reconnectNow,
-                                    onPlayRecording = { recordingId, intent ->
-                                        warmReturn = rearmWarmReturnForPlaybackSelection(
-                                            current = warmReturn,
-                                            currentWarmTarget = currentWarmTarget,
-                                            requestedTarget = WarmPlaybackTarget.RECORDING,
-                                            currentIdentity = activeRecordingId,
-                                            requestedIdentity = recordingId,
-                                        )
-                                        nav.navigate(Routes.recordingPlayer(recordingId, intent))
-                                    },
-                                    state = recordingsScreenState,
-                                )
+                                    RecordingsScreen(
+                                        contentPadding = contentPadding,
+                                        initialFocusEnabled = !drawerActive,
+                                        backEnabled = applianceLaunchRequest == null,
+                                        connectionUiState = connectionUiState,
+                                        onRetry = appVm::reconnectNow,
+                                        onPlayRecording = { recordingId, intent ->
+                                            warmReturn = rearmWarmReturnForPlaybackSelection(
+                                                current = warmReturn,
+                                                currentWarmTarget = currentWarmTarget,
+                                                requestedTarget = WarmPlaybackTarget.RECORDING,
+                                                currentIdentity = activeRecordingId,
+                                                requestedIdentity = recordingId,
+                                            )
+                                            nav.navigate(
+                                                Routes.recordingPlayer(recordingId, intent)
+                                            )
+                                        },
+                                        state = recordingsScreenState,
+                                    )
                             }
                         }
                     }
@@ -488,33 +478,34 @@ fun AppRoot(
                     composable(Routes.SETTINGS) {
                         if (capabilityProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
                             ContentContainer {
-                                SettingsScreen(
-                                    initialFocusEnabled = !drawerActive,
-                                    contentPadding = contentPadding,
-                                    backEnabled = applianceLaunchRequest == null,
-                                    onStartSimpleTv = {
-                                        applianceLaunchRequests.request()
-                                        simpleTvSession.start()
-                                    },
-                                )
+                                    SettingsScreen(
+                                        initialFocusEnabled = !drawerActive,
+                                        contentPadding = contentPadding,
+                                        backEnabled = applianceLaunchRequest == null,
+                                        onStartSimpleTv = {
+                                            applianceLaunchRequests.request()
+                                            simpleTvSession.start()
+                                        },
+                                    )
                             }
                         }
                     }
 
                     composable(Routes.UNLOCK) {
                         ContentContainer {
-                            SimpleTvUnlockScreen(
-                                backEnabled = !drawerActive && applianceLaunchRequest == null,
-                                onExited = {
-                                    navigateTopLevel(Routes.CHANNELS)
-                                },
-                                onBack = {
-                                    nav.popBackStack()
-                                    if (simpleTvActive && activeServiceId == null) {
-                                        applianceLaunchRequests.request()
-                                    }
-                                },
-                            )
+                                SimpleTvUnlockScreen(
+                                    backEnabled =
+                                        !drawerActive && applianceLaunchRequest == null,
+                                    onExited = {
+                                        navigateTopLevel(Routes.CHANNELS)
+                                    },
+                                    onBack = {
+                                        nav.popBackStack()
+                                        if (simpleTvActive && activeServiceId == null) {
+                                            applianceLaunchRequests.request()
+                                        }
+                                    },
+                                )
                         }
                     }
 
@@ -525,10 +516,10 @@ fun AppRoot(
                             navArgument("serviceId") { type = NavType.IntType },
                             navArgument("channelName") { type = NavType.StringType },
                         )
-                    ) { backStackEntry ->
-                        val channelId = backStackEntry.arguments?.getInt("channelId") ?: 0
-                        val serviceId = backStackEntry.arguments?.getInt("serviceId") ?: 0
-                        val channelName = backStackEntry.arguments?.getString("channelName") ?: ""
+                    ) { entry ->
+                        val channelId = entry.arguments?.getInt("channelId") ?: 0
+                        val serviceId = entry.arguments?.getInt("serviceId") ?: 0
+                        val channelName = entry.arguments?.getString("channelName") ?: ""
 
                         VideoPlayerScreen(
                             channelId = channelId,
@@ -549,10 +540,10 @@ fun AppRoot(
                             navArgument("startMode") { type = NavType.StringType },
                             navArgument("startPosition") { type = NavType.LongType },
                         ),
-                    ) { backStackEntry ->
-                        val recordingId = backStackEntry.arguments?.getInt("recordingId") ?: 0
-                        val startPosition = backStackEntry.arguments?.getLong("startPosition") ?: -1L
-                        val intent = when (backStackEntry.arguments?.getString("startMode")) {
+                    ) { entry ->
+                        val recordingId = entry.arguments?.getInt("recordingId") ?: 0
+                        val startPosition = entry.arguments?.getLong("startPosition") ?: -1L
+                        val intent = when (entry.arguments?.getString("startMode")) {
                             "beginning" -> RecordingPlaybackIntent.FromBeginning
                             "resume" -> RecordingPlaybackIntent.Resume(startPosition)
                             else -> RecordingPlaybackIntent.DefaultPolicy

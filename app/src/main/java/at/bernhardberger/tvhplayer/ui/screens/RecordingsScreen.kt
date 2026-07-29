@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -61,6 +64,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
@@ -111,10 +115,12 @@ import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.repositories.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.TvListRow
 import coil3.ImageLoader
 import java.time.Instant
@@ -180,6 +186,9 @@ fun RecordingsScreen(
     onPlayRecording: (Int, RecordingPlaybackIntent) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
 ) {
+    val layoutDirection = LocalLayoutDirection.current
+    val startPadding = contentPadding.calculateStartPadding(layoutDirection)
+    val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val entries by repository.entries.collectAsStateWithLifecycle()
     val canModifyRecordings by repository.canModifyRecordings.collectAsStateWithLifecycle()
     val observedProgressCapability by repository.progressCapability.collectAsStateWithLifecycle()
@@ -334,20 +343,24 @@ fun RecordingsScreen(
                     else -> false
                 }
             }
-            .padding(contentPadding),
+            .padding(
+                top = contentPadding.calculateTopPadding(),
+                bottom = contentPadding.calculateBottomPadding(),
+            ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
+        TopLevelBrowseHeader(
+            title = stringResource(R.string.recordings_title),
+            modifier = Modifier
+                .padding(start = startPadding, end = endPadding)
+                .testTag("recordings-header"),
+        )
+        Spacer(Modifier.height(TvSpacing8))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = startPadding)
+                .testTag("recordings-mode-tabs-row"),
         ) {
-            Text(
-                text = stringResource(R.string.recordings_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { heading() },
-            )
             RecordingModeTabs(
                 selected = mode,
                 onFocused = {
@@ -361,6 +374,9 @@ fun RecordingsScreen(
                 onMoveToContent = {
                     requestContentFocus = true
                 },
+                modifier = Modifier
+                    .wrapContentWidth(align = Alignment.Start)
+                    .testTag("recordings-mode-tabs"),
             )
         }
         if (mode == DvrLibraryMode.ARCHIVE && archivePath.isNotEmpty()) {
@@ -374,16 +390,23 @@ fun RecordingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(TvSpacing16))
 
         if (entries.isEmpty()) {
-            RecordingsEmptyState(connectionUiState, onRetry)
+            RecordingsEmptyState(
+                connectionUiState = connectionUiState,
+                onRetry = onRetry,
+                modifier = Modifier.padding(start = startPadding, end = endPadding),
+            )
         } else {
             when (mode) {
                 DvrLibraryMode.ARCHIVE -> Row(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .padding(start = startPadding, end = endPadding)
+                        .fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     RecordingBrowserSurface(
@@ -467,6 +490,7 @@ fun RecordingsScreen(
                 }
                 DvrLibraryMode.SCHEDULE -> RecordingBrowserSurface(
                     modifier = Modifier
+                        .padding(start = startPadding, end = endPadding)
                         .fillMaxSize()
                         .onFocusChanged { contentHasFocus = it.hasFocus },
                 ) {
@@ -496,6 +520,7 @@ fun RecordingsScreen(
                 }
                 DvrLibraryMode.PROBLEMS -> RecordingBrowserSurface(
                     modifier = Modifier
+                        .padding(start = startPadding, end = endPadding)
                         .fillMaxSize()
                         .onFocusChanged { contentHasFocus = it.hasFocus },
                 ) {
@@ -600,6 +625,7 @@ fun RecordingsScreen(
 @Composable
 private fun RecordingModeTabs(
     selected: DvrLibraryMode,
+    modifier: Modifier = Modifier,
     onFocused: (DvrLibraryMode) -> Unit,
     onClick: (DvrLibraryMode) -> Unit,
     onMoveToContent: () -> Unit,
@@ -607,8 +633,7 @@ private fun RecordingModeTabs(
     val selectedFocus = remember { FocusRequester() }
     TabRow(
         selectedTabIndex = selected.ordinal,
-        modifier = Modifier
-            .width(450.dp)
+        modifier = modifier
             .focusRestorer(selectedFocus)
             .onPreviewKeyEvent { event ->
                 event.type == KeyEventType.KeyDown &&
@@ -648,7 +673,13 @@ private fun RecordingModeTabs(
                             DvrLibraryMode.PROBLEMS -> R.string.recordings_problems
                         }
                     ),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(
+                        horizontal = TvSpacing16,
+                        vertical = TvSpacing8,
+                    ),
                 )
             }
         }
@@ -1889,10 +1920,11 @@ private fun RecordingDialogSurface(
 private fun RecordingsEmptyState(
     connectionUiState: ConnectionUiState,
     onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val error = connectionUiState is ConnectionUiState.Error
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

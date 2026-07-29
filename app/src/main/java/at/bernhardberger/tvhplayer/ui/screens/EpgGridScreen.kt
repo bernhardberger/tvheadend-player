@@ -55,7 +55,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -125,6 +124,7 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import coil3.ImageLoader
@@ -585,95 +585,25 @@ fun EpgGridScreen(
                     } ?: false
                 },
         ) {
-            Row(
+            TopLevelBrowseHeader(
+                title = if (category == ProgrammeCategory.ALL) {
+                    stringResource(R.string.epg_title)
+                } else {
+                    stringResource(R.string.epg_filtered_title, categoryLabel)
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(
                         start = startPadding,
                         top = contentPadding.calculateTopPadding(),
                         end = endPadding,
                     ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = if (category == ProgrammeCategory.ALL) {
-                        stringResource(R.string.epg_title)
-                    } else {
-                        stringResource(R.string.epg_filtered_title, categoryLabel)
-                    },
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { heading() },
-                )
-                OutlinedButton(
-                    onClick = { showJumpDialog = true },
-                    modifier = Modifier
-                        .focusRequester(guideDateFocus)
-                        .onFocusChanged {
-                            if (it.isFocused) lastHeaderFocus = GuideHeaderFocus.DATE
-                        }
-                        .onPreviewKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                                if (hasScopeTabs) {
-                                    scopeFocus.requestFocus()
-                                } else {
-                                    focusGuideContent()
-                                }
-                            } else {
-                                false
-                            }
-                        },
-                ) {
-                    Text(windowStartSec.formatDateTime())
-                }
-                OutlinedButton(
-                    onClick = {
-                        windowStartSec = floorToHour(nowSec)
-                        requestVisibleWindow(
-                            windowStartSec,
-                            selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
-                        )
-                        selectedTarget = nearestTargetAt(
-                            channels,
-                            repository,
-                            selectedTarget?.channelIndex ?: 0,
-                            nowSec,
-                            category,
-                        )
-                    },
-                    modifier = Modifier
-                        .focusRequester(guideNowFocus)
-                        .onFocusChanged {
-                            if (it.isFocused) lastHeaderFocus = GuideHeaderFocus.NOW
-                        }
-                        .onPreviewKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
-                                if (hasScopeTabs) {
-                                    scopeFocus.requestFocus()
-                                } else {
-                                    focusGuideContent()
-                                }
-                            } else {
-                                false
-                            }
-                        },
-                ) {
-                    Text(stringResource(R.string.now))
-                }
-                if (category != ProgrammeCategory.ALL) {
+                actions = {
                     OutlinedButton(
-                        onClick = onClearCategory,
+                        onClick = { showJumpDialog = true },
                         modifier = Modifier
-                            .focusRequester(guideClearFilterFocus)
+                            .focusRequester(guideDateFocus)
                             .onFocusChanged {
-                                if (it.isFocused) {
-                                    lastHeaderFocus = GuideHeaderFocus.CLEAR_FILTER
-                                }
+                                if (it.isFocused) lastHeaderFocus = GuideHeaderFocus.DATE
                             }
                             .onPreviewKeyEvent { event ->
                                 if (
@@ -690,10 +620,75 @@ fun EpgGridScreen(
                                 }
                             },
                     ) {
-                        Text(stringResource(R.string.epg_clear_filter))
+                        Text(windowStartSec.formatDateTime())
                     }
-                }
-            }
+                    OutlinedButton(
+                        onClick = {
+                            windowStartSec = floorToHour(nowSec)
+                            requestVisibleWindow(
+                                windowStartSec,
+                                selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
+                            )
+                            selectedTarget = nearestTargetAt(
+                                channels,
+                                repository,
+                                selectedTarget?.channelIndex ?: 0,
+                                nowSec,
+                                category,
+                            )
+                        },
+                        modifier = Modifier
+                            .focusRequester(guideNowFocus)
+                            .onFocusChanged {
+                                if (it.isFocused) lastHeaderFocus = GuideHeaderFocus.NOW
+                            }
+                            .onPreviewKeyEvent { event ->
+                                if (
+                                    event.type == KeyEventType.KeyDown &&
+                                    event.key == Key.DirectionDown
+                                ) {
+                                    if (hasScopeTabs) {
+                                        scopeFocus.requestFocus()
+                                    } else {
+                                        focusGuideContent()
+                                    }
+                                } else {
+                                    false
+                                }
+                            },
+                    ) {
+                        Text(stringResource(R.string.now))
+                    }
+                    if (category != ProgrammeCategory.ALL) {
+                        OutlinedButton(
+                            onClick = onClearCategory,
+                            modifier = Modifier
+                                .focusRequester(guideClearFilterFocus)
+                                .onFocusChanged {
+                                    if (it.isFocused) {
+                                        lastHeaderFocus = GuideHeaderFocus.CLEAR_FILTER
+                                    }
+                                }
+                                .onPreviewKeyEvent { event ->
+                                    if (
+                                        event.type == KeyEventType.KeyDown &&
+                                        event.key == Key.DirectionDown
+                                    ) {
+                                        if (hasScopeTabs) {
+                                            scopeFocus.requestFocus()
+                                        } else {
+                                            focusGuideContent()
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                },
+                        ) {
+                            Text(stringResource(R.string.epg_clear_filter))
+                        }
+                    }
+                },
+            )
             if (hasScopeTabs) {
                 Spacer(Modifier.height(TvSpacing8))
                 ChannelTagSelector(

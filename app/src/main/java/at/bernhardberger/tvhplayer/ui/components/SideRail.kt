@@ -22,7 +22,11 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -156,11 +160,18 @@ fun SideRail(
     }
     val items = mainItems + footerItems
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
-    val activeItemFocus = itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route]
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    var requestedRoute by remember { mutableStateOf(currentRoute) }
+    val drawerRoute = requestedRoute?.takeIf(itemFocus::containsKey)
+        ?: currentRoute?.takeIf(itemFocus::containsKey)
+        ?: items.firstOrNull()?.route
+    val activeItemFocus = itemFocus[
+        if (drawerState.currentValue == DrawerValue.Open) drawerRoute else currentRoute
+    ] ?: itemFocus[items.firstOrNull()?.route]
     val backAction = browseShellBackAction(
         drawerOpen = drawerState.currentValue == DrawerValue.Open,
         currentRoute = currentRoute,
+        drawerRoute = drawerRoute,
         rootRoute = rootRoute,
         rootBackPriority = rootBackPriority,
     )
@@ -171,8 +182,11 @@ fun SideRail(
                     ?.requestFocus()
             }
             BrowseShellBackAction.FOCUS_ROOT_DESTINATION -> {
+                requestedRoute = rootRoute
+                onNavigate(rootRoute)
                 itemFocus[rootRoute]?.requestFocus()
             }
+            BrowseShellBackAction.AWAIT_ROOT_DESTINATION -> Unit
             BrowseShellBackAction.DELEGATE_TO_ROOT -> onRootBack()
         }
     }
@@ -226,10 +240,36 @@ fun SideRail(
                 .testTag("global-navigation-shell"),
             drawerState = drawerState,
             drawerContent = { drawerValue ->
-                LaunchedEffect(drawerValue, currentRoute) {
+                val selectedRoute = if (drawerValue == DrawerValue.Open) {
+                    drawerRoute
+                } else {
+                    currentRoute
+                }
+                // Drawer entry restores the route that is actually current.
+                LaunchedEffect(drawerValue) {
                     if (drawerValue == DrawerValue.Open) {
-                        (itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route])
-                            ?.requestFocus()
+                        val targetRoute = currentRoute?.takeIf(itemFocus::containsKey)
+                            ?: items.firstOrNull()?.route
+                        requestedRoute = targetRoute
+                        if (targetRoute != null && targetRoute != currentRoute) {
+                            onNavigate(targetRoute)
+                        }
+                        itemFocus[targetRoute]?.requestFocus()
+                    }
+                }
+                // An item-set change preserves a still-valid D-pad intent. Only
+                // removal of that target falls back to reported route or root.
+                LaunchedEffect(itemFocus) {
+                    if (drawerValue == DrawerValue.Open) {
+                        val targetRoute = requestedRoute?.takeIf(itemFocus::containsKey)
+                            ?: currentRoute?.takeIf(itemFocus::containsKey)
+                            ?: items.firstOrNull()?.route
+                        val targetChanged = targetRoute != requestedRoute
+                        requestedRoute = targetRoute
+                        if (targetChanged && targetRoute != null && targetRoute != currentRoute) {
+                            onNavigate(targetRoute)
+                        }
+                        itemFocus[targetRoute]?.requestFocus()
                     }
                 }
                 Column(
@@ -258,50 +298,62 @@ fun SideRail(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     mainItems.forEach { item ->
-                        NavigationDrawerItem(
-                            selected = currentRoute == item.route,
-                            onClick = { onNavigate(item.route) },
-                            leadingContent = item.icon,
-                            modifier = Modifier
-                                .focusRequester(itemFocus.getValue(item.route))
-                                .semantics { contentDescription = item.label }
-                                .testTag("nav-${item.route}")
-                                .onFocusChanged { focusState ->
-                                    if (
-                                        drawerValue == DrawerValue.Open &&
-                                        focusState.isFocused &&
-                                        currentRoute != item.route
-                                    ) {
-                                        onNavigate(item.route)
-                                    }
+                        key(item.route) {
+                            NavigationDrawerItem(
+                                selected = selectedRoute == item.route,
+                                onClick = {
+                                    requestedRoute = item.route
+                                    onNavigate(item.route)
                                 },
-                        ) {
-                            Text(item.label)
+                                leadingContent = item.icon,
+                                modifier = Modifier
+                                    .focusRequester(itemFocus.getValue(item.route))
+                                    .semantics { contentDescription = item.label }
+                                    .testTag("nav-${item.route}")
+                                    .onFocusChanged { focusState ->
+                                        if (
+                                            drawerValue == DrawerValue.Open &&
+                                            focusState.isFocused &&
+                                            requestedRoute != item.route
+                                        ) {
+                                            requestedRoute = item.route
+                                            onNavigate(item.route)
+                                        }
+                                    },
+                            ) {
+                                Text(item.label)
+                            }
                         }
                     }
 
                     Spacer(Modifier.weight(1f))
 
                     footerItems.forEach { item ->
-                        NavigationDrawerItem(
-                            selected = currentRoute == item.route,
-                            onClick = { onNavigate(item.route) },
-                            leadingContent = item.icon,
-                            modifier = Modifier
-                                .focusRequester(itemFocus.getValue(item.route))
-                                .semantics { contentDescription = item.label }
-                                .testTag("nav-${item.route}")
-                                .onFocusChanged { focusState ->
-                                    if (
-                                        drawerValue == DrawerValue.Open &&
-                                        focusState.isFocused &&
-                                        currentRoute != item.route
-                                    ) {
-                                        onNavigate(item.route)
-                                    }
+                        key(item.route) {
+                            NavigationDrawerItem(
+                                selected = selectedRoute == item.route,
+                                onClick = {
+                                    requestedRoute = item.route
+                                    onNavigate(item.route)
                                 },
-                        ) {
-                            Text(item.label)
+                                leadingContent = item.icon,
+                                modifier = Modifier
+                                    .focusRequester(itemFocus.getValue(item.route))
+                                    .semantics { contentDescription = item.label }
+                                    .testTag("nav-${item.route}")
+                                    .onFocusChanged { focusState ->
+                                        if (
+                                            drawerValue == DrawerValue.Open &&
+                                            focusState.isFocused &&
+                                            requestedRoute != item.route
+                                        ) {
+                                            requestedRoute = item.route
+                                            onNavigate(item.route)
+                                        }
+                                    },
+                            ) {
+                                Text(item.label)
+                            }
                         }
                     }
                 }

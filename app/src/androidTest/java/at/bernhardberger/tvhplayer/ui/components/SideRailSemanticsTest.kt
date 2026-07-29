@@ -325,6 +325,173 @@ class SideRailSemanticsTest {
     }
 
     @Test
+    fun delayedRouteFeedbackDoesNotPullFocusBackDuringRapidNavigation() {
+        val reportedRoute = mutableStateOf(Routes.CHANNELS)
+        val requestedRoutes = mutableListOf<String>()
+        val contentFocus = FocusRequester()
+        var rootBackCount = 0
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                SideRail(
+                    currentRoute = reportedRoute.value,
+                    rootRoute = Routes.CHANNELS,
+                    showEpgMenu = true,
+                    onRootBack = { rootBackCount += 1 },
+                    onNavigate = { requestedRoutes += it },
+                    content = { _, drawerActive ->
+                        Button(
+                            onClick = {},
+                            modifier = Modifier
+                                .focusRequester(contentFocus)
+                                .testTag("rapid-browse-focus"),
+                        ) {
+                            Text("Browse")
+                        }
+                        LaunchedEffect(drawerActive) {
+                            if (!drawerActive) contentFocus.requestFocus()
+                        }
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("rapid-browse-focus")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("nav-channels")
+            .assertIsFocused()
+            .performKeyInput {
+                pressKey(Key.DirectionDown)
+                pressKey(Key.DirectionDown)
+            }
+
+        composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(listOf(Routes.EPG, Routes.RECORDINGS), requestedRoutes)
+            // Navigation can report an intermediate route after focus has already
+            // advanced again during an in-flight destination crossfade.
+            reportedRoute.value = Routes.EPG
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
+            .performKeyInput {
+                pressKey(Key.DirectionUp)
+                pressKey(Key.DirectionUp)
+            }
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf(Routes.EPG, Routes.RECORDINGS, Routes.EPG, Routes.CHANNELS),
+                requestedRoutes,
+            )
+        }
+
+        composeRule.onNodeWithTag("nav-channels")
+            .performKeyInput { pressKey(Key.Back) }
+        composeRule.runOnIdle { assertEquals(0, rootBackCount) }
+    }
+
+    @Test
+    fun removingTheFocusedOpenDrawerItemUsesADeterministicFallback() {
+        val reportedRoute = mutableStateOf(Routes.EPG)
+        val showEpgMenu = mutableStateOf(true)
+        val requestedRoutes = mutableListOf<String>()
+        val contentFocus = FocusRequester()
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                SideRail(
+                    currentRoute = reportedRoute.value,
+                    rootRoute = Routes.CHANNELS,
+                    showEpgMenu = showEpgMenu.value,
+                    onRootBack = {},
+                    onNavigate = {
+                        requestedRoutes += it
+                        reportedRoute.value = it
+                    },
+                    content = { _, drawerActive ->
+                        Button(
+                            onClick = {},
+                            modifier = Modifier
+                                .focusRequester(contentFocus)
+                                .testTag("item-change-browse-focus"),
+                        ) {
+                            Text("Browse")
+                        }
+                        LaunchedEffect(drawerActive) {
+                            if (!drawerActive) contentFocus.requestFocus()
+                        }
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("item-change-browse-focus")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("nav-epg").assertIsFocused()
+
+        composeRule.runOnIdle { showEpgMenu.value = false }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(listOf(Routes.CHANNELS), requestedRoutes)
+        }
+    }
+
+    @Test
+    fun removingAnotherItemPreservesAStillValidRapidNavigationIntent() {
+        val reportedRoute = mutableStateOf(Routes.EPG)
+        val showEpgMenu = mutableStateOf(true)
+        val requestedRoutes = mutableListOf<String>()
+        val contentFocus = FocusRequester()
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                SideRail(
+                    currentRoute = reportedRoute.value,
+                    rootRoute = Routes.CHANNELS,
+                    showEpgMenu = showEpgMenu.value,
+                    onRootBack = {},
+                    onNavigate = { requestedRoutes += it },
+                    content = { _, drawerActive ->
+                        Button(
+                            onClick = {},
+                            modifier = Modifier
+                                .focusRequester(contentFocus)
+                                .testTag("preserved-intent-browse-focus"),
+                        ) {
+                            Text("Browse")
+                        }
+                        LaunchedEffect(drawerActive) {
+                            if (!drawerActive) contentFocus.requestFocus()
+                        }
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("preserved-intent-browse-focus")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("nav-epg")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(listOf(Routes.RECORDINGS), requestedRoutes)
+            // EPG feedback is still reported when that unrelated item disappears.
+            showEpgMenu.value = false
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(listOf(Routes.RECORDINGS), requestedRoutes)
+        }
+    }
+
+    @Test
     fun focusedContentCanConsumeBackBeforeTheBrowseShell() {
         val contentFocus = FocusRequester()
         var contentBackCount = 0

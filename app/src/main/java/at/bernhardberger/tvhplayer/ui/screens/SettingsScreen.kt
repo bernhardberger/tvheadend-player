@@ -34,6 +34,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import at.bernhardberger.tvhplayer.ui.components.SettingsSubRail
+import at.bernhardberger.tvhplayer.ui.appDestinationEnterTransition
+import at.bernhardberger.tvhplayer.ui.appDestinationExitTransition
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.core.SettingsBackAction
@@ -179,6 +181,10 @@ fun SettingsScreen(
                 NavHost(
                     navController = nav,
                     startDestination = SettingsRoutes.GENERAL,
+                    enterTransition = { appDestinationEnterTransition() },
+                    exitTransition = { appDestinationExitTransition() },
+                    popEnterTransition = { appDestinationEnterTransition() },
+                    popExitTransition = { appDestinationExitTransition() },
                 ) {
                     composable(SettingsRoutes.GENERAL) {
                         SettingsLanguage(contentFocus.getValue(SettingsRoutes.GENERAL))

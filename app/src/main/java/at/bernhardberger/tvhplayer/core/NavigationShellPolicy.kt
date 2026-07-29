@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 enum class BrowseShellBackAction {
     FOCUS_CURRENT_DESTINATION,
     FOCUS_ROOT_DESTINATION,
+    AWAIT_ROOT_DESTINATION,
     DELEGATE_TO_ROOT,
 }
 
@@ -14,12 +15,14 @@ enum class SettingsBackAction {
 fun browseShellBackAction(
     drawerOpen: Boolean,
     currentRoute: String?,
+    drawerRoute: String? = currentRoute,
     rootRoute: String,
     rootBackPriority: Boolean = false,
 ): BrowseShellBackAction = when {
     rootBackPriority -> BrowseShellBackAction.DELEGATE_TO_ROOT
     !drawerOpen -> BrowseShellBackAction.FOCUS_CURRENT_DESTINATION
-    currentRoute != rootRoute -> BrowseShellBackAction.FOCUS_ROOT_DESTINATION
+    drawerRoute != rootRoute -> BrowseShellBackAction.FOCUS_ROOT_DESTINATION
+    currentRoute != rootRoute -> BrowseShellBackAction.AWAIT_ROOT_DESTINATION
     else -> BrowseShellBackAction.DELEGATE_TO_ROOT
 }
 

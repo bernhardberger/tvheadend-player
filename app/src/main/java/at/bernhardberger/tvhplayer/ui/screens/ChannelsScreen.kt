@@ -79,8 +79,9 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
+import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
@@ -274,10 +275,8 @@ fun ChannelsScreen(
                 bottom = contentPadding.calculateBottomPadding(),
             )
     ) {
-        Text(
-            stringResource(R.string.channel_list),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
+        TopLevelBrowseHeader(
+            title = stringResource(R.string.channel_list),
             modifier = Modifier.padding(start = startPadding, end = endPadding),
         )
         if (channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1) {
@@ -294,7 +293,7 @@ fun ChannelsScreen(
             )
         }
 
-        Spacer(Modifier.height(TvSpacing24))
+        Spacer(Modifier.height(TvSpacing16))
 
         if (channels.isEmpty()) {
             if (channelScope.allChannels.isNotEmpty() && channelScope.activeTagId != null) {

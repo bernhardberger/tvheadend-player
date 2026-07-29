@@ -248,6 +248,36 @@ No new type scale. Roles are fixed so slots stop being re-chosen per screen.
 
 Long localized text must not change a layout's anchors. See 6.1.
 
+### 5.1 Top-level browse rhythm
+
+Channels, Guide, and Recordings share one stable header plane so moving through
+the global drawer does not make the page title, scope selector, or body jump:
+
+- the shell supplies the 32dp top safe inset;
+- a 40dp header slot vertically anchors the `headlineMedium` title and any Guide
+  actions without allowing those actions to move the title baseline;
+- a dedicated leading-aligned scope `TabRow` follows after 8dp;
+- Channels and Recordings leave 16dp between that selector and their browse
+  panels, while the denser Guide leaves 8dp before its ruler;
+- Recordings mode tabs are a scope row, not trailing title actions.
+
+Root destinations and nested Settings categories use one explicit 150ms linear
+crossfade. The logical route and visible target update immediately; the existing
+focus owner remains governed by section 4.2, so an open drawer or Settings rail
+keeps focus until the viewer enters content. The fade is only the visual handoff
+and must not debounce or block rapid D-pad navigation. Do not use Navigation
+Compose's generic 700ms default. The persistent player surface is owned below
+destination UI and does not participate in this crossfade. Route feedback must
+not re-request drawer focus while the drawer is already open; D-pad focus may be
+ahead of an intermediate route update during rapid retargeting. While open, the
+drawer selection and Back policy follow that latest focus intent. If root focus
+is already requested but route feedback has not converged, Back is consumed
+rather than escaping to player or app-exit policy.
+
+Settings is intentionally exempt. Its fixed category rail and detail pane are a
+local master-detail hierarchy whose outer panels begin at the shell's top inset;
+do not add a redundant top-level Settings header above them.
+
 ---
 
 ## 6. Components

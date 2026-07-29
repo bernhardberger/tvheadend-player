@@ -56,6 +56,32 @@ class NavigationShellPolicyTest {
     }
 
     @Test
+    fun backWaitsWhenDrawerIntentIsRootButRouteFeedbackIsNot() {
+        assertEquals(
+            BrowseShellBackAction.AWAIT_ROOT_DESTINATION,
+            browseShellBackAction(
+                drawerOpen = true,
+                currentRoute = "epg",
+                drawerRoute = "channels",
+                rootRoute = "channels",
+            ),
+        )
+    }
+
+    @Test
+    fun backUsesLatestNonRootDrawerIntentInsteadOfStaleRootRoute() {
+        assertEquals(
+            BrowseShellBackAction.FOCUS_ROOT_DESTINATION,
+            browseShellBackAction(
+                drawerOpen = true,
+                currentRoute = "channels",
+                drawerRoute = "recordings",
+                rootRoute = "channels",
+            ),
+        )
+    }
+
+    @Test
     fun backFromSettingsContentFocusesCurrentCategory() {
         assertEquals(
             SettingsBackAction.FOCUS_CURRENT_CATEGORY,

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
@@ -36,6 +38,36 @@ import org.junit.Test
 class RecordingsScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun modeTabsUseTheTitleLeadingAnchorOnTheirOwnRow() {
+        val repository = DvrRepository(
+            htsp = HtspService(Dispatchers.Unconfined),
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreen(
+                    contentPadding = PaddingValues(start = 24.dp, end = 48.dp),
+                    repository = repository,
+                )
+            }
+        }
+
+        val title = composeRule.onNodeWithTag("recordings-header")
+            .fetchSemanticsNode().boundsInRoot
+        val tabs = composeRule.onNodeWithTag("recordings-mode-tabs")
+            .fetchSemanticsNode().boundsInRoot
+        val tabsRow = composeRule.onNodeWithTag("recordings-mode-tabs-row")
+            .fetchSemanticsNode().boundsInRoot
+
+        assertEquals(title.left, tabs.left, 0.5f)
+        assertTrue(tabs.right < title.right)
+        assertTrue(tabsRow.width > tabs.width)
+        assertTrue(tabsRow.right > title.right)
+        assertTrue(tabs.top >= title.bottom)
+    }
 
     @Test
     fun completedRecordingOpensDetailsBeforeDeleteConfirmation() {

@@ -166,7 +166,14 @@ take precedence over completed-work narrative.
   player-route concern; navigation does not detach or recreate the stream surface.
   Implemented on 2026-07-29: the no-benefit route-owned diagnostic was removed,
   one activity-composition-owned view now survives warm player/shell transitions,
-  and only player/shell destination edges bypass the default navigation fade.
+  and every app destination edge now uses an explicit 150ms linear crossfade
+  rather than Navigation Compose's generic 700ms default. Do not add an app-level
+  current-entry visibility gate: rapid retargeting can advance the controller
+  before NavHost has composed that entry, blanking and blocking the browse plane.
+  The latest route retargets immediately while the drawer or current content
+  keeps focus according to the normal entry policy; only the visual handoff
+  fades. The root-owned player surface does not participate in the destination
+  fade.
 
 ## Hardening checkpoint: 2026-07-24
 

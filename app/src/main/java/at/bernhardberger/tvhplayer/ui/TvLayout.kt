@@ -14,6 +14,9 @@ val TvSpacing48 = 48.dp
 val TvSpacing56 = 56.dp
 val TvSpacing80 = 80.dp
 
+/** Stable title/action slot shared by peer top-level browse destinations. */
+val TvBrowseHeaderHeight = 40.dp
+
 // ---- Product opacity ----
 const val TvTextPrimaryAlpha = 1.00f
 const val TvTextSecondaryAlpha = 0.88f
