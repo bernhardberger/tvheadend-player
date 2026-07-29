@@ -88,6 +88,12 @@ class ChannelNavigationTest {
     }
 
     @Test
+    fun hdmiCecForwardAndBackward_mapToLiveChannelDirection() {
+        assertEquals(1, ChannelNavigation.directionForKeyCode(KeyEvent.KEYCODE_MEDIA_NEXT))
+        assertEquals(-1, ChannelNavigation.directionForKeyCode(KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+    }
+
+    @Test
     fun channelKeys_mapToConventionalPageDirection() {
         assertEquals(-1, ChannelNavigation.pageDirectionForKeyCode(KeyEvent.KEYCODE_CHANNEL_UP))
         assertEquals(1, ChannelNavigation.pageDirectionForKeyCode(KeyEvent.KEYCODE_CHANNEL_DOWN))

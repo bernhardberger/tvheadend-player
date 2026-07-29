@@ -202,9 +202,10 @@ introduce abstractions for a single use.
   Firebase configuration.
 - Runtime device addresses belong in ignored `.tvhplayer-device.json` or the
   `TVHPLAYER_ADB_SERIAL` environment variable.
-- The dining-room G10 is the current development target and may use local role
-  `test`. The bedroom G08 is handed-over production and must use role
-  `production`. The exact identities and lifecycle rules are in
+- The dining-room G10 is the household acceptance target and may use local role
+  `test`. The indexed NVIDIA Shield may also use role `test` as a temporary
+  deployment target. The bedroom G08 is handed-over production and must use
+  role `production`. The exact identities and lifecycle rules are in
   `docs/device-targets.md`.
 - `tools/device` rejects install, launch, force-stop, smoke, screenshot,
   synthetic key, and credential-provisioning actions unless the local role is

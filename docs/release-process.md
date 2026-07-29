@@ -11,9 +11,10 @@ Publication and production-device mutation still require explicit owner approval
 (`versionCode` 1) was its first candidate. Versions `0.1.1` and `0.1.2`
 (`versionCode` 2 and 3) are interlaced-playback diagnostic updates. Version
 `0.1.3` (`versionCode` 4) consolidates the live and recording player overlays.
-None update the predecessor or temporary `at.leoville.tvhstream` diagnostic
-package. Every subsequently distributed or device-installed product build must
-increase `versionCode`.
+Version `0.1.4` (`versionCode` 5) adds the Shield HDMI-CEC channel-key
+compatibility fix. None update the predecessor or temporary
+`at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
+device-installed product build must increase `versionCode`.
 `versionName` follows semantic versioning; do not reuse an APK version for
 different source or native binaries.
 
@@ -63,7 +64,7 @@ commands are:
 ```bash
 ./tools/release prepare
 ./tools/release sign
-./tools/release verify-signed build/release/signed/0.1.3
+./tools/release verify-signed build/release/signed/0.1.4
 ```
 
 `prepare` rebuilds the pinned native dependency and creates the unsigned bundle.
@@ -138,7 +139,7 @@ never release artifacts.
 
 Read `docs/device-targets.md` and load the `android-tv-device-testing` workflow.
 Run `./tools/device doctor` before every mutation and proceed only when the live
-identity is the dining-room G10 with local role `test`. A release-signed APK
+identity is an explicitly indexed test target. A release-signed APK
 cannot update a debug-signed installation; uninstalling the debug package erases
 its app-private settings, so reprovision the designated test credentials only
 through the approved debug staging flow or enter them normally in the release
@@ -159,8 +160,8 @@ complete signed bundle through the bounded wrapper:
 
 ```bash
 ./tools/device install-release \
-  --bundle build/release/signed/0.1.3 \
-  --confirm-production-install
+  --bundle build/release/signed/0.1.4 \
+  --confirm-release-install
 ```
 
 The wrapper independently verifies bundle checksums, source continuity, APK

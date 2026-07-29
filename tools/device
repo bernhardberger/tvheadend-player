@@ -61,7 +61,8 @@ TEST_DEVICE_ACTIONS = {
     "provision-test-credentials",
     "allow-appliance-autostart",
 }
-PRODUCTION_DEVICE_ACTIONS = {"install-release", "uninstall-legacy"}
+RELEASE_DEVICE_ACTIONS = {"install-release"}
+PRODUCTION_DEVICE_ACTIONS = {"uninstall-legacy"}
 VALID_ROLES = {"production", "test", "unclassified"}
 
 
@@ -178,6 +179,10 @@ def require_serial(value: str | None) -> str:
 
 
 def action_policy_error(role: str, action: str) -> str | None:
+    if action in RELEASE_DEVICE_ACTIONS:
+        if role in {"production", "test"}:
+            return None
+        return f"{action} requires an explicitly classified deployment target"
     if action in PRODUCTION_DEVICE_ACTIONS:
         if role == "production":
             return None
@@ -625,7 +630,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     release_parser = subparsers.add_parser(
         "install-release",
-        help="Install a verified signed release on an exact-identity production device",
+        help="Install a verified signed release on an exact-identity deployment target",
     )
     release_parser.add_argument(
         "--bundle",
@@ -634,9 +639,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Signed release bundle produced by tools/release",
     )
     release_parser.add_argument(
+        "--confirm-release-install",
         "--confirm-production-install",
+        dest="confirm_release_install",
         action="store_true",
-        help="Confirm explicit owner approval for this production-device mutation",
+        help="Confirm explicit owner approval for this signed-release mutation",
     )
 
     uninstall_parser = subparsers.add_parser(
@@ -728,8 +735,8 @@ def main() -> int:
     policy_error = action_policy_error(role, args.action)
     if policy_error:
         fail(policy_error)
-    if args.action == "install-release" and not args.confirm_production_install:
-        fail("install-release requires --confirm-production-install")
+    if args.action == "install-release" and not args.confirm_release_install:
+        fail("install-release requires --confirm-release-install")
     if args.action == "uninstall-legacy" and not args.confirm_legacy_uninstall:
         fail("uninstall-legacy requires --confirm-legacy-uninstall")
     if args.action == "screenshot" and not args.confirm_safe_screen:
@@ -762,7 +769,7 @@ def main() -> int:
         )
         return 0
 
-    if args.action in TEST_DEVICE_ACTIONS | PRODUCTION_DEVICE_ACTIONS:
+    if args.action in TEST_DEVICE_ACTIONS | RELEASE_DEVICE_ACTIONS | PRODUCTION_DEVICE_ACTIONS:
         require_device_ready(adb, serial)
         properties = read_device_properties(adb, serial)
         verify_configured_identity(properties, config, require_expected=True)

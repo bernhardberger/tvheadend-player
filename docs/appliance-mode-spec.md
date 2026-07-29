@@ -44,14 +44,16 @@ on the Android debug keystore.
 
 - The deployed household TV is a production appliance. Do not use it for routine
   debug APK installs, ADB key injection, smoke tests, or development experiments.
-- The dining-room TCL Smart TV Pro is the temporary debug/test target. Its address
-  remains only in ignored local device configuration, and tooling must verify its
-  manufacturer, model, device, and product before every mutation.
+- The dining-room TCL Smart TV Pro is the household acceptance target. The
+  owner-controlled NVIDIA Shield may be selected as a temporary deployment
+  target. Addresses remain only in ignored local device configuration, and
+  tooling must verify manufacturer, model, device, and product before every
+  mutation.
 - `tools/device` enforces this boundary: production and unclassified devices
   reject debug install, launch, force-stop, smoke, screenshot, synthetic-key,
-  and credential-provisioning actions. An exact-identity production device may
-  receive a fully verified product-signed bundle only after explicit owner
-  approval and command-line confirmation.
+  and credential-provisioning actions. An exact-identity production or test
+  deployment target may receive a fully verified product-signed bundle only
+  after explicit owner approval and command-line confirmation.
 - A designated test device may receive TVHeadend credentials through the
   debug-only app-private provisioning path after role and complete live identity
   validation. Secret values travel only over process stdin from an ignored,

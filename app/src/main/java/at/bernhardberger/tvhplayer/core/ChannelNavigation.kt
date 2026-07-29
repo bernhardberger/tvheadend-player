@@ -6,8 +6,12 @@ object ChannelNavigation {
     private const val MAX_CHANNEL_NUMBER_DIGITS = 3
 
     fun directionForKeyCode(keyCode: Int): Int? = when (keyCode) {
-        KeyEvent.KEYCODE_CHANNEL_UP -> 1
-        KeyEvent.KEYCODE_CHANNEL_DOWN -> -1
+        KeyEvent.KEYCODE_CHANNEL_UP,
+        KeyEvent.KEYCODE_MEDIA_NEXT,
+        -> 1
+        KeyEvent.KEYCODE_CHANNEL_DOWN,
+        KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+        -> -1
         else -> null
     }
 

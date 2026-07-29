@@ -180,9 +180,9 @@ class DevicePolicyTest(unittest.TestCase):
 
         self.assertFalse(args.confirm_user_enabled_accessibility)
 
-    def test_release_install_is_available_only_for_production(self) -> None:
+    def test_release_install_is_available_for_exact_identity_deployment_targets(self) -> None:
         self.assertIsNone(action_policy_error("production", "install-release"))
-        self.assertIsNotNone(action_policy_error("test", "install-release"))
+        self.assertIsNone(action_policy_error("test", "install-release"))
         self.assertIsNotNone(action_policy_error("unclassified", "install-release"))
 
     def test_legacy_uninstall_is_available_only_for_production(self) -> None:
@@ -196,7 +196,7 @@ class DevicePolicyTest(unittest.TestCase):
             ["install-release", "--bundle", "build/release/signed/0.1.0"]
         )
 
-        self.assertFalse(args.confirm_production_install)
+        self.assertFalse(args.confirm_release_install)
 
     def test_legacy_uninstall_requires_explicit_confirmation(self) -> None:
         parser = DEVICE["build_parser"]()
