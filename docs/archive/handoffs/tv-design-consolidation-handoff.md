@@ -1,6 +1,10 @@
 # TV design consolidation handoff
 
-> Implementation sequence for `docs/tv-design-spec.md`.
+> **Status: historical implementation sequence.** `docs/tv-design-spec.md` is
+> the current authority; this file preserves the original rollout only and is
+> not a current work queue.
+>
+> Historical implementation sequence for `docs/tv-design-spec.md`.
 > Evidence for every claim: `docs/tv-design-audit-2026-07-27.md`.
 > Read all three before starting. Nothing here depends on prior conversation.
 

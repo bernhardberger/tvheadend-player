@@ -1,5 +1,9 @@
 # Implementation plan: TVHeadend Player appliance mode
 
+**Status:** Active architecture and implementation record. Read only the
+sections relevant to the current task; current specifications, source, and tests
+take precedence over completed-work narrative.
+
 ## Architecture decisions
 
 - Keep upstream's custom Media3/HTSP playback architecture unchanged because the

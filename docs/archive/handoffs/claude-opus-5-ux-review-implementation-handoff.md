@@ -1,5 +1,10 @@
 # Claude Opus 5 UX/UI review implementation handoff
 
+> **Status: historical implementation record.** The evidence, model guidance,
+> and work sequence below are frozen to the 2026-07-26 review programme. Current
+> authority is `docs/tv-design-spec.md`, current source, and current tests. Do not
+> execute this handoff unless an assignment explicitly requests historical work.
+
 ## Agent selection
 
 Use the project `android-tv` agent with **gpt-5.6 Sol High** effort for the
@@ -632,7 +637,7 @@ one focused question and wait whenever human observation is required.
 Use the project android-tv agent with gpt-5.6 Sol High effort.
 
 Implement the complete UX/UI remediation in
-docs/claude-opus-5-ux-review-implementation-handoff.md end-to-end, one
+docs/archive/handoffs/claude-opus-5-ux-review-implementation-handoff.md end-to-end, one
 independently verified slice at a time.
 
 Treat

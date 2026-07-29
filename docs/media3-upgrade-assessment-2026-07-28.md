@@ -1,6 +1,8 @@
 # Media3 upgrade assessment
 
 Date: 2026-07-28
+Status: dated decision record for the named upgrade and its remaining device
+gate; not general playback authority.
 
 ## Decision
 

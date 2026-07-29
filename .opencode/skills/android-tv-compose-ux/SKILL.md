@@ -7,9 +7,10 @@ description: Use ONLY as the TVHeadend Player product overlay for Compose UI, Ma
 
 This is a product overlay, not a general Compose implementation guide. Treat
 `docs/tv-design-spec.md` as the normative visual and interaction specification.
-Read its current contents, the TV UX requirements in `AGENTS.md`, and
-`docs/ai-skills-audit-2026-07-28.md` before making a UI decision; do not copy
-token values or mutable screen rules into this skill.
+Read its current contents and the TV interaction floor in `AGENTS.md` before
+making a UI decision; do not copy token values or mutable screen rules into this
+skill. The dated skills audit is provenance, not mandatory implementation
+context; the durable caveats are stated below.
 
 ## Load focused implementation guidance
 

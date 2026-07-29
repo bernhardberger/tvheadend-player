@@ -1,8 +1,9 @@
 # TV design specification
 
 Status: normative from 2026-07-28. Supersedes ad-hoc values in `ui/`.
-Evidence and rationale: `docs/tv-design-audit-2026-07-27.md`.
-Implementation sequence: `docs/tv-design-consolidation-handoff.md`.
+Historical evidence and rationale: `docs/tv-design-audit-2026-07-27.md`.
+Archived implementation sequence:
+`docs/archive/handoffs/tv-design-consolidation-handoff.md`.
 
 This document says what the app's surfaces **must** do. It is deliberately short
 so it can stay current, as AGENTS.md requires. It does not restate the audit's
@@ -66,8 +67,7 @@ Consequences that follow, and are not negotiable once orange is reserved:
   in the same tile, 29° apart in hue, which is the hardest discrimination at
   viewing distance.
 - Orange never carries "live", "new", or any other state. State differences are
-  carried by shape and label, with colour as reinforcement only — AGENTS.md:
-  "subtle color-only state are not acceptable TV interactions".
+  carried by shape and label, with colour as reinforcement only.
 
 ### 1.3 One recording red
 

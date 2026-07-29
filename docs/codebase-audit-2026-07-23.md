@@ -1,6 +1,8 @@
 # TVHeadend Player predecessor-fork technical audit
 
 Date: 2026-07-23
+Status: dated audit and implementation record. Use only a named finding and
+verify it against current source; this is not a general implementation guide.
 
 ## Implementation update: 2026-07-24
 

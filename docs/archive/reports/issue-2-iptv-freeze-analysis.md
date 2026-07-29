@@ -1,5 +1,9 @@
 # Issue #2 — m3u8 / IPTV freezes after the first frame — blind analysis
 
+> **Status: historical unverified hypothesis record.** This is not a confirmed
+> root cause or current playback instruction. Reproduce against current source
+> before acting on any hypothesis.
+
 **Symptom:** IPTV-network channels (m3u8/HLS, e.g. Acestream via PyAcexy) show one frame
 then freeze. TVHeadend "Status → Subscriptions" shows video output (data IS flowing).
 SAT/DVB tuner channels play fine. Reporter suspects a bad PTS.

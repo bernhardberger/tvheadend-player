@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Validate documentation authority, lifecycle, and context-ingress rules."""
+
+from __future__ import annotations
+
+import fnmatch
+import re
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+FORBIDDEN_ROOT_PATTERNS = (
+    "*handoff*.md",
+    "*completion-report*.md",
+    "*goal-prompt*.md",
+)
+AUTHORITY_SECTIONS = (
+    "## Normative and operational documents",
+    "## Active plans",
+    "## Dated references",
+)
+ARCHIVE_SECTIONS = (
+    "## Handoffs",
+    "## Reports",
+)
+DATED_DOCUMENT = re.compile(r"docs/[A-Za-z0-9_.-]+-20\d{2}-\d{2}-\d{2}\.md")
+EXACT_ARCHIVE_DOCUMENT = re.compile(r"docs/archive/[A-Za-z0-9_./-]+\.md")
+
+
+def operational_context_files(root: Path) -> list[Path]:
+    paths = [root / "AGENTS.md"]
+    for relative in (
+        ".opencode/agents",
+        ".opencode/commands",
+        ".opencode/skills",
+        ".agents/skills",
+    ):
+        directory = root / relative
+        if directory.is_dir():
+            paths.extend(sorted(directory.rglob("*.md")))
+    return paths
+
+
+def section(text: str, heading: str) -> str:
+    marker = f"{heading}\n"
+    if marker not in text:
+        return ""
+    remainder = text.split(marker, 1)[1]
+    return remainder.split("\n## ", 1)[0]
+
+
+def validate(root: Path) -> list[str]:
+    errors: list[str] = []
+    docs = root / "docs"
+    index = docs / "README.md"
+    archive = docs / "archive"
+    archive_index = archive / "README.md"
+
+    if not index.is_file():
+        errors.append("missing documentation authority index: docs/README.md")
+        index_text = ""
+    else:
+        index_text = index.read_text(encoding="utf-8")
+
+    if not archive_index.is_file():
+        errors.append("missing archive policy: docs/archive/README.md")
+        archive_text = ""
+    else:
+        archive_text = archive_index.read_text(encoding="utf-8")
+
+    if docs.is_dir():
+        for path in sorted(docs.glob("*.md")):
+            if path.name == "README.md":
+                continue
+            classifications = [
+                heading
+                for heading in AUTHORITY_SECTIONS
+                if any(
+                    line.startswith(f"| `{path.name}` |")
+                    for line in section(index_text, heading).splitlines()
+                )
+            ]
+            if not classifications:
+                errors.append(f"docs/README.md does not classify {path.name}")
+            elif len(classifications) > 1:
+                errors.append(f"docs/README.md classifies {path.name} more than once")
+            if any(fnmatch.fnmatchcase(path.name, pattern) for pattern in FORBIDDEN_ROOT_PATTERNS):
+                errors.append(f"session/handoff document must not live in docs/: {path.name}")
+
+            first_lines = "\n".join(path.read_text(encoding="utf-8").splitlines()[:12])
+            requires_status = any(
+                heading in classifications
+                for heading in ("## Active plans", "## Dated references")
+            )
+            if requires_status and "Status:" not in first_lines:
+                errors.append(f"{path.relative_to(root)} must declare Status near the top")
+
+    if archive.is_dir():
+        for path in sorted(archive.rglob("*.md")):
+            if path == archive_index:
+                continue
+            relative = path.relative_to(archive).as_posix()
+            classifications = [
+                heading
+                for heading in ARCHIVE_SECTIONS
+                if any(
+                    line.startswith(f"| `{relative}` |")
+                    for line in section(archive_text, heading).splitlines()
+                )
+            ]
+            if not classifications:
+                errors.append(f"docs/archive/README.md does not inventory {relative}")
+            elif len(classifications) > 1:
+                errors.append(
+                    f"docs/archive/README.md inventories {relative} more than once"
+                )
+            first_lines = "\n".join(path.read_text(encoding="utf-8").splitlines()[:12])
+            if "Status:" not in first_lines:
+                errors.append(f"{path.relative_to(root)} must declare historical Status")
+
+    for path in operational_context_files(root):
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        relative = path.relative_to(root)
+        for dated_match in DATED_DOCUMENT.finditer(text):
+            errors.append(
+                f"{relative} must not hard-code dated context: {dated_match.group(0)}"
+            )
+        archive_match = EXACT_ARCHIVE_DOCUMENT.search(text)
+        if archive_match:
+            errors.append(
+                f"{relative} must not hard-code archived context: {archive_match.group(0)}"
+            )
+
+    return errors
+
+
+def main() -> int:
+    errors = validate(ROOT)
+    for error in errors:
+        print(f"error: {error}", file=sys.stderr)
+    if errors:
+        return 1
+    print("Documentation authority passed: active docs classified and historical context contained")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

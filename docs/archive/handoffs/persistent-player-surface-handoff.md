@@ -1,9 +1,19 @@
 # Persistent player surface implementation handoff
 
+> **Status: historical completed implementation record.** The 2026-07-29 motion
+> update marks this work complete. Current authority is
+> `docs/appliance-mode-spec.md`, `docs/appliance-mode-plan.md`, current source,
+> and current tests. The diagnosis remains available only as historical context.
+>
 > Written for a new implementation session with no access to the investigation
 > that produced it. Read this file end to end before editing. Implement one
 > numbered slice at a time and do not combine this work with unrelated player,
 > shell, or decoder changes.
+>
+> **Motion update, 2026-07-29:** the persistent-surface work is complete. The
+> earlier player/shell-only transition policy is superseded: current focus-driven
+> navigation replaces every destination immediately. Normative sections below
+> are updated; historical diagnosis remains for context.
 
 ## Outcome
 
@@ -17,9 +27,10 @@ destinations and shell destinations render only UI above the same video plane.
 The video view must not detach, move, fade, or be recreated during a warm
 player-to-shell-to-player cycle.
 
-Disable Navigation Compose's full-destination transition only when crossing
-between a player destination and a non-player destination. Preserve the current
-destination transition for shell-to-shell and player-to-player navigation.
+Disable Navigation Compose's full-destination transitions for every app-owned
+`NavHost`, including the nested Settings categories. Focus-driven navigation can
+retarget on each D-pad step, so the selected item and visible destination must
+not disagree while an outgoing tree waits for animation completion.
 
 This is a **mixed change**:
 
@@ -196,7 +207,7 @@ a separate follow-up slice rather than adding a second surface.
 
 The video plane never receives focus. Route UI must have exactly one focus,
 semantics, and key owner immediately after a transition; the outgoing route must
-not remain an invisible interaction owner during a crossfade.
+not remain an invisible interaction owner.
 
 ### Shell
 
@@ -231,34 +242,17 @@ stops playback.
 
 ## Navigation transition policy
 
-Create one pure route-edge classifier and unit-test it before wiring Compose.
-Classify destinations by their exact top-level route segment, not broad text
-matching:
-
-- player family: `Routes.PLAYER`, `Routes.RECORDING_PLAYER`
-- non-player family: Channels, EPG including category routes, Recordings,
-  Settings, and Unlock
-
-The policy is symmetric:
-
-| Initial | Target | Transition |
-|---|---|---|
-| Player | Non-player | None |
-| Non-player | Player | None |
-| Non-player | Non-player | Existing default |
-| Player | Player | Existing default |
-
-Apply the result to all four `NavHost` paths:
+Use shared immediate enter and exit transitions for every destination edge.
+Apply them to all four paths of the root and nested Settings `NavHost`s:
 
 - `enterTransition`
 - `exitTransition`
 - `popEnterTransition`
 - `popExitTransition`
 
-For player/non-player edges, both incoming and outgoing transitions are
-`EnterTransition.None` / `ExitTransition.None`. For every other edge, explicitly
-preserve the installed Navigation Compose 2.9.7 default 700 ms fade. Do not add
-`AnimatedContent`, `Crossfade`, or a second animation around `NavHost`.
+Both incoming and outgoing transitions are `EnterTransition.None` /
+`ExitTransition.None`. Do not add `AnimatedContent`, `Crossfade`, or a second
+animation around `NavHost`.
 
 If the immediate UI swap feels harsh after physical review, a later change may
 animate only a non-focusable shell scrim for roughly 150-180 ms. Do not delay the
@@ -355,28 +349,28 @@ Focused gate:
 ./gradlew compileDebugAndroidTestKotlin --no-daemon
 ```
 
-### Slice 3 — Remove player/shell destination crossfades
+### Slice 3 — Remove destination crossfades
 
 Files:
 
-- a small pure policy file under
-  `app/src/main/java/at/bernhardberger/tvhplayer/core/`
-- its JVM test under `app/src/test/java/at/bernhardberger/tvhplayer/core/`
+- the shared immediate transition helpers under
+  `app/src/main/java/at/bernhardberger/tvhplayer/ui/`
 - `app/src/main/java/at/bernhardberger/tvhplayer/ui/AppRoot.kt`
-- `app/src/androidTest/java/at/bernhardberger/tvhplayer/ui/PlayerShellTransitionTest.kt` (new, or the nearest existing navigation test)
+- `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/SettingsScreen.kt`
+- `app/src/androidTest/java/at/bernhardberger/tvhplayer/ui/AppDestinationTransitionTest.kt` (new, or the nearest existing navigation test)
 
-Test the complete route-edge matrix first, including route templates and EPG
-category routes. Then wire the classifier into all four `NavHost` transition
-callbacks.
+Test forward, pop, same-family, and frame-separated rapid navigation first. Then
+wire the shared helpers into all four transition callbacks on both app-owned
+`NavHost`s.
 
 Add a minimal Navigation Compose instrumentation harness that uses the production
-classifier and focusable tagged player/shell content. Drive both forward and pop
-navigation with the test clock paused and prove that on a player/non-player edge:
+helpers and focusable tagged destination content. Drive forward, pop, and rapid
+same-family navigation with the test clock paused and prove that:
 
 - the outgoing destination is not retained as an interactive semantic node;
 - the target owns the only focused node after the navigation frame settles;
 - no 700 ms destination fade must complete before the target can own focus;
-- default shell-to-shell behavior is not reclassified as an instant player edge.
+- a frame-separated retarget leaves only the latest destination composed.
 
 Do not build a second app navigation architecture in the test and do not use
 click-only assertions for TV focus behavior.
@@ -384,7 +378,6 @@ click-only assertions for TV focus behavior.
 Focused gate:
 
 ```bash
-./gradlew testDebugUnitTest --tests '*PlayerShell*Transition*Test' --no-daemon
 ./gradlew compileDebugAndroidTestKotlin --no-daemon
 ```
 
@@ -420,9 +413,8 @@ blocker and is not fixed by this UI architecture.
 - Actual host removal clears `PlayerView.player` and `keepScreenOn` without
   releasing `PlayerSession`/ExoPlayer.
 - The root video host has no focus or accessibility interaction behavior.
-- Player/non-player transitions are instant in enter, exit, pop-enter, and
-  pop-exit directions.
-- Shell/shell and player/player edges retain the existing default transition.
+- Every root and nested Settings destination transition is instant in enter,
+  exit, pop-enter, and pop-exit directions.
 - Existing Back, warm-return, same-service idempotence, Stop ordering, reveal-key,
   channel drawer, playback options, recording seek, and focus tests still pass.
 - `./tools/verify` passes.

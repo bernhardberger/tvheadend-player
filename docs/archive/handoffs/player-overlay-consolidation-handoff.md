@@ -1,5 +1,10 @@
 # Player overlay consolidation implementation handoff
 
+> **Status: historical implementation record.** Measurements and rationale are
+> preserved, but the screenshots and source assumptions are revision-bound.
+> Current authority is `docs/tv-design-spec.md`, current player source, and
+> current tests.
+>
 > Written for an implementer with no access to the investigation that produced it. Everything
 > needed is in this file; nothing depends on prior conversation. Read it end to end before
 > touching code.

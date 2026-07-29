@@ -1,186 +1,145 @@
 # AI engineering harness
 
-The current LXC 106 checkout is:
+OpenCode and OpenChamber use the same repository-local harness from the project
+root:
 
 ```text
 /root/projects/tvhstream
 ```
 
-Add that directory as the project root in OpenCode or OpenChamber. OpenChamber
-uses the same OpenCode backend, so both interfaces see the same Git worktree,
-project instructions, agents, skills, and commands.
-
-## What is tracked
+## Tracked architecture
 
 | Path | Purpose |
 |---|---|
-| `AGENTS.md` | Project-wide engineering, safety, testing, Git, and upstream rules |
-| `docs/device-targets.md` | Current development-versus-production TV boundary, without private addresses |
-| `.opencode/opencode.json` | Project config; selects the Android TV agent, disables generic Build and sharing, and limits delegation to one capability-gated child level |
-| `.opencode/agents/android-tv.md` | Default implementation agent |
-| `.opencode/agents/repo-maintainer.md` | Repository harness, tooling, CI, documentation, licensing, and release-policy maintainer |
-| `.opencode/agents/android-reviewer.md` | Directly selectable read-only review agent |
-| `.opencode/agents/tv-ux-reviewer.md` | Evidence-scoped product UX and Material for TV reviewer |
-| `.opencode/agents/quick-explore.md` | Read-only exact lookup child that escalates ambiguous or consequential investigation |
-| `.opencode/agents/scout.md` | Read-only repository and external-documentation research child |
-| `.agents/skills/` | Reviewed, project-local Kotlin and Compose skills imported from `chrisbanes/skills` |
-| `skills-lock.json` | Imported skill source, `2026.7.21` ref, paths, and content hashes |
-| `.opencode/skills/android-tv-compose-ux/` | Product TV UI, D-pad, focus, Back, accessibility, and evidence workflow |
-| `.opencode/skills/live-tv-dvr-conventions/` | Channel, EPG, recordings, DVR action, and context-restoration workflow |
-| `.opencode/skills/media3-htsp-playback-safety/` | Playback baseline, native coupling, and device regression workflow |
-| `.opencode/skills/android-tv-device-testing/` | Safe TCL/ADB/runtime verification workflow |
-| `.opencode/skills/tvhstream-upstream-contribution/` | Upstream sync and contribution boundary workflow |
-| `.opencode/commands/` | Verification, device, direct reviewer, TV UX, and upstream-review shortcuts |
-| `docs/ai-skills-audit-2026-07-28.md` | Per-skill decisions, external-guidance caveats, and mandatory routing model |
-| `docs/media3-upgrade-assessment-2026-07-28.md` | Evidence, automated results, and physical-TV gate for the Media3 1.10.1 upgrade |
-| `tools/check-ai-harness` | Static harness/config validation plus live OpenCode parser and skill-discovery checks |
-| `tools/verify` | Native/tool/JVM/lint/Android-test compilation, debug assembly, APK identity/ABI, and 16 KB gate |
-| `tools/check-native-libs` | Audited AAR hashes, ABI/ELF checks, and a strict release-provenance gate |
-| `tools/device` | Role-aware bounded ADB wrapper that blocks production mutations and screenshots, safely provisions designated test devices, and avoids secret-bearing broad dumps |
+| `AGENTS.md` | Sole automatic project instruction; concise safety, routing, and workflow floor |
+| `docs/README.md` | Documentation authority and lifecycle index used for task-specific reads |
+| `docs/archive/README.md` | Historical-document containment and successor map |
+| `.opencode/opencode.json` | Default agent, disabled generic Build, model assignments, sharing policy, and one-level child allowlist |
+| `.opencode/agents/android-tv.md` | Application implementation primary |
+| `.opencode/agents/repo-maintainer.md` | Harness, tooling, CI, documentation, licensing, and release-policy primary |
+| `.opencode/agents/android-reviewer.md` | Read-only Android correctness reviewer |
+| `.opencode/agents/tv-ux-reviewer.md` | Evidence-scoped, read-only product UX reviewer |
+| `.opencode/agents/quick-explore.md` | Exact low-consequence repository lookup child |
+| `.opencode/agents/scout.md` | Bounded repository and external-documentation research child |
+| `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
+| `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
+| `.opencode/commands/` | Model-tier, verification, device, reviewer, UX, and upstream shortcuts |
+| `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
+| `tools/check-ai-harness` | Config, agent, skill, command, permission, safety, and live OpenCode validation |
+| `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
+| `tools/ai-model-tier` | Checked child-agent switch between matching standard and fast service tiers |
+| `tools/verify` | Native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
+| `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
+| `tools/device` | Role-aware bounded ADB wrapper |
 
-The project intentionally does not pin an AI provider or model. It inherits the
-operator's OpenCode provider configuration while keeping project behavior and
-safety rules in Git.
+## Primary agents and model tier
 
-`android-tv` is the default and the only application implementation primary for
-this repository. `repo-maintainer` is the separate full-tool primary for the AI
-harness, repository tools, CI, documentation infrastructure, licensing, and
-release-policy mechanics; it must hand application Kotlin, Compose, playback,
-EPG, DVR, and appliance behavior to `android-tv`.
+`android-tv` is the default and only application implementation primary.
+`repo-maintainer` owns repository infrastructure and must not implement Kotlin,
+Compose, playback, EPG, DVR, or appliance behavior. The generic built-in `build`
+agent is disabled so a retained primary selection cannot bypass those scopes.
 
-The generic built-in `build` agent is disabled because it receives project
-instructions but neither primary agent's mandatory scope and routing prompt.
-Setting a default alone is insufficient: existing sessions can retain an
-explicitly selected primary agent across restarts.
+Primary agents inherit the operator's OpenCode model. While subscription capacity
+is available, child agents are temporarily pinned to matching OpenAI
+`gpt-5.6-*-fast` service-tier models in `.opencode/opencode.json`: Luna/low for
+exact lookup, Terra/medium for exploration and research, Sol/high for reviewers,
+and approval-gated Sol/medium for General. The fast IDs select service priority,
+not a less capable model.
 
-Delegation is capability-based and one level deep. The top-level Task policy
-denies every child first, then allows automatic spawning only for read-only
-children. `quick-explore` handles exact low-consequence lookups and must escalate
-ambiguous, multi-hop, or completeness-sensitive work to `explore`. `scout`
-handles bounded source research; `android-reviewer` and `tv-ux-reviewer` provide
-independent review. `general` requires user approval; after approval, every
-writing assignment needs an explicit scope and exclusive file ownership. Every
-permitted child has an effective `task: deny`, so recursive spawning remains
-prohibited.
-
-TV UX evidence is allowlisted by the assignment. A delegation must name each
-exact current screenshot, handoff, or evidence-inventory path, or identify the
-work as a source-only interaction review with a bounded UI-change scope. Tracked
-screenshots and handoffs are historical by default. The reviewer cannot use Glob
-and must not replace it with directory listings or repository searches to invent
-a current evidence set. Without supplied visual evidence it skips the visual pass
-and requests more evidence only when the requested conclusion actually requires
-visual or physical-TV proof.
-
-Parallel read-only exploration and research are allowed. Parallel writers must
-not modify the same dirty worktree, and agents must not run concurrent Gradle
-builds, device operations, Git mutations, signing, publishing, or release
-operations. `/android-review`, `/tv-ux-review`, and `/upstream-review` create
-isolated child sessions. Direct agent selection remains available.
-
-The imported Chris Banes suite is intentionally selective. Its 17 retained
-skills are the default implementation guidance for matching Kotlin, coroutine,
-Flow, Compose state, layout, focus, performance, animation, API-design, and
-UI-testing concerns. Agents must route to concrete matching skills before edits;
-repository-local skills add TVHeadend product constraints instead of replacing
-that guidance. `docs/ai-skills-audit-2026-07-28.md` records every decision and
-the few instructions that require a project-specific caveat.
-
-`implement-issue` and `shepherd` are excluded because they assume
-subagent/worktree execution or can drive commits, pushes, rebases, and merges.
-`using-chrisbanes-skills` is excluded because its router points to the excluded
-shepherd workflow. `kotlin-multiplatform-expect-actual` is excluded because this
-is an Android-only product and speculative platform abstraction conflicts with
-the current product boundary.
-
-The imported source is pinned to the `2026.7.21` tag in `skills-lock.json`.
-Review upstream changes before updating it; do not install `*` over the reviewed
-set without repeating the action-bearing-instruction audit. Run Skills CLI
-updates only with `--agent opencode`, then review its output and complete diff;
-the generic `skills check` command can create integrations for unrelated agents.
-
-The imported files are unmodified Apache-2.0 material. `NOTICE.md` records their
-source and points to the retained license text.
-
-The operating precedence is product and safety specifications, audited external
-skill caveats, the matching focused Chris Banes skill, then existing local style.
-The audit does not permit broad cleanup: apply external guidance only to the
-requested concern. OpenCode discovery is validated with `opencode debug skill`,
-not inferred from the Skills CLI lock file.
-
-The harness treats Compose for TV as the focusable UI default, the accepted
-Media3/HTSP path as a regression boundary, incomplete native provenance as a
-signed-release blocker, and read-only GitHub CI as the only enabled automation
-until signing and publication are separately approved.
-
-The 2026-07-28 Media3 assessment records the source and source-matched native
-upgrade from `1.9.2` to stable `1.10.1`. Automated compatibility, native
-integrity, and reproducibility gates pass; the full physical playback matrix
-remains mandatory before production deployment or playback-quality claims.
-
-Dedicated TV UX sections in `AGENTS.md`, `android-tv`, `android-reviewer`, and
-`tv-ux-reviewer` make Google TV and Android TV design guidance, Compose for TV,
-and Material for TV guidance a standing implementation and review gate. Google
-TV defines the target product experience; Android TV OS and Compose for TV remain
-the platform and implementation APIs. `tools/check-ai-harness` requires those
-sections so future harness edits cannot silently remove the focus, ten-foot
-readability, safe-area, key-dispatch, accessibility, video-scrim, evidence, and
-physical-TV validation expectations.
-
-## Local device configuration
-
-OpenCode loads both `AGENTS.md` and `docs/device-targets.md` as project
-instructions. The tracked target document identifies device roles but contains
-no private address; the ignored local file selects the reachable device.
-
-Copy the tracked example to the ignored local file, retain only assigned devices,
-and fill in their local ADB serials. Keep `active_target` set to the G10 for
-routine debug work. The example assigns `role: "test"` only to the designated
-G10 and Shield test targets and keeps the bedroom G08 at `role: "production"`:
+OpenCode cannot hot-reload model assignments for later Task calls. Use the
+checked repository tool or matching slash command, then restart OpenCode:
 
 ```bash
-cp .tvhplayer-device.example.json .tvhplayer-device.json
-./tools/device doctor
-./tools/device --target nvidia-shield doctor
+./tools/ai-model-tier status
+./tools/ai-model-tier fast
+./tools/ai-model-tier standard
 ```
 
-Select another configured profile for one command or session without changing
-the ignored file:
+## Delegation and evidence containment
 
-```bash
-./tools/device --target nvidia-shield doctor
-export TVHPLAYER_DEVICE_TARGET='nvidia-shield'
-```
+Delegation is capability-based and one level deep. The project policy denies
+every child first, then allows these read-only children:
 
-An environment or command-line serial does not override the role policy from
-the local file. `doctor`, `current`, and `package-info` are available for
-production or unclassified targets. Debug install, launch, force-stop, smoke,
-and synthetic-key operations are rejected unless the configured role is
-`test` and all four live identity properties match the local expectations.
+- `quick-explore` for exact, low-consequence lookup;
+- `explore` for architecture, multi-hop tracing, or completeness;
+- `scout` for bounded repository or external-source research;
+- `android-reviewer` and `tv-ux-reviewer` for independent review.
 
-The device file contains no TVHeadend credential values. For a designated test
-device only, it may name an ignored owner-only `credential_file`; the bounded
-`provision-test-credentials` command streams that file over stdin to a debug-only
-app-private importer after role and identity validation. Production and
-unclassified devices are always rejected. See
-`docs/test-device-credential-provisioning.md` for setup and cleanup.
+`general` requires user approval plus explicit scope and exclusive file
+ownership. Every child resolves to `task: deny`, preventing recursive spawning.
+Read-only children may run in parallel; writers, Gradle builds, device operations,
+Git mutations, signing, publishing, and release operations may not.
 
-Test-device screenshots use
-`./tools/device screenshot --confirm-safe-screen --name <descriptive-slug>` and
-default to an owner-only PNG under the ignored workspace path
-`captures/device/<12-char-HEAD>[-dirty]/`. The UTC timestamp and descriptive
-filename keep comparisons identifiable and previewable in OpenCode/OpenChamber;
-repository output paths outside `captures/device/` remain rejected. Never run
-that command while a credential or other secret-bearing screen is visible.
+TV UX evidence is assignment-allowlisted. The assignment must name every exact
+path it treats as current or declare a source-only UI-change scope. The UX
+reviewer denies Glob and may not use directory reads or searches to replace it.
+Without supplied current visual evidence it skips the visual pass and does not
+infer appearance or physical-TV behavior from source. Glob and Bash discovery
+are capability-denied. Read and Grep remain available for scoped source review,
+so their prohibition for evidence discovery is an explicit reviewer/command
+policy whose required wording—not dynamic path behavior—the harness checks.
+
+## Skills and routing
+
+The 17 retained Chris Banes skills are pinned to `chrisbanes/skills` tag
+`2026.7.21`; `skills-lock.json` records their paths and content hashes. They are
+default mechanics only when their concrete trigger matches. Repository-local
+skills provide the TV interaction, TVHeadend DVR, playback, device, and upstream
+constraints plus durable caveats for this product.
+
+`implement-issue`, `shepherd`, and `using-chrisbanes-skills` remain excluded
+because they can introduce uncontrolled worktree/Git orchestration.
+`kotlin-multiplatform-expect-actual` remains excluded because this product is
+Android-only. Review upstream changes before updating the imported set, use the
+Skills CLI only with `--agent opencode`, and review the full output. The dated AI
+skills audit records the original selection; agents do not load it as standing
+implementation context.
+
+Precedence is: product and safety specification, repository-local domain overlay,
+matching focused imported skill, then existing local style. Focused guidance is
+never permission for broad cleanup. OpenCode discovery, not only the lock file,
+is the runtime proof that a skill is available.
+
+## Documentation context
+
+OpenCode automatically loads only `AGENTS.md`. Agents use `docs/README.md` to
+select domain authority after understanding the task. Device targets, appliance
+plans, dated audits, evidence inventories, and archived handoffs are not startup
+context.
+
+`tools/check-doc-authority` requires every active root document to be classified,
+every archived document to be inventoried, lifecycle status on plans and dated
+references, and no handoff/session prompt in active `docs/`. It also rejects
+any exact dated or archived document hard-coded into an agent, command, or skill;
+this prohibition includes conditional static examples. Assignment arguments,
+which are not hard-coded harness context, remain the only way to introduce an
+exact historical path.
+`tools/check-ai-harness` invokes that gate and validates the effective OpenCode
+permissions and evidence-review boundary without requiring shared prose to be
+copied across prompts.
+
+## Device, native, and release boundaries
+
+Physical-device work must load `android-tv-device-testing`, read
+`docs/device-targets.md`, and use `./tools/device`. Reachable serials and any
+credential-file reference live only in ignored owner configuration. Production
+and unclassified targets remain read-only except for an explicitly approved
+production-signed update. Credential provisioning is limited to the designated
+test-device workflow in `docs/test-device-credential-provisioning.md`.
+
+The accepted Media3/HTSP path and source-matched native extension remain a
+regression boundary. Native integrity passing does not clear an unresolved
+corresponding-source or provenance warning; signed publication remains blocked
+until the release policy's gate passes. The dated Media3 assessment is read only
+for that named upgrade decision and remaining physical playback matrix.
 
 ## Validation
 
 ```bash
+./tools/check-doc-authority
 ./tools/check-ai-harness
 ./tools/verify
-./tools/device doctor
 ```
 
-OpenCode loads project configuration only at startup. After changing
-`opencode.json`, an agent, a skill, or a command, quit and restart the OpenCode
-session before evaluating the new harness.
+OpenCode loads config-time files only at startup. After changing config, an
+agent, skill, command, or plugin, quit and restart before evaluating the result.

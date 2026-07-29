@@ -6,9 +6,10 @@ description: Use for Media3, ExoPlayer, PlayerSession, PlayerView, HTSP data sou
 # Media3 And HTSP Playback Safety
 
 The accepted custom HTSP-to-Media3 path is a regression boundary. Read the
-playback decisions in `docs/appliance-mode-plan.md`, the relevant audit findings
-in `docs/codebase-audit-2026-07-23.md`, and `app/libs/native-dependencies.json`
-before changing it.
+relevant current playback decisions selected through `docs/README.md` and
+`app/libs/native-dependencies.json` before changing it. Read a dated audit or
+upgrade assessment only when the task names that specific finding or upgrade;
+revalidate it against current source.
 
 ## Scope the change before editing
 

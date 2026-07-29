@@ -1,267 +1,141 @@
 # TVHeadend Player Engineering Guide
 
 TVHeadend Player for TV is an independently developed, public GPLv3 Android TV
-client for TVHeadend servers. It descends from
-[`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) and preserves the
-upstream history, copyright, and a clean path for contributing generic fixes
-back to that project.
+client for TVHeadend. It descends from
+[`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) and preserves
+upstream history, attribution, and a clean path for generic contributions.
 
 ## Start here
 
 Before non-trivial work:
 
-1. Read `docs/appliance-mode-spec.md`.
-2. Read `docs/device-targets.md` before any build, install, ADB, or physical-TV
-   work.
-3. Read `docs/appliance-mode-plan.md` and identify the current task.
-4. Read `docs/codebase-audit-2026-07-23.md` for hardening work and
-   `docs/product-identity-plan.md` for identity work.
-5. Run `git status -sb` and inspect the recent log.
-6. Fetch configured remotes before changing code: `git fetch --all --prune`.
-7. Run `./tools/check-ai-harness` when changing agents, skills, commands, or
-   OpenCode configuration.
+1. Run `git status -sb` and inspect the recent log. Preserve every existing
+   worktree change and stop if another writer is active in the same checkout.
+2. Use `docs/README.md` to select only the documents relevant to the task. Do
+   not read the whole documentation tree.
+3. Use `android-tv` for application Kotlin, Compose, navigation, playback, EPG,
+   DVR, or appliance behavior. Use `repo-maintainer` for repository and harness
+   infrastructure.
+4. State assumptions before ambiguous or architectural work and implement one
+   small, independently verifiable slice.
+5. Fetch remotes before upstream synchronization, contribution preparation, or
+   commit-range comparison. A local documentation or tooling edit does not need
+   a fetch merely to begin.
 
-The standalone product repository is `bernhardberger/tvheadend-player`. A
-separately configured `upstream` remote may point at `Preclikos/tvhstream` for
-comparison and generic contributions; never push product or appliance work to
-that predecessor repository.
+Anything under `docs/archive/`, legacy screenshots, captures, review artifacts,
+and model/session notes is historical by default. Read it only when the user or
+assignment names its exact path. A recent timestamp or a filename containing
+`current` does not establish authority.
 
-## Current product boundary
+## Product and safety boundaries
 
-The public product is a remote-first Android TV live-TV client for TVHeadend.
-Appliance behavior is an optional profile and household integration layer, not
-the identity of every core type or workflow. Distribution is GitHub-first while
-remaining compatible with a later Google Play path.
+- The public product is a remote-first Android TV live-TV client. Appliance
+  behavior is an optional profile and household integration layer.
+- `docs/product-identity-plan.md` is the identity authority. Do not rename the
+  package, product, or public repository as incidental cleanup.
+- The accepted playback baseline is upstream TVHStream's Media3/HTSP path. Do
+  not alter the extractor, stream readers, renderer/decoder selection, native
+  extensions, or progressive/interlaced behavior as a side effect.
+- Focusable TV UI uses `androidx.tv:tv-material`. Mobile Material is limited to
+  primitives that the installed TV artifact does not provide.
+- Distributed combined binaries and corresponding source remain GPLv3. Preserve
+  predecessor attribution and do not imply this fork is wholly original.
+- Native decoder provenance remains a signed-release gate. Never reinterpret a
+  warning from `./tools/check-native-libs` as permission to publish.
 
-The accepted playback baseline is upstream TVHStream's Media3/HTSP path.
+## Task routing
 
-Current product identity:
+Read and load only the matching row:
 
-- Application ID: `at.bernhardberger.tvhplayer`
-- Public name: `TVHeadend Player for TV`
-- Launcher label: `TVHeadend Player`
-- Source namespace: `at.bernhardberger.tvhplayer`
-- Minimum SDK: 28
-- Target/compile SDK: 36
-- Java toolchain: 21
-- Household device ABI: `armeabi-v7a`
-- Current packaged ABIs: `armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`
+| Concern | Required authority and workflow |
+|---|---|
+| Compose UI, focus, remote keys, accessibility, TV surfaces | `docs/tv-design-spec.md`; `android-tv-compose-ux`; every focused Kotlin/Compose skill whose trigger matches |
+| Channels, EPG, recordings, DVR | `live-tv-dvr-conventions`; the relevant appliance specification/plan sections only when appliance behavior is involved |
+| Appliance launch, HOME, GUIDE, wake, Simple TV | `docs/appliance-mode-spec.md`, relevant sections of `docs/appliance-mode-plan.md` |
+| Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; `app/libs/native-dependencies.json`; dated assessments only when the task names that upgrade/finding |
+| Physical TV, ADB, install, screenshots, remote keys | `docs/device-targets.md`; `android-tv-device-testing` |
+| Product identity | `docs/product-identity-plan.md` |
+| Signing, publication, rollback | `docs/release-process.md` |
+| AI harness, agents, skills, commands, OpenCode config | `docs/ai-engineering-harness.md`; `customize-opencode` |
+| Upstream sync or contribution | `tvhstream-upstream-contribution` |
 
-Do not alter the HTSP extractor, Media3 playback path, or decoder behavior as a
-side effect of appliance-shell work. Progressive and interlaced playback are
-regression gates.
-
-Focusable TV UI uses `androidx.tv:tv-material`. Mobile Material remains only
-for primitives that TV Material 1.1.0 does not provide here, such as text
-fields, progress/dividers, and selected dialog primitives. Do not introduce a
-second competing theme or move focusable controls back to mobile Material.
-
-## TV UX and UI requirements
-
-- Google TV is the target product experience, while Android TV OS remains the
-  platform and API layer. Treat current official Google TV and Android TV design
-  guidance, Compose for TV guidance, and Material for TV component behavior as
-  the baseline for every UI change. Check current documentation and official
-  samples before inventing an interaction pattern or working around an
-  unfamiliar component.
-- Prefer official Material for TV components and semantics. Do not recreate a
-  component that the installed TV Material version provides, and do not use a
-  focusable mobile Material control when a TV equivalent exists.
-- Design for a ten-foot, 16:9, remote-only experience first. Every screen must
-  have deterministic initial focus, complete D-pad reachability, predictable
-  Back behavior, visible focus at viewing distance, and focus restoration after
-  navigation or recomposition. Avoid dead focus containers and scale effects
-  that clip inside lists or safe areas.
-- Treat key dispatch as stateful navigation. Consume an event when it reveals,
-  replaces, or moves focus to new UI so that the same press cannot activate the
-  newly focused control. Cover these transitions with policy or UI tests.
-- Respect TV-safe content margins, large readable type, concise labels, strong
-  focused/unfocused contrast, and stable layouts for long localized text.
-  Touch-only affordances, hover assumptions, dense mobile forms, and subtle
-  color-only state are not acceptable TV interactions.
-- For video-backed UI, preserve the live picture with deliberate scrims and
-  layered surfaces rather than uncontrolled transparency. Keep dense guides and
-  settings more opaque than browsing chrome, keep focused controls strongest,
-  and avoid blur or effects that add GPU cost without improving comprehension.
-- Preserve accessibility semantics, meaningful content descriptions, and clear
-  selected/focused state. Validate loading, empty, error, reconnecting, and
-  long-content states rather than only the happy path.
-- Compile focused Compose UI coverage where practical, then validate focus,
-  clipping, readability, and motion on the physical TV. ADB screenshots cannot
-  prove SurfaceView video visibility or human-perceived motion quality.
+Focused imported skills are implementation guidance, not authorization for
+opportunistic cleanup. Product and safety specifications take precedence, then
+repository-local domain overlays, then the focused skill, then local style.
 
 ## Engineering workflow
 
-- State assumptions before ambiguous or architectural work.
-- Keep `docs/appliance-mode-spec.md` and `docs/appliance-mode-plan.md` current
-  when requirements or architecture change.
-- Implement one small slice at a time.
-- For behavior changes, write a failing test first, then the minimum code to
-  make it pass.
-- Run the focused test while iterating and `./tools/verify` before committing.
-- Treat warnings from `./tools/check-native-libs` as signed-release blockers,
-  not as permission to invent missing provenance. The stricter
-  `./tools/check-native-libs --release` must pass before distributing a signed
-  build from this fork.
-- Review every diff for secrets, unrelated churn, upstreamability, and GPLv3
-  attribution before pushing.
-- OpenCode delegation is limited to one child level. `quick-explore` may be
-  spawned automatically only for exact, low-consequence repository lookups;
-  route architecture, multi-hop tracing, and completeness-sensitive work to
-  `explore`. `scout`, `android-reviewer`, and `tv-ux-reviewer` may be spawned
-  automatically for bounded read-only research or review. Child agents must not
-  delegate again. Spawning the writing-capable `general` agent requires user
-  approval and an explicit scope with exclusive file ownership.
-- Every `tv-ux-reviewer` assignment must name exact current-evidence paths or be
-  labeled source-only with a bounded UI-change scope. Repository screenshots and
-  handoffs are historical by default; never ask the reviewer to discover which
-  artifacts are current.
-- Read-only child sessions may run in parallel. Do not run parallel writers in
-  the same dirty worktree, or concurrent Gradle builds, device operations, Git
-  mutations, signing, publishing, or release operations.
+- Make the smallest correct change. Do not introduce an abstraction for one
+  use or combine unrelated cleanup with behavior work.
+- For behavior changes, write the failing test first. Keep pure policy outside
+  Android UI where practical so JVM tests can cover it.
+- Run focused checks while iterating and `./tools/verify` before considering a
+  slice complete. Run `./tools/check-ai-harness` after any harness/config change.
+- Review the final diff for secrets, unrelated churn, stale paths, GPLv3
+  attribution, and generic/product/appliance boundaries.
+- Do not commit, amend, push, publish, sign, install, or mutate a TV unless the
+  user explicitly requests that operation and its safety requirements pass.
+- Do not run parallel writers in one dirty worktree or concurrent Gradle builds,
+  device operations, Git mutations, signing, publishing, or releases.
+- On the shared LXC, keep Gradle state in disk-backed `$HOME/.gradle`, retain
+  `--no-daemon`, and stop rather than increasing memory if the host becomes
+  sluggish.
 
-Use the project-local skills when relevant:
+## TV interaction floor
 
-- `android-tv-device-testing` for ADB, TCL runtime checks, remote keys, playback,
-  HOME, standby/wake, and reboot validation.
-- `tvhstream-upstream-contribution` when syncing upstream or preparing a generic
-  change for an upstream pull request.
+TV UI is ten-foot, 16:9, D-pad-only first. Every changed surface needs a
+deterministic initial focus, complete directional reachability, predictable Back,
+visible focus, restoration, TV-safe spacing, readable long localized text,
+accessibility semantics, and explicit loading/empty/error/recovery behavior. A
+key that reveals, replaces, or moves focus to UI must be consumed so the same
+event cannot activate the new target. Use deliberate scrims over video.
 
-## Commands
+Automated tests and ADB screenshots do not prove SurfaceView visibility, focus
+feel, readability over motion, overscan, remote-repeat behavior, deinterlacing,
+or motion quality. Record those as physical-TV gates.
 
-```bash
-# Full local verification
-./tools/verify
+## Device, credential, and release safety
 
-# AI harness/config validation
-./tools/check-ai-harness
+- TVHeadend credentials and signing material belong only in ignored owner-only
+  files and Android app-private storage. Never place values in arguments,
+  environment variables, Git, Gradle properties, logs, screenshots, reports, or
+  generated output.
+- Before any physical-device operation, read `docs/device-targets.md`, load
+  `android-tv-device-testing`, and use `./tools/device`. Confirm the selected
+  role and all four live identity properties before mutation.
+- Production and unclassified devices are read-only except for an explicitly
+  approved production-signed update. Never substitute one TV for another based
+  only on a generic model string.
+- Do not use broad `logcat`, `dumpsys`, `uiautomator dump`, app-data export, or
+  credential-bearing UI automation. Credential provisioning is allowed only
+  through `./tools/device provision-test-credentials` on an exact designated
+  test target under `docs/test-device-credential-provisioning.md`.
+- Do not add debug exported components for secret injection or modify TVHeadend
+  accounts, tuners, OSCam, storage, stream profiles, TV packages, or network
+  infrastructure without separate explicit approval.
+- For a human-visible or time-window device check, ask one focused question and
+  wait. Do not infer a human-observation pass from counters or screenshots.
 
-# Device wrapper help
-./tools/device --help
+## Delegation and evidence
 
-# Native AAR integrity and 16 KB ELF alignment
-./tools/check-native-libs
+Delegation is limited to one child level. `quick-explore` is for exact,
+low-consequence lookups; use `explore` for architecture, multi-hop tracing, or
+completeness. `scout`, `android-reviewer`, and `tv-ux-reviewer` may perform
+bounded read-only research/review and cannot delegate. Spawning the writing-capable
+`general` agent requires user approval, an explicit scope, and exclusive file
+ownership.
 
-# Configure a local device without committing its address
-cp .tvhplayer-device.example.json .tvhplayer-device.json
-./tools/device doctor
-```
+Every `tv-ux-reviewer` assignment must either name each exact current-evidence
+path or be source-only with a bounded UI-change scope. Never ask the reviewer to
+discover which repository screenshots, captures, or handoffs are current.
 
-The Gradle portion of verification is:
+## Upstream and repository discipline
 
-```bash
-./gradlew testDebugUnitTest lintDebug compileDebugAndroidTestKotlin assembleDebug --no-daemon
-```
+Classify work as **generic**, **product-specific**, **appliance-specific**, or
+**mixed**. Keep generic foundations separable and use the upstream contribution
+skill before proposing them to `Preclikos/tvhstream`. Never push product or
+appliance work to the predecessor repository.
 
-On the shared LXC 106 engineering host, keep Gradle state on disk. Never set
-`GRADLE_USER_HOME` to `/tmp` or another tmpfs-backed path: Gradle downloads and
-caches there consume container memory and can make OpenCode, SSH, and other
-agent sessions unresponsive. Use the default disk-backed `$HOME/.gradle`, retain
-`--no-daemon` and the project JVM limit in `gradle.properties`, and do not run
-concurrent full Gradle builds while other agent sessions are active. If SSH or
-the wider LXC becomes sluggish during a build, stop the build rather than
-retrying it or increasing its memory use.
-
-## Code layout
-
-- `app/src/main/java/at/bernhardberger/tvhplayer/` — application source
-- `app/src/test/` — JVM unit tests for pure policy and navigation logic
-- `app/src/androidTest/` — device/instrumentation tests
-- `docs/` — appliance specification, plan, and engineering/operator notes
-- `tools/` — repeatable local build and device workflows
-- `.opencode/` — project agents, skills, commands, and OpenCode configuration
-- `app/libs/native-dependencies.json` — audited hashes/layout and explicit
-  release-provenance status for bundled native AARs
-
-Keep policy code independent from Android UI where practical so it can be
-covered by fast JVM tests. Match the existing Kotlin and Compose style; do not
-introduce abstractions for a single use.
-
-## Device and credential safety
-
-- TVHeadend credentials belong only in an ignored owner-only local secret file
-  while provisioning and in Android app-private storage afterward. Never put
-  their values in command arguments, Git, committed config, Gradle properties,
-  scripts, command history, issue text, console output, logs, screenshots, or
-  generated reports.
-- Never use `uiautomator dump`, broad `dumpsys`, unrestricted `logcat`, or app
-  data exports while a credential field or secret-bearing screen may be
-  present. Prefer bounded commands in `./tools/device`.
-- Do not add debug-only exported receivers, activities, services, or content
-  providers for credential injection.
-- Automated credential provisioning is permitted only through
-  `./tools/device provision-test-credentials`, for a local device configured
-  with `role: "test"` whose live manufacturer, model, device, and product exactly
-  match the local expectations. Production and unclassified devices remain
-  prohibited.
-- Provisioning must use the debug-only app-private staging mechanism and local
-  secret file described in `docs/test-device-credential-provisioning.md`. Do
-  not replace it with synthetic keyboard input, raw ADB arguments, UI automation,
-  or an exported Android component.
-- Never commit signing keys, keystores, key passwords, service-account JSON, or
-  Firebase configuration.
-- Runtime device addresses belong in ignored `.tvhplayer-device.json` or the
-  `TVHPLAYER_ADB_SERIAL` environment variable.
-- The dining-room G10 is the household acceptance target and may use local role
-  `test`. The indexed NVIDIA Shield may also use role `test` as a temporary
-  deployment target. The bedroom G08 is handed-over production and must use
-  role `production`. The exact identities and lifecycle rules are in
-  `docs/device-targets.md`.
-- `tools/device` rejects install, launch, force-stop, smoke, screenshot,
-  synthetic key, and credential-provisioning actions unless the local role is
-  `test` and all four expected identity properties match. Capture screenshots
-  only after confirming that no credential or other secret-bearing screen is
-  visible.
-- Do not modify TVHeadend server accounts, tuners, OSCam, recording storage,
-  stream profiles, TCL/Google packages, or network infrastructure from this
-  repository unless the user explicitly approves that separate operation.
-- Keep Google Basic TV, Headent, and the upstream-package diagnostic client as
-  rollback paths until appliance validation is complete.
-
-For physical tests that require the user to press a remote button, observe the
-TV, or act within a time window, ask one focused question and wait for the
-result. Do not infer a human-visible motion-quality pass from ADB counters.
-
-## Appliance behavior invariants
-
-- Persist only a channel that was actually sent to the player; UI focus alone
-  must not change the last-played channel.
-- `CH+` and `CH-` wrap through the current ordered channel list.
-- Appliance launches are one-shot requests consumed only after channel data is
-  available.
-- Back from playback returns to the normal UI and must not trigger an autoplay
-  loop.
-- The accessibility service, when implemented, consumes only GUIDE and must not
-  inspect window content or become general UI automation.
-- Google/TCL packages remain installed and reversible throughout validation.
-
-## Upstreamability and licensing
-
-Classify each change before implementation:
-
-- **Generic:** useful to the predecessor TVHStream project without TVHeadend
-  Player assumptions. Keep it separable and suitable for an upstream pull
-  request.
-- **Product-specific:** TVHeadend Player identity, public UX, release policy, or
-  repository metadata. Keep it in this repository.
-- **Appliance-specific:** HOME behavior, TCL GUIDE handling, household defaults,
-  device deployment, or signing. Keep it in this repository.
-- **Mixed:** split the generic foundation from the appliance integration before
-  committing.
-
-Do not rewrite upstream attribution or imply that this fork is wholly original.
-Distributed combined binaries and corresponding source remain GPLv3.
-Bundled Media3 decoder AARs currently have incomplete provenance and notices;
-do not publish a signed binary until the native release gate and license/source
-obligations are satisfied.
-
-## Git discipline
-
-- Direct local development on `main` is allowed during rapid iteration. Use a
-  branch for upstream contributions, parallel work, or risky experiments.
-- Keep commits small, buildable, and independently reviewable.
-- Do not force-push, rewrite published history, or amend commits unless the user
-  explicitly asks.
-- Before committing, inspect `git status`, `git diff`, and recent history.
-- Before an upstream pull request, compare the proposed range with the configured
-  `Preclikos/tvhstream` remote and remove product/appliance assumptions.
+Direct local work on `main` is allowed, but use a branch for upstream work,
+parallel development, or risky experiments. Never force-push or rewrite
+published history.

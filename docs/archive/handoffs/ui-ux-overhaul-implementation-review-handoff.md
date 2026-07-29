@@ -1,5 +1,10 @@
 # UX/UI overhaul implementation review handoff
 
+> **Status: historical review record.** This file is tied to the audited branch
+> and revision below. Current authority is `docs/tv-design-spec.md`, current
+> source, and current tests; old evidence is not current unless an assignment
+> names its exact path.
+
 Date: 2026-07-26
 
 ## Purpose
@@ -30,7 +35,7 @@ test was added.
 Authoritative requirements remain:
 
 - `artifacts/ux-screen-inventory/review/2026-07-26_12-05-40/claude-opus-5-ux-review.md`
-- `docs/claude-opus-5-ux-review-implementation-handoff.md`
+- `docs/archive/handoffs/claude-opus-5-ux-review-implementation-handoff.md`
 - `docs/appliance-mode-spec.md`
 
 ## Confirmed engineering findings
@@ -182,7 +187,7 @@ The reviewer must read:
 1. `AGENTS.md`
 2. `docs/device-targets.md`
 3. `docs/appliance-mode-spec.md`
-4. `docs/claude-opus-5-ux-review-implementation-handoff.md`
+4. `docs/archive/handoffs/claude-opus-5-ux-review-implementation-handoff.md`
 5. The authoritative Claude Opus 5 review named above
 6. This handoff
 7. The UI source needed to confirm visual or interaction mechanisms after the
@@ -335,7 +340,7 @@ push during the independent pass.
 Switch to the project tv-ux-reviewer agent and perform a read-only, screenshot-
 first independent UX/UI review of the completed overhaul at 25400e7.
 
-Read docs/ui-ux-overhaul-implementation-review-handoff.md first, then all source
+Read docs/archive/handoffs/ui-ux-overhaul-implementation-review-handoff.md first, then all source
 requirements and evidence it names. Treat E1-E9 as confirmed engineering defects,
 but do not limit the review to them. The main purpose is a fresh visual and
 interaction-design assessment of the resulting TV product: information

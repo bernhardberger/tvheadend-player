@@ -1,6 +1,8 @@
 # AI skills audit
 
 Date: 2026-07-28
+Status: dated audit record. Current agents and local skills carry the durable
+routing and caveats; this file is not mandatory implementation reading.
 
 ## Conclusion
 

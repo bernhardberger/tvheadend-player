@@ -10,8 +10,8 @@ dumps whenever it supports the required operation.
 
 ## Before touching the device
 
-1. Read `AGENTS.md` and the runtime criteria in
-   `docs/appliance-mode-spec.md`.
+1. Read `AGENTS.md` and `docs/device-targets.md`. Read runtime criteria from
+   `docs/appliance-mode-spec.md` only for an appliance behavior check.
 2. Confirm the source tree is clean or identify the exact uncommitted slice.
 3. Run the relevant JVM test, then `./tools/verify` before installing.
 4. Configure the ADB serial through ignored `.tvhplayer-device.json`,
@@ -19,8 +19,8 @@ dumps whenever it supports the required operation.
    address as a required default.
 5. Confirm the package under test. The appliance default is
    `at.bernhardberger.tvhplayer`; rollback clients use different package IDs.
-6. Run `./tools/device doctor` and confirm the local role against
-   `docs/device-targets.md`. Only a designated development target may be `test`,
+6. Run `./tools/device doctor` and confirm the local role. Only a designated
+   development target may be `test`,
    and mutations require matching manufacturer, model, device, and product.
 
 ## Safe sequence

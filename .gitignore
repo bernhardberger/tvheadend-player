@@ -69,3 +69,9 @@ __pycache__/
 
 # Local AI-generated UX review artifacts
 /artifacts/ux-screen-inventory/review/
+
+# Local third-party UI inspiration screenshots and research notes
+/artifacts/ui-inspiration/
+
+# Local AI planning, handoff, and session records are never current authority
+/artifacts/ai-session-notes/

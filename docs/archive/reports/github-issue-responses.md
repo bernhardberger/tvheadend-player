@@ -1,5 +1,8 @@
 # Draft GitHub issue responses (not yet posted)
 
+> **Status: historical unposted draft.** Verify current issue and source state
+> before reusing any response.
+
 Fixes are in commit `f93c061` on `main` (ships in the next build).
 
 ---

@@ -1,6 +1,7 @@
 # TV design system audit
 
 Date: 2026-07-27
+Status: dated historical rationale. `docs/tv-design-spec.md` is authoritative.
 Audited head: `6fb8d4d` (`Prepare 0.1.3 release`)
 Worktree at audit: `docs/appliance-mode-plan.md`, `tools/device`,
 `tools/tests/test_device.py` modified and unrelated to this work.
@@ -10,8 +11,9 @@ Worktree at audit: `docs/appliance-mode-plan.md`, `tools/device`,
 This audit answers a product-owner report that the app "doesn't yet feel 100%
 native to Material on TV" and that cards, colour, focus navigation, and list
 spacing are inconsistent. It is a **design-system** audit, not a repeat of the
-UX review programme recorded in `docs/claude-opus-5-ux-review-implementation-handoff.md`
-and `docs/ui-ux-overhaul-implementation-review-handoff.md`. Those catalogue
+UX review programme recorded in
+`docs/archive/handoffs/claude-opus-5-ux-review-implementation-handoff.md`
+and `docs/archive/handoffs/ui-ux-overhaul-implementation-review-handoff.md`. Those catalogue
 missing behaviour on individual screens. This one asks why the same defects keep
 being reintroduced.
 

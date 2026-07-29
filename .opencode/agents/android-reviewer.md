@@ -15,13 +15,15 @@ permission:
     "./tools/verify*": allow
 ---
 
-Review TVHeadend Player without editing it. Read `AGENTS.md`, the appliance
-specification, the implementation plan, and
-`docs/ai-skills-audit-2026-07-28.md`, then inspect the complete proposed diff and
-relevant tests. Load every reviewed Chris Banes skill matching a changed concern
-and use it as the default implementation review guidance. Apply the local TV UX,
-live TV/DVR, or playback-safety skill as the product overlay when that domain is
-present. Product rules and the audit's explicit caveats take precedence.
+Review without editing. Read `AGENTS.md`, inspect the complete proposed diff,
+and use `docs/README.md` to select authority only for domains the diff actually
+touches. Do not make appliance plans, dated audits, or historical handoffs
+universal review prerequisites.
+
+Load every focused imported skill matching a changed concern and the local TV
+UX, live TV/DVR, playback, device, or upstream overlay when that domain is
+present. Specifications and local safety overlays take precedence over focused
+implementation guidance.
 
 Prioritize findings in this order:
 
@@ -39,26 +41,11 @@ Prioritize findings in this order:
 7. GPLv3 attribution and generic-versus-appliance commit boundaries.
 8. Unnecessary complexity, unrelated churn, and maintenance risk.
 
-## TV UX review gates
-
-For every UI diff, explicitly check:
-
-- The implementation follows current Google TV and Android TV design guidance,
-  Compose for TV, and Material for TV patterns, and uses official TV focusable
-  components where available. Do not treat Google TV as a separate app SDK.
-- Initial focus, directional reachability, Back, focus restoration, and
-  same-event propagation are deterministic for remote-only operation.
-- Focus indication remains visible at viewing distance without scaling or
-  clipping rows, drawers, overlays, or safe-area content.
-- Typography, spacing, contrast, localized long labels, accessibility semantics,
-  and loading/empty/error/recovery states work as a ten-foot interface.
-- Video-backed screens use deliberate scrims and layered opacity without making
-  motion distracting or text illegible; settings and dense EPG surfaces remain
-  calmer than browsing chrome.
-- Automated evidence is not overstated: physical-TV observation is required for
-  focus feel, SurfaceView visibility, overscan, readability over motion, and
-  progressive/interlaced motion quality.
+For UI diffs, apply `docs/tv-design-spec.md`, `android-tv-compose-ux`, and every
+matching focused Compose skill. Check the interaction floor in `AGENTS.md`, but
+do not infer focus feel, SurfaceView visibility, overscan, readability over
+motion, or motion quality from source, compilation, or screenshots.
 
 Report concrete findings with file and line references. Do not invent findings
-to fill a template. If no blocking issue exists, say so and list any remaining
-runtime tests that still require the TCL or a human observer.
+to fill a template. If no blocking issue exists, say so and list only the
+remaining runtime or physical-TV gates.

@@ -5,10 +5,11 @@ description: Use for TVHeadend channels, channel scopes, EPG timelines, programm
 
 # Live TV And DVR Conventions
 
-Read the current behavior in `docs/appliance-mode-spec.md` and architecture
-decisions in `docs/appliance-mode-plan.md` before changing channel, EPG, or DVR
-workflows. Those documents are authoritative; this skill supplies a safe method,
-not a second copy of the product requirements.
+Use `docs/README.md` to select the current plan for the requested channel, EPG,
+or DVR work. Read the relevant behavior in `docs/appliance-mode-spec.md` and the
+matching sections of `docs/appliance-mode-plan.md` only when the change affects
+appliance behavior or a contract documented there. This skill supplies a safe
+method, not a second copy of product requirements.
 
 ## Preserve domain boundaries
 
@@ -56,4 +57,5 @@ Load `kotlin-flow-state-event-modeling` and
 `kotlin-coroutines-structured-concurrency` when changing repository streams or
 command lifecycles. Load `compose-state-holder-ui-split`,
 `compose-state-hoisting`, and `compose-side-effects` when changing screen state
-or event collection, subject to `docs/ai-skills-audit-2026-07-28.md`.
+or event collection. Preserve explicit lifecycle owners, treat Channel delivery
+as non-durable, and avoid broad architecture churn.

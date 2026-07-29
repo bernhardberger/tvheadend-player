@@ -21,7 +21,11 @@ SKILLS_LOCK_PATH = ROOT / "skills-lock.json"
 REQUIRED_FILES = (
     "AGENTS.md",
     "NOTICE.md",
+    "docs/README.md",
+    "docs/archive/README.md",
     "docs/device-targets.md",
+    "artifacts/README.md",
+    "screenshots/README.md",
     ".opencode/opencode.json",
     ".opencode/agents/android-tv.md",
     ".opencode/agents/repo-maintainer.md",
@@ -35,13 +39,12 @@ REQUIRED_FILES = (
     ".opencode/skills/media3-htsp-playback-safety/SKILL.md",
     ".opencode/skills/tvhstream-upstream-contribution/SKILL.md",
     ".opencode/commands/android-review.md",
+    ".opencode/commands/ai-model-tier.md",
     ".opencode/commands/verify.md",
     ".opencode/commands/device-check.md",
     ".opencode/commands/tv-ux-review.md",
     ".opencode/commands/upstream-review.md",
     "docs/ai-engineering-harness.md",
-    "docs/ai-skills-audit-2026-07-28.md",
-    "docs/media3-upgrade-assessment-2026-07-28.md",
     "docs/test-device-credential-provisioning.md",
     "app/src/debug/AndroidManifest.xml",
     "app/src/debug/java/at/bernhardberger/tvhplayer/DebugApp.kt",
@@ -49,34 +52,20 @@ REQUIRED_FILES = (
     "app/libs/licenses/media3-APACHE-2.0.txt",
     ".github/workflows/build.yml",
     "tools/verify",
+    "tools/ai-model-tier",
+    "tools/check-doc-authority",
     "tools/device",
     "tools/check-native-libs",
     "tools/tests/test_device.py",
+    "tools/tests/test_ai_model_tier.py",
+    "tools/tests/test_check_doc_authority.py",
     "skills-lock.json",
 )
 SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SKILL_HASH = re.compile(r"^[0-9a-f]{64}$")
 PRIVATE_KEY = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
 PRIVATE_LAN_IP = re.compile(r"\b(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]))(?:\.\d{1,3}){2}\b")
-REQUIRED_TV_UX_SECTIONS = {
-    "AGENTS.md": "## TV UX and UI requirements",
-    ".opencode/agents/android-tv.md": "## TV UX implementation checklist",
-    ".opencode/agents/android-reviewer.md": "## TV UX review gates",
-    ".opencode/agents/tv-ux-reviewer.md": "## UX review method",
-}
 REQUIRED_TV_UX_EVIDENCE_RULES = {
-    "AGENTS.md": (
-        "Every `tv-ux-reviewer` assignment must name exact current-evidence paths",
-        "Repository screenshots and handoffs are historical by default",
-    ),
-    ".opencode/agents/android-tv.md": (
-        "When delegating to `tv-ux-reviewer`, name every current evidence path explicitly",
-        "Never ask the reviewer to discover which repository screenshots or handoffs are current",
-    ),
-    ".opencode/agents/repo-maintainer.md": (
-        "When delegating to `tv-ux-reviewer`, name every current evidence path explicitly",
-        "Never ask the reviewer to discover which repository screenshots or handoffs are current",
-    ),
     ".opencode/agents/tv-ux-reviewer.md": (
         "Never glob, list, or search the repository for candidate screenshots, images",
         "Treat every repository screenshot, image, and handoff as historical unless the",
@@ -265,13 +254,54 @@ def main() -> int:
         errors.append("project session sharing must remain disabled")
     if config.get("subagent_depth") != 1:
         errors.append("subagent depth must be exactly one")
-    if config.get("instructions") != ["AGENTS.md", "docs/device-targets.md"]:
-        errors.append("project instructions must load AGENTS.md and docs/device-targets.md")
+    if config.get("instructions") != ["AGENTS.md"]:
+        errors.append("project instructions must load only AGENTS.md")
     task_policy = config.get("permission", {}).get("task")
     if task_policy != EXPECTED_TASK_POLICY:
         errors.append("project Task policy must exactly match the bounded child allowlist")
     elif list(task_policy)[0] != "*":
         errors.append("project Task wildcard denial must precede named exceptions")
+
+    model_tier_tool = ROOT / "tools/ai-model-tier"
+    if model_tier_tool.is_file():
+        try:
+            model_tier_result = subprocess.run(
+                [str(model_tier_tool), "status"],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            errors.append(f"cannot inspect child-agent model tier: {exc}")
+        else:
+            if model_tier_result.returncode != 0:
+                detail = model_tier_result.stderr.strip() or model_tier_result.stdout.strip()
+                errors.append(f"invalid child-agent model tier: {detail}")
+
+    doc_authority_tool = ROOT / "tools/check-doc-authority"
+    if doc_authority_tool.is_file():
+        try:
+            doc_authority_result = subprocess.run(
+                [str(doc_authority_tool)],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            errors.append(f"cannot validate documentation authority: {exc}")
+        else:
+            if doc_authority_result.returncode != 0:
+                detail = (
+                    doc_authority_result.stderr.strip()
+                    or doc_authority_result.stdout.strip()
+                )
+                errors.append(f"invalid documentation authority: {detail}")
 
     for path in sorted((ROOT / ".opencode/agents").glob("*.md")):
         metadata = frontmatter(path)
@@ -302,11 +332,13 @@ def main() -> int:
         errors.append(
             ".opencode/agents/tv-ux-reviewer.md: must deny Glob-based evidence discovery"
         )
-
-    for relative, heading in REQUIRED_TV_UX_SECTIONS.items():
-        text = (ROOT / relative).read_text(encoding="utf-8")
-        if heading not in text:
-            errors.append(f"{relative}: missing required section {heading!r}")
+    if (
+        tv_ux_reviewer_path.is_file()
+        and frontmatter_permission(tv_ux_reviewer_path, "bash") != "deny"
+    ):
+        errors.append(
+            ".opencode/agents/tv-ux-reviewer.md: must deny Bash-based evidence discovery"
+        )
 
     for relative, snippets in REQUIRED_TV_UX_EVIDENCE_RULES.items():
         text = (ROOT / relative).read_text(encoding="utf-8")
@@ -326,6 +358,9 @@ def main() -> int:
         path = ROOT / ".opencode/commands" / f"{name}.md"
         if path.is_file() and frontmatter(path).get("subtask") != "true":
             errors.append(f"{path.relative_to(ROOT)}: must declare subtask: true")
+    tv_ux_command = ROOT / ".opencode/commands/tv-ux-review.md"
+    if tv_ux_command.is_file() and frontmatter(tv_ux_command).get("agent") != "tv-ux-reviewer":
+        errors.append(".opencode/commands/tv-ux-review.md: must use tv-ux-reviewer")
 
     seen_skills: set[str] = set()
     imported_skills: set[str] = set()
@@ -392,6 +427,8 @@ def main() -> int:
 
     harness_paths = [
         ROOT / "AGENTS.md",
+        ROOT / "docs/README.md",
+        ROOT / "docs/archive/README.md",
         ROOT / "docs/ai-engineering-harness.md",
         ROOT / "docs/ai-skills-audit-2026-07-28.md",
         ROOT / "docs/test-device-credential-provisioning.md",
@@ -422,18 +459,46 @@ def main() -> int:
     except (OSError, json.JSONDecodeError) as exc:
         errors.append(f"invalid device example JSON: {exc}")
         device_example = {}
-    if device_example.get("role") != "production":
-        errors.append("device example must default to the safe production role")
-    if device_example.get("credential_file") != ".tvhplayer-credentials.json":
-        errors.append("device example must name the ignored local credential file")
-    for key in (
-        "expected_manufacturer",
-        "expected_model",
-        "expected_device",
-        "expected_product",
-    ):
-        if not device_example.get(key):
-            errors.append(f"device example must include {key}")
+    if device_example.get("active_target") != "g10":
+        errors.append("device example active_target must be g10")
+    device_targets = device_example.get("targets", {})
+    if not isinstance(device_targets, dict):
+        errors.append("device example targets must be an object")
+        device_targets = {}
+    expected_roles = {
+        "g10": "test",
+        "nvidia-shield": "test",
+        "g08": "production",
+    }
+    if set(device_targets) != set(expected_roles):
+        errors.append("device example must contain exactly g10, nvidia-shield, and g08")
+    for name, expected_role in expected_roles.items():
+        target = device_targets.get(name, {})
+        if not isinstance(target, dict):
+            errors.append(f"device example target {name} must be an object")
+            continue
+        if target.get("role") != expected_role:
+            errors.append(f"device example target {name} must use role {expected_role}")
+        for key in (
+            "serial",
+            "package",
+            "expected_manufacturer",
+            "expected_model",
+            "expected_device",
+            "expected_product",
+        ):
+            if not target.get(key):
+                errors.append(f"device example target {name} must include {key}")
+        if expected_role == "test" and target.get("credential_file") != (
+            ".tvhplayer-credentials.json"
+        ):
+            errors.append(
+                f"device example test target {name} must name the ignored credential file"
+            )
+        if expected_role == "production" and "credential_file" in target:
+            errors.append(
+                f"device example production target {name} must not name a credential file"
+            )
 
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     if ".tvhplayer-credentials.json" not in gitignore.splitlines():
@@ -566,6 +631,12 @@ def main() -> int:
                 errors.append(
                     "resolved tv-ux-reviewer must deny Glob-based evidence discovery"
                 )
+            if tv_ux_reviewer:
+                tools = tv_ux_reviewer.get("tools", {})
+                if not isinstance(tools, dict) or tools.get("bash") is not False:
+                    errors.append(
+                        "resolved tv-ux-reviewer must deny Bash-based evidence discovery"
+                    )
 
             discovered, skill_error = run_json_command(
                 [opencode, "debug", "skill", "--pure"], environment
@@ -597,8 +668,8 @@ def main() -> int:
     if errors:
         return 1
     print(
-        "AI harness passed: config, agents, skills, commands, safety scan, "
-        "and resolved OpenCode permissions/discovery"
+        "AI harness passed: config, agents, skills, commands, documentation "
+        "authority, safety scan, and resolved OpenCode permissions/discovery"
     )
     return 0
 

@@ -55,8 +55,8 @@ physical-device conclusion.
 
 When source inspection is necessary, load `android-tv-compose-ux` as the product
 overlay. Also load `compose-focus-navigation` for focus or key code and
-`compose-ui-testing-patterns` when evaluating interaction tests; apply the
-audited caveats in `docs/ai-skills-audit-2026-07-28.md`.
+`compose-ui-testing-patterns` when evaluating interaction tests. Apply the
+repository-local overlay's caveats before generic focused guidance.
 
 For each relevant surface, review:
 
