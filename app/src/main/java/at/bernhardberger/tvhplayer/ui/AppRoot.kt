@@ -51,7 +51,7 @@ import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
-import at.bernhardberger.tvhplayer.core.shouldUseWarmVideoSurface
+import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
@@ -197,8 +197,7 @@ fun AppRoot(
         recordingPlayerRoute = Routes.RECORDING_PLAYER,
     )
 
-    val isPlayer = currentRoute?.startsWith(Routes.PLAYER) == true ||
-        currentRoute?.startsWith(Routes.RECORDING_PLAYER) == true
+    val isPlayer = topRoute == Routes.PLAYER || topRoute == Routes.RECORDING_PLAYER
 
     // One-shot warm-player return: armed when a service/recording becomes active
     // or the user navigates deliberately while playback remains warm; consumed
@@ -324,6 +323,30 @@ fun AppRoot(
                 NavHost(
                     navController = nav,
                     startDestination = Routes.CHANNELS,
+                    enterTransition = {
+                        playerShellEnterTransition(
+                            initialRoute = initialState.destination.route,
+                            targetRoute = targetState.destination.route,
+                        )
+                    },
+                    exitTransition = {
+                        playerShellExitTransition(
+                            initialRoute = initialState.destination.route,
+                            targetRoute = targetState.destination.route,
+                        )
+                    },
+                    popEnterTransition = {
+                        playerShellEnterTransition(
+                            initialRoute = initialState.destination.route,
+                            targetRoute = targetState.destination.route,
+                        )
+                    },
+                    popExitTransition = {
+                        playerShellExitTransition(
+                            initialRoute = initialState.destination.route,
+                            targetRoute = targetState.destination.route,
+                        )
+                    },
                 ) {
                     composable(Routes.CHANNELS) {
                         ContentContainer {
@@ -511,7 +534,6 @@ fun AppRoot(
                             channelName = channelName,
                             serviceId = serviceId,
                             simpleTvProfile = capabilityProfile,
-                            debugVideoBackdropVisible = debugVideoBackdropVisible,
                             onUnlock = { nav.navigate(Routes.UNLOCK) },
                             onClose = {
                                 if (!simpleTvActive) nav.popBackStack()
@@ -541,7 +563,6 @@ fun AppRoot(
                                 recordingId = recordingId,
                                 playbackIntent = intent,
                                 simpleTvProfile = capabilityProfile,
-                                debugVideoBackdropVisible = debugVideoBackdropVisible,
                                 onUnlock = { nav.navigate(Routes.UNLOCK) },
                                 onClose = { nav.popBackStack() },
                             )
@@ -594,7 +615,7 @@ fun AppRoot(
             }
             .background(androidx.tv.material3.MaterialTheme.colorScheme.background)
     ) {
-        if (shouldUseWarmVideoSurface(
+        if (shouldMountPersistentPlayerSurface(
                 hasActivePlayback = playbackState !is PlaybackSessionState.Idle,
                 isPlayerRoute = isPlayer,
             )

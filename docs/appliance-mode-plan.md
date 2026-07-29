@@ -160,6 +160,9 @@
 - Mount the Media3 `PlayerView` at the app root so operator screens retain live
   video as well as audio under a dark navigation scrim. Player controls remain a
   player-route concern; navigation does not detach or recreate the stream surface.
+  Implemented on 2026-07-29: the no-benefit route-owned diagnostic was removed,
+  one activity-composition-owned view now survives warm player/shell transitions,
+  and only player/shell destination edges bypass the default navigation fade.
 
 ## Hardening checkpoint: 2026-07-24
 

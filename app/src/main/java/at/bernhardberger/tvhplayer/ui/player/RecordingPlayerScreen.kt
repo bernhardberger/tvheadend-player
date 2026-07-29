@@ -111,7 +111,6 @@ fun RecordingPlayerScreen(
     session: PlayerSession = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
-    debugVideoBackdropVisible: Boolean = false,
     onUnlock: () -> Unit = {},
     onClose: () -> Unit,
 ) {
@@ -427,13 +426,6 @@ fun RecordingPlayerScreen(
                 )
             },
     ) {
-        PlayerVideoSurface(
-            player = player,
-            aspectRatio = aspectRatio,
-            debugVideoBackdropVisible = debugVideoBackdropVisible,
-            modifier = Modifier.fillMaxSize(),
-        )
-
         if (availability is RecordingPlaybackAvailability.Ready) {
             AnimatedVisibility(
                 visible = controlsVisible,

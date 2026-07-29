@@ -152,7 +152,6 @@ fun VideoPlayerScreen(
     channelName: String,
     serviceId: Int,
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
-    debugVideoBackdropVisible: Boolean = false,
     onUnlock: () -> Unit = {},
     onClose: () -> Unit
 ) {
@@ -703,13 +702,6 @@ fun VideoPlayerScreen(
                 false
             }
     ) {
-        PlayerVideoSurface(
-            player = player,
-            aspectRatio = aspectRatio,
-            debugVideoBackdropVisible = debugVideoBackdropVisible,
-            modifier = Modifier.fillMaxSize(),
-        )
-
         AnimatedVisibility(
             visible = showDrawer,
             enter = slideInHorizontally(tween(180)) { -it },

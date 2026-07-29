@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-fun shouldUseWarmVideoSurface(
+fun shouldMountPersistentPlayerSurface(
     hasActivePlayback: Boolean,
     isPlayerRoute: Boolean,
-): Boolean = hasActivePlayback && !isPlayerRoute
+): Boolean = hasActivePlayback || isPlayerRoute

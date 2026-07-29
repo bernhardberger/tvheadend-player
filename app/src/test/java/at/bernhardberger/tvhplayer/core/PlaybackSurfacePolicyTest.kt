@@ -6,9 +6,50 @@ import org.junit.Test
 
 class PlaybackSurfacePolicyTest {
     @Test
-    fun `warm root surface is used only behind browse UI`() {
-        assertFalse(shouldUseWarmVideoSurface(hasActivePlayback = false, isPlayerRoute = false))
-        assertFalse(shouldUseWarmVideoSurface(hasActivePlayback = true, isPlayerRoute = true))
-        assertTrue(shouldUseWarmVideoSurface(hasActivePlayback = true, isPlayerRoute = false))
+    fun `shell mounts the persistent surface only for an active session`() {
+        assertFalse(
+            shouldMountPersistentPlayerSurface(
+                hasActivePlayback = false,
+                isPlayerRoute = false,
+            )
+        )
+        assertTrue(
+            shouldMountPersistentPlayerSurface(
+                hasActivePlayback = true,
+                isPlayerRoute = false,
+            )
+        )
+    }
+
+    @Test
+    fun `live player route mounts the persistent surface before and during playback`() {
+        assertTrue(
+            shouldMountPersistentPlayerSurface(
+                hasActivePlayback = false,
+                isPlayerRoute = true,
+            )
+        )
+        assertTrue(
+            shouldMountPersistentPlayerSurface(
+                hasActivePlayback = true,
+                isPlayerRoute = true,
+            )
+        )
+    }
+
+    @Test
+    fun `recording player route mounts the persistent surface before and during playback`() {
+        assertTrue(
+            shouldMountPersistentPlayerSurface(
+                hasActivePlayback = false,
+                isPlayerRoute = true,
+            )
+        )
+        assertTrue(
+            shouldMountPersistentPlayerSurface(
+                hasActivePlayback = true,
+                isPlayerRoute = true,
+            )
+        )
     }
 }
