@@ -10,7 +10,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,10 +22,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.EOFException
 import java.io.InputStream
+import java.io.IOException
 import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -36,6 +37,14 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
 import kotlin.text.Charsets.UTF_8
+
+internal const val DVR_PLAY_COUNT_KEEP: Int = Int.MAX_VALUE - 1
+
+class HtspRequestTimeoutException(
+    val requestMethod: String,
+    val timeoutMs: Long,
+    cause: Throwable? = null,
+) : IOException("HTSP request timed out", cause)
 
 sealed class ConnectionState {
     data object Disconnected : ConnectionState()
@@ -58,6 +67,8 @@ open class HtspService(
 ) {
     private val _state = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val state: StateFlow<ConnectionState> = _state
+
+    internal open fun currentConnectionState(): ConnectionState = state.value
 
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
@@ -280,18 +291,20 @@ open class HtspService(
         }
 
         return try {
-            withTimeout(timeoutMs) { def.await() }
-        } catch (t: TimeoutCancellationException) {
-            pending.remove(s)
+            val response = withTimeoutOrNull(timeoutMs) { def.await() }
+            if (response == null) {
+                pending.remove(s)
 
-            if (disconnectOnTimeout) {
-                closeSocket(requestSocket)
-                throw SocketTimeoutException(
-                    "HTSP request '$method' timed out after ${timeoutMs}ms"
-                ).apply { initCause(t) }
+                if (disconnectOnTimeout) {
+                    closeSocket(requestSocket)
+                    throw SocketTimeoutException(
+                        "HTSP request '$method' timed out after ${timeoutMs}ms"
+                    )
+                }
+
+                throw HtspRequestTimeoutException(method, timeoutMs)
             }
-
-            throw t
+            response
         } catch (t: Throwable) {
             pending.remove(s)
             throw t
@@ -344,6 +357,28 @@ open class HtspService(
             timeoutMs = timeoutMs,
             flush = true,
             disconnectOnTimeout = false
+        )
+    }
+
+    suspend fun fileCloseRecording(
+        id: Int,
+        htspVersion: Int?,
+        timeoutMs: Long = 5_000,
+    ) {
+        val fields = if (htspVersion != null && htspVersion >= 27) {
+            mapOf(
+                "id" to id,
+                "playcount" to DVR_PLAY_COUNT_KEEP,
+            )
+        } else {
+            mapOf("id" to id)
+        }
+        request(
+            method = "fileClose",
+            fields = fields,
+            timeoutMs = timeoutMs,
+            flush = true,
+            disconnectOnTimeout = false,
         )
     }
 

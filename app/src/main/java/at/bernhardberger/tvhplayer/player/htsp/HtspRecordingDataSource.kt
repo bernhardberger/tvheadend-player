@@ -8,10 +8,57 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import at.bernhardberger.tvhplayer.core.recordingReadLength
+import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.player.PlaybackReadMetrics
 import java.io.Closeable
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.runBlocking
+
+internal data class RecordingFileHandle(
+    val id: Int,
+    val htspVersion: Int?,
+)
+
+internal class RecordingFileSession(
+    private val htsp: HtspService,
+    private val path: String,
+    private val htspVersion: () -> Int? = {
+        (htsp.state.value as? ConnectionState.Connected)?.htspVersion
+    },
+) {
+    private val current = AtomicReference<RecordingFileHandle?>()
+
+    @Synchronized
+    fun open(position: Long) {
+        close()
+        val id = runBlocking { htsp.fileOpen(path) }
+        current.set(RecordingFileHandle(id = id, htspVersion = htspVersion()))
+        try {
+            if (position > 0L) {
+                runBlocking { htsp.fileSeek(id, position) }
+            }
+        } catch (error: Throwable) {
+            close()
+            throw error
+        }
+    }
+
+    fun currentId(): Int? = current.get()?.id
+
+    @Synchronized
+    fun close() {
+        val handle = current.getAndSet(null) ?: return
+        runCatching {
+            runBlocking {
+                htsp.fileCloseRecording(
+                    id = handle.id,
+                    htspVersion = handle.htspVersion,
+                )
+            }
+        }
+    }
+}
 
 /**
  * Seekable access to a TVHeadend DVR file over the already authenticated HTSP session.
@@ -23,12 +70,12 @@ import kotlinx.coroutines.runBlocking
 @OptIn(UnstableApi::class)
 class HtspRecordingDataSource private constructor(
     private val htsp: HtspService,
-    private val path: String,
+    path: String,
     private val knownSize: Long?,
     private val readMetrics: PlaybackReadMetrics,
 ) : DataSource, Closeable {
     private var uri: Uri? = null
-    private var fileId: Int? = null
+    private val fileSession = RecordingFileSession(htsp = htsp, path = path)
     private var bytesRemaining: Long? = null
 
     class Factory(
@@ -37,18 +84,17 @@ class HtspRecordingDataSource private constructor(
         private val knownSize: Long?,
     ) : DataSource.Factory {
         internal val readMetrics = PlaybackReadMetrics()
-        private var current: HtspRecordingDataSource? = null
+        private val current = AtomicReference<HtspRecordingDataSource?>()
 
         override fun createDataSource(): DataSource = HtspRecordingDataSource(
             htsp = htsp,
             path = path,
             knownSize = knownSize,
             readMetrics = readMetrics,
-        ).also { current = it }
+        ).also(current::set)
 
         fun releaseCurrentDataSource() {
-            current?.close()
-            current = null
+            current.getAndSet(null)?.close()
         }
     }
 
@@ -57,11 +103,7 @@ class HtspRecordingDataSource private constructor(
     override fun open(dataSpec: DataSpec): Long {
         close()
         uri = dataSpec.uri
-        val id = runBlocking { htsp.fileOpen(path) }
-        fileId = id
-        if (dataSpec.position > 0L) {
-            runBlocking { htsp.fileSeek(id, dataSpec.position) }
-        }
+        fileSession.open(dataSpec.position)
         bytesRemaining = when {
             dataSpec.length != C.LENGTH_UNSET.toLong() -> dataSpec.length
             knownSize != null -> (knownSize - dataSpec.position).coerceAtLeast(0L)
@@ -71,7 +113,7 @@ class HtspRecordingDataSource private constructor(
     }
 
     override fun read(buffer: ByteArray, offset: Int, readLength: Int): Int {
-        val id = fileId ?: return C.RESULT_END_OF_INPUT
+        val id = fileSession.currentId() ?: return C.RESULT_END_OF_INPUT
         val requested = recordingReadLength(readLength, bytesRemaining)
         if (requested == 0) return C.RESULT_END_OF_INPUT
         val bytes = runBlocking { htsp.fileRead(id, requested) }
@@ -88,9 +130,7 @@ class HtspRecordingDataSource private constructor(
     override fun getResponseHeaders(): Map<String, List<String>> = emptyMap()
 
     override fun close() {
-        val id = fileId ?: return
-        fileId = null
-        runCatching { runBlocking { htsp.fileClose(id) } }
+        fileSession.close()
         bytesRemaining = null
         uri = null
     }

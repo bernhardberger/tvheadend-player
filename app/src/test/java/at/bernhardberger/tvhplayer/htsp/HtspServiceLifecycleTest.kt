@@ -4,6 +4,8 @@ import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.connectionFailureKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -99,6 +101,37 @@ class HtspServiceLifecycleTest {
                 }.exceptionOrNull()
 
                 assertNotNull(failure)
+                assertTrue(failure is HtspRequestTimeoutException)
+                assertTrue(service.state.value is ConnectionState.Connected)
+                service.disconnect()
+            }
+        }
+    }
+
+    @Test
+    fun callerTimeoutIsNotConvertedToRequestTimeout() {
+        FakeHtspServer(respondToHello = true).use { server ->
+            val service = service()
+            runBlocking {
+                service.connect(
+                    host = "127.0.0.1",
+                    port = server.port,
+                    connectTimeoutMs = 1_000,
+                    responseTimeoutMs = 1_000,
+                    soTimeoutMs = 50,
+                )
+
+                val failure = runCatching {
+                    withTimeout(50L) {
+                        service.request(
+                            method = "getEvents",
+                            timeoutMs = 500L,
+                            disconnectOnTimeout = false,
+                        )
+                    }
+                }.exceptionOrNull()
+
+                assertTrue(failure is TimeoutCancellationException)
                 assertTrue(service.state.value is ConnectionState.Connected)
                 service.disconnect()
             }
