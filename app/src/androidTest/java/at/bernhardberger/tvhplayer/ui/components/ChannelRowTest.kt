@@ -8,10 +8,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -53,11 +57,51 @@ class ChannelRowTest {
             }
         }
 
-        composeTestRule.onNodeWithText("ČT1 HD").assertIsDisplayed()
+        composeTestRule.onNodeWithText("3  ČT1 HD").assertIsDisplayed()
         composeTestRule.onNodeWithText("Večerní zprávy").assertIsDisplayed()
 
         composeTestRule.onNodeWithTag("row").performClick()
         assertTrue(confirmed)
+    }
+
+    @Test
+    fun playingMarkerPreservesProgressWidth_andRecordingStatusCoexists() {
+        composeTestRule.setContent {
+            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
+            TVHeadendPlayerTheme {
+                Column {
+                    repeat(2) { index ->
+                        ChannelRow(
+                            modifier = Modifier
+                                .width(400.dp)
+                                .testTag("status-row-$index"),
+                            number = index + 1,
+                            name = "ČT1 HD",
+                            programTitle = "Večerní zprávy",
+                            progress = 0.5f,
+                            imageLoader = imageLoader,
+                            piconPath = null,
+                            focused = false,
+                            recordingNow = true,
+                            playingNow = index == 0,
+                            onFocus = {},
+                            onConfirm = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.onAllNodesWithTag("channel-picon")[0]
+            .assertLeftPositionInRootIsEqualTo(20.dp)
+        composeTestRule.onNodeWithTag("channel-playing-indicator").assertIsDisplayed()
+        composeTestRule.onAllNodesWithTag("channel-recording-indicator")[0].assertIsDisplayed()
+        composeTestRule.onNodeWithTag("status-row-0").assertIsSelected()
+        composeTestRule.onNodeWithTag("status-row-1").assertIsNotSelected()
+        val progressNodes = composeTestRule.onAllNodesWithTag("channel-progress")
+        val playingWidth = progressNodes[0].fetchSemanticsNode().boundsInRoot.width
+        val idleWidth = progressNodes[1].fetchSemanticsNode().boundsInRoot.width
+        assertEquals(idleWidth, playingWidth, 0.5f)
     }
 
     @OptIn(ExperimentalTestApi::class)
@@ -89,6 +133,7 @@ class ChannelRowTest {
 
         composeTestRule.onNodeWithTag("row-1").requestFocus()
         composeTestRule.onNodeWithTag("row-1").assertIsFocused()
+        composeTestRule.onNodeWithTag("row-1").assertIsNotSelected()
         composeTestRule.onNodeWithTag("row-1").performKeyInput {
             pressKey(Key.DirectionDown)
         }

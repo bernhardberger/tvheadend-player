@@ -26,6 +26,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import coil3.ImageLoader
 
 @Composable
@@ -44,14 +45,33 @@ fun ChannelRow(
     onConfirm: () -> Unit,
 ) {
     ListItem(
-        selected = focused,
+        selected = playingNow,
         onClick = onConfirm,
         headlineContent = {
-            Text(
-                text = name,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = buildString {
+                        number?.let {
+                            append(it)
+                            append("  ")
+                        }
+                        append(name)
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (playingNow) {
+                    Spacer(Modifier.width(TvSpacing8))
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(R.string.player_on_now),
+                        modifier = Modifier
+                            .testTag("channel-playing-indicator")
+                            .size(20.dp),
+                    )
+                }
+            }
         },
         supportingContent = {
             Column(Modifier.padding(top = 3.dp)) {
@@ -79,41 +99,23 @@ fun ChannelRow(
             }
         },
         leadingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (playingNow) {
-                    Icon(
-                        imageVector = Icons.Filled.PlayArrow,
-                        contentDescription = stringResource(R.string.player_on_now),
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                } else {
-                    Spacer(Modifier.width(20.dp))
-                }
-                Text(
-                    text = number?.toString().orEmpty(),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.width(32.dp),
-                )
-                PiconBox(
-                    imageLoader = imageLoader,
-                    piconPath = piconPath,
-                    modifier = Modifier
-                        .width(56.dp)
-                        .height(40.dp),
+            PiconBox(
+                imageLoader = imageLoader,
+                piconPath = piconPath,
+                modifier = Modifier
+                    .testTag("channel-picon")
+                    .width(56.dp)
+                    .height(40.dp),
+            )
+        },
+        trailingContent = if (recordingNow) {
+            {
+                RecordingStatusIndicator(
+                    state = at.bernhardberger.tvhplayer.htsp.DvrState.RECORDING,
+                    modifier = Modifier.testTag("channel-recording-indicator"),
                 )
             }
-        },
-        trailingContent = when {
-            recordingNow -> {
-                {
-                    RecordingStatusIndicator(
-                        state = at.bernhardberger.tvhplayer.htsp.DvrState.RECORDING,
-                    )
-                }
-            }
-            else -> null
-        },
+        } else null,
         scale = ListItemDefaults.scale(
             focusedScale = 1f,
             focusedSelectedScale = 1f,
