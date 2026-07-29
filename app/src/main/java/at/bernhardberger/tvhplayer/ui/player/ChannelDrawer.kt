@@ -224,7 +224,6 @@ fun ChannelDrawer(
                 focusRequesters = rowFocusRequesters,
                 gridState = gridState,
                 contentPadding = TvPlaybackPadding,
-                columns = 3,
                 onFocusChannel = { if (!isRestoring) onFocusChannel(it) },
                 onConfirmChannel = onPickChannel,
                 modifier = Modifier
