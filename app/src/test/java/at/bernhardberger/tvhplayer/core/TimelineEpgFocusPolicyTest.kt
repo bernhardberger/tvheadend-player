@@ -8,6 +8,96 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
+    @Test
+    fun pageFocusSkipsEmptyFilteredRowsFromPreferredPageTarget() {
+        val rows = listOf(
+            row(1, event(11, 0, 100)),
+            row(2),
+            row(3),
+            row(4, event(41, 20, 120)),
+            row(5),
+        )
+
+        assertEquals(
+            EpgFocusTarget(channelIndex = 3, eventId = 41),
+            timelinePageFocusTarget(
+                rows = rows,
+                current = EpgFocusTarget(channelIndex = 0, eventId = 11),
+                preferredChannelIndex = 2,
+                direction = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun pageFocusCanSearchBackwardAcrossEmptyFilteredRows() {
+        val rows = listOf(
+            row(1, event(11, 0, 100)),
+            row(2),
+            row(3, event(31, 20, 120)),
+            row(4),
+            row(5, event(51, 0, 100)),
+        )
+
+        assertEquals(
+            EpgFocusTarget(channelIndex = 2, eventId = 31),
+            timelinePageFocusTarget(
+                rows = rows,
+                current = EpgFocusTarget(channelIndex = 4, eventId = 51),
+                preferredChannelIndex = 3,
+                direction = -1,
+            ),
+        )
+    }
+
+    @Test
+    fun reconciliationKeepsExistingSemanticEventTarget() {
+        val current = EpgFocusTarget(channelIndex = 1, eventId = 21)
+
+        assertEquals(
+            current,
+            reconcileTimelineEpgFocus(
+                rows = rows,
+                current = current,
+                preferredChannelIndex = 0,
+                targetSec = 0,
+            ),
+        )
+    }
+
+    @Test
+    fun reconciliationMovesToNearestPopulatedRowWhenEventDisappears() {
+        val filteredRows = listOf(
+            row(1),
+            row(2),
+            row(3, event(31, 30, 90)),
+        )
+
+        assertEquals(
+            focus(2, 31),
+            reconcileTimelineEpgFocus(
+                rows = filteredRows,
+                current = focus(0, 11),
+                preferredChannelIndex = 0,
+                targetSec = 45 * 60,
+            ),
+        )
+    }
+
+    @Test
+    fun reconciliationTracksSemanticEventAcrossChannelReordering() {
+        val reordered = listOf(rows[1], rows[0], rows[2])
+
+        assertEquals(
+            focus(0, 21),
+            reconcileTimelineEpgFocus(
+                rows = reordered,
+                current = focus(1, 21),
+                preferredChannelIndex = 1,
+                targetSec = 0,
+            ),
+        )
+    }
     private val rows = listOf(
         row(1, event(11, 0, 60), event(12, 60, 120)),
         row(2, event(21, 0, 30), event(22, 30, 90), event(23, 90, 120)),
@@ -73,6 +163,81 @@ class TimelineEpgFocusPolicyTest {
 
         assertTrue(move.pageChannels)
         assertEquals(31, move.target.eventId)
+    }
+
+    @Test
+    fun verticalNavigationSkipsRowsWithoutFilteredEvents() {
+        val filteredRows = listOf(
+            row(1, event(11, 0, 60)),
+            row(2),
+            row(3),
+            row(4, event(41, 30, 90)),
+        )
+
+        val down = moveTimelineEpgFocus(
+            rows = filteredRows,
+            current = focus(0, 11),
+            direction = EpgFocusDirection.DOWN,
+            visibleChannelRange = 0..2,
+        )
+        val up = moveTimelineEpgFocus(
+            rows = filteredRows,
+            current = down.target,
+            direction = EpgFocusDirection.UP,
+            visibleChannelRange = 1..3,
+        )
+
+        assertEquals(focus(3, 41), down.target)
+        assertTrue(down.pageChannels)
+        assertEquals(focus(0, 11), up.target)
+        assertTrue(up.pageChannels)
+    }
+
+    @Test
+    fun upAcrossOnlyEmptyRowsMovesToHeader() {
+        val filteredRows = listOf(
+            row(1),
+            row(2),
+            row(3, event(31, 0, 60)),
+        )
+
+        val move = moveTimelineEpgFocus(
+            rows = filteredRows,
+            current = focus(2, 31),
+            direction = EpgFocusDirection.UP,
+        )
+
+        assertEquals(focus(2, 31), move.target)
+        assertTrue(move.focusHeader)
+    }
+
+    @Test
+    fun initialFocusSkipsEmptyPreferredRowAndUsesCurrentMatchingEvent() {
+        val filteredRows = listOf(
+            row(1),
+            row(2, event(21, 0, 30), event(22, 30, 90)),
+            row(3, event(31, 90, 120)),
+        )
+
+        val target = initialTimelineEpgFocus(
+            rows = filteredRows,
+            preferredChannelIndex = 0,
+            targetSec = 45 * 60,
+        )
+
+        assertEquals(focus(1, 22), target)
+    }
+
+    @Test
+    fun initialFocusPrefersRestoredEventWhenItStillMatches() {
+        val target = initialTimelineEpgFocus(
+            rows = rows,
+            preferredChannelIndex = 1,
+            preferredEventId = 21,
+            targetSec = 100 * 60,
+        )
+
+        assertEquals(focus(1, 21), target)
     }
 
     @Test

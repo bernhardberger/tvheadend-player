@@ -2,8 +2,10 @@
 
 ## Architecture decisions
 
-- Keep upstream's Media3/HTSP playback path unchanged because the live TCL test
-  passed the human motion-quality gate.
+- Keep upstream's custom Media3/HTSP playback architecture unchanged because the
+  live TCL test passed the human motion-quality gate. Upgrade Media3 only as a
+  source-matched native compatibility slice with the full playback regression
+  matrix.
 - Use a distinct `at.bernhardberger.tvhplayer` application ID so the accepted
   diagnostic build and Headent remain installable rollback clients.
 - Keep UI focus selection in memory, but persist the last channel actually sent
@@ -39,11 +41,13 @@
   channel/EPG snapshot while a same-server reconnect stages its replacement.
 - Use TV Material for focusable Compose controls. Retain mobile Material only
   for primitives not supplied by TV Material 1.1.0, under one coordinated theme.
-- Use TV Material's modal navigation drawer and list-item geometry on a shared
-  48/32 dp overscan-safe grid so expanded navigation overlays content without
-  resizing it. Hide the global rail on Settings routes; keep only the Settings
-  category rail and symmetric full-screen padding. Disable focus scaling where
-  rows sit in a clipped scrolling viewport, and present playback channel
+- Use TV Material's standard navigation drawer and list-item geometry on a shared
+  48/32 dp overscan-safe grid so expanded navigation translates the closed-width
+  browse viewport rather than reflowing it narrower. Keep the collapsed global
+  rail on Settings routes beside the temporary Settings category rail. Back from
+  browse content focuses the current global destination before Channels/root policy;
+  Settings content returns to its current category first. Disable focus scaling
+  where rows sit in a clipped scrolling viewport, and present playback channel
   selection as a full-height edge sheet with a cinematic scrim rather than an
   inset card.
 - Serialize HTSP teardown and player commands, keep repository flow creation
@@ -414,11 +418,12 @@ exit cancellation, correct/incorrect PIN, HOME, wake, reboot, and focus behavior
 on 2026-07-27. The stable owner key is isolated on LXC 117 and signed packaging
 passes. The owner explicitly approved a constrained G08 production installation
 while the G10 is unavailable, then separately approved removal of the legacy
-client after launching the new app. Runtime validation currently fails the
-interlaced-motion gate: 720p50 remains smooth, but direct 1080i25 AVC playback
-looks less smooth and less effectively deinterlaced than the prior production
-build. The G08 reports `c2.mto.avc.decoder`, zero dropped output buffers, and a
-3840x2160 60 Hz display mode; disabling timeshift did not improve motion. A
+client after launching the new app. Runtime validation found an intermittent
+interlaced-motion failure: 720p50 remained smooth, but direct 1080i25 AVC
+playback initially looked less smooth and less effectively deinterlaced than
+the prior production build. The G08 reports `c2.mto.avc.decoder`, zero dropped
+output buffers, and a 3840x2160 60 Hz display mode; disabling timeshift did not
+improve motion. A
 `0.1.1` diagnostic candidate restores only the pre-`44ed28c` H.264 format/SAR
 update behavior while retaining the audited FFmpeg audio dependency. It made no
 visible difference on the same G08 service, falsifying that hypothesis. The next
@@ -430,7 +435,14 @@ service uses AC3 rather than the rebuilt MP1/MP2/MP3 audio path. Stop speculativ
 decoder changes pending a direct same-broadcast reference comparison or new
 evidence from the G10. The G10 has previously entered a similar bad render mode
 intermittently and recovered after retuning; on the G08, switching away and back
-and fully force-stopping/reopening `0.1.2` did not restore quality.
+and fully force-stopping/reopening `0.1.2` did not restore quality. On 2026-07-27,
+the operator reported fluid ServusTV playback after rebooting that same G08 with
+the unchanged `0.1.2` build. This points to device/decoder initialization state
+rather than a deterministic application format or surface regression. The
+operator then confirmed that the good mode survived both standby/wake and a
+switch to another channel and back. Current motion therefore passes direct human
+review, but keep the intermittent startup fault open until later cold starts
+establish when the good and bad modes recur.
 
 **Acceptance criteria:**
 

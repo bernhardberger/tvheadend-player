@@ -7,6 +7,51 @@ import org.junit.Test
 
 class BackNavigationPolicyTest {
     @Test
+    fun confirmedSameWarmPlaybackSelectionRearmsOneReturn() {
+        val consumed = consumeWarmReturn(armWarmReturn(WarmPlaybackTarget.LIVE))
+
+        assertEquals(
+            WarmReturnOpportunity(armed = true, target = WarmPlaybackTarget.LIVE),
+            rearmWarmReturnForPlaybackSelection(
+                current = consumed,
+                currentWarmTarget = WarmPlaybackTarget.LIVE,
+                requestedTarget = WarmPlaybackTarget.LIVE,
+                currentIdentity = 42,
+                requestedIdentity = 42,
+            ),
+        )
+    }
+
+    @Test
+    fun confirmedPlaybackSelectionDoesNotInventWarmSession() {
+        assertEquals(
+            WarmReturnOpportunity(),
+            rearmWarmReturnForPlaybackSelection(
+                current = WarmReturnOpportunity(),
+                currentWarmTarget = WarmPlaybackTarget.NONE,
+                requestedTarget = WarmPlaybackTarget.RECORDING,
+                currentIdentity = null,
+                requestedIdentity = 7,
+            ),
+        )
+    }
+
+    @Test
+    fun differentLiveSelectionWaitsForPlaybackStartBeforeArming() {
+        val consumed = consumeWarmReturn(armWarmReturn(WarmPlaybackTarget.LIVE))
+
+        assertEquals(
+            consumed,
+            rearmWarmReturnForPlaybackSelection(
+                current = consumed,
+                currentWarmTarget = WarmPlaybackTarget.LIVE,
+                requestedTarget = WarmPlaybackTarget.LIVE,
+                currentIdentity = 42,
+                requestedIdentity = 43,
+            ),
+        )
+    }
+    @Test
     fun rootStartDestinationFinishesActivityWithoutWarmReturn() {
         assertEquals(
             BackAction.FINISH_ACTIVITY,

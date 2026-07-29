@@ -21,8 +21,8 @@ fun guideEntryFocusTarget(
     hasProgrammeTarget: Boolean,
     hasRetryAction: Boolean,
 ): GuideEntryFocusTarget = when {
-    hasProgrammeTarget -> GuideEntryFocusTarget.PROGRAMME
     hasRetryAction -> GuideEntryFocusTarget.RETRY
+    hasProgrammeTarget -> GuideEntryFocusTarget.PROGRAMME
     else -> GuideEntryFocusTarget.HEADER
 }
 
@@ -30,7 +30,7 @@ fun guideScopeExitFocusTarget(
     hasProgrammeTarget: Boolean,
     hasRetryAction: Boolean,
 ): GuideScopeExitFocusTarget = when {
-    hasProgrammeTarget -> GuideScopeExitFocusTarget.PROGRAMME
     hasRetryAction -> GuideScopeExitFocusTarget.RETRY
+    hasProgrammeTarget -> GuideScopeExitFocusTarget.PROGRAMME
     else -> GuideScopeExitFocusTarget.STAY_ON_SCOPE
 }

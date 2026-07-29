@@ -1,10 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.platform.testTag
@@ -35,7 +33,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.tv.material3.Button
@@ -50,7 +50,7 @@ class SideRailSemanticsTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun collapsedRailIconsExposeDestinationNames() {
+    fun collapsedRailExposesAllDestinationItems() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
@@ -67,11 +67,11 @@ class SideRailSemanticsTest {
             }
         }
 
-        composeRule.onAllNodesWithContentDescription("Home").assertCountEquals(1)
+        composeRule.onNodeWithTag("nav-channels").assertExists()
+        composeRule.onNodeWithTag("nav-epg").assertExists()
+        composeRule.onNodeWithTag("nav-recordings").assertExists()
+        composeRule.onNodeWithTag("nav-settings").assertExists()
         composeRule.onAllNodesWithContentDescription("Channels").assertCountEquals(1)
-        composeRule.onAllNodesWithContentDescription("Guide").assertCountEquals(1)
-        composeRule.onAllNodesWithContentDescription("Recordings").assertCountEquals(1)
-        composeRule.onAllNodesWithContentDescription("Settings").assertCountEquals(1)
     }
 
     @Test
@@ -81,7 +81,7 @@ class SideRailSemanticsTest {
             Box(Modifier.fillMaxSize().background(Color.Red)) {
                 TVHeadendPlayerTheme {
                     SideRail(
-                        currentRoute = Routes.HOME,
+                        currentRoute = Routes.CHANNELS,
                         showEpgMenu = true,
                         onRootBack = {},
                         onNavigate = {},
@@ -203,7 +203,7 @@ class SideRailSemanticsTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
-                    currentRoute = Routes.HOME,
+                    currentRoute = Routes.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
@@ -237,7 +237,7 @@ class SideRailSemanticsTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
-                    currentRoute = Routes.HOME,
+                    currentRoute = Routes.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
@@ -261,13 +261,14 @@ class SideRailSemanticsTest {
 
     @Test
     fun openDrawerPreservesBrowseWidthAndFocusedDestinationNavigates() {
-        val route = mutableStateOf(Routes.HOME)
+        val route = mutableStateOf(Routes.CHANNELS)
         val contentFocus = FocusRequester()
         var rootBackCount = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = route.value,
+                    rootRoute = Routes.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = { route.value = it },
@@ -276,8 +277,8 @@ class SideRailSemanticsTest {
                             Button(
                                 onClick = {},
                                 modifier = Modifier
-                                    // Geometrically aligns with Channels, so drawer entry must
-                                    // still restore Home before focus-driven navigation starts.
+                                    // Drawer entry must restore the current root destination
+                                    // before focus-driven navigation starts.
                                     .padding(top = 60.dp)
                                     .focusRequester(contentFocus)
                                     .testTag("browse-focus"),
@@ -297,7 +298,7 @@ class SideRailSemanticsTest {
             .fetchSemanticsNode().boundsInRoot
         composeRule.onNodeWithTag("browse-focus").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
-        composeRule.onNodeWithTag("nav-home").assertIsFocused()
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
         composeRule.waitForIdle()
         val openBounds = composeRule.onNodeWithTag("browse-viewport")
             .fetchSemanticsNode().boundsInRoot
@@ -305,21 +306,20 @@ class SideRailSemanticsTest {
         assertTrue(openBounds.left > closedBounds.left)
         assertEquals(closedBounds.width, openBounds.width, 1f)
 
-        composeRule.onNodeWithTag("nav-home")
-            .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.runOnIdle { assertEquals(Routes.CHANNELS, route.value) }
-        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
-
         composeRule.onNodeWithTag("nav-channels")
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.runOnIdle { assertEquals(Routes.EPG, route.value) }
+        composeRule.onNodeWithTag("nav-epg").assertIsFocused()
+
+        composeRule.onNodeWithTag("nav-epg")
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("browse-focus").assertIsFocused()
             .performKeyInput { pressKey(Key.Back) }
-        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+        composeRule.onNodeWithTag("nav-epg").assertIsFocused()
 
-        composeRule.onNodeWithTag("nav-channels")
+        composeRule.onNodeWithTag("nav-epg")
             .performKeyInput { pressKey(Key.Back) }
-        composeRule.runOnIdle { assertEquals(Routes.HOME, route.value) }
-        composeRule.onNodeWithTag("nav-home").assertIsFocused()
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
             .performKeyInput { pressKey(Key.Back) }
         composeRule.runOnIdle { assertEquals(1, rootBackCount) }
     }

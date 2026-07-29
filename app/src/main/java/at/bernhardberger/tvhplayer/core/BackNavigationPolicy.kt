@@ -60,6 +60,22 @@ fun armWarmReturn(target: WarmPlaybackTarget): WarmReturnOpportunity =
 fun rearmWarmReturn(target: WarmPlaybackTarget): WarmReturnOpportunity =
     armWarmReturn(target)
 
+fun rearmWarmReturnForPlaybackSelection(
+    current: WarmReturnOpportunity,
+    currentWarmTarget: WarmPlaybackTarget,
+    requestedTarget: WarmPlaybackTarget,
+    currentIdentity: Int?,
+    requestedIdentity: Int,
+): WarmReturnOpportunity = if (
+    currentWarmTarget != WarmPlaybackTarget.NONE &&
+    currentWarmTarget == requestedTarget &&
+    currentIdentity == requestedIdentity
+) {
+    rearmWarmReturn(currentWarmTarget)
+} else {
+    current
+}
+
 /** Map active session IDs to a warm playback target. */
 fun warmPlaybackTarget(
     activeServiceId: Int?,

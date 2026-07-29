@@ -25,7 +25,7 @@ class BrowseFocusPolicyTest {
     @Test
     fun `Guide entry prefers programme then retry then header`() {
         assertEquals(
-            GuideEntryFocusTarget.PROGRAMME,
+            GuideEntryFocusTarget.RETRY,
             guideEntryFocusTarget(hasProgrammeTarget = true, hasRetryAction = true),
         )
         assertEquals(
@@ -41,7 +41,7 @@ class BrowseFocusPolicyTest {
     @Test
     fun `Guide scope exit never moves backward to the header`() {
         assertEquals(
-            GuideScopeExitFocusTarget.PROGRAMME,
+            GuideScopeExitFocusTarget.RETRY,
             guideScopeExitFocusTarget(hasProgrammeTarget = true, hasRetryAction = true),
         )
         assertEquals(

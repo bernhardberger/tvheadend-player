@@ -19,7 +19,6 @@ import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import at.bernhardberger.tvhplayer.viewmodels.HomeViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -77,16 +76,6 @@ val appModule = module {
     }
     viewModel { VideoPlayerViewModel(playerSession = get(), repo = get(), htspService = get()) }
     viewModel { ChannelsViewModel(repo = get(), tagSettings = get()) }
-    viewModel { params ->
-        HomeViewModel(
-            repo = get(),
-            tagSettings = get(),
-            dvrRepository = get(),
-            playerSession = get(),
-            lastPlayedStore = get(),
-            initialAllowRecordings = params.getOrNull<Boolean>() ?: true,
-        )
-    }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),

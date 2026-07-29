@@ -13,7 +13,7 @@ class NavigationShellPolicyTest {
             browseShellBackAction(
                 drawerOpen = false,
                 currentRoute = "settings",
-                homeRoute = "home",
+                rootRoute = "channels",
             ),
         )
     }
@@ -25,32 +25,32 @@ class NavigationShellPolicyTest {
             browseShellBackAction(
                 drawerOpen = false,
                 currentRoute = "channels",
-                homeRoute = "home",
+                rootRoute = "channels",
                 rootBackPriority = true,
             ),
         )
     }
 
     @Test
-    fun backFromNonHomeDrawerDestinationFocusesHome() {
+    fun backFromNonRootDrawerDestinationFocusesRoot() {
         assertEquals(
-            BrowseShellBackAction.FOCUS_HOME_DESTINATION,
+            BrowseShellBackAction.FOCUS_ROOT_DESTINATION,
             browseShellBackAction(
                 drawerOpen = true,
                 currentRoute = "settings",
-                homeRoute = "home",
+                rootRoute = "channels",
             ),
         )
     }
 
     @Test
-    fun backFromHomeDrawerDestinationDelegatesToRootPolicy() {
+    fun backFromRootDrawerDestinationDelegatesToRootPolicy() {
         assertEquals(
             BrowseShellBackAction.DELEGATE_TO_ROOT,
             browseShellBackAction(
                 drawerOpen = true,
-                currentRoute = "home",
-                homeRoute = "home",
+                currentRoute = "channels",
+                rootRoute = "channels",
             ),
         )
     }

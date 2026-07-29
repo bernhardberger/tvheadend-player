@@ -5,7 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import at.bernhardberger.tvhplayer.core.HOME_RECENT_CHANNEL_LIMIT
+import at.bernhardberger.tvhplayer.core.RECENT_CHANNEL_LIMIT
 import at.bernhardberger.tvhplayer.core.pushRecentChannelId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -39,7 +39,7 @@ class LastPlayedChannelStore(private val context: Context) {
             preferences[Keys.RECENT_CHANNEL_IDS] = pushRecentChannelId(
                 current = current,
                 channelId = channelId,
-                limit = HOME_RECENT_CHANNEL_LIMIT,
+                limit = RECENT_CHANNEL_LIMIT,
             ).joinToString(",")
         }
     }

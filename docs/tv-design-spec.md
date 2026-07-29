@@ -117,7 +117,11 @@ the closed drawer width plus a 32dp runout: `0%/0.78`, `25%/0.72`, `55%/0.55`,
 `78%/0.25`, and `100%/0.00` (position/alpha). The expanded drawer uses a
 stronger full-width black curve so labels retain a stable foundation while the
 player emerges at the content boundary: `0%/0.92`, `35%/0.88`, `70%/0.72`,
-`90%/0.35`, and `100%/0.00`. These are curve controls rather than surface tiers.
+`90%/0.35`, and `100%/0.00`. Opaque browse content requires this optical curve
+to be rendered as coordinated drawer backing and a foreground veil on the
+leading edge of the adjacent browse plane; a shell background alone does not
+soften a scrolling viewport's hard clip. These are curve controls rather than
+surface tiers.
 
 ---
 
@@ -219,8 +223,8 @@ commit.
 
 Back unwinds focus layers before changing top-level destination history. From
 browse content it activates the global drawer on the current destination. From
-a non-Home drawer destination, the next Back focuses Home; Back from Home then
-delegates to the existing warm-player or activity-exit policy. Settings adds one
+a non-root drawer destination, the next Back focuses Channels; Back from
+Channels then delegates to the existing warm-player or activity-exit policy. Settings adds one
 local layer: content returns to the current category before category focus
 returns to the global drawer on Settings. Focus-previewed drawer destinations do
 not form a Back stack, but their saved screen and focus state is restored when
@@ -295,6 +299,9 @@ Use the component and hierarchy appropriate to the scope.
 - Horizontal browse scopes use `TabRow` in a dedicated full-width row. Do not
   squeeze a scrolling tab set into a trailing header slot or hide clipped focus
   surfaces behind an edge fade.
+- An unfocused tab leaving the leading edge may pass through a coordinated
+  foreground veil, but the focused/selected pill and its indication must always
+  be fully visible beyond that veil.
 - Settings categories are local master-detail navigation, not a second app
   drawer. Keep one fixed-width, focus-restoring, vertically scrollable column of
   TV Material `ListItem`s beside the detail pane. Its width must not change when
@@ -321,8 +328,7 @@ expanded focusable items, preserving the darkest region through the icon and
 label area before fading at the content boundary. In the collapsed state, use
 its narrower companion curve across the complete rail and 32dp runout. Both
 states must read like cinematic text scrims rather than grey panels with a
-trailing dropoff. Home leaves the canvas visible because its hero and cards own
-their surfaces. Do not add a hard divider, blur, or a second full-screen
+trailing dropoff. Do not add a hard divider, blur, or a second full-screen
 navigation scrim.
 
 Use the **standard push drawer**. Expanding the drawer changes the browse
@@ -332,6 +338,12 @@ content inset and keeps navigation and content as adjacent planes. Settings
 remains in this global shell, so entering its content collapses the drawer to the
 icon rail instead of removing it. Its local category pane remains fixed and must
 not introduce another collapsing drawer.
+
+The adjacent-plane model does not permit a bare hard seam. The shell overlays a
+non-focusable, semantics-free leading-edge veil above departing browse content
+and below drawer focus surfaces. This is an optical fade at the seam, not content
+physically scrolling under a modal drawer; it must not alter measurement, focus,
+Back, or key dispatch.
 
 ---
 

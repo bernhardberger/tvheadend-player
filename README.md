@@ -33,9 +33,8 @@ playback. Phone and tablet support is not currently planned.
 - Native TVHeadend channel synchronization, picons, channel numbers, and live
   playback over HTSP
 - First-run connection setup with explicit connection and synchronization status
-- Home dashboard with featured programmes, recently watched channels, what is on
-  now, recent recordings, and upcoming recordings
-- Channel browsing in a detailed list or large-card layout
+- Normal launches open channel browsing in a detailed list or large-card layout;
+  autoplay and Simple TV resume the last successfully played channel
 - Per-device browsing scopes using TVHeadend channel tags
 - `CH+` and `CH-` switching with wraparound during fullscreen playback
 - Direct 1- to 3-digit TVHeadend channel-number entry

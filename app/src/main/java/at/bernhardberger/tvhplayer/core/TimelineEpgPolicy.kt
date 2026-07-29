@@ -34,6 +34,52 @@ data class TimelineEventSpan(
     val endFraction: Float,
 )
 
+fun initialTimelineEpgFocus(
+    rows: List<EpgFocusColumn>,
+    preferredChannelIndex: Int,
+    targetSec: Long,
+    preferredEventId: Int? = null,
+): EpgFocusTarget? {
+    if (rows.isEmpty()) return null
+    val preferredIndex = preferredChannelIndex.coerceIn(rows.indices)
+    val candidateIndices = buildList {
+        add(preferredIndex)
+        for (distance in 1..rows.size) {
+            (preferredIndex + distance).takeIf { it in rows.indices }?.let(::add)
+            (preferredIndex - distance).takeIf { it in rows.indices }?.let(::add)
+        }
+    }
+    candidateIndices.forEach { channelIndex ->
+        val events = rows[channelIndex].events.sortedBy { it.start }
+        if (events.isEmpty()) return@forEach
+        val event = preferredEventId?.let { id -> events.firstOrNull { it.eventId == id } }
+            ?: events.firstOrNull { it.start <= targetSec && targetSec < it.stop }
+            ?: events.minByOrNull { abs(it.start - targetSec) }
+        if (event != null) return EpgFocusTarget(channelIndex, event.eventId)
+    }
+    return null
+}
+
+fun reconcileTimelineEpgFocus(
+    rows: List<EpgFocusColumn>,
+    current: EpgFocusTarget?,
+    preferredChannelIndex: Int,
+    targetSec: Long,
+): EpgFocusTarget? {
+    current?.let { target ->
+        rows.forEachIndexed { channelIndex, row ->
+            if (row.events.any { it.eventId == target.eventId }) {
+                return EpgFocusTarget(channelIndex, target.eventId)
+            }
+        }
+    }
+    return initialTimelineEpgFocus(
+        rows = rows,
+        preferredChannelIndex = preferredChannelIndex,
+        targetSec = targetSec,
+    )
+}
+
 fun moveTimelineEpgFocus(
     rows: List<EpgFocusColumn>,
     current: EpgFocusTarget,
@@ -56,12 +102,15 @@ fun moveTimelineEpgFocus(
         return TimelineEpgFocusMove(current.copy(eventId = event.eventId))
     }
 
-    val channelIndex = current.channelIndex +
-        if (direction == EpgFocusDirection.UP) -1 else 1
-    if (channelIndex < 0) {
+    val step = if (direction == EpgFocusDirection.UP) -1 else 1
+    val channelIndex = generateSequence(current.channelIndex + step) { it + step }
+        .takeWhile { it in rows.indices }
+        .firstOrNull { rows[it].events.isNotEmpty() }
+    if (channelIndex == null && direction == EpgFocusDirection.UP) {
         return TimelineEpgFocusMove(current, focusHeader = true)
     }
-    val adjacent = rows.getOrNull(channelIndex) ?: return TimelineEpgFocusMove(current)
+    channelIndex ?: return TimelineEpgFocusMove(current)
+    val adjacent = rows[channelIndex]
     val best = adjacent.events.maxWithOrNull(
         compareBy<EpgEventEntry>(
             { overlapSeconds(currentEvent, it) },
@@ -73,6 +122,31 @@ fun moveTimelineEpgFocus(
         target = EpgFocusTarget(channelIndex, best.eventId),
         pageChannels = channelIndex !in visibleChannelRange,
     )
+}
+
+fun timelinePageFocusTarget(
+    rows: List<EpgFocusColumn>,
+    current: EpgFocusTarget,
+    preferredChannelIndex: Int,
+    direction: Int,
+): EpgFocusTarget? {
+    val currentEvent = rows.getOrNull(current.channelIndex)
+        ?.events
+        ?.firstOrNull { it.eventId == current.eventId }
+        ?: return null
+    val step = if (direction < 0) -1 else 1
+    val startIndex = preferredChannelIndex.coerceIn(rows.indices)
+    val targetIndex = generateSequence(startIndex) { it + step }
+        .takeWhile { it in rows.indices }
+        .firstOrNull { rows[it].events.isNotEmpty() }
+        ?: return null
+    val targetEvent = rows[targetIndex].events.maxWithOrNull(
+        compareBy<EpgEventEntry>(
+            { overlapSeconds(currentEvent, it) },
+            { -abs(midpoint(currentEvent) - midpoint(it)) },
+        ),
+    ) ?: return null
+    return EpgFocusTarget(targetIndex, targetEvent.eventId)
 }
 
 fun timelineEventSpan(
@@ -108,6 +182,7 @@ enum class EpgColumnDataState {
     PERMISSION_DENIED,
     RECONNECTING,
     SERVER_FAILURE,
+    FILTER_EMPTY,
 }
 
 fun epgColumnDataState(
@@ -116,6 +191,8 @@ fun epgColumnDataState(
     windowStartSec: Long,
     windowEndSec: Long,
     connectionState: ConnectionUiState,
+    filterActive: Boolean = false,
+    matchingCachedEvents: List<EpgEventEntry> = cachedEvents,
 ): EpgColumnDataState = when {
     connectionState is ConnectionUiState.Error &&
         connectionState.kind == ConnectionFailureKind.PERMISSION_DENIED ->
@@ -129,6 +206,8 @@ fun epgColumnDataState(
     connectionState == ConnectionUiState.Connecting ||
         connectionState == ConnectionUiState.SyncingChannels ->
         if (cachedEvents.isEmpty()) EpgColumnDataState.LOADING else EpgColumnDataState.STALE
+    filterActive && cachedEvents.isNotEmpty() && matchingCachedEvents.isEmpty() ->
+        EpgColumnDataState.FILTER_EMPTY
     visibleEvents.isEmpty() && cachedEvents.isEmpty() -> EpgColumnDataState.NO_DATA
     visibleEvents.isEmpty() -> EpgColumnDataState.EMPTY_DAY
     visibleEvents.minOf { it.start } > windowStartSec ||

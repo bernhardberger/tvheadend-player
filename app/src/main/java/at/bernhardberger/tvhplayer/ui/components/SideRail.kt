@@ -17,7 +17,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.LockOpen
@@ -40,6 +39,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerValue
@@ -76,6 +77,7 @@ private val ClosedDrawerWidth =
 @Composable
 fun SideRail(
     currentRoute: String?,
+    rootRoute: String = Routes.CHANNELS,
     showEpgMenu: Boolean,
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     rootBackPriority: Boolean = false,
@@ -84,14 +86,12 @@ fun SideRail(
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
-    val homeLabel = stringResource(R.string.nav_home)
     val channelsLabel = stringResource(R.string.nav_channels)
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
     val unlockLabel = stringResource(R.string.simple_tv_unlock)
     val mainItems = remember(
-        homeLabel,
         channelsLabel,
         epgLabel,
         recordingsLabel,
@@ -100,17 +100,10 @@ fun SideRail(
     ) {
         buildList {
             if (simpleTvProfile.allows(SimpleTvCapability.CHANNEL_LIST)) {
-                add(RailItem(Routes.HOME, homeLabel) {
-                    Icon(
-                        Icons.Filled.Home,
-                        contentDescription = homeLabel,
-                        modifier = Modifier.size(24.dp),
-                    )
-                })
                 add(RailItem(Routes.CHANNELS, channelsLabel) {
                     Icon(
                         Icons.AutoMirrored.Filled.List,
-                        contentDescription = channelsLabel,
+                        contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
                 })
@@ -119,7 +112,7 @@ fun SideRail(
                 add(RailItem(Routes.EPG, epgLabel) {
                     Icon(
                         Icons.Filled.Event,
-                        contentDescription = epgLabel,
+                        contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
                 })
@@ -128,7 +121,7 @@ fun SideRail(
                 add(RailItem(Routes.RECORDINGS, recordingsLabel) {
                     Icon(
                         Icons.Filled.VideoLibrary,
-                        contentDescription = recordingsLabel,
+                        contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
                 })
@@ -145,7 +138,7 @@ fun SideRail(
                 add(RailItem(Routes.UNLOCK, unlockLabel) {
                     Icon(
                         Icons.Filled.LockOpen,
-                        contentDescription = unlockLabel,
+                        contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
                 })
@@ -154,7 +147,7 @@ fun SideRail(
                 add(RailItem(Routes.SETTINGS, settingsLabel) {
                     Icon(
                         Icons.Filled.Settings,
-                        contentDescription = settingsLabel,
+                        contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
                 })
@@ -168,7 +161,7 @@ fun SideRail(
     val backAction = browseShellBackAction(
         drawerOpen = drawerState.currentValue == DrawerValue.Open,
         currentRoute = currentRoute,
-        homeRoute = Routes.HOME,
+        rootRoute = rootRoute,
         rootBackPriority = rootBackPriority,
     )
     val handleBrowseBack: () -> Unit = {
@@ -177,8 +170,8 @@ fun SideRail(
                 (itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route])
                     ?.requestFocus()
             }
-            BrowseShellBackAction.FOCUS_HOME_DESTINATION -> {
-                itemFocus[Routes.HOME]?.requestFocus()
+            BrowseShellBackAction.FOCUS_ROOT_DESTINATION -> {
+                itemFocus[rootRoute]?.requestFocus()
             }
             BrowseShellBackAction.DELEGATE_TO_ROOT -> onRootBack()
         }
@@ -271,6 +264,7 @@ fun SideRail(
                             leadingContent = item.icon,
                             modifier = Modifier
                                 .focusRequester(itemFocus.getValue(item.route))
+                                .semantics { contentDescription = item.label }
                                 .testTag("nav-${item.route}")
                                 .onFocusChanged { focusState ->
                                     if (
@@ -295,6 +289,7 @@ fun SideRail(
                             leadingContent = item.icon,
                             modifier = Modifier
                                 .focusRequester(itemFocus.getValue(item.route))
+                                .semantics { contentDescription = item.label }
                                 .testTag("nav-${item.route}")
                                 .onFocusChanged { focusState ->
                                     if (

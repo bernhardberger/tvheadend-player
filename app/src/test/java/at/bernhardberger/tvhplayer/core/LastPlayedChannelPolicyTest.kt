@@ -26,4 +26,24 @@ class LastPlayedChannelPolicyTest {
     fun emptyChannelList_hasNoPlayableChannel() {
         assertNull(LastPlayedChannelPolicy.resolve(emptyList(), 20))
     }
+
+    @Test
+    fun recentlyPlayedChannelsAreDeduplicatedMostRecentFirst() {
+        assertEquals(
+            listOf(20, 10, 30),
+            pushRecentChannelId(current = listOf(10, 20, 30), channelId = 20),
+        )
+    }
+
+    @Test
+    fun recentlyPlayedChannelsRespectTheBound() {
+        assertEquals(
+            listOf(40, 10, 20),
+            pushRecentChannelId(
+                current = listOf(10, 20, 30),
+                channelId = 40,
+                limit = 3,
+            ),
+        )
+    }
 }

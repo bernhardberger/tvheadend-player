@@ -119,9 +119,11 @@ fun adjacentChannelId(
   collapsed global rail beside its temporary category rail; onboarding and
   unlock use symmetric full-screen padding. Collapsed rail icons expose
   destination content descriptions.
-- Normal non-autoplay launches open an in-app Home dashboard. Channels may use
-  List with details (default) or Large cards. Simple TV quick select uses the
-  large-card grid. Player Info reuses the shared Content Details composition.
+- Normal non-autoplay launches open Channels. Autoplay and Simple TV launches
+  continue to resume the last successfully played channel, falling back to the
+  first available channel. Channels may use List with details (default) or Large
+  cards. Simple TV quick select uses the large-card grid. Player Info reuses the
+  shared Content Details composition.
 - Reveal hidden playback controls with OK or vertical D-pad. Programme info is an
   explicit player action rather than a hidden D-pad Up shortcut. Picking the
   channel that is already playing from the playback channel sheet closes the
