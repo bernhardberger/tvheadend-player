@@ -22,7 +22,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -31,16 +33,23 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.Icon
@@ -200,25 +209,43 @@ fun SideRail(
     ) {
         val browseWidth = (maxWidth - ClosedDrawerWidth).coerceAtLeast(0.dp)
         val railGradientWidth = ClosedDrawerWidth + TvNavigationRailGradientRunout
-        val railGradientEndPx = with(LocalDensity.current) { railGradientWidth.toPx() }
+        val density = LocalDensity.current
+        val layoutDirection = LocalLayoutDirection.current
+        val railGradientWidthPx = with(density) { railGradientWidth.toPx() }
+        val maxWidthPx = with(density) { maxWidth.toPx() }
+        val collapsedColorStops = arrayOf(
+            0f to Color.Black.copy(alpha = TvNavigationRailGradientStartAlpha),
+            0.25f to Color.Black.copy(alpha = TvNavigationRailGradientQuarterAlpha),
+            0.55f to Color.Black.copy(alpha = TvNavigationRailGradientMiddleAlpha),
+            0.78f to Color.Black.copy(alpha = TvNavigationRailGradientLateAlpha),
+            1f to Color.Transparent,
+        )
         val collapsedRailBrush = Brush.horizontalGradient(
-            colorStops = arrayOf(
-                0f to Color.Black.copy(alpha = TvNavigationRailGradientStartAlpha),
-                0.25f to Color.Black.copy(alpha = TvNavigationRailGradientQuarterAlpha),
-                0.55f to Color.Black.copy(alpha = TvNavigationRailGradientMiddleAlpha),
-                0.78f to Color.Black.copy(alpha = TvNavigationRailGradientLateAlpha),
-                1f to Color.Transparent,
-            ),
-            endX = railGradientEndPx,
+            colorStops = if (layoutDirection == LayoutDirection.Ltr) {
+                collapsedColorStops
+            } else {
+                collapsedColorStops.reversedLogicalStops()
+            },
+            startX = if (layoutDirection == LayoutDirection.Ltr) {
+                0f
+            } else {
+                maxWidthPx - railGradientWidthPx
+            },
+            endX = if (layoutDirection == LayoutDirection.Ltr) railGradientWidthPx else maxWidthPx,
+        )
+        val expandedColorStops = arrayOf(
+            0f to Color.Black.copy(alpha = TvNavigationDrawerGradientStartAlpha),
+            0.35f to Color.Black.copy(alpha = TvNavigationDrawerGradientEarlyAlpha),
+            0.70f to Color.Black.copy(alpha = TvNavigationDrawerGradientMiddleAlpha),
+            0.90f to Color.Black.copy(alpha = TvNavigationDrawerGradientLateAlpha),
+            1f to Color.Black.copy(alpha = TvNavigationDrawerGradientLateAlpha),
         )
         val expandedDrawerBrush = Brush.horizontalGradient(
-            colorStops = arrayOf(
-                0f to Color.Black.copy(alpha = TvNavigationDrawerGradientStartAlpha),
-                0.35f to Color.Black.copy(alpha = TvNavigationDrawerGradientEarlyAlpha),
-                0.70f to Color.Black.copy(alpha = TvNavigationDrawerGradientMiddleAlpha),
-                0.90f to Color.Black.copy(alpha = TvNavigationDrawerGradientLateAlpha),
-                1f to Color.Transparent,
-            ),
+            colorStops = if (layoutDirection == LayoutDirection.Ltr) {
+                expandedColorStops
+            } else {
+                expandedColorStops.reversedLogicalStops()
+            },
         )
         NavigationDrawer(
             modifier = Modifier
@@ -312,7 +339,14 @@ fun SideRail(
                 }
             },
             content = {
-                BrowseViewport(width = browseWidth) {
+                BrowseViewport(
+                    width = browseWidth,
+                    edgeVeilAlpha = if (drawerState.currentValue == DrawerValue.Closed) {
+                        TvNavigationRailGradientLateAlpha
+                    } else {
+                        TvNavigationDrawerGradientLateAlpha
+                    },
+                ) {
                     content(
                         TvScreenPadding,
                         drawerState.currentValue == DrawerValue.Open,
@@ -326,10 +360,32 @@ fun SideRail(
 @Composable
 private fun BrowseViewport(
     width: Dp,
+    edgeVeilAlpha: Float,
     content: @Composable () -> Unit,
 ) {
+    val veilState = remember { BrowseVeilState() }
     Layout(
-        content = { Box(Modifier.fillMaxSize()) { content() } },
+        content = {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned(veilState::updateViewportBounds)
+                    .navigationEdgeVeil(
+                        width = TvNavigationRailGradientRunout,
+                        startAlpha = edgeVeilAlpha,
+                        // Keep the shell-owned 24 dp safe inset and its 8 dp
+                        // focus-overflow reserve completely outside the veil.
+                        availableWidthPx = { (DrawerStartPadding - 8.dp).toPx() },
+                        protectedBoundsPx = { veilState.protectedBoundsInViewport() },
+                    ),
+            ) {
+                CompositionLocalProvider(
+                    LocalNavigationVeilFocusProtection provides veilState::protectBounds,
+                ) {
+                    content()
+                }
+            }
+        },
         modifier = Modifier.fillMaxSize(),
     ) { measurables, constraints ->
         val fixedWidth = width.roundToPx()
@@ -343,3 +399,27 @@ private fun BrowseViewport(
         }
     }
 }
+
+private class BrowseVeilState {
+    private val viewportBounds = mutableStateOf(Rect.Zero)
+    private val protectedBounds = mutableStateOf<Rect?>(null)
+
+    fun updateViewportBounds(coordinates: LayoutCoordinates) {
+        viewportBounds.value = coordinates.unclippedBoundsInRoot()
+    }
+
+    fun protectBounds(bounds: Rect?) {
+        protectedBounds.value = bounds
+    }
+
+    fun protectedBoundsInViewport(): Rect? {
+        val viewport = viewportBounds.value
+        return protectedBounds.value?.translate(-viewport.left, -viewport.top)
+    }
+}
+
+private fun LayoutCoordinates.unclippedBoundsInRoot(): Rect =
+    Rect(offset = positionInRoot(), size = Size(size.width.toFloat(), size.height.toFloat()))
+
+private fun Array<Pair<Float, Color>>.reversedLogicalStops(): Array<Pair<Float, Color>> =
+    reversedArray().map { (position, color) -> (1f - position) to color }.toTypedArray()

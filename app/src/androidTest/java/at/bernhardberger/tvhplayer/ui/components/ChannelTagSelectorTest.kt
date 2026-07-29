@@ -1,8 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,16 +14,23 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
@@ -163,5 +173,106 @@ class ChannelTagSelectorTest {
         composeRule.onNodeWithText("Tag 20").requestFocus().assertIsFocused()
         composeRule.runOnIdle { tags = tags.dropLast(1) }
         composeRule.onNodeWithText("All channels").assertIsFocused()
+    }
+
+    @Test
+    fun overflowingInactiveTabsFadeAtTheLeadingEdgeButTheFirstTabDoesNot() {
+        var selectedTagId by mutableStateOf<Int?>(5)
+        val tags = longTags()
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                ChannelTagSelector(
+                    tags = tags,
+                    activeTagId = selectedTagId,
+                    onSelectTag = { selectedTagId = it },
+                    modifier = Modifier
+                        .width(260.dp)
+                        .height(80.dp)
+                        .background(Color.Red)
+                        .testTag("overflowing-scopes"),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(tags.last().name).requestFocus().assertIsFocused()
+        composeRule.waitForIdle()
+
+        val overflowPixels = composeRule.onNodeWithTag("overflowing-scopes")
+            .captureToImage()
+            .toPixelMap()
+        val sampleY = overflowPixels.height - 2
+        assertEquals(0.75f, overflowPixels[1, sampleY].red, 0.08f)
+        assertEquals(1f, overflowPixels[overflowPixels.width - 2, sampleY].red, 0.06f)
+
+        composeRule.onNodeWithText("All channels").requestFocus().assertIsFocused()
+        composeRule.waitForIdle()
+        val firstTabPixels = composeRule.onNodeWithTag("overflowing-scopes")
+            .captureToImage()
+            .toPixelMap()
+        assertEquals(1f, firstTabPixels[1, sampleY].red, 0.06f)
+    }
+
+    @Test
+    fun overflowingInactiveTabsFadeAtTheLogicalLeadingEdgeInRtl() {
+        val tags = longTags()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                TVHeadendPlayerTheme {
+                    ChannelTagSelector(
+                        tags = tags,
+                        activeTagId = 5,
+                        onSelectTag = {},
+                        modifier = Modifier
+                            .width(260.dp)
+                            .height(80.dp)
+                            .background(Color.Red)
+                            .testTag("rtl-overflowing-scopes"),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText(tags.last().name).requestFocus().assertIsFocused()
+        composeRule.waitForIdle()
+
+        val pixels = composeRule.onNodeWithTag("rtl-overflowing-scopes")
+            .captureToImage()
+            .toPixelMap()
+        val sampleY = pixels.height - 2
+        assertEquals(0.75f, pixels[pixels.width - 2, sampleY].red, 0.08f)
+        assertEquals(1f, pixels[1, sampleY].red, 0.06f)
+    }
+
+    @Test
+    fun focusedTabIsProtectedBeforeSelectionStateCatchesUp() {
+        var requestedTagId: Int? = null
+        val tags = longTags()
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                ChannelTagSelector(
+                    tags = tags,
+                    activeTagId = 5,
+                    onSelectTag = { requestedTagId = it },
+                    modifier = Modifier.width(260.dp),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(tags.last().name).requestFocus().performKeyInput {
+            pressKey(Key.DirectionLeft)
+        }
+
+        composeRule.onNodeWithText(tags[tags.lastIndex - 1].name).assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(4, requestedTagId)
+        }
+    }
+
+    private fun longTags(): List<ChannelTagUi> = (1..5).map { id ->
+        ChannelTagUi(
+            id = id,
+            name = "Long channel scope $id",
+            index = id,
+        )
     }
 }
