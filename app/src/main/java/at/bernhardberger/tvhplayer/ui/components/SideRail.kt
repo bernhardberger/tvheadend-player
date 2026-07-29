@@ -29,19 +29,21 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.Icon
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.NavigationDrawerItemDefaults
@@ -55,6 +57,15 @@ import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
 import at.bernhardberger.tvhplayer.models.RailItem
 import at.bernhardberger.tvhplayer.ui.Routes
+import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientEarlyAlpha
+import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientLateAlpha
+import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientMiddleAlpha
+import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientStartAlpha
+import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientLateAlpha
+import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientMiddleAlpha
+import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientQuarterAlpha
+import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
+import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientStartAlpha
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 
 private val DrawerStartPadding = 24.dp
@@ -154,7 +165,6 @@ fun SideRail(
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
     val activeItemFocus = itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route]
     val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val drawerColor = MaterialTheme.colorScheme.background
     val backAction = browseShellBackAction(
         drawerOpen = drawerState.currentValue == DrawerValue.Open,
         currentRoute = currentRoute,
@@ -189,8 +199,38 @@ fun SideRail(
             },
     ) {
         val browseWidth = (maxWidth - ClosedDrawerWidth).coerceAtLeast(0.dp)
+        val railGradientWidth = ClosedDrawerWidth + TvNavigationRailGradientRunout
+        val railGradientEndPx = with(LocalDensity.current) { railGradientWidth.toPx() }
+        val collapsedRailBrush = Brush.horizontalGradient(
+            colorStops = arrayOf(
+                0f to Color.Black.copy(alpha = TvNavigationRailGradientStartAlpha),
+                0.25f to Color.Black.copy(alpha = TvNavigationRailGradientQuarterAlpha),
+                0.55f to Color.Black.copy(alpha = TvNavigationRailGradientMiddleAlpha),
+                0.78f to Color.Black.copy(alpha = TvNavigationRailGradientLateAlpha),
+                1f to Color.Transparent,
+            ),
+            endX = railGradientEndPx,
+        )
+        val expandedDrawerBrush = Brush.horizontalGradient(
+            colorStops = arrayOf(
+                0f to Color.Black.copy(alpha = TvNavigationDrawerGradientStartAlpha),
+                0.35f to Color.Black.copy(alpha = TvNavigationDrawerGradientEarlyAlpha),
+                0.70f to Color.Black.copy(alpha = TvNavigationDrawerGradientMiddleAlpha),
+                0.90f to Color.Black.copy(alpha = TvNavigationDrawerGradientLateAlpha),
+                1f to Color.Transparent,
+            ),
+        )
         NavigationDrawer(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (drawerState.currentValue == DrawerValue.Closed) {
+                        Modifier.background(collapsedRailBrush)
+                    } else {
+                        Modifier
+                    }
+                )
+                .testTag("global-navigation-shell"),
             drawerState = drawerState,
             drawerContent = { drawerValue ->
                 LaunchedEffect(drawerValue, currentRoute) {
@@ -202,7 +242,13 @@ fun SideRail(
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .background(drawerColor)
+                        .then(
+                            if (drawerValue == DrawerValue.Open) {
+                                Modifier.background(expandedDrawerBrush)
+                            } else {
+                                Modifier
+                            }
+                        )
                         .testTag("global-drawer-surface")
                         // The surface reaches the edge; content retains the same safe inset.
                         .padding(

@@ -21,6 +21,14 @@ const val TvTextTertiaryAlpha = 0.72f
 const val TvTextDisabledAlpha = 0.38f
 const val TvPanelBrowseAlpha = 0.84f
 const val TvPanelDenseAlpha = 0.92f
+const val TvNavigationRailGradientStartAlpha = 0.78f
+const val TvNavigationRailGradientQuarterAlpha = 0.72f
+const val TvNavigationRailGradientMiddleAlpha = 0.55f
+const val TvNavigationRailGradientLateAlpha = 0.25f
+const val TvNavigationDrawerGradientStartAlpha = 0.92f
+const val TvNavigationDrawerGradientEarlyAlpha = 0.88f
+const val TvNavigationDrawerGradientMiddleAlpha = 0.72f
+const val TvNavigationDrawerGradientLateAlpha = 0.35f
 const val TvScrimNavigationAlpha = 0.50f
 const val TvScrimModalAlpha = 0.76f
 const val TvTrackAlpha = 0.20f
@@ -74,6 +82,9 @@ val CompactChannelCardWidth = 196.dp
 
 /** Material for TV card-lane peek spacing. */
 val TvCardSpacing = 20.dp
+
+/** Softens the collapsed navigation plane into the browse content gutter. */
+val TvNavigationRailGradientRunout = TvSpacing32
 
 /** Stable master-detail width for the local Settings category pane. */
 val SettingsCategoryPaneWidth = 268.dp

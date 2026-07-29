@@ -93,7 +93,8 @@ data-derived and outside the palette. Rules:
 
 ### 1.5 Opacity tiers
 
-Nineteen distinct alpha values are in use. These are the only permitted ones.
+Use semantic opacity tiers rather than screen-specific near-duplicates. Gradient
+control points are scoped visual curves, not additional reusable panel tiers.
 
 | Token | Value | Use |
 |---|---|---|
@@ -110,6 +111,13 @@ Nineteen distinct alpha values are in use. These are the only permitted ones.
 
 `TvTrackAlpha` drops from 0.24 to 0.20. Orange separates from the old track at
 only 3.46:1; cyan at 4.09:1. Both need the track darker.
+
+The collapsed navigation darkening scrim uses one continuous black curve across
+the closed drawer width plus a 32dp runout: `0%/0.78`, `25%/0.72`, `55%/0.55`,
+`78%/0.25`, and `100%/0.00` (position/alpha). The expanded drawer uses a
+stronger full-width black curve so labels retain a stable foundation while the
+player emerges at the content boundary: `0%/0.92`, `35%/0.88`, `70%/0.72`,
+`90%/0.35`, and `100%/0.00`. These are curve controls rather than surface tiers.
 
 ---
 
@@ -308,12 +316,14 @@ do not spend the top safe region on a decorative product mark. A top action may
 be added later only for a real product capability such as search or profile
 selection.
 
-Use an opaque near-black navigation plane behind the focusable items, matching
-the app canvas when no video is active. Home leaves that canvas visible because
-its hero and cards own their surfaces. Standard drawers place navigation and
-content beside one another; do not add a gradient, hard divider, blur, or
-full-screen navigation scrim without physical evidence that a separate boundary
-treatment is needed.
+Use the stronger continuous nonlinear black curve from section 1.5 behind the
+expanded focusable items, preserving the darkest region through the icon and
+label area before fading at the content boundary. In the collapsed state, use
+its narrower companion curve across the complete rail and 32dp runout. Both
+states must read like cinematic text scrims rather than grey panels with a
+trailing dropoff. Home leaves the canvas visible because its hero and cards own
+their surfaces. Do not add a hard divider, blur, or a second full-screen
+navigation scrim.
 
 Use the **standard push drawer**. Expanding the drawer changes the browse
 viewport position while preserving its closed width; the trailing edge clips

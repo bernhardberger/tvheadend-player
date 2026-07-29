@@ -72,7 +72,8 @@ class SideRailSemanticsTest {
     }
 
     @Test
-    fun drawerUsesAnOpaqueNearBlackSurface() {
+    fun collapsedRailAndExpandedDrawerUseContinuousScrims() {
+        val contentFocus = FocusRequester()
         composeRule.setContent {
             Box(Modifier.fillMaxSize().background(Color.Red)) {
                 TVHeadendPlayerTheme {
@@ -81,23 +82,59 @@ class SideRailSemanticsTest {
                         showEpgMenu = true,
                         onRootBack = {},
                         onNavigate = {},
-                        content = { _, _ -> },
+                        content = { _, drawerActive ->
+                            Button(
+                                onClick = {},
+                                modifier = Modifier
+                                    .focusRequester(contentFocus)
+                                    .testTag("rail-surface-test-content"),
+                            ) {
+                                Text("Browse")
+                            }
+                            LaunchedEffect(drawerActive) {
+                                if (!drawerActive) contentFocus.requestFocus()
+                            }
+                        },
                     )
                 }
             }
         }
 
-        val surfacePixels = composeRule.onNodeWithTag("global-drawer-surface")
+        val shellPixels = composeRule.onNodeWithTag("global-navigation-shell")
             .captureToImage()
             .toPixelMap()
-        val surfacePixel = surfacePixels[
-            surfacePixels.width / 2,
-            surfacePixels.height / 2,
-        ]
+        val sampleY = shellPixels.height / 2
+        fun redAt(x: Int): Float {
+            val sampleX = with(composeRule.density) { x.dp.roundToPx() }
+            return shellPixels[sampleX, sampleY].red
+        }
 
-        assertTrue(surfacePixel.red < 0.1f)
-        assertTrue(surfacePixel.green < 0.1f)
-        assertTrue(surfacePixel.blue < 0.1f)
+        assertEquals(0.22f, redAt(1), 0.06f)
+        assertEquals(0.28f, redAt(31), 0.06f)
+        assertEquals(0.45f, redAt(68), 0.06f)
+        assertEquals(0.75f, redAt(97), 0.06f)
+        assertEquals(1f, redAt(124), 0.06f)
+
+        composeRule.onNodeWithTag("rail-surface-test-content")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.waitForIdle()
+
+        val expandedPixels = composeRule.onNodeWithTag("global-drawer-surface")
+            .captureToImage()
+            .toPixelMap()
+        val expandedSampleY = expandedPixels.height / 2
+        fun expandedRedAt(fraction: Float): Float {
+            val sampleX = (expandedPixels.width * fraction).toInt()
+                .coerceIn(0, expandedPixels.width - 1)
+            return expandedPixels[sampleX, expandedSampleY].red
+        }
+
+        assertEquals(0.08f, expandedRedAt(0.01f), 0.06f)
+        assertEquals(0.12f, expandedRedAt(0.35f), 0.06f)
+        assertEquals(0.28f, expandedRedAt(0.70f), 0.06f)
+        assertEquals(0.65f, expandedRedAt(0.90f), 0.06f)
+        assertEquals(0.96f, expandedRedAt(0.99f), 0.06f)
     }
 
     @Test
