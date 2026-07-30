@@ -61,6 +61,8 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
+import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBlockGap
 import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -469,6 +471,18 @@ internal fun RecordingSeekPreview(
     }
 }
 
+internal data class RecordingDurationStatusEmphasis(
+    val elapsedAlpha: Float,
+    val statusAlpha: Float,
+    val deltaAlpha: Float,
+)
+
+internal val recordingDurationStatusEmphasis = RecordingDurationStatusEmphasis(
+    elapsedAlpha = TvOverlayTextTertiaryAlpha,
+    statusAlpha = TvOverlayTextSecondaryAlpha,
+    deltaAlpha = TvOverlayTextTertiaryAlpha,
+)
+
 @Composable
 private fun RecordingDurationStatus(
     elapsedMs: Long,
@@ -497,17 +511,26 @@ private fun RecordingDurationStatus(
             Text(
                 text = elapsed,
                 style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = recordingDurationStatusEmphasis.elapsedAlpha,
+                ),
             )
             Spacer(Modifier.weight(1f))
             Text(
                 text = status,
                 style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = recordingDurationStatusEmphasis.statusAlpha,
+                ),
             )
         }
         delta?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = recordingDurationStatusEmphasis.deltaAlpha,
+                ),
                 modifier = Modifier.testTag("recording-seek-preview-delta"),
             )
         }

@@ -51,6 +51,33 @@ class PlayerIdentityHeaderTest {
     }
 
     @Test
+    fun programmeTitleTypographyOutranksTheClock() {
+        val content = mutableStateOf(
+            HeaderContent(
+                eyebrow = "104  Documentary",
+                title = "Programme title",
+                support = "Up next: News",
+                clockSupport = "Ends at 00:05",
+            ),
+        )
+        setHeader(content)
+
+        val titleLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        val clockLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        composeRule.onNodeWithTag("player-header-title").performSemanticsAction(
+            SemanticsActions.GetTextLayoutResult,
+        ) { action -> action(titleLayouts) }
+        composeRule.onNodeWithTag("player-header-clock").performSemanticsAction(
+            SemanticsActions.GetTextLayoutResult,
+        ) { action -> action(clockLayouts) }
+
+        assertTrue(
+            titleLayouts.single().layoutInput.style.fontSize >
+                clockLayouts.single().layoutInput.style.fontSize,
+        )
+    }
+
+    @Test
     fun longEnglishHeaderKeepsTwoLineTitleAndStableSafeAnchorsAt960x540() {
         val content = mutableStateOf(
             HeaderContent(

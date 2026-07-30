@@ -109,7 +109,7 @@ fun PlayerIdentityHeader(
             Text(
                 text = clock,
                 color = onSurface.copy(alpha = TvOverlayTextSecondaryAlpha),
-                style = MaterialTheme.typography.displaySmall,
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier
                     .optionalTestTag(tags.clock)
                     .paddingFrom(FirstBaseline, before = TvOverlayHeaderFirstBaseline)
@@ -118,7 +118,7 @@ fun PlayerIdentityHeader(
                 Text(
                     text = it,
                     color = onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.optionalTestTag(tags.clockSupport),

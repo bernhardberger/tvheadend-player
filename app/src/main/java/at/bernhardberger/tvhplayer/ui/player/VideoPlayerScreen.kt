@@ -163,10 +163,26 @@ val bottomGradient = Brush.verticalGradient(
     1f to Color.Black.copy(alpha = 0.92f)
 )
 
+internal data class PlayerTopScrimTone(
+    val topAlpha: Float,
+    val middleStop: Float,
+    val middleAlpha: Float,
+    val endAlpha: Float,
+)
+
+internal val playerTopScrimTone = PlayerTopScrimTone(
+    topAlpha = 0.88f,
+    middleStop = 0.58f,
+    middleAlpha = 0.64f,
+    endAlpha = 0.08f,
+)
+
 val topGradient = Brush.verticalGradient(
-    0f to Color.Black.copy(alpha = 0.78f),
-    0.48f to Color.Black.copy(alpha = 0.48f),
-    1f to Color.Transparent,
+    0f to Color.Black.copy(alpha = playerTopScrimTone.topAlpha),
+    playerTopScrimTone.middleStop to Color.Black.copy(
+        alpha = playerTopScrimTone.middleAlpha,
+    ),
+    1f to Color.Black.copy(alpha = playerTopScrimTone.endAlpha),
 )
 
 @OptIn(UnstableApi::class)
