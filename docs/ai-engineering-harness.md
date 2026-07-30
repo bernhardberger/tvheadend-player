@@ -15,7 +15,11 @@ root:
 | `docs/README.md` | Documentation authority and lifecycle index used for task-specific reads |
 | `docs/archive/README.md` | Historical-document containment and successor map |
 | `.opencode/opencode.json` | Default agent, disabled generic Build, model assignments, sharing policy, and one-level child allowlist |
-| `.opencode/agents/android-tv.md` | Application implementation primary |
+| `.opencode/agents/android-tv.md` | Read-only supervising application orchestrator and default primary |
+| `.opencode/agents/android-implementer.md` | Luna/max bounded ordinary application writer |
+| `.opencode/agents/android-implementer-deep.md` | Terra/xhigh bounded high-risk application writer |
+| `.opencode/agents/android-implementer-critical.md` | Sol/xhigh exception-gated critical application writer |
+| `.opencode/agents/android-tv-integrated.md` | Selectable integrated fallback preserving the pre-trial workflow |
 | `.opencode/agents/repo-maintainer.md` | Harness, tooling, CI, documentation, licensing, and release-policy primary |
 | `.opencode/agents/android-reviewer.md` | Read-only Android runtime and cross-layer correctness reviewer |
 | `.opencode/agents/tv-interaction-reviewer.md` | Read-only TV interaction code reviewer for focus, keys, Back, accessibility, and UI tests |
@@ -28,24 +32,34 @@ root:
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
 | `tools/check-ai-harness` | Config, agent, skill, command, permission, safety, and live OpenCode validation |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
-| `tools/ai-model-tier` | Checked child-agent switch between matching standard and fast service tiers |
+| `tools/ai-model-tier` | Checked managed-agent switch between matching standard and fast service tiers |
 | `tools/verify` | Native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
 
 ## Primary agents and model tier
 
-`android-tv` is the default and only application implementation primary.
-`repo-maintainer` owns repository infrastructure and must not implement Kotlin,
-Compose, playback, EPG, DVR, or appliance behavior. The generic built-in `build`
-agent is disabled so a retained primary selection cannot bypass those scopes.
+`android-tv` is the default supervising application primary. It owns planning,
+authority, slice boundaries, worker routing, verification, review, device gates,
+and acceptance but is capability-denied from editing. `android-implementer`
+performs ordinary bounded application work; `android-implementer-deep` owns
+HTSP/Media3 architecture, concurrency, lifecycle/ownership, security,
+native-boundary, and broad cross-layer work; `android-implementer-critical` is an
+exception gate for unresolved P1 or combined transport/ownership plus security,
+native, signing, rollback, or release-safety work. `repo-maintainer` owns
+repository infrastructure and cannot use application writers. The generic
+built-in `build` agent is disabled.
 
-Primary agents inherit the operator's OpenCode model. While subscription capacity
-is available, child agents are temporarily pinned to matching OpenAI
-`gpt-5.6-*-fast` service-tier models in `.opencode/opencode.json`: Luna/low for
-exact lookup, Terra/medium for exploration and research, Sol/high for reviewers,
-and approval-gated Sol/medium for General. The fast IDs select service priority,
-not a less capable model.
+The delegated trial pins `android-tv` to Sol/xhigh, the ordinary worker to
+Luna/max, the deep worker to Terra/xhigh, and the exception-gated critical worker
+to Sol/xhigh. Sol implementation is not a routine confidence upgrade: it
+requires the documented critical gate. Read-only lookup and research retain
+Luna/low and Terra/medium; Android and interaction reviewers remain Sol/high;
+the screenshot-first design reviewer uses Sol/medium; General remains
+approval-gated Sol/medium. Managed agents use matching `gpt-5.6-*-fast` service
+IDs while subscription capacity is available. The fast IDs select service
+priority, not a less capable model. `repo-maintainer` and the integrated fallback
+inherit the operator-selected model.
 
 OpenCode cannot hot-reload model assignments for later Task calls. Use the
 checked repository tool or matching slash command, then restart OpenCode:
@@ -59,7 +73,30 @@ checked repository tool or matching slash command, then restart OpenCode:
 ## Delegation and evidence containment
 
 Delegation is capability-based and one level deep. The project policy denies
-every child first, then allows these read-only children:
+every child first. `android-tv` may invoke one of three writing children:
+
+- `android-implementer` for ordinary bounded Kotlin, Compose, policy, repository,
+  resource, localization, deterministic visual-evidence, and test work;
+- `android-implementer-deep` for HTSP/Media3 architecture, concurrency,
+  cancellation, lifecycle/ownership, security, native boundaries, and broad
+  cross-layer invariants;
+- `android-implementer-critical` only for an unresolved P1 after a bounded deep
+  root-cause attempt, or a transport/ownership defect that also crosses a
+  security, native, signing, rollback, or release-safety boundary.
+
+Large scope, a deadline, general complexity, or a desire for more confidence is
+not a critical gate. The orchestrator records `CRITICAL_GATE`, explains why the
+deep worker is insufficient, and preserves the reproducer and attempted-fix
+evidence. A deep worker may return `ESCALATE_CRITICAL`; escalation changes the
+writer only after the previous worker yields.
+
+Only one implementation writer may run at a time. Its assignment names exact
+acceptance criteria, owned files or symbols, dirty changes to preserve,
+exclusions, and focused checks. It resolves to `task: deny`, cannot use a device
+or mutate Git, and yields before the orchestrator runs integration verification
+or review. Resume the same worker session for scoped remediation when practical.
+
+The permitted read-only children are:
 
 - `quick-explore` for exact, low-consequence lookup;
 - `explore` for architecture, multi-hop tracing, or completeness;
@@ -70,8 +107,40 @@ every child first, then allows these read-only children:
 
 `general` requires user approval plus explicit scope and exclusive file
 ownership. Every child resolves to `task: deny`, preventing recursive spawning.
-Read-only children may run in parallel; writers, Gradle builds, device operations,
-Git mutations, signing, publishing, and release operations may not.
+`repo-maintainer` and `android-tv-integrated` explicitly deny all application
+workers. Read-only children may run in parallel only after the writer yields;
+writers, Gradle builds, device operations, Git mutations, signing, publishing,
+and release operations may not overlap.
+
+## Delegated trial and rollback
+
+Harness commit `d830c25` is the exact pre-trial integrated baseline. The trial
+preserves that behavior as the selectable `android-tv-integrated` primary. Use
+that agent for an immediate functional fallback without deleting the new roles;
+it plans and edits directly and cannot invoke any implementation worker.
+
+For an exact repository rollback, keep the delegated trial in one isolated
+maintenance commit and revert that commit, then quit and restart OpenCode. Do not
+reset or restore the whole dirty worktree. Before the trial is committed, a
+maintainer may restore only its named harness paths from `d830c25` and remove
+only its four new agent files. Application changes are never part of rollback.
+
+The trial footprint is intentionally limited to these existing paths:
+
+- `AGENTS.md`;
+- `docs/ai-engineering-harness.md`;
+- `.opencode/opencode.json`;
+- `.opencode/agents/android-tv.md`;
+- `.opencode/agents/repo-maintainer.md`;
+- `.opencode/commands/ai-model-tier.md`;
+- `tools/ai-model-tier`; and
+- `tools/check-ai-harness`.
+
+Its only new paths are `.opencode/agents/android-tv-integrated.md`,
+`.opencode/agents/android-implementer.md`,
+`.opencode/agents/android-implementer-deep.md`, and
+`.opencode/agents/android-implementer-critical.md`. This allowlist is also the
+uncommitted rollback boundary; never include application or product-plan files.
 
 ## Review lifecycle and autonomous continuation
 
@@ -97,7 +166,8 @@ architecture. The two code reviewers may run together only when their assignment
 name distinct concerns and paths or symbols. The primary deduplicates a genuine
 cross-boundary finding and sends closure only to its owner.
 
-The primary batches blocking code fixes before closure. Code reviewers classify
+The orchestrator batches blocking code fixes and sends one remediation contract
+to the appropriate implementation worker before closure. Code reviewers classify
 results as `PASS`, `REMEDIATE`, `ADVISORY`, or `HUMAN_DECISION_REQUIRED` and
 separate blocking findings from optional improvements, pre-existing issues, and
 physical gates. A blocking finding needs a stable ID, evidence, the violated
@@ -148,13 +218,13 @@ dynamic path behavior—the harness checks.
 
 Prefer deterministic offline captures of production composables with fake
 channels, EPG, tracks, timelines, recovery states, local images, and a
-deterministic video backdrop. The primary, not the read-only design reviewer,
-generates them without a live TVHeadend connection and records scenario, canvas,
-density, font scale, locale, and focus state. Generated PNGs remain under ignored
-evidence paths and are passed by exact path. They can prove only the captured
-static composition; integrated navigation, SurfaceView/video, focus and remote
-feel, overscan, HDR, deinterlacing, and motion retain their emulator/device or
-human gates.
+deterministic video backdrop. The assigned implementation worker, not the
+read-only orchestrator or design reviewer, generates them without a live
+TVHeadend connection and records scenario, canvas, density, font scale, locale,
+and focus state. Generated PNGs remain under ignored evidence paths and are
+passed by exact path. They can prove only the captured static composition;
+integrated navigation, SurfaceView/video, focus and remote feel, overscan, HDR,
+deinterlacing, and motion retain their emulator/device or human gates.
 
 ## Skills and routing
 

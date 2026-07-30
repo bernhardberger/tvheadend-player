@@ -13,9 +13,11 @@ Before non-trivial work:
    worktree change and stop if another writer is active in the same checkout.
 2. Use `docs/README.md` to select only the documents relevant to the task. Do
    not read the whole documentation tree.
-3. Use `android-tv` for application Kotlin, Compose, navigation, playback, EPG,
-   DVR, or appliance behavior. Use `repo-maintainer` for repository and harness
-   infrastructure.
+3. Use `android-tv` to orchestrate application Kotlin, Compose, navigation,
+   playback, EPG, DVR, or appliance behavior through one bounded implementation
+   worker at a time. Use `repo-maintainer` for repository and harness
+   infrastructure. Select `android-tv-integrated` only as the documented trial
+   fallback.
 4. State assumptions before ambiguous or architectural work and implement one
    small, independently verifiable slice.
 5. Fetch remotes before upstream synchronization, contribution preparation, or
@@ -132,8 +134,18 @@ Delegation is limited to one child level. `quick-explore` is for exact,
 low-consequence lookups; use `explore` for architecture, multi-hop tracing, or
 completeness. `scout`, `android-reviewer`, `tv-interaction-reviewer`, and
 `tv-ux-reviewer` may perform bounded read-only research/review and cannot
-delegate. Spawning the writing-capable `general` agent requires user approval,
-an explicit scope, and exclusive file ownership.
+delegate. `android-tv` may delegate an exact application slice to one
+writing-capable `android-implementer`, `android-implementer-deep`, or
+`android-implementer-critical`; they cannot delegate, overlap another writer,
+commit, or use a device. Use the deep worker for HTSP/Media3 architecture,
+concurrency, lifecycle/ownership, security, native-boundary, or broad cross-layer
+work. Reserve the critical worker for an unresolved P1 after a bounded deep
+attempt or a transport/ownership defect that also crosses security, native,
+signing, rollback, or release safety; size or complexity alone is not enough.
+Spawning the writing-capable `general` agent still requires user approval, an
+explicit scope, and exclusive file ownership. When explicitly selected as the
+trial fallback, `android-tv-integrated` implements directly and must not invoke
+any Android implementation worker.
 
 Use `android-reviewer` for runtime/cross-layer correctness and
 `tv-interaction-reviewer` for source-level focus, keys, Back, accessibility, and

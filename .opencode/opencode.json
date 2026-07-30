@@ -8,6 +8,22 @@
     "build": {
       "disable": true
     },
+    "android-tv": {
+      "model": "openai/gpt-5.6-sol-fast",
+      "variant": "xhigh"
+    },
+    "android-implementer": {
+      "model": "openai/gpt-5.6-luna-fast",
+      "variant": "max"
+    },
+    "android-implementer-deep": {
+      "model": "openai/gpt-5.6-terra-fast",
+      "variant": "xhigh"
+    },
+    "android-implementer-critical": {
+      "model": "openai/gpt-5.6-sol-fast",
+      "variant": "xhigh"
+    },
     "explore": {
       "model": "openai/gpt-5.6-terra-fast",
       "variant": "medium",
@@ -43,7 +59,7 @@
     },
     "tv-ux-reviewer": {
       "model": "openai/gpt-5.6-sol-fast",
-      "variant": "high"
+      "variant": "medium"
     }
   },
   "permission": {
@@ -52,6 +68,9 @@
       "quick-explore": "allow",
       "explore": "allow",
       "scout": "allow",
+      "android-implementer": "allow",
+      "android-implementer-deep": "allow",
+      "android-implementer-critical": "allow",
       "android-reviewer": "allow",
       "tv-interaction-reviewer": "allow",
       "tv-ux-reviewer": "allow",
