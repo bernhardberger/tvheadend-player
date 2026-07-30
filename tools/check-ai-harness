@@ -28,6 +28,10 @@ REQUIRED_FILES = (
     "screenshots/README.md",
     ".opencode/opencode.json",
     ".opencode/agents/android-tv.md",
+    ".opencode/agents/android-tv-integrated.md",
+    ".opencode/agents/android-implementer.md",
+    ".opencode/agents/android-implementer-deep.md",
+    ".opencode/agents/android-implementer-critical.md",
     ".opencode/agents/repo-maintainer.md",
     ".opencode/agents/android-reviewer.md",
     ".opencode/agents/quick-explore.md",
@@ -82,6 +86,9 @@ REQUIRED_TV_UX_EVIDENCE_RULES = {
 }
 REQUIRED_REVIEW_LIFECYCLE_RULES = {
     "AGENTS.md": (
+        "Use `android-tv` to orchestrate application Kotlin",
+        "writing-capable `android-implementer`, `android-implementer-deep`, or",
+        "Reserve the critical worker for an unresolved P1",
         "External review is risk-based, not an automatic approval loop",
         "Never ask the user merely whether to continue",
         "Review economy never waives an unresolved correctness or safety blocker",
@@ -93,15 +100,44 @@ REQUIRED_REVIEW_LIFECYCLE_RULES = {
         "Continue automatically through planned slices",
         "Review economy never downgrades or waives a confirmed correctness",
         "Prefer deterministic offline captures of production composables",
+        "Harness commit `d830c25` is the exact pre-trial integrated baseline",
     ),
     ".opencode/agents/android-tv.md": (
+        "Plan and deliver application work without directly editing source files",
+        "Delegate ordinary bounded Kotlin, Compose, policy, repository",
+        "Delegate directly to `android-implementer-deep`",
+        "Reserve `android-implementer-critical` for an evidenced `CRITICAL_GATE`",
+        "general complexity, or desire for extra confidence is not enough",
+        "Run only one implementation writer at a time",
         "Autonomous review lifecycle",
-        "`closure` is limited to named finding IDs",
-        "Treat `REMEDIATE` as an autonomous bounded remediation sub-slice",
-        "Use `tv-ux-reviewer` as an independent screenshot-first product design critic",
-        "Generate this evidence without a live TVHeadend connection",
-        "Do not ask the user merely whether to continue",
-        "Never continue past an unresolved correctness or safety blocker",
+        "Closure is limited to named IDs",
+        "`REMEDIATE` and `DESIGN_REMEDIATE` create autonomous bounded remediation",
+        "Never ask merely whether to continue",
+    ),
+    ".opencode/agents/android-implementer.md": (
+        "Implement one exact application slice delegated by `android-tv`",
+        "return `ESCALATE_DEEP` before editing",
+        "The orchestrator owns `./tools/verify`",
+        "Do not commit, push, install, use ADB",
+    ),
+    ".opencode/agents/android-implementer-deep.md": (
+        "Implement one exact high-risk application slice delegated by `android-tv`",
+        "State the attempt, generation, ownership, terminal-state, and cleanup invariants",
+        "Return `ESCALATE_CRITICAL` before editing",
+        "The orchestrator owns `./tools/verify`",
+        "Do not commit, push, install, use ADB",
+    ),
+    ".opencode/agents/android-implementer-critical.md": (
+        "Implement one exceptional critical application slice delegated by `android-tv`",
+        "The assignment must include a `CRITICAL_GATE` statement",
+        "A large diff, deadline, general complexity, or desire for extra confidence is not",
+        "The orchestrator owns `./tools/verify`",
+        "Do not commit, push, install, use ADB",
+    ),
+    ".opencode/agents/android-tv-integrated.md": (
+        "integrated fallback primary preserved from harness baseline `d830c25`",
+        "this agent plans and directly implements application changes",
+        "does not delegate to any Android implementation worker",
     ),
     ".opencode/agents/android-reviewer.md": (
         "Assignment contract and modes",
@@ -136,7 +172,11 @@ REQUIRED_REVIEW_LIFECYCLE_RULES = {
         "Without current images, return `EVIDENCE_REQUIRED`",
     ),
 }
-REQUIRED_PRIMARY_AGENTS = {"android-tv", "repo-maintainer"}
+REQUIRED_PRIMARY_AGENTS = {
+    "android-tv",
+    "android-tv-integrated",
+    "repo-maintainer",
+}
 READ_ONLY_CHILD_AGENTS = {
     "quick-explore",
     "explore",
@@ -145,16 +185,48 @@ READ_ONLY_CHILD_AGENTS = {
     "tv-interaction-reviewer",
     "tv-ux-reviewer",
 }
-ALL_CHILD_AGENTS = READ_ONLY_CHILD_AGENTS | {"general"}
+IMPLEMENTATION_CHILD_AGENTS = {
+    "android-implementer",
+    "android-implementer-deep",
+    "android-implementer-critical",
+}
+WRITING_CHILD_AGENTS = IMPLEMENTATION_CHILD_AGENTS | {"general"}
+ALL_CHILD_AGENTS = READ_ONLY_CHILD_AGENTS | WRITING_CHILD_AGENTS
 EXPECTED_TASK_POLICY = {
     "*": "deny",
     "quick-explore": "allow",
     "explore": "allow",
     "scout": "allow",
+    "android-implementer": "allow",
+    "android-implementer-deep": "allow",
+    "android-implementer-critical": "allow",
     "android-reviewer": "allow",
     "tv-interaction-reviewer": "allow",
     "tv-ux-reviewer": "allow",
     "general": "ask",
+}
+EXPECTED_NONIMPLEMENTING_TASK_POLICY = {
+    name: action
+    for name, action in EXPECTED_TASK_POLICY.items()
+    if name not in IMPLEMENTATION_CHILD_AGENTS
+}
+EXPECTED_PRIMARY_TASK_POLICIES = {
+    "android-tv": EXPECTED_TASK_POLICY,
+    "android-tv-integrated": EXPECTED_NONIMPLEMENTING_TASK_POLICY,
+    "repo-maintainer": EXPECTED_NONIMPLEMENTING_TASK_POLICY,
+}
+EXPECTED_AGENT_VARIANTS = {
+    "android-tv": "xhigh",
+    "android-implementer": "max",
+    "android-implementer-deep": "xhigh",
+    "android-implementer-critical": "xhigh",
+    "quick-explore": "low",
+    "explore": "medium",
+    "scout": "medium",
+    "android-reviewer": "high",
+    "tv-interaction-reviewer": "high",
+    "tv-ux-reviewer": "medium",
+    "general": "medium",
 }
 ISOLATED_REVIEW_COMMANDS = {
     "android-review",
@@ -222,7 +294,8 @@ def frontmatter_permission(path: Path, name: str) -> str | None:
         if in_permission and line.startswith("  ") and ":" in line:
             key, value = line.strip().split(":", 1)
             if key == name:
-                return value.strip().strip("'\"")
+                scalar = value.strip().strip("'\"")
+                return scalar or None
     return None
 
 
@@ -323,6 +396,17 @@ def main() -> int:
         errors.append("project Task policy must exactly match the bounded child allowlist")
     elif list(task_policy)[0] != "*":
         errors.append("project Task wildcard denial must precede named exceptions")
+    configured_agents = config.get("agent", {})
+    for name, expected_variant in EXPECTED_AGENT_VARIANTS.items():
+        agent_config = configured_agents.get(name, {})
+        if not isinstance(agent_config, dict):
+            errors.append(f"agent {name} must have a model configuration")
+            continue
+        if agent_config.get("variant") != expected_variant:
+            errors.append(
+                f"agent {name} variant must be {expected_variant}, "
+                f"got {agent_config.get('variant')}"
+            )
 
     model_tier_tool = ROOT / "tools/ai-model-tier"
     if model_tier_tool.is_file():
@@ -337,11 +421,11 @@ def main() -> int:
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
-            errors.append(f"cannot inspect child-agent model tier: {exc}")
+            errors.append(f"cannot inspect managed-agent model tier: {exc}")
         else:
             if model_tier_result.returncode != 0:
                 detail = model_tier_result.stderr.strip() or model_tier_result.stdout.strip()
-                errors.append(f"invalid child-agent model tier: {detail}")
+                errors.append(f"invalid managed-agent model tier: {detail}")
 
     doc_authority_tool = ROOT / "tools/check-doc-authority"
     if doc_authority_tool.is_file():
@@ -381,7 +465,17 @@ def main() -> int:
             if frontmatter_permission(path, "task") is not None:
                 errors.append(f"{path.relative_to(ROOT)}: must inherit the project Task policy")
 
+    android_tv_path = ROOT / ".opencode/agents/android-tv.md"
+    if (
+        android_tv_path.is_file()
+        and frontmatter_permission(android_tv_path, "edit") != "deny"
+    ):
+        errors.append(".opencode/agents/android-tv.md: orchestrator must deny editing")
+
     for name in (
+        "android-implementer",
+        "android-implementer-deep",
+        "android-implementer-critical",
         "android-reviewer",
         "tv-interaction-reviewer",
         "tv-ux-reviewer",
@@ -668,9 +762,11 @@ def main() -> int:
                     continue
                 if agent.get("mode") != "primary":
                     errors.append(f"resolved agent {name} must remain primary")
-                for child, expected_action in EXPECTED_TASK_POLICY.items():
-                    if child == "*":
-                        continue
+                expected_policy = EXPECTED_PRIMARY_TASK_POLICIES[name]
+                for child in ALL_CHILD_AGENTS:
+                    expected_action = expected_policy.get(
+                        child, expected_policy["*"]
+                    )
                     actual_action = effective_permission(agent, "task", child)
                     if actual_action != expected_action:
                         errors.append(
@@ -679,6 +775,42 @@ def main() -> int:
                         )
                 if effective_permission(agent, "task", "unlisted-child") != "deny":
                     errors.append(f"resolved agent {name} must deny unlisted children")
+
+            android_tv = resolved_agent_details.get("android-tv")
+            if android_tv:
+                tools = android_tv.get("tools", {})
+                mutation_tools = (
+                    [key for key in ("apply_patch", "edit", "write") if key in tools]
+                    if isinstance(tools, dict)
+                    else []
+                )
+                if not mutation_tools or any(
+                    tools[key] is not False for key in mutation_tools
+                ):
+                    errors.append("resolved android-tv orchestrator must remain read-only")
+                if effective_permission(android_tv, "bash", "git status -sb") != "allow":
+                    errors.append("resolved android-tv must allow bounded Git inspection")
+                if effective_permission(
+                    android_tv, "bash", "python3 -c 'write source'"
+                ) != "ask":
+                    errors.append(
+                        "resolved android-tv must ask before unclassified Bash commands"
+                    )
+
+            integrated = resolved_agent_details.get("android-tv-integrated")
+            if integrated:
+                tools = integrated.get("tools", {})
+                mutation_tools = (
+                    [key for key in ("apply_patch", "edit", "write") if key in tools]
+                    if isinstance(tools, dict)
+                    else []
+                )
+                if not mutation_tools or not any(
+                    tools[key] is not False for key in mutation_tools
+                ):
+                    errors.append(
+                        "resolved android-tv-integrated fallback must remain writable"
+                    )
 
             for name in ALL_CHILD_AGENTS:
                 agent = resolved_agent_details.get(name)
@@ -700,6 +832,32 @@ def main() -> int:
                 )
                 if not mutation_tools or any(tools[key] is not False for key in mutation_tools):
                     errors.append(f"resolved child agent {name} must remain read-only")
+
+            for name in IMPLEMENTATION_CHILD_AGENTS:
+                agent = resolved_agent_details.get(name)
+                if not agent:
+                    continue
+                tools = agent.get("tools", {})
+                mutation_tools = (
+                    [key for key in ("apply_patch", "edit", "write") if key in tools]
+                    if isinstance(tools, dict)
+                    else []
+                )
+                if not mutation_tools or not any(
+                    tools[key] is not False for key in mutation_tools
+                ):
+                    errors.append(f"resolved implementation child {name} must be writable")
+                for command in (
+                    "adb devices",
+                    "./tools/device doctor",
+                    "git commit -m test",
+                    "git push",
+                    "git reset --hard HEAD",
+                ):
+                    if effective_permission(agent, "bash", command) != "deny":
+                        errors.append(
+                            f"resolved implementation child {name} must deny {command!r}"
+                        )
 
             explore = resolved_agent_details.get("explore")
             if explore:
