@@ -329,6 +329,112 @@ interlaced-motion regression check.
 **Files:** launch-policy helper/test, `MainActivity`, and `AppRoot`.  
 **Dependencies:** Task 2.
 
+### Follow-up: startup/autoplay hardening (parked, unaccepted)
+
+**Status:** **PARKED — not accepted and not release-ready** (2026-07-30).
+**Branch/base:** `wip/startup-autoplay-hardening` from `a4df928`.
+**Classification:** The implementation is mixed: generic playback/readiness
+foundations, product startup UI/presentation/splash, and appliance-specific
+entry/Simple TV integration. This documentation update is appliance-plan work.
+Current source, normative specifications, and tests win; all revision-bound
+findings below must be revalidated on resume.
+
+**Scope and invariants:** Bound the platform splash, then give app startup
+exclusive ownership. Start only from a current channel snapshot, target the
+exact player directly (never compose Channels/a rail first), and leave normal
+non-autoplay launches in Channels. Missing configuration goes to onboarding;
+startup never waits for EPG. Presentation must be truthful and either passive or
+actionable. Back cancels once under normal policy, while Simple TV remains
+contained, and every request completes its cycle. Preserve the singleton
+`PlayerSession`, serialized commands, root `SurfaceView`, and the accepted
+Media3/HTSP/native playback path.
+
+**Implemented slices 1–9 (unaccepted delta):**
+
+1. Propagated a generic live request through the Stop barrier in
+   `PlaybackIssuanceCoordinator`/`PlayerSession`, including acceptance outcomes
+   (`player/` and JVM tests).
+2. Added generic typed `CurrentChannelReadiness` for the current snapshot
+   (`core/CurrentChannelReadiness*` and JVM tests).
+3. Added appliance atomic Idle/Pending/Entering exact launch state
+   (`core/ApplianceLaunchRequests*` and JVM tests).
+4. Made bootstrap recreation-stable and Activity-scoped in
+   `MainStartupViewModel`, including runtime server-presentation observation
+   without rearming startup (`viewmodels/`, `core/`, and UI/JVM tests).
+5. Added a bounded Android platform splash with launcher mark, `#0F1014`, and
+   core-splashscreen (`build.gradle.kts`, manifest, themes/resources).
+6. Added pure `MainStartupPresentation` policy (`core/MainStartupPresentation*`
+   and JVM tests).
+7. Added localized, focusable, semantic `MainStartupScreen`
+   (`ui/startup/`, `res/values*`, and startup UI tests).
+8. Added `MainStartupKeyCycleOwner` complete-cycle policy (`ui/startup/` and
+   JVM tests).
+9. Integrated exclusive root ownership, direct player, and Settings entry in
+   `MainActivity`/`AppRoot`, replacing the legacy recovery host
+   (`ui/MainActivity`, `ui/AppRoot`, `ui/screens/SettingsScreen`, and Android UI
+   tests).
+
+These outcomes remain **unaccepted** because audit remediation is open.
+
+**Verification completed before parking:** Repeated `./tools/verify` runs
+passed. The latest stable pre-audit-remediation run included the native check
+(one artifact, four ABIs, 16 KiB), 56 tool tests, JVM tests, lint, Android-test
+Kotlin compilation, and a debug APK build. Instrumentation tests compiled but
+were not run. No device work occurred.
+
+**Open audit blockers and bounded restart contracts:**
+
+1. **`AND-003-A`** — A Playing → request B → B canceled/rejected can persist B
+   through a generic Playing effect. Use exact active service identity. Resume as
+   Slice 1 with a deep worker owning session ownership.
+2. **`AND-001-A`** — `ChannelsViewModel` currently initializes while startup is
+   Pending. Defer acquisition until the exact player or normal browse is allowed
+   and prove production wiring. Resume as Slice 9 with a deep worker.
+3. **`TVI-002a`** — `effectiveMainStartupPresentation` can compose player before
+   the exact Entering CAS commits. Retain startup/key ownership and suppress the
+   player until commit, then update tests. Resume as Slice 9 with a deep worker.
+4. **`TVI-004a`** — tests bypass the production Activity dispatcher for OK
+   opening and the full Back cycle. Strengthen shared-owner production-dispatch
+   tests. Resume as Slice 9 with a deep worker.
+5. **`TVI-002b`** — the bounds test uses empty padding and an incomplete
+   German-only matrix. Add production `TvFullScreenPadding`; test EN/DE at
+   960×540 and font 1.3 with longest messages and every action set, without
+   claiming overscan proof. Resume as Slice 7 with an ordinary worker.
+6. **`AND-004-A`** — process restoration loses or rearms in-memory
+   Pending/Entering. Restore or reconstruct the exact request generation once,
+   revalidate its target from the current snapshot (never restore a stale
+   Entering target directly), and preserve no-rearm semantics. This is a review
+   interpretation: revalidate it against current product/spec authority before
+   implementation if that authority does not already require process-death
+   restoration. Resume as Slice 4 with a deep worker.
+
+**Resume sequence:** Revalidate the branch, current source, and dirty paths;
+use one writer at a time. Address `AND-003-A`, then the Slice 9 batch, then
+bounds, then process restoration only after authority revalidation. Run focused
+checks and `./tools/verify`; perform one closure limited to the named IDs and
+fix delta. Then complete Slice 10 Paparazzi evidence, exact-path UX review, and
+a final verify.
+
+**Slice 10 remaining:** Create ignored, opt-in Paparazzi evidence following the
+existing player pattern: 960×540 mdpi, TV/D-pad/no-touch, dark, with a
+locale/font/focus manifest. Capture Preparing, Connecting, German syncing at
+1.3, retryable Retry focus, credential Settings focus, authoritative no
+channels, every Simple TV action focused, and Entering. Generated captures stay
+ignored.
+
+**Still-unproven physical-TV gates:** Splash behavior on API 28/31; absence of a
+Channels frame; slow/failing/zero-channel startup; held Back/OK/D-pad cycles;
+player handoff, black/fade, and persistent `SurfaceView`; rapid HOME/GUIDE while
+Stop is active; progressive/interlaced motion and deinterlacing; and German,
+overscan, TalkBack, and ten-foot readability.
+
+**Safety and worktree boundary:** Do not generate or stage credentials, server
+identities, or captures. Do not change native/Media3 code beyond the accepted
+core-splashscreen Java dependency. Do not commit, push, install, sign, or
+release without an explicit user request and applicable safety gates. Existing
+dirty harness/config paths are not part of this application-branch commit and
+must remain preserved and uncommitted.
+
 ### Task 5: Register and validate the HOME role
 
 **Status:** Candidate registration implemented; TCL selection blocked.

@@ -470,12 +470,19 @@ class PlayerSession(
     }
 
     @OptIn(UnstableApi::class)
-    suspend fun playService(context: Context, serviceId: Int) {
-        val ticket = issuance.submit(PlaybackIntent.Live(serviceId))
-        val epoch = (ticket.decision as? PlaybackSubmissionDecision.Issue)?.epoch
-        if (epoch == null) {
-            ticket.completion.await()
-            return
+    suspend fun playService(context: Context, serviceId: Int): Boolean {
+        val ticket = issuance.submitLive(serviceId) ?: return false
+        val epoch = when (val decision = ticket.decision) {
+            is PlaybackSubmissionDecision.Issue -> decision.epoch
+            is PlaybackSubmissionDecision.Join -> {
+                ticket.completion.await()
+                return issuance.commitIfCurrent(decision.epoch) {
+                    activePlayback?.let {
+                        it.serviceId == serviceId && it.generation == decision.epoch
+                    } == true
+                } == true
+            }
+            is PlaybackSubmissionDecision.Reject -> return false
         }
 
         try {
@@ -509,6 +516,11 @@ class PlayerSession(
         } finally {
             issuance.complete(epoch)
         }
+        return issuance.commitIfCurrent(epoch) {
+            activePlayback?.let {
+                it.serviceId == serviceId && it.generation == epoch
+            } == true
+        } == true
     }
 
     @OptIn(UnstableApi::class)

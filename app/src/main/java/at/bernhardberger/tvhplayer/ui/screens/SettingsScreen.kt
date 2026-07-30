@@ -63,10 +63,44 @@ object SettingsRoutes {
 
 @Composable
 fun SettingsScreen(
+    startRoute: String = SettingsRoutes.GENERAL,
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
     onStartSimpleTv: () -> Unit,
+) {
+    val simpleTvSession: SimpleTvSession = koinInject()
+    val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
+    SettingsScreenNavigation(
+        startRoute = startRoute,
+        initialFocusEnabled = initialFocusEnabled,
+        contentPadding = contentPadding,
+        backEnabled = backEnabled,
+        showSimpleTvSettings = !simpleTvActive,
+    ) { route, initialFocusRequester ->
+        when (route) {
+            SettingsRoutes.GENERAL -> SettingsLanguage(initialFocusRequester)
+            SettingsRoutes.CONNECTION -> SettingsConnection(initialFocusRequester)
+            SettingsRoutes.OPTIONS -> SettingsOptions(initialFocusRequester)
+            SettingsRoutes.CHANNEL_TAGS -> SettingsChannelTags(initialFocusRequester)
+            SettingsRoutes.PLAYER -> SettingsPlayer(initialFocusRequester)
+            SettingsRoutes.APPLIANCE -> SettingsAppliance(initialFocusRequester)
+            SettingsRoutes.SIMPLE_TV -> SettingsSimpleTv(
+                initialFocusRequester = initialFocusRequester,
+                onStartSimpleTv = onStartSimpleTv,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SettingsScreenNavigation(
+    startRoute: String,
+    initialFocusEnabled: Boolean = true,
+    contentPadding: PaddingValues = TvFullScreenPadding,
+    backEnabled: Boolean = true,
+    showSimpleTvSettings: Boolean,
+    destinationContent: @Composable (String, FocusRequester) -> Unit,
 ) {
     val nav = rememberNavController()
     val settingsRoutes = remember {
@@ -80,6 +114,10 @@ fun SettingsScreen(
             SettingsRoutes.SIMPLE_TV,
         )
     }
+    val resolvedStartRoute = startRoute.takeIf { route ->
+        route in settingsRoutes &&
+            (route != SettingsRoutes.SIMPLE_TV || showSimpleTvSettings)
+    } ?: SettingsRoutes.GENERAL
     val categoryFocus = remember(settingsRoutes) {
         settingsRoutes.associateWith { FocusRequester() }
     }
@@ -87,9 +125,7 @@ fun SettingsScreen(
         settingsRoutes.associateWith { FocusRequester() }
     }
     var contentPaneFocused by remember { mutableStateOf(false) }
-    val simpleTvSession: SimpleTvSession = koinInject()
-    val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
-    val showSimpleTvSettings = !simpleTvActive
+    var initialCategoryFocusHandled by remember { mutableStateOf(false) }
 
     val backStackEntry by nav.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -104,6 +140,16 @@ fun SettingsScreen(
         enabled = backEnabled && backAction == SettingsBackAction.FOCUS_CURRENT_CATEGORY,
     ) {
         focusCurrentCategory()
+    }
+    LaunchedEffect(initialFocusEnabled, currentRoute) {
+        if (!initialFocusEnabled) {
+            initialCategoryFocusHandled = false
+            return@LaunchedEffect
+        }
+        if (!initialCategoryFocusHandled && currentRoute != null) {
+            categoryFocus.getValue(currentRoute).requestFocus()
+            initialCategoryFocusHandled = true
+        }
     }
     LaunchedEffect(currentRoute, showSimpleTvSettings) {
         if (currentRoute == SettingsRoutes.SIMPLE_TV && !showSimpleTvSettings) {
@@ -142,7 +188,9 @@ fun SettingsScreen(
                 currentRoute = currentRoute,
                 categoryFocusRequesters = categoryFocus,
                 contentFocusRequesters = contentFocus,
-                initialFocusEnabled = initialFocusEnabled,
+                // Settings owns route-aware entry so a direct Connection start
+                // never briefly focuses General while NavHost initializes.
+                initialFocusEnabled = false,
                 showSimpleTv = showSimpleTvSettings,
                 onNavigate = { route ->
                     nav.navigate(route) {
@@ -180,42 +228,58 @@ fun SettingsScreen(
             ) {
                 NavHost(
                     navController = nav,
-                    startDestination = SettingsRoutes.GENERAL,
+                    startDestination = resolvedStartRoute,
                     enterTransition = { appDestinationEnterTransition() },
                     exitTransition = { appDestinationExitTransition() },
                     popEnterTransition = { appDestinationEnterTransition() },
                     popExitTransition = { appDestinationExitTransition() },
                 ) {
                     composable(SettingsRoutes.GENERAL) {
-                        SettingsLanguage(contentFocus.getValue(SettingsRoutes.GENERAL))
+                        destinationContent(
+                            SettingsRoutes.GENERAL,
+                            contentFocus.getValue(SettingsRoutes.GENERAL),
+                        )
                     }
 
                     composable(SettingsRoutes.CONNECTION) {
-                        SettingsConnection(contentFocus.getValue(SettingsRoutes.CONNECTION))
+                        destinationContent(
+                            SettingsRoutes.CONNECTION,
+                            contentFocus.getValue(SettingsRoutes.CONNECTION),
+                        )
                     }
 
                     composable(SettingsRoutes.OPTIONS) {
-                        SettingsOptions(contentFocus.getValue(SettingsRoutes.OPTIONS))
+                        destinationContent(
+                            SettingsRoutes.OPTIONS,
+                            contentFocus.getValue(SettingsRoutes.OPTIONS),
+                        )
                     }
 
                     composable(SettingsRoutes.CHANNEL_TAGS) {
-                        SettingsChannelTags(contentFocus.getValue(SettingsRoutes.CHANNEL_TAGS))
+                        destinationContent(
+                            SettingsRoutes.CHANNEL_TAGS,
+                            contentFocus.getValue(SettingsRoutes.CHANNEL_TAGS),
+                        )
                     }
 
                     composable(SettingsRoutes.PLAYER) {
-                        SettingsPlayer(contentFocus.getValue(SettingsRoutes.PLAYER))
+                        destinationContent(
+                            SettingsRoutes.PLAYER,
+                            contentFocus.getValue(SettingsRoutes.PLAYER),
+                        )
                     }
 
                     composable(SettingsRoutes.APPLIANCE) {
-                        SettingsAppliance(contentFocus.getValue(SettingsRoutes.APPLIANCE))
+                        destinationContent(
+                            SettingsRoutes.APPLIANCE,
+                            contentFocus.getValue(SettingsRoutes.APPLIANCE),
+                        )
                     }
 
                     composable(SettingsRoutes.SIMPLE_TV) {
-                        SettingsSimpleTv(
-                            initialFocusRequester = contentFocus.getValue(
-                                SettingsRoutes.SIMPLE_TV
-                            ),
-                            onStartSimpleTv = onStartSimpleTv,
+                        destinationContent(
+                            SettingsRoutes.SIMPLE_TV,
+                            contentFocus.getValue(SettingsRoutes.SIMPLE_TV),
                         )
                     }
                 }

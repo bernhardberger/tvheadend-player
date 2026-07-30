@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.CoroutineDispatcher
@@ -72,6 +73,14 @@ val appModule = module {
             dvrRepository = get(),
             settings = get(),
             passwords = get(),
+        )
+    }
+    viewModel {
+        MainStartupViewModel(
+            serverSettingsStore = get(),
+            uiSettingsStore = get(),
+            simpleTvSettingsStore = get(),
+            simpleTvSession = get(),
         )
     }
     viewModel { VideoPlayerViewModel(playerSession = get(), repo = get(), htspService = get()) }

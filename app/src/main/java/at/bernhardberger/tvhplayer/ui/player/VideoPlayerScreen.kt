@@ -306,8 +306,9 @@ fun VideoPlayerScreen(
         if (lastPlayedServiceId != -1) {
             videoPlayerViewModel.stop()
         }
-        videoPlayerViewModel.playService(ctx, currentServiceId)
-        lastPlayedServiceId = currentServiceId
+        if (videoPlayerViewModel.playService(ctx, currentServiceId)) {
+            lastPlayedServiceId = currentServiceId
+        }
     }
 
     LaunchedEffect(playbackState, currentChannelId) {
@@ -705,8 +706,9 @@ fun VideoPlayerScreen(
                     connectionLost = false
                     showControls()
 
-                    videoPlayerViewModel.playService(ctx, currentServiceId)
-                    lastPlayedServiceId = currentServiceId
+                    if (videoPlayerViewModel.playService(ctx, currentServiceId)) {
+                        lastPlayedServiceId = currentServiceId
+                    }
                     if (restoreToLiveAfterReconnect) {
                         timeshiftFeedback = timeshiftReconnectLiveText
                         restoreToLiveAfterReconnect = false

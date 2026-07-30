@@ -3,22 +3,26 @@ package at.bernhardberger.tvhplayer.ui
 import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -26,10 +30,17 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchBackAction
 import at.bernhardberger.tvhplayer.core.BackAction
+import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
+import at.bernhardberger.tvhplayer.core.MainStartupActionId
+import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
+import at.bernhardberger.tvhplayer.core.MainStartupPresentation
+import at.bernhardberger.tvhplayer.core.MainStartupState
+import at.bernhardberger.tvhplayer.core.mainStartupPresentation
 import at.bernhardberger.tvhplayer.core.WarmPlaybackTarget
 import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
 import at.bernhardberger.tvhplayer.core.armWarmReturn
@@ -39,6 +50,7 @@ import at.bernhardberger.tvhplayer.core.consumeWarmReturn
 import at.bernhardberger.tvhplayer.core.rearmWarmReturn
 import at.bernhardberger.tvhplayer.core.rearmWarmReturnForPlaybackSelection
 import at.bernhardberger.tvhplayer.core.rootBackAction
+import at.bernhardberger.tvhplayer.core.serverSettingsForRuntime
 import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
@@ -59,7 +71,6 @@ import at.bernhardberger.tvhplayer.player.PlayerSession
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettings
-import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
@@ -67,7 +78,6 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.ui.components.ContentContainer
 import at.bernhardberger.tvhplayer.ui.components.SideRail
-import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
@@ -77,11 +87,13 @@ import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
+import at.bernhardberger.tvhplayer.ui.screens.SettingsRoutes
 import at.bernhardberger.tvhplayer.ui.screens.SimpleTvUnlockScreen
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -110,33 +122,299 @@ object Routes {
     }
 }
 
+internal data class MainStartupCompositionState(
+    val presentation: MainStartupPresentation,
+    val navigationStartDestination: String?,
+    val navigationAllowed: Boolean,
+)
+
+internal fun effectiveMainStartupPresentation(
+    presentation: MainStartupPresentation,
+    launchState: ApplianceLaunchState,
+    matchingEnteringPlayerVisible: Boolean,
+): MainStartupPresentation = if (
+    launchState is ApplianceLaunchState.Entering && matchingEnteringPlayerVisible
+) {
+    MainStartupPresentation.Inactive
+} else {
+    presentation
+}
+
+internal fun shouldShowMainNavigationRail(
+    simpleTvActive: Boolean,
+    currentTopRoute: String?,
+    navigationStartDestination: String?,
+): Boolean = showGlobalNavigationRail(
+    simpleTvActive = simpleTvActive,
+    topRoute = currentTopRoute ?: navigationStartDestination?.substringBefore("/"),
+    playerRoute = Routes.PLAYER,
+    recordingPlayerRoute = Routes.RECORDING_PLAYER,
+)
+
+@Composable
+internal fun MainNavigationShell(
+    showRail: Boolean,
+    rail: @Composable () -> Unit,
+    fullScreen: @Composable () -> Unit,
+) {
+    if (showRail) rail() else fullScreen()
+}
+
+@Composable
+internal fun MainStartupComposition(
+    state: MainStartupCompositionState,
+    simpleTvActive: Boolean,
+    onBack: () -> Unit,
+    onAction: (MainStartupActionId) -> Unit,
+    registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit),
+    modifier: Modifier = Modifier,
+    persistentSurface: @Composable BoxScope.() -> Unit = {},
+    navigation: @Composable BoxScope.(String) -> Unit = {},
+) {
+    val renderedPresentation = when (state.presentation) {
+        is MainStartupPresentation.Enter -> MainStartupPresentation.Passive(
+            MainStartupMessageKind.STARTING_TELEVISION,
+        )
+        else -> state.presentation
+    }
+    val backProfile = if (simpleTvActive) {
+        MainStartupBackProfile.SIMPLE_TV
+    } else {
+        MainStartupBackProfile.NORMAL
+    }
+    val keyMode = when (renderedPresentation) {
+        MainStartupPresentation.Inactive -> MainStartupKeyMode.Inactive
+        is MainStartupPresentation.Passive -> MainStartupKeyMode.Passive(backProfile)
+        is MainStartupPresentation.Actionable -> MainStartupKeyMode.Actionable(backProfile)
+        is MainStartupPresentation.Enter -> error("Enter is rendered as passive startup")
+    }
+    val keyContract = remember(keyMode, onBack) {
+        MainStartupActivityKeyContract(
+            mode = keyMode,
+            cancelNormalStartup = if (
+                keyMode != MainStartupKeyMode.Inactive &&
+                backProfile == MainStartupBackProfile.NORMAL
+            ) {
+                onBack
+            } else {
+                null
+            },
+        )
+    }
+
+    DisposableEffect(registerActivityKeyContract, keyContract) {
+        val unregister = registerActivityKeyContract(keyContract)
+        onDispose(unregister)
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        persistentSurface()
+        val startDestination = state.navigationStartDestination
+        if (state.navigationAllowed && startDestination != null) {
+            navigation(startDestination)
+        }
+        if (renderedPresentation != MainStartupPresentation.Inactive) {
+            MainStartupScreen(
+                presentation = renderedPresentation,
+                contentPadding = TvFullScreenPadding,
+                onAction = onAction,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    BackHandler(
+        enabled = renderedPresentation != MainStartupPresentation.Inactive,
+        onBack = onBack,
+    )
+}
+
+internal fun cancelStartupAndSelectRoot(
+    requests: ApplianceLaunchRequests,
+    expectedState: ApplianceLaunchState,
+    destination: String,
+    selectRoot: (String) -> Unit,
+): Boolean {
+    if (!requests.cancel(expectedState)) return false
+    selectRoot(destination)
+    return true
+}
+
+internal fun closeNormalLivePlayer(
+    simpleTvActive: Boolean,
+    popBackStack: () -> Boolean,
+    selectRoot: (String) -> Unit,
+) {
+    if (simpleTvActive) return
+    if (!popBackStack()) selectRoot(Routes.CHANNELS)
+}
+
+internal fun performMainStartupBack(
+    simpleTvActive: Boolean,
+    requests: ApplianceLaunchRequests,
+    expectedState: ApplianceLaunchState,
+    selectRoot: (String) -> Unit,
+) {
+    when (applianceLaunchBackAction(simpleTvActive)) {
+        ApplianceLaunchBackAction.CANCEL_REQUEST -> {
+            cancelStartupAndSelectRoot(
+                requests = requests,
+                expectedState = expectedState,
+                destination = Routes.CHANNELS,
+                selectRoot = selectRoot,
+            )
+        }
+        ApplianceLaunchBackAction.CONSUME_WITHOUT_CHANGE -> Unit
+    }
+}
+
+internal enum class DeferredResolvingBackAction {
+    NONE,
+    CANCEL_TO_CHANNELS,
+    CONTAIN_SIMPLE_TV,
+}
+
+internal fun deferredResolvingBackAction(
+    cancellationRequested: Boolean,
+    readyState: MainStartupState.Ready,
+): DeferredResolvingBackAction = when {
+    !cancellationRequested -> DeferredResolvingBackAction.NONE
+    readyState.startSimpleTv -> DeferredResolvingBackAction.CONTAIN_SIMPLE_TV
+    else -> DeferredResolvingBackAction.CANCEL_TO_CHANNELS
+}
+
+internal fun applyDeferredResolvingBack(
+    action: DeferredResolvingBackAction,
+    requests: ApplianceLaunchRequests,
+    expectedState: ApplianceLaunchState,
+    selectRoot: (String) -> Unit,
+): Boolean = when (action) {
+    DeferredResolvingBackAction.NONE,
+    DeferredResolvingBackAction.CONTAIN_SIMPLE_TV -> false
+    DeferredResolvingBackAction.CANCEL_TO_CHANNELS -> cancelStartupAndSelectRoot(
+        requests = requests,
+        expectedState = expectedState,
+        destination = Routes.CHANNELS,
+        selectRoot = selectRoot,
+    )
+}
+
+internal fun performMainStartupAction(
+    action: MainStartupActionId,
+    onRetry: () -> Unit,
+    onConnectionSettings: () -> Unit,
+    onExitSimpleTv: () -> Unit,
+) {
+    when (action) {
+        MainStartupActionId.RETRY -> onRetry()
+        MainStartupActionId.CONNECTION_SETTINGS -> onConnectionSettings()
+        MainStartupActionId.EXIT_SIMPLE_TV -> onExitSimpleTv()
+    }
+}
+
 @Composable
 fun AppRoot(
+    startupState: MainStartupState,
+    runtimeServerSettings: ServerSettings?,
     applianceLaunchRequests: ApplianceLaunchRequests,
-    applyStartupMode: Boolean,
     debugVideoBackdropVisible: Boolean = false,
     onPlayerVisibilityChanged: (Boolean) -> Unit,
+    registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit) = { {} },
 ) {
-    val serverSettingsStore: ServerSettingsStore = koinInject()
-    var serverSettings by remember { mutableStateOf<ServerSettings?>(null) }
-    LaunchedEffect(serverSettingsStore) {
-        serverSettingsStore.serverSettings.collect { serverSettings = it }
+    val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
+    var cancelBootstrapLaunchWhenReady by rememberSaveable { mutableStateOf(false) }
+    val serverSettings = when (startupState) {
+        MainStartupState.ResolvingLocal -> {
+            val expectedLaunchState = applianceLaunchState
+            val resolvingBack = remember(expectedLaunchState) {
+                {
+                    cancelBootstrapLaunchWhenReady = true
+                    if (expectedLaunchState != ApplianceLaunchState.Idle) {
+                        applianceLaunchRequests.cancel(expectedLaunchState)
+                    }
+                    Unit
+                }
+            }
+            MainStartupComposition(
+                state = MainStartupCompositionState(
+                    presentation = MainStartupPresentation.Passive(
+                        MainStartupMessageKind.PREPARING,
+                    ),
+                    navigationStartDestination = null,
+                    navigationAllowed = false,
+                ),
+                simpleTvActive = false,
+                onBack = resolvingBack,
+                onAction = {},
+                registerActivityKeyContract = registerActivityKeyContract,
+            )
+            return
+        }
+        is MainStartupState.Ready ->
+            startupState.serverSettingsForRuntime(runtimeServerSettings)
     }
-    val currentServerSettings = serverSettings
-    if (currentServerSettings == null) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(androidx.tv.material3.MaterialTheme.colorScheme.background)
+    val readyStartupState = startupState
+    val deferredBackAction = deferredResolvingBackAction(
+        cancellationRequested = cancelBootstrapLaunchWhenReady,
+        readyState = readyStartupState,
+    )
+    if (serverSettings.host.isBlank()) {
+        MainStartupComposition(
+            state = MainStartupCompositionState(
+                presentation = MainStartupPresentation.Inactive,
+                navigationStartDestination = Routes.CHANNELS,
+                navigationAllowed = true,
+            ),
+            simpleTvActive = false,
+            onBack = {},
+            onAction = {},
+            registerActivityKeyContract = registerActivityKeyContract,
+            navigation = { OnboardingScreen() },
         )
-        return
-    }
-    if (currentServerSettings.host.isBlank()) {
-        OnboardingScreen()
         return
     }
 
     val nav = rememberNavController()
+    var navigationStartDestination by rememberSaveable {
+        mutableStateOf(
+            when (val launchState = applianceLaunchState) {
+                ApplianceLaunchState.Idle -> Routes.CHANNELS
+                is ApplianceLaunchState.Pending -> if (
+                    deferredBackAction ==
+                    DeferredResolvingBackAction.CANCEL_TO_CHANNELS
+                ) {
+                    Routes.CHANNELS
+                } else {
+                    null
+                }
+                is ApplianceLaunchState.Entering -> if (
+                    deferredBackAction ==
+                    DeferredResolvingBackAction.CANCEL_TO_CHANNELS
+                ) {
+                    Routes.CHANNELS
+                } else {
+                    Routes.player(
+                        channelId = launchState.target.channelId,
+                        serviceId = launchState.target.serviceId,
+                        channelName = launchState.target.channelName,
+                    )
+                }
+            },
+        )
+    }
+    LaunchedEffect(deferredBackAction, applianceLaunchState) {
+        if (deferredBackAction == DeferredResolvingBackAction.NONE) {
+            return@LaunchedEffect
+        }
+        val expectedState = applianceLaunchState
+        applyDeferredResolvingBack(
+            action = deferredBackAction,
+            requests = applianceLaunchRequests,
+            expectedState = expectedState,
+            selectRoot = { navigationStartDestination = it },
+        )
+        cancelBootstrapLaunchWhenReady = false
+    }
     val navigateTopLevel: (String) -> Unit = { route ->
         nav.navigate(route) {
             // Top-level drawer destinations are siblings, not a Back history.
@@ -177,28 +455,87 @@ fun AppRoot(
     )
     val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
     val capabilityProfile = simpleTvProfile(simpleTvSettings, simpleTvActive)
-    val applianceLaunchRequest by applianceLaunchRequests.pending.collectAsStateWithLifecycle()
-    val connectionAvailable = connectionState is ConnectionState.Connected
-    LaunchedEffect(uiSettingsStore, simpleTvStore, applyStartupMode) {
-        val startSimpleTv = applyStartupMode && simpleTvStore.settings.first().enabled
-        if (startSimpleTv) simpleTvSession.start()
-        applianceLaunchRequests.requestStartup(
-            uiSettingsStore.settings.first().autoStartPlayback || startSimpleTv
-        )
-    }
+    val currentChannelReadiness by
+        appVm.currentChannelReadiness.collectAsStateWithLifecycle()
+    val startupPresentation = mainStartupPresentation(
+        startupState = startupState,
+        launchState = applianceLaunchState,
+        connectionState = connectionUiState,
+        currentChannelReadiness = currentChannelReadiness,
+        simpleTvActive = simpleTvActive,
+    )
 
     val backStackEntry by nav.currentBackStackEntryAsState()
 
     val currentRoute = backStackEntry?.destination?.route
     val topRoute = currentRoute?.substringBefore("/")
-    val showRail = showGlobalNavigationRail(
+    val showRail = shouldShowMainNavigationRail(
         simpleTvActive = simpleTvActive,
-        topRoute = topRoute,
-        playerRoute = Routes.PLAYER,
-        recordingPlayerRoute = Routes.RECORDING_PLAYER,
+        currentTopRoute = topRoute,
+        navigationStartDestination = navigationStartDestination,
     )
 
     val isPlayer = topRoute == Routes.PLAYER || topRoute == Routes.RECORDING_PLAYER
+    val enteringLaunchTarget =
+        (applianceLaunchState as? ApplianceLaunchState.Entering)?.target
+    val visibleLivePlayerChannelId = if (topRoute == Routes.PLAYER) {
+        backStackEntry?.arguments?.getInt("channelId")
+    } else {
+        null
+    }
+    val visibleLivePlayerServiceId = if (topRoute == Routes.PLAYER) {
+        backStackEntry?.arguments?.getInt("serviceId")
+    } else {
+        null
+    }
+    val visibleLivePlayerName = if (topRoute == Routes.PLAYER) {
+        backStackEntry?.arguments?.getString("channelName")
+    } else {
+        null
+    }
+    val matchingEnteringPlayerVisible = enteringLaunchTarget?.let { target ->
+        visibleLivePlayerChannelId != null &&
+            visibleLivePlayerServiceId != null &&
+            visibleLivePlayerName != null &&
+            target.matchesPlayer(
+                channelId = visibleLivePlayerChannelId,
+                serviceId = visibleLivePlayerServiceId,
+                channelName = visibleLivePlayerName,
+            )
+    } == true
+    val effectiveStartupPresentation = effectiveMainStartupPresentation(
+        presentation = startupPresentation,
+        launchState = applianceLaunchState,
+        matchingEnteringPlayerVisible = matchingEnteringPlayerVisible,
+    )
+    val applianceLaunchActive =
+        effectiveStartupPresentation != MainStartupPresentation.Inactive
+    val navigationAllowed = when (val launchState = applianceLaunchState) {
+        ApplianceLaunchState.Idle ->
+            effectiveStartupPresentation == MainStartupPresentation.Inactive &&
+                navigationStartDestination != null
+        is ApplianceLaunchState.Pending -> false
+        is ApplianceLaunchState.Entering -> {
+            val exactStart = Routes.player(
+                channelId = launchState.target.channelId,
+                serviceId = launchState.target.serviceId,
+                channelName = launchState.target.channelName,
+            )
+            if (nav.currentBackStackEntry == null) {
+                navigationStartDestination == exactStart
+            } else {
+                matchingEnteringPlayerVisible
+            }
+        }
+    }
+    val selectRoot = remember(nav) {
+        { destination: String ->
+            navigationStartDestination = destination
+            if (nav.currentBackStackEntry != null) {
+                replaceNavigationRoot(nav, destination)
+            }
+        }
+    }
 
     // One-shot warm-player return: armed when a service/recording becomes active
     // or the user navigates deliberately while playback remains warm; consumed
@@ -241,33 +578,68 @@ fun AppRoot(
         },
     )
 
-    LaunchedEffect(isPlayer) {
+    SideEffect {
         onPlayerVisibilityChanged(isPlayer)
-    }
-
-    LaunchedEffect(applianceLaunchRequest) {
-        if (applianceLaunchRequest == null) return@LaunchedEffect
-
-        val persistedId = lastPlayedChannelStore.channelId.first()
-        val channels = channelsVm.allChannels.filter { it.isNotEmpty() }.first()
-        val target = applianceLaunchRequests.resolve(channels.map { it.id }, persistedId)
-            ?: return@LaunchedEffect
-        val channel = channels.firstOrNull { it.id == target.channelId }
-            ?: return@LaunchedEffect
-
-        if (applianceLaunchRequests.consume(target.request)) {
-            nav.navigate(Routes.player(channel.id, channel.id, channel.name))
+        val target = enteringLaunchTarget
+        val channelId = visibleLivePlayerChannelId
+        val serviceId = visibleLivePlayerServiceId
+        val channelName = visibleLivePlayerName
+        if (
+            target != null &&
+            channelId != null &&
+            serviceId != null &&
+            channelName != null
+        ) {
+            applianceLaunchRequests.completePlayerVisibility(
+                target = target,
+                channelId = channelId,
+                serviceId = serviceId,
+                channelName = channelName,
+            )
         }
     }
 
+    val enterDirective = startupPresentation as? MainStartupPresentation.Enter
+    LaunchedEffect(enterDirective, currentChannelReadiness) {
+        val directive = enterDirective ?: return@LaunchedEffect
+        val readiness = currentChannelReadiness as? CurrentChannelReadiness.Ready
+            ?: return@LaunchedEffect
+        val persistedId = lastPlayedChannelStore.channelId.first()
+        val target = applianceLaunchRequests.resolve(
+            request = directive.request,
+            readiness = readiness,
+            persistedId = persistedId,
+        ) ?: return@LaunchedEffect
+        val targetRoute = Routes.player(
+            channelId = target.channelId,
+            serviceId = target.serviceId,
+            channelName = target.channelName,
+        )
+        if (nav.currentBackStackEntry == null && navigationStartDestination == null) {
+            // The first NavHost mount for fresh autoplay starts at the exact player.
+            navigationStartDestination = targetRoute
+        } else if (!target.matchesPlayerEntry(nav.currentBackStackEntry)) {
+            // Startup entry owns a root replacement. Clearing the prior graph
+            // prevents browse destinations from composing during the handoff.
+            replaceNavigationRoot(nav, targetRoute)
+        }
+    }
+
+    val startupBack = remember(applianceLaunchState, simpleTvActive, selectRoot) {
+        val expectedState = applianceLaunchState
+        {
+            performMainStartupBack(
+                simpleTvActive = simpleTvActive,
+                requests = applianceLaunchRequests,
+                expectedState = expectedState,
+                selectRoot = selectRoot,
+            )
+        }
+    }
     val handleRootBack: () -> Unit = rootBack@{
-        val pendingRequest = applianceLaunchRequest
-        if (pendingRequest != null) {
-            when (applianceLaunchBackAction(simpleTvActive)) {
-                ApplianceLaunchBackAction.CANCEL_REQUEST ->
-                    applianceLaunchRequests.cancel(pendingRequest)
-                ApplianceLaunchBackAction.CONSUME_WITHOUT_CHANGE -> Unit
-            }
+        val currentLaunchState = applianceLaunchRequests.state.value
+        if (currentLaunchState != ApplianceLaunchState.Idle && applianceLaunchActive) {
+            startupBack()
             return@rootBack
         }
 
@@ -317,13 +689,16 @@ fun AppRoot(
             }
         }
     }
-    BackHandler(enabled = !showRail, onBack = handleRootBack)
-    val content: @Composable (PaddingValues, Boolean) -> Unit = {
-            contentPadding, drawerActive ->
+    BackHandler(
+        enabled = navigationAllowed && !applianceLaunchActive && !showRail,
+        onBack = handleRootBack,
+    )
+    val content: @Composable (PaddingValues, Boolean, String) -> Unit = {
+            contentPadding, drawerActive, startDestination ->
             Box(Modifier.fillMaxSize()) {
                 NavHost(
                     navController = nav,
-                    startDestination = Routes.CHANNELS,
+                    startDestination = startDestination,
                     enterTransition = {
                         appDestinationEnterTransition()
                     },
@@ -455,7 +830,7 @@ fun AppRoot(
                                     RecordingsScreen(
                                         contentPadding = contentPadding,
                                         initialFocusEnabled = !drawerActive,
-                                        backEnabled = applianceLaunchRequest == null,
+                                        backEnabled = !applianceLaunchActive,
                                         connectionUiState = connectionUiState,
                                         onRetry = appVm::reconnectNow,
                                         onPlayRecording = { recordingId, intent ->
@@ -480,9 +855,16 @@ fun AppRoot(
                         if (capabilityProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
                             ContentContainer {
                                     SettingsScreen(
+                                        startRoute = if (
+                                            navigationStartDestination == Routes.SETTINGS
+                                        ) {
+                                            SettingsRoutes.CONNECTION
+                                        } else {
+                                            SettingsRoutes.GENERAL
+                                        },
                                         initialFocusEnabled = !drawerActive,
                                         contentPadding = contentPadding,
-                                        backEnabled = applianceLaunchRequest == null,
+                                        backEnabled = !applianceLaunchActive,
                                         onStartSimpleTv = {
                                             simpleTvSession.start()
                                         },
@@ -495,7 +877,7 @@ fun AppRoot(
                         ContentContainer {
                                 SimpleTvUnlockScreen(
                                     backEnabled =
-                                        !drawerActive && applianceLaunchRequest == null,
+                                        !drawerActive && !applianceLaunchActive,
                                     onExited = {
                                         navigateTopLevel(Routes.CHANNELS)
                                     },
@@ -521,17 +903,23 @@ fun AppRoot(
                         val serviceId = entry.arguments?.getInt("serviceId") ?: 0
                         val channelName = entry.arguments?.getString("channelName") ?: ""
 
-                        VideoPlayerScreen(
-                            channelId = channelId,
-                            channelName = channelName,
-                            serviceId = serviceId,
-                            simpleTvProfile = capabilityProfile,
-                            onReconnect = appVm::reconnectNow,
-                            onUnlock = { nav.navigate(Routes.UNLOCK) },
-                            onClose = {
-                                if (!simpleTvActive) nav.popBackStack()
-                            }
-                        )
+                        if (!applianceLaunchActive) {
+                            VideoPlayerScreen(
+                                channelId = channelId,
+                                channelName = channelName,
+                                serviceId = serviceId,
+                                simpleTvProfile = capabilityProfile,
+                                onReconnect = appVm::reconnectNow,
+                                onUnlock = { nav.navigate(Routes.UNLOCK) },
+                                onClose = {
+                                    closeNormalLivePlayer(
+                                        simpleTvActive = simpleTvActive,
+                                        popBackStack = nav::popBackStack,
+                                        selectRoot = selectRoot,
+                                    )
+                                },
+                            )
+                        }
                     }
 
                     composable(
@@ -568,115 +956,124 @@ fun AppRoot(
             }
     }
 
-    ApplianceLaunchRecoveryHost(
-        visible = applianceLaunchRequest != null && !isPlayer,
-        actionable = !connectionAvailable,
-        onBack = handleRootBack,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(androidx.tv.material3.MaterialTheme.colorScheme.background),
-        overlay = {
-            TvRecoveryOverlay(
-                visible = applianceLaunchRequest != null && !isPlayer,
-                message = stringResource(
-                    if (connectionAvailable) {
-                        R.string.appliance_starting_tv
-                    } else {
-                        R.string.appliance_connection_recovering
-                    }
-                ),
-                hint = if (!connectionAvailable && simpleTvActive) {
-                    stringResource(R.string.simple_tv_recovery_hint)
-                } else {
-                    null
-                },
-                primaryActionLabel = if (!connectionAvailable) {
-                    stringResource(R.string.retry)
-                } else {
-                    null
-                },
-                onPrimaryAction = if (!connectionAvailable) {
-                    appVm::reconnectNow
-                } else {
-                    null
-                },
-                secondaryActionLabel = if (!connectionAvailable) {
-                    stringResource(
-                        if (simpleTvActive) R.string.simple_tv_unlock else R.string.close
+    val startupAction = remember(applianceLaunchState, selectRoot, appVm) {
+        val expectedState = applianceLaunchState
+        { action: MainStartupActionId ->
+            performMainStartupAction(
+                action = action,
+                onRetry = appVm::reconnectNow,
+                onConnectionSettings = {
+                    cancelStartupAndSelectRoot(
+                        requests = applianceLaunchRequests,
+                        expectedState = expectedState,
+                        destination = Routes.SETTINGS,
+                        selectRoot = selectRoot,
                     )
-                } else {
-                    null
+                    Unit
                 },
-                onSecondaryAction = if (!connectionAvailable) {
-                    {
-                        val pending = applianceLaunchRequest
-                        if (pending != null) applianceLaunchRequests.cancel(pending)
-                        if (simpleTvActive) {
-                            nav.navigate(Routes.UNLOCK) { launchSingleTop = true }
-                        }
-                    }
-                } else {
-                    null
+                onExitSimpleTv = {
+                    cancelStartupAndSelectRoot(
+                        requests = applianceLaunchRequests,
+                        expectedState = expectedState,
+                        destination = Routes.UNLOCK,
+                        selectRoot = selectRoot,
+                    )
+                    Unit
+                },
+            )
+        }
+    }
+    MainStartupComposition(
+        state = MainStartupCompositionState(
+            presentation = effectiveStartupPresentation,
+            navigationStartDestination = navigationStartDestination,
+            navigationAllowed = navigationAllowed,
+        ),
+        simpleTvActive = simpleTvActive,
+        onBack = startupBack,
+        onAction = startupAction,
+        registerActivityKeyContract = registerActivityKeyContract,
+        persistentSurface = {
+            if (shouldMountPersistentPlayerSurface(
+                    hasActivePlayback = playbackState !is PlaybackSessionState.Idle,
+                    isPlayerRoute = isPlayer,
+                )
+            ) {
+                PlayerVideoSurface(
+                    player = playerSession.getOrCreatePlayer(context),
+                    aspectRatio = playerSettings.aspectRatio,
+                    debugVideoBackdropVisible = debugVideoBackdropVisible,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (navigationAllowed && showRail) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = TvNavigationScrimAlpha))
+                    )
+                }
+            }
+        },
+        navigation = { startDestination ->
+            MainNavigationShell(
+                showRail = showRail,
+                rail = {
+                    SideRail(
+                        currentRoute = topRoute,
+                        rootRoute = Routes.CHANNELS,
+                        showEpgMenu = uiSettings.showEpgMenu,
+                        simpleTvProfile = capabilityProfile,
+                        rootBackPriority = applianceLaunchActive,
+                        onRootBack = handleRootBack,
+                        onNavigate = { route ->
+                            val current = nav.currentBackStackEntry?.destination?.route
+                            if (current == route) {
+                                focusManager.moveFocus(FocusDirection.Right)
+                            } else {
+                                // Deliberate rail navigation re-arms one warm return while
+                                // playback remains active. Returning from the player via
+                                // Back does not go through this path and must not re-arm.
+                                if (currentWarmTarget != WarmPlaybackTarget.NONE) {
+                                    warmReturn = rearmWarmReturn(currentWarmTarget)
+                                }
+                                if (route == Routes.UNLOCK) {
+                                    nav.navigate(route) { launchSingleTop = true }
+                                } else {
+                                    navigateTopLevel(route)
+                                }
+                            }
+                        },
+                        content = { contentPadding, drawerActive ->
+                            content(contentPadding, drawerActive, startDestination)
+                        },
+                    )
+                },
+                fullScreen = {
+                    content(TvFullScreenPadding, false, startDestination)
                 },
             )
         },
-    ) {
-        if (shouldMountPersistentPlayerSurface(
-                hasActivePlayback = playbackState !is PlaybackSessionState.Idle,
-                isPlayerRoute = isPlayer,
-            )
-        ) {
-            PlayerVideoSurface(
-                player = playerSession.getOrCreatePlayer(context),
-                aspectRatio = playerSettings.aspectRatio,
-                debugVideoBackdropVisible = debugVideoBackdropVisible,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (showRail) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = TvNavigationScrimAlpha))
-                )
-            }
-        }
+    )
+}
 
-        if (showRail) {
-            SideRail(
-                currentRoute = topRoute,
-                rootRoute = Routes.CHANNELS,
-                showEpgMenu = uiSettings.showEpgMenu,
-                simpleTvProfile = capabilityProfile,
-                rootBackPriority = applianceLaunchRequest != null,
-                onRootBack = handleRootBack,
-                onNavigate = { route ->
-                    val current = nav.currentBackStackEntry?.destination?.route
-                    if (current == route) {
-                        focusManager.moveFocus(FocusDirection.Right)
-                    } else {
-                        // Deliberate rail navigation re-arms one warm return while
-                        // playback remains active. Returning from the player via
-                        // Back does not go through this path and must not re-arm.
-                        if (currentWarmTarget != WarmPlaybackTarget.NONE) {
-                            warmReturn = rearmWarmReturn(currentWarmTarget)
-                        }
-                        if (route == Routes.UNLOCK) {
-                            nav.navigate(route) { launchSingleTop = true }
-                        } else {
-                            navigateTopLevel(route)
-                        }
-                    }
-                },
-                content = content,
-            )
-        } else {
-            content(TvFullScreenPadding, false)
-        }
-    }
-    // Registered after all destination handlers so system/accessibility Back
-    // cancels a pending one-shot launch before any nested UI can consume it.
-    key(applianceLaunchRequest) {
-        BackHandler(enabled = applianceLaunchRequest != null, onBack = handleRootBack)
+private fun ApplianceLaunchTarget.matchesPlayerEntry(entry: NavBackStackEntry?): Boolean {
+    if (entry?.destination?.route?.substringBefore("/") != Routes.PLAYER) return false
+    val arguments = entry.arguments ?: return false
+    val channelName = arguments.getString("channelName") ?: return false
+    return matchesPlayer(
+        channelId = arguments.getInt("channelId"),
+        serviceId = arguments.getInt("serviceId"),
+        channelName = channelName,
+    )
+}
+
+private fun replaceNavigationRoot(
+    nav: NavHostController,
+    destination: String,
+) {
+    nav.navigate(destination) {
+        popUpTo(nav.graph.id) { inclusive = true }
+        launchSingleTop = true
     }
 }
 

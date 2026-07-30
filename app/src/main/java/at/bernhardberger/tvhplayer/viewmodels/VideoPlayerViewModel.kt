@@ -20,9 +20,8 @@ class VideoPlayerViewModel(
     fun getPlayerInstance(context: Context) =
         playerSession.getOrCreatePlayer(context)
 
-    suspend fun playService(context: Context, serviceId: Int) {
+    suspend fun playService(context: Context, serviceId: Int): Boolean =
         playerSession.playService(context, serviceId)
-    }
 
     suspend fun stop() {
         playerSession.stop()

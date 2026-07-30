@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionPolicy
 import at.bernhardberger.tvhplayer.core.ConnectionAttemptState
+import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.ReconnectAttemptPhase
 import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
 import at.bernhardberger.tvhplayer.core.SubscriptionFailureTrackerState
@@ -14,6 +15,7 @@ import at.bernhardberger.tvhplayer.core.completeReconnectAttemptPhase
 import at.bernhardberger.tvhplayer.core.connectionAttemptMayPublish
 import at.bernhardberger.tvhplayer.core.connectionAttemptState
 import at.bernhardberger.tvhplayer.core.connectionFailureKind
+import at.bernhardberger.tvhplayer.core.deriveCurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.invalidateConnectionAttempts
 import at.bernhardberger.tvhplayer.core.invalidateReconnectAttemptPhase
 import at.bernhardberger.tvhplayer.core.shouldRestartConnectionRetry
@@ -36,7 +38,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -51,6 +56,16 @@ class AppConnectionViewModel(
     val connectionState = htsp.state
     private val _uiState = MutableStateFlow<ConnectionUiState>(ConnectionUiState.Connecting)
     val uiState = _uiState.asStateFlow()
+    val currentChannelReadiness: StateFlow<CurrentChannelReadiness> = combine(
+        htsp.state,
+        repo.metadataReady,
+        repo.channelsUi,
+        ::deriveCurrentChannelReadiness,
+    ).stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = CurrentChannelReadiness.Waiting,
+    )
 
     private data class ServerCfg(
         val host: String,

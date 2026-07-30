@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackIntent
 import at.bernhardberger.tvhplayer.core.PlaybackRejectionReason
 import at.bernhardberger.tvhplayer.core.PlaybackSubmissionDecision
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.joinAll
@@ -11,11 +12,43 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CopyOnWriteArrayList
 
 class PlaybackCommandOrderingTest {
+    @Test
+    fun newerTuneSupersedesAnOlderStopWaiterRegardlessOfResumeOrder() = runBlocking {
+        val coordinator = PlaybackIssuanceCoordinator()
+        val gate = PlayerCommandGate()
+        coordinator.submit(PlaybackIntent.Stop)
+        val older = async(start = CoroutineStart.UNDISPATCHED) {
+            coordinator.submitLive(serviceId = 8)
+        }
+        val newer = async(start = CoroutineStart.UNDISPATCHED) {
+            coordinator.submitLive(serviceId = 9)
+        }
+
+        coordinator.completeTeardown(epoch = 1L)
+
+        val olderTicket = older.await()
+        val newerTicket = newer.await()
+        val committed = mutableListOf<Int>()
+        val newerEpoch = (newerTicket?.decision as PlaybackSubmissionDecision.Issue).epoch
+        try {
+            gate.run {
+                coordinator.commitIfCurrent(newerEpoch) { committed += 9 }
+            }
+        } finally {
+            coordinator.complete(newerEpoch)
+        }
+
+        assertNull(olderTicket)
+        assertEquals(PlaybackSubmissionDecision.Issue(epoch = 2L), newerTicket.decision)
+        assertEquals(listOf(9), committed)
+    }
+
     @Test
     fun laterTuneInvalidatesEarlierSuspendedCommitBeforeEnteringTheGate() = runBlocking {
         val coordinator = PlaybackIssuanceCoordinator()

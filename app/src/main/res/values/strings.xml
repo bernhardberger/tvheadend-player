@@ -111,6 +111,24 @@
     <string name="appliance_connection_recovering">Television is currently unavailable. Reconnecting automatically…</string>
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
+    <!-- Startup status screen -->
+    <string name="main_startup_passive_title">Starting TVHeadend Player</string>
+    <string name="main_startup_actionable_title">Action needed</string>
+    <string name="main_startup_message_preparing">Preparing TVHeadend Player…</string>
+    <string name="main_startup_message_connecting">Connecting to TVHeadend…</string>
+    <string name="main_startup_message_syncing_channels">Loading channel information…</string>
+    <string name="main_startup_message_waiting_for_current_channel_metadata">Preparing channel information…</string>
+    <string name="main_startup_message_reconnecting">Reconnecting to TVHeadend…</string>
+    <string name="main_startup_message_starting_television">Starting television…</string>
+    <string name="main_startup_message_no_channels">No channels are available for this account.</string>
+    <string name="main_startup_message_retryable_failure">TVHeadend is unavailable. Try again.</string>
+    <string name="main_startup_message_configuration_required">Set up the TVHeadend connection to load channels.</string>
+    <string name="main_startup_message_credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
+    <string name="main_startup_message_simple_tv_failure">Television is unavailable in Simple TV.</string>
+    <string name="main_startup_action_retry">Retry</string>
+    <string name="main_startup_action_connection_settings">Connection settings</string>
+    <string name="main_startup_action_exit_simple_tv">Exit Simple TV</string>
+
     <string name="player_tuning_channel">Tuning %1$s…</string>
     <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
     <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>

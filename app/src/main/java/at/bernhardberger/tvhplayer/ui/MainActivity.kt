@@ -6,26 +6,65 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
-import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
+import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.player.PlayerSession
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
+import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
+import at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
+import org.koin.androidx.viewmodel.ext.android.viewModel
+
+data class MainStartupActivityKeyContract(
+    val mode: MainStartupKeyMode,
+    val cancelNormalStartup: (() -> Unit)? = null,
+)
+
+internal fun dispatchMainStartupKeyEvent(
+    owner: MainStartupKeyCycleOwner,
+    contract: MainStartupActivityKeyContract,
+    event: KeyEvent,
+): Boolean = when (
+    owner.keyEvent(
+        mode = contract.mode,
+        keyCode = event.keyCode,
+        action = event.action,
+        repeatCount = event.repeatCount,
+    )
+) {
+    MainStartupKeyDecision.PASS_THROUGH -> false
+    MainStartupKeyDecision.CONSUME -> true
+    MainStartupKeyDecision.CANCEL_NORMAL_STARTUP_AND_CONSUME -> {
+        contract.cancelNormalStartup?.invoke()
+        true
+    }
+}
 
 class MainActivity : AppCompatActivity() {
-    private val applianceLaunchRequests = ApplianceLaunchRequests()
+    private val startupViewModel: MainStartupViewModel by viewModel()
     private val playerSession: PlayerSession by inject()
     private var isPlayerVisible = false
     private var debugVideoBackdropVisible by mutableStateOf(false)
     private var debugVideoBackdropReceiverRegistered = false
+    private val mainStartupKeyCycleOwner = MainStartupKeyCycleOwner()
+    private var mainStartupActivityKeyContract = MainStartupActivityKeyContract(
+        mode = MainStartupKeyMode.Inactive,
+    )
     private val debugVideoBackdropReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (
@@ -42,14 +81,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
+        val platformSplashDeadlineUptimeMillis =
+            SystemClock.uptimeMillis() + MAX_PLATFORM_SPLASH_HOLD_MILLIS
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition {
+            startupViewModel.state.value is MainStartupState.ResolvingLocal &&
+                SystemClock.uptimeMillis() < platformSplashDeadlineUptimeMillis
+        }
+        if (savedInstanceState == null) requestApplianceEntry(intent)
         setContent {
+            val startupState by startupViewModel.state.collectAsStateWithLifecycle()
+            val runtimeServerSettings by
+                startupViewModel.runtimeServerSettings.collectAsStateWithLifecycle()
             TVHeadendPlayerTheme {
                 AppRoot(
-                    applianceLaunchRequests = applianceLaunchRequests,
-                    applyStartupMode = savedInstanceState == null,
+                    startupState = startupState,
+                    runtimeServerSettings = runtimeServerSettings,
+                    applianceLaunchRequests = startupViewModel.applianceLaunchRequests,
                     debugVideoBackdropVisible = debugVideoBackdropVisible,
                     onPlayerVisibilityChanged = { isPlayerVisible = it },
+                    registerActivityKeyContract = ::registerMainStartupActivityKeyContract,
                 )
             }
         }
@@ -71,9 +123,20 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (ApplianceEntryPolicy.shouldCreateLaunchRequest(isPlayerVisible)) {
-            applianceLaunchRequests.request()
+        requestApplianceEntry(intent)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (
+            dispatchMainStartupKeyEvent(
+                owner = mainStartupKeyCycleOwner,
+                contract = mainStartupActivityKeyContract,
+                event = event,
+            )
+        ) {
+            return true
         }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onStop() {
@@ -86,7 +149,28 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch { playerSession.stop() }
     }
 
+    private fun requestApplianceEntry(intent: Intent?) {
+        if (intent?.action != ApplianceEntryAccessibilityService.ACTION_APPLIANCE_ENTRY) return
+        if (ApplianceEntryPolicy.shouldCreateLaunchRequest(isPlayerVisible)) {
+            startupViewModel.applianceLaunchRequests.request()
+        }
+    }
+
+    private fun registerMainStartupActivityKeyContract(
+        contract: MainStartupActivityKeyContract,
+    ): () -> Unit {
+        mainStartupActivityKeyContract = contract
+        return {
+            if (mainStartupActivityKeyContract === contract) {
+                mainStartupActivityKeyContract = MainStartupActivityKeyContract(
+                    mode = MainStartupKeyMode.Inactive,
+                )
+            }
+        }
+    }
+
     private companion object {
+        const val MAX_PLATFORM_SPLASH_HOLD_MILLIS = 1_000L
         const val ACTION_DEBUG_VIDEO_BACKDROP =
             "at.bernhardberger.tvhplayer.action.DEBUG_VIDEO_BACKDROP"
         const val EXTRA_DEBUG_VIDEO_BACKDROP_VISIBLE = "visible"

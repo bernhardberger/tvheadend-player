@@ -107,6 +107,24 @@
     <string name="appliance_connection_recovering">Fernsehen ist gerade nicht verfügbar. Die Verbindung wird automatisch wiederhergestellt…</string>
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
 
+    <!-- Startup-Statusbildschirm -->
+    <string name="main_startup_passive_title">TVHeadend Player wird gestartet</string>
+    <string name="main_startup_actionable_title">Aktion erforderlich</string>
+    <string name="main_startup_message_preparing">TVHeadend Player wird vorbereitet…</string>
+    <string name="main_startup_message_connecting">Verbindung mit TVHeadend wird hergestellt…</string>
+    <string name="main_startup_message_syncing_channels">Senderinformationen werden geladen…</string>
+    <string name="main_startup_message_waiting_for_current_channel_metadata">Senderinformationen werden vorbereitet…</string>
+    <string name="main_startup_message_reconnecting">Verbindung mit TVHeadend wird wiederhergestellt…</string>
+    <string name="main_startup_message_starting_television">Fernsehen wird gestartet…</string>
+    <string name="main_startup_message_no_channels">Für dieses Konto sind keine Sender verfügbar.</string>
+    <string name="main_startup_message_retryable_failure">TVHeadend ist nicht verfügbar. Versuchen Sie es erneut.</string>
+    <string name="main_startup_message_configuration_required">Richten Sie die TVHeadend-Verbindung ein, um Sender zu laden.</string>
+    <string name="main_startup_message_credential_unavailable">Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein.</string>
+    <string name="main_startup_message_simple_tv_failure">Fernsehen ist in Einfachem TV derzeit nicht verfügbar.</string>
+    <string name="main_startup_action_retry">Erneut versuchen</string>
+    <string name="main_startup_action_connection_settings">Verbindungseinstellungen</string>
+    <string name="main_startup_action_exit_simple_tv">Einfaches TV verlassen</string>
+
     <string name="player_tuning_channel">%1$s wird eingestellt…</string>
     <string name="player_programme_progress_description">Programmfortschritt, %1$s von %2$s</string>
     <string name="player_connection_recovering">Verbindung unterbrochen. Sie wird automatisch wiederhergestellt…</string>
