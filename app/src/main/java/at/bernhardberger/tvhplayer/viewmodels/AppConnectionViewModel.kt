@@ -4,9 +4,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionPolicy
+import at.bernhardberger.tvhplayer.core.ConnectionAttemptState
+import at.bernhardberger.tvhplayer.core.ReconnectAttemptPhase
 import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
+import at.bernhardberger.tvhplayer.core.SubscriptionFailureTrackerState
+import at.bernhardberger.tvhplayer.core.beginConnectionAttempt
+import at.bernhardberger.tvhplayer.core.beginReconnectAttemptPhase
+import at.bernhardberger.tvhplayer.core.completeReconnectAttemptPhase
+import at.bernhardberger.tvhplayer.core.connectionAttemptMayPublish
 import at.bernhardberger.tvhplayer.core.connectionAttemptState
 import at.bernhardberger.tvhplayer.core.connectionFailureKind
+import at.bernhardberger.tvhplayer.core.invalidateConnectionAttempts
+import at.bernhardberger.tvhplayer.core.invalidateReconnectAttemptPhase
+import at.bernhardberger.tvhplayer.core.shouldRestartConnectionRetry
+import at.bernhardberger.tvhplayer.core.updateSubscriptionFailure
+import at.bernhardberger.tvhplayer.core.removeSubscriptionFailure
 import at.bernhardberger.tvhplayer.htsp.HtspEvent
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
@@ -18,6 +30,7 @@ import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.StoredPassword
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -49,9 +62,13 @@ class AppConnectionViewModel(
     @Volatile
     private var lastCfg: ServerCfg? = null
     private var reconnectJob: Job? = null
+    private var reconnectAttemptPhase = ReconnectAttemptPhase()
     private var autoJob: Job? = null
+    private val connectionAttemptLock = Any()
+    private var connectionAttempts = ConnectionAttemptState()
 
-    private val subs = mutableMapOf<Int, SubscriptionStatus>()
+    private val subscriptionStatusLock = Any()
+    private var subscriptionFailureState = SubscriptionFailureTrackerState()
 
     init {
         repo.startIfNeeded()
@@ -63,6 +80,9 @@ class AppConnectionViewModel(
             ) { server, password -> server to password }
                 .collectLatest { (server, password) ->
                     if (!ConnectionPolicy.isAutoConnectReady(server.host, server.htspPort)) {
+                        invalidateReconnectAttempts()
+                        reconnectJob?.cancel()
+                        reconnectJob = null
                         _uiState.value = ConnectionUiState.NeedsConfiguration
                         return@collectLatest
                     }
@@ -72,6 +92,7 @@ class AppConnectionViewModel(
                         is StoredPassword.Available -> password.value
                         StoredPassword.Unavailable -> {
                             lastCfg = null
+                            invalidateReconnectAttempts()
                             reconnectJob?.cancel()
                             reconnectJob = null
                             _uiState.value = ConnectionUiState.CredentialUnavailable
@@ -99,26 +120,32 @@ class AppConnectionViewModel(
             htsp.controlEvents.collectLatest { e ->
                 when (e) {
                     is HtspEvent.ConnectionError -> {
-                        _uiState.value = ConnectionUiState.Reconnecting
-                        repo.onDisconnected()
-                        startOrRestartReconnectLoop(
-                            reuseMatchingConnection = false,
-                            preservePublishedChannels = true,
-                        )
+                        if (!repo.onDisconnected(e.connectionAttemptId)) {
+                            return@collectLatest
+                        }
+                        htsp.commitIfCurrentConnectionAttempt(e.connectionAttemptId) {
+                            _uiState.value = ConnectionUiState.Reconnecting
+                            startOrRestartReconnectLoop(
+                                reuseMatchingConnection = false,
+                                preservePublishedChannels = true,
+                            )
+                        }
                     }
 
                     is HtspEvent.ServerMessage -> {
                         val msg = e.msg
 
                         msg.toSubStatusOrNull()?.let { st ->
-                            subs[st.id] = st
-                            publishSubsStatus()
+                            htsp.commitIfCurrentConnectionAttempt(e.connectionAttemptId) {
+                                updateSubscriptionStatus(st)
+                            }
                             return@collectLatest
                         }
 
                         msg.subStopIdOrNull()?.let { id ->
-                            subs.remove(id)
-                            publishSubsStatus()
+                            htsp.commitIfCurrentConnectionAttempt(e.connectionAttemptId) {
+                                removeSubscriptionStatus(id)
+                            }
                             return@collectLatest
                         }
                     }
@@ -127,8 +154,7 @@ class AppConnectionViewModel(
         }
     }
 
-    private fun publishSubsStatus() {
-        val failure = subs.values.computeFailureKind()
+    private fun publishSubsStatus(failure: SubscriptionFailureKind?) {
         if (failure == null) {
             if (_uiState.value is ConnectionUiState.SubscriptionError) {
                 _uiState.value = ConnectionUiState.Ready
@@ -136,6 +162,30 @@ class AppConnectionViewModel(
         } else {
             _uiState.value = ConnectionUiState.SubscriptionError(failure)
         }
+    }
+
+    private fun updateSubscriptionStatus(status: SubscriptionStatus) {
+        val failure = synchronized(subscriptionStatusLock) {
+            subscriptionFailureState = updateSubscriptionFailure(
+                state = subscriptionFailureState,
+                subscriptionId = status.id,
+                subscriptionError = status.subscriptionError,
+                status = status.state,
+            )
+            subscriptionFailureState.currentFailure
+        }
+        publishSubsStatus(failure)
+    }
+
+    private fun removeSubscriptionStatus(id: Int) {
+        val failure = synchronized(subscriptionStatusLock) {
+            subscriptionFailureState = removeSubscriptionFailure(
+                subscriptionFailureState,
+                subscriptionId = id,
+            )
+            subscriptionFailureState.currentFailure
+        }
+        publishSubsStatus(failure)
     }
 
     private fun HtspMessage.toSubStatusOrNull(): SubscriptionStatus? {
@@ -157,53 +207,57 @@ class AppConnectionViewModel(
         return int("subscriptionId") ?: int("id")
     }
 
-    private fun Collection<SubscriptionStatus>.computeFailureKind(): SubscriptionFailureKind? {
-        if (isEmpty()) return null
-
-        fun norm(v: String?): String =
-            v?.lowercase()?.replace(" ", "") ?: ""
-
-        for (s in this) {
-            val code = norm(s.subscriptionError ?: s.state)
-
-            return when {
-                "invalidtarget" in code -> SubscriptionFailureKind.INVALID_TARGET
-                "nofreeadapter" in code -> SubscriptionFailureKind.NO_FREE_ADAPTER
-                "muxnotenabled" in code -> SubscriptionFailureKind.MUX_NOT_ENABLED
-                "tuningfailed" in code -> SubscriptionFailureKind.TUNING_FAILED
-                "badsignal" in code -> SubscriptionFailureKind.BAD_SIGNAL
-                "scrambled" in code -> SubscriptionFailureKind.SCRAMBLED
-                "subscriptionoverridden" in code -> SubscriptionFailureKind.OVERRIDDEN
-                "noinput" in code -> SubscriptionFailureKind.NO_INPUT
-                else -> continue
-            }
-        }
-
-        return null
-    }
-
+    @Synchronized
     private fun startOrRestartReconnectLoop(
         reuseMatchingConnection: Boolean,
         preservePublishedChannels: Boolean,
+        coalesceWhileConnecting: Boolean = false,
     ) {
+        if (
+            coalesceWhileConnecting &&
+            !shouldRestartConnectionRetry(
+                reconnectJobActive = reconnectJob?.isActive == true,
+                connectionIsConnecting = reconnectAttemptPhase.inFlightAttemptId != null,
+            )
+        ) return
+        val attemptId = beginReconnectAttempt()
+        synchronized(subscriptionStatusLock) {
+            subscriptionFailureState = SubscriptionFailureTrackerState()
+        }
+        reconnectAttemptPhase = beginReconnectAttemptPhase(reconnectAttemptPhase, attemptId)
         reconnectJob?.cancel()
-        _uiState.value = connectionAttemptState(
-            hasPublishedChannels = preservePublishedChannels && repo.channelsUi.value.isNotEmpty(),
+        publishConnectionState(
+            attemptId,
+            connectionAttemptState(
+                hasPublishedChannels =
+                    preservePublishedChannels && repo.channelsUi.value.isNotEmpty(),
+            ),
         )
 
         reconnectJob = viewModelScope.launch(Dispatchers.IO) {
             var mayReuseConnection = reuseMatchingConnection
+            var firstAttempt = true
             while (true) {
-                val cfg = lastCfg ?: return@launch
+                if (!firstAttempt && !markReconnectAttemptInFlight(attemptId)) return@launch
+                firstAttempt = false
+                val cfg = lastCfg ?: run {
+                    clearReconnectAttemptInFlight(attemptId)
+                    return@launch
+                }
 
-                val ok = connectInternal(
-                    cfg.host,
-                    cfg.htspPort,
-                    cfg.username,
-                    cfg.password,
-                    reuseMatchingConnection = mayReuseConnection,
-                    preservePublishedChannels = preservePublishedChannels,
-                )
+                val ok = try {
+                    connectInternal(
+                        attemptId = attemptId,
+                        host = cfg.host,
+                        port = cfg.htspPort,
+                        username = cfg.username,
+                        password = cfg.password,
+                        reuseMatchingConnection = mayReuseConnection,
+                        preservePublishedChannels = preservePublishedChannels,
+                    )
+                } finally {
+                    clearReconnectAttemptInFlight(attemptId)
+                }
                 if (ok) return@launch
 
                 mayReuseConnection = false
@@ -215,6 +269,7 @@ class AppConnectionViewModel(
     fun reconnectNow() = startOrRestartReconnectLoop(
         reuseMatchingConnection = false,
         preservePublishedChannels = true,
+        coalesceWhileConnecting = true,
     )
 
     fun connectOnceFromUi(
@@ -231,6 +286,7 @@ class AppConnectionViewModel(
     }
 
     private suspend fun connectInternal(
+        attemptId: Long,
         host: String,
         port: Int,
         username: String,
@@ -239,6 +295,7 @@ class AppConnectionViewModel(
         preservePublishedChannels: Boolean,
     ): Boolean {
         return try {
+            ensureCurrentConnectionAttempt(attemptId)
             val connected = htsp.state.value as? ConnectionState.Connected
             if (reuseMatchingConnection && ConnectionPolicy.isSameEndpoint(
                     connectedHost = connected?.host,
@@ -247,16 +304,21 @@ class AppConnectionViewModel(
                     requestedPort = port,
                 )
             ) {
-                _uiState.value = ConnectionUiState.Ready
+                publishConnectionState(attemptId, ConnectionUiState.Ready)
                 return true
             }
 
+            ensureCurrentConnectionAttempt(attemptId)
             repo.onNewConnectionStarting(
                 preservePublishedChannels = preservePublishedChannels,
+                attemptId = attemptId,
             )
+            ensureCurrentConnectionAttempt(attemptId)
             dvrRepository.onNewConnectionStarting(
                 preservePublished = preservePublishedChannels,
+                attemptId = attemptId,
             )
+            ensureCurrentConnectionAttempt(attemptId)
 
             htsp.connect(
                 host = host,
@@ -267,24 +329,105 @@ class AppConnectionViewModel(
                 connectTimeoutMs = 10_000,
                 responseTimeoutMs = 5_000
             )
+            ensureCurrentConnectionAttempt(attemptId)
             val connectedAfterAuth = htsp.state.value as? ConnectionState.Connected
-            dvrRepository.applyAuthenticatedDvrAccess(connectedAfterAuth?.dvrAccess)
+            dvrRepository.applyAuthenticatedDvrAccess(
+                dvrAccess = connectedAfterAuth?.dvrAccess,
+                attemptId = attemptId,
+            )
 
-            _uiState.value = ConnectionUiState.SyncingChannels
+            publishConnectionState(attemptId, ConnectionUiState.SyncingChannels)
             htsp.enableAsyncMetadataAndWaitInitialSync()
+            ensureCurrentConnectionAttempt(attemptId)
 
             repo.awaitChannelsReady()
+            ensureCurrentConnectionAttempt(attemptId)
             // Transport failure keeps Unknown/Denied; never optimistically Allowed.
-            runCatching { dvrRepository.refreshConfigs() }
-                .onFailure { Timber.w(it, "DVR configurations unavailable") }
-            repo.startEpgWorker()
-            _uiState.value = ConnectionUiState.Ready
+            try {
+                dvrRepository.refreshConfigs(attemptId = attemptId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Timber.w(error, "DVR configurations unavailable")
+            }
+            ensureCurrentConnectionAttempt(attemptId)
+            runForCurrentConnectionAttempt(attemptId) {
+                repo.startEpgWorker()
+                _uiState.value = ConnectionUiState.Ready
+            }
 
             true
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
+            ensureCurrentConnectionAttempt(attemptId)
             Timber.e(e, "Connect failed")
-            _uiState.value = ConnectionUiState.Error(connectionFailureKind(e))
+            publishConnectionState(
+                attemptId,
+                ConnectionUiState.Error(connectionFailureKind(e)),
+            )
             false
+        }
+    }
+
+    private fun beginReconnectAttempt(): Long = synchronized(connectionAttemptLock) {
+        beginConnectionAttempt(connectionAttempts).also {
+            connectionAttempts = it.state
+        }.attemptId.also(::advanceRepositoryConnectionAttempt)
+    }
+
+    private fun invalidateReconnectAttempts() {
+        val attemptId = synchronized(connectionAttemptLock) {
+            connectionAttempts = invalidateConnectionAttempts(connectionAttempts)
+            connectionAttempts.currentAttemptId
+        }
+        synchronized(this) {
+            reconnectAttemptPhase = invalidateReconnectAttemptPhase(reconnectAttemptPhase)
+        }
+        synchronized(subscriptionStatusLock) {
+            subscriptionFailureState = SubscriptionFailureTrackerState()
+        }
+        advanceRepositoryConnectionAttempt(attemptId)
+    }
+
+    @Synchronized
+    private fun markReconnectAttemptInFlight(attemptId: Long): Boolean {
+        if (!isCurrentConnectionAttempt(attemptId)) return false
+        reconnectAttemptPhase = beginReconnectAttemptPhase(reconnectAttemptPhase, attemptId)
+        return true
+    }
+
+    @Synchronized
+    private fun clearReconnectAttemptInFlight(attemptId: Long) {
+        reconnectAttemptPhase = completeReconnectAttemptPhase(reconnectAttemptPhase, attemptId)
+    }
+
+    private fun advanceRepositoryConnectionAttempt(attemptId: Long) {
+        repo.advanceConnectionAttempt(attemptId)
+        dvrRepository.advanceConnectionAttempt(attemptId)
+    }
+
+    private fun ensureCurrentConnectionAttempt(attemptId: Long) {
+        if (!isCurrentConnectionAttempt(attemptId)) {
+            throw CancellationException("Superseded connection attempt")
+        }
+    }
+
+    private fun isCurrentConnectionAttempt(attemptId: Long): Boolean =
+        synchronized(connectionAttemptLock) {
+            connectionAttemptMayPublish(connectionAttempts, attemptId)
+        }
+
+    private fun publishConnectionState(attemptId: Long, state: ConnectionUiState) {
+        runForCurrentConnectionAttempt(attemptId) { _uiState.value = state }
+    }
+
+    private fun runForCurrentConnectionAttempt(attemptId: Long, block: () -> Unit) {
+        synchronized(connectionAttemptLock) {
+            if (!connectionAttemptMayPublish(connectionAttempts, attemptId)) {
+                throw CancellationException("Superseded connection attempt")
+            }
+            block()
         }
     }
 }

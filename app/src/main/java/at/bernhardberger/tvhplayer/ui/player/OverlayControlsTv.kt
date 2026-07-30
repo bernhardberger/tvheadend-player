@@ -91,8 +91,13 @@ fun OverlayControlsTv(
     onSeekTimeshift: (Long) -> Unit,
     onGoLive: () -> Unit,
     showStop: Boolean = true,
+    restoreInfoFocus: Boolean = false,
+    onInfoFocusRestored: () -> Unit = {},
+    restoreOptionsFocus: Boolean = false,
+    onOptionsFocusRestored: () -> Unit = {},
 ) {
     var lastFocused by rememberSaveable { mutableStateOf<String?>(null) }
+    var focusedAction by remember { mutableStateOf<String?>(null) }
 
     val channelsFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -113,6 +118,8 @@ fun OverlayControlsTv(
         canSeekForward,
         showStop,
         optionsOpen,
+        restoreInfoFocus,
+        restoreOptionsFocus,
     ) {
         if (controlsVisible && !optionsOpen) {
             val requesters = buildMap {
@@ -135,9 +142,17 @@ fun OverlayControlsTv(
                 PlaybackOverlayFocusTarget.CONTROLS_CLUSTER ->
                     if (timeshiftState.available) "pause" else "channels"
             }
-            (lastFocused?.let(requesters::get)
-                ?: requesters[initialKey]
-                ?: requesters.values.first()).requestFocus()
+            val target = when {
+                restoreInfoFocus -> infoFocus
+                restoreOptionsFocus -> optionsFocus
+                else -> lastFocused?.let(requesters::get)
+                    ?: requesters[initialKey]
+                    ?: requesters.values.first()
+            }
+            if (target.requestFocus()) {
+                if (restoreInfoFocus) onInfoFocusRestored()
+                if (restoreOptionsFocus) onOptionsFocusRestored()
+            }
         }
     }
 
@@ -157,9 +172,14 @@ fun OverlayControlsTv(
     val programmePositionMs = nowEvent?.let {
         ((playbackSec - it.start) * 1_000L).coerceIn(0L, programmeDurationMs ?: 0L)
     }
-    fun focused(key: String) {
-        lastFocused = key
-        onUserInteraction()
+    fun focusChanged(key: String, isFocused: Boolean) {
+        if (isFocused) {
+            lastFocused = key
+            focusedAction = key
+            onUserInteraction()
+        } else if (focusedAction == key) {
+            focusedAction = null
+        }
     }
 
     val channelsLabel = stringResource(R.string.nav_channels)
@@ -171,6 +191,16 @@ fun OverlayControlsTv(
     val infoLabel = stringResource(R.string.player_info)
     val moreLabel = stringResource(R.string.playback_options)
     val stopLabel = stringResource(R.string.stop_playback)
+    val contextLabel = if (controlsVisible && !optionsOpen) {
+        when (focusedAction) {
+            "channels" -> channelsLabel
+            "live" -> goLiveLabel
+            "options" -> moreLabel
+            else -> null
+        }
+    } else {
+        null
+    }
     Box(Modifier.fillMaxSize()) {
         PlayerIdentityHeader(
             imageLoader = imageLoader,
@@ -252,6 +282,7 @@ fun OverlayControlsTv(
 
             Spacer(Modifier.height(TvOverlayTimelineBlockGap))
             PlayerActionRow(
+                contextLabel = contextLabel,
                 modifier = Modifier
                     .testTag("player-actions")
                     .onPreviewKeyEvent { event ->
@@ -284,7 +315,7 @@ fun OverlayControlsTv(
                                     }
                                 }
                                 .focusRequester(channelsFocus)
-                                .onFocusChanged { if (it.isFocused) focused("channels") },
+                                .onFocusChanged { focusChanged("channels", it.isFocused) },
                         ) {
                             Icon(Icons.AutoMirrored.Filled.List, channelsLabel)
                         }
@@ -313,7 +344,7 @@ fun OverlayControlsTv(
                                         right = pauseFocus
                                     }
                                     .focusRequester(backFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("back") },
+                                    .onFocusChanged { focusChanged("back", it.isFocused) },
                                 ) {
                                     Icon(Icons.Filled.Replay30, seekBackLabel)
                                 }
@@ -328,7 +359,7 @@ fun OverlayControlsTv(
                                         right = if (canSeekForward) forwardFocus else infoFocus
                                     }
                                     .focusRequester(pauseFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("pause") },
+                                    .onFocusChanged { focusChanged("pause", it.isFocused) },
                             ) {
                                 Icon(
                                     if (timeshiftState.paused) {
@@ -355,7 +386,7 @@ fun OverlayControlsTv(
                                             right = liveFocus
                                         }
                                         .focusRequester(forwardFocus)
-                                        .onFocusChanged { if (it.isFocused) focused("forward") },
+                                        .onFocusChanged { focusChanged("forward", it.isFocused) },
                                 ) {
                                     Icon(Icons.Filled.Forward30, seekForwardLabel)
                                 }
@@ -374,7 +405,7 @@ fun OverlayControlsTv(
                                             right = infoFocus
                                         }
                                         .focusRequester(liveFocus)
-                                        .onFocusChanged { if (it.isFocused) focused("live") },
+                                        .onFocusChanged { focusChanged("live", it.isFocused) },
                                 ) {
                                     Icon(Icons.Outlined.LiveTv, goLiveLabel)
                                 }
@@ -394,6 +425,7 @@ fun OverlayControlsTv(
                                 onClick = { onUserInteraction(); onOpenInfo() },
                                 modifier = Modifier
                                     .size(TvOverlayActionButtonSize)
+                                    .testTag("live-info-action")
                                     .focusProperties {
                                         if (timeshiftState.available) up = seekbarFocus
                                         left = when {
@@ -404,7 +436,7 @@ fun OverlayControlsTv(
                                         right = optionsFocus
                                     }
                                     .focusRequester(infoFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("info") },
+                                    .onFocusChanged { focusChanged("info", it.isFocused) },
                             ) {
                                 Icon(Icons.Filled.Info, infoLabel)
                             }
@@ -412,13 +444,14 @@ fun OverlayControlsTv(
                                 onClick = { onUserInteraction(); onOpenOptions() },
                                 modifier = Modifier
                                     .size(TvOverlayActionButtonSize)
+                                    .testTag("live-playback-options")
                                     .focusProperties {
                                         if (timeshiftState.available) up = seekbarFocus
                                         left = infoFocus
                                         if (showStop) right = stopFocus
                                     }
                                     .focusRequester(optionsFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("options") },
+                                    .onFocusChanged { focusChanged("options", it.isFocused) },
                             ) {
                                 Icon(Icons.Filled.MoreVert, moreLabel)
                             }
@@ -436,7 +469,7 @@ fun OverlayControlsTv(
                                             left = optionsFocus
                                         }
                                         .focusRequester(stopFocus)
-                                        .onFocusChanged { if (it.isFocused) focused("stop") },
+                                        .onFocusChanged { focusChanged("stop", it.isFocused) },
                                 ) {
                                     Icon(Icons.Filled.Stop, stopLabel)
                                 }

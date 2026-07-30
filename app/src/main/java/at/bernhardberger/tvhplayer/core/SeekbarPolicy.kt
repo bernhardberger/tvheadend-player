@@ -32,11 +32,18 @@ data class SeekbarRange(
         else ((positionMs - startMs).toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
 }
 
+sealed interface RecordingTimelinePresentation {
+    data class Seekable(val range: SeekbarRange) : RecordingTimelinePresentation
+    data class StillRecording(val elapsedMs: Long) : RecordingTimelinePresentation
+    data class DurationUnavailable(val elapsedMs: Long) : RecordingTimelinePresentation
+}
+
 /** Programme-anchored timeshift axis. Fractions are 0..1 across the programme. */
 data class ProgrammeAxis(
     val playbackFraction: Float,
     val liveEdgeFraction: Float,
     val rewindableStartFraction: Float,
+    val rewindableStartsBeforeProgramme: Boolean,
 )
 
 /**
@@ -60,17 +67,33 @@ fun programmeAnchoredAxis(
         playbackFraction = fraction(nowEpochSec + state.positionMs / 1_000L),
         liveEdgeFraction = fraction(nowEpochSec),
         rewindableStartFraction = fraction(nowEpochSec + state.bufferStartMs / 1_000L),
+        rewindableStartsBeforeProgramme =
+            nowEpochSec + state.bufferStartMs / 1_000L < programmeStartSec,
     )
 }
 
-fun recordingSeekbarRange(positionMs: Long, durationMs: Long?): SeekbarRange {
-    val end = durationMs?.coerceAtLeast(0L) ?: positionMs.coerceAtLeast(0L)
+fun recordingSeekbarRange(positionMs: Long, durationMs: Long?): SeekbarRange? {
+    val end = durationMs?.takeIf { it > 0L } ?: return null
     return SeekbarRange(
         domain = SeekbarDomain.RECORDING,
         startMs = 0L,
         endMs = end,
         positionMs = positionMs.coerceIn(0L, end),
     )
+}
+
+fun recordingTimelinePresentation(
+    positionMs: Long,
+    durationMs: Long?,
+    growing: Boolean,
+): RecordingTimelinePresentation {
+    val elapsedMs = positionMs.coerceAtLeast(0L)
+    val range = recordingSeekbarRange(elapsedMs, durationMs)
+    return when {
+        range != null -> RecordingTimelinePresentation.Seekable(range)
+        growing -> RecordingTimelinePresentation.StillRecording(elapsedMs)
+        else -> RecordingTimelinePresentation.DurationUnavailable(elapsedMs)
+    }
 }
 
 fun timeshiftSeekbarRange(state: TimeshiftState): SeekbarRange =

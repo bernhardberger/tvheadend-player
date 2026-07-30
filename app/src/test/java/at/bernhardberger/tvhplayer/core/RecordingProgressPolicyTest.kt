@@ -33,7 +33,7 @@ class RecordingProgressPolicyTest {
     }
 
     @Test
-    fun defaultAndExplicitResumeRequireUsableKnownTimeline() {
+    fun defaultResumeRequiresKnownTimelineWhileExplicitResumeUsesLocalPosition() {
         assertEquals(
             RecordingStartDecision.FromBeginning,
             recordingStartDecision(
@@ -59,6 +59,15 @@ class RecordingProgressPolicyTest {
                 state = DvrState.COMPLETED,
                 serverPositionSeconds = 600L,
                 durationMs = 3_600_000L,
+            ),
+        )
+        assertEquals(
+            RecordingStartDecision.ResumeAt(30_000L),
+            recordingStartDecision(
+                intent = RecordingPlaybackIntent.Resume(30L),
+                state = DvrState.RECORDING,
+                serverPositionSeconds = null,
+                durationMs = null,
             ),
         )
         assertEquals(

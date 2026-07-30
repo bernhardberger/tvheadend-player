@@ -16,11 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -33,10 +28,12 @@ import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchBackAction
 import at.bernhardberger.tvhplayer.core.BackAction
 import at.bernhardberger.tvhplayer.core.WarmPlaybackTarget
 import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
 import at.bernhardberger.tvhplayer.core.armWarmReturn
+import at.bernhardberger.tvhplayer.core.applianceLaunchBackAction
 import at.bernhardberger.tvhplayer.core.clearWarmReturn
 import at.bernhardberger.tvhplayer.core.consumeWarmReturn
 import at.bernhardberger.tvhplayer.core.rearmWarmReturn
@@ -44,13 +41,16 @@ import at.bernhardberger.tvhplayer.core.rearmWarmReturnForPlaybackSelection
 import at.bernhardberger.tvhplayer.core.rootBackAction
 import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
+import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
+import at.bernhardberger.tvhplayer.core.SimpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
+import at.bernhardberger.tvhplayer.core.simpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
@@ -178,6 +178,7 @@ fun AppRoot(
     val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
     val capabilityProfile = simpleTvProfile(simpleTvSettings, simpleTvActive)
     val applianceLaunchRequest by applianceLaunchRequests.pending.collectAsStateWithLifecycle()
+    val connectionAvailable = connectionState is ConnectionState.Connected
     LaunchedEffect(uiSettingsStore, simpleTvStore, applyStartupMode) {
         val startSimpleTv = applyStartupMode && simpleTvStore.settings.first().enabled
         if (startSimpleTv) simpleTvSession.start()
@@ -230,15 +231,15 @@ fun AppRoot(
         }
     }
 
-    LaunchedEffect(topRoute, capabilityProfile) {
-        val route = topRoute.toSimpleTvRoute() ?: return@LaunchedEffect
-        if (!capabilityProfile.allowsRoute(route) && route != SimpleTvRoute.CHANNELS) {
-            nav.navigate(Routes.CHANNELS) {
-                popUpTo(Routes.CHANNELS) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
-    }
+    SimpleTvRouteGuardEffect(
+        topRoute = topRoute,
+        profile = capabilityProfile,
+        recordingActive = activeRecordingId != null,
+        stopRecording = playerSession::stop,
+        redirectToLive = {
+            applianceLaunchRequests.requestStartup(autoStartPlayback = true)
+        },
+    )
 
     LaunchedEffect(isPlayer) {
         onPlayerVisibilityChanged(isPlayer)
@@ -262,8 +263,11 @@ fun AppRoot(
     val handleRootBack: () -> Unit = rootBack@{
         val pendingRequest = applianceLaunchRequest
         if (pendingRequest != null) {
-            applianceLaunchRequests.cancel(pendingRequest)
-            if (simpleTvActive) nav.navigate(Routes.UNLOCK) { launchSingleTop = true }
+            when (applianceLaunchBackAction(simpleTvActive)) {
+                ApplianceLaunchBackAction.CANCEL_REQUEST ->
+                    applianceLaunchRequests.cancel(pendingRequest)
+                ApplianceLaunchBackAction.CONSUME_WITHOUT_CHANGE -> Unit
+            }
             return@rootBack
         }
 
@@ -314,12 +318,9 @@ fun AppRoot(
         }
     }
     BackHandler(enabled = !showRail, onBack = handleRootBack)
-    var consumePriorityBackKeyUp by remember { mutableStateOf(false) }
     val content: @Composable (PaddingValues, Boolean) -> Unit = {
             contentPadding, drawerActive ->
-            Box(
-                Modifier.fillMaxSize()
-            ) {
+            Box(Modifier.fillMaxSize()) {
                 NavHost(
                     navController = nav,
                     startDestination = Routes.CHANNELS,
@@ -483,7 +484,6 @@ fun AppRoot(
                                         contentPadding = contentPadding,
                                         backEnabled = applianceLaunchRequest == null,
                                         onStartSimpleTv = {
-                                            applianceLaunchRequests.request()
                                             simpleTvSession.start()
                                         },
                                     )
@@ -526,6 +526,7 @@ fun AppRoot(
                             channelName = channelName,
                             serviceId = serviceId,
                             simpleTvProfile = capabilityProfile,
+                            onReconnect = appVm::reconnectNow,
                             onUnlock = { nav.navigate(Routes.UNLOCK) },
                             onClose = {
                                 if (!simpleTvActive) nav.popBackStack()
@@ -555,6 +556,8 @@ fun AppRoot(
                                 recordingId = recordingId,
                                 playbackIntent = intent,
                                 simpleTvProfile = capabilityProfile,
+                                connectionAvailable = connectionState is ConnectionState.Connected,
+                                onReconnect = appVm::reconnectNow,
                                 onUnlock = { nav.navigate(Routes.UNLOCK) },
                                 onClose = { nav.popBackStack() },
                             )
@@ -562,50 +565,61 @@ fun AppRoot(
                     }
                 }
 
-                TvRecoveryOverlay(
-                    visible = applianceLaunchRequest != null && !isPlayer,
-                    message = stringResource(
-                        if (connectionState is ConnectionState.Connected) {
-                            R.string.appliance_starting_tv
-                        } else {
-                            R.string.appliance_connection_recovering
-                        }
-                    ),
-                    hint = stringResource(
-                        if (simpleTvActive) {
-                            R.string.simple_tv_back_for_exit
-                        } else {
-                            R.string.appliance_back_for_menu
-                        }
-                    ),
-                )
             }
     }
 
-    Box(
+    ApplianceLaunchRecoveryHost(
+        visible = applianceLaunchRequest != null && !isPlayer,
+        actionable = !connectionAvailable,
+        onBack = handleRootBack,
         modifier = Modifier
             .fillMaxSize()
-            .onPreviewKeyEvent { event ->
-                if (
-                    event.key == Key.Back &&
-                    event.type == KeyEventType.KeyUp &&
-                    consumePriorityBackKeyUp
-                ) {
-                    consumePriorityBackKeyUp = false
-                    return@onPreviewKeyEvent true
-                }
-                if (
-                    event.key == Key.Back &&
-                    event.type == KeyEventType.KeyDown &&
-                    applianceLaunchRequest != null
-                ) {
-                    consumePriorityBackKeyUp = true
-                    handleRootBack()
-                    return@onPreviewKeyEvent true
-                }
-                false
-            }
-            .background(androidx.tv.material3.MaterialTheme.colorScheme.background)
+            .background(androidx.tv.material3.MaterialTheme.colorScheme.background),
+        overlay = {
+            TvRecoveryOverlay(
+                visible = applianceLaunchRequest != null && !isPlayer,
+                message = stringResource(
+                    if (connectionAvailable) {
+                        R.string.appliance_starting_tv
+                    } else {
+                        R.string.appliance_connection_recovering
+                    }
+                ),
+                hint = if (!connectionAvailable && simpleTvActive) {
+                    stringResource(R.string.simple_tv_recovery_hint)
+                } else {
+                    null
+                },
+                primaryActionLabel = if (!connectionAvailable) {
+                    stringResource(R.string.retry)
+                } else {
+                    null
+                },
+                onPrimaryAction = if (!connectionAvailable) {
+                    appVm::reconnectNow
+                } else {
+                    null
+                },
+                secondaryActionLabel = if (!connectionAvailable) {
+                    stringResource(
+                        if (simpleTvActive) R.string.simple_tv_unlock else R.string.close
+                    )
+                } else {
+                    null
+                },
+                onSecondaryAction = if (!connectionAvailable) {
+                    {
+                        val pending = applianceLaunchRequest
+                        if (pending != null) applianceLaunchRequests.cancel(pending)
+                        if (simpleTvActive) {
+                            nav.navigate(Routes.UNLOCK) { launchSingleTop = true }
+                        }
+                    }
+                } else {
+                    null
+                },
+            )
+        },
     ) {
         if (shouldMountPersistentPlayerSurface(
                 hasActivePlayback = playbackState !is PlaybackSessionState.Idle,
@@ -663,6 +677,28 @@ fun AppRoot(
     // cancels a pending one-shot launch before any nested UI can consume it.
     key(applianceLaunchRequest) {
         BackHandler(enabled = applianceLaunchRequest != null, onBack = handleRootBack)
+    }
+}
+
+@Composable
+internal fun SimpleTvRouteGuardEffect(
+    topRoute: String?,
+    profile: SimpleTvProfile,
+    recordingActive: Boolean,
+    stopRecording: suspend () -> Unit,
+    redirectToLive: () -> Unit,
+) {
+    LaunchedEffect(topRoute, profile.active) {
+        val route = topRoute?.substringBefore("/").toSimpleTvRoute()
+            ?: return@LaunchedEffect
+        when (simpleTvRouteGuardAction(profile, route, recordingActive)) {
+            SimpleTvRouteGuardAction.ALLOW -> Unit
+            SimpleTvRouteGuardAction.REDIRECT_TO_LIVE -> redirectToLive()
+            SimpleTvRouteGuardAction.STOP_RECORDING_AND_REDIRECT_TO_LIVE -> {
+                stopRecording()
+                redirectToLive()
+            }
+        }
     }
 }
 

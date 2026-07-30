@@ -98,6 +98,27 @@ class RecordingFileSessionTest {
         assertEquals(1, service.requests.count { it.method == "fileClose" })
     }
 
+    @Test
+    fun staleConnectionAttemptRejectsTheOldFileHandle() {
+        val service = RecordingSessionHtspService()
+        var connectionAttemptId = 1L
+        val session = RecordingFileSession(
+            htsp = service,
+            path = "/recordings/example.ts",
+            htspVersion = { 27 },
+            connectionAttemptId = { connectionAttemptId },
+        )
+        session.open(position = 0L)
+
+        connectionAttemptId = 2L
+
+        assertThrows(RecordingConnectionChangedException::class.java) {
+            session.currentHandle()
+        }
+        session.close()
+        assertEquals(0, service.requests.count { it.method == "fileClose" })
+    }
+
     private fun session(
         service: HtspService,
         htspVersion: Int?,
@@ -134,5 +155,20 @@ class RecordingFileSessionTest {
             }
             return HtspMessage(method = null, seq = 1, fields = responseFields)
         }
+
+        override suspend fun requestForConnectionAttempt(
+            expectedConnectionAttemptId: Long,
+            method: String,
+            fields: Map<String, Any?>,
+            timeoutMs: Long,
+            flush: Boolean,
+            disconnectOnTimeout: Boolean,
+        ): HtspMessage = request(
+            method = method,
+            fields = fields,
+            timeoutMs = timeoutMs,
+            flush = flush,
+            disconnectOnTimeout = disconnectOnTimeout,
+        )
     }
 }

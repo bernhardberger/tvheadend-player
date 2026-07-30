@@ -73,6 +73,18 @@ fun recordingPlaybackSuppressesRevealingKey(
     keyCode: Int,
 ): Boolean = revealingKeyCode == keyCode
 
+fun recordingKeyActionStartsOpeningCycle(action: RecordingPlaybackKeyAction): Boolean =
+    when (action) {
+        RecordingPlaybackKeyAction.REVEAL_CONTROLS,
+        RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+        RecordingPlaybackKeyAction.OPEN_INFO -> true
+        RecordingPlaybackKeyAction.PASS_THROUGH,
+        RecordingPlaybackKeyAction.HIDE_CONTROLS,
+        RecordingPlaybackKeyAction.CLOSE,
+        RecordingPlaybackKeyAction.SEEK_BACK,
+        RecordingPlaybackKeyAction.SEEK_FORWARD -> false
+    }
+
 fun recordingFinishedAction(
     recordingFinished: Boolean,
     activeRecordingId: Int?,

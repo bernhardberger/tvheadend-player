@@ -20,10 +20,12 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay30
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,13 +41,20 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.media3.common.C
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
-import at.bernhardberger.tvhplayer.core.recordingSeekbarRange
+import at.bernhardberger.tvhplayer.core.recordingTimelinePresentation
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
@@ -66,6 +75,7 @@ internal fun RecordingOverlayControls(
     channelName: String?,
     positionMs: Long,
     durationMs: Long,
+    growing: Boolean,
     nowSec: Long,
     isPlaying: Boolean,
     controlsVisible: Boolean,
@@ -77,8 +87,11 @@ internal fun RecordingOverlayControls(
     showStop: Boolean,
     onOpenOptions: () -> Unit,
     onOpenInfo: () -> Unit,
+    restoreOptionsFocus: Boolean = false,
+    onOptionsFocusRestored: () -> Unit = {},
 ) {
     var lastFocused by rememberSaveable { mutableStateOf("playPause") }
+    var focusedAction by remember { mutableStateOf<String?>(null) }
     val playPauseFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val forwardFocus = remember { FocusRequester() }
@@ -86,6 +99,25 @@ internal fun RecordingOverlayControls(
     val optionsFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val seekbarFocus = remember { FocusRequester() }
+    val timelinePresentation = recordingTimelinePresentation(
+        positionMs = positionMs,
+        durationMs = durationMs.takeIf { it != C.TIME_UNSET },
+        growing = growing,
+    )
+    val seekableTimeline = timelinePresentation is RecordingTimelinePresentation.Seekable
+    val latestSeekableTimeline by rememberUpdatedState(seekableTimeline)
+    val latestLastFocused by rememberUpdatedState(lastFocused)
+    DisposableEffect(seekableTimeline) {
+        onDispose {
+            if (
+                seekableTimeline &&
+                !latestSeekableTimeline &&
+                latestLastFocused == "seekbar"
+            ) {
+                playPauseFocus.requestFocus()
+            }
+        }
+    }
     val focusTargets = mapOf(
         "playPause" to playPauseFocus,
         "back" to backFocus,
@@ -93,9 +125,15 @@ internal fun RecordingOverlayControls(
         "stop" to stopFocus,
         "options" to optionsFocus,
         "info" to infoFocus,
+        "seekbar" to seekbarFocus,
     )
 
-    LaunchedEffect(controlsVisible, showStop, optionsOpen) {
+    LaunchedEffect(
+        controlsVisible,
+        showStop,
+        optionsOpen,
+        restoreOptionsFocus,
+    ) {
         if (controlsVisible && !optionsOpen) {
             val availableTargets = buildMap {
                 put("playPause", playPauseFocus)
@@ -104,17 +142,30 @@ internal fun RecordingOverlayControls(
                 if (showStop) put("stop", stopFocus)
                 put("options", optionsFocus)
                 put("info", infoFocus)
+                if (seekableTimeline) put("seekbar", seekbarFocus)
             }
-            (availableTargets[lastFocused] ?: playPauseFocus).requestFocus()
+            val target = if (restoreOptionsFocus) {
+                optionsFocus
+            } else {
+                availableTargets[lastFocused] ?: playPauseFocus
+            }
+            val focused = target.requestFocus()
+            if (focused && restoreOptionsFocus) {
+                onOptionsFocusRestored()
+            }
         }
     }
 
-    fun focused(key: String) {
-        if (focusTargets.containsKey(key)) lastFocused = key
-        onUserInteraction()
+    fun focusChanged(key: String, isFocused: Boolean) {
+        if (isFocused) {
+            if (focusTargets.containsKey(key)) lastFocused = key
+            focusedAction = key
+            onUserInteraction()
+        } else if (focusedAction == key) {
+            focusedAction = null
+        }
     }
 
-    val knownDuration = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
     val seekBackLabel = stringResource(R.string.seek_back_30)
     val seekForwardLabel = stringResource(R.string.seek_forward_30)
     val playLabel = stringResource(R.string.play)
@@ -122,6 +173,11 @@ internal fun RecordingOverlayControls(
     val moreLabel = stringResource(R.string.playback_options)
     val infoLabel = stringResource(R.string.player_info)
     val stopLabel = stringResource(R.string.stop_playback)
+    val contextLabel = if (controlsVisible && !optionsOpen && focusedAction == "options") {
+        moreLabel
+    } else {
+        null
+    }
     val clock = remember(nowSec) { formatClock(nowSec) }
     Box(Modifier.fillMaxSize()) {
         PlayerIdentityHeader(
@@ -161,26 +217,40 @@ internal fun RecordingOverlayControls(
                     bottom = TvOverlayBottomPadding,
                 ),
         ) {
-            PlaybackSeekbar(
-                range = recordingSeekbarRange(
-                    positionMs = positionMs.coerceAtLeast(0L),
-                    durationMs = knownDuration,
-                ),
-                onSeekTo = { target ->
-                    onUserInteraction()
-                    onSeek(target - positionMs)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(seekbarFocus)
-                    .focusProperties { down = playPauseFocus },
-            )
+            when (timelinePresentation) {
+                is RecordingTimelinePresentation.Seekable -> PlaybackSeekbar(
+                    range = timelinePresentation.range,
+                    onSeekTo = { target ->
+                        onUserInteraction()
+                        onSeek(target - positionMs)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("recording-seekbar")
+                        .focusRequester(seekbarFocus)
+                        .onFocusChanged { focusChanged("seekbar", it.isFocused) }
+                        .focusProperties { down = playPauseFocus },
+                )
+                is RecordingTimelinePresentation.StillRecording -> RecordingDurationStatus(
+                    elapsedMs = timelinePresentation.elapsedMs,
+                    status = stringResource(R.string.recording_still_recording),
+                )
+                is RecordingTimelinePresentation.DurationUnavailable -> RecordingDurationStatus(
+                    elapsedMs = timelinePresentation.elapsedMs,
+                    status = stringResource(R.string.recording_duration_unavailable),
+                )
+            }
             Spacer(Modifier.height(TvOverlayTimelineBlockGap))
             PlayerActionRow(
+                contextLabel = contextLabel,
                 modifier = Modifier
                     .testTag("recording-actions")
                     .onPreviewKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp) {
+                        if (
+                            seekableTimeline &&
+                            event.type == KeyEventType.KeyDown &&
+                            event.key == Key.DirectionUp
+                        ) {
                             seekbarFocus.requestFocus()
                             true
                         } else {
@@ -198,11 +268,15 @@ internal fun RecordingOverlayControls(
                             modifier = Modifier
                                 .size(TvOverlayActionButtonSize)
                                 .focusProperties {
-                                    up = seekbarFocus
+                                    up = if (seekableTimeline) {
+                                        seekbarFocus
+                                    } else {
+                                        FocusRequester.Cancel
+                                    }
                                     right = playPauseFocus
                                 }
                                 .focusRequester(backFocus)
-                                .onFocusChanged { if (it.isFocused) focused("back") },
+                                .onFocusChanged { focusChanged("back", it.isFocused) },
                         ) {
                             Icon(Icons.Filled.Replay30, seekBackLabel)
                         }
@@ -210,13 +284,18 @@ internal fun RecordingOverlayControls(
                             onClick = { onUserInteraction(); onTogglePlayPause() },
                             modifier = Modifier
                                 .size(TvOverlayActionButtonSize)
+                                .testTag("recording-play-pause")
                                 .focusProperties {
-                                    up = seekbarFocus
+                                    up = if (seekableTimeline) {
+                                        seekbarFocus
+                                    } else {
+                                        FocusRequester.Cancel
+                                    }
                                     left = backFocus
                                     right = forwardFocus
                                 }
                                 .focusRequester(playPauseFocus)
-                                .onFocusChanged { if (it.isFocused) focused("playPause") },
+                                .onFocusChanged { focusChanged("playPause", it.isFocused) },
                         ) {
                             Icon(
                                 if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -228,12 +307,16 @@ internal fun RecordingOverlayControls(
                             modifier = Modifier
                                 .size(TvOverlayActionButtonSize)
                                 .focusProperties {
-                                    up = seekbarFocus
+                                    up = if (seekableTimeline) {
+                                        seekbarFocus
+                                    } else {
+                                        FocusRequester.Cancel
+                                    }
                                     left = playPauseFocus
                                     right = infoFocus
                                 }
                                 .focusRequester(forwardFocus)
-                                .onFocusChanged { if (it.isFocused) focused("forward") },
+                                .onFocusChanged { focusChanged("forward", it.isFocused) },
                         ) {
                             Icon(Icons.Filled.Forward30, seekForwardLabel)
                         }
@@ -250,12 +333,16 @@ internal fun RecordingOverlayControls(
                             modifier = Modifier
                                 .size(TvOverlayActionButtonSize)
                                 .focusProperties {
-                                    up = seekbarFocus
+                                    up = if (seekableTimeline) {
+                                        seekbarFocus
+                                    } else {
+                                        FocusRequester.Cancel
+                                    }
                                     left = forwardFocus
                                     right = optionsFocus
                                 }
                                 .focusRequester(infoFocus)
-                                .onFocusChanged { if (it.isFocused) focused("info") },
+                                .onFocusChanged { focusChanged("info", it.isFocused) },
                         ) {
                             Icon(Icons.Filled.Info, infoLabel)
                         }
@@ -263,13 +350,18 @@ internal fun RecordingOverlayControls(
                             onClick = { onUserInteraction(); onOpenOptions() },
                             modifier = Modifier
                                 .size(TvOverlayActionButtonSize)
+                                .testTag("recording-playback-options")
                                 .focusProperties {
-                                    up = seekbarFocus
+                                    up = if (seekableTimeline) {
+                                        seekbarFocus
+                                    } else {
+                                        FocusRequester.Cancel
+                                    }
                                     left = infoFocus
                                     if (showStop) right = stopFocus
                                 }
                                 .focusRequester(optionsFocus)
-                                .onFocusChanged { if (it.isFocused) focused("options") },
+                                .onFocusChanged { focusChanged("options", it.isFocused) },
                         ) {
                             Icon(Icons.Filled.MoreVert, moreLabel)
                         }
@@ -283,11 +375,15 @@ internal fun RecordingOverlayControls(
                                 modifier = Modifier
                                     .size(TvOverlayActionButtonSize)
                                     .focusProperties {
-                                        up = seekbarFocus
+                                        up = if (seekableTimeline) {
+                                            seekbarFocus
+                                        } else {
+                                            FocusRequester.Cancel
+                                        }
                                         left = optionsFocus
                                     }
                                     .focusRequester(stopFocus)
-                                    .onFocusChanged { if (it.isFocused) focused("stop") },
+                                    .onFocusChanged { focusChanged("stop", it.isFocused) },
                             ) {
                                 Icon(Icons.Filled.Stop, stopLabel)
                             }
@@ -306,13 +402,32 @@ internal fun RecordingSeekPreview(
     targetMs: Long,
     originMs: Long?,
     durationMs: Long,
+    growing: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val knownDuration = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
-    val progress = knownDuration?.let { targetMs.toFloat() / it } ?: 0f
-    val originProgress = knownDuration?.let { duration ->
-        originMs?.toFloat()?.div(duration)
+    val presentation = recordingTimelinePresentation(
+        positionMs = targetMs,
+        durationMs = durationMs.takeIf { it != C.TIME_UNSET },
+        growing = growing,
+    )
+    val target = formatPlaybackDuration(targetMs)
+    val delta = formatPlaybackDelta((originMs ?: targetMs).let { targetMs - it })
+    val durationStatus = when (presentation) {
+        is RecordingTimelinePresentation.Seekable -> stringResource(
+            R.string.recording_known_duration,
+            formatPlaybackDuration(presentation.range.endMs),
+        )
+        is RecordingTimelinePresentation.StillRecording ->
+            stringResource(R.string.recording_still_recording)
+        is RecordingTimelinePresentation.DurationUnavailable ->
+            stringResource(R.string.recording_duration_unavailable)
     }
+    val description = stringResource(
+        R.string.recording_seek_preview_description,
+        target,
+        delta,
+        durationStatus,
+    )
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -322,16 +437,79 @@ internal fun RecordingSeekPreview(
                 end = TvOverlaySidePadding,
                 top = TvOverlayFooterGradientRunout,
                 bottom = TvOverlayBottomPadding,
-            ),
+            )
+            .testTag("recording-seek-preview")
+            .clearAndSetSemantics {
+                contentDescription = description
+                liveRegion = LiveRegionMode.Polite
+            },
     ) {
-        PlayerTimelineBlock(
-            progress = progress.coerceIn(0f, 1f),
-            tone = PlayerTimelineTone.PREVIEW,
-            ghostProgress = originProgress?.coerceIn(0f, 1f),
-            leadingLabel = formatPlaybackDuration(targetMs),
-            trailingLabel = originMs?.let { formatPlaybackDelta(targetMs - it) }
-                ?: knownDuration?.let(::formatPlaybackDuration)
-                ?: stringResource(R.string.recording_duration_unknown),
-        )
+        when (presentation) {
+            is RecordingTimelinePresentation.Seekable -> PlayerTimelineBlock(
+                progress = presentation.range.progress,
+                tone = PlayerTimelineTone.PREVIEW,
+                ghostProgress = originMs?.let { origin ->
+                    origin.toFloat().div(presentation.range.endMs).coerceIn(0f, 1f)
+                },
+                leadingLabel = formatPlaybackDuration(targetMs),
+                trailingLabel = originMs?.let { formatPlaybackDelta(targetMs - it) }
+                    ?: formatPlaybackDuration(presentation.range.endMs),
+            )
+            is RecordingTimelinePresentation.StillRecording -> RecordingDurationStatus(
+                elapsedMs = presentation.elapsedMs,
+                status = stringResource(R.string.recording_still_recording),
+                delta = originMs?.let { formatPlaybackDelta(targetMs - it) },
+            )
+            is RecordingTimelinePresentation.DurationUnavailable -> RecordingDurationStatus(
+                elapsedMs = presentation.elapsedMs,
+                status = stringResource(R.string.recording_duration_unavailable),
+                delta = originMs?.let { formatPlaybackDelta(targetMs - it) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecordingDurationStatus(
+    elapsedMs: Long,
+    status: String,
+    modifier: Modifier = Modifier,
+    delta: String? = null,
+) {
+    val elapsed = formatPlaybackDuration(elapsedMs)
+    val description = stringResource(
+        R.string.recording_timeline_status_description,
+        elapsed,
+        status,
+    )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("recording-duration-status")
+            .clearAndSetSemantics {
+                contentDescription = description
+            },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = elapsed,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = status,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+        delta?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.testTag("recording-seek-preview-delta"),
+            )
+        }
     }
 }

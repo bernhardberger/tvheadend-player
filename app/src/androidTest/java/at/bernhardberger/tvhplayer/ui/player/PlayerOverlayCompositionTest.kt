@@ -9,7 +9,9 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -18,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import coil3.ImageLoader
 import org.junit.Assert.assertEquals
@@ -134,7 +137,11 @@ class PlayerOverlayCompositionTest {
             .fetchSemanticsNode().boundsInRoot
         val terminal = composeRule.onNodeWithTag("player-terminal-actions")
             .fetchSemanticsNode().boundsInRoot
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val sidePaddingPx = with(composeRule.density) { TvOverlaySidePadding.toPx() }
 
+        assertEquals(root.left + sidePaddingPx, picon.left, 1f)
+        assertEquals(root.right - sidePaddingPx, clock.right, 1f)
         assertTrue(picon.left < title.left)
         assertTrue(picon.height > title.height)
         assertTrue(channel.bottom <= title.top)
@@ -204,23 +211,95 @@ class PlayerOverlayCompositionTest {
         }
 
         composeRule.waitForIdle()
-        assertEquals(1, composeRule.onAllNodesWithText("29:56").fetchSemanticsNodes().size)
-        assertEquals(1, composeRule.onAllNodesWithText("1:00:00").fetchSemanticsNodes().size)
+        assertEquals(1, composeRule.onAllNodesWithText("Live").fetchSemanticsNodes().size)
 
         composeRule.onNodeWithTag("player-seekbar").requestFocus()
         composeRule.waitForIdle()
-        assertEquals(
-            1,
-            composeRule.onAllNodesWithTag("player-programme-progress")
-                .fetchSemanticsNodes().size,
-        )
-        assertEquals(1, composeRule.onAllNodesWithText("29:56").fetchSemanticsNodes().size)
-        assertEquals(1, composeRule.onAllNodesWithText("1:00:00").fetchSemanticsNodes().size)
+        assertEquals(1, composeRule.onAllNodesWithText("Live").fetchSemanticsNodes().size)
         assertEquals(
             1,
             composeRule.onAllNodesWithTag("player-seekbar-thumb")
                 .fetchSemanticsNodes().size,
         )
+    }
+
+    @Test
+    @OptIn(ExperimentalTestApi::class)
+    fun liveContextLabelAppearsOnlyForAFocusedNonObviousAction() {
+        composeRule.setContent {
+            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
+            TVHeadendPlayerTheme {
+                OverlayControlsTv(
+                    imageLoader = imageLoader,
+                    channelNumber = 1,
+                    channelName = "ORF 1 HD",
+                    piconPath = null,
+                    nowEvent = null,
+                    nextEvent = null,
+                    nowSec = 5_400,
+                    controlsVisible = true,
+                    optionsOpen = false,
+                    onOpenChannels = {},
+                    onStopPlayback = {},
+                    onUserInteraction = {},
+                    onOpenOptions = {},
+                    timeshiftState = TimeshiftState(
+                        available = true,
+                        bufferStartMs = -60_000,
+                        positionMs = -30_000,
+                        liveEdgeMs = 0,
+                    ),
+                    timeshiftFeedback = null,
+                    onToggleTimeshiftPause = {},
+                    onSeekTimeshift = {},
+                    onGoLive = {},
+                )
+            }
+        }
+
+        val actionsBefore = composeRule.onNodeWithTag("player-actions")
+            .fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-channels").requestFocus()
+        composeRule.onNodeWithTag("player-action-context-label").assertExists()
+        composeRule.onNodeWithText("Channels", useUnmergedTree = true).assertExists()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithContentDescription("−30 seconds").assertIsFocused()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithContentDescription("Pause").assertIsFocused()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithContentDescription("+30 seconds").assertIsFocused()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused()
+        composeRule.onNodeWithTag("player-action-context-label").assertExists()
+        composeRule.onNodeWithText("Go live", useUnmergedTree = true).assertExists()
+
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("live-info-action").assertIsFocused()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("live-playback-options").assertIsFocused()
+        composeRule.onNodeWithTag("player-action-context-label").assertExists()
+        composeRule.onNodeWithText("Playback options", useUnmergedTree = true).assertExists()
+        val actionsAfter = composeRule.onNodeWithTag("player-actions")
+            .fetchSemanticsNode().boundsInRoot
+        val contextLabel = composeRule.onNodeWithTag("player-action-context-label")
+            .fetchSemanticsNode().boundsInRoot
+        val timeline = composeRule.onNodeWithTag("player-timeline")
+            .fetchSemanticsNode().boundsInRoot
+        assertEquals(actionsBefore, actionsAfter)
+        assertTrue(contextLabel.left >= actionsAfter.left)
+        assertTrue(contextLabel.right <= actionsAfter.right)
+        assertTrue(timeline.bottom <= contextLabel.top)
+        assertTrue(contextLabel.bottom <= actionsAfter.top)
+
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("live-info-action").assertIsFocused()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
     }
 
     @Test

@@ -1,16 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.KeyEvent as AndroidKeyEvent
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -48,8 +41,16 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
-import at.bernhardberger.tvhplayer.core.PlaybackAuxiliaryBackAction
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvhplayer.core.PlaybackRecoveryInitialAction
+import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
+import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
+import at.bernhardberger.tvhplayer.core.PlayerBackAction
+import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
+import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
+import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
+import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
+import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
@@ -58,7 +59,12 @@ import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
-import at.bernhardberger.tvhplayer.core.playbackAuxiliaryBackAction
+import at.bernhardberger.tvhplayer.core.playerBackAction
+import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
+import at.bernhardberger.tvhplayer.core.playerForegroundLayer
+import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
+import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
+import at.bernhardberger.tvhplayer.core.recordingKeyActionStartsOpeningCycle
 import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
@@ -76,6 +82,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
+import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import coil3.ImageLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -111,6 +118,8 @@ fun RecordingPlayerScreen(
     session: PlayerSession = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
+    connectionAvailable: Boolean,
+    onReconnect: () -> Unit,
     onUnlock: () -> Unit = {},
     onClose: () -> Unit,
 ) {
@@ -123,15 +132,17 @@ fun RecordingPlayerScreen(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
     )
     val entries by repository.entries.collectAsStateWithLifecycle()
+    val entriesReady by repository.entriesReady.collectAsStateWithLifecycle()
     val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
     val channelsById = remember(channels) { channels.associateBy(ChannelUi::id) }
     val entry = entries.firstOrNull { it.id == recordingId }
+    val recordingResolved = entry != null || entriesReady
+    val recordingLoading = !recordingResolved && connectionAvailable
+    val initialConnectionFailure = !recordingResolved && !connectionAvailable
     val availability = entry?.let(::recordingPlaybackAvailability)
-        ?: RecordingPlaybackAvailability.FileUnavailable
     val ready = availability as? RecordingPlaybackAvailability.Ready
     val player = remember { session.getOrCreatePlayer(context) }
     val rootFocus = remember { FocusRequester() }
-    val unavailableFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val showStop = simpleTvProfile.allows(SimpleTvCapability.STOP)
     val showUnlock = simpleTvProfile.active
@@ -144,7 +155,9 @@ fun RecordingPlayerScreen(
     var seekFeedbackToken by remember { mutableIntStateOf(0) }
     var pendingSeekTargetMs by remember { mutableStateOf<Long?>(null) }
     var pendingSeekOriginMs by remember { mutableStateOf<Long?>(null) }
+    var pendingSeekDispatched by remember { mutableStateOf(false) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
+    var restoreOptionsFocus by remember { mutableStateOf(false) }
     var statsVisible by remember { mutableStateOf(false) }
     var infoOpen by remember { mutableStateOf(false) }
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
@@ -204,10 +217,11 @@ fun RecordingPlayerScreen(
     fun seekBy(deltaMs: Long) {
         val currentPosition = player.currentPosition.coerceAtLeast(0L)
         if (pendingSeekTargetMs == null) pendingSeekOriginMs = currentPosition
+        pendingSeekDispatched = false
         val target = recordingStackedSeekTarget(
             currentMs = currentPosition,
             pendingTargetMs = pendingSeekTargetMs,
-            durationMs = player.duration.takeIf { it != C.TIME_UNSET },
+            durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0L },
             deltaMs = deltaMs,
         )
         pendingSeekTargetMs = target
@@ -252,29 +266,6 @@ fun RecordingPlayerScreen(
         }
     }
 
-    fun applyAuxiliaryBack(): Boolean = when (
-        playbackAuxiliaryBackAction(optionsPage, statsVisible, infoOpen)
-    ) {
-        PlaybackAuxiliaryBackAction.CLOSE_INFO -> {
-            infoOpen = false
-            true
-        }
-        PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT -> {
-            optionsPage = PlaybackOptionsPage.ROOT
-            true
-        }
-        PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
-            optionsPage = null
-            interactionToken++
-            true
-        }
-        PlaybackAuxiliaryBackAction.HIDE_STATS -> {
-            statsVisible = false
-            true
-        }
-        PlaybackAuxiliaryBackAction.PASS_THROUGH -> false
-    }
-
     LaunchedEffect(recordingId, ready?.path, playbackIntent) {
         val playableEntry = entry ?: return@LaunchedEffect
         ready ?: return@LaunchedEffect
@@ -306,20 +297,112 @@ fun RecordingPlayerScreen(
         }
     }
 
-    LaunchedEffect(controlsVisible, interactionToken, optionsPage) {
-        if (!controlsVisible || availability !is RecordingPlaybackAvailability.Ready) {
-            return@LaunchedEffect
+    val autoHideEligible = playerControlsAutoHideEligible(
+        PlayerAutoHideContext(
+            controlsVisible = controlsVisible,
+            playbackProgressing = isPlaying,
+            playbackStable = availability is RecordingPlaybackAvailability.Ready &&
+                playbackState is PlaybackSessionState.Playing,
+            seekPending = pendingSeekTargetMs != null,
+            modalVisible = optionsPage != null || infoOpen,
+            recoveryVisible = playbackState is PlaybackSessionState.Recovering,
+            actionableErrorVisible = initialConnectionFailure ||
+                (recordingResolved &&
+                    (availability !is RecordingPlaybackAvailability.Ready ||
+                        playbackState is PlaybackSessionState.Failed)),
+        )
+    )
+    PlayerControlsAutoHideEffect(
+        eligible = autoHideEligible,
+        interactionToken = interactionToken,
+        timeoutMillis = RECORDING_CONTROLS_AUTO_HIDE_MS,
+        onHide = ::hideControls,
+    )
+
+    val seekPreviewPhase = when {
+        controlsVisible || pendingSeekTargetMs == null -> PlayerSeekPreviewPhase.NONE
+        pendingSeekDispatched -> PlayerSeekPreviewPhase.DISPATCHED
+        else -> PlayerSeekPreviewPhase.PENDING
+    }
+    val foregroundLayer = playerForegroundLayer(
+        PlayerForegroundContext(
+            confirmationVisible = false,
+            infoVisible = infoOpen && entry != null &&
+                availability is RecordingPlaybackAvailability.Ready,
+            optionsPage = optionsPage,
+            numberEntryVisible = false,
+            channelDrawerVisible = false,
+            recoveryVisible = playbackState is PlaybackSessionState.Recovering,
+            terminalErrorVisible = initialConnectionFailure ||
+                (recordingResolved &&
+                    (availability !is RecordingPlaybackAvailability.Ready ||
+                        playbackState is PlaybackSessionState.Failed)),
+            seekPreviewPhase = seekPreviewPhase,
+            controlsVisible = controlsVisible &&
+                availability is RecordingPlaybackAvailability.Ready,
+            statsEnabled = statsVisible,
+        )
+    )
+    val failureReason = (playbackState as? PlaybackSessionState.Failed)?.reason
+    val retryTargetAvailable =
+        initialConnectionFailure ||
+            (availability is RecordingPlaybackAvailability.Ready &&
+                failureReason == PlaybackFailureReason.RECORDING_READ_FAILED)
+    val recoveryUiModel = playbackRecoveryUiModel(
+        surface = PlaybackRecoverySurface.RECORDING,
+        connectionAvailable = connectionAvailable,
+        retryTargetAvailable = retryTargetAvailable,
+        simpleTvActive = false,
+    )
+
+    fun dispatchRecoveryRetry() {
+        when (recoveryUiModel.retryCommand) {
+            PlaybackRetryCommand.RECONNECT -> onReconnect()
+            PlaybackRetryCommand.RESUME_RECORDING -> session.requestRetryRecording()
+            PlaybackRetryCommand.RETRY_LIVE,
+            PlaybackRetryCommand.NONE -> Unit
         }
-        if (optionsPage != null) return@LaunchedEffect
-        delay(RECORDING_CONTROLS_AUTO_HIDE_MS)
-        hideControls()
     }
 
-    LaunchedEffect(controlsVisible, availability) {
-        if (!controlsVisible && availability is RecordingPlaybackAvailability.Ready) {
+    val handlePlaybackBack: () -> Unit = {
+        when (
+            playerBackAction(
+                surface = PlayerSurface.RECORDING,
+                simpleTvActive = simpleTvProfile.active,
+                foregroundLayer = foregroundLayer,
+            )
+        ) {
+            PlayerBackAction.DISMISS_CONFIRMATION -> Unit
+            PlayerBackAction.CLOSE_INFO -> infoOpen = false
+            PlayerBackAction.RETURN_TO_OPTIONS_ROOT -> optionsPage = PlaybackOptionsPage.ROOT
+            PlayerBackAction.CLOSE_OPTIONS -> {
+                optionsPage = null
+                restoreOptionsFocus = true
+                interactionToken++
+            }
+            PlayerBackAction.CLEAR_NUMBER_ENTRY,
+            PlayerBackAction.CLOSE_CHANNEL_DRAWER -> Unit
+            PlayerBackAction.CLOSE_PLAYER -> onClose()
+            PlayerBackAction.CANCEL_PENDING_SEEK,
+            PlayerBackAction.DISMISS_SEEK_FEEDBACK -> {
+                seekFeedbackToken++
+                pendingSeekTargetMs = null
+                pendingSeekOriginMs = null
+                pendingSeekDispatched = false
+            }
+            PlayerBackAction.HIDE_CONTROLS -> hideControls()
+            PlayerBackAction.HIDE_STATS -> statsVisible = false
+            PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
+        }
+    }
+
+    LaunchedEffect(controlsVisible, availability, playbackState) {
+        if (
+            !controlsVisible &&
+            availability is RecordingPlaybackAvailability.Ready &&
+            playbackState !is PlaybackSessionState.Failed
+        ) {
             rootFocus.requestFocus()
-        } else if (availability !is RecordingPlaybackAvailability.Ready) {
-            unavailableFocus.requestFocus()
         }
     }
 
@@ -330,6 +413,7 @@ fun RecordingPlayerScreen(
     LaunchedEffect(seekFeedbackToken) {
         val targetMs = pendingSeekTargetMs ?: return@LaunchedEffect
         delay(RECORDING_SEEK_DEBOUNCE_MS)
+        pendingSeekDispatched = true
         player.seekTo(targetMs)
         session.onRecordingSeekSettled()
         delay(RECORDING_SEEK_FEEDBACK_MIN_MS)
@@ -347,36 +431,32 @@ fun RecordingPlayerScreen(
         delay(RECORDING_SEEK_FEEDBACK_SETTLED_GRACE_MS)
         pendingSeekTargetMs = null
         pendingSeekOriginMs = null
+        pendingSeekDispatched = false
     }
 
-    BackHandler {
-        if (!applyAuxiliaryBack()) {
-            applyKeyAction(
-                recordingPlaybackKeyAction(
-                    controlsVisible = controlsVisible,
-                    keyCode = AndroidKeyEvent.KEYCODE_BACK,
-                )
-            )
-        }
-    }
-    KeepScreenOn(enabled = availability is RecordingPlaybackAvailability.Ready)
+    val dispatchBack = rememberPlayerBackDispatcher(handlePlaybackBack)
+    KeepScreenOn(
+        enabled = availability is RecordingPlaybackAvailability.Ready &&
+            playbackState !is PlaybackSessionState.Failed,
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusRequester(rootFocus)
-            .focusable()
             .onPreviewKeyEvent { event ->
+                if (dispatchBack(event)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (recordingPlaybackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-
-                // Back is owned by BackHandler so one key cycle cannot both hide
-                // controls and close the player after state changes.
-                if (keyCode == AndroidKeyEvent.KEYCODE_BACK) return@onPreviewKeyEvent false
+                if (
+                    foregroundLayer == PlayerForegroundLayer.RECOVERY ||
+                    foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR
+                ) {
+                    return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
+                }
 
                 if (infoOpen) return@onPreviewKeyEvent false
                 if (optionsPage != null) return@onPreviewKeyEvent false
@@ -414,33 +494,33 @@ fun RecordingPlayerScreen(
                     keyCode = keyCode,
                     simpleTvActive = simpleTvProfile.active,
                 )
-                if (
-                    keyAction == RecordingPlaybackKeyAction.REVEAL_CONTROLS ||
-                    keyAction == RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE
-                ) {
+                if (recordingKeyActionStartsOpeningCycle(keyAction)) {
                     revealingKeyCode = keyCode
                 }
                 applyKeyAction(
                     action = keyAction,
                     repeatCount = event.nativeKeyEvent.repeatCount,
                 )
-            },
+            }
+            .focusRequester(rootFocus)
+            .playerRootSemantics(stringResource(R.string.player_recording_surface))
+            .focusable(),
     ) {
         if (availability is RecordingPlaybackAvailability.Ready) {
-            AnimatedVisibility(
-                visible = controlsVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
+            PlayerControlsLayer(
+                visible = foregroundLayer == PlayerForegroundLayer.CONTROLS,
+                modalVisible = optionsPage != null,
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 RecordingOverlayControls(
                     imageLoader = imageLoader,
-                    piconPath = entry?.let { channelsById[it.channelId]?.icon },
-                    title = entry?.title ?: stringResource(R.string.recording_unavailable_title),
-                    subtitle = entry?.subtitle,
-                    channelName = entry?.channelName,
+                    piconPath = channelsById[entry.channelId]?.icon,
+                    title = entry.title,
+                    subtitle = entry.subtitle,
+                    channelName = entry.channelName,
                     positionMs = positionMs,
                     durationMs = durationMs,
+                    growing = availability.growing,
                     nowSec = nowSec,
                     isPlaying = isPlaying,
                     controlsVisible = controlsVisible,
@@ -451,6 +531,7 @@ fun RecordingPlayerScreen(
                     onUserInteraction = { interactionToken++ },
                     showStop = showStop,
                     onOpenOptions = {
+                        restoreOptionsFocus = false
                         optionsPage = PlaybackOptionsPage.ROOT
                         controlsVisible = true
                     },
@@ -458,10 +539,12 @@ fun RecordingPlayerScreen(
                         controlsVisible = false
                         infoOpen = true
                     },
+                    restoreOptionsFocus = restoreOptionsFocus,
+                    onOptionsFocusRestored = { restoreOptionsFocus = false },
                 )
             }
 
-            if (infoOpen && entry != null) {
+            if (foregroundLayer == PlayerForegroundLayer.INFO) {
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -487,7 +570,7 @@ fun RecordingPlayerScreen(
                 }
             }
 
-            if (statsVisible && !controlsVisible && optionsPage == null && !infoOpen) {
+            if (foregroundLayer == PlayerForegroundLayer.STATS) {
                 PlaybackStatsOverlay(
                     diagnostics = diagnostics,
                     aspectRatio = aspectRatio,
@@ -497,11 +580,15 @@ fun RecordingPlayerScreen(
                 )
             }
 
-            if (!controlsVisible && pendingSeekTargetMs != null) {
+            if (
+                foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
+                foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
+            ) {
                 RecordingSeekPreview(
                     targetMs = requireNotNull(pendingSeekTargetMs),
                     originMs = pendingSeekOriginMs,
                     durationMs = durationMs,
+                    growing = availability.growing,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -539,22 +626,12 @@ fun RecordingPlayerScreen(
             }
 
             val statusText = when {
-                playbackState is PlaybackSessionState.Failed -> stringResource(
-                    when ((playbackState as PlaybackSessionState.Failed).reason) {
-                        PlaybackFailureReason.RECORDING_UNAVAILABLE ->
-                            R.string.recording_file_unavailable
-                        PlaybackFailureReason.RECORDING_READ_FAILED ->
-                            R.string.recording_read_failed
-                    }
-                )
                 controlsVisible && progressSyncState == RecordingProgressSyncState.Degraded ->
                     stringResource(R.string.recording_progress_save_failed)
                 controlsVisible && progressSyncState == RecordingProgressSyncState.ReadOnly ->
                     stringResource(R.string.recording_progress_read_only)
                 controlsVisible && progressSyncState == RecordingProgressSyncState.Unsupported ->
                     stringResource(R.string.recording_progress_unsupported)
-                availability.growing && durationMs == C.TIME_UNSET ->
-                    stringResource(R.string.recording_growing_playback)
                 else -> null
             }
             statusText?.let {
@@ -563,12 +640,11 @@ fun RecordingPlayerScreen(
                         .align(Alignment.TopCenter)
                         .padding(top = 48.dp)
                         .semantics {
-                            when {
-                                playbackState is PlaybackSessionState.Failed ->
-                                    liveRegion = LiveRegionMode.Assertive
+                            if (
                                 controlsVisible &&
-                                    progressSyncState == RecordingProgressSyncState.Degraded ->
-                                    hideFromAccessibility()
+                                progressSyncState == RecordingProgressSyncState.Degraded
+                            ) {
+                                hideFromAccessibility()
                             }
                         },
                     colors = SurfaceDefaults.colors(
@@ -580,53 +656,84 @@ fun RecordingPlayerScreen(
                     Text(it, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
                 }
             }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.88f))
-                    .padding(horizontal = 56.dp, vertical = 40.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = entry?.title ?: stringResource(R.string.recording_unavailable_title),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = Color.White,
-                )
-                Text(
-                    text = stringResource(
-                        if (availability == RecordingPlaybackAvailability.NotReady) {
-                            R.string.recording_not_ready
-                        } else {
-                            R.string.recording_file_unavailable
-                        }
-                    ),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(vertical = 18.dp),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = onClose,
-                        modifier = Modifier.focusRequester(unavailableFocus),
-                    ) {
-                        Text(stringResource(R.string.close))
-                    }
-                    if (showUnlock) {
-                        Button(onClick = { optionsPage = PlaybackOptionsPage.ROOT }) {
-                            Text(stringResource(R.string.playback_options))
-                        }
-                    }
-                }
-            }
         }
+        TvRecoveryOverlay(
+            visible = recordingLoading,
+            message = stringResource(R.string.recording_loading),
+            opaque = false,
+        )
+        TvRecoveryOverlay(
+            visible = foregroundLayer == PlayerForegroundLayer.RECOVERY,
+            message = stringResource(R.string.recording_recovering),
+            detail = entry?.title,
+            opaque = false,
+            primaryActionLabel = stringResource(R.string.close),
+            onPrimaryAction = onClose,
+        )
+        TvRecoveryOverlay(
+            visible = foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
+            message = stringResource(
+                if (failureReason == PlaybackFailureReason.RECORDING_READ_FAILED) {
+                    R.string.recording_playback_interrupted_title
+                } else {
+                    R.string.recording_unavailable_title
+                }
+            ),
+            detail = entry?.title,
+            hint = stringResource(
+                when {
+                    failureReason == PlaybackFailureReason.RECORDING_READ_FAILED ->
+                        R.string.recording_read_failed
+                    initialConnectionFailure -> R.string.recording_connection_unavailable
+                    availability == RecordingPlaybackAvailability.NotReady ->
+                        R.string.recording_not_ready
+                    else -> R.string.recording_file_unavailable
+                }
+            ),
+            opaque = false,
+            primaryActionLabel = stringResource(
+                if (
+                    recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
+                ) {
+                    R.string.retry
+                } else {
+                    R.string.close
+                }
+            ),
+            onPrimaryAction = if (
+                recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
+            ) {
+                ::dispatchRecoveryRetry
+            } else {
+                onClose
+            },
+            secondaryActionLabel = if (
+                recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
+            ) {
+                stringResource(R.string.close)
+            } else {
+                null
+            },
+            onSecondaryAction = if (
+                recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
+            ) {
+                onClose
+            } else {
+                null
+            },
+            liveRegionMode = LiveRegionMode.Assertive,
+        )
         optionsPage?.let { page ->
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
+                tracksResolving =
+                    playbackState is PlaybackSessionState.Starting ||
+                        playbackState is PlaybackSessionState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
                 showSimpleTvExit = showUnlock,
+                simpleTvActive = simpleTvProfile.active,
                 onPageChange = { optionsPage = it },
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
@@ -635,6 +742,7 @@ fun RecordingPlayerScreen(
                 onStatsVisibleChange = { statsVisible = it },
                 onSimpleTvExit = {
                     optionsPage = null
+                    restoreOptionsFocus = true
                     onUnlock()
                 },
             )

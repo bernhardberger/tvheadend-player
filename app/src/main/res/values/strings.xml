@@ -47,6 +47,9 @@
     <string name="channels_layout_cards_description">A 3-column card grid with larger channel artwork and titles.</string>
     <string name="player_info">Info</string>
     <string name="player_info_close">Close info</string>
+    <string name="player_info_pane_title">Programme information</string>
+    <string name="player_info_unavailable_title">Programme information unavailable</string>
+    <string name="player_info_unavailable_message">No programme information is available for %1$s right now.</string>
     <string name="show_epg_menu_enabled">Show Guide menu: On</string>
     <string name="show_epg_menu_disabled">Show Guide menu: Off</string>
     <string name="host">Host</string>
@@ -112,6 +115,7 @@
     <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
     <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>
     <string name="player_playback_recovering">Playback interrupted. Retrying automatically…</string>
+    <string name="player_playback_failed">Playback stopped.</string>
 
     <string name="loading_wait">Waiting for loading…</string>
     <string name="not_connected">Not connected</string>
@@ -130,6 +134,7 @@
 
     <!-- Audio -->
     <string name="audio_track">Audio track</string>
+    <string name="audio_track_unselected">Choose audio track</string>
     <string name="no_audio_tracks">No audio tracks available.</string>
 
     <!-- Subtitles -->
@@ -141,55 +146,89 @@
     <string name="close">Close</string>
     <string name="stop_playback">Stop playback</string>
     <string name="playback_options">Playback options</string>
+    <string name="playback_tracks_loading">Loading playback tracks…</string>
     <string name="playback_options_previous_category">Previous options category</string>
     <string name="playback_options_next_category">Next options category</string>
+    <string name="player_live_tv_surface">Live TV player</string>
+    <string name="player_recording_surface">Recording player</string>
     <string name="stats_on">On</string>
     <string name="stats_off">Off</string>
     <string name="display_mode">Display mode</string>
     <string name="display_mode_auto">Auto (original aspect)</string>
     <string name="display_mode_16_9">Fill 16:9</string>
     <string name="display_mode_4_3">Fill 4:3</string>
-    <string name="stats_for_nerds">Stats for nerds</string>
-    <string name="stats_source">Source</string>
-    <string name="stats_source_live">Live TV</string>
-    <string name="stats_source_recording">Recording</string>
-    <string name="stats_state">State</string>
-    <string name="stats_timing">Position</string>
-    <string name="stats_video">Video</string>
-    <string name="stats_video_decoder">Video decoder</string>
-    <string name="stats_frames">Frames</string>
-    <string name="stats_audio">Audio</string>
-    <string name="stats_audio_decoder">Audio decoder</string>
-    <string name="stats_underruns">Audio underruns</string>
-    <string name="stats_stream_read_rate">Stream read rate</string>
-    <string name="stats_file_read_rate">File read rate</string>
-    <string name="stats_unavailable">Unavailable</string>
-    <string name="stats_playback">Playback</string>
-    <string name="stats_tuner">Tuner</string>
-    <string name="stats_tuner_status">Frontend</string>
-    <string name="stats_signal">Signal</string>
-    <string name="stats_snr">SNR</string>
-    <string name="stats_ber">Bit error rate</string>
-    <string name="stats_uncorrected_blocks">Uncorrected blocks</string>
-    <string name="stats_server_queue">TVHeadend queue</string>
-    <string name="stats_queued">Queued</string>
-    <string name="stats_queue_delay">Queue delay</string>
-    <string name="stats_packet_count">%1$s packets</string>
-    <string name="stats_server_drops">Server frame drops</string>
-    <string name="stats_system">System</string>
-    <string name="stats_output">Display output</string>
-    <string name="stats_thermal">Thermal</string>
-    <string name="stats_app_memory">App memory</string>
-    <string name="stats_low_memory">Low-memory state</string>
-    <string name="stats_yes">Yes</string>
-    <string name="stats_no">No</string>
-    <string name="stats_thermal_none">None</string>
-    <string name="stats_thermal_light">Light</string>
-    <string name="stats_thermal_moderate">Moderate</string>
-    <string name="stats_thermal_severe">Severe</string>
-    <string name="stats_thermal_critical">Critical</string>
-    <string name="stats_thermal_emergency">Emergency</string>
-    <string name="stats_thermal_shutdown">Shutdown</string>
+    <string name="stats_for_nerds" translatable="false">Stats for nerds</string>
+    <string name="stats_source" translatable="false">Source</string>
+    <string name="stats_source_live" translatable="false">Live TV</string>
+    <string name="stats_source_recording" translatable="false">Recording</string>
+    <string name="stats_state" translatable="false">State</string>
+    <string name="stats_state_idle" translatable="false">Idle</string>
+    <string name="stats_state_starting" translatable="false">Starting</string>
+    <string name="stats_state_playing" translatable="false">Playing</string>
+    <string name="stats_state_paused" translatable="false">Paused</string>
+    <string name="stats_state_finished" translatable="false">Finished</string>
+    <string name="stats_state_recovering" translatable="false">Recovering</string>
+    <string name="stats_state_failed" translatable="false">Failed</string>
+    <string name="stats_timing" translatable="false">Position</string>
+    <string name="stats_timing_buffered" translatable="false">%1$s · buffer %2$d s</string>
+    <string name="stats_timing_buffered_with_duration" translatable="false">%1$s / %2$s · buffer %3$d s</string>
+    <string name="stats_timeshift_live" translatable="false">Live</string>
+    <string name="stats_timeshift_behind_live" translatable="false">%1$s behind live</string>
+    <string name="stats_video" translatable="false">Video</string>
+    <string name="stats_video_decoder" translatable="false">Video decoder</string>
+    <string name="stats_frames" translatable="false">Frames</string>
+    <string name="stats_frame_rate" translatable="false">%1$s fps</string>
+    <string name="stats_frames_value" translatable="false">%1$s rendered · %2$s dropped</string>
+    <string name="stats_frames_value_with_percentage" translatable="false">%1$s rendered · %2$s dropped (%3$s%%)</string>
+    <string name="stats_audio" translatable="false">Audio</string>
+    <string name="stats_audio_decoder" translatable="false">Audio decoder</string>
+    <string name="stats_audio_channels" translatable="false">%1$d ch</string>
+    <string name="stats_sample_rate" translatable="false">%1$s Hz</string>
+    <string name="stats_underruns" translatable="false">Audio underruns</string>
+    <string name="stats_stream_read_rate" translatable="false">Stream read rate</string>
+    <string name="stats_file_read_rate" translatable="false">File read rate</string>
+    <string name="stats_display_mode" translatable="false">Display mode</string>
+    <string name="stats_display_mode_auto" translatable="false">Auto (original aspect)</string>
+    <string name="stats_display_mode_16_9" translatable="false">Fill 16:9</string>
+    <string name="stats_display_mode_4_3" translatable="false">Fill 4:3</string>
+    <string name="stats_unavailable" translatable="false">Unavailable</string>
+    <string name="stats_playback" translatable="false">Playback</string>
+    <string name="stats_tuner" translatable="false">Tuner</string>
+    <string name="stats_tuner_status" translatable="false">Frontend</string>
+    <string name="stats_signal" translatable="false">Signal</string>
+    <string name="stats_snr" translatable="false">SNR</string>
+    <string name="stats_ber" translatable="false">Bit error rate</string>
+    <string name="stats_uncorrected_blocks" translatable="false">Uncorrected blocks</string>
+    <string name="stats_server_queue" translatable="false">TVHeadend queue</string>
+    <string name="stats_queued" translatable="false">Queued</string>
+    <string name="stats_queue_delay" translatable="false">Queue delay</string>
+    <string name="stats_queue_delay_value" translatable="false">%1$s ms</string>
+    <string name="stats_packet_count" translatable="false">%1$s packets</string>
+    <string name="stats_server_drops" translatable="false">Server frame drops</string>
+    <string name="stats_server_drops_value" translatable="false">I %1$s · P %2$s · B %3$s</string>
+    <string name="stats_system" translatable="false">System</string>
+    <string name="stats_output" translatable="false">Display output</string>
+    <string name="stats_output_value" translatable="false">%1$dx%2$d @ %3$s Hz</string>
+    <string name="stats_thermal" translatable="false">Thermal</string>
+    <string name="stats_app_memory" translatable="false">App memory</string>
+    <string name="stats_low_memory" translatable="false">Low-memory state</string>
+    <string name="stats_yes" translatable="false">Yes</string>
+    <string name="stats_no" translatable="false">No</string>
+    <string name="stats_thermal_none" translatable="false">None</string>
+    <string name="stats_thermal_light" translatable="false">Light</string>
+    <string name="stats_thermal_moderate" translatable="false">Moderate</string>
+    <string name="stats_thermal_severe" translatable="false">Severe</string>
+    <string name="stats_thermal_critical" translatable="false">Critical</string>
+    <string name="stats_thermal_emergency" translatable="false">Emergency</string>
+    <string name="stats_thermal_shutdown" translatable="false">Shutdown</string>
+    <string name="stats_bit_rate_mbps" translatable="false">%1$s Mbps</string>
+    <string name="stats_bit_rate_kbps" translatable="false">%1$s kbps</string>
+    <string name="stats_bit_rate_bps" translatable="false">%1$s bps</string>
+    <string name="stats_unit_dbm" translatable="false">%1$s dBm</string>
+    <string name="stats_unit_db" translatable="false">%1$s dB</string>
+    <string name="stats_bytes_mb" translatable="false">%1$s MB</string>
+    <string name="stats_bytes_kb" translatable="false">%1$s KB</string>
+    <string name="stats_bytes_b" translatable="false">%1$s B</string>
 
 
     <!-- ===== EPG ===== -->
@@ -242,7 +281,16 @@
     <string name="record">Record</string>
     <string name="cancel_recording">Cancel recording</string>
     <string name="record_confirm_title">Record “%1$s”?</string>
-    <string name="record_confirm_message">TVHeadend will schedule this event with the selected server recording configuration.</string>
+    <string name="record_confirm_message">TVHeadend will add this programme to your recordings.</string>
+    <string name="record_confirm_pane_title">Confirm recording</string>
+    <string name="record_confirm_cancel">Cancel</string>
+    <string name="recording_request_busy_title">Scheduling “%1$s”…</string>
+    <string name="recording_request_busy_message">Waiting for TVHeadend to answer. Closing this message does not cancel the request.</string>
+    <string name="recording_request_busy_action">Scheduling…</string>
+    <string name="recording_request_success_title">Recording scheduled</string>
+    <string name="recording_request_success_message">TVHeadend accepted the recording request for “%1$s”.</string>
+    <string name="recording_request_failure_title">Recording request failed</string>
+    <string name="recording_request_failure_message">“%1$s” was not scheduled. %2$s</string>
     <string name="recording_config_title">Choose a recording configuration</string>
     <string name="recording_config_message">This server has several available recording configurations.</string>
     <string name="cancel_recording_confirm_title">Stop “%1$s”?</string>
@@ -292,10 +340,13 @@
     <string name="delete_recording_confirm_title">Delete “%1$s”?</string>
     <string name="delete_recording_confirm_message">TVHeadend will permanently delete this completed recording.</string>
     <string name="recording_unavailable_title">Recording unavailable</string>
+    <string name="recording_loading">Loading recording…</string>
+    <string name="recording_recovering">Restoring recording playback…</string>
+    <string name="recording_playback_interrupted_title">Recording playback interrupted</string>
+    <string name="recording_connection_unavailable">The recording could not be loaded because the server connection was interrupted.</string>
     <string name="recording_not_ready">This recording has not started yet.</string>
     <string name="recording_file_unavailable">TVHeadend did not expose a playable file for this recording.</string>
     <string name="recording_read_failed">TVHeadend could not continue reading this recording.</string>
-    <string name="recording_growing_playback">This recording is still growing. Seeking is available where the server permits it.</string>
     <string name="recording_resume_from">Resume from %1$s</string>
     <plurals name="recording_duration_hours">
         <item quantity="one">%1$d hour</item>
@@ -313,14 +364,21 @@
     <string name="recording_progress_read_only">Existing resume progress is available. New progress won’t be saved.</string>
     <string name="recording_progress_unsupported">This server supports playback from the beginning, but not synchronized progress.</string>
     <string name="recording_progress_save_failed">Playback progress couldn’t be saved.</string>
-    <string name="recording_duration_unknown">Live duration</string>
+    <string name="recording_still_recording">Still recording</string>
+    <string name="recording_duration_unavailable">Duration unavailable</string>
+    <string name="recording_timeline_status_description">Elapsed %1$s. %2$s.</string>
+    <string name="recording_seek_preview_description">Seek target %1$s. Cumulative change %2$s. %3$s.</string>
+    <string name="recording_known_duration">Total %1$s</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 seconds</string>
     <string name="seek_forward_30">+30 seconds</string>
     <string name="timeshift_buffer_start">Buffer: %1$s ago</string>
+    <string name="timeshift_buffer_start_description">Buffer starts %1$s behind live.</string>
     <string name="timeshift_live">Live</string>
     <string name="player_seekbar_recording_description">Playback position %1$s of %2$s</string>
-    <string name="player_seekbar_timeshift_description">Timeshift position %1$s behind live</string>
+    <string name="player_seekbar_timeshift_description">Timeshift position %1$s behind live. %2$s</string>
+    <string name="player_seekbar_timeshift_live_description">Timeshift position Live. %1$s</string>
+    <string name="timeshift_seek_preview_description">Seek target %1$s. Cumulative change %2$s. %3$s. %4$s</string>
     <string name="player_on_now">Currently playing</string>
     <string name="simple_tv_owner_section">Owner</string>
     <string name="track_unknown_language">Unknown language</string>
@@ -349,7 +407,8 @@
     <string name="simple_tv_start_confirm_message">The full interface will be locked for this session. Exit later from More → Exit Simple TV.</string>
     <string name="simple_tv_recovery_connection">Television is unavailable right now.</string>
     <string name="simple_tv_recovery_playback">This channel could not start.</string>
-    <string name="simple_tv_recovery_hint">Press Retry to try again. An owner can exit Simple TV from More.</string>
+    <string name="simple_tv_recovery_hint">Try again, or let an owner exit Simple TV.</string>
+    <string name="simple_tv_recovery_exit_hint">An owner can exit Simple TV.</string>
     <string name="simple_tv_back_for_exit">Back for exit options</string>
     <string name="simple_tv_timeshift">Allow timeshift controls</string>
     <string name="simple_tv_timeshift_explanation">When on, pause and seek are available if the server supports timeshift. When off, live TV plays without timeshift controls.</string>

@@ -54,6 +54,8 @@ class DvrRepository(
     private val store = DvrSnapshotStore()
     private val _entries = MutableStateFlow<List<DvrEntry>>(emptyList())
     val entries: StateFlow<List<DvrEntry>> = _entries
+    private val _entriesReady = MutableStateFlow(false)
+    val entriesReady: StateFlow<Boolean> = _entriesReady
     private val _configs = MutableStateFlow<List<DvrConfig>>(emptyList())
     val configs: StateFlow<List<DvrConfig>> = _configs
     /**
@@ -73,11 +75,19 @@ class DvrRepository(
     val progressCapability: StateFlow<RecordingProgressCapability> = _progressCapability
     @Volatile
     private var progressMethodUnsupported = false
+    private val connectionAttemptLock = Any()
+    @Volatile
+    private var latestConnectionAttemptId = 0L
 
     init {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             htsp.controlEvents.collect { event ->
-                if (event is HtspEvent.ServerMessage) acceptDvrMessage(event.msg)
+                if (event is HtspEvent.ServerMessage) {
+                    acceptDvrMessage(
+                        message = event.msg,
+                        connectionAttemptId = event.connectionAttemptId,
+                    )
+                }
             }
         }
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -94,13 +104,29 @@ class DvrRepository(
         }
     }
 
-    suspend fun onNewConnectionStarting(preservePublished: Boolean) {
+    suspend fun onNewConnectionStarting(
+        preservePublished: Boolean,
+        attemptId: Long? = null,
+    ) {
         mutex.withLock {
-            store.reset(preservePublished)
-            _entries.value = store.publishedSnapshot()
-            if (!preservePublished) _configs.value = emptyList()
-            // Hide write actions until auth / getDvrConfigs prove access.
-            setWriteCapability(RecordingWriteCapability.Unknown)
+            synchronized(connectionAttemptLock) {
+                if (attemptId != null && attemptId < latestConnectionAttemptId) {
+                    return@synchronized
+                }
+                if (attemptId != null) latestConnectionAttemptId = attemptId
+                store.reset(preservePublished)
+                _entries.value = store.publishedSnapshot()
+                if (!preservePublished) _entriesReady.value = false
+                if (!preservePublished) _configs.value = emptyList()
+                // Hide write actions until auth / getDvrConfigs prove access.
+                setWriteCapability(RecordingWriteCapability.Unknown)
+            }
+        }
+    }
+
+    fun advanceConnectionAttempt(attemptId: Long) {
+        synchronized(connectionAttemptLock) {
+            if (attemptId > latestConnectionAttemptId) latestConnectionAttemptId = attemptId
         }
     }
 
@@ -116,44 +142,74 @@ class DvrRepository(
         }
     }
 
-    suspend fun refreshConfigs() {
+    suspend fun applyAuthenticatedDvrAccess(dvrAccess: Boolean?, attemptId: Long) {
+        mutex.withLock {
+            synchronized(connectionAttemptLock) {
+                if (attemptId == latestConnectionAttemptId) {
+                    applyAuthenticatedDvrAccess(dvrAccess)
+                }
+            }
+        }
+    }
+
+    suspend fun refreshConfigs(attemptId: Long? = null) {
         val reply = htsp.request(
             method = "getDvrConfigs",
             fields = emptyMap(),
             timeoutMs = 10_000,
             disconnectOnTimeout = false,
         )
-        when (val failure = dvrActionFailure(reply.fields)) {
-            // getDvrConfigs is gated on ACCESS_HTSP_RECORDER, so a bare noaccess=1
-            // is authoritative for every DVR write method too.
-            DvrActionFailure.PERMISSION_DENIED -> {
-                setWriteCapability(RecordingWriteCapability.Denied)
-                _configs.value = emptyList()
+        mutex.withLock {
+            synchronized(connectionAttemptLock) {
+                if (attemptId != null && attemptId != latestConnectionAttemptId) {
+                    return@synchronized
+                }
+                when (val failure = dvrActionFailure(reply.fields)) {
+                    // getDvrConfigs is gated on ACCESS_HTSP_RECORDER, so a bare noaccess=1
+                    // is authoritative for every DVR write method too.
+                    DvrActionFailure.PERMISSION_DENIED -> {
+                        setWriteCapability(RecordingWriteCapability.Denied)
+                        _configs.value = emptyList()
+                    }
+                    null -> {
+                        setWriteCapability(RecordingWriteCapability.Allowed)
+                        _configs.value = dvrConfigsFromReply(reply)
+                    }
+                    // Any other error (unknown method on old servers, connection limit,
+                    // malformed reply) proves nothing either way: leave the capability alone
+                    // rather than reading it as access.
+                    else -> Timber.w(
+                        "getDvrConfigs failed with %s; write capability unchanged",
+                        failure,
+                    )
+                }
             }
-            null -> {
-                setWriteCapability(RecordingWriteCapability.Allowed)
-                _configs.value = dvrConfigsFromReply(reply)
-            }
-            // Any other error (unknown method on old servers, connection limit,
-            // malformed reply) proves nothing either way: leave the capability alone
-            // rather than reading it as access.
-            else -> Timber.w("getDvrConfigs failed with %s; write capability unchanged", failure)
         }
     }
 
-    internal suspend fun acceptDvrMessage(message: HtspMessage) {
+    internal suspend fun acceptDvrMessage(
+        message: HtspMessage,
+        connectionAttemptId: Long = 0L,
+    ) {
         mutex.withLock {
-            when (message.method) {
-                // Server→client async notifications keep these names.
-                "dvrEntryAdd", "dvrEntryUpdate" -> {
-                    val entry = mergeDvrEntry(message, store) ?: return@withLock
-                    store.upsert(entry)?.let { _entries.value = it }
+            htsp.commitIfCurrentConnectionAttempt(connectionAttemptId) {
+                when (message.method) {
+                    // Server→client async notifications keep these names.
+                    "dvrEntryAdd", "dvrEntryUpdate" -> {
+                        val entry = mergeDvrEntry(message, store)
+                            ?: return@commitIfCurrentConnectionAttempt
+                        store.upsert(entry)?.let { _entries.value = it }
+                    }
+                    "dvrEntryDelete" -> {
+                        val id = message.int("id") ?: message.int("dvrId")
+                            ?: return@commitIfCurrentConnectionAttempt
+                        store.delete(id)?.let { _entries.value = it }
+                    }
+                    "initialSyncCompleted" -> {
+                        _entries.value = store.completeInitialSync()
+                        _entriesReady.value = true
+                    }
                 }
-                "dvrEntryDelete" -> {
-                    val id = message.int("id") ?: message.int("dvrId") ?: return@withLock
-                    store.delete(id)?.let { _entries.value = it }
-                }
-                "initialSyncCompleted" -> _entries.value = store.completeInitialSync()
             }
         }
     }
@@ -281,6 +337,8 @@ class DvrRepository(
         DvrActionResult.Failed(DvrActionFailure.CONNECTION)
     } catch (_: ConnectException) {
         DvrActionResult.Failed(DvrActionFailure.CONNECTION)
+    } catch (error: CancellationException) {
+        throw error
     } catch (_: Exception) {
         DvrActionResult.Failed(DvrActionFailure.REJECTED)
     }

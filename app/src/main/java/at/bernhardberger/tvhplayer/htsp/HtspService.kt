@@ -14,8 +14,10 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -62,6 +64,12 @@ sealed class ConnectionState {
     data class Error(val throwable: Throwable) : ConnectionState()
 }
 
+internal enum class HtspConnectionAttemptStatus {
+    LIVE,
+    GONE,
+    REPLACED,
+}
+
 open class HtspService(
     ioDispatcher: CoroutineDispatcher
 ) {
@@ -73,13 +81,16 @@ open class HtspService(
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     private val controlEventStream = HtspEventStream()
-    val controlEvents: SharedFlow<HtspEvent> = controlEventStream.events
+    val controlEvents: Flow<HtspEvent> = controlEventStream.events.filter { event ->
+        event.connectionAttemptId == 0L ||
+            isCurrentConnectionAttempt(event.connectionAttemptId)
+    }
 
-    private val _muxEvents = MutableSharedFlow<HtspMessage>(
+    private val _muxEvents = MutableSharedFlow<HtspMuxEvent>(
         extraBufferCapacity = 8192,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
-    val muxEvents: SharedFlow<HtspMessage> = _muxEvents
+    val muxEvents: SharedFlow<HtspMuxEvent> = _muxEvents
 
     private val pending = ConcurrentHashMap<Int, PendingReq>()
 
@@ -92,9 +103,24 @@ open class HtspService(
 
     private val writeMutex = Mutex()
     private val connectMutex = Mutex()
+    private val connectionAttemptLock = Any()
+    @Volatile
+    private var connectionAttempt = 0L
+
+    @Volatile
+    private var liveTransportAttempt: Long? = null
+
+    @Volatile
+    private var muxCursorAttempt = 0L
+
+    @Volatile
+    private var muxCursorSequence = 0L
 
     @Volatile
     private var socket: Socket? = null
+
+    @Volatile
+    private var connectingSocket: Socket? = null
 
     @Volatile
     private var input: InputStream? = null
@@ -136,101 +162,146 @@ open class HtspService(
 
         forceReconnect: Boolean = false
     ) {
-        connectMutex.withLock {
-            if (!forceReconnect && isConnectedUnsafe()) return
-
-            _state.value = ConnectionState.Connecting(host, port)
-
-            disconnectInternal(CancellationException("Reconnect"))
-
-            val s = Socket()
-            try {
-                s.tcpNoDelay = true
-                s.keepAlive = true
-                s.soTimeout = soTimeoutMs
-                s.connect(InetSocketAddress(host, port), connectTimeoutMs)
-
-                val inp = BufferedInputStream(s.getInputStream(), socketBufferBytes)
-                val out = BufferedOutputStream(s.getOutputStream(), socketBufferBytes)
-
-                socket = s
-                input = inp
-                output = out
-                lastReadAtMs = System.currentTimeMillis()
-
-                if (readerJob != null) {
-                    throw IllegalStateException("Reader job already running")
+        if (!forceReconnect && isConnectedUnsafe()) return
+        val attemptId = beginConnectionAttempt()
+        if (forceReconnect) supersedeCurrentTransport()
+        try {
+            connectMutex.withLock {
+                ensureCurrentConnectionAttempt(attemptId)
+                if (!forceReconnect && isConnectedUnsafe()) {
+                    restorePreviousConnectionAttempt(attemptId)
+                    return
                 }
-                readerJob = scope.launch {
-                    readerLoop(
-                        responseTimeoutMs = responseTimeoutMs
+
+                disconnectInternal(
+                    t = CancellationException("Reconnect"),
+                    attemptId = attemptId,
+                    publishState = false,
+                )
+                ensureCurrentConnectionAttempt(attemptId)
+                publishConnectionState(
+                    attemptId,
+                    ConnectionState.Connecting(host, port),
+                )
+
+                val s = Socket()
+                try {
+                    connectingSocket = s
+                    s.tcpNoDelay = true
+                    s.keepAlive = true
+                    s.soTimeout = soTimeoutMs
+                    s.connect(InetSocketAddress(host, port), connectTimeoutMs)
+
+                    val inp = BufferedInputStream(s.getInputStream(), socketBufferBytes)
+                    val out = BufferedOutputStream(s.getOutputStream(), socketBufferBytes)
+
+                    installTransport(attemptId, s, inp, out)
+                    lastReadAtMs = System.currentTimeMillis()
+
+                    if (readerJob != null) {
+                        throw IllegalStateException("Reader job already running")
+                    }
+                    readerJob = scope.launch {
+                        readerLoop(
+                            responseTimeoutMs = responseTimeoutMs,
+                            attemptId = attemptId,
+                        )
+                    }
+
+                    val hello = request(
+                        method = "hello",
+                        fields = mapOf(
+                            "htspversion" to htspVersion,
+                            "clientname" to clientName,
+                            "clientversion" to clientVersion
+                        ),
+                        timeoutMs = responseTimeoutMs,
+                        flush = true,
+                        disconnectOnTimeout = true
                     )
-                }
 
-                val hello = request(
-                    method = "hello",
-                    fields = mapOf(
-                        "htspversion" to htspVersion,
-                        "clientname" to clientName,
-                        "clientversion" to clientVersion
-                    ),
-                    timeoutMs = responseTimeoutMs,
-                    flush = true,
-                    disconnectOnTimeout = true
-                )
+                    challenge = hello.bin("challenge")
+                    val serverMax = hello.int("htspversion") ?: htspVersion
+                    negotiatedHtspVersion = min(htspVersion, serverMax)
 
-                challenge = hello.bin("challenge")
-                val serverMax = hello.int("htspversion") ?: htspVersion
-                negotiatedHtspVersion = min(htspVersion, serverMax)
+                    val user = username?.trim().orEmpty()
+                    val pass = password?.trim().orEmpty()
 
-                val user = username?.trim().orEmpty()
-                val pass = password?.trim().orEmpty()
-
-                // Always call authenticate, even without credentials: the server leaves
-                // address-based anonymous rights untouched when the message carries no
-                // username, and the reply is the only place HTSP reports our rights.
-                val withCredentials =
-                    ConnectionPolicy.shouldAuthenticate(username, password) && challenge != null
-                val authFields = if (withCredentials) {
-                    mapOf("username" to user, "digest" to makeDigest(pass, challenge!!))
-                } else {
-                    emptyMap()
-                }
-                val auth = request(
-                    method = "authenticate",
-                    fields = authFields,
-                    timeoutMs = responseTimeoutMs,
-                    flush = true,
-                    disconnectOnTimeout = true
-                )
-                if (auth.int("noaccess") == 1) {
-                    throw IllegalStateException(
-                        if (withCredentials) {
-                            "HTSP authentication failed (noaccess=1)"
+                    // Always call authenticate, even without credentials: the server leaves
+                    // address-based anonymous rights untouched when the message carries no
+                    // username, and the reply is the only place HTSP reports our rights.
+                    val withCredentials =
+                        ConnectionPolicy.shouldAuthenticate(username, password) && challenge != null
+                    val authFields = if (withCredentials) {
+                        mapOf("username" to user, "digest" to makeDigest(pass, challenge!!))
+                    } else {
+                        emptyMap()
+                    }
+                    val auth = request(
+                        method = "authenticate",
+                        fields = authFields,
+                        timeoutMs = responseTimeoutMs,
+                        flush = true,
+                        disconnectOnTimeout = true
+                    )
+                    if (auth.int("noaccess") == 1) {
+                        throw IllegalStateException(
+                            if (withCredentials) {
+                                "HTSP authentication failed (noaccess=1)"
+                            } else {
+                                "HTSP server requires credentials (noaccess=1)"
+                            }
+                        )
+                    }
+                    // HTSP ≥ 26 includes ACCESS_HTSP_RECORDER as "dvr".
+                    val dvrAccess =
+                        if (negotiatedHtspVersion != null && negotiatedHtspVersion!! > 25) {
+                            auth.int("dvr")?.let { it == 1 }
                         } else {
-                            "HTSP server requires credentials (noaccess=1)"
+                            null
                         }
+
+                    ensureCurrentConnectionAttempt(attemptId)
+                    publishConnectionState(
+                        attemptId,
+                        ConnectionState.Connected(
+                            host = host,
+                            port = port,
+                            htspVersion = negotiatedHtspVersion,
+                            dvrAccess = dvrAccess,
+                        ),
                     )
-                }
-                // HTSP ≥ 26 includes ACCESS_HTSP_RECORDER as "dvr".
-                val dvrAccess = if (negotiatedHtspVersion != null && negotiatedHtspVersion!! > 25) {
-                    auth.int("dvr")?.let { it == 1 }
-                } else {
-                    null
-                }
 
-                _state.value = ConnectionState.Connected(
-                    host = host,
-                    port = port,
-                    htspVersion = negotiatedHtspVersion,
-                    dvrAccess = dvrAccess,
-                )
-
-            } catch (t: Throwable) {
-                _state.value = ConnectionState.Error(t)
-                disconnectInternal(t)
-                throw t
+                } catch (cancelled: CancellationException) {
+                    disconnectInternal(
+                        t = cancelled,
+                        attemptId = attemptId,
+                        publishState = true,
+                    )
+                    throw cancelled
+                } catch (t: Throwable) {
+                    if (!isCurrentConnectionAttempt(attemptId)) {
+                        val superseded = CancellationException("Superseded connection attempt")
+                        superseded.initCause(t)
+                        disconnectInternal(
+                            t = superseded,
+                            attemptId = attemptId,
+                            publishState = false,
+                        )
+                        throw superseded
+                    }
+                    publishConnectionState(attemptId, ConnectionState.Error(t))
+                    disconnectInternal(
+                        t = t,
+                        attemptId = attemptId,
+                        publishState = true,
+                    )
+                    throw t
+                }
             }
+        } catch (cancelled: CancellationException) {
+            publishConnectionState(attemptId, ConnectionState.Disconnected)
+            throw cancelled
         }
     }
 
@@ -263,13 +334,54 @@ open class HtspService(
         timeoutMs: Long = 5_000,
         flush: Boolean = true,
         disconnectOnTimeout: Boolean = true
+    ): HtspMessage = requestInternal(
+        expectedConnectionAttemptId = null,
+        method = method,
+        fields = fields,
+        timeoutMs = timeoutMs,
+        flush = flush,
+        disconnectOnTimeout = disconnectOnTimeout,
+    )
+
+    internal open suspend fun requestForConnectionAttempt(
+        expectedConnectionAttemptId: Long,
+        method: String,
+        fields: Map<String, Any?> = emptyMap(),
+        timeoutMs: Long = 5_000,
+        flush: Boolean = true,
+        disconnectOnTimeout: Boolean = true,
+    ): HtspMessage = requestInternal(
+        expectedConnectionAttemptId = expectedConnectionAttemptId,
+        method = method,
+        fields = fields,
+        timeoutMs = timeoutMs,
+        flush = flush,
+        disconnectOnTimeout = disconnectOnTimeout,
+    )
+
+    private suspend fun requestInternal(
+        expectedConnectionAttemptId: Long?,
+        method: String,
+        fields: Map<String, Any?>,
+        timeoutMs: Long,
+        flush: Boolean,
+        disconnectOnTimeout: Boolean,
     ): HtspMessage {
         val s = seq.getAndIncrement()
         val def = CompletableDeferred<HtspMessage>()
         pending[s] = PendingReq(def, System.currentTimeMillis())
-        val requestSocket = socket
-
-        val out = output ?: run {
+        val transport = if (expectedConnectionAttemptId == null) {
+            socket to output
+        } else {
+            commitIfLiveConnectionAttempt(expectedConnectionAttemptId) {
+                socket to output
+            } ?: run {
+                pending.remove(s)
+                throw CancellationException("Stale HTSP connection attempt")
+            }
+        }
+        val requestSocket = transport.first
+        val out = transport.second ?: run {
             pending.remove(s)
             throw IllegalStateException("Not connected")
         }
@@ -296,7 +408,7 @@ open class HtspService(
                 pending.remove(s)
 
                 if (disconnectOnTimeout) {
-                    closeSocket(requestSocket)
+                    markTransportGone(requestSocket)
                     throw SocketTimeoutException(
                         "HTSP request '$method' timed out after ${timeoutMs}ms"
                     )
@@ -311,9 +423,14 @@ open class HtspService(
         }
     }
 
-    suspend fun fileOpen(path: String, timeoutMs: Long = 5_000): Int {
+    suspend fun fileOpen(
+        path: String,
+        timeoutMs: Long = 5_000,
+        expectedConnectionAttemptId: Long? = null,
+    ): Int {
         val p = if (path.startsWith("/")) path else "/$path"
-        val msg = request(
+        val msg = fileRequest(
+            expectedConnectionAttemptId = expectedConnectionAttemptId,
             method = "fileOpen",
             fields = mapOf("file" to p),
             timeoutMs = timeoutMs,
@@ -323,8 +440,14 @@ open class HtspService(
         return msg.int("id") ?: error("fileOpen: missing id")
     }
 
-    suspend fun fileRead(id: Int, size: Int, timeoutMs: Long = 5_000): ByteArray {
-        val msg = request(
+    suspend fun fileRead(
+        id: Int,
+        size: Int,
+        timeoutMs: Long = 5_000,
+        expectedConnectionAttemptId: Long? = null,
+    ): ByteArray {
+        val msg = fileRequest(
+            expectedConnectionAttemptId = expectedConnectionAttemptId,
             method = "fileRead",
             fields = mapOf("id" to id, "size" to size),
             timeoutMs = timeoutMs,
@@ -339,8 +462,10 @@ open class HtspService(
         offset: Long,
         whence: String = "SEEK_SET",
         timeoutMs: Long = 5_000,
+        expectedConnectionAttemptId: Long? = null,
     ): Long {
-        val msg = request(
+        val msg = fileRequest(
+            expectedConnectionAttemptId = expectedConnectionAttemptId,
             method = "fileSeek",
             fields = mapOf("id" to id, "offset" to offset, "whence" to whence),
             timeoutMs = timeoutMs,
@@ -350,8 +475,13 @@ open class HtspService(
         return msg.long("offset") ?: offset
     }
 
-    suspend fun fileClose(id: Int, timeoutMs: Long = 5_000) {
-        request(
+    suspend fun fileClose(
+        id: Int,
+        timeoutMs: Long = 5_000,
+        expectedConnectionAttemptId: Long? = null,
+    ) {
+        fileRequest(
+            expectedConnectionAttemptId = expectedConnectionAttemptId,
             method = "fileClose",
             fields = mapOf("id" to id),
             timeoutMs = timeoutMs,
@@ -364,6 +494,7 @@ open class HtspService(
         id: Int,
         htspVersion: Int?,
         timeoutMs: Long = 5_000,
+        expectedConnectionAttemptId: Long? = null,
     ) {
         val fields = if (htspVersion != null && htspVersion >= 27) {
             mapOf(
@@ -373,7 +504,8 @@ open class HtspService(
         } else {
             mapOf("id" to id)
         }
-        request(
+        fileRequest(
+            expectedConnectionAttemptId = expectedConnectionAttemptId,
             method = "fileClose",
             fields = fields,
             timeoutMs = timeoutMs,
@@ -382,48 +514,104 @@ open class HtspService(
         )
     }
 
-    suspend fun disconnect() {
+    private suspend fun fileRequest(
+        expectedConnectionAttemptId: Long?,
+        method: String,
+        fields: Map<String, Any?>,
+        timeoutMs: Long,
+        flush: Boolean,
+        disconnectOnTimeout: Boolean,
+    ): HtspMessage = if (expectedConnectionAttemptId == null) {
+        request(method, fields, timeoutMs, flush, disconnectOnTimeout)
+    } else {
+        requestForConnectionAttempt(
+            expectedConnectionAttemptId,
+            method,
+            fields,
+            timeoutMs,
+            flush,
+            disconnectOnTimeout,
+        )
+    }
+
+    suspend fun disconnect() = withContext(NonCancellable) {
+        val attemptId = beginConnectionAttempt()
+        supersedeCurrentTransport()
         connectMutex.withLock {
-            disconnectInternal(CancellationException("Disconnected"))
+            disconnectInternal(
+                t = CancellationException("Disconnected"),
+                attemptId = attemptId,
+                publishState = true,
+            )
         }
     }
 
-    private suspend fun readerLoop(responseTimeoutMs: Long) {
+    private suspend fun readerLoop(responseTimeoutMs: Long, attemptId: Long) {
         val inp = input ?: return
 
         val pendingMaxSilentMs = responseTimeoutMs * 2
+        var messageSequence = 0L
+        var muxSequence = 0L
+        if (
+            withCurrentConnectionAttempt(attemptId) {
+                muxCursorAttempt = attemptId
+                muxCursorSequence = 0L
+            } == null
+        ) return
 
         try {
             while (currentCoroutineContext().isActive) {
                 try {
                     val msg = HtspCodec.readMessage(inp)
-                    lastReadAtMs = System.currentTimeMillis()
+                    val currentMessageSequence = ++messageSequence
+                    var controlEvent: HtspEvent.ServerMessage? = null
+                    val published = withCurrentConnectionAttempt(attemptId) {
+                        lastReadAtMs = System.currentTimeMillis()
 
-                    // Special-cased latch
-                    if (msg.seq == null && msg.method == "initialSyncCompleted") {
-                        initialSyncDef?.complete(Unit)
-                    }
-
-                    val seqNo = msg.seq
-                    if (seqNo != null) {
-                        val pr = pending.remove(seqNo)
-                        if (pr != null) {
-                            pr.def.complete(msg)
-                            continue
+                        // Special-cased latch
+                        if (msg.seq == null && msg.method == "initialSyncCompleted") {
+                            initialSyncDef?.complete(Unit)
                         }
-                    }
 
-                    if (msg.method == "muxpkt") {
-                        _muxEvents.tryEmit(msg)
-                    } else {
-                        controlEventStream.emit(HtspEvent.ServerMessage(msg))
-                    }
+                        val seqNo = msg.seq
+                        if (seqNo != null) {
+                            val pr = pending.remove(seqNo)
+                            if (pr != null) {
+                                pr.def.complete(msg)
+                                return@withCurrentConnectionAttempt
+                            }
+                        }
+
+                        if (msg.method == "muxpkt") {
+                            val currentMuxSequence = ++muxSequence
+                            muxCursorSequence = currentMuxSequence
+                            _muxEvents.tryEmit(
+                                HtspMuxEvent(
+                                    msg = msg,
+                                    connectionAttemptId = attemptId,
+                                    messageSequence = currentMessageSequence,
+                                    muxSequence = currentMuxSequence,
+                                )
+                            )
+                        } else {
+                            controlEvent = HtspEvent.ServerMessage(
+                                msg = msg,
+                                connectionAttemptId = attemptId,
+                                messageSequence = currentMessageSequence,
+                            )
+                        }
+                    } != null
+                    if (!published) return
+                    controlEvent?.let { controlEventStream.emit(it) }
                 } catch (t: SocketTimeoutException) {
                     val now = System.currentTimeMillis()
                     if (pending.isNotEmpty()) {
                         val silent = now - lastReadAtMs
                         if (silent >= pendingMaxSilentMs) {
-                            failAll(SocketTimeoutException("HTSP no incoming data for ${silent}ms with ${pending.size} pending requests"))
+                            failAll(
+                                SocketTimeoutException("HTSP no incoming data for ${silent}ms with ${pending.size} pending requests"),
+                                attemptId,
+                            )
                             return
                         }
                     }
@@ -431,11 +619,14 @@ open class HtspService(
                 }
             }
         } catch (t: NoSuchElementException) {
-            failAll(EOFException("Broken/EOF HTSP stream").apply { initCause(t) })
+            failAll(
+                EOFException("Broken/EOF HTSP stream").apply { initCause(t) },
+                attemptId,
+            )
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
             if (!currentCoroutineContext().isActive) return
-            failAll(t)
+            failAll(t, attemptId)
         }
     }
 
@@ -455,7 +646,11 @@ open class HtspService(
                 s?.isConnected == true && !s.isClosed
     }
 
-    private suspend fun disconnectInternal(t: Throwable) {
+    private suspend fun disconnectInternal(
+        t: Throwable,
+        attemptId: Long,
+        publishState: Boolean,
+    ) {
         val callerJob = currentCoroutineContext()[Job]
         withContext(NonCancellable) {
             val defs = pending.values.toList()
@@ -476,32 +671,166 @@ open class HtspService(
 
             challenge = null
             negotiatedHtspVersion = null
-            _state.value = ConnectionState.Disconnected
+            if (publishState && isCurrentConnectionAttempt(attemptId)) {
+                publishConnectionState(attemptId, ConnectionState.Disconnected)
+            }
         }
     }
 
-    private suspend fun failAll(t: Throwable) {
-        connectMutex.withLock {
-            _state.value = ConnectionState.Error(t)
-            controlEventStream.emit(HtspEvent.ConnectionError(t))
-            disconnectInternal(t)
+    private suspend fun failAll(t: Throwable, attemptId: Long) {
+        if (!isCurrentConnectionAttempt(attemptId)) return
+        val event = connectMutex.withLock<HtspEvent.ConnectionError?> {
+            if (!isCurrentConnectionAttempt(attemptId)) return@withLock null
+            val event = withCurrentConnectionAttempt(attemptId) {
+                _state.value = ConnectionState.Error(t)
+                HtspEvent.ConnectionError(
+                    error = t,
+                    connectionAttemptId = attemptId,
+                )
+            } ?: return@withLock null
+            disconnectInternal(
+                t = t,
+                attemptId = attemptId,
+                publishState = true,
+            )
+            event
+        } ?: return
+        controlEventStream.emit(event)
+    }
+
+    private fun ensureCurrentConnectionAttempt(attemptId: Long) {
+        if (!isCurrentConnectionAttempt(attemptId)) {
+            throw CancellationException("Superseded connection attempt")
         }
+    }
+
+    private fun beginConnectionAttempt(): Long = synchronized(connectionAttemptLock) {
+        ++connectionAttempt
+    }
+
+    private fun restorePreviousConnectionAttempt(attemptId: Long) {
+        synchronized(connectionAttemptLock) {
+            if (connectionAttempt == attemptId) connectionAttempt--
+        }
+    }
+
+    internal fun currentConnectionAttemptId(): Long = connectionAttempt
+
+    internal fun currentMuxSequenceForConnectionAttempt(attemptId: Long): Long? =
+        synchronized(connectionAttemptLock) {
+            if (connectionAttempt == attemptId && muxCursorAttempt == attemptId) {
+                muxCursorSequence
+            } else {
+                null
+            }
+        }
+
+    internal fun isCurrentConnectionAttemptId(attemptId: Long): Boolean =
+        isCurrentConnectionAttempt(attemptId)
+
+    internal fun connectionAttemptStatus(attemptId: Long): HtspConnectionAttemptStatus =
+        synchronized(connectionAttemptLock) {
+            when {
+                connectionAttempt != attemptId -> HtspConnectionAttemptStatus.REPLACED
+                liveTransportAttempt == attemptId -> HtspConnectionAttemptStatus.LIVE
+                else -> HtspConnectionAttemptStatus.GONE
+            }
+        }
+
+    private fun isCurrentConnectionAttempt(attemptId: Long): Boolean = connectionAttempt == attemptId
+
+    private fun publishConnectionState(
+        attemptId: Long,
+        state: ConnectionState,
+    ): Boolean = withCurrentConnectionAttempt(attemptId) {
+        _state.value = state
+    } != null
+
+    internal fun <T> commitIfCurrentConnectionAttempt(
+        attemptId: Long,
+        block: () -> T,
+    ): T? = synchronized(connectionAttemptLock) {
+        if (attemptId == 0L) return@synchronized block()
+        if (connectionAttempt != attemptId) return@synchronized null
+        block()
+    }
+
+    internal fun <T> commitIfLiveConnectionAttempt(
+        attemptId: Long,
+        block: () -> T,
+    ): T? = synchronized(connectionAttemptLock) {
+        if (connectionAttempt != attemptId || liveTransportAttempt != attemptId) {
+            return@synchronized null
+        }
+        block()
+    }
+
+    private fun <T> withCurrentConnectionAttempt(
+        attemptId: Long,
+        block: () -> T,
+    ): T? = commitIfCurrentConnectionAttempt(attemptId, block)
+
+    private fun installTransport(
+        attemptId: Long,
+        transportSocket: Socket,
+        transportInput: InputStream,
+        transportOutput: OutputStream,
+    ) = synchronized(connectionAttemptLock) {
+        ensureCurrentConnectionAttempt(attemptId)
+        socket = transportSocket
+        connectingSocket = null
+        input = transportInput
+        output = transportOutput
+        liveTransportAttempt = attemptId
     }
 
     private fun closeTransport() {
-        val currentSocket = socket
-        val currentInput = input
-        val currentOutput = output
-        socket = null
-        input = null
-        output = null
+        val (
+            currentConnectingSocket,
+            currentSocket,
+            currentInput,
+            currentOutput,
+        ) = synchronized(connectionAttemptLock) {
+            val snapshot = TransportSnapshot(connectingSocket, socket, input, output)
+            connectingSocket = null
+            socket = null
+            input = null
+            output = null
+            liveTransportAttempt = null
+            snapshot
+        }
 
+        closeSocket(currentConnectingSocket)
         closeSocket(currentSocket)
         runCatching { currentInput?.close() }
         runCatching { currentOutput?.close() }
     }
 
+    private fun markTransportGone(target: Socket?) {
+        synchronized(connectionAttemptLock) {
+            if (socket === target) liveTransportAttempt = null
+        }
+        closeSocket(target)
+    }
+
     private fun closeSocket(target: Socket?) {
         runCatching { target?.close() }
     }
+
+    private fun supersedeCurrentTransport() {
+        val cancellation = CancellationException("Superseded connection attempt")
+        val defs = pending.values.toList()
+        pending.clear()
+        defs.forEach { it.def.completeExceptionally(cancellation) }
+        initialSyncDef?.completeExceptionally(cancellation)
+        closeTransport()
+    }
+
+
+    private data class TransportSnapshot(
+        val connectingSocket: Socket?,
+        val socket: Socket?,
+        val input: InputStream?,
+        val output: OutputStream?,
+    )
 }

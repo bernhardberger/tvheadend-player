@@ -12,13 +12,47 @@ import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.player.PlaybackReadMetrics
 import java.io.Closeable
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 
 internal data class RecordingFileHandle(
     val id: Int,
     val htspVersion: Int?,
+    val connectionAttemptId: Long,
 )
+
+internal class RecordingConnectionChangedException(cause: Throwable? = null) :
+    IOException("Recording connection changed", cause)
+
+internal class RecordingDataSourceOwner {
+    private val sources = LinkedHashSet<Closeable>()
+    private var released = false
+
+    @Synchronized
+    fun register(source: Closeable): Boolean {
+        if (released) {
+            source.close()
+            return false
+        }
+        sources += source
+        return true
+    }
+
+    @Synchronized
+    fun unregister(source: Closeable) {
+        sources -= source
+    }
+
+    @Synchronized
+    fun releaseAll() {
+        released = true
+        val owned = sources.toList()
+        sources.clear()
+        owned.forEach { runCatching { it.close() } }
+    }
+}
 
 internal class RecordingFileSession(
     private val htsp: HtspService,
@@ -26,17 +60,47 @@ internal class RecordingFileSession(
     private val htspVersion: () -> Int? = {
         (htsp.state.value as? ConnectionState.Connected)?.htspVersion
     },
+    private val connectionAttemptId: () -> Long = htsp::currentConnectionAttemptId,
 ) {
     private val current = AtomicReference<RecordingFileHandle?>()
 
     @Synchronized
     fun open(position: Long) {
         close()
-        val id = runBlocking { htsp.fileOpen(path) }
-        current.set(RecordingFileHandle(id = id, htspVersion = htspVersion()))
+        val attemptId = connectionAttemptId()
+        val id = try {
+            runBlocking {
+                htsp.fileOpen(
+                    path = path,
+                    expectedConnectionAttemptId = attemptId,
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw RecordingConnectionChangedException(cancelled)
+        }
+        if (connectionAttemptId() != attemptId) {
+            throw RecordingConnectionChangedException()
+        }
+        current.set(
+            RecordingFileHandle(
+                id = id,
+                htspVersion = htspVersion(),
+                connectionAttemptId = attemptId,
+            )
+        )
         try {
             if (position > 0L) {
-                runBlocking { htsp.fileSeek(id, position) }
+                try {
+                    runBlocking {
+                        htsp.fileSeek(
+                            id = id,
+                            offset = position,
+                            expectedConnectionAttemptId = attemptId,
+                        )
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw RecordingConnectionChangedException(cancelled)
+                }
             }
         } catch (error: Throwable) {
             close()
@@ -44,16 +108,24 @@ internal class RecordingFileSession(
         }
     }
 
-    fun currentId(): Int? = current.get()?.id
+    fun currentHandle(): RecordingFileHandle? {
+        val handle = current.get() ?: return null
+        if (connectionAttemptId() != handle.connectionAttemptId) {
+            throw RecordingConnectionChangedException()
+        }
+        return handle
+    }
 
     @Synchronized
     fun close() {
         val handle = current.getAndSet(null) ?: return
+        if (connectionAttemptId() != handle.connectionAttemptId) return
         runCatching {
             runBlocking {
                 htsp.fileCloseRecording(
                     id = handle.id,
                     htspVersion = handle.htspVersion,
+                    expectedConnectionAttemptId = handle.connectionAttemptId,
                 )
             }
         }
@@ -73,6 +145,7 @@ class HtspRecordingDataSource private constructor(
     path: String,
     private val knownSize: Long?,
     private val readMetrics: PlaybackReadMetrics,
+    private val owner: RecordingDataSourceOwner,
 ) : DataSource, Closeable {
     private var uri: Uri? = null
     private val fileSession = RecordingFileSession(htsp = htsp, path = path)
@@ -84,17 +157,18 @@ class HtspRecordingDataSource private constructor(
         private val knownSize: Long?,
     ) : DataSource.Factory {
         internal val readMetrics = PlaybackReadMetrics()
-        private val current = AtomicReference<HtspRecordingDataSource?>()
+        private val owner = RecordingDataSourceOwner()
 
         override fun createDataSource(): DataSource = HtspRecordingDataSource(
             htsp = htsp,
             path = path,
             knownSize = knownSize,
             readMetrics = readMetrics,
-        ).also(current::set)
+            owner = owner,
+        ).also(owner::register)
 
         fun releaseCurrentDataSource() {
-            current.getAndSet(null)?.close()
+            owner.releaseAll()
         }
     }
 
@@ -102,6 +176,7 @@ class HtspRecordingDataSource private constructor(
 
     override fun open(dataSpec: DataSpec): Long {
         close()
+        check(owner.register(this)) { "Recording data source owner has been released" }
         uri = dataSpec.uri
         fileSession.open(dataSpec.position)
         bytesRemaining = when {
@@ -113,10 +188,20 @@ class HtspRecordingDataSource private constructor(
     }
 
     override fun read(buffer: ByteArray, offset: Int, readLength: Int): Int {
-        val id = fileSession.currentId() ?: return C.RESULT_END_OF_INPUT
+        val handle = fileSession.currentHandle() ?: return C.RESULT_END_OF_INPUT
         val requested = recordingReadLength(readLength, bytesRemaining)
         if (requested == 0) return C.RESULT_END_OF_INPUT
-        val bytes = runBlocking { htsp.fileRead(id, requested) }
+        val bytes = try {
+            runBlocking {
+                htsp.fileRead(
+                    id = handle.id,
+                    size = requested,
+                    expectedConnectionAttemptId = handle.connectionAttemptId,
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw RecordingConnectionChangedException(cancelled)
+        }
         if (bytes.isEmpty()) return C.RESULT_END_OF_INPUT
         val count = minOf(bytes.size, requested)
         bytes.copyInto(buffer, destinationOffset = offset, endIndex = count)
@@ -133,5 +218,6 @@ class HtspRecordingDataSource private constructor(
         fileSession.close()
         bytesRemaining = null
         uri = null
+        owner.unregister(this)
     }
 }

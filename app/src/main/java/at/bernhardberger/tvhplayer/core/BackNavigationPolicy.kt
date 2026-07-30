@@ -7,6 +7,18 @@ enum class BackAction {
     FINISH_ACTIVITY,
 }
 
+enum class ApplianceLaunchBackAction {
+    CANCEL_REQUEST,
+    CONSUME_WITHOUT_CHANGE,
+}
+
+fun applianceLaunchBackAction(simpleTvActive: Boolean): ApplianceLaunchBackAction =
+    if (simpleTvActive) {
+        ApplianceLaunchBackAction.CONSUME_WITHOUT_CHANGE
+    } else {
+        ApplianceLaunchBackAction.CANCEL_REQUEST
+    }
+
 /** Warm playback the root destination may return to once. */
 enum class WarmPlaybackTarget {
     NONE,

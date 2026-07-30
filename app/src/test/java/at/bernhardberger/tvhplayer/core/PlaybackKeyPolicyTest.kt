@@ -60,6 +60,29 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
+    fun everyActionThatCreatesFocusStartsACompleteOpeningKeyCycle() {
+        listOf(
+            PlayerKeyAction.REVEAL_CONTROLS,
+            PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+            PlayerKeyAction.OPEN_CHANNELS,
+            PlayerKeyAction.OPEN_INFO,
+        ).forEach { action ->
+            assertTrue(action.name, playerKeyActionStartsOpeningCycle(action))
+        }
+
+        listOf(
+            PlayerKeyAction.PASS_THROUGH,
+            PlayerKeyAction.SEEK_BACK,
+            PlayerKeyAction.SEEK_FORWARD,
+            PlayerKeyAction.HIDE_CONTROLS,
+            PlayerKeyAction.CLOSE_PLAYER,
+            PlayerKeyAction.DISMISS_OVERLAY_ONLY,
+        ).forEach { action ->
+            assertFalse(action.name, playerKeyActionStartsOpeningCycle(action))
+        }
+    }
+
+    @Test
     fun liveWithoutTimeshiftUsesRevealAndChannelDrawer() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,

@@ -62,10 +62,22 @@ fun recordingStartDecision(
     if (intent == RecordingPlaybackIntent.FromBeginning) {
         return RecordingStartDecision.FromBeginning
     }
+    if (intent is RecordingPlaybackIntent.Resume) {
+        val candidateMs = recordingSecondsToMediaMilliseconds(intent.positionSeconds)
+            ?: return RecordingStartDecision.FromBeginning
+        val usableDuration = durationMs?.takeIf { it > 0L }
+        if (usableDuration != null) {
+            if (candidateMs >= usableDuration) return RecordingStartDecision.FromBeginning
+            if (recordingIsComplete(state, candidateMs, usableDuration, naturalEnd = false)) {
+                return RecordingStartDecision.FromBeginning
+            }
+        }
+        return RecordingStartDecision.ResumeAt(candidateMs)
+    }
     val requestedSeconds = when (intent) {
         RecordingPlaybackIntent.DefaultPolicy -> serverPositionSeconds
         RecordingPlaybackIntent.FromBeginning -> null
-        is RecordingPlaybackIntent.Resume -> intent.positionSeconds
+        is RecordingPlaybackIntent.Resume -> null
     }
     val candidateSeconds = recordingResumeCandidateSeconds(state, requestedSeconds)
         ?: return RecordingStartDecision.FromBeginning

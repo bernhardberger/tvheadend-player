@@ -83,9 +83,26 @@ data class HtspMessage(
 }
 
 sealed interface HtspEvent {
-    data class ServerMessage(val msg: HtspMessage) : HtspEvent
-    data class ConnectionError(val error: Throwable) : HtspEvent
+    val connectionAttemptId: Long
+
+    data class ServerMessage(
+        val msg: HtspMessage,
+        override val connectionAttemptId: Long = 0L,
+        val messageSequence: Long = 0L,
+    ) : HtspEvent
+
+    data class ConnectionError(
+        val error: Throwable,
+        override val connectionAttemptId: Long = 0L,
+    ) : HtspEvent
 }
+
+data class HtspMuxEvent(
+    val msg: HtspMessage,
+    val connectionAttemptId: Long,
+    val messageSequence: Long = 0L,
+    val muxSequence: Long = 0L,
+)
 
 data class ChannelUi(
     val id: Int,

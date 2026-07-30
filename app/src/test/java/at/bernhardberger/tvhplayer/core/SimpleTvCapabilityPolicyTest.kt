@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -56,6 +57,33 @@ class SimpleTvCapabilityPolicyTest {
         assertFalse(profile.allowsRoute(SimpleTvRoute.RECORDINGS))
         assertFalse(profile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER))
         assertFalse(profile.allowsRoute(SimpleTvRoute.SETTINGS))
+    }
+
+    @Test
+    fun restrictedRouteGuardRedirectsToLiveAndSerializesActiveRecordingTeardown() {
+        val active = simpleTvProfile(SimpleTvSettings(enabled = true), active = true)
+        val inactive = simpleTvProfile(SimpleTvSettings(enabled = true), active = false)
+
+        assertEquals(
+            SimpleTvRouteGuardAction.ALLOW,
+            simpleTvRouteGuardAction(inactive, SimpleTvRoute.RECORDING_PLAYER, recordingActive = true),
+        )
+        assertEquals(
+            SimpleTvRouteGuardAction.ALLOW,
+            simpleTvRouteGuardAction(active, SimpleTvRoute.PLAYER, recordingActive = true),
+        )
+        assertEquals(
+            SimpleTvRouteGuardAction.REDIRECT_TO_LIVE,
+            simpleTvRouteGuardAction(active, SimpleTvRoute.RECORDINGS, recordingActive = false),
+        )
+        assertEquals(
+            SimpleTvRouteGuardAction.STOP_RECORDING_AND_REDIRECT_TO_LIVE,
+            simpleTvRouteGuardAction(
+                active,
+                SimpleTvRoute.RECORDING_PLAYER,
+                recordingActive = true,
+            ),
+        )
     }
 
     @Test

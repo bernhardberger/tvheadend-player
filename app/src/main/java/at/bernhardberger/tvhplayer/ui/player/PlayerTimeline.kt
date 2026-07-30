@@ -1,12 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -16,7 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -46,8 +50,12 @@ fun PlayerTimelineBar(
     ghostProgress: Float? = null,
     boundaryFractions: List<Float> = emptyList(),
     rewindableStartFraction: Float? = null,
+    rewindableStartOverflow: Boolean = false,
     liveEdgeFraction: Float? = null,
     thumbTestTag: String? = null,
+    rewindableBoundaryTestTag: String? = null,
+    rewindableOverflowTestTag: String? = null,
+    liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
 ) {
     val currentProgress = progress.coerceIn(0f, 1f)
@@ -111,6 +119,62 @@ fun PlayerTimelineBar(
                     .height(barHeight)
                     .background(PlaybackPositionColor),
             )
+            rewindableStartFraction?.let { fraction ->
+                val start = fraction.coerceIn(0f, 1f)
+                if (rewindableStartOverflow) {
+                    val markerColor = MaterialTheme.colorScheme.onSurface
+                    Box(
+                        Modifier
+                            .offset(x = maxWidth * start)
+                            .width(8.dp)
+                            .height(barHeight)
+                            .then(
+                                rewindableBoundaryTestTag
+                                    ?.let(Modifier::testTag)
+                                    ?: Modifier,
+                            ),
+                    ) {
+                        Canvas(
+                            Modifier
+                                .fillMaxSize()
+                                .then(
+                                    rewindableOverflowTestTag
+                                        ?.let(Modifier::testTag)
+                                        ?: Modifier,
+                                ),
+                        ) {
+                            val strokeWidth = 2.dp.toPx()
+                            drawLine(
+                                color = markerColor,
+                                start = Offset(size.width, 0f),
+                                end = Offset(0f, size.height / 2f),
+                                strokeWidth = strokeWidth,
+                                cap = StrokeCap.Square,
+                            )
+                            drawLine(
+                                color = markerColor,
+                                start = Offset(0f, size.height / 2f),
+                                end = Offset(size.width, size.height),
+                                strokeWidth = strokeWidth,
+                                cap = StrokeCap.Square,
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        Modifier
+                            .offset(x = maxWidth * start)
+                            .width(2.dp)
+                            .height(barHeight)
+                            .background(MaterialTheme.colorScheme.onSurface)
+                            .then(
+                                rewindableBoundaryTestTag
+                                    ?.let(Modifier::testTag)
+                                    ?: Modifier,
+                            ),
+                    )
+                }
+            }
             boundaryFractions.forEach { fraction ->
                 Box(
                     Modifier
@@ -130,7 +194,8 @@ fun PlayerTimelineBar(
                         .offset(x = maxWidth * fraction.coerceIn(0f, 1f) - 1.dp)
                         .width(2.dp)
                         .height(barHeight)
-                        .background(MaterialTheme.colorScheme.onSurface),
+                        .background(MaterialTheme.colorScheme.onSurface)
+                        .then(liveEdgeTestTag?.let(Modifier::testTag) ?: Modifier),
                 )
             }
         }
@@ -163,8 +228,12 @@ fun PlayerTimelineBlock(
     ghostProgress: Float? = null,
     boundaryFractions: List<Float> = emptyList(),
     rewindableStartFraction: Float? = null,
+    rewindableStartOverflow: Boolean = false,
     liveEdgeFraction: Float? = null,
     thumbTestTag: String? = null,
+    rewindableBoundaryTestTag: String? = null,
+    rewindableOverflowTestTag: String? = null,
+    liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
 ) {
     Column(modifier.fillMaxWidth()) {
@@ -202,8 +271,12 @@ fun PlayerTimelineBlock(
             ghostProgress = ghostProgress,
             boundaryFractions = boundaryFractions,
             rewindableStartFraction = rewindableStartFraction,
+            rewindableStartOverflow = rewindableStartOverflow,
             liveEdgeFraction = liveEdgeFraction,
             thumbTestTag = thumbTestTag,
+            rewindableBoundaryTestTag = rewindableBoundaryTestTag,
+            rewindableOverflowTestTag = rewindableOverflowTestTag,
+            liveEdgeTestTag = liveEdgeTestTag,
             progressSemantics = progressSemantics,
         )
     }

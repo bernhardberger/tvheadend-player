@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -82,6 +84,7 @@ fun PlayerIdentityHeader(
                 style = HeaderTextStyle.TITLE,
                 modifier = Modifier
                     .optionalTestTag(tags.title)
+                    .semantics { heading() }
                     .then(
                         if (eyebrow == null) {
                             Modifier.paddingFrom(

@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
@@ -24,6 +27,7 @@ import at.bernhardberger.tvhplayer.player.PlaybackThermalLevel
 import at.bernhardberger.tvhplayer.player.droppedFramePercentage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale
 
@@ -34,6 +38,7 @@ internal fun PlaybackStatsOverlay(
     modifier: Modifier = Modifier,
     timeshiftState: TimeshiftState? = null,
 ) {
+    val locale = Locale.ROOT
     val video = diagnostics.video
     val audio = diagnostics.audio
     val tuner = diagnostics.transport?.tuner
@@ -44,7 +49,9 @@ internal fun PlaybackStatsOverlay(
         diagnostics.droppedFrames,
     )
     Surface(
-        modifier = modifier.width(820.dp),
+        modifier = modifier
+            .width(820.dp)
+            .testTag("playback-stats-overlay"),
         colors = SurfaceDefaults.colors(
             containerColor = Color.Black.copy(alpha = 0.86f),
             contentColor = Color.White,
@@ -58,6 +65,7 @@ internal fun PlaybackStatsOverlay(
             Text(
                 text = stringResource(R.string.stats_for_nerds),
                 style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() },
             )
             Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 Column(
@@ -76,34 +84,54 @@ internal fun PlaybackStatsOverlay(
                     StatLine(
                 stringResource(R.string.stats_state),
                 when (diagnostics.state) {
-                    PlaybackSessionState.Idle -> "Idle"
-                    PlaybackSessionState.Starting -> "Starting"
-                    PlaybackSessionState.Playing -> if (diagnostics.isPlaying) "Playing" else "Paused"
-                    PlaybackSessionState.Finished -> "Finished"
-                    is PlaybackSessionState.Recovering -> "Recovering"
-                    is PlaybackSessionState.Failed -> "Failed"
+                    PlaybackSessionState.Idle -> stringResource(R.string.stats_state_idle)
+                    PlaybackSessionState.Starting -> stringResource(R.string.stats_state_starting)
+                    PlaybackSessionState.Playing -> stringResource(
+                        if (diagnostics.isPlaying) {
+                            R.string.stats_state_playing
+                        } else {
+                            R.string.stats_state_paused
+                        },
+                    )
+                    PlaybackSessionState.Finished -> stringResource(R.string.stats_state_finished)
+                    is PlaybackSessionState.Recovering ->
+                        stringResource(R.string.stats_state_recovering)
+                    is PlaybackSessionState.Failed -> stringResource(R.string.stats_state_failed)
                 },
                     )
                     StatLine(
                 stringResource(R.string.stats_timing),
                 timeshiftState?.let { state ->
-                    if (!state.available || state.positionMs >= -1_000L) {
-                        stringResource(R.string.timeshift_live)
+                    if (!state.available || timeshiftPositionPresentation(state).atLiveEdge) {
+                        stringResource(R.string.stats_timeshift_live)
                     } else {
                         stringResource(
-                            R.string.timeshift_behind_live,
+                            R.string.stats_timeshift_behind_live,
                             formatHms(-state.positionMs / 1_000L),
                         )
                     }
-                } ?: buildString {
-                    append(formatHms(diagnostics.positionMs / 1_000L))
-                    diagnostics.durationMs?.let { append(" / ${formatHms(it / 1_000L)}") }
-                    append("  buffer ${diagnostics.bufferedMs / 1_000L}s")
-                },
+                } ?: diagnostics.durationMs?.let { durationMs ->
+                    stringResource(
+                        R.string.stats_timing_buffered_with_duration,
+                        formatHms(diagnostics.positionMs / 1_000L),
+                        formatHms(durationMs / 1_000L),
+                        diagnostics.bufferedMs / 1_000L,
+                    )
+                } ?: stringResource(
+                    R.string.stats_timing_buffered,
+                    formatHms(diagnostics.positionMs / 1_000L),
+                    diagnostics.bufferedMs / 1_000L,
+                ),
                     )
                     StatLine(
                 stringResource(R.string.stats_video),
-                listOfNotNull(video?.codec, video?.resolution, video?.frameRate?.let { "${it.oneDecimal()} fps" })
+                listOfNotNull(
+                    video?.codec,
+                    video?.resolution,
+                    video?.frameRate?.let {
+                        stringResource(R.string.stats_frame_rate, it.oneDecimal(locale))
+                    },
+                )
                     .joinToString(" · ").ifBlank { stringResource(R.string.stats_unavailable) },
                     )
                     StatLine(
@@ -112,18 +140,30 @@ internal fun PlaybackStatsOverlay(
                     )
                     StatLine(
                 stringResource(R.string.stats_frames),
-                buildString {
-                    append("${diagnostics.renderedFrames} rendered · ${diagnostics.droppedFrames} dropped")
-                    droppedPercent?.let { append(" (${it.oneDecimal()}%)") }
-                },
+                droppedPercent?.let {
+                    stringResource(
+                        R.string.stats_frames_value_with_percentage,
+                        formatCount(diagnostics.renderedFrames.toLong(), locale),
+                        formatCount(diagnostics.droppedFrames.toLong(), locale),
+                        it.oneDecimal(locale),
+                    )
+                } ?: stringResource(
+                    R.string.stats_frames_value,
+                    formatCount(diagnostics.renderedFrames.toLong(), locale),
+                    formatCount(diagnostics.droppedFrames.toLong(), locale),
+                ),
                     )
                     StatLine(
                 stringResource(R.string.stats_audio),
                 listOfNotNull(
                     audio?.codec,
                     audio?.language,
-                    audio?.channelCount?.let { "${it}ch" },
-                    audio?.sampleRateHz?.let { "${it} Hz" },
+                    audio?.channelCount?.let {
+                        stringResource(R.string.stats_audio_channels, it)
+                    },
+                    audio?.sampleRateHz?.let {
+                        stringResource(R.string.stats_sample_rate, formatCount(it.toLong(), locale))
+                    },
                 ).joinToString(" · ").ifBlank { stringResource(R.string.stats_unavailable) },
                     )
                     StatLine(
@@ -132,7 +172,7 @@ internal fun PlaybackStatsOverlay(
                     )
                     StatLine(
                         stringResource(R.string.stats_underruns),
-                        diagnostics.audioUnderruns.toString(),
+                        formatCount(diagnostics.audioUnderruns.toLong(), locale),
                     )
                     StatLine(
                 stringResource(
@@ -142,16 +182,16 @@ internal fun PlaybackStatsOverlay(
                         R.string.stats_stream_read_rate
                     }
                 ),
-                diagnostics.readRateBitsPerSecond?.let(::formatBitRate)
+                diagnostics.readRateBitsPerSecond?.let { formatBitRate(it, locale) }
                     ?: stringResource(R.string.stats_unavailable),
                     )
                     StatLine(
-                stringResource(R.string.display_mode),
+                stringResource(R.string.stats_display_mode),
                 stringResource(
                     when (aspectRatio) {
-                        AspectRatioMode.FIT -> R.string.display_mode_auto
-                        AspectRatioMode.FORCE_16_9 -> R.string.display_mode_16_9
-                        AspectRatioMode.FORCE_4_3 -> R.string.display_mode_4_3
+                        AspectRatioMode.FIT -> R.string.stats_display_mode_auto
+                        AspectRatioMode.FORCE_16_9 -> R.string.stats_display_mode_16_9
+                        AspectRatioMode.FORCE_4_3 -> R.string.stats_display_mode_4_3
                     }
                 ),
                     )
@@ -166,21 +206,23 @@ internal fun PlaybackStatsOverlay(
                         tuner.status?.let {
                             StatLine(stringResource(R.string.stats_tuner_status), it)
                         }
-                        (tuner.signalMilliDbm?.let { formatMilliUnit(it, "dBm") }
-                            ?: tuner.signalPercent?.let(::formatPercent))?.let {
+                        (tuner.signalMilliDbm?.let {
+                            formatMilliUnit(it, R.string.stats_unit_dbm, locale)
+                        } ?: tuner.signalPercent?.let { formatPercent(it, locale) })?.let {
                             StatLine(stringResource(R.string.stats_signal), it)
                         }
-                        (tuner.snrMilliDb?.let { formatMilliUnit(it, "dB") }
-                            ?: tuner.snrPercent?.let(::formatPercent))?.let {
+                        (tuner.snrMilliDb?.let {
+                            formatMilliUnit(it, R.string.stats_unit_db, locale)
+                        } ?: tuner.snrPercent?.let { formatPercent(it, locale) })?.let {
                             StatLine(stringResource(R.string.stats_snr), it)
                         }
                         tuner.bitErrorRate?.let {
-                            StatLine(stringResource(R.string.stats_ber), formatCount(it))
+                            StatLine(stringResource(R.string.stats_ber), formatCount(it, locale))
                         }
                         tuner.uncorrectedBlocks?.let {
                             StatLine(
                                 stringResource(R.string.stats_uncorrected_blocks),
-                                formatCount(it),
+                                formatCount(it, locale),
                             )
                         }
                     }
@@ -191,23 +233,32 @@ internal fun PlaybackStatsOverlay(
                             stringResource(R.string.stats_queued),
                             listOfNotNull(
                                 queue.packets?.let {
-                                    stringResource(R.string.stats_packet_count, formatCount(it))
+                                    stringResource(
+                                        R.string.stats_packet_count,
+                                        formatCount(it, locale),
+                                    )
                                 },
-                                queue.bytes?.let(::formatBytes),
+                                queue.bytes?.let { formatBytes(it, locale) },
                             ).joinToString(" · ")
                                 .ifBlank { stringResource(R.string.stats_unavailable) },
                         )
                         queue.delayMicros?.let {
                             StatLine(
                                 stringResource(R.string.stats_queue_delay),
-                                String.format(Locale.ROOT, "%.1f ms", it / 1_000.0),
+                                stringResource(
+                                    R.string.stats_queue_delay_value,
+                                    formatDecimal(it / 1_000.0, 1, locale),
+                                ),
                             )
                         }
                         StatLine(
                             stringResource(R.string.stats_server_drops),
-                            "I ${formatCount(queue.iFrameDrops ?: 0)} · " +
-                                "P ${formatCount(queue.pFrameDrops ?: 0)} · " +
-                                "B ${formatCount(queue.bFrameDrops ?: 0)}",
+                            stringResource(
+                                R.string.stats_server_drops_value,
+                                formatCount(queue.iFrameDrops ?: 0, locale),
+                                formatCount(queue.pFrameDrops ?: 0, locale),
+                                formatCount(queue.bFrameDrops ?: 0, locale),
+                            ),
                         )
                     }
 
@@ -216,7 +267,12 @@ internal fun PlaybackStatsOverlay(
                         system.outputMode?.let { mode ->
                             StatLine(
                                 stringResource(R.string.stats_output),
-                                "${mode.width}x${mode.height} @ ${mode.refreshRateHz.oneDecimal()} Hz",
+                                stringResource(
+                                    R.string.stats_output_value,
+                                    mode.width,
+                                    mode.height,
+                                    mode.refreshRateHz.oneDecimal(locale),
+                                ),
                             )
                         }
                         system.thermalLevel?.let { level ->
@@ -226,7 +282,10 @@ internal fun PlaybackStatsOverlay(
                             )
                         }
                         system.appPssBytes?.let { bytes ->
-                            StatLine(stringResource(R.string.stats_app_memory), formatBytes(bytes))
+                            StatLine(
+                                stringResource(R.string.stats_app_memory),
+                                formatBytes(bytes, locale),
+                            )
                         }
                         system.lowMemory?.let { lowMemory ->
                             StatLine(
@@ -249,7 +308,7 @@ private fun StatsSection(title: String) {
         text = title,
         color = MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier.padding(top = 5.dp),
+        modifier = Modifier.padding(top = 5.dp).semantics { heading() },
     )
 }
 
@@ -264,6 +323,8 @@ private fun StatLine(label: String, value: String) {
             color = Color.White.copy(alpha = 0.68f),
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.weight(0.38f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = value,
@@ -275,31 +336,48 @@ private fun StatLine(label: String, value: String) {
     }
 }
 
-private fun Float.oneDecimal(): String = String.format(Locale.ROOT, "%.1f", this)
+private fun Float.oneDecimal(locale: Locale): String = formatDecimal(toDouble(), 1, locale)
 
-private fun formatBitRate(bitsPerSecond: Long): String = when {
-    bitsPerSecond >= 1_000_000L -> String.format(
-        Locale.ROOT,
-        "%.2f Mbps",
-        bitsPerSecond / 1_000_000.0,
+@Composable
+private fun formatBitRate(bitsPerSecond: Long, locale: Locale): String = when {
+    bitsPerSecond >= 1_000_000L -> stringResource(
+        R.string.stats_bit_rate_mbps,
+        formatDecimal(bitsPerSecond / 1_000_000.0, 2, locale),
     )
-    bitsPerSecond >= 1_000L -> String.format(Locale.ROOT, "%.0f kbps", bitsPerSecond / 1_000.0)
-    else -> "$bitsPerSecond bps"
+    bitsPerSecond >= 1_000L -> stringResource(
+        R.string.stats_bit_rate_kbps,
+        formatDecimal(bitsPerSecond / 1_000.0, 0, locale),
+    )
+    else -> stringResource(
+        R.string.stats_bit_rate_bps,
+        formatCount(bitsPerSecond, locale),
+    )
 }
 
-private fun formatPercent(value: Float): String =
-    String.format(Locale.ROOT, "%.1f%%", value)
+private fun formatPercent(value: Float, locale: Locale): String =
+    "${value.oneDecimal(locale)}%"
 
-private fun formatMilliUnit(value: Long, unit: String): String =
-    String.format(Locale.ROOT, "%.1f %s", value / 1_000.0, unit)
+@Composable
+private fun formatMilliUnit(value: Long, unitResource: Int, locale: Locale): String =
+    stringResource(unitResource, formatDecimal(value / 1_000.0, 1, locale))
 
-private fun formatCount(value: Long): String = String.format(Locale.ROOT, "%,d", value)
+private fun formatCount(value: Long, locale: Locale): String = String.format(locale, "%,d", value)
 
-private fun formatBytes(bytes: Long): String = when {
-    bytes >= 1024L * 1024L -> String.format(Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0))
-    bytes >= 1024L -> String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0)
-    else -> "$bytes B"
+@Composable
+private fun formatBytes(bytes: Long, locale: Locale): String = when {
+    bytes >= 1024L * 1024L -> stringResource(
+        R.string.stats_bytes_mb,
+        formatDecimal(bytes / (1024.0 * 1024.0), 1, locale),
+    )
+    bytes >= 1024L -> stringResource(
+        R.string.stats_bytes_kb,
+        formatDecimal(bytes / 1024.0, 1, locale),
+    )
+    else -> stringResource(R.string.stats_bytes_b, formatCount(bytes, locale))
 }
+
+private fun formatDecimal(value: Double, fractionDigits: Int, locale: Locale): String =
+    String.format(locale, "%.${fractionDigits}f", value)
 
 private fun PlaybackThermalLevel.labelResource(): Int = when (this) {
     PlaybackThermalLevel.NONE -> R.string.stats_thermal_none

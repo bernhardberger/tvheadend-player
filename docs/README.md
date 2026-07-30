@@ -35,6 +35,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | Document | Scope and lifecycle |
 |---|---|
 | `appliance-mode-plan.md` | Appliance architecture and task history. Read only the sections relevant to an appliance, channel/EPG/DVR, or playback decision. Split completed history from current work in a dedicated later cleanup. |
+| `player-ui-ux-overhaul-plan.md` | Completed implementation record for fullscreen Live TV, timeshift, and recording playback through Slice 8. Slice 9 remains optional and unstarted. |
 | `recording-progress-sync-plan.md` | Recording progress work; slices 0–5 are complete and the remaining slice is explicitly gated. |
 
 ## Dated references
@@ -43,6 +44,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 |---|---|
 | `ai-skills-audit-2026-07-28.md` | Audit record for the imported skill set. Current agents and local skills carry the durable routing and caveats; this audit is not mandatory startup reading. |
 | `codebase-audit-2026-07-23.md` | Point-in-time hardening audit with later updates. Use only for a specifically identified finding, then verify current source. |
+| `current-player-ui-ux-2026-07-29.md` | Revision-bound fullscreen-player baseline and exact replacement G10 screenshot manifest used by the completed overhaul. Revalidate every claim against current source. |
 | `media3-upgrade-assessment-2026-07-28.md` | Evidence and remaining gate for the named Media3 upgrade only. |
 | `tv-design-audit-2026-07-27.md` | Historical rationale for `tv-design-spec.md`; the specification is authoritative. |
 

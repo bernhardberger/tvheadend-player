@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -118,6 +119,139 @@ class TimeshiftPolicyTest {
     }
 
     @Test
+    fun dispatchQueueKeepsOneRequestInFlightAndPreservesQueuedOrder() {
+        val atLive = TimeshiftState(
+            available = true,
+            bufferStartMs = -180_000L,
+            positionMs = 0L,
+            liveEdgeMs = 0L,
+        )
+        var queue = TimeshiftSeekQueueState()
+
+        queue = queueTimeshiftSeek(queue, atLive, -30_000L)
+        val first = requireNotNull(beginTimeshiftSeekDispatch(queue))
+        queue = first.queue
+        assertEquals(-30_000L, first.deltaMs)
+
+        queue = queueTimeshiftSeek(queue, atLive, -30_000L)
+        queue = queueTimeshiftSeek(queue, atLive, -30_000L)
+        assertNull(beginTimeshiftSeekDispatch(queue))
+
+        queue = completeTimeshiftSeekDispatch(
+            queue,
+            TimeshiftSeekDecision(-30_000L, -30_000L, clamped = false),
+        )
+        val second = requireNotNull(beginTimeshiftSeekDispatch(queue))
+        assertEquals(-60_000L, second.deltaMs)
+        assertTrue(second.queue.dispatchInFlight)
+    }
+
+    @Test
+    fun queuedReversalIsRebasedFromTheCompletedDispatchTarget() {
+        val atLive = TimeshiftState(
+            available = true,
+            bufferStartMs = -180_000L,
+            positionMs = 0L,
+            liveEdgeMs = 0L,
+        )
+        val first = requireNotNull(
+            beginTimeshiftSeekDispatch(
+                queueTimeshiftSeek(TimeshiftSeekQueueState(), atLive, -30_000L)
+            )
+        )
+        var queue = queueTimeshiftSeek(first.queue, atLive, 30_000L)
+
+        assertEquals(
+            TimeshiftSeekDecision(0L, 30_000L, clamped = false),
+            queuedTimeshiftSeekDecision(queue),
+        )
+        assertNull(beginTimeshiftSeekDispatch(queue))
+
+        queue = completeTimeshiftSeekDispatch(
+            queue,
+            TimeshiftSeekDecision(-30_000L, -30_000L, clamped = false),
+        )
+        assertEquals(30_000L, requireNotNull(beginTimeshiftSeekDispatch(queue)).deltaMs)
+    }
+
+    @Test
+    fun inputAfterCompletionUsesProjectedTargetUntilObservedStateCatchesUp() {
+        val staleAtLive = TimeshiftState(
+            available = true,
+            bufferStartMs = -180_000L,
+            positionMs = 0L,
+            liveEdgeMs = 0L,
+        )
+        val first = requireNotNull(
+            beginTimeshiftSeekDispatch(
+                queueTimeshiftSeek(TimeshiftSeekQueueState(), staleAtLive, -30_000L)
+            )
+        )
+        var completed = completeTimeshiftSeekDispatch(
+            first.queue,
+            TimeshiftSeekDecision(-30_000L, -30_000L, clamped = false),
+        )
+
+        completed = queueTimeshiftSeek(completed, staleAtLive, 30_000L)
+
+        assertEquals(
+            TimeshiftSeekDecision(0L, 30_000L, clamped = false),
+            queuedTimeshiftSeekDecision(completed),
+        )
+        assertEquals(30_000L, requireNotNull(beginTimeshiftSeekDispatch(completed)).deltaMs)
+    }
+
+    @Test
+    fun inputAfterCompletionCanCancelAnExistingQueuedReversalAgainstStaleState() {
+        val staleAtLive = TimeshiftState(
+            available = true,
+            bufferStartMs = -180_000L,
+            positionMs = 0L,
+            liveEdgeMs = 0L,
+        )
+        val first = requireNotNull(
+            beginTimeshiftSeekDispatch(
+                queueTimeshiftSeek(TimeshiftSeekQueueState(), staleAtLive, -30_000L)
+            )
+        )
+        var queue = queueTimeshiftSeek(first.queue, staleAtLive, 30_000L)
+        queue = completeTimeshiftSeekDispatch(
+            queue,
+            TimeshiftSeekDecision(-30_000L, -30_000L, clamped = false),
+        )
+
+        queue = queueTimeshiftSeek(queue, staleAtLive, -30_000L)
+
+        assertEquals(
+            TimeshiftSeekDecision(-30_000L, 0L, clamped = false),
+            queuedTimeshiftSeekDecision(queue),
+        )
+        assertNull(beginTimeshiftSeekDispatch(queue))
+    }
+
+    @Test
+    fun cancellingPendingSeekDoesNotClaimToCancelAnActiveDispatch() {
+        val state = TimeshiftState(
+            available = true,
+            bufferStartMs = -180_000L,
+            positionMs = 0L,
+            liveEdgeMs = 0L,
+        )
+        val active = requireNotNull(
+            beginTimeshiftSeekDispatch(
+                queueTimeshiftSeek(TimeshiftSeekQueueState(), state, -30_000L)
+            )
+        ).queue
+        val activeWithPending = queueTimeshiftSeek(active, state, -30_000L)
+
+        val cancelled = cancelPendingTimeshiftSeek(activeWithPending)
+
+        assertEquals(0L, cancelled.pendingDeltaMs)
+        assertTrue(cancelled.dispatchInFlight)
+        assertNull(beginTimeshiftSeekDispatch(cancelled))
+    }
+
+    @Test
     fun seekControlsFollowTheAvailableBufferAroundTheCurrentPosition() {
         val atLive = TimeshiftState(
             available = true,
@@ -141,6 +275,33 @@ class TimeshiftPolicyTest {
 
         assertFalse(canSeekTimeshiftBackward(TimeshiftState()))
         assertFalse(canSeekTimeshiftForward(TimeshiftState()))
+    }
+
+    @Test
+    fun everyLiveEdgeConsumerUsesTheSameInclusiveTolerance() {
+        val live = TimeshiftState(
+            available = true,
+            bufferStartMs = -120_000,
+            positionMs = -TIMESHIFT_LIVE_EDGE_TOLERANCE_MS,
+            liveEdgeMs = 0,
+        )
+        val livePresentation = timeshiftPositionPresentation(live)
+
+        assertTrue(livePresentation.atLiveEdge)
+        assertEquals(TIMESHIFT_LIVE_EDGE_TOLERANCE_MS, livePresentation.behindLiveMs)
+        assertFalse(canSeekTimeshiftForward(live))
+        assertFalse(isTimeshiftActive(live))
+
+        val behindLive = live.copy(positionMs = -TIMESHIFT_LIVE_EDGE_TOLERANCE_MS - 1L)
+        val behindPresentation = timeshiftPositionPresentation(behindLive)
+
+        assertFalse(behindPresentation.atLiveEdge)
+        assertEquals(
+            TIMESHIFT_LIVE_EDGE_TOLERANCE_MS + 1L,
+            behindPresentation.behindLiveMs,
+        )
+        assertTrue(canSeekTimeshiftForward(behindLive))
+        assertTrue(isTimeshiftActive(behindLive))
     }
 
     @Test

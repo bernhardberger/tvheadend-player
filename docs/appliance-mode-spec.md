@@ -126,8 +126,13 @@ fun adjacentChannelId(
   first available channel. Channels may use List with details (default) or Large
   cards. Simple TV quick select uses the large-card grid. Player Info reuses the
   shared Content Details composition.
-- Reveal hidden playback controls with OK or vertical D-pad. Programme info is an
-  explicit player action rather than a hidden D-pad Up shortcut. Picking the
+- With controls hidden, Center/Enter/Numpad Enter toggles Play/Pause and reveals
+  controls for timeshift Live TV and recordings; non-timeshift Live TV reveals
+  without a playback change because pause is unavailable. Up/Down is the neutral
+  reveal path and never changes playback. Consume each acting/revealing key's
+  complete down/repeat/up cycle so the same press cannot act twice or activate a
+  newly focused control. Programme info is an explicit player action rather than
+  a hidden D-pad Up shortcut. Picking the
   channel that is already playing from the playback channel sheet closes the
   sheet without rebuilding or restarting the player session.
 - Standard Android TV Info opens the explicit programme-details surface. TV
@@ -174,16 +179,24 @@ fun adjacentChannelId(
   scan type and deinterlacing details are omitted rather than guessed. The
   overlay uses a screen-safe multi-column layout and must not expose server
   addresses, recording paths, credentials, identifiers, raw errors, or logs.
-  Back hides stats before normal player Back behavior.
+  Back hides Stats before normal player behavior only while the Stats overlay is
+  actually rendered. An enabled but obscured Stats preference must not consume
+  Back ahead of the visible foreground layer.
 - Simple TV mode is a strict player-only session. Configurable state is limited to
   startup enablement, optional timeshift, and an optional owner PIN. Granular
   EPG/recordings/stop/settings/app-exit flags are not offered. Its startup toggle
   affects only fresh launches, while **Start Simple TV now** enters it explicitly.
+  Recording browse and recording playback routes are unreachable while the
+  restricted session is active; entry from an existing recording context closes
+  that route through its normal playback owner before starting Live TV.
   Back may dismiss overlays but must not leave playback while the mode is active.
 - Exiting Simple TV is deliberately secondary inside Playback options rather than
   a primary transport action. It requires optional owner-PIN verification and a
   separate cancellable confirmation even when no PIN is set. Confirmed exit
   unlocks only the current app session and does not change startup.
+  When recovery prevents access to Playback options, the recovery surface also
+  exposes the same secondary Exit Simple TV flow beside Retry; Retry remains
+  initial focus and Back still cannot leave the restricted session.
 - Consume only Android GUIDE and the captured TCL TV key code in the
   accessibility service; boot/wake entry must not subscribe to accessibility
   events or inspect window content.
@@ -266,12 +279,17 @@ fun adjacentChannelId(
     overlay that restores row focus when closed.
     Returning from playback restores the previous mode, folder, scroll position,
     and focused item rather than resetting the recordings browser.
-    Recording playback uses an auto-hiding TV overlay with metadata, elapsed and
-    total time, a seek bar, icon-based transport, Playback options, and stable
-    focus. With controls hidden, Left/Right seek 30 seconds and Down/Up seek 10
-    minutes. Rapid steps accumulate on screen and dispatch as one seek after a
-    short input pause; the seek timeline and cumulative step remain visible
-    through buffering and briefly after playback resumes. With controls visible,
+    Recording playback uses an auto-hiding TV overlay with metadata, icon-based
+    transport, Playback options, and stable focus. A known real seekable duration
+    shows elapsed/total time and a focusable seekbar. A growing recording with no
+    known duration shows elapsed time plus **Still recording**; another unknown
+    duration shows elapsed time plus **Duration unavailable**. Neither unknown
+    state fabricates a total, normalized progress range, or focusable seekbar.
+    With controls hidden, Left/Right seek using repeat-accelerated steps,
+    while Up/Down reveal controls without seeking. Rapid steps accumulate on
+    screen and dispatch as one seek after a short input pause; the seek timeline
+    and cumulative step remain visible through buffering and briefly after
+    playback resumes. With controls visible,
     D-pad navigation moves focus normally. Back dismisses visible controls before
     a subsequent Back returns to the recordings library without stopping
     playback. Explicit Stop and natural end tear down the recording session and

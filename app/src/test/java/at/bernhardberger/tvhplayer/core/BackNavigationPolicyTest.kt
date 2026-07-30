@@ -176,6 +176,18 @@ class BackNavigationPolicyTest {
     }
 
     @Test
+    fun pendingApplianceLaunchBackCancelsNormallyButCannotExitSimpleTv() {
+        assertEquals(
+            ApplianceLaunchBackAction.CANCEL_REQUEST,
+            applianceLaunchBackAction(simpleTvActive = false),
+        )
+        assertEquals(
+            ApplianceLaunchBackAction.CONSUME_WITHOUT_CHANGE,
+            applianceLaunchBackAction(simpleTvActive = true),
+        )
+    }
+
+    @Test
     fun nestedStartDestinationReturnsToParentGraph() {
         assertEquals(
             BackAction.RETURN_TO_PARENT,

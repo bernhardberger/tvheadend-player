@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
-import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -12,18 +12,14 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -47,7 +42,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -66,33 +60,61 @@ import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_DELAY_MS
+import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_FADE_IN_MS
+import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_MINIMUM_OPAQUE_MS
+import at.bernhardberger.tvhplayer.core.CompactTuningVisibilityAction
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.ChannelKeyAction
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
-import at.bernhardberger.tvhplayer.core.DvrActionFailure
-import at.bernhardberger.tvhplayer.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
+import at.bernhardberger.tvhplayer.core.LiveInfoRecordingDecision
+import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
-import at.bernhardberger.tvhplayer.core.PlaybackAuxiliaryBackAction
+import at.bernhardberger.tvhplayer.core.PlaybackRecoverySecondaryAction
+import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
+import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvhplayer.core.PlayerBackAction
+import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
+import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
+import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
+import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
+import at.bernhardberger.tvhplayer.core.TimeshiftSeekQueueState
+import at.bernhardberger.tvhplayer.core.beginTimeshiftSeekDispatch
+import at.bernhardberger.tvhplayer.core.cancelPendingTimeshiftSeek
 import at.bernhardberger.tvhplayer.core.channelPickAction
-import at.bernhardberger.tvhplayer.core.coalesceTimeshiftSeekDelta
+import at.bernhardberger.tvhplayer.core.completeTimeshiftSeekDispatch
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
-import at.bernhardberger.tvhplayer.core.playbackAuxiliaryBackAction
+import at.bernhardberger.tvhplayer.core.compactTuningVisibilityAction
+import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
+import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
+import at.bernhardberger.tvhplayer.core.playerBackAction
+import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerKeyAction
+import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
+import at.bernhardberger.tvhplayer.core.queueTimeshiftSeek as enqueueTimeshiftSeek
+import at.bernhardberger.tvhplayer.core.queuedTimeshiftSeekDecision
+import at.bernhardberger.tvhplayer.core.liveInfoRecordingCompletion
+import at.bernhardberger.tvhplayer.core.liveInfoRecordingDecision
+import at.bernhardberger.tvhplayer.core.liveInfoRecordingDismissed
+import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
+import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
+import at.bernhardberger.tvhplayer.core.timeshiftSeek
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
@@ -103,6 +125,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.nextAfter
 import at.bernhardberger.tvhplayer.ui.common.nowEvent
+import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
 import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
@@ -117,6 +140,13 @@ import org.koin.compose.koinInject
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 private const val TIMESHIFT_SEEK_DEBOUNCE_MS = 400L
+private const val TIMESHIFT_SEEK_FEEDBACK_MS = 950L
+
+private data class LiveTimeshiftSeekPreview(
+    val token: Int,
+    val decision: TimeshiftSeekDecision,
+    val dispatched: Boolean,
+)
 
 internal suspend fun stopPlaybackAndClose(
     stopPlayback: suspend () -> Unit,
@@ -153,6 +183,7 @@ fun VideoPlayerScreen(
     channelName: String,
     serviceId: Int,
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
+    onReconnect: () -> Unit,
     onUnlock: () -> Unit = {},
     onClose: () -> Unit
 ) {
@@ -165,6 +196,8 @@ fun VideoPlayerScreen(
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
     val timeshiftState by videoPlayerViewModel.timeshiftState.collectAsStateWithLifecycle()
+    val subscriptionFailure by
+        videoPlayerViewModel.liveSubscriptionFailure.collectAsStateWithLifecycle()
     val diagnostics by videoPlayerViewModel.diagnostics.collectAsStateWithLifecycle()
     val effectiveTimeshiftState = if (
         simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT)
@@ -189,16 +222,25 @@ fun VideoPlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var channelNumberInput by remember { mutableStateOf("") }
     var timeshiftFeedback by remember { mutableStateOf<String?>(null) }
-    var pendingTimeshiftSeekMs by remember { mutableLongStateOf(0L) }
+    var timeshiftSeekQueue by remember { mutableStateOf(TimeshiftSeekQueueState()) }
     var timeshiftSeekJob by remember { mutableStateOf<Job?>(null) }
+    var timeshiftSeekFeedbackJob by remember { mutableStateOf<Job?>(null) }
+    var timeshiftSeekPreview by remember { mutableStateOf<LiveTimeshiftSeekPreview?>(null) }
+    var timeshiftSeekToken by remember { mutableIntStateOf(0) }
+    var timeshiftSeekQueuedAtMs by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
+    var restoreOptionsFocus by remember { mutableStateOf(false) }
     var statsVisible by remember { mutableStateOf(false) }
     var infoOpen by remember { mutableStateOf(false) }
-    var infoDvrActionResult by remember { mutableStateOf<DvrActionResult?>(null) }
+    var restoreInfoFocus by remember { mutableStateOf(false) }
+    var restoreRecordFocus by remember { mutableStateOf(false) }
+    var recordingDialogVisible by remember { mutableStateOf(false) }
+    var infoRecordingState by remember {
+        mutableStateOf<LiveInfoRecordingState>(LiveInfoRecordingState.Idle)
+    }
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
-
-    val showDrawer = drawerOpen && !controlsVisible && !infoOpen
+    val rootFocus = remember { FocusRequester() }
 
     var currentChannelId by remember { mutableIntStateOf(channelId) }
     var currentServiceId by remember { mutableIntStateOf(serviceId) }
@@ -210,6 +252,7 @@ fun VideoPlayerScreen(
     val timeshiftReconnectLiveText = stringResource(R.string.timeshift_reconnect_live)
     val timeshiftSeekClampedText = stringResource(R.string.timeshift_seek_clamped)
     val player = remember { videoPlayerViewModel.getPlayerInstance(ctx) }
+    val playerPlaybackProgressing = rememberPlayerPlaybackProgressing(player)
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
     LaunchedEffect(settings.aspectRatio) {
@@ -271,31 +314,123 @@ fun VideoPlayerScreen(
         controlsVisible = false
     }
 
+    fun openInfo() {
+        recordingDialogVisible = false
+        restoreInfoFocus = false
+        restoreRecordFocus = false
+        infoOpen = true
+        hideControls()
+    }
+
+    fun dismissRecordingDialog() {
+        infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
+        recordingDialogVisible = false
+        restoreRecordFocus = true
+    }
+
+    fun closeInfo() {
+        infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
+        recordingDialogVisible = false
+        restoreRecordFocus = false
+        infoOpen = false
+        showControls()
+        restoreInfoFocus = true
+    }
+
+    fun openChannelDrawer() {
+        selectedId = browsingFocusChannelId(
+            visibleChannels = channels,
+            currentFocusId = currentChannelId,
+        ) ?: -1
+        hideControls()
+        drawerOpen = true
+    }
+
     fun queueTimeshiftSeek(deltaMs: Long) {
-        pendingTimeshiftSeekMs = coalesceTimeshiftSeekDelta(
+        timeshiftSeekQueue = enqueueTimeshiftSeek(
+            queue = timeshiftSeekQueue,
             state = effectiveTimeshiftState,
-            pendingDeltaMs = pendingTimeshiftSeekMs,
             requestedDeltaMs = deltaMs,
         )
-        timeshiftSeekJob?.cancel()
+        timeshiftSeekToken++
+        val token = timeshiftSeekToken
+        timeshiftSeekQueuedAtMs = SystemClock.uptimeMillis()
+        timeshiftSeekPreview = LiveTimeshiftSeekPreview(
+            token = token,
+            decision = queuedTimeshiftSeekDecision(timeshiftSeekQueue),
+            dispatched = false,
+        )
+        timeshiftSeekFeedbackJob?.cancel()
+        timeshiftSeekFeedbackJob = null
+        if (timeshiftSeekJob?.isActive == true) return
         timeshiftSeekJob = scope.launch {
-            delay(TIMESHIFT_SEEK_DEBOUNCE_MS)
-            val coalescedDeltaMs = pendingTimeshiftSeekMs
-            pendingTimeshiftSeekMs = 0L
-            val decision = videoPlayerViewModel.seekTimeshift(coalescedDeltaMs)
-            timeshiftFeedback = if (decision?.clamped == true) {
-                timeshiftSeekClampedText
-            } else if (decision == null) {
-                timeshiftUnavailableText
-            } else {
-                null
+            try {
+                while (true) {
+                    val debounceRemainingMs = (
+                        timeshiftSeekQueuedAtMs + TIMESHIFT_SEEK_DEBOUNCE_MS -
+                            SystemClock.uptimeMillis()
+                        ).coerceAtLeast(0L)
+                    if (debounceRemainingMs > 0L) delay(debounceRemainingMs)
+
+                    val dispatch = beginTimeshiftSeekDispatch(timeshiftSeekQueue)
+                    if (dispatch == null) {
+                        timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
+                        if (timeshiftSeekPreview?.dispatched == false) {
+                            timeshiftSeekPreview = null
+                        }
+                        break
+                    }
+                    timeshiftSeekQueue = dispatch.queue
+                    val dispatchToken = timeshiftSeekPreview?.token ?: timeshiftSeekToken
+                    timeshiftSeekPreview = timeshiftSeekPreview
+                        ?.takeIf { it.token == dispatchToken }
+                        ?.copy(dispatched = true)
+
+                    val decision = videoPlayerViewModel.seekTimeshift(dispatch.deltaMs)
+                    timeshiftSeekQueue = completeTimeshiftSeekDispatch(
+                        timeshiftSeekQueue,
+                        decision,
+                    )
+                    val previewIsCurrent = timeshiftSeekPreview?.token == dispatchToken
+                    if (decision != null && previewIsCurrent) {
+                        timeshiftSeekPreview = timeshiftSeekPreview?.copy(decision = decision)
+                    }
+                    if (previewIsCurrent) {
+                        timeshiftFeedback = if (decision?.clamped == true) {
+                            timeshiftSeekClampedText
+                        } else if (decision == null) {
+                            timeshiftUnavailableText
+                        } else {
+                            null
+                        }
+                        timeshiftSeekFeedbackJob?.cancel()
+                        timeshiftSeekFeedbackJob = scope.launch {
+                            delay(TIMESHIFT_SEEK_FEEDBACK_MS)
+                            if (timeshiftSeekPreview?.token == dispatchToken) {
+                                timeshiftSeekPreview = null
+                            }
+                            timeshiftSeekFeedbackJob = null
+                        }
+                    }
+                }
+            } finally {
+                if (timeshiftSeekQueue.dispatchInFlight) {
+                    timeshiftSeekQueue = completeTimeshiftSeekDispatch(
+                        timeshiftSeekQueue,
+                        decision = null,
+                    )
+                }
+                timeshiftSeekJob = null
             }
         }
     }
 
     fun tuneChannel(channel: ChannelUi): Boolean {
-        timeshiftSeekJob?.cancel()
-        pendingTimeshiftSeekMs = 0L
+        timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
+        timeshiftSeekToken++
+        timeshiftSeekFeedbackJob?.cancel()
+        timeshiftSeekFeedbackJob = null
+        timeshiftSeekPreview = null
         channelNumberInput = ""
         selection.setSelected(channel.id)
         selectedId = channel.id
@@ -352,12 +487,6 @@ fun VideoPlayerScreen(
         tuneEnteredChannel()
     }
 
-    LaunchedEffect(controlsVisible, interactionToken, optionsPage) {
-        if (!controlsVisible || optionsPage != null) return@LaunchedEffect
-        delay(autoHideMs)
-        hideControls()
-    }
-
     val epg by videoPlayerViewModel.epgForChannel(currentChannelId).collectAsStateWithLifecycle()
 
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
@@ -383,26 +512,168 @@ fun VideoPlayerScreen(
     val currentRecording = remember(dvrEntries, nowEvent?.eventId) {
         nowEvent?.let { event -> dvrEntries.firstOrNull { it.eventId == event.eventId } }
     }
+    val currentRecordingTarget = nowEvent?.programmeRecordingTarget()
+    val optimisticRecordingTarget = when (val state = infoRecordingState) {
+        is LiveInfoRecordingState.Dispatching -> state.target
+        is LiveInfoRecordingState.Succeeded -> state.target
+        LiveInfoRecordingState.Idle,
+        is LiveInfoRecordingState.Confirming,
+        is LiveInfoRecordingState.Failed -> null
+    }
+    val optimisticRecordingMatchesCurrent = optimisticRecordingTarget != null &&
+        optimisticRecordingTarget == currentRecordingTarget
+    val infoRecordingScheduled = currentRecording != null || optimisticRecordingMatchesCurrent
+    val canRecordFromInfo = !simpleTvProfile.active &&
+        canModifyRecordings &&
+        infoRecordingState !is LiveInfoRecordingState.Dispatching &&
+        !(infoRecordingState is LiveInfoRecordingState.Succeeded &&
+            optimisticRecordingMatchesCurrent)
+    val recordActionEligible = !infoRecordingScheduled && canRecordFromInfo
+    val currentSubscriptionFailure = subscriptionFailure
     val statusPresentation = playbackStatusPresentation(
         connectionAvailable = connState is ConnectionState.Connected,
         playbackStarting = playbackState is PlaybackSessionState.Starting,
         playbackRecovering = playbackState is PlaybackSessionState.Recovering,
         playbackPlaying = playbackState is PlaybackSessionState.Playing,
+        playbackFailed = playbackState is PlaybackSessionState.Failed ||
+            currentSubscriptionFailure != null,
     )
     val recoveryVisible = screenActive &&
         statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
+    val recoveryUiModel = playbackRecoveryUiModel(
+        surface = PlaybackRecoverySurface.LIVE,
+        connectionAvailable = connState is ConnectionState.Connected,
+        retryTargetAvailable = playbackState is PlaybackSessionState.Recovering ||
+            currentSubscriptionFailure != null,
+        simpleTvActive = simpleTvProfile.active,
+    )
+    val recoveryHasRetry = recoveryUiModel.retryCommand != PlaybackRetryCommand.NONE
+    val recoverySafeActionIsExit =
+        recoveryUiModel.secondaryAction == PlaybackRecoverySecondaryAction.EXIT_SIMPLE_TV
+    val confirmationVisible = infoOpen &&
+        recordingDialogVisible &&
+        infoRecordingState !is LiveInfoRecordingState.Idle
+    val infoVisible = infoOpen && !confirmationVisible
+    val showDrawer = drawerOpen && !controlsVisible && !infoOpen
+    val seekPreviewPhase = when {
+        controlsVisible || timeshiftSeekPreview == null -> PlayerSeekPreviewPhase.NONE
+        requireNotNull(timeshiftSeekPreview).dispatched -> PlayerSeekPreviewPhase.DISPATCHED
+        else -> PlayerSeekPreviewPhase.PENDING
+    }
+    val foregroundLayer = playerForegroundLayer(
+        PlayerForegroundContext(
+            confirmationVisible = confirmationVisible,
+            infoVisible = infoVisible,
+            optionsPage = optionsPage,
+            numberEntryVisible = channelNumberInput.isNotEmpty(),
+            channelDrawerVisible = showDrawer,
+            recoveryVisible = recoveryVisible,
+            terminalErrorVisible = false,
+            seekPreviewPhase = seekPreviewPhase,
+            controlsVisible = controlsVisible,
+            statsEnabled = statsVisible,
+        )
+    )
+    val autoHideEligible = playerControlsAutoHideEligible(
+        PlayerAutoHideContext(
+            controlsVisible = controlsVisible,
+            playbackProgressing = playerPlaybackProgressing &&
+                !effectiveTimeshiftState.paused,
+            playbackStable = connState is ConnectionState.Connected &&
+                playbackState is PlaybackSessionState.Playing &&
+                statusPresentation == PlaybackStatusPresentation.NONE,
+            seekPending = timeshiftSeekQueue.pendingDeltaMs != 0L,
+            modalVisible = optionsPage != null ||
+                infoOpen ||
+                showDrawer ||
+                channelNumberInput.isNotEmpty(),
+            recoveryVisible = recoveryVisible,
+            actionableErrorVisible = connState is ConnectionState.Error ||
+                playbackState is PlaybackSessionState.Failed,
+        )
+    )
+    PlayerControlsAutoHideEffect(
+        eligible = autoHideEligible,
+        interactionToken = interactionToken,
+        timeoutMillis = autoHideMs,
+        onHide = ::hideControls,
+    )
+    PlayerRootFocusEffect(foregroundLayer, rootFocus)
     var compactTuningVisible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(screenActive, statusPresentation) {
-        compactTuningVisible = false
-        if (screenActive && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING) {
-            delay(500L)
-            compactTuningVisible = true
+    LaunchedEffect(screenActive, statusPresentation, compactTuningVisible) {
+        when (
+            compactTuningVisibilityAction(
+                screenActive = screenActive,
+                presentation = statusPresentation,
+                currentlyVisible = compactTuningVisible,
+            )
+        ) {
+            CompactTuningVisibilityAction.KEEP_HIDDEN -> Unit
+            CompactTuningVisibilityAction.SHOW_AFTER_DELAY -> {
+                delay(COMPACT_TUNING_DELAY_MS)
+                compactTuningVisible = true
+            }
+            CompactTuningVisibilityAction.KEEP_VISIBLE -> Unit
+            CompactTuningVisibilityAction.HIDE_AFTER_MINIMUM -> {
+                delay(COMPACT_TUNING_FADE_IN_MS + COMPACT_TUNING_MINIMUM_OPAQUE_MS)
+                compactTuningVisible = false
+            }
+            CompactTuningVisibilityAction.HIDE_IMMEDIATELY -> {
+                compactTuningVisible = false
+            }
         }
     }
 
-    LaunchedEffect(nowEvent?.eventId) {
-        infoDvrActionResult = null
+    LiveInfoRecordingValidityEffect(
+        state = infoRecordingState,
+        currentEvent = nowEvent,
+        actionEligible = recordActionEligible,
+        confirmationVisible = recordingDialogVisible,
+        onInvalidated = {
+            infoRecordingState = LiveInfoRecordingState.Idle
+            recordingDialogVisible = false
+            restoreRecordFocus = true
+        },
+    )
+
+    fun activateInfoRecording() {
+        when (
+            val decision = liveInfoRecordingDecision(
+                state = infoRecordingState,
+                currentEvent = nowEvent,
+                actionEligible = recordActionEligible,
+            )
+        ) {
+            is LiveInfoRecordingDecision.Dispatch -> {
+                infoRecordingState = LiveInfoRecordingState.Dispatching(decision.target)
+                scope.launch {
+                    val result = dvrRepository.scheduleEvent(decision.target.eventId)
+                    val completion = liveInfoRecordingCompletion(
+                        state = infoRecordingState,
+                        result = result,
+                        infoOpen = infoOpen,
+                    )
+                    infoRecordingState = completion.state
+                    if (completion.showResult) recordingDialogVisible = true
+                }
+            }
+            LiveInfoRecordingDecision.Invalidate -> {
+                infoRecordingState = LiveInfoRecordingState.Idle
+                recordingDialogVisible = false
+                restoreRecordFocus = true
+            }
+            LiveInfoRecordingDecision.Ignore -> Unit
+        }
+    }
+
+    fun dispatchRecoveryRetry() {
+        when (recoveryUiModel.retryCommand) {
+            PlaybackRetryCommand.RECONNECT -> onReconnect()
+            PlaybackRetryCommand.RETRY_LIVE -> videoPlayerViewModel.retryLiveNow()
+            PlaybackRetryCommand.RESUME_RECORDING,
+            PlaybackRetryCommand.NONE -> Unit
+        }
     }
 
     LaunchedEffect(controlsVisible) {
@@ -434,7 +705,9 @@ fun VideoPlayerScreen(
                     connectionLost = true
                     restoreToLiveAfterReconnect =
                         effectiveTimeshiftState.available &&
-                            effectiveTimeshiftState.positionMs < -1_000L
+                            !timeshiftPositionPresentation(
+                                effectiveTimeshiftState
+                            ).atLiveEdge
                     showControls()
                     videoPlayerViewModel.stop()
                     lastPlayedServiceId = -1
@@ -443,69 +716,50 @@ fun VideoPlayerScreen(
         }
     }
 
-    val handlePlaybackBack: () -> Unit = playbackBack@{
-        if (recoveryVisible) {
-            val recoveryBackAction = playerKeyAction(
-                PlayerKeyContext(
-                    surface = PlayerSurface.LIVE,
-                    controlsVisible = false,
-                    seekbarFocused = false,
-                    timeshiftAvailable = effectiveTimeshiftState.available,
-                    simpleTvActive = simpleTvProfile.active,
-                ),
-                keyCode = AndroidKeyEvent.KEYCODE_BACK,
+    val handlePlaybackBack: () -> Unit = {
+        when (
+            playerBackAction(
+                surface = PlayerSurface.LIVE,
+                simpleTvActive = simpleTvProfile.active,
+                foregroundLayer = foregroundLayer,
             )
-            if (recoveryBackAction == PlayerKeyAction.CLOSE_PLAYER) onClose()
-            return@playbackBack
-        }
-        when (playbackAuxiliaryBackAction(optionsPage, statsVisible, infoOpen)) {
-            PlaybackAuxiliaryBackAction.CLOSE_INFO -> infoOpen = false
-            PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT -> {
-                optionsPage = PlaybackOptionsPage.ROOT
-            }
-            PlaybackAuxiliaryBackAction.CLOSE_OPTIONS -> {
+        ) {
+            PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
+            PlayerBackAction.CLOSE_INFO -> closeInfo()
+            PlayerBackAction.RETURN_TO_OPTIONS_ROOT -> optionsPage = PlaybackOptionsPage.ROOT
+            PlayerBackAction.CLOSE_OPTIONS -> {
                 optionsPage = null
+                restoreOptionsFocus = true
                 interactionToken++
             }
-            PlaybackAuxiliaryBackAction.HIDE_STATS -> statsVisible = false
-            PlaybackAuxiliaryBackAction.PASS_THROUGH -> when {
-                channelNumberInput.isNotEmpty() -> channelNumberInput = ""
-                showDrawer -> drawerOpen = false
-                else -> when (
-                    playerKeyAction(
-                        PlayerKeyContext(
-                            surface = PlayerSurface.LIVE,
-                            controlsVisible = controlsVisible,
-                            seekbarFocused = false,
-                            timeshiftAvailable = effectiveTimeshiftState.available,
-                            simpleTvActive = simpleTvProfile.active,
-                            optionsOpen = false,
-                            statsOpen = false,
-                            infoOpen = false,
-                            drawerOpen = false,
-                        ),
-                        keyCode = AndroidKeyEvent.KEYCODE_BACK,
-                    )
-                ) {
-                    PlayerKeyAction.HIDE_CONTROLS -> hideControls()
-                    PlayerKeyAction.CLOSE_PLAYER -> onClose()
-                    else -> Unit
-                }
+            PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
+            PlayerBackAction.CLOSE_CHANNEL_DRAWER -> drawerOpen = false
+            PlayerBackAction.CLOSE_PLAYER -> onClose()
+            PlayerBackAction.CANCEL_PENDING_SEEK -> {
+                timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
+                timeshiftSeekToken++
+                timeshiftSeekFeedbackJob?.cancel()
+                timeshiftSeekFeedbackJob = null
+                timeshiftSeekPreview = null
             }
+            PlayerBackAction.DISMISS_SEEK_FEEDBACK -> {
+                timeshiftSeekFeedbackJob?.cancel()
+                timeshiftSeekFeedbackJob = null
+                timeshiftSeekPreview = null
+            }
+            PlayerBackAction.HIDE_CONTROLS -> hideControls()
+            PlayerBackAction.HIDE_STATS -> statsVisible = false
+            PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
         }
     }
-    BackHandler(onBack = handlePlaybackBack)
+    val dispatchBack = rememberPlayerBackDispatcher(handlePlaybackBack)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .focusable()
             .onPreviewKeyEvent { event ->
+                if (dispatchBack(event)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
-                if (event.key == Key.Back) {
-                    if (event.type == KeyEventType.KeyUp) handlePlaybackBack()
-                    return@onPreviewKeyEvent true
-                }
                 if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
                     return@onPreviewKeyEvent true
@@ -592,12 +846,6 @@ fun VideoPlayerScreen(
                         Key.Enter,
                         Key.NumPadEnter,
                         Key.DirectionCenter -> tuneEnteredChannel()
-
-                        Key.Back -> {
-                            channelNumberInput = ""
-                            true
-                        }
-
                         else -> false
                     }
                 }
@@ -608,10 +856,6 @@ fun VideoPlayerScreen(
                     // Back (or a pick) closes there.
                     val largeCardDrawer = simpleTvProfile.active
                     return@onPreviewKeyEvent when (event.key) {
-                        Key.Back -> {
-                            drawerOpen = false
-                            true
-                        }
                         Key.DirectionRight -> {
                             if (largeCardDrawer) {
                                 false
@@ -638,24 +882,25 @@ fun VideoPlayerScreen(
                     ),
                     keyCode = keyCode,
                 )
+                if (playerKeyActionStartsOpeningCycle(keyAction)) {
+                    revealingKeyCode = keyCode
+                }
                 when (keyAction) {
                     PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
                         when {
                             infoOpen -> {
-                                infoOpen = false
+                                closeInfo()
                                 return@onPreviewKeyEvent true
                             }
                             else -> return@onPreviewKeyEvent true
                         }
                     }
                     PlayerKeyAction.REVEAL_CONTROLS -> {
-                        revealingKeyCode = keyCode
                         infoOpen = false
                         showControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
-                        revealingKeyCode = keyCode
                         if (effectiveTimeshiftState.paused || !player.playWhenReady) {
                             player.play()
                             scope.launch { videoPlayerViewModel.resumeTimeshift() }
@@ -671,16 +916,11 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_CHANNELS -> {
-                        selectedId = browsingFocusChannelId(
-                            visibleChannels = channels,
-                            currentFocusId = currentChannelId,
-                        ) ?: -1
-                        drawerOpen = true
+                        openChannelDrawer()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_INFO -> {
-                        infoOpen = true
-                        hideControls()
+                        openInfo()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SEEK_BACK -> {
@@ -703,9 +943,12 @@ fun VideoPlayerScreen(
                 }
                 false
             }
+            .focusRequester(rootFocus)
+            .playerRootSemantics(stringResource(R.string.player_live_tv_surface))
+            .focusable()
     ) {
         AnimatedVisibility(
-            visible = showDrawer,
+            visible = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
             enter = slideInHorizontally(tween(180)) { -it },
             exit = slideOutHorizontally(tween(180)) { -it },
             modifier = Modifier
@@ -728,10 +971,9 @@ fun VideoPlayerScreen(
             )
         }
 
-        AnimatedVisibility(
-            visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+        PlayerControlsLayer(
+            visible = foregroundLayer == PlayerForegroundLayer.CONTROLS,
+            modalVisible = optionsPage != null || infoOpen,
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             OverlayControlsTv(
@@ -745,16 +987,10 @@ fun VideoPlayerScreen(
                 controlsVisible = controlsVisible,
                 optionsOpen = optionsPage != null,
                 onOpenChannels = {
-                    selectedId = browsingFocusChannelId(
-                        visibleChannels = channels,
-                        currentFocusId = currentChannelId,
-                    ) ?: -1
-                    hideControls()
-                    drawerOpen = true
+                    openChannelDrawer()
                 },
                 onOpenInfo = {
-                    infoOpen = true
-                    hideControls()
+                    openInfo()
                 },
                 onStopPlayback = {
                     scope.launch {
@@ -766,6 +1002,7 @@ fun VideoPlayerScreen(
                 },
                 onUserInteraction = { interactionToken++ },
                 onOpenOptions = {
+                    restoreOptionsFocus = false
                     optionsPage = PlaybackOptionsPage.ROOT
                     controlsVisible = true
                 },
@@ -792,25 +1029,7 @@ fun VideoPlayerScreen(
                     }
                 },
                 onSeekTimeshift = { deltaMs ->
-                    pendingTimeshiftSeekMs = coalesceTimeshiftSeekDelta(
-                        state = effectiveTimeshiftState,
-                        pendingDeltaMs = pendingTimeshiftSeekMs,
-                        requestedDeltaMs = deltaMs,
-                    )
-                    timeshiftSeekJob?.cancel()
-                    timeshiftSeekJob = scope.launch {
-                        delay(TIMESHIFT_SEEK_DEBOUNCE_MS)
-                        val coalescedDeltaMs = pendingTimeshiftSeekMs
-                        pendingTimeshiftSeekMs = 0L
-                        val decision = videoPlayerViewModel.seekTimeshift(coalescedDeltaMs)
-                        timeshiftFeedback = if (decision?.clamped == true) {
-                            timeshiftSeekClampedText
-                        } else if (decision == null) {
-                            timeshiftUnavailableText
-                        } else {
-                            null
-                        }
-                    }
+                    queueTimeshiftSeek(deltaMs)
                 },
                 onGoLive = {
                     scope.launch {
@@ -824,129 +1043,67 @@ fun VideoPlayerScreen(
                     }
                 },
                 showStop = simpleTvProfile.allows(SimpleTvCapability.STOP),
+                restoreInfoFocus = restoreInfoFocus,
+                onInfoFocusRestored = { restoreInfoFocus = false },
+                restoreOptionsFocus = restoreOptionsFocus,
+                onOptionsFocusRestored = { restoreOptionsFocus = false },
             )
         }
 
-        if (infoOpen && nowEvent != null) {
-            val infoFocus = remember { FocusRequester() }
-            LaunchedEffect(infoOpen, nowEvent.eventId) {
-                runCatching { infoFocus.requestFocus() }
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.72f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.68f),
-                ) {
-                    Surface(
-                        shape = MaterialTheme.shapes.large,
-                        colors = SurfaceDefaults.colors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(28.dp),
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            PiconBox(
-                                imageLoader = imageLoader,
-                                piconPath = currentChannel?.icon,
-                                modifier = Modifier.width(96.dp).height(54.dp),
-                            )
-                            at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails(
-                                event = nowEvent,
-                                subtitle = buildString {
-                                    append(currentChannelName)
-                                    append(" • ")
-                                    append(
-                                        at.bernhardberger.tvhplayer.ui.common.formatClock(
-                                            nowEvent.start,
-                                        )
-                                    )
-                                    append("–")
-                                    append(
-                                        at.bernhardberger.tvhplayer.ui.common.formatClock(
-                                            nowEvent.stop,
-                                        )
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(max = 420.dp),
-                                footer = {
-                                    currentRecording?.let {
-                                        Text(
-                                            text = stringResource(R.string.recording_already_scheduled),
-                                            color = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                    infoDvrActionResult?.let {
-                                        Text(
-                                            text = infoDvrActionResultLabel(it),
-                                            color = if (it is DvrActionResult.Failed) {
-                                                MaterialTheme.colorScheme.error
-                                            } else {
-                                                MaterialTheme.colorScheme.primary
-                                            },
-                                        )
-                                    }
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(
-                                            10.dp,
-                                            Alignment.End,
-                                        ),
-                                    ) {
-                                        if (
-                                            currentRecording == null &&
-                                            !simpleTvProfile.active &&
-                                            canModifyRecordings
-                                        ) {
-                                            Button(
-                                                onClick = {
-                                                    scope.launch {
-                                                        infoDvrActionResult =
-                                                            dvrRepository.scheduleEvent(
-                                                                nowEvent.eventId,
-                                                            )
-                                                    }
-                                                },
-                                            ) {
-                                                Text(stringResource(R.string.record))
-                                            }
-                                        }
-                                        OutlinedButton(
-                                            onClick = { infoOpen = false },
-                                            modifier = Modifier.focusRequester(infoFocus),
-                                        ) {
-                                            Text(stringResource(R.string.player_info_close))
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-        } else if (infoOpen && nowEvent == null) {
-            // No EPG: close immediately rather than trapping the user.
-            LaunchedEffect(Unit) { infoOpen = false }
+        if (
+            foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
+            foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
+        ) {
+            TimeshiftSeekPreview(
+                state = effectiveTimeshiftState,
+                decision = requireNotNull(timeshiftSeekPreview).decision,
+                nowEpochSec = nowSec,
+                programmeStartSec = nowEvent?.start,
+                programmeStopSec = nowEvent?.stop,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
 
         if (
-            statsVisible &&
-            !controlsVisible &&
-            optionsPage == null &&
-            channelNumberInput.isEmpty() &&
-            !showDrawer &&
-            !infoOpen
+            infoOpen &&
+            (foregroundLayer == PlayerForegroundLayer.INFO ||
+                foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
         ) {
+            LiveProgrammeInfoOverlay(
+                event = nowEvent,
+                channelIdentity = buildString {
+                    currentChannelNumber?.let { number -> append("$number • ") }
+                    append(currentChannelName)
+                },
+                channelName = currentChannelName,
+                recordingScheduled = infoRecordingScheduled,
+                canRecord = recordActionEligible,
+                recordingState = infoRecordingState,
+                confirmationVisible = confirmationVisible,
+                restoreRecordFocus = restoreRecordFocus,
+                onRecord = {
+                    val event = nowEvent ?: return@LiveProgrammeInfoOverlay
+                    infoRecordingState = LiveInfoRecordingState.Confirming(
+                        event.programmeRecordingTarget()
+                    )
+                    recordingDialogVisible = true
+                    restoreRecordFocus = false
+                },
+                onRecordingActivate = ::activateInfoRecording,
+                onRecordingDismiss = ::dismissRecordingDialog,
+                onClose = ::closeInfo,
+                piconContent = {
+                    PiconBox(
+                        imageLoader = imageLoader,
+                        piconPath = currentChannel?.icon,
+                        modifier = Modifier.width(96.dp).height(54.dp),
+                    )
+                },
+                onRecordFocusRestored = { restoreRecordFocus = false },
+            )
+        }
+
+        if (foregroundLayer == PlayerForegroundLayer.STATS) {
             PlaybackStatsOverlay(
                 diagnostics = diagnostics,
                 aspectRatio = aspectRatio,
@@ -961,6 +1118,9 @@ fun VideoPlayerScreen(
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
+                tracksResolving =
+                    playbackState is PlaybackSessionState.Starting ||
+                        playbackState is PlaybackSessionState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
                 showSimpleTvExit = simpleTvProfile.active,
@@ -973,13 +1133,14 @@ fun VideoPlayerScreen(
                 onStatsVisibleChange = { statsVisible = it },
                 onSimpleTvExit = {
                     optionsPage = null
+                    restoreOptionsFocus = true
                     onUnlock()
                 },
             )
         }
 
         AnimatedVisibility(
-            visible = channelNumberInput.isNotEmpty(),
+            visible = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -1002,80 +1163,69 @@ fun VideoPlayerScreen(
             }
         }
 
-        AnimatedVisibility(
+        CompactTuningStatus(
             visible = compactTuningVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            label = stringResource(R.string.player_tuning_channel, currentChannelName),
             modifier = Modifier
                 .align(Alignment.Center)
+                .padding(horizontal = 56.dp)
                 .testTag("player-tuning-status"),
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    modifier = Modifier.size(32.dp),
-                )
-                Text(
-                    text = stringResource(R.string.player_tuning_channel, currentChannelName),
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        shadow = Shadow(color = Color.Black, blurRadius = 12f),
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        )
 
         TvRecoveryOverlay(
-            visible = recoveryVisible,
+            visible = foregroundLayer == PlayerForegroundLayer.RECOVERY,
             message = stringResource(
                 when {
+                    currentSubscriptionFailure != null ->
+                        subscriptionFailureMessageResource(currentSubscriptionFailure)
                     simpleTvProfile.active && connState !is ConnectionState.Connected ->
                         R.string.simple_tv_recovery_connection
                     simpleTvProfile.active -> R.string.simple_tv_recovery_playback
                     connState !is ConnectionState.Connected -> R.string.player_connection_recovering
+                    playbackState is PlaybackSessionState.Failed -> R.string.player_playback_failed
                     else -> R.string.player_playback_recovering
                 }
             ),
             hint = if (simpleTvProfile.active) {
-                stringResource(R.string.simple_tv_recovery_hint)
+                stringResource(
+                    if (recoveryHasRetry) {
+                        R.string.simple_tv_recovery_hint
+                    } else {
+                        R.string.simple_tv_recovery_exit_hint
+                    }
+                )
             } else {
                 null
             },
             opaque = simpleTvProfile.active,
-            retryLabel = if (simpleTvProfile.active) {
+            primaryActionLabel = if (recoveryHasRetry) {
                 stringResource(R.string.retry)
+            } else {
+                stringResource(
+                    if (recoverySafeActionIsExit) R.string.simple_tv_unlock else R.string.close
+                )
+            },
+            onPrimaryAction = if (recoveryHasRetry) {
+                ::dispatchRecoveryRetry
+            } else if (recoverySafeActionIsExit) {
+                onUnlock
+            } else {
+                onClose
+            },
+            secondaryActionLabel = if (recoveryHasRetry) {
+                stringResource(
+                    if (recoverySafeActionIsExit) R.string.simple_tv_unlock else R.string.close
+                )
             } else {
                 null
             },
-            onRetry = if (simpleTvProfile.active) {
-                {
-                    scope.launch {
-                        // Retry through the existing serialized playback owner.
-                        videoPlayerViewModel.playService(ctx, currentServiceId)
-                    }
-                }
-            } else {
+            onSecondaryAction = if (!recoveryHasRetry) {
                 null
+            } else if (recoverySafeActionIsExit) {
+                onUnlock
+            } else {
+                onClose
             },
         )
     }
 }
-
-@Composable
-private fun infoDvrActionResultLabel(result: DvrActionResult): String = stringResource(
-    when (result) {
-        is DvrActionResult.Accepted -> R.string.recording_action_accepted
-        is DvrActionResult.Failed -> when (result.reason) {
-            DvrActionFailure.PERMISSION_DENIED -> R.string.recording_action_permission
-            DvrActionFailure.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
-            DvrActionFailure.CONFLICT -> R.string.recording_action_conflict
-            DvrActionFailure.REJECTED -> R.string.recording_action_rejected
-            DvrActionFailure.CONNECTION -> R.string.recording_action_connection
-        }
-    },
-)

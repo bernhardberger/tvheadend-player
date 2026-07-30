@@ -75,6 +75,19 @@ fun playbackSuppressesRevealingKey(
     keyCode: Int,
 ): Boolean = revealingKeyCode == keyCode
 
+fun playerKeyActionStartsOpeningCycle(action: PlayerKeyAction): Boolean = when (action) {
+    PlayerKeyAction.REVEAL_CONTROLS,
+    PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+    PlayerKeyAction.OPEN_CHANNELS,
+    PlayerKeyAction.OPEN_INFO -> true
+    PlayerKeyAction.PASS_THROUGH,
+    PlayerKeyAction.HIDE_CONTROLS,
+    PlayerKeyAction.SEEK_BACK,
+    PlayerKeyAction.SEEK_FORWARD,
+    PlayerKeyAction.CLOSE_PLAYER,
+    PlayerKeyAction.DISMISS_OVERLAY_ONLY -> false
+}
+
 fun playerParentConsumesRecoveryKey(keyCode: Int): Boolean = when (keyCode) {
     KeyEvent.KEYCODE_DPAD_CENTER,
     KeyEvent.KEYCODE_ENTER,

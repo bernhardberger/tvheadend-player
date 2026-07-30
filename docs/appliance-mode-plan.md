@@ -90,16 +90,23 @@ take precedence over completed-work narrative.
 - Support app-specific German and English selection and persist the
   operator preference for showing the main EPG menu.
 - Retry interrupted playback through the serialized player command gate with
-  bounded 1/2/5/10/30-second backoff and visible, Back-cancellable recovery UI.
+  bounded 1/2/5/10/30-second backoff and visible recovery UI. Normal-mode Back
+  leaves the player route for warm browse without implying cancellation of an
+  automatic or in-flight retry. Simple TV Back remains in recovery; that surface
+  exposes Retry plus the existing PIN/confirmation-protected Exit Simple TV flow
+  so the restricted session has no in-app navigation trap.
 - Treat ordinary channel tuning as a non-blocking transition: preserve the video
   surface and remote input, and show only delayed compact feedback when tuning is
   slow. Reserve the full-screen recovery scrim for connection loss or actual
   playback recovery, not every non-playing state.
 - Give recording playback the same auto-hiding cinematic control language as
-  live TV, with recording metadata, a progress bar, icon-based transport and
-  focus restoration. Hidden controls use Kodi-style direct
-  seeks: Left/Right move 30 seconds and Down/Up move 10 minutes; visible controls
-  retain normal D-pad focus navigation. Accumulate rapid fixed-step inputs and
+  live TV, with recording metadata, icon-based transport and focus restoration.
+  Use a finite elapsed/total seekbar only for a known real seekable duration;
+  growing or otherwise unknown durations show explicit non-finite status and do
+  not expose a fabricated total, normalized range, or focusable seekbar. Hidden
+  controls use horizontal repeat-accelerated direct
+  seeks; Up/Down reveals controls without seeking, and visible controls retain
+  normal D-pad focus navigation. Accumulate rapid fixed-step inputs and
   dispatch one seek after a short debounce, keeping feedback visible while the
   player buffers and briefly after playback resumes. Back hides visible controls
   before a subsequent Back returns to the recordings library while playback
@@ -128,7 +135,8 @@ take precedence over completed-work narrative.
   replace it with category choices after selection, show current values in the
   root rows and detail header, and keep Exit Simple TV as a secondary
   owner action with the existing PIN and confirmation flow. Back closes the
-  detail, overlay, then stats, before player Back. Player controls use recognizable icons
+  detail and overlay, then hides Stats only when Stats is actually rendered,
+  before player Back. Player controls use recognizable icons
   and accessible descriptions without a dedicated visible label row. Keep Stop
   directly reachable at the terminal end, separated from the ordinary utility
   actions.
@@ -145,8 +153,12 @@ take precedence over completed-work narrative.
   multi-column overlay to remain inside the TV safe area as optional sections
   appear. Diagnostic snapshots contain no server, path, credential, identifier,
   raw-error, or log fields.
-- Consume OK and D-pad Down when they reveal hidden playback controls so the same
-  key event cannot activate a newly focused control. Treat selection of the
+- Consume the complete acting/revealing cycle for Center, Enter, Numpad Enter,
+  D-pad Up/Down, Info, TV Contents Menu, TV Number Entry, Bookmark, and hidden
+  non-seekable Live Left so one press cannot act twice or continue into a newly
+  focused surface. Center toggles Play/Pause while revealing seekable playback;
+  Up/Down only reveals. Seekable Left/Right repeats remain deliberate seek input.
+  Treat selection of the
   current playback channel as a drawer-close action rather than a tune request.
 - Keep the active service warm while Back exposes the foreground Channel List.
   A same-service player request is idempotent, while `MainActivity.onStop` remains
@@ -408,7 +420,9 @@ Simple TV mode is an app-level, player-only session profile:
   last valid channel. **Start Simple TV now** performs the same entry explicitly.
 - While active, retain fullscreen live TV, channel keys, number entry, the player
   channel drawer, and optionally timeshift. Do not expose the Channel List, EPG,
-  recordings, Settings, Stop, or app-exit navigation.
+  recordings, Settings, Stop, or app-exit navigation. Recording browse and player
+  routes are gated out; entering the mode from a recording context closes that
+  route through its normal serialized playback owner before starting Live TV.
 - Back dismisses player overlays but cannot leave fullscreen playback. HOME
   remains normal Android behavior; this is not lock-task or device-owner kiosk
   mode.

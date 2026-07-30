@@ -22,6 +22,7 @@ internal class HtspSubscriptionExtractor : Extractor {
 
     private lateinit var mOutput: ExtractorOutput
     private val mStreamReaders = SparseArray<StreamReader>()
+    private val videoStreamIndices = mutableSetOf<Int>()
 
     // raw read chunk
     private val mRawBytes = ByteArray(1024 * 1024)
@@ -29,6 +30,20 @@ internal class HtspSubscriptionExtractor : Extractor {
     // framed stream state
     private val acc = ByteAccumulator(256 * 1024)
     private var headerConsumed = false
+    private val timeshiftPtsRebaser = TimeshiftPtsRebaser { event ->
+        when (event) {
+            is TimeshiftPtsRebaseEvent.GateOpened -> Timber.i(
+                "Timeshift timestamp gate opened (fallback=%s, dropped=%d, offsetUs=%d)",
+                event.usedFallback,
+                event.droppedPackets,
+                event.offsetUs,
+            )
+            is TimeshiftPtsRebaseEvent.PacketDroppedBelowFloor -> Timber.d(
+                "Dropped post-seek packet below timestamp floor (count=%d)",
+                event.droppedPackets,
+            )
+        }
+    }
 
     private class HtspSeekMap : SeekMap {
         override fun isSeekable(): Boolean = true
@@ -109,20 +124,33 @@ internal class HtspSubscriptionExtractor : Extractor {
         acc.clear()
         headerConsumed = false
         mStreamReaders.clear()
+        videoStreamIndices.clear()
+        timeshiftPtsRebaser.reset()
     }
 
     override fun release() {
         Timber.i("Releasing HTSP Extractor")
         mStreamReaders.clear()
+        videoStreamIndices.clear()
         acc.clear()
         headerConsumed = false
+        timeshiftPtsRebaser.reset()
     }
 
     // Internal Methods
     private fun handleMessage(message: HtspMessage) {
         when (message.method) {
             "subscriptionStart" -> handleSubscriptionStart(message)
-            "muxpkt" -> handleMuxpkt(message)
+            TIMESHIFT_DISCONTINUITY_METHOD -> timeshiftPtsRebaser.markDiscontinuity(
+                waitForVideoKeyframe = videoStreamIndices.isNotEmpty()
+            )
+            "muxpkt" -> {
+                val streamIndex = message.int("stream")
+                timeshiftPtsRebaser.rebaseMuxPacket(
+                    message = message,
+                    isVideo = streamIndex in videoStreamIndices,
+                )?.let(::handleMuxpkt)
+            }
         }
     }
 
@@ -139,11 +167,16 @@ internal class HtspSubscriptionExtractor : Extractor {
     private fun handleSubscriptionStart(message: HtspMessage) {
         Timber.d("Handling Subscription Start")
         val streamReadersFactory = StreamReadersFactory()
+        videoStreamIndices.clear()
 
         for (obj in message.list("streams") ?: emptyList()) {
             val stream = mapToHtspMessage(obj!!)
             val streamIndex = stream.int("index")
             val streamType = stream.str("type")
+
+            if (streamIndex != null && streamType in VIDEO_STREAM_TYPES) {
+                videoStreamIndices += streamIndex
+            }
 
             val streamReader = streamReadersFactory.createStreamReader(streamType!!)
             if (streamReader != null) {
@@ -163,6 +196,10 @@ internal class HtspSubscriptionExtractor : Extractor {
         val streamIdx = message.int("stream") ?: return
         val streamReader = mStreamReaders.get(streamIdx) ?: return
         streamReader.consume(message)
+    }
+
+    private companion object {
+        val VIDEO_STREAM_TYPES = setOf("H264", "HEVC", "MPEG2VIDEO")
     }
 
     // ---------- Helpers ----------

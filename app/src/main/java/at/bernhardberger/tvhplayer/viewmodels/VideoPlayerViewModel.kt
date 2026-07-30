@@ -14,6 +14,7 @@ class VideoPlayerViewModel(
     val connectionState = htspService.state
     val playbackState = playerSession.state
     val timeshiftState = playerSession.timeshiftState
+    val liveSubscriptionFailure = playerSession.liveSubscriptionFailure
     val diagnostics = playerSession.diagnostics
 
     fun getPlayerInstance(context: Context) =
@@ -26,6 +27,8 @@ class VideoPlayerViewModel(
     suspend fun stop() {
         playerSession.stop()
     }
+
+    fun retryLiveNow() = playerSession.requestRetryLiveNow()
 
     suspend fun pauseTimeshift() = playerSession.pauseTimeshift()
 

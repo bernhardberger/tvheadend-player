@@ -5,14 +5,69 @@ import at.bernhardberger.tvhplayer.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.RecordingWriteCapability
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
 import at.bernhardberger.tvhplayer.htsp.HtspService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class DvrRepositoryCapabilityTest {
+
+    @Test
+    fun supersededConfigRefreshCannotPublishOverNewConnectionAttempt() = runBlocking {
+        val requestStarted = CountDownLatch(1)
+        val releaseResponse = CountDownLatch(1)
+        val repository = repository { method, _ ->
+            if (method != "getDvrConfigs") error("unexpected $method")
+            requestStarted.countDown()
+            check(releaseResponse.await(1, TimeUnit.SECONDS))
+            message("dvrconfigs" to listOf(mapOf("uuid" to "old", "name" to "Old")))
+        }
+        repository.onNewConnectionStarting(preservePublished = false, attemptId = 1L)
+        val staleRefresh = launch(Dispatchers.Default) {
+            repository.refreshConfigs(attemptId = 1L)
+        }
+        assertTrue(requestStarted.await(1, TimeUnit.SECONDS))
+
+        repository.advanceConnectionAttempt(attemptId = 2L)
+        releaseResponse.countDown()
+        staleRefresh.join()
+
+        assertEquals(RecordingWriteCapability.Unknown, repository.writeCapability.value)
+        assertTrue(repository.configs.value.isEmpty())
+    }
+
+    @Test
+    fun staleAuthenticatedAccessCannotPublishOverNewConnectionAttempt() = runBlocking {
+        val repository = repository()
+        repository.onNewConnectionStarting(preservePublished = false, attemptId = 2L)
+
+        repository.applyAuthenticatedDvrAccess(dvrAccess = true, attemptId = 1L)
+
+        assertEquals(RecordingWriteCapability.Unknown, repository.writeCapability.value)
+        assertFalse(repository.canModifyRecordings.value)
+    }
+
+    @Test
+    fun writeActionPropagatesCoroutineCancellation() {
+        var cancellationPropagated = false
+
+        try {
+            runBlocking {
+                repository { _, _ -> throw CancellationException("cancelled") }
+                    .scheduleEvent(eventId = 42)
+            }
+        } catch (_: CancellationException) {
+            cancellationPropagated = true
+        }
+
+        assertTrue(cancellationPropagated)
+    }
 
     @Test
     fun startsUnknownAndHidesWriteActions() = runBlocking {

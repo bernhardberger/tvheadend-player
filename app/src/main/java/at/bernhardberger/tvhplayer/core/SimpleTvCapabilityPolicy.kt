@@ -25,6 +25,12 @@ enum class SimpleTvRoute {
     UNLOCK,
 }
 
+enum class SimpleTvRouteGuardAction {
+    ALLOW,
+    REDIRECT_TO_LIVE,
+    STOP_RECORDING_AND_REDIRECT_TO_LIVE,
+}
+
 /**
  * Simple TV remains a strict player-only mode.
  *
@@ -71,6 +77,16 @@ data class SimpleTvProfile(
 
 fun simpleTvProfile(settings: SimpleTvSettings, active: Boolean): SimpleTvProfile =
     SimpleTvProfile(settings, active)
+
+fun simpleTvRouteGuardAction(
+    profile: SimpleTvProfile,
+    route: SimpleTvRoute,
+    recordingActive: Boolean,
+): SimpleTvRouteGuardAction = when {
+    profile.allowsRoute(route) -> SimpleTvRouteGuardAction.ALLOW
+    recordingActive -> SimpleTvRouteGuardAction.STOP_RECORDING_AND_REDIRECT_TO_LIVE
+    else -> SimpleTvRouteGuardAction.REDIRECT_TO_LIVE
+}
 
 fun isValidSimpleTvPin(pin: String): Boolean = pin.length == 4 && pin.all(Char::isDigit)
 

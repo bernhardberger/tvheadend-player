@@ -225,6 +225,27 @@ class RecordingPlaybackPolicyTest {
     }
 
     @Test
+    fun recordingStartsCompleteCyclesForEveryFocusCreatingAction() {
+        listOf(
+            RecordingPlaybackKeyAction.REVEAL_CONTROLS,
+            RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+            RecordingPlaybackKeyAction.OPEN_INFO,
+        ).forEach { action ->
+            assertTrue(action.name, recordingKeyActionStartsOpeningCycle(action))
+        }
+
+        listOf(
+            RecordingPlaybackKeyAction.PASS_THROUGH,
+            RecordingPlaybackKeyAction.SEEK_BACK,
+            RecordingPlaybackKeyAction.SEEK_FORWARD,
+            RecordingPlaybackKeyAction.HIDE_CONTROLS,
+            RecordingPlaybackKeyAction.CLOSE,
+        ).forEach { action ->
+            assertEquals(false, recordingKeyActionStartsOpeningCycle(action))
+        }
+    }
+
+    @Test
     fun finishedRecordingAlwaysStopsAndOnlyClosesAVisiblePlayer() {
         assertEquals(
             RecordingFinishedAction.STOP_AND_CLOSE_PLAYER,

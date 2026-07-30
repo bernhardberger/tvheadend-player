@@ -11,12 +11,54 @@ enum class PlaybackOptionsPage {
     STATS,
 }
 
-enum class PlaybackAuxiliaryBackAction {
-    CLOSE_INFO,
-    RETURN_TO_OPTIONS_ROOT,
-    CLOSE_OPTIONS,
-    HIDE_STATS,
-    PASS_THROUGH,
+enum class PlaybackTrackContentState {
+    LOADING,
+    AVAILABLE,
+    EMPTY,
+}
+
+sealed interface PlaybackTrackFocusTarget {
+    data object HeaderBack : PlaybackTrackFocusTarget
+    data object SubtitlesOff : PlaybackTrackFocusTarget
+    data class Track(
+        val key: String,
+        val lazyIndex: Int,
+    ) : PlaybackTrackFocusTarget
+
+    companion object {
+        fun track(key: String, lazyIndex: Int): PlaybackTrackFocusTarget =
+            Track(key = key, lazyIndex = lazyIndex)
+    }
+}
+
+fun playbackTrackContentState(
+    trackCount: Int,
+    tracksResolving: Boolean,
+): PlaybackTrackContentState {
+    require(trackCount >= 0)
+    return when {
+        trackCount > 0 -> PlaybackTrackContentState.AVAILABLE
+        tracksResolving -> PlaybackTrackContentState.LOADING
+        else -> PlaybackTrackContentState.EMPTY
+    }
+}
+
+fun playbackTrackFocusTarget(
+    trackKeys: List<String>,
+    selectedTrackKey: String?,
+    subtitles: Boolean,
+): PlaybackTrackFocusTarget {
+    val selectedIndex = selectedTrackKey?.let(trackKeys::indexOf)?.takeIf { it >= 0 }
+    if (selectedIndex != null) {
+        return PlaybackTrackFocusTarget.Track(
+            key = trackKeys[selectedIndex],
+            lazyIndex = selectedIndex + if (subtitles) 1 else 0,
+        )
+    }
+    if (subtitles) return PlaybackTrackFocusTarget.SubtitlesOff
+    return trackKeys.firstOrNull()?.let { firstKey ->
+        PlaybackTrackFocusTarget.Track(key = firstKey, lazyIndex = 0)
+    } ?: PlaybackTrackFocusTarget.HeaderBack
 }
 
 fun playbackOptionsCategories(simpleTvActive: Boolean): List<PlaybackOptionsPage> =
@@ -40,19 +82,6 @@ fun adjacentPlaybackOptionsPage(
     val index = pages.indexOf(current).takeIf { it >= 0 } ?: 0
     val next = (index + direction).floorMod(pages.size)
     return pages[next]
-}
-
-fun playbackAuxiliaryBackAction(
-    optionsPage: PlaybackOptionsPage?,
-    statsVisible: Boolean,
-    infoOpen: Boolean = false,
-): PlaybackAuxiliaryBackAction = when {
-    infoOpen -> PlaybackAuxiliaryBackAction.CLOSE_INFO
-    optionsPage != null && optionsPage != PlaybackOptionsPage.ROOT ->
-        PlaybackAuxiliaryBackAction.RETURN_TO_OPTIONS_ROOT
-    optionsPage == PlaybackOptionsPage.ROOT -> PlaybackAuxiliaryBackAction.CLOSE_OPTIONS
-    statsVisible -> PlaybackAuxiliaryBackAction.HIDE_STATS
-    else -> PlaybackAuxiliaryBackAction.PASS_THROUGH
 }
 
 private fun Int.floorMod(modulus: Int): Int {

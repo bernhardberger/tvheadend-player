@@ -155,6 +155,9 @@ class TvhRepository(
     private val epgInFlight = mutableSetOf<Int>()
 
     private val stateMutex = Mutex()
+    private val connectionAttemptLock = Any()
+    @Volatile
+    private var latestConnectionAttemptId = 0L
 
     // Worker
     private var epgWorkerJob: Job? = null
@@ -170,35 +173,63 @@ class TvhRepository(
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             htsp.controlEvents.collect { e ->
                 when (e) {
-                    is HtspEvent.ServerMessage -> acceptMetadataMessage(e.msg)
+                    is HtspEvent.ServerMessage -> acceptMetadataMessage(
+                        msg = e.msg,
+                        connectionAttemptId = e.connectionAttemptId,
+                    )
                     else -> {}
                 }
             }
         }
     }
 
-    suspend fun onDisconnected() {
-        stopEpgWorker()
-        onNewConnectionStarting()
+    suspend fun onDisconnected(connectionAttemptId: Long = 0L): Boolean =
+        stateMutex.withLock {
+            htsp.commitIfCurrentConnectionAttempt(connectionAttemptId) {
+                stopEpgWorker()
+                synchronized(connectionAttemptLock) {
+                    resetForNewConnectionLocked(preservePublishedChannels = true)
+                }
+                true
+            } ?: false
+        }
+
+    suspend fun onNewConnectionStarting(
+        preservePublishedChannels: Boolean = true,
+        attemptId: Long? = null,
+    ) {
+        stateMutex.withLock {
+            synchronized(connectionAttemptLock) {
+                if (attemptId != null && attemptId < latestConnectionAttemptId) {
+                    return@synchronized
+                }
+                if (attemptId != null) latestConnectionAttemptId = attemptId
+                resetForNewConnectionLocked(preservePublishedChannels)
+            }
+        }
     }
 
-    suspend fun onNewConnectionStarting(preservePublishedChannels: Boolean = true) {
-        stateMutex.withLock {
-            channelStore.reset(preservePublished = preservePublishedChannels)
-            _channelsUi.value = channelStore.publishedSnapshot().toChannelUi()
-            tagStore.reset(preservePublished = preservePublishedChannels)
-            _tagsUi.value = tagStore.publishedSnapshot().toTagUi()
-            _metadataReady.value = false
+    private fun resetForNewConnectionLocked(preservePublishedChannels: Boolean) {
+        channelStore.reset(preservePublished = preservePublishedChannels)
+        _channelsUi.value = channelStore.publishedSnapshot().toChannelUi()
+        tagStore.reset(preservePublished = preservePublishedChannels)
+        _tagsUi.value = tagStore.publishedSnapshot().toTagUi()
+        _metadataReady.value = false
 
-            if (!preservePublishedChannels) epgByChannel.clear()
-            epgCoverage.clear()
-            epgRetentionAnchor.clear()
-            epgInFlight.clear()
+        if (!preservePublishedChannels) epgByChannel.clear()
+        epgCoverage.clear()
+        epgRetentionAnchor.clear()
+        epgInFlight.clear()
 
-            // Force a fresh warmup for the new connection; coverage was just cleared.
-            warmupCompleted = false
+        // Force a fresh warmup for the new connection; coverage was just cleared.
+        warmupCompleted = false
 
-            channelsReadyDef = CompletableDeferred()
+        channelsReadyDef = CompletableDeferred()
+    }
+
+    fun advanceConnectionAttempt(attemptId: Long) {
+        synchronized(connectionAttemptLock) {
+            if (attemptId > latestConnectionAttemptId) latestConnectionAttemptId = attemptId
         }
     }
 
@@ -424,15 +455,19 @@ class TvhRepository(
     // Server message handling
     // ---------------------------
 
-    internal suspend fun acceptMetadataMessage(msg: HtspMessage) {
-        when (msg.method) {
-            "channelAdd", "channelUpdate" -> stateMutex.withLock { handleChannelLocked(msg) }
-            "channelDelete" -> stateMutex.withLock { handleChannelDeleteLocked(msg) }
-            "tagAdd", "tagUpdate" -> stateMutex.withLock { handleTagLocked(msg) }
-            "tagDelete" -> stateMutex.withLock { handleTagDeleteLocked(msg) }
+    internal suspend fun acceptMetadataMessage(
+        msg: HtspMessage,
+        connectionAttemptId: Long = 0L,
+    ) {
+        stateMutex.withLock {
+            htsp.commitIfCurrentConnectionAttempt(connectionAttemptId) {
+                when (msg.method) {
+                    "channelAdd", "channelUpdate" -> handleChannelLocked(msg)
+                    "channelDelete" -> handleChannelDeleteLocked(msg)
+                    "tagAdd", "tagUpdate" -> handleTagLocked(msg)
+                    "tagDelete" -> handleTagDeleteLocked(msg)
 
-            "initialSyncCompleted" -> {
-                stateMutex.withLock {
+                    "initialSyncCompleted" -> {
                     val channels = channelStore.completeInitialSync()
                     val tags = tagStore.completeInitialSync()
                     val channelIds = channels.mapTo(mutableSetOf()) { it.id }
@@ -442,12 +477,13 @@ class TvhRepository(
                     publishTagsLocked(tags)
                     _metadataReady.value = true
                     if (!channelsReadyDef.isCompleted) channelsReadyDef.complete(Unit)
+                    }
+
+                    // Async EPG updates (only when server data changes)
+                    "eventAdd", "eventUpdate" -> handleEventUpsertLocked(msg)
+                    "eventDelete" -> handleEventDeleteLocked(msg)
                 }
             }
-
-            // Async EPG updates (only when server data changes)
-            "eventAdd", "eventUpdate" -> stateMutex.withLock { handleEventUpsertLocked(msg) }
-            "eventDelete" -> stateMutex.withLock { handleEventDeleteLocked(msg) }
         }
     }
 

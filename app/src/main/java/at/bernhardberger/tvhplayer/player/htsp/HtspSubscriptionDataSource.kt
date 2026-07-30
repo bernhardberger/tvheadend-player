@@ -9,21 +9,24 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import at.bernhardberger.tvhplayer.htsp.HtspEvent
+import at.bernhardberger.tvhplayer.htsp.HtspConnectionAttemptStatus
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
+import at.bernhardberger.tvhplayer.htsp.HtspMuxEvent
 import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.core.REQUESTED_TIMESHIFT_PERIOD_SEC
+import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
 import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.TimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftAbsoluteTargetUs
 import at.bernhardberger.tvhplayer.core.timeshiftSeek
 import at.bernhardberger.tvhplayer.core.timeshiftStateFromStatus
+import at.bernhardberger.tvhplayer.core.subscriptionFailureKind
 import at.bernhardberger.tvhplayer.player.PlaybackReadMetrics
 import at.bernhardberger.tvhplayer.player.PlaybackQueueDiagnostics
 import at.bernhardberger.tvhplayer.player.PlaybackTransportDiagnostics
 import at.bernhardberger.tvhplayer.player.PlaybackTunerDiagnostics
 import at.bernhardberger.tvhplayer.player.relativeSignalPercent
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,9 +41,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 import java.io.Closeable
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
-import kotlin.math.min
 
 internal fun <C, M> CoroutineScope.launchSubscriptionEventPump(
     controlEvents: Flow<C>,
@@ -99,6 +103,7 @@ class HtspSubscriptionDataSource private constructor(
     private val streamProfile: String?,
     private val timeshiftEnabled: Boolean,
     private val sharedTimeshiftState: MutableStateFlow<TimeshiftState>,
+    private val sharedSubscriptionFailure: MutableStateFlow<SubscriptionFailureKind?>,
     private val readMetrics: PlaybackReadMetrics,
     private val sharedTransportDiagnostics: MutableStateFlow<PlaybackTransportDiagnostics>,
 ) : DataSource, Closeable, HtspDataSourceInterface {
@@ -109,12 +114,17 @@ class HtspSubscriptionDataSource private constructor(
 
     private var timeshiftPeriod = 0
     private var subscriptionStarted = false
-    private var isSubscribed = false
+    private val subscriptionLifecycle = LiveSubscriptionLifecycle()
 
     private val jobScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var eventJob: Job? = null
     @Volatile
-    private var pendingSkip: CompletableDeferred<Boolean>? = null
+    private var connectionAttemptId: Long? = null
+    private val timeshiftSeekMuxGate = TimeshiftSeekMuxGate<HtspMuxEvent>(
+        sequenceOf = HtspMuxEvent::messageSequence,
+        maxPendingMux = MAX_PENDING_MUX,
+    )
+    private var muxDeliveryTracker: HtspMuxDeliveryTracker? = null
 
     // ---------- subscriptionStart / muxpkt ordering ----------
     // The control-event and mux-event flows are collected by two independent
@@ -136,7 +146,7 @@ class HtspSubscriptionDataSource private constructor(
     /**
      * Ring buffer: zero compact/flip.
      */
-    private val ring = RingBuffer(BUFFER_SIZE)
+    private val ring = FramedRingBuffer(BUFFER_SIZE)
 
     class Factory internal constructor(
         private val context: Context,
@@ -145,35 +155,49 @@ class HtspSubscriptionDataSource private constructor(
         private val timeshiftEnabled: Boolean,
     ) : DataSource.Factory {
         internal val readMetrics = PlaybackReadMetrics()
-        private var dataSource: HtspSubscriptionDataSource? = null
+        private val owner = LiveSubscriptionFactoryOwner<HtspSubscriptionDataSource>()
         private val _timeshiftState = MutableStateFlow(TimeshiftState())
         val timeshiftState: StateFlow<TimeshiftState> = _timeshiftState.asStateFlow()
+        private val _subscriptionFailure = MutableStateFlow<SubscriptionFailureKind?>(null)
+        val subscriptionFailure: StateFlow<SubscriptionFailureKind?> =
+            _subscriptionFailure.asStateFlow()
         private val _transportDiagnostics = MutableStateFlow(PlaybackTransportDiagnostics())
         internal val transportDiagnostics: StateFlow<PlaybackTransportDiagnostics> =
             _transportDiagnostics.asStateFlow()
 
         override fun createDataSource(): DataSource {
             Timber.d("Created new data source from factory")
-            dataSource = HtspSubscriptionDataSource(
-                context,
-                htspConnection,
-                streamProfile,
-                timeshiftEnabled,
-                _timeshiftState,
-                readMetrics,
-                _transportDiagnostics,
-            )
-            return dataSource!!
+            return owner.create {
+                HtspSubscriptionDataSource(
+                    context,
+                    htspConnection,
+                    streamProfile,
+                    timeshiftEnabled,
+                    _timeshiftState,
+                    _subscriptionFailure,
+                    readMetrics,
+                    _transportDiagnostics,
+                )
+            }
         }
 
         val currentDataSource: HtspDataSourceInterface?
-            get() = dataSource
+            get() = owner.current()
 
         fun releaseCurrentDataSource() {
             Timber.d("Releasing data source")
-            dataSource?.release()
-            dataSource = null
+            var firstFailure: Throwable? = null
+            owner.retire().forEach { source ->
+                try {
+                    source.release()
+                    owner.releaseSettled(source)
+                } catch (error: Throwable) {
+                    if (firstFailure == null) firstFailure = error
+                }
+            }
+            firstFailure?.let { throw it }
             _timeshiftState.value = TimeshiftState()
+            _subscriptionFailure.value = null
             _transportDiagnostics.value = PlaybackTransportDiagnostics()
         }
     }
@@ -203,7 +227,7 @@ class HtspSubscriptionDataSource private constructor(
     @Throws(Throwable::class)
     protected fun finalize() {
         Timber.d("Finalizing subscription data source")
-        release()
+        runCatching(::release)
     }
 
     override fun addTransferListener(transferListener: TransferListener) {
@@ -211,16 +235,44 @@ class HtspSubscriptionDataSource private constructor(
     }
 
     override fun open(dataSpec: DataSpec): Long {
+        check(subscriptionLifecycle.beginOpen()) { "Subscription data source is unavailable" }
+        return try {
+            openSubscription(dataSpec)
+        } finally {
+            subscriptionLifecycle.openSettled()
+        }
+    }
+
+    private fun openSubscription(dataSpec: DataSpec): Long {
+        val attemptId = htspConnection.currentConnectionAttemptId()
+        subscriptionLifecycle.ownershipAttemptId()?.let { ownershipAttemptId ->
+            if (
+                htspConnection.connectionAttemptStatus(ownershipAttemptId) !=
+                HtspConnectionAttemptStatus.LIVE
+            ) {
+                subscriptionLifecycle.connectionAttemptUnavailable(ownershipAttemptId)
+            }
+        }
+        check(
+            htspConnection.connectionAttemptStatus(attemptId) ==
+                HtspConnectionAttemptStatus.LIVE
+        ) {
+            "HTSP transport is unavailable before subscription open"
+        }
+        connectionAttemptId = attemptId
         startPumpIfNeeded()
         Timber.d("Opening subscription data source (%d)", dataSourceNumber)
         this.dataSpec = dataSpec
 
-        if (!isSubscribed) {
+        if (!subscriptionLifecycle.hasAcceptedSubscription(attemptId)) {
             val path = dataSpec.uri.path
             Timber.d("We are not yet subscribed to path %s", path)
 
             if (!path.isNullOrBlank() && path.length > 1) {
                 val channelId = path.substring(1).toInt()
+                check(subscriptionLifecycle.beginSubscriptionRequest(attemptId)) {
+                    "Subscription ownership has not settled for this data source"
+                }
 
                 Timber.d(
                     "Sending subscription start (subscriptionId=%s channelId=%s)",
@@ -228,93 +280,186 @@ class HtspSubscriptionDataSource private constructor(
                     channelId
                 )
 
-                runBlocking {
-                    val response = htspConnection.request(
-                        "subscribe",
-                        mapOf(
-                            "subscriptionId" to subscriptionId,
-                            "channelId" to channelId,
-                            "timeshiftPeriod" to if (timeshiftEnabled) {
-                                REQUESTED_TIMESHIFT_PERIOD_SEC
-                            } else {
-                                0
-                            },
-                            "profile" to streamProfile,
+                try {
+                    runBlocking {
+                        val response = htspConnection.requestForConnectionAttempt(
+                            expectedConnectionAttemptId = attemptId,
+                            method = "subscribe",
+                            fields = mapOf(
+                                "subscriptionId" to subscriptionId,
+                                "channelId" to channelId,
+                                "timeshiftPeriod" to if (timeshiftEnabled) {
+                                    REQUESTED_TIMESHIFT_PERIOD_SEC
+                                } else {
+                                    0
+                                },
+                                "profile" to streamProfile,
+                            )
                         )
-                    )
 
-                    val availableTimeshiftPeriod = response.int("timeshiftPeriod")
-                    if (availableTimeshiftPeriod != null) {
-                        timeshiftPeriod = availableTimeshiftPeriod.coerceAtLeast(0)
-                        Timber.d(
-                            "Available timeshift period in seconds: %s",
-                            availableTimeshiftPeriod
-                        )
+                        val availableTimeshiftPeriod = response.int("timeshiftPeriod")
+                        if (availableTimeshiftPeriod != null) {
+                            timeshiftPeriod = availableTimeshiftPeriod.coerceAtLeast(0)
+                            Timber.d(
+                                "Available timeshift period in seconds: %s",
+                                availableTimeshiftPeriod
+                            )
+                        }
                     }
+                } catch (error: Throwable) {
+                    val cleanupFailure = if (
+                        subscriptionLifecycle.failedOpenRequiresUnsubscribe(attemptId)
+                    ) {
+                        unsubscribeClaimed(attemptId)
+                    } else {
+                        null
+                    }
+                    if (cleanupFailure != null) error.addSuppressed(cleanupFailure)
+                    if (subscriptionLifecycle.ownershipAttemptId() == null) {
+                        connectionAttemptId = null
+                    }
+                    throw error
                 }
 
-                isSubscribed = true
+                val acceptance = checkNotNull(
+                    htspConnection.commitIfLiveConnectionAttempt(attemptId) {
+                        subscriptionLifecycle.subscriptionAccepted(attemptId)
+                    }
+                ) {
+                    subscriptionLifecycle.connectionAttemptUnavailable(attemptId)
+                    connectionAttemptId = null
+                    "HTSP transport changed after subscription open"
+                }
+                if (acceptance == LiveSubscriptionAcceptance.RELEASE_IMMEDIATELY) {
+                    check(subscriptionLifecycle.pendingUnsubscribeRequiresUnsubscribe())
+                    unsubscribeClaimed(attemptId)?.let { error ->
+                        throw SubscriptionSettlementException(error)
+                    }
+                    connectionAttemptId = null
+                    throw IOException("Subscription data source released during open")
+                }
             }
         }
 
-        subscriptionStarted = true
+        val started = checkNotNull(
+            htspConnection.commitIfLiveConnectionAttempt(attemptId) {
+                subscriptionLifecycle.commitIfOwned(attemptId) {
+                    subscriptionStarted = true
+                }
+            }
+        ) {
+            subscriptionLifecycle.connectionAttemptUnavailable(attemptId)
+            connectionAttemptId = null
+            "HTSP transport changed before subscription start"
+        }
+        check(started) { "Subscription data source released before subscription start" }
         return C.LENGTH_UNSET.toLong()
     }
 
     private fun startPumpIfNeeded() {
         if (eventJob != null) return
+        val sourceAttemptId = requireNotNull(connectionAttemptId)
+        val initialMuxSequence = checkNotNull(
+            htspConnection.currentMuxSequenceForConnectionAttempt(sourceAttemptId)
+        ) { "HTSP mux cursor is unavailable for the subscription attempt" }
+        muxDeliveryTracker = HtspMuxDeliveryTracker(initialMuxSequence)
 
         eventJob = jobScope.launchSubscriptionEventPump(
             controlEvents = htspConnection.controlEvents,
             muxEvents = htspConnection.muxEvents,
             onControl = control@{ ev ->
-                val msg = (ev as? HtspEvent.ServerMessage)?.msg ?: return@control
+                val event = ev as? HtspEvent.ServerMessage ?: return@control
+                val sourceAttemptId = connectionAttemptId ?: return@control
+                if (event.connectionAttemptId != sourceAttemptId) return@control
+                if (!htspConnection.isCurrentConnectionAttemptId(sourceAttemptId)) return@control
+                val msg = event.msg
                 val msgSubId = msg.int("subscriptionId")
+                if (msg.method == "subscriptionStatus" && msgSubId == null) return@control
                 if (msgSubId != null && msgSubId != subscriptionId) return@control
-                sharedTransportDiagnostics.value = updatePlaybackTransportDiagnostics(
-                    current = sharedTransportDiagnostics.value,
-                    message = msg,
-                    subscriptionId = subscriptionId,
-                )
+                if (
+                    htspConnection.commitIfCurrentConnectionAttempt(sourceAttemptId) {
+                        sharedTransportDiagnostics.value = updatePlaybackTransportDiagnostics(
+                            current = sharedTransportDiagnostics.value,
+                            message = msg,
+                            subscriptionId = subscriptionId,
+                        )
+                    } == null
+                ) return@control
 
                 when (msg.method) {
-                    "timeshiftStatus" -> {
-                        val previous = sharedTimeshiftState.value
-                        sharedTimeshiftState.value = timeshiftStateFromStatus(
-                            advertisedPeriodSec = timeshiftPeriod.takeIf { it > 0 }
-                                ?: REQUESTED_TIMESHIFT_PERIOD_SEC,
-                            shiftMicros = msg.long("shift"),
-                            startMicros = msg.long("start"),
-                            endMicros = msg.long("end"),
-                            full = msg.bool("full") == true,
-                            speed = msg.int("speed")
-                                ?: if (previous.paused) 0 else 100,
-                            nowEpochMs = System.currentTimeMillis(),
+                    "subscriptionStatus" -> {
+                        val failure = subscriptionFailureKind(
+                            subscriptionError = msg.str("subscriptionError")
+                                ?: msg.str("error"),
+                            state = msg.str("state") ?: msg.str("status"),
                         )
+                        if (failure != null) {
+                            invalidateTerminalSubscription(sourceAttemptId, failure)
+                        }
+                    }
+
+                    "timeshiftStatus" -> {
+                        htspConnection.commitIfCurrentConnectionAttempt(sourceAttemptId) {
+                            val previous = sharedTimeshiftState.value
+                            sharedTimeshiftState.value = timeshiftStateFromStatus(
+                                advertisedPeriodSec = timeshiftPeriod.takeIf { it > 0 }
+                                    ?: REQUESTED_TIMESHIFT_PERIOD_SEC,
+                                shiftMicros = msg.long("shift"),
+                                startMicros = msg.long("start"),
+                                endMicros = msg.long("end"),
+                                full = msg.bool("full") == true,
+                                speed = msg.int("speed")
+                                    ?: if (previous.paused) 0 else 100,
+                                nowEpochMs = System.currentTimeMillis(),
+                            )
+                        }
                     }
 
                     "subscriptionStart" -> {
-                        subscriptionStarted = true
+                        val started =
+                            htspConnection.commitIfCurrentConnectionAttempt(sourceAttemptId) {
+                                subscriptionLifecycle.commitIfOwned(sourceAttemptId) {
+                                    subscriptionStarted = true
+                                }
+                            } ?: return@control
+                        if (!started) return@control
                         // Write the start frame first, then release any muxpkts that
                         // arrived before it (preserving their original order).
-                        writeFramedMessage(msg)
-                        val drained: List<HtspMessage>
-                        synchronized(startGate) {
-                            subscriptionStartWritten = true
-                            drained = pendingMux.toList()
-                            pendingMux.clear()
+                        if (!writeFramedMessage(msg, sourceAttemptId)) {
+                            invalidateStaleSubscription()
+                            return@control
                         }
-                        drained.forEach { writeFramedMessage(it) }
+                        val drained = htspConnection.commitIfCurrentConnectionAttempt(
+                            sourceAttemptId
+                        ) {
+                            synchronized(startGate) {
+                                subscriptionStartWritten = true
+                                pendingMux.toList().also { pendingMux.clear() }
+                            }
+                        } ?: run {
+                            invalidateStaleSubscription()
+                            return@control
+                        }
+                        drained.forEach {
+                            if (!writeFramedMessage(it, sourceAttemptId)) {
+                                invalidateStaleSubscription()
+                                return@control
+                            }
+                        }
                     }
 
                     "subscriptionStop" -> {
-                        subscriptionStarted = false
-                        pendingSkip?.complete(false)
-                        sharedTimeshiftState.value = TimeshiftState()
-                        synchronized(startGate) {
-                            subscriptionStartWritten = false
-                            pendingMux.clear()
-                        }
+                        if (
+                            htspConnection.commitIfCurrentConnectionAttempt(sourceAttemptId) {
+                                subscriptionStarted = false
+                                sharedTimeshiftState.value = TimeshiftState()
+                                synchronized(startGate) {
+                                    subscriptionStartWritten = false
+                                    pendingMux.clear()
+                                }
+                            } == null
+                        ) return@control
+                        timeshiftSeekMuxGate.cancelCurrent()
                         lock.lock()
                         try {
                             notEmpty.signalAll()
@@ -325,27 +470,74 @@ class HtspSubscriptionDataSource private constructor(
                     }
 
                     "subscriptionSkip" -> {
-                        pendingSkip?.complete(msg.int("error") != 1)
+                        if (
+                            htspConnection.commitIfCurrentConnectionAttempt(sourceAttemptId) {
+                                true
+                            } == null
+                        ) return@control
+                        var transitionAttempted = false
+                        val committed = timeshiftSeekMuxGate.acknowledge(
+                            messageSequence = event.messageSequence,
+                            succeeded = msg.int("error") != 1,
+                        ) { clearBufferedFrames, readyMux ->
+                            transitionAttempted = true
+                            val prepared = if (!clearBufferedFrames) {
+                                true
+                            } else {
+                                clearBufferedFramesForSkip(sourceAttemptId) &&
+                                    writeFramedMessage(
+                                        message = TIMESHIFT_DISCONTINUITY_MESSAGE,
+                                        expectedConnectionAttemptId = sourceAttemptId,
+                                    )
+                            }
+                            prepared && readyMux.all {
+                                writeFramedMessage(it.msg, sourceAttemptId)
+                            }
+                        }
+                        if (transitionAttempted && !committed) {
+                            invalidateStaleSubscription()
+                        }
                     }
                 }
             },
-            onMux = mux@{ msg ->
+            onMux = mux@{ event: HtspMuxEvent ->
+                val sourceAttemptId = connectionAttemptId ?: return@mux
+                if (event.connectionAttemptId != sourceAttemptId) return@mux
+                if (!htspConnection.isCurrentConnectionAttemptId(sourceAttemptId)) return@mux
+                if (muxDeliveryTracker?.accept(event.muxSequence) != true) {
+                    invalidateStaleSubscription()
+                    return@mux
+                }
+                val msg = event.msg
                 val msgSubId = msg.int("subscriptionId")
                 if (msgSubId != null && msgSubId != subscriptionId) return@mux
-                if (pendingSkip != null) return@mux
-
-                // If subscriptionStart hasn't been framed yet, hold the muxpkt back
-                // so the extractor never sees a packet before its stream definition.
-                val deferred = synchronized(startGate) {
-                    if (!subscriptionStartWritten) {
-                        pendingMux.addLast(msg)
-                        while (pendingMux.size > MAX_PENDING_MUX) pendingMux.removeFirst()
-                        true
-                    } else {
-                        false
+                when (
+                    timeshiftSeekMuxGate.offer(event) { muxEvent, writePermit ->
+                        // If subscriptionStart hasn't been framed yet, hold the muxpkt back
+                        // so the extractor never sees a packet before its stream definition.
+                        val deferred = synchronized(startGate) {
+                            if (!subscriptionStartWritten) {
+                                pendingMux.addLast(muxEvent.msg)
+                                while (pendingMux.size > MAX_PENDING_MUX) {
+                                    pendingMux.removeFirst()
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        deferred || writeFramedMessage(
+                            message = muxEvent.msg,
+                            expectedConnectionAttemptId = sourceAttemptId,
+                            writePermit = writePermit,
+                        )
                     }
+                ) {
+                    TimeshiftMuxOffer.QUEUED,
+                    TimeshiftMuxOffer.DROPPED_STALE,
+                    TimeshiftMuxOffer.WRITTEN -> Unit
+                    TimeshiftMuxOffer.FAILED -> invalidateStaleSubscription()
                 }
-                if (!deferred) writeFramedMessage(msg)
             },
         )
     }
@@ -375,8 +567,7 @@ class HtspSubscriptionDataSource private constructor(
                 return C.RESULT_END_OF_INPUT
             }
 
-            val toRead = min(readLength, ring.size())
-            val actuallyRead = ring.read(buffer, offset, toRead)
+            val actuallyRead = ring.read(buffer, offset, readLength)
             if (actuallyRead > 0) {
                 readMetrics.record(actuallyRead)
                 notFull.signalAll()
@@ -394,25 +585,40 @@ class HtspSubscriptionDataSource private constructor(
 
     override fun close() {
         Timber.d("Closing subscription data source (%d)", dataSourceNumber)
-        subscriptionStarted = false
-        eventJob?.cancel()
-        eventJob = null
-
-        lock.lock()
-        try {
-            notEmpty.signalAll()
-            notFull.signalAll()
-        } finally {
-            lock.unlock()
-        }
+        closeLocalReader()
     }
 
     private fun release() {
         Timber.d("Releasing subscription data source (%d)", dataSourceNumber)
+        val attemptId = subscriptionLifecycle.ownershipAttemptId()
+        val unsubscribeRequired = subscriptionLifecycle.retireRequiresUnsubscribe()
+        closeLocalReader()
+
+        var unsubscribeFailure: Throwable? = null
+        if (unsubscribeRequired) {
+            unsubscribeFailure = unsubscribeClaimed(
+                checkNotNull(attemptId) {
+                    "Subscription lifecycle claimed unsubscribe without an attempt"
+                }
+            )
+        }
+
+        val settled = subscriptionLifecycle.awaitOwnershipSettlement(
+            SUBSCRIPTION_SETTLEMENT_TIMEOUT_MS
+        )
+        if (settled) connectionAttemptId = null
+        if (!settled || unsubscribeFailure != null) {
+            throw IOException("Subscription teardown did not settle", unsubscribeFailure)
+        }
+    }
+
+    private fun closeLocalReader() {
         subscriptionStarted = false
+        timeshiftSeekMuxGate.cancelCurrent()
 
         eventJob?.cancel()
         eventJob = null
+        muxDeliveryTracker = null
 
         lock.lock()
         try {
@@ -422,34 +628,59 @@ class HtspSubscriptionDataSource private constructor(
             lock.unlock()
         }
 
-        if (isSubscribed) {
-            runBlocking {
-                try {
-                    htspConnection.request(
-                        "unsubscribe",
-                        mapOf("subscriptionId" to subscriptionId)
-                    )
-                } catch (t: Throwable) {
-                    Timber.w(t, "unsubscribe failed (%d)", dataSourceNumber)
+    }
+
+    private fun unsubscribe(attemptId: Long) {
+        runBlocking {
+            htspConnection.requestForConnectionAttempt(
+                expectedConnectionAttemptId = attemptId,
+                method = "unsubscribe",
+                fields = mapOf("subscriptionId" to subscriptionId),
+            )
+        }
+    }
+
+    private fun unsubscribeClaimed(attemptId: Long): Throwable? {
+        val failure = when (htspConnection.connectionAttemptStatus(attemptId)) {
+            HtspConnectionAttemptStatus.LIVE -> try {
+                unsubscribe(attemptId)
+                null
+            } catch (error: Throwable) {
+                if (
+                    htspConnection.connectionAttemptStatus(attemptId) ==
+                    HtspConnectionAttemptStatus.LIVE
+                ) {
+                    error
+                } else {
+                    null
                 }
             }
-        }
 
-        isSubscribed = false
+            HtspConnectionAttemptStatus.GONE,
+            HtspConnectionAttemptStatus.REPLACED -> null
+        }
+        subscriptionLifecycle.unsubscribeSettled(attemptId, success = failure == null)
+        if (failure != null) Timber.w(failure, "unsubscribe failed (%d)", dataSourceNumber)
+        return failure
     }
 
     override fun pause() {
         Timber.d("Pausing subscription data source (%d)", dataSourceNumber)
         runBlocking {
-            htspConnection.request(
-                "subscriptionSpeed",
-                mapOf(
+            htspConnection.requestForConnectionAttempt(
+                expectedConnectionAttemptId = requireNotNull(connectionAttemptId),
+                method = "subscriptionSpeed",
+                fields = mapOf(
                     "subscriptionId" to subscriptionId,
                     "speed" to 0
                 )
             )
         }
-        sharedTimeshiftState.value = sharedTimeshiftState.value.copy(paused = true)
+        connectionAttemptId?.let { attemptId ->
+            htspConnection.commitIfCurrentConnectionAttempt(attemptId) {
+                sharedTimeshiftState.value = sharedTimeshiftState.value.copy(paused = true)
+            }
+        }
     }
 
     override val timeshiftState: StateFlow<TimeshiftState>
@@ -460,9 +691,10 @@ class HtspSubscriptionDataSource private constructor(
 
     override fun setSpeed(tvhSpeed: Int) {
         runBlocking {
-            htspConnection.request(
-                "subscriptionSpeed",
-                mapOf(
+            htspConnection.requestForConnectionAttempt(
+                expectedConnectionAttemptId = requireNotNull(connectionAttemptId),
+                method = "subscriptionSpeed",
+                fields = mapOf(
                     "subscriptionId" to subscriptionId,
                     "speed" to tvhSpeed
                 )
@@ -481,26 +713,32 @@ class HtspSubscriptionDataSource private constructor(
     override fun resume() {
         Timber.d("Resuming subscription data source (%d)", dataSourceNumber)
         runBlocking {
-            htspConnection.request(
-                "subscriptionSpeed",
-                mapOf("subscriptionId" to subscriptionId, "speed" to 100)
+            htspConnection.requestForConnectionAttempt(
+                expectedConnectionAttemptId = requireNotNull(connectionAttemptId),
+                method = "subscriptionSpeed",
+                fields = mapOf("subscriptionId" to subscriptionId, "speed" to 100)
             )
         }
-        sharedTimeshiftState.value = sharedTimeshiftState.value.copy(paused = false)
+        connectionAttemptId?.let { attemptId ->
+            htspConnection.commitIfCurrentConnectionAttempt(attemptId) {
+                sharedTimeshiftState.value = sharedTimeshiftState.value.copy(paused = false)
+            }
+        }
     }
 
     override fun seekTimeshift(deltaMs: Long): TimeshiftSeekDecision {
         val state = sharedTimeshiftState.value
         val decision = timeshiftSeek(state, deltaMs)
         if (decision.deltaMs != 0L) {
-            val acknowledgement = CompletableDeferred<Boolean>()
-            pendingSkip = acknowledgement
+            val acknowledgement = timeshiftSeekMuxGate.beginSeek()
+            wakeBufferedWriters()
             try {
                 val acknowledged = runBlocking {
                     val absoluteTargetUs = timeshiftAbsoluteTargetUs(state, decision)
-                    htspConnection.request(
-                        "subscriptionSeek",
-                        mapOf(
+                    htspConnection.requestForConnectionAttempt(
+                        expectedConnectionAttemptId = requireNotNull(connectionAttemptId),
+                        method = "subscriptionSeek",
+                        fields = mapOf(
                             "subscriptionId" to subscriptionId,
                             "time" to (absoluteTargetUs ?: decision.deltaMs * 1_000L),
                             "absolute" to if (absoluteTargetUs != null) 1 else 0,
@@ -511,9 +749,10 @@ class HtspSubscriptionDataSource private constructor(
                     } == true
                 }
                 check(acknowledged) { "TVHeadend did not confirm the timeshift seek" }
-                clearBufferedFramesForSkip()
             } finally {
-                if (pendingSkip === acknowledgement) pendingSkip = null
+                if (timeshiftSeekMuxGate.cancel(acknowledgement)) {
+                    invalidateStaleSubscription()
+                }
             }
         }
         return decision
@@ -522,12 +761,29 @@ class HtspSubscriptionDataSource private constructor(
     override fun goLive(): TimeshiftSeekDecision =
         seekTimeshift(sharedTimeshiftState.value.liveEdgeMs - sharedTimeshiftState.value.positionMs)
 
-    private fun clearBufferedFramesForSkip() {
+    private fun clearBufferedFramesForSkip(
+        expectedConnectionAttemptId: Long? = null,
+    ): Boolean {
         lock.lock()
         try {
-            ring.clear()
-            notEmpty.signalAll()
-            notFull.signalAll()
+            val cleared = if (expectedConnectionAttemptId == null) {
+                ring.clear()
+                true
+            } else {
+                htspConnection.commitIfCurrentConnectionAttempt(expectedConnectionAttemptId) {
+                    if (!subscriptionStarted) {
+                        false
+                    } else {
+                        ring.clearCompleteFramesForSeek()
+                        true
+                    }
+                } ?: false
+            }
+            if (cleared) {
+                notEmpty.signalAll()
+                notFull.signalAll()
+            }
+            return cleared
         } finally {
             lock.unlock()
         }
@@ -537,84 +793,100 @@ class HtspSubscriptionDataSource private constructor(
      * Writes a framed message into ring buffer:
      * [int32 payloadLen][payload bytes]
      */
-    private fun writeFramedMessage(message: HtspMessage) {
+    private fun writeFramedMessage(
+        message: HtspMessage,
+        expectedConnectionAttemptId: Long? = null,
+        writePermit: TimeshiftMuxWritePermit? = null,
+    ): Boolean {
         val frame = try {
             HtspFramedCodec.frameMessage(message)
         } catch (t: Throwable) {
             Timber.e(t, "Failed to encode message (%d)", dataSourceNumber)
-            return
+            return false
+        }
+        if (frame.size > BUFFER_SIZE) {
+            Timber.e("Framed HTSP message exceeds the subscription buffer")
+            return false
         }
 
+        val written: Boolean
         lock.lock()
         try {
-            ring.write(frame, 0, frame.size) { needed ->
-                while (subscriptionStarted && needed > ring.free()) {
-                    try {
-                        notFull.await()
-                    } catch (_: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                        return@write false
-                    }
+            while (subscriptionStarted && frame.size > ring.free()) {
+                if (writePermit != null && !writePermit.commit { true }) return false
+                if (
+                    expectedConnectionAttemptId != null &&
+                    !htspConnection.isCurrentConnectionAttemptId(
+                        expectedConnectionAttemptId
+                    )
+                ) return false
+                try {
+                    notFull.await(100L, TimeUnit.MILLISECONDS)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return false
                 }
-                needed <= ring.free()
             }
-            notEmpty.signalAll()
+            if (!subscriptionStarted) return false
+            val writeFrame = {
+                ring.write(frame, 0, frame.size) { needed ->
+                    subscriptionStarted && needed <= ring.free()
+                }
+            }
+            val writeWithPermit = {
+                writePermit?.commit(writeFrame) ?: writeFrame()
+            }
+            written = if (expectedConnectionAttemptId == null) {
+                writeWithPermit()
+            } else {
+                htspConnection.commitIfCurrentConnectionAttempt(
+                    expectedConnectionAttemptId
+                ) {
+                    writeWithPermit()
+                } ?: false
+            }
+            if (written) notEmpty.signalAll()
+        } finally {
+            lock.unlock()
+        }
+        return written
+    }
+
+    private fun wakeBufferedWriters() {
+        lock.lock()
+        try {
+            notFull.signalAll()
         } finally {
             lock.unlock()
         }
     }
 
-    private class RingBuffer(capacity: Int) {
-        private val buf = ByteArray(capacity)
-        private var head = 0 // read
-        private var tail = 0 // write
-        private var size = 0
-
-        fun size(): Int = size
-        fun free(): Int = buf.size - size
-
-        fun clear() {
-            head = 0
-            tail = 0
-            size = 0
+    private fun invalidateStaleSubscription() {
+        subscriptionStarted = false
+        timeshiftSeekMuxGate.cancelCurrent()
+        sharedTimeshiftState.value = TimeshiftState()
+        synchronized(startGate) {
+            subscriptionStartWritten = false
+            pendingMux.clear()
         }
+        clearBufferedFramesForSkip()
+    }
 
-        fun write(src: ByteArray, off: Int, len: Int, spacePolicy: (needed: Int) -> Boolean) {
-            if (len <= 0) return
-            if (!spacePolicy(len)) return
-
-            var remaining = len
-            var srcPos = off
-            while (remaining > 0) {
-                val chunk = min(remaining, buf.size - tail)
-                System.arraycopy(src, srcPos, buf, tail, chunk)
-                tail = (tail + chunk) % buf.size
-                size += chunk
-                srcPos += chunk
-                remaining -= chunk
-            }
-        }
-
-        fun read(dst: ByteArray, off: Int, len: Int): Int {
-            if (len <= 0 || size == 0) return 0
-            val toRead = min(len, size)
-
-            var remaining = toRead
-            var dstPos = off
-            while (remaining > 0) {
-                val chunk = min(remaining, buf.size - head)
-                System.arraycopy(buf, head, dst, dstPos, chunk)
-                head = (head + chunk) % buf.size
-                size -= chunk
-                dstPos += chunk
-                remaining -= chunk
-            }
-            return toRead
+    private fun invalidateTerminalSubscription(
+        attemptId: Long,
+        failure: SubscriptionFailureKind,
+    ) {
+        sharedSubscriptionFailure.value = failure
+        val unsubscribeRequired = subscriptionLifecycle.terminalFailureRequiresUnsubscribe()
+        invalidateStaleSubscription()
+        if (unsubscribeRequired) {
+            unsubscribeClaimed(attemptId)
         }
     }
 
     companion object {
         private const val SKIP_ACK_TIMEOUT_MS = 5_000L
+        private const val SUBSCRIPTION_SETTLEMENT_TIMEOUT_MS = 11_000L
         private val dataSourceCount = AtomicInteger()
         private val subscriptionCount = AtomicInteger()
 
@@ -625,3 +897,8 @@ class HtspSubscriptionDataSource private constructor(
         private const val MAX_PENDING_MUX = 4096
     }
 }
+
+private class SubscriptionSettlementException(cause: Throwable) : IOException(
+    "Subscription ownership did not settle",
+    cause,
+)

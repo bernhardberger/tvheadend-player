@@ -1,0 +1,95 @@
+package at.bernhardberger.tvhplayer.ui
+
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import at.bernhardberger.tvhplayer.core.SimpleTvRoute
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
+import at.bernhardberger.tvhplayer.core.simpleTvProfile
+import kotlinx.coroutines.CompletableDeferred
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+
+class SimpleTvRouteGuardEffectTest {
+    @get:Rule
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun recordingDeepLinkStopsItsOwnerBeforeRedirectingToLive() {
+        val events = mutableListOf<String>()
+        var profile by mutableStateOf(
+            simpleTvProfile(SimpleTvSettings(enabled = true), active = true)
+        )
+        val finishStop = CompletableDeferred<Unit>()
+        var recordingActive by mutableStateOf(true)
+
+        composeRule.setContent {
+            val nav = rememberNavController()
+            val entry by nav.currentBackStackEntryAsState()
+            SimpleTvRouteGuardEffect(
+                topRoute = entry?.destination?.route,
+                profile = profile,
+                recordingActive = recordingActive,
+                stopRecording = {
+                    events += "stop-started"
+                    recordingActive = false
+                    finishStop.await()
+                    events += "stop-finished"
+                },
+                redirectToLive = {
+                    events += "redirect-live"
+                    nav.navigate(Routes.PLAYER) {
+                        popUpTo(Routes.RECORDING_PLAYER) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
+            NavHost(navController = nav, startDestination = Routes.RECORDING_PLAYER) {
+                composable(Routes.RECORDING_PLAYER) {
+                    if (profile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER)) {
+                        Box(Modifier.fillMaxSize().testTag(RECORDING_ROUTE))
+                    }
+                }
+                composable(Routes.PLAYER) {
+                    Box(Modifier.fillMaxSize().testTag(LIVE_ROUTE))
+                }
+            }
+        }
+
+        composeRule.waitUntil { events.contains("stop-started") }
+        composeRule.runOnIdle {
+            profile = simpleTvProfile(
+                SimpleTvSettings(enabled = true, timeshift = true),
+                active = true,
+            )
+        }
+        composeRule.runOnIdle {
+            assertEquals(listOf("stop-started"), events)
+            finishStop.complete(Unit)
+        }
+        composeRule.onNodeWithTag(LIVE_ROUTE).assertIsDisplayed()
+        composeRule.onNodeWithTag(RECORDING_ROUTE).assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf("stop-started", "stop-finished", "redirect-live"),
+                events,
+            )
+        }
+    }
+}
+
+private const val RECORDING_ROUTE = "simple-tv-recording-route"
+private const val LIVE_ROUTE = "simple-tv-live-route"

@@ -63,7 +63,6 @@ import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.repositories.DvrRepository
@@ -74,6 +73,7 @@ import at.bernhardberger.tvhplayer.core.programmeSummaryText
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.common.progress
+import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
 import at.bernhardberger.tvhplayer.ui.components.ChannelCardGrid
 import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
@@ -723,16 +723,8 @@ private fun connectionMessage(state: ConnectionUiState): String = stringResource
             ConnectionFailureKind.ZERO_CHANNELS -> R.string.status_connection_failed_zero_channels
             ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
         }
-        is ConnectionUiState.SubscriptionError -> when (state.kind) {
-            SubscriptionFailureKind.INVALID_TARGET -> R.string.tvh_target_invalid
-            SubscriptionFailureKind.NO_FREE_ADAPTER -> R.string.tvh_no_free_adapter
-            SubscriptionFailureKind.MUX_NOT_ENABLED -> R.string.tvh_mux_not_enabled
-            SubscriptionFailureKind.TUNING_FAILED -> R.string.tvh_tuning_failed
-            SubscriptionFailureKind.BAD_SIGNAL -> R.string.tvh_bad_signal
-            SubscriptionFailureKind.SCRAMBLED -> R.string.tvh_scrambled
-            SubscriptionFailureKind.OVERRIDDEN -> R.string.tvh_subscription_overridden
-            SubscriptionFailureKind.NO_INPUT -> R.string.tvh_no_input
-        }
+        is ConnectionUiState.SubscriptionError ->
+            subscriptionFailureMessageResource(state.kind)
     }
 )
 

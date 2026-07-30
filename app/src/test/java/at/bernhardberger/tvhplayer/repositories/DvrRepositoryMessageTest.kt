@@ -6,7 +6,9 @@ import at.bernhardberger.tvhplayer.htsp.HtspService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DvrRepositoryMessageTest {
@@ -16,6 +18,7 @@ class DvrRepositoryMessageTest {
             htsp = HtspService(Dispatchers.Unconfined),
             ioDispatcher = Dispatchers.Unconfined,
         )
+        assertFalse(repository.entriesReady.value)
         repository.acceptDvrMessage(
             message(
                 "dvrEntryAdd",
@@ -31,6 +34,7 @@ class DvrRepositoryMessageTest {
         assertEquals(emptyList<Any>(), repository.entries.value)
 
         repository.acceptDvrMessage(message("initialSyncCompleted"))
+        assertTrue(repository.entriesReady.value)
         assertEquals(DvrState.SCHEDULED, repository.entries.value.single().state)
 
         repository.acceptDvrMessage(
@@ -40,6 +44,11 @@ class DvrRepositoryMessageTest {
 
         repository.acceptDvrMessage(message("dvrEntryDelete", "id" to 4))
         assertEquals(emptyList<Any>(), repository.entries.value)
+
+        repository.onNewConnectionStarting(preservePublished = true)
+        assertTrue(repository.entriesReady.value)
+        repository.onNewConnectionStarting(preservePublished = false)
+        assertFalse(repository.entriesReady.value)
     }
 
     @Test
