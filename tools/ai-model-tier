@@ -20,6 +20,7 @@ AGENT_MODELS = {
     "explore": "openai/gpt-5.6-terra",
     "scout": "openai/gpt-5.6-terra",
     "android-reviewer": "openai/gpt-5.6-sol",
+    "tv-interaction-reviewer": "openai/gpt-5.6-sol",
     "tv-ux-reviewer": "openai/gpt-5.6-sol",
     "general": "openai/gpt-5.6-sol",
 }

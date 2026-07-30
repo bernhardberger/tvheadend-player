@@ -71,6 +71,11 @@ repository-local domain overlays, then the focused skill, then local style.
   Android UI where practical so JVM tests can cover it.
 - Run focused checks while iterating and `./tools/verify` before considering a
   slice complete. Run `./tools/check-ai-harness` after any harness/config change.
+- External review is risk-based, not an automatic approval loop. Use one scoped
+  audit and one closure limited to its findings and fix delta, then remediate
+  new in-scope blockers autonomously. Never ask the user merely whether to
+  continue; interrupt only for a genuine product choice or safety boundary.
+  Review economy never waives an unresolved correctness or safety blocker.
 - Review the final diff for secrets, unrelated churn, stale paths, GPLv3
   attribution, and generic/product/appliance boundaries.
 - Do not commit, amend, push, publish, sign, install, or mutate a TV unless the
@@ -93,6 +98,11 @@ event cannot activate the new target. Use deliberate scrims over video.
 Automated tests and ADB screenshots do not prove SurfaceView visibility, focus
 feel, readability over motion, overscan, remote-repeat behavior, deinterlacing,
 or motion quality. Record those as physical-TV gates.
+
+Prefer deterministic offline captures of production composables with fake state
+for static visual review. Record canvas, locale, font scale, and focus state and
+keep generated evidence ignored. This can prove only the captured composition;
+it does not replace integrated or physical-TV gates.
 
 ## Device, credential, and release safety
 
@@ -120,13 +130,16 @@ or motion quality. Record those as physical-TV gates.
 
 Delegation is limited to one child level. `quick-explore` is for exact,
 low-consequence lookups; use `explore` for architecture, multi-hop tracing, or
-completeness. `scout`, `android-reviewer`, and `tv-ux-reviewer` may perform
-bounded read-only research/review and cannot delegate. Spawning the writing-capable
-`general` agent requires user approval, an explicit scope, and exclusive file
-ownership.
+completeness. `scout`, `android-reviewer`, `tv-interaction-reviewer`, and
+`tv-ux-reviewer` may perform bounded read-only research/review and cannot
+delegate. Spawning the writing-capable `general` agent requires user approval,
+an explicit scope, and exclusive file ownership.
 
-Every `tv-ux-reviewer` assignment must either name each exact current-evidence
-path or be source-only with a bounded UI-change scope. Never ask the reviewer to
+Use `android-reviewer` for runtime/cross-layer correctness and
+`tv-interaction-reviewer` for source-level focus, keys, Back, accessibility, and
+TV UI-test correctness. Their assignments must be non-overlapping. Every
+`tv-ux-reviewer` assignment must name each exact current-evidence path; it is a
+screenshot-first design critic, not a source-only code reviewer. Never ask it to
 discover which repository screenshots, captures, or handoffs are current.
 
 ## Upstream and repository discipline

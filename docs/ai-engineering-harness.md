@@ -17,8 +17,9 @@ root:
 | `.opencode/opencode.json` | Default agent, disabled generic Build, model assignments, sharing policy, and one-level child allowlist |
 | `.opencode/agents/android-tv.md` | Application implementation primary |
 | `.opencode/agents/repo-maintainer.md` | Harness, tooling, CI, documentation, licensing, and release-policy primary |
-| `.opencode/agents/android-reviewer.md` | Read-only Android correctness reviewer |
-| `.opencode/agents/tv-ux-reviewer.md` | Evidence-scoped, read-only product UX reviewer |
+| `.opencode/agents/android-reviewer.md` | Read-only Android runtime and cross-layer correctness reviewer |
+| `.opencode/agents/tv-interaction-reviewer.md` | Read-only TV interaction code reviewer for focus, keys, Back, accessibility, and UI tests |
+| `.opencode/agents/tv-ux-reviewer.md` | Screenshot-first, read-only product design and visual-quality reviewer |
 | `.opencode/agents/quick-explore.md` | Exact low-consequence repository lookup child |
 | `.opencode/agents/scout.md` | Bounded repository and external-documentation research child |
 | `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
@@ -63,21 +64,97 @@ every child first, then allows these read-only children:
 - `quick-explore` for exact, low-consequence lookup;
 - `explore` for architecture, multi-hop tracing, or completeness;
 - `scout` for bounded repository or external-source research;
-- `android-reviewer` and `tv-ux-reviewer` for independent review.
+- `android-reviewer` for Android runtime and cross-layer code correctness;
+- `tv-interaction-reviewer` for TV interaction code correctness; and
+- `tv-ux-reviewer` for independent screenshot-first product design review.
 
 `general` requires user approval plus explicit scope and exclusive file
 ownership. Every child resolves to `task: deny`, preventing recursive spawning.
 Read-only children may run in parallel; writers, Gradle builds, device operations,
 Git mutations, signing, publishing, and release operations may not.
 
-TV UX evidence is assignment-allowlisted. The assignment must name every exact
-path it treats as current or declare a source-only UI-change scope. The UX
-reviewer denies Glob and may not use directory reads or searches to replace it.
-Without supplied current visual evidence it skips the visual pass and does not
-infer appearance or physical-TV behavior from source. Glob and Bash discovery
-are capability-denied. Read and Grep remain available for scoped source review,
-so their prohibition for evidence discovery is an explicit reviewer/command
-policy whose required wording—not dynamic path behavior—the harness checks.
+## Review lifecycle and autonomous continuation
+
+Independent review supplements focused tests and primary-agent self-review; it
+does not replace either and is not an automatic gate for every edit. Select it by
+risk:
+
+| Change | Independent review |
+|---|---|
+| Documentation, tests, or mechanical work with no production behavior change | Normally none |
+| Runtime behavior, production wiring, concurrency, playback, security, native, or release invariant | `android-reviewer` |
+| Compose for TV focus, keys, Back, accessibility, safe bounds, or UI-test behavior | `tv-interaction-reviewer` |
+| A slice crossing runtime and TV interaction code | Both code reviewers once, in parallel, with non-overlapping scopes |
+| Visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` against supplied current images |
+| HTSP, Media3, concurrency, subscription ownership, or DVR lifecycle | One early architecture/race audit may replace the normal audit, followed by closure review |
+
+Every code-review assignment declares an exact slice, acceptance criteria,
+included paths, exclusions, an owning reviewer, and either `audit` or `closure`
+mode. An `audit` is one broad defect-discovery pass over that stable scope. A
+`closure` verifies named finding IDs, regressions introduced by their fixes, and
+the delta since the audit; it is not another audit of unchanged code or adjacent
+architecture. The two code reviewers may run together only when their assignments
+name distinct concerns and paths or symbols. The primary deduplicates a genuine
+cross-boundary finding and sends closure only to its owner.
+
+The primary batches blocking code fixes before closure. Code reviewers classify
+results as `PASS`, `REMEDIATE`, `ADVISORY`, or `HUMAN_DECISION_REQUIRED` and
+separate blocking findings from optional improvements, pre-existing issues, and
+physical gates. A blocking finding needs a stable ID, evidence, the violated
+invariant or acceptance criterion, and a closure condition. A clean review with
+zero findings is valid; reviewers never fill a quota. Android findings use
+`AND-` IDs and interaction findings use `TVI-` IDs so closure ownership remains
+unambiguous. Review economy never downgrades or waives a confirmed correctness,
+security, accessibility, resource-ownership, release-safety, or
+acceptance-criterion violation.
+
+Routine remediation is autonomous. `REMEDIATE` creates a bounded remediation
+sub-slice with a reproducing test where practical, focused checks, and targeted
+closure. A new blocker found during closure does not start another broad audit or
+ask the user whether to continue. If related findings recur, stop micro-patching,
+state the subsystem invariants, perform one root-cause audit of that defect
+family, batch the correction, and resume targeted closure. `ADVISORY` items are
+recorded without blocking the current acceptance criteria. Scouts answer bounded
+research questions and do not act as additional approval reviewers.
+
+Visual design uses a separate evidence lifecycle. `tv-ux-reviewer` accepts
+`brief`, `review`, and `closure` modes. A brief turns baseline images and accepted
+requirements into one preferred visual direction before implementation. Review
+judges one stable current evidence set after implementation. Closure compares
+named `UX-` findings with matched updated captures and does not restart broad
+redesign. `DESIGN_REMEDIATE` is fixed autonomously when it violates accepted
+visual criteria; `DESIGN_READY` proceeds; advisory polish does not silently
+expand scope. Routine spacing, typography, hierarchy, component, and composition
+judgments belong to the reviewer, not to a non-designer user.
+
+Continue automatically through planned slices, internal checkpoints, recoverable
+test failures, reviewer findings, child-agent errors, and in-scope technical
+remediation. A checkpoint records scope, acceptance status, tests, finding
+dispositions, and the next action, then proceeds without user confirmation. Ask
+one substantive question only when progress requires a product choice, conflicts
+with current authority, changes accepted scope or capability, cannot preserve
+unrelated worktree changes, crosses an explicit credential/device/signing/release
+boundary, or requires a human physical-TV observation. Never ask merely whether
+to continue.
+
+TV design evidence is assignment-allowlisted. The assignment must name every
+exact current and historical path, capture state, and canvas or device. The
+reviewer denies Glob and Bash and may not replace them with directory reads or
+searches. Without current images it returns `EVIDENCE_REQUIRED`; it never turns
+that gap into a source-only code review. Read remains available only for an exact
+supplied implementation path after the image-first critique, so the evidence
+prohibition is an explicit reviewer/command policy whose required wording—not
+dynamic path behavior—the harness checks.
+
+Prefer deterministic offline captures of production composables with fake
+channels, EPG, tracks, timelines, recovery states, local images, and a
+deterministic video backdrop. The primary, not the read-only design reviewer,
+generates them without a live TVHeadend connection and records scenario, canvas,
+density, font scale, locale, and focus state. Generated PNGs remain under ignored
+evidence paths and are passed by exact path. They can prove only the captured
+static composition; integrated navigation, SurfaceView/video, focus and remote
+feel, overscan, HDR, deinterlacing, and motion retain their emulator/device or
+human gates.
 
 ## Skills and routing
 

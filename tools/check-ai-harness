@@ -32,6 +32,7 @@ REQUIRED_FILES = (
     ".opencode/agents/android-reviewer.md",
     ".opencode/agents/quick-explore.md",
     ".opencode/agents/scout.md",
+    ".opencode/agents/tv-interaction-reviewer.md",
     ".opencode/agents/tv-ux-reviewer.md",
     ".opencode/skills/android-tv-device-testing/SKILL.md",
     ".opencode/skills/android-tv-compose-ux/SKILL.md",
@@ -42,6 +43,7 @@ REQUIRED_FILES = (
     ".opencode/commands/ai-model-tier.md",
     ".opencode/commands/verify.md",
     ".opencode/commands/device-check.md",
+    ".opencode/commands/tv-interaction-review.md",
     ".opencode/commands/tv-ux-review.md",
     ".opencode/commands/upstream-review.md",
     "docs/ai-engineering-harness.md",
@@ -68,13 +70,70 @@ PRIVATE_LAN_IP = re.compile(r"\b(?:10\.\d{1,3}|192\.168|172\.(?:1[6-9]|2\d|3[01]
 REQUIRED_TV_UX_EVIDENCE_RULES = {
     ".opencode/agents/tv-ux-reviewer.md": (
         "Never glob, list, or search the repository for candidate screenshots, images",
-        "Treat every repository screenshot, image, and handoff as historical unless the",
-        "When no current visual evidence is supplied, perform a source-only interaction",
+        "Treat every repository image and handoff as historical unless the assignment",
+        "Without supplied current visual evidence, return `EVIDENCE_REQUIRED`",
+        "Do not substitute a source-only UI code review",
     ),
     ".opencode/commands/tv-ux-review.md": (
-        "Use `$ARGUMENTS` as the complete evidence allowlist and review scope",
+        "Use `$ARGUMENTS` as the complete visual-evidence contract",
         "Never glob, list, or search the repository for additional visual evidence",
-        "For a source-only UI-change review, skip the visual pass",
+        "do not perform a source-only UI code review",
+    ),
+}
+REQUIRED_REVIEW_LIFECYCLE_RULES = {
+    "AGENTS.md": (
+        "External review is risk-based, not an automatic approval loop",
+        "Never ask the user merely whether to continue",
+        "Review economy never waives an unresolved correctness or safety blocker",
+    ),
+    "docs/ai-engineering-harness.md": (
+        "Review lifecycle and autonomous continuation",
+        "Every code-review assignment declares an exact slice, acceptance criteria",
+        "A new blocker found during closure does not start another broad audit",
+        "Continue automatically through planned slices",
+        "Review economy never downgrades or waives a confirmed correctness",
+        "Prefer deterministic offline captures of production composables",
+    ),
+    ".opencode/agents/android-tv.md": (
+        "Autonomous review lifecycle",
+        "`closure` is limited to named finding IDs",
+        "Treat `REMEDIATE` as an autonomous bounded remediation sub-slice",
+        "Use `tv-ux-reviewer` as an independent screenshot-first product design critic",
+        "Generate this evidence without a live TVHeadend connection",
+        "Do not ask the user merely whether to continue",
+        "Never continue past an unresolved correctness or safety blocker",
+    ),
+    ".opencode/agents/android-reviewer.md": (
+        "Assignment contract and modes",
+        "Own Android runtime and cross-layer correctness",
+        "belong to `tv-interaction-reviewer`",
+        "Do not re-audit unchanged code or adjacent architecture in closure mode",
+        "Start with exactly one disposition: `PASS`, `REMEDIATE`, `ADVISORY`, or",
+    ),
+    ".opencode/agents/tv-interaction-reviewer.md": (
+        "Own source-level TV interaction correctness",
+        "Do not duplicate the Android runtime reviewer",
+        "Do not perform visual-design review",
+        "In `closure` mode, verify supplied finding IDs",
+    ),
+    ".opencode/agents/tv-ux-reviewer.md": (
+        "independent TV product design critic",
+        "`brief`: inspect baseline evidence and requirements before implementation",
+        "Do not limit findings to formal violations",
+        "Start with exactly one disposition: `DESIGN_READY`, `DESIGN_REMEDIATE`",
+    ),
+    ".opencode/commands/android-review.md": (
+        "Use `$ARGUMENTS` as the complete review contract",
+        "Never default an empty or ambiguous contract to the complete "
+        "dirty worktree",
+    ),
+    ".opencode/commands/tv-interaction-review.md": (
+        "Use `$ARGUMENTS` as the complete review contract",
+        "Do not duplicate Android runtime, playback-transport, security, native",
+    ),
+    ".opencode/commands/tv-ux-review.md": (
+        "`mode=brief`, `mode=review`, or `mode=closure`",
+        "Without current images, return `EVIDENCE_REQUIRED`",
     ),
 }
 REQUIRED_PRIMARY_AGENTS = {"android-tv", "repo-maintainer"}
@@ -83,6 +142,7 @@ READ_ONLY_CHILD_AGENTS = {
     "explore",
     "scout",
     "android-reviewer",
+    "tv-interaction-reviewer",
     "tv-ux-reviewer",
 }
 ALL_CHILD_AGENTS = READ_ONLY_CHILD_AGENTS | {"general"}
@@ -92,11 +152,13 @@ EXPECTED_TASK_POLICY = {
     "explore": "allow",
     "scout": "allow",
     "android-reviewer": "allow",
+    "tv-interaction-reviewer": "allow",
     "tv-ux-reviewer": "allow",
     "general": "ask",
 }
 ISOLATED_REVIEW_COMMANDS = {
     "android-review",
+    "tv-interaction-review",
     "tv-ux-review",
     "upstream-review",
 }
@@ -319,7 +381,11 @@ def main() -> int:
             if frontmatter_permission(path, "task") is not None:
                 errors.append(f"{path.relative_to(ROOT)}: must inherit the project Task policy")
 
-    for name in ("android-reviewer", "tv-ux-reviewer"):
+    for name in (
+        "android-reviewer",
+        "tv-interaction-reviewer",
+        "tv-ux-reviewer",
+    ):
         path = ROOT / ".opencode/agents" / f"{name}.md"
         if path.is_file() and frontmatter_permission(path, "task") != "deny":
             errors.append(f"{path.relative_to(ROOT)}: must retain task: deny")
@@ -347,6 +413,15 @@ def main() -> int:
             if " ".join(snippet.split()) not in normalized_text:
                 errors.append(f"{relative}: missing TV UX evidence rule {snippet!r}")
 
+    for relative, snippets in REQUIRED_REVIEW_LIFECYCLE_RULES.items():
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        normalized_text = " ".join(text.split())
+        for snippet in snippets:
+            if " ".join(snippet.split()) not in normalized_text:
+                errors.append(
+                    f"{relative}: missing autonomous review lifecycle rule {snippet!r}"
+                )
+
     for path in sorted((ROOT / ".opencode/commands").glob("*.md")):
         metadata = frontmatter(path)
         if not metadata.get("description"):
@@ -361,6 +436,16 @@ def main() -> int:
     tv_ux_command = ROOT / ".opencode/commands/tv-ux-review.md"
     if tv_ux_command.is_file() and frontmatter(tv_ux_command).get("agent") != "tv-ux-reviewer":
         errors.append(".opencode/commands/tv-ux-review.md: must use tv-ux-reviewer")
+    tv_interaction_command = ROOT / ".opencode/commands/tv-interaction-review.md"
+    if (
+        tv_interaction_command.is_file()
+        and frontmatter(tv_interaction_command).get("agent")
+        != "tv-interaction-reviewer"
+    ):
+        errors.append(
+            ".opencode/commands/tv-interaction-review.md: "
+            "must use tv-interaction-reviewer"
+        )
 
     seen_skills: set[str] = set()
     imported_skills: set[str] = set()

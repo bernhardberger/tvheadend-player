@@ -1,12 +1,21 @@
 ---
-description: Run the read-only Android correctness and release-safety reviewer on the current change or supplied scope.
+description: Run a scoped audit or closure with the read-only Android correctness and release-safety reviewer.
 agent: android-reviewer
 subtask: true
 ---
 
-Review `$ARGUMENTS` when a scope was supplied; otherwise review the complete
-current worktree diff. Inspect Git status, the relevant implementation and tests,
-and apply the local domain skills that match the change. Do not edit, commit,
-push, or use a device. Lead with concrete findings ordered by severity and include
-file and line references. If there are no findings, say so and identify only the
-remaining verification or physical-TV evidence gaps.
+Use `$ARGUMENTS` as the complete review contract. It must name `mode=audit` or
+`mode=closure`, the exact slice and acceptance criteria, included paths,
+exclusions, and, for closure, the prior finding IDs and delta since the audit.
+Never default an empty or ambiguous contract to the complete dirty worktree;
+report what the primary must supply instead.
+
+Inspect Git status, the relevant scoped implementation and tests, and apply only
+the local domain skills matching that scope. Do not edit, commit, push, or use a
+device. Review Android runtime, cross-layer wiring, concurrency, playback,
+resource ownership, security, native, and release correctness. Do not duplicate
+the TV interaction code review or visual design review. Follow the reviewer's
+disposition and finding-ID contract. In closure mode, verify prior findings and
+fix regressions without re-auditing unchanged or adjacent code. If no blocking
+issue exists, return `PASS` or `ADVISORY` and list only the remaining
+verification or physical-TV evidence gates.
