@@ -93,7 +93,6 @@ import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
-import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.flow.first
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -126,19 +125,43 @@ internal data class MainStartupCompositionState(
     val presentation: MainStartupPresentation,
     val navigationStartDestination: String?,
     val navigationAllowed: Boolean,
+    val contentAllowed: Boolean = presentation == MainStartupPresentation.Inactive,
 )
 
-internal fun effectiveMainStartupPresentation(
-    presentation: MainStartupPresentation,
-    launchState: ApplianceLaunchState,
-    matchingEnteringPlayerVisible: Boolean,
-): MainStartupPresentation = if (
-    launchState is ApplianceLaunchState.Entering && matchingEnteringPlayerVisible
-) {
-    MainStartupPresentation.Inactive
-} else {
-    presentation
+internal data class WarmLivePlayerTarget(
+    val channelId: Int,
+    val serviceId: Int,
+    val channelName: String,
+)
+
+internal fun warmLivePlayerTarget(
+    activeServiceId: Int,
+    readiness: CurrentChannelReadiness,
+): WarmLivePlayerTarget {
+    val channel = (readiness as? CurrentChannelReadiness.Ready)
+        ?.channels
+        ?.firstOrNull { it.id == activeServiceId }
+    return WarmLivePlayerTarget(
+        channelId = channel?.id ?: activeServiceId,
+        serviceId = activeServiceId,
+        channelName = channel?.name.orEmpty(),
+    )
 }
+
+internal fun enteringNavigationAllowed(
+    hasBackStackEntry: Boolean,
+    navigationStartDestination: String?,
+    exactStartDestination: String,
+    matchingVisiblePlayer: Boolean,
+): Boolean = if (hasBackStackEntry) matchingVisiblePlayer else navigationStartDestination == exactStartDestination
+
+internal fun completeEnteringPlayerVisibility(
+    requests: ApplianceLaunchRequests,
+    target: ApplianceLaunchTarget,
+    channelId: Int,
+    serviceId: Int,
+    channelName: String,
+): Boolean = requests.completePlayerVisibility(target, channelId, serviceId, channelName)
 
 internal fun shouldShowMainNavigationRail(
     simpleTvActive: Boolean,
@@ -161,6 +184,22 @@ internal fun MainNavigationShell(
 }
 
 @Composable
+internal fun StartupGatedChannelsContent(
+    contentAllowed: Boolean,
+    channelsContent: @Composable () -> Unit,
+) {
+    if (contentAllowed) channelsContent()
+}
+
+@Composable
+internal fun StartupGatedPlayerContent(
+    contentAllowed: Boolean,
+    playerContent: @Composable () -> Unit,
+) {
+    if (contentAllowed) playerContent()
+}
+
+@Composable
 internal fun MainStartupComposition(
     state: MainStartupCompositionState,
     simpleTvActive: Boolean,
@@ -169,7 +208,7 @@ internal fun MainStartupComposition(
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit),
     modifier: Modifier = Modifier,
     persistentSurface: @Composable BoxScope.() -> Unit = {},
-    navigation: @Composable BoxScope.(String) -> Unit = {},
+    navigation: @Composable BoxScope.(String, Boolean) -> Unit = { _, _ -> },
 ) {
     val renderedPresentation = when (state.presentation) {
         is MainStartupPresentation.Enter -> MainStartupPresentation.Passive(
@@ -211,7 +250,10 @@ internal fun MainStartupComposition(
         persistentSurface()
         val startDestination = state.navigationStartDestination
         if (state.navigationAllowed && startDestination != null) {
-            navigation(startDestination)
+            navigation(
+                startDestination,
+                state.contentAllowed,
+            )
         }
         if (renderedPresentation != MainStartupPresentation.Inactive) {
             MainStartupScreen(
@@ -364,12 +406,13 @@ fun AppRoot(
                 presentation = MainStartupPresentation.Inactive,
                 navigationStartDestination = Routes.CHANNELS,
                 navigationAllowed = true,
+                contentAllowed = true,
             ),
             simpleTvActive = false,
             onBack = {},
             onAction = {},
             registerActivityKeyContract = registerActivityKeyContract,
-            navigation = { OnboardingScreen() },
+            navigation = { _, _ -> OnboardingScreen() },
         )
         return
     }
@@ -436,7 +479,6 @@ fun AppRoot(
     val appVm: AppConnectionViewModel = koinViewModel()
     val connectionUiState by appVm.uiState.collectAsStateWithLifecycle()
     val connectionState by appVm.connectionState.collectAsStateWithLifecycle()
-    val channelsVm: ChannelsViewModel = koinViewModel()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
     val playerSession: PlayerSession = koinInject()
     val playerSettingsStore: PlayerSettingsStore = koinInject()
@@ -503,11 +545,7 @@ fun AppRoot(
                 channelName = visibleLivePlayerName,
             )
     } == true
-    val effectiveStartupPresentation = effectiveMainStartupPresentation(
-        presentation = startupPresentation,
-        launchState = applianceLaunchState,
-        matchingEnteringPlayerVisible = matchingEnteringPlayerVisible,
-    )
+    val effectiveStartupPresentation = startupPresentation
     val applianceLaunchActive =
         effectiveStartupPresentation != MainStartupPresentation.Inactive
     val navigationAllowed = when (val launchState = applianceLaunchState) {
@@ -521,11 +559,12 @@ fun AppRoot(
                 serviceId = launchState.target.serviceId,
                 channelName = launchState.target.channelName,
             )
-            if (nav.currentBackStackEntry == null) {
-                navigationStartDestination == exactStart
-            } else {
-                matchingEnteringPlayerVisible
-            }
+            enteringNavigationAllowed(
+                hasBackStackEntry = nav.currentBackStackEntry != null,
+                navigationStartDestination = navigationStartDestination,
+                exactStartDestination = exactStart,
+                matchingVisiblePlayer = matchingEnteringPlayerVisible,
+            )
         }
     }
     val selectRoot = remember(nav) {
@@ -578,8 +617,14 @@ fun AppRoot(
         },
     )
 
-    SideEffect {
-        onPlayerVisibilityChanged(isPlayer)
+    SideEffect { onPlayerVisibilityChanged(isPlayer) }
+
+    LaunchedEffect(
+        enteringLaunchTarget,
+        visibleLivePlayerChannelId,
+        visibleLivePlayerServiceId,
+        visibleLivePlayerName,
+    ) {
         val target = enteringLaunchTarget
         val channelId = visibleLivePlayerChannelId
         val serviceId = visibleLivePlayerServiceId
@@ -590,7 +635,8 @@ fun AppRoot(
             serviceId != null &&
             channelName != null
         ) {
-            applianceLaunchRequests.completePlayerVisibility(
+            completeEnteringPlayerVisibility(
+                requests = applianceLaunchRequests,
                 target = target,
                 channelId = channelId,
                 serviceId = serviceId,
@@ -666,13 +712,15 @@ fun AppRoot(
                 when (target) {
                     WarmPlaybackTarget.LIVE -> {
                         val serviceId = activeServiceId ?: return@rootBack
-                        val channel = channelsVm.allChannels.value
-                            .firstOrNull { it.id == serviceId }
+                        val playerTarget = warmLivePlayerTarget(
+                            activeServiceId = serviceId,
+                            readiness = currentChannelReadiness,
+                        )
                         nav.navigate(
                             Routes.player(
-                                channelId = channel?.id ?: serviceId,
-                                serviceId = serviceId,
-                                channelName = channel?.name.orEmpty(),
+                                channelId = playerTarget.channelId,
+                                serviceId = playerTarget.serviceId,
+                                channelName = playerTarget.channelName,
                             )
                         ) {
                             launchSingleTop = true
@@ -693,8 +741,8 @@ fun AppRoot(
         enabled = navigationAllowed && !applianceLaunchActive && !showRail,
         onBack = handleRootBack,
     )
-    val content: @Composable (PaddingValues, Boolean, String) -> Unit = {
-            contentPadding, drawerActive, startDestination ->
+    val content: @Composable (PaddingValues, Boolean, String, Boolean) -> Unit = {
+            contentPadding, drawerActive, startDestination, contentAllowed ->
             Box(Modifier.fillMaxSize()) {
                 NavHost(
                     navController = nav,
@@ -713,7 +761,8 @@ fun AppRoot(
                     },
                 ) {
                     composable(Routes.CHANNELS) {
-                        ContentContainer {
+                        StartupGatedChannelsContent(contentAllowed = contentAllowed) {
+                            ContentContainer {
                                 ChannelsScreen(
                                     contentPadding = contentPadding,
                                     initialFocusEnabled = !drawerActive,
@@ -734,11 +783,12 @@ fun AppRoot(
                                         nav.navigate(Routes.player(channelId, serviceId, name))
                                     }
                                 )
+                            }
                         }
                     }
 
                     composable(Routes.EPG) {
-                        if (capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
+                        if (contentAllowed && capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
                             ContentContainer {
                                     EpgGridScreen(
                                         contentPadding = contentPadding,
@@ -781,7 +831,7 @@ fun AppRoot(
                             navArgument("category") { type = NavType.StringType },
                         ),
                     ) { entry ->
-                        if (capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
+                        if (contentAllowed && capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
                             val category = ProgrammeCategory.fromRoute(
                                 entry.arguments?.getString("category")
                             )
@@ -825,7 +875,7 @@ fun AppRoot(
                     }
 
                     composable(Routes.RECORDINGS) {
-                        if (capabilityProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
+                        if (contentAllowed && capabilityProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
                             ContentContainer {
                                     RecordingsScreen(
                                         contentPadding = contentPadding,
@@ -852,7 +902,7 @@ fun AppRoot(
                     }
 
                     composable(Routes.SETTINGS) {
-                        if (capabilityProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
+                        if (contentAllowed && capabilityProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
                             ContentContainer {
                                     SettingsScreen(
                                         startRoute = if (
@@ -874,7 +924,7 @@ fun AppRoot(
                     }
 
                     composable(Routes.UNLOCK) {
-                        ContentContainer {
+                        if (contentAllowed) ContentContainer {
                                 SimpleTvUnlockScreen(
                                     backEnabled =
                                         !drawerActive && !applianceLaunchActive,
@@ -903,7 +953,7 @@ fun AppRoot(
                         val serviceId = entry.arguments?.getInt("serviceId") ?: 0
                         val channelName = entry.arguments?.getString("channelName") ?: ""
 
-                        if (!applianceLaunchActive) {
+                        StartupGatedPlayerContent(contentAllowed = contentAllowed) {
                             VideoPlayerScreen(
                                 channelId = channelId,
                                 channelName = channelName,
@@ -938,6 +988,7 @@ fun AppRoot(
                             else -> RecordingPlaybackIntent.DefaultPolicy
                         }
                         if (
+                            contentAllowed &&
                             capabilityProfile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER)
                         ) {
                             RecordingPlayerScreen(
@@ -988,6 +1039,9 @@ fun AppRoot(
             presentation = effectiveStartupPresentation,
             navigationStartDestination = navigationStartDestination,
             navigationAllowed = navigationAllowed,
+            contentAllowed =
+                applianceLaunchState == ApplianceLaunchState.Idle &&
+                    effectiveStartupPresentation == MainStartupPresentation.Inactive,
         ),
         simpleTvActive = simpleTvActive,
         onBack = startupBack,
@@ -1014,7 +1068,7 @@ fun AppRoot(
                 }
             }
         },
-        navigation = { startDestination ->
+        navigation = { startDestination, contentAllowed ->
             MainNavigationShell(
                 showRail = showRail,
                 rail = {
@@ -1044,12 +1098,12 @@ fun AppRoot(
                             }
                         },
                         content = { contentPadding, drawerActive ->
-                            content(contentPadding, drawerActive, startDestination)
+                            content(contentPadding, drawerActive, startDestination, contentAllowed)
                         },
                     )
                 },
                 fullScreen = {
-                    content(TvFullScreenPadding, false, startDestination)
+                    content(TvFullScreenPadding, false, startDestination, contentAllowed)
                 },
             )
         },

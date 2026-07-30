@@ -105,6 +105,44 @@ sealed interface PlaybackSessionState {
     data class Failed(val reason: PlaybackFailureReason) : PlaybackSessionState
 }
 
+/**
+ * Updated only by serialized target transitions and generation-validated player callbacks.
+ */
+internal class LivePlayingServiceTracker {
+    private val lock = Any()
+    private var generation = Long.MIN_VALUE
+    private var targetServiceId: Int? = null
+    private val _serviceId = MutableStateFlow<Int?>(null)
+
+    val serviceId: StateFlow<Int?> = _serviceId
+
+    fun beginLiveTarget(serviceId: Int, generation: Long) {
+        synchronized(lock) {
+            if (generation < this.generation) return
+            _serviceId.value = null
+            this.generation = generation
+            targetServiceId = serviceId
+        }
+    }
+
+    fun invalidate(generation: Long) {
+        synchronized(lock) {
+            if (generation < this.generation) return
+            _serviceId.value = null
+            this.generation = generation
+            targetServiceId = null
+        }
+    }
+
+    fun markLivePlaying(serviceId: Int, generation: Long): Boolean = synchronized(lock) {
+        if (generation != this.generation || serviceId != targetServiceId) {
+            return@synchronized false
+        }
+        _serviceId.value = serviceId
+        true
+    }
+}
+
 enum class PlaybackFailureReason {
     RECORDING_UNAVAILABLE,
     RECORDING_READ_FAILED,
@@ -222,6 +260,8 @@ class PlayerSession(
 
     private val _activeServiceId = MutableStateFlow<Int?>(null)
     val activeServiceId: StateFlow<Int?> = _activeServiceId
+    private val livePlayingServiceTracker = LivePlayingServiceTracker()
+    val playingLiveServiceId: StateFlow<Int?> = livePlayingServiceTracker.serviceId
     private val _activeRecordingId = MutableStateFlow<Int?>(null)
     val activeRecordingId: StateFlow<Int?> = _activeRecordingId
     private val _recordingProgressSyncState =
@@ -293,7 +333,14 @@ class PlayerSession(
                         }
                     } else if (live != null) {
                         issuance.commitIfCurrent(live.generation) {
-                            if (activePlayback == live && recoveryEventsEnabled) {
+                            if (
+                                activePlayback == live &&
+                                recoveryEventsEnabled &&
+                                livePlayingServiceTracker.markLivePlaying(
+                                    serviceId = live.serviceId,
+                                    generation = live.generation,
+                                )
+                            ) {
                                 _state.value = PlaybackSessionState.Playing
                             }
                         }
@@ -359,7 +406,14 @@ class PlayerSession(
                 }
                 live != null -> {
                     issuance.commitIfCurrent(live.generation) {
-                        if (activePlayback != live) return@commitIfCurrent
+                        if (
+                            activePlayback != live ||
+                            !recoveryEventsEnabled ||
+                            !livePlayingServiceTracker.markLivePlaying(
+                                serviceId = live.serviceId,
+                                generation = live.generation,
+                            )
+                        ) return@commitIfCurrent
                         retryJob?.cancel()
                         retryJob = null
                         consecutiveFailures = 0
@@ -503,6 +557,7 @@ class PlayerSession(
                         consecutiveFailures = 0
                         ActivePlayback(appContext, serviceId, epoch).also {
                             resetDiagnosticsCounters()
+                            livePlayingServiceTracker.beginLiveTarget(serviceId, epoch)
                             activePlayback = it
                             _activeServiceId.value = serviceId
                             _activeRecordingId.value = null
@@ -578,6 +633,7 @@ class PlayerSession(
         val recording = withContext(Dispatchers.Main.immediate) {
             issuance.commitIfCurrent(epoch) {
                 cancelRecordingJobs()
+                livePlayingServiceTracker.invalidate(epoch)
                 activePlayback = null
                 _activeServiceId.value = null
                 val progressCapability = dvrRepository.progressCapability.value
@@ -1114,6 +1170,7 @@ class PlayerSession(
                 val retryTarget = withContext(Dispatchers.Main.immediate) {
                     issuance.commitIfCurrent(epoch) {
                         target.copy(generation = epoch).also {
+                            livePlayingServiceTracker.beginLiveTarget(it.serviceId, epoch)
                             activePlayback = it
                             _state.value = PlaybackSessionState.Starting
                         }
@@ -1177,6 +1234,7 @@ class PlayerSession(
 
         try {
             commands.run {
+                livePlayingServiceTracker.invalidate(epoch)
                 finishActiveRecordingLocked()
                 withContext(Dispatchers.Main.immediate) {
                     cancelRecordingJobs()
@@ -1224,6 +1282,7 @@ class PlayerSession(
 
         try {
             commands.run {
+                livePlayingServiceTracker.invalidate(epoch)
                 finishActiveRecordingLocked()
                 withContext(Dispatchers.Main.immediate) {
                     cancelRecordingJobs()

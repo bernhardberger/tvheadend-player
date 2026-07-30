@@ -13,6 +13,8 @@ class VideoPlayerViewModel(
 ) : ViewModel() {
     val connectionState = htspService.state
     val playbackState = playerSession.state
+    val activeServiceId = playerSession.activeServiceId
+    val playingLiveServiceId = playerSession.playingLiveServiceId
     val timeshiftState = playerSession.timeshiftState
     val liveSubscriptionFailure = playerSession.liveSubscriptionFailure
     val diagnostics = playerSession.diagnostics

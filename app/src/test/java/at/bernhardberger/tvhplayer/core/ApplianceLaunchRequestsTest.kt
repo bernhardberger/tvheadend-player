@@ -32,6 +32,117 @@ class ApplianceLaunchRequestsTest {
     }
 
     @Test
+    fun retainedPending_restoresExactGenerationAndResolvesCurrentSnapshot() {
+        var retainedRequestId: Long? = null
+        val original = ApplianceLaunchRequests(
+            onRetainedRequestIdChanged = { retainedRequestId = it },
+        )
+        original.request()
+        val originalPending = original.state.value as ApplianceLaunchState.Pending
+
+        val restored = ApplianceLaunchRequests(
+            restoredRequestId = retainedRequestId,
+            onRetainedRequestIdChanged = { retainedRequestId = it },
+        )
+        val restoredPending = restored.state.value as ApplianceLaunchState.Pending
+        val currentReady = CurrentChannelReadiness.Ready(
+            listOf(channel(id = 20, name = "Current Twenty")),
+        )
+        val target = requireNotNull(
+            restored.resolve(
+                request = restoredPending.request,
+                readiness = currentReady,
+                persistedId = 20,
+            )
+        )
+
+        assertEquals(originalPending.request, restoredPending.request)
+        assertEquals(20, target.channelId)
+        assertEquals("Current Twenty", target.channelName)
+    }
+
+    @Test
+    fun retainedEntering_restoresAsPendingAndDoesNotReuseStaleTarget() {
+        var retainedRequestId: Long? = null
+        val original = ApplianceLaunchRequests(
+            onRetainedRequestIdChanged = { retainedRequestId = it },
+        )
+        original.request()
+        val originalPending = original.state.value as ApplianceLaunchState.Pending
+        val staleTarget = requireNotNull(
+            original.resolve(
+                request = originalPending.request,
+                readiness = CurrentChannelReadiness.Ready(
+                    listOf(channel(id = 20, name = "Stale Twenty")),
+                ),
+                persistedId = 20,
+            )
+        )
+        assertEquals(ApplianceLaunchState.Entering(staleTarget), original.state.value)
+
+        val restored = ApplianceLaunchRequests(
+            restoredRequestId = retainedRequestId,
+            onRetainedRequestIdChanged = { retainedRequestId = it },
+        )
+        val restoredPending = restored.state.value as ApplianceLaunchState.Pending
+        val currentTarget = requireNotNull(
+            restored.resolve(
+                request = restoredPending.request,
+                readiness = CurrentChannelReadiness.Ready(
+                    listOf(channel(id = 20, name = "Current Twenty")),
+                ),
+                persistedId = 20,
+            )
+        )
+
+        assertEquals(staleTarget.request, restoredPending.request)
+        assertEquals("Current Twenty", currentTarget.channelName)
+        assertFalse(currentTarget == staleTarget)
+    }
+
+    @Test
+    fun requestAfterRestoredGenerationClears_isGreaterAndRejectsStaleOperations() {
+        var retainedRequestId: Long? = 41L
+        val requests = ApplianceLaunchRequests(
+            restoredRequestId = retainedRequestId,
+            onRetainedRequestIdChanged = { retainedRequestId = it },
+        )
+        val restoredPending = requests.state.value as ApplianceLaunchState.Pending
+        val restoredTarget = requireNotNull(
+            requests.resolve(
+                request = restoredPending.request,
+                readiness = ready,
+                persistedId = 20,
+            )
+        )
+        val restoredEntering = ApplianceLaunchState.Entering(restoredTarget)
+
+        assertTrue(requests.cancel(restoredEntering))
+        assertNull(retainedRequestId)
+        requests.request()
+        val nextPending = requests.state.value as ApplianceLaunchState.Pending
+        val nextTarget = requireNotNull(
+            requests.resolve(
+                request = nextPending.request,
+                readiness = ready,
+                persistedId = 20,
+            )
+        )
+
+        assertTrue(nextPending.request.id > restoredPending.request.id)
+        assertFalse(requests.cancel(restoredEntering))
+        assertFalse(
+            requests.completePlayerVisibility(
+                target = restoredTarget,
+                channelId = restoredTarget.channelId,
+                serviceId = restoredTarget.serviceId,
+                channelName = restoredTarget.channelName,
+            )
+        )
+        assertEquals(ApplianceLaunchState.Entering(nextTarget), requests.state.value)
+    }
+
+    @Test
     fun disabledStartup_staysIdle() {
         val requests = ApplianceLaunchRequests()
 

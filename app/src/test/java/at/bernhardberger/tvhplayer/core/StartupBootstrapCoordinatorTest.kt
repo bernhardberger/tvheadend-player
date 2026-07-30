@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import java.util.concurrent.CancellationException
@@ -42,6 +43,39 @@ class StartupBootstrapCoordinatorTest {
                 startSimpleTv = false,
             ),
             fixture.coordinator.state.value,
+        )
+    }
+
+    @Test
+    fun restoredPendingAndEnabledAutoplay_coalesceAsOneGeneration() = runBlocking {
+        val requests = ApplianceLaunchRequests(restoredRequestId = 52L)
+        val fixture = fixture(
+            autoStartPlayback = true,
+            requests = requests,
+        )
+
+        fixture.coordinator.bootstrap()
+
+        val pending = requests.state.value as ApplianceLaunchState.Pending
+        assertEquals(52L, pending.request.id)
+        assertEquals(1, fixture.serverReads)
+        assertEquals(1, fixture.uiReads)
+        assertEquals(1, fixture.simpleTvReads)
+    }
+
+    @Test
+    fun restoredExplicitPending_survivesDisabledAutoplay() = runBlocking {
+        val requests = ApplianceLaunchRequests(restoredRequestId = 61L)
+        val fixture = fixture(
+            autoStartPlayback = false,
+            requests = requests,
+        )
+
+        fixture.coordinator.bootstrap()
+
+        assertEquals(
+            ApplianceLaunchState.Pending(ApplianceLaunchRequest(61L)),
+            requests.state.value,
         )
     }
 
@@ -90,6 +124,56 @@ class StartupBootstrapCoordinatorTest {
             fixture.coordinator.state.value,
         )
     }
+
+    @Test
+    fun successfulBootstrap_marksRequestCreationHandledBeforeReady() = runBlocking {
+        lateinit var fixture: Fixture
+        fixture = fixture(
+            autoStartPlayback = true,
+            onBootstrapHandled = {
+                assertEquals(
+                    MainStartupState.ResolvingLocal,
+                    fixture.coordinator.state.value,
+                )
+                assertTrue(fixture.requests.state.value is ApplianceLaunchState.Pending)
+            },
+        )
+
+        fixture.coordinator.bootstrap()
+
+        assertEquals(1, fixture.bootstrapHandledCalls)
+        assertTrue(fixture.coordinator.state.value is MainStartupState.Ready)
+    }
+
+    @Test
+    fun handledSimpleTvRestoration_restartsSessionBeforeReadyWithoutCreatingRequest() =
+        runBlocking {
+            lateinit var fixture: Fixture
+            fixture = fixture(
+                simpleTvEnabled = true,
+                createStartupRequest = false,
+                onSimpleTvStart = {
+                    assertEquals(
+                        MainStartupState.ResolvingLocal,
+                        fixture.coordinator.state.value,
+                    )
+                    assertEquals(ApplianceLaunchState.Idle, fixture.requests.state.value)
+                },
+            )
+
+            fixture.coordinator.bootstrap()
+
+            assertEquals(1, fixture.simpleTvStarts)
+            assertEquals(ApplianceLaunchState.Idle, fixture.requests.state.value)
+            assertEquals(
+                MainStartupState.Ready(
+                    server = configuredServer,
+                    autoStartPlayback = false,
+                    startSimpleTv = true,
+                ),
+                fixture.coordinator.state.value,
+            )
+        }
 
     @Test
     fun unconfiguredServer_neitherStartsSimpleTvNorRequestsPlayback() = runBlocking {
@@ -154,6 +238,75 @@ class StartupBootstrapCoordinatorTest {
     }
 
     @Test
+    fun handledBootstrapWithNoRetainedRequest_doesNotRearmAfterCancelOrCommit() = runBlocking {
+        suspend fun restoreAfterTerminal(completePlayer: Boolean): ApplianceLaunchState {
+            var retainedRequestId: Long? = null
+            var bootstrapHandled = false
+            val originalRequests = ApplianceLaunchRequests(
+                onRetainedRequestIdChanged = { retainedRequestId = it },
+            )
+            val original = fixture(
+                autoStartPlayback = true,
+                requests = originalRequests,
+                onBootstrapHandled = { bootstrapHandled = true },
+            )
+            original.coordinator.bootstrap()
+            val pending = originalRequests.state.value as ApplianceLaunchState.Pending
+            if (completePlayer) {
+                val target = requireNotNull(
+                    originalRequests.resolve(
+                        request = pending.request,
+                        readiness = CurrentChannelReadiness.Ready(
+                            listOf(
+                                ChannelUi(
+                                    id = 20,
+                                    name = "Twenty",
+                                    number = null,
+                                    icon = null,
+                                )
+                            ),
+                        ),
+                        persistedId = 20,
+                    )
+                )
+                assertTrue(
+                    originalRequests.completePlayerVisibility(
+                        target = target,
+                        channelId = target.channelId,
+                        serviceId = target.serviceId,
+                        channelName = target.channelName,
+                    )
+                )
+            } else {
+                assertTrue(originalRequests.cancel(pending))
+            }
+            assertTrue(bootstrapHandled)
+            assertEquals(null, retainedRequestId)
+
+            val restoredRequests = ApplianceLaunchRequests(
+                restoredRequestId = retainedRequestId,
+                onRetainedRequestIdChanged = { retainedRequestId = it },
+            )
+            val restored = fixture(
+                autoStartPlayback = true,
+                requests = restoredRequests,
+                createStartupRequest = !bootstrapHandled,
+            )
+            restored.coordinator.bootstrap()
+            return restoredRequests.state.value
+        }
+
+        assertEquals(
+            ApplianceLaunchState.Idle,
+            restoreAfterTerminal(completePlayer = false),
+        )
+        assertEquals(
+            ApplianceLaunchState.Idle,
+            restoreAfterTerminal(completePlayer = true),
+        )
+    }
+
+    @Test
     fun concurrentBootstrapCalls_serializeOneStartupSequence() = runBlocking {
         val firstReadStarted = CompletableDeferred<Unit>()
         val allowFirstRead = CompletableDeferred<Unit>()
@@ -210,12 +363,14 @@ class StartupBootstrapCoordinatorTest {
     fun bootstrapCancellation_propagatesWithoutPublishingReady() {
         val cancellation = CancellationException("cancel bootstrap")
         val requests = ApplianceLaunchRequests()
+        var bootstrapHandledCalls = 0
         val coordinator = StartupBootstrapCoordinator(
             applianceLaunchRequests = requests,
             loadServerSettings = { throw cancellation },
             loadUiSettings = { UiSettings() },
             loadSimpleTvSettings = { SimpleTvSettings() },
             startSimpleTvSession = {},
+            onStartupRequestCreationHandled = { bootstrapHandledCalls += 1 },
         )
 
         val thrown = assertThrows(CancellationException::class.java) {
@@ -225,6 +380,31 @@ class StartupBootstrapCoordinatorTest {
         assertSame(cancellation, thrown)
         assertEquals(MainStartupState.ResolvingLocal, coordinator.state.value)
         assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+        assertEquals(0, bootstrapHandledCalls)
+    }
+
+    @Test
+    fun bootstrapFailure_doesNotMarkRequestCreationHandledOrPublishReady() {
+        val failure = IllegalStateException("settings unavailable")
+        val requests = ApplianceLaunchRequests()
+        var bootstrapHandledCalls = 0
+        val coordinator = StartupBootstrapCoordinator(
+            applianceLaunchRequests = requests,
+            loadServerSettings = { configuredServer },
+            loadUiSettings = { throw failure },
+            loadSimpleTvSettings = { SimpleTvSettings() },
+            startSimpleTvSession = {},
+            onStartupRequestCreationHandled = { bootstrapHandledCalls += 1 },
+        )
+
+        val thrown = assertThrows(IllegalStateException::class.java) {
+            runBlocking { coordinator.bootstrap() }
+        }
+
+        assertSame(failure, thrown)
+        assertEquals(MainStartupState.ResolvingLocal, coordinator.state.value)
+        assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+        assertEquals(0, bootstrapHandledCalls)
     }
 
     private fun fixture(
@@ -232,11 +412,17 @@ class StartupBootstrapCoordinatorTest {
         autoStartPlayback: Boolean = false,
         simpleTvEnabled: Boolean = false,
         onSimpleTvStart: () -> Unit = {},
+        requests: ApplianceLaunchRequests = ApplianceLaunchRequests(),
+        createStartupRequest: Boolean = true,
+        onBootstrapHandled: () -> Unit = {},
     ): Fixture = Fixture(
         server = server,
         autoStartPlayback = autoStartPlayback,
         simpleTvEnabled = simpleTvEnabled,
         onSimpleTvStart = onSimpleTvStart,
+        requests = requests,
+        createStartupRequest = createStartupRequest,
+        onBootstrapHandled = onBootstrapHandled,
     )
 
     private class Fixture(
@@ -244,12 +430,15 @@ class StartupBootstrapCoordinatorTest {
         autoStartPlayback: Boolean,
         simpleTvEnabled: Boolean,
         private val onSimpleTvStart: () -> Unit,
+        val requests: ApplianceLaunchRequests,
+        createStartupRequest: Boolean,
+        private val onBootstrapHandled: () -> Unit,
     ) {
-        val requests = ApplianceLaunchRequests()
         var serverReads = 0
         var uiReads = 0
         var simpleTvReads = 0
         var simpleTvStarts = 0
+        var bootstrapHandledCalls = 0
 
         val coordinator = StartupBootstrapCoordinator(
             applianceLaunchRequests = requests,
@@ -268,6 +457,11 @@ class StartupBootstrapCoordinatorTest {
             startSimpleTvSession = {
                 simpleTvStarts += 1
                 onSimpleTvStart()
+            },
+            createStartupRequest = createStartupRequest,
+            onStartupRequestCreationHandled = {
+                bootstrapHandledCalls += 1
+                onBootstrapHandled()
             },
         )
     }

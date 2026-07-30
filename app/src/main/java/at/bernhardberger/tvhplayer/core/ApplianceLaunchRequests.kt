@@ -28,19 +28,32 @@ sealed interface ApplianceLaunchState {
     data class Entering(val target: ApplianceLaunchTarget) : ApplianceLaunchState
 }
 
-class ApplianceLaunchRequests {
-    private val nextRequestId = AtomicLong(0L)
-    private val _state = MutableStateFlow<ApplianceLaunchState>(ApplianceLaunchState.Idle)
+class ApplianceLaunchRequests(
+    restoredRequestId: Long? = null,
+    private val onRetainedRequestIdChanged: (Long?) -> Unit = {},
+) {
+    private val nextRequestId = AtomicLong(restoredRequestId?.coerceAtLeast(0L) ?: 0L)
+    private val _state = MutableStateFlow<ApplianceLaunchState>(
+        restoredRequestId?.let { requestId ->
+            ApplianceLaunchState.Pending(ApplianceLaunchRequest(requestId))
+        } ?: ApplianceLaunchState.Idle,
+    )
     val state = _state.asStateFlow()
 
+    @Synchronized
     fun request() {
         while (true) {
             if (_state.value != ApplianceLaunchState.Idle) return
 
             val pending = ApplianceLaunchState.Pending(
-                ApplianceLaunchRequest(nextRequestId.incrementAndGet())
+                ApplianceLaunchRequest(
+                    nextRequestId.updateAndGet { currentId ->
+                        check(currentId < Long.MAX_VALUE) { "Launch request ID exhausted" }
+                        currentId + 1L
+                    }
+                )
             )
-            if (_state.compareAndSet(ApplianceLaunchState.Idle, pending)) return
+            if (transition(ApplianceLaunchState.Idle, pending, pending.request.id)) return
         }
     }
 
@@ -48,6 +61,7 @@ class ApplianceLaunchRequests {
         if (autoStartPlayback) request()
     }
 
+    @Synchronized
     fun resolve(
         request: ApplianceLaunchRequest,
         readiness: CurrentChannelReadiness,
@@ -67,21 +81,23 @@ class ApplianceLaunchRequests {
         )
         val pending = ApplianceLaunchState.Pending(request)
 
-        return if (_state.compareAndSet(pending, ApplianceLaunchState.Entering(target))) {
+        return if (transition(pending, ApplianceLaunchState.Entering(target), request.id)) {
             target
         } else {
             null
         }
     }
 
+    @Synchronized
     fun cancel(expectedState: ApplianceLaunchState): Boolean {
         if (expectedState == ApplianceLaunchState.Idle) return false
-        return _state.compareAndSet(expectedState, ApplianceLaunchState.Idle)
+        return transition(expectedState, ApplianceLaunchState.Idle, retainedRequestId = null)
     }
 
     fun isEntering(target: ApplianceLaunchTarget): Boolean =
         _state.value == ApplianceLaunchState.Entering(target)
 
+    @Synchronized
     fun completePlayerVisibility(
         target: ApplianceLaunchTarget,
         channelId: Int,
@@ -89,9 +105,20 @@ class ApplianceLaunchRequests {
         channelName: String,
     ): Boolean {
         if (!target.matchesPlayer(channelId, serviceId, channelName)) return false
-        return _state.compareAndSet(
+        return transition(
             ApplianceLaunchState.Entering(target),
             ApplianceLaunchState.Idle,
+            retainedRequestId = null,
         )
+    }
+
+    private fun transition(
+        expectedState: ApplianceLaunchState,
+        newState: ApplianceLaunchState,
+        retainedRequestId: Long?,
+    ): Boolean {
+        if (!_state.compareAndSet(expectedState, newState)) return false
+        onRetainedRequestIdChanged(retainedRequestId)
+        return true
     }
 }

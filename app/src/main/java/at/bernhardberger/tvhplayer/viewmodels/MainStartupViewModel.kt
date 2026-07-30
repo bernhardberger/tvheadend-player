@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
@@ -21,8 +22,13 @@ class MainStartupViewModel(
     uiSettingsStore: UiSettingsStore,
     simpleTvSettingsStore: SimpleTvSettingsStore,
     simpleTvSession: SimpleTvSession,
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    val applianceLaunchRequests = ApplianceLaunchRequests()
+    private val createStartupRequest = shouldCreateStartupRequest(savedStateHandle)
+    private val initialActivityIntentPolicy = InitialActivityIntentPolicy(
+        allowRestoredIntent = createStartupRequest,
+    )
+    val applianceLaunchRequests = createRetainedApplianceLaunchRequests(savedStateHandle)
     private val _state = MutableStateFlow<MainStartupState>(MainStartupState.ResolvingLocal)
     val state = _state.asStateFlow()
     private val _runtimeServerSettings = MutableStateFlow<ServerSettings?>(null)
@@ -33,6 +39,10 @@ class MainStartupViewModel(
         loadUiSettings = { uiSettingsStore.settings.first() },
         loadSimpleTvSettings = { simpleTvSettingsStore.settings.first() },
         startSimpleTvSession = simpleTvSession::start,
+        createStartupRequest = createStartupRequest,
+        onStartupRequestCreationHandled = {
+            markStartupRequestCreationHandled(savedStateHandle)
+        },
         startupState = _state,
     )
 
@@ -44,6 +54,47 @@ class MainStartupViewModel(
             serverSettingsStore.serverSettings.collect { server ->
                 _runtimeServerSettings.value = server
             }
+        }
+    }
+
+    internal fun shouldHandleInitialActivityIntent(activityWasRestored: Boolean): Boolean =
+        initialActivityIntentPolicy.shouldHandle(activityWasRestored)
+
+    internal class InitialActivityIntentPolicy(
+        private val allowRestoredIntent: Boolean,
+    ) {
+        private var initialIntentHandled = false
+
+        fun shouldHandle(activityWasRestored: Boolean): Boolean {
+            if (initialIntentHandled) return false
+            initialIntentHandled = true
+            return !activityWasRestored || allowRestoredIntent
+        }
+    }
+
+    companion object {
+        private const val RETAINED_REQUEST_ID_KEY = "startup.retainedRequestId"
+        private const val STARTUP_REQUEST_CREATION_HANDLED_KEY =
+            "startup.requestCreationHandled"
+
+        internal fun createRetainedApplianceLaunchRequests(
+            savedStateHandle: SavedStateHandle,
+        ): ApplianceLaunchRequests = ApplianceLaunchRequests(
+            restoredRequestId = savedStateHandle[RETAINED_REQUEST_ID_KEY],
+            onRetainedRequestIdChanged = { requestId ->
+                if (requestId == null) {
+                    savedStateHandle.remove<Long>(RETAINED_REQUEST_ID_KEY)
+                } else {
+                    savedStateHandle[RETAINED_REQUEST_ID_KEY] = requestId
+                }
+            },
+        )
+
+        internal fun shouldCreateStartupRequest(savedStateHandle: SavedStateHandle): Boolean =
+            savedStateHandle.get<Boolean>(STARTUP_REQUEST_CREATION_HANDLED_KEY) != true
+
+        internal fun markStartupRequestCreationHandled(savedStateHandle: SavedStateHandle) {
+            savedStateHandle[STARTUP_REQUEST_CREATION_HANDLED_KEY] = true
         }
     }
 }

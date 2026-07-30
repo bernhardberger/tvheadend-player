@@ -35,6 +35,7 @@ import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -288,52 +289,33 @@ class MainStartupScreenTest {
     }
 
     @Test
-    fun longGermanSimpleTvFailureFitsTheConstrainedProductionRoot() {
+    fun startupSafeBoundsMatrixUsesProductionPaddingAtLargeFontScale() {
+        var scenario by mutableStateOf(startupBoundsMatrix.first())
         composeRule.setContent {
-            GermanStartupContent {
-                TVHeadendPlayerTheme {
-                    Box(
-                        modifier = Modifier
-                            .size(width = 960.dp, height = 540.dp)
-                            .testTag(VIEWPORT_TAG),
-                    ) {
-                        MainStartupScreen(
-                            presentation = MainStartupPresentation.Actionable(
-                                MainStartupMessageKind.SIMPLE_TV_FAILURE,
-                                retryAndExit,
-                            ),
-                            contentPadding = PaddingValues(),
-                        )
+            LocaleStartupContent(scenario.locale) {
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density = 1f, fontScale = 1.3f),
+                ) {
+                    TVHeadendPlayerTheme {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 960.dp, height = 540.dp)
+                                .testTag(VIEWPORT_TAG),
+                        ) {
+                            MainStartupScreen(
+                                presentation = scenario.presentation,
+                                contentPadding = TvFullScreenPadding,
+                            )
+                        }
                     }
                 }
             }
         }
 
-        val viewport = composeRule.onNodeWithTag(VIEWPORT_TAG).fetchSemanticsNode().boundsInRoot
-        val root = composeRule.onNodeWithTag(ROOT_TAG).fetchSemanticsNode().boundsInRoot
-        assertEquals(960f, viewport.width, 1f)
-        assertEquals(540f, viewport.height, 1f)
-        assertTrue(root.left >= viewport.left)
-        assertTrue(root.top >= viewport.top)
-        assertTrue(root.right <= viewport.right)
-        assertTrue(root.bottom <= viewport.bottom)
-        composeRule.onNodeWithText("Fernsehen ist in Einfachem TV derzeit nicht verfügbar.")
-            .assertIsDisplayed()
-        composeRule.onNodeWithText("Erneut versuchen").assertIsDisplayed()
-        composeRule.onNodeWithText("Einfaches TV verlassen").assertIsDisplayed()
-        listOf(
-            composeRule.onNodeWithText(
-                "Fernsehen ist in Einfachem TV derzeit nicht verfügbar.",
-            ).fetchSemanticsNode().boundsInRoot,
-            composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY))
-                .fetchSemanticsNode().boundsInRoot,
-            composeRule.onNodeWithTag(actionTag(MainStartupActionId.EXIT_SIMPLE_TV))
-                .fetchSemanticsNode().boundsInRoot,
-        ).forEach { bounds ->
-            assertTrue(bounds.left >= root.left)
-            assertTrue(bounds.top >= root.top)
-            assertTrue(bounds.right <= root.right)
-            assertTrue(bounds.bottom <= root.bottom)
+        startupBoundsMatrix.forEach { nextScenario ->
+            composeRule.runOnIdle { scenario = nextScenario }
+            composeRule.waitForIdle()
+            assertStartupBoundsScenario(nextScenario)
         }
     }
 
@@ -364,6 +346,34 @@ class MainStartupScreenTest {
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY)).assertIsFocused()
+    }
+
+    private fun assertStartupBoundsScenario(scenario: StartupBoundsScenario) {
+        val viewport = composeRule.onNodeWithTag(VIEWPORT_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(960f, viewport.width, 1f)
+        assertEquals(540f, viewport.height, 1f)
+
+        val nodes = buildList {
+            add(composeRule.onNodeWithTag(MARK_TAG).assertIsDisplayed())
+            add(composeRule.onNodeWithText(scenario.title).assertIsDisplayed())
+            add(composeRule.onNodeWithText(scenario.message).assertIsDisplayed())
+            scenario.actions.forEach { action ->
+                add(composeRule.onNodeWithTag(actionTag(action.id)).assertIsDisplayed())
+                composeRule.onNodeWithText(action.label).assertIsDisplayed()
+            }
+        }
+        MainStartupActionId.entries
+            .filterNot { action -> scenario.actions.any { it.id == action } }
+            .forEach { action ->
+                composeRule.onNodeWithTag(actionTag(action)).assertDoesNotExist()
+            }
+        nodes.forEach { node ->
+            val bounds = node.fetchSemanticsNode().boundsInRoot
+            assertTrue(bounds.left >= viewport.left + 48f)
+            assertTrue(bounds.top >= viewport.top + 32f)
+            assertTrue(bounds.right <= viewport.right - 48f)
+            assertTrue(bounds.bottom <= viewport.bottom - 32f)
+        }
     }
 
     private fun setStartupContent(
@@ -423,6 +433,7 @@ class MainStartupScreenTest {
 
     private companion object {
         const val ROOT_TAG = "main-startup-root"
+        const val MARK_TAG = "main-startup-mark"
         const val VIEWPORT_TAG = "main-startup-test-viewport"
 
         val retryAndSettings = listOf(
@@ -448,6 +459,67 @@ class MainStartupScreenTest {
             MessageText(MainStartupMessageKind.CREDENTIAL_UNAVAILABLE, "The saved credential is unavailable. Open connection settings and enter it again.", "Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein."),
             MessageText(MainStartupMessageKind.SIMPLE_TV_FAILURE, "Television is unavailable in Simple TV.", "Fernsehen ist in Einfachem TV derzeit nicht verfügbar."),
         )
+
+        val startupBoundsMatrix = listOf(
+            StartupBoundsScenario(
+                locale = Locale.ENGLISH,
+                presentation = MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_CHANNELS),
+                title = "Starting TVHeadend Player",
+                message = "Loading channel information…",
+            ),
+            StartupBoundsScenario(
+                locale = Locale.GERMAN,
+                presentation = MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
+                title = "TVHeadend Player wird gestartet",
+                message = "Verbindung mit TVHeadend wird wiederhergestellt…",
+            ),
+            StartupBoundsScenario(
+                locale = Locale.ENGLISH,
+                presentation = MainStartupPresentation.Actionable(
+                    MainStartupMessageKind.CONFIGURATION_REQUIRED,
+                    settingsOnly,
+                ),
+                title = "Action needed",
+                message = "Set up the TVHeadend connection to load channels.",
+                actions = listOf(StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Connection settings")),
+            ),
+            StartupBoundsScenario(
+                locale = Locale.GERMAN,
+                presentation = MainStartupPresentation.Actionable(
+                    MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
+                    settingsOnly,
+                ),
+                title = "Aktion erforderlich",
+                message = "Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein.",
+                actions = listOf(StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Verbindungseinstellungen")),
+            ),
+            StartupBoundsScenario(
+                locale = Locale.ENGLISH,
+                presentation = MainStartupPresentation.Actionable(
+                    MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
+                    retryAndSettings,
+                ),
+                title = "Action needed",
+                message = "No channels are available for this account.",
+                actions = listOf(
+                    StartupActionLabel(MainStartupActionId.RETRY, "Retry"),
+                    StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Connection settings"),
+                ),
+            ),
+            StartupBoundsScenario(
+                locale = Locale.GERMAN,
+                presentation = MainStartupPresentation.Actionable(
+                    MainStartupMessageKind.SIMPLE_TV_FAILURE,
+                    retryAndExit,
+                ),
+                title = "Aktion erforderlich",
+                message = "Fernsehen ist in Einfachem TV derzeit nicht verfügbar.",
+                actions = listOf(
+                    StartupActionLabel(MainStartupActionId.RETRY, "Erneut versuchen"),
+                    StartupActionLabel(MainStartupActionId.EXIT_SIMPLE_TV, "Einfaches TV verlassen"),
+                ),
+            ),
+        )
     }
 }
 
@@ -455,6 +527,19 @@ private data class MessageText(
     val kind: MainStartupMessageKind,
     val english: String,
     val german: String,
+)
+
+private data class StartupBoundsScenario(
+    val locale: Locale,
+    val presentation: MainStartupPresentation,
+    val title: String,
+    val message: String,
+    val actions: List<StartupActionLabel> = emptyList(),
+)
+
+private data class StartupActionLabel(
+    val id: MainStartupActionId,
+    val label: String,
 )
 
 private fun actionTag(action: MainStartupActionId): String = "main-startup-action-${action.name}"

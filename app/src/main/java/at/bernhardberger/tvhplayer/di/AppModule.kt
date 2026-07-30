@@ -81,6 +81,7 @@ val appModule = module {
             uiSettingsStore = get(),
             simpleTvSettingsStore = get(),
             simpleTvSession = get(),
+            savedStateHandle = get(),
         )
     }
     viewModel { VideoPlayerViewModel(playerSession = get(), repo = get(), htspService = get()) }

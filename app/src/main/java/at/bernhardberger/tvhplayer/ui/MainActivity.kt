@@ -35,24 +35,65 @@ data class MainStartupActivityKeyContract(
     val cancelNormalStartup: (() -> Unit)? = null,
 )
 
-internal fun dispatchMainStartupKeyEvent(
-    owner: MainStartupKeyCycleOwner,
-    contract: MainStartupActivityKeyContract,
-    event: KeyEvent,
-): Boolean = when (
-    owner.keyEvent(
-        mode = contract.mode,
+internal class MainStartupActivityKeyDispatcher(
+    private val owner: MainStartupKeyCycleOwner,
+) {
+    private val forwardedActivationKeyCodes = mutableSetOf<Int>()
+
+    fun dispatch(contract: MainStartupActivityKeyContract, event: KeyEvent): Boolean = dispatch(
+        contract = contract,
         keyCode = event.keyCode,
         action = event.action,
         repeatCount = event.repeatCount,
     )
-) {
-    MainStartupKeyDecision.PASS_THROUGH -> false
-    MainStartupKeyDecision.CONSUME -> true
-    MainStartupKeyDecision.CANCEL_NORMAL_STARTUP_AND_CONSUME -> {
-        contract.cancelNormalStartup?.invoke()
-        true
+
+    fun dispatch(
+        contract: MainStartupActivityKeyContract,
+        keyCode: Int,
+        action: Int,
+        repeatCount: Int = 0,
+    ): Boolean {
+        val decision = owner.keyEvent(
+            mode = contract.mode,
+            keyCode = keyCode,
+            action = action,
+            repeatCount = repeatCount,
+        )
+        when (decision) {
+            MainStartupKeyDecision.CONSUME -> return true
+            MainStartupKeyDecision.CANCEL_NORMAL_STARTUP_AND_CONSUME -> {
+                contract.cancelNormalStartup?.invoke()
+                return true
+            }
+            MainStartupKeyDecision.PASS_THROUGH -> Unit
+        }
+        if (action == KeyEvent.ACTION_UP && keyCode in forwardedActivationKeyCodes) {
+            forwardedActivationKeyCodes.remove(keyCode)
+            return contract.mode !is MainStartupKeyMode.Actionable
+        }
+        if (
+            action == KeyEvent.ACTION_DOWN &&
+            repeatCount == 0 &&
+            contract.mode is MainStartupKeyMode.Actionable &&
+            keyCode.isStartupActivationKey()
+        ) {
+            forwardedActivationKeyCodes += keyCode
+        }
+        return false
     }
+}
+
+internal fun dispatchMainStartupKeyEvent(
+    owner: MainStartupKeyCycleOwner,
+    contract: MainStartupActivityKeyContract,
+    event: KeyEvent,
+): Boolean = MainStartupActivityKeyDispatcher(owner).dispatch(contract, event)
+
+private fun Int.isStartupActivationKey(): Boolean = when (this) {
+    KeyEvent.KEYCODE_DPAD_CENTER,
+    KeyEvent.KEYCODE_ENTER,
+    KeyEvent.KEYCODE_NUMPAD_ENTER -> true
+    else -> false
 }
 
 class MainActivity : AppCompatActivity() {
@@ -62,6 +103,8 @@ class MainActivity : AppCompatActivity() {
     private var debugVideoBackdropVisible by mutableStateOf(false)
     private var debugVideoBackdropReceiverRegistered = false
     private val mainStartupKeyCycleOwner = MainStartupKeyCycleOwner()
+    private val mainStartupKeyDispatcher =
+        MainStartupActivityKeyDispatcher(mainStartupKeyCycleOwner)
     private var mainStartupActivityKeyContract = MainStartupActivityKeyContract(
         mode = MainStartupKeyMode.Inactive,
     )
@@ -89,7 +132,9 @@ class MainActivity : AppCompatActivity() {
             startupViewModel.state.value is MainStartupState.ResolvingLocal &&
                 SystemClock.uptimeMillis() < platformSplashDeadlineUptimeMillis
         }
-        if (savedInstanceState == null) requestApplianceEntry(intent)
+        if (startupViewModel.shouldHandleInitialActivityIntent(savedInstanceState != null)) {
+            requestApplianceEntry(intent)
+        }
         setContent {
             val startupState by startupViewModel.state.collectAsStateWithLifecycle()
             val runtimeServerSettings by
@@ -127,13 +172,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (
-            dispatchMainStartupKeyEvent(
-                owner = mainStartupKeyCycleOwner,
-                contract = mainStartupActivityKeyContract,
-                event = event,
-            )
-        ) {
+        if (mainStartupKeyDispatcher.dispatch(mainStartupActivityKeyContract, event)) {
             return true
         }
         return super.dispatchKeyEvent(event)

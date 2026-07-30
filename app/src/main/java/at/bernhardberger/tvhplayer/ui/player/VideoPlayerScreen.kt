@@ -211,6 +211,8 @@ fun VideoPlayerScreen(
 
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
+    val playingLiveServiceId by
+        videoPlayerViewModel.playingLiveServiceId.collectAsStateWithLifecycle()
     val timeshiftState by videoPlayerViewModel.timeshiftState.collectAsStateWithLifecycle()
     val subscriptionFailure by
         videoPlayerViewModel.liveSubscriptionFailure.collectAsStateWithLifecycle()
@@ -311,8 +313,8 @@ fun VideoPlayerScreen(
         }
     }
 
-    LaunchedEffect(playbackState, currentChannelId) {
-        if (playbackState is PlaybackSessionState.Playing) {
+    LaunchedEffect(playingLiveServiceId, currentChannelId, currentServiceId) {
+        if (playingLiveServiceId == currentServiceId) {
             lastPlayedChannelStore.setChannelId(currentChannelId)
         }
     }

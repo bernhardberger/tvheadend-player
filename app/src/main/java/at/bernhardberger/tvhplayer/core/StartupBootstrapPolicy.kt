@@ -4,6 +4,8 @@ import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -27,6 +29,8 @@ internal class StartupBootstrapCoordinator(
     private val loadUiSettings: suspend () -> UiSettings,
     private val loadSimpleTvSettings: suspend () -> SimpleTvSettings,
     private val startSimpleTvSession: () -> Unit,
+    private val createStartupRequest: Boolean = true,
+    private val onStartupRequestCreationHandled: () -> Unit = {},
     private val startupState: MutableStateFlow<MainStartupState> =
         MutableStateFlow(MainStartupState.ResolvingLocal),
 ) {
@@ -40,12 +44,16 @@ internal class StartupBootstrapCoordinator(
             val server = loadServerSettings()
             val uiSettings = loadUiSettings()
             val simpleTvSettings = loadSimpleTvSettings()
+            currentCoroutineContext().ensureActive()
             val configured = server.host.isNotBlank()
             val autoStartPlayback = configured && uiSettings.autoStartPlayback
             val startSimpleTv = configured && simpleTvSettings.enabled
 
             if (startSimpleTv) startSimpleTvSession()
-            applianceLaunchRequests.requestStartup(autoStartPlayback || startSimpleTv)
+            if (createStartupRequest) {
+                applianceLaunchRequests.requestStartup(autoStartPlayback || startSimpleTv)
+            }
+            onStartupRequestCreationHandled()
             startupState.value = MainStartupState.Ready(
                 server = server,
                 autoStartPlayback = autoStartPlayback,

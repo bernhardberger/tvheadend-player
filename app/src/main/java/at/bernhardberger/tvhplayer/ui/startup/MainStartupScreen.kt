@@ -1,15 +1,19 @@
 package at.bernhardberger.tvhplayer.ui.startup
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -26,6 +30,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.dialog
@@ -49,7 +54,9 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvSpacing32
 
 private val MainStartupContentMaxWidth = 800.dp
+private val MainStartupMarkSize = 120.dp
 private const val MainStartupRootTag = "main-startup-root"
+private const val MainStartupMarkTag = "main-startup-mark"
 private const val MainStartupActionTagPrefix = "main-startup-action-"
 
 /**
@@ -104,6 +111,7 @@ private fun MainStartupPassiveContent(
         Text(
             text = stringResource(R.string.main_startup_passive_title),
             style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
@@ -164,6 +172,7 @@ private fun MainStartupActionableContent(
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxWidth()
@@ -256,6 +265,14 @@ private fun MainStartupFrame(
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(MainStartupMarkSize)
+                    .testTag(MainStartupMarkTag),
+            )
+            Spacer(modifier = Modifier.height(TvSpacing32))
             content()
         }
     }
