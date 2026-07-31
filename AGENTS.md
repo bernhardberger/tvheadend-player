@@ -13,11 +13,10 @@ Before non-trivial work:
    worktree change and stop if another writer is active in the same checkout.
 2. Use `docs/README.md` to select only the documents relevant to the task. Do
    not read the whole documentation tree.
-3. Use `android-tv` to orchestrate application Kotlin, Compose, navigation,
-   playback, EPG, DVR, or appliance behavior through one bounded implementation
-   worker at a time. Use `repo-maintainer` for repository and harness
-   infrastructure. Select `android-tv-integrated` only as the documented trial
-   fallback.
+3. Use the writable `android-tv` primary for application Kotlin, Compose,
+   navigation, playback, EPG, DVR, or appliance behavior. It implements one
+   bounded slice directly. Use `repo-maintainer` for repository and harness
+   infrastructure.
 4. State assumptions before ambiguous or architectural work and implement one
    small, independently verifiable slice.
 5. Fetch remotes before upstream synchronization, contribution preparation, or
@@ -84,6 +83,9 @@ repository-local domain overlays, then the focused skill, then local style.
   user explicitly requests that operation and its safety requirements pass.
 - Do not run parallel writers in one dirty worktree or concurrent Gradle builds,
   device operations, Git mutations, signing, publishing, or releases.
+- Run at most one substantial visual or navigation slice per primary session;
+  return a compact next-slice handoff instead of carrying accumulated context
+  into another implementation.
 - On the shared LXC, keep Gradle state in disk-backed `$HOME/.gradle`, retain
   `--no-daemon`, and stop rather than increasing memory if the host becomes
   sluggish.
@@ -130,29 +132,23 @@ it does not replace integrated or physical-TV gates.
 
 ## Delegation and evidence
 
-Delegation is limited to one child level. `quick-explore` is for exact,
-low-consequence lookups; use `explore` for architecture, multi-hop tracing, or
-completeness. `scout`, `android-reviewer`, `tv-interaction-reviewer`, and
-`tv-ux-reviewer` may perform bounded read-only research/review and cannot
-delegate. `android-tv` may delegate an exact application slice to one
-writing-capable `android-implementer`, `android-implementer-deep`, or
-`android-implementer-critical`; they cannot delegate, overlap another writer,
-commit, or use a device. Use the deep worker for HTSP/Media3 architecture,
-concurrency, lifecycle/ownership, security, native-boundary, or broad cross-layer
-work. Reserve the critical worker for an unresolved P1 after a bounded deep
-attempt or a transport/ownership defect that also crosses security, native,
-signing, rollback, or release safety; size or complexity alone is not enough.
-Spawning the writing-capable `general` agent still requires user approval, an
-explicit scope, and exclusive file ownership. When explicitly selected as the
-trial fallback, `android-tv-integrated` implements directly and must not invoke
-any Android implementation worker.
+Delegation is limited to one child level and all children are read-only.
+`android-tv` performs routine repository lookup and application implementation
+itself. Use `scout` only for a bounded multi-hop repository or external-source
+question when isolating research context is materially useful. Use
+`android-reviewer` for one risk-based source audit covering runtime,
+cross-layer correctness, focus, keys, Back, accessibility, and test truthfulness.
+Use `tv-ux-reviewer` only as a screenshot-first design critic against exact
+current-evidence paths. Children cannot delegate, edit, run a device, mutate
+Git, or act as additional approval layers.
 
-Use `android-reviewer` for runtime/cross-layer correctness and
-`tv-interaction-reviewer` for source-level focus, keys, Back, accessibility, and
-TV UI-test correctness. Their assignments must be non-overlapping. Every
-`tv-ux-reviewer` assignment must name each exact current-evidence path; it is a
-screenshot-first design critic, not a source-only code reviewer. Never ask it to
-discover which repository screenshots, captures, or handoffs are current.
+Start each research, audit, or closure child as a fresh session by omitting
+`task_id`; never resume old child history. Supply only the exact contract,
+accepted invariants, included paths, exclusions, relevant evidence, and stop
+condition. A child that reaches its step budget returns `HANDOFF_REQUIRED`
+instead of claiming complete or pass. The writable primary batches and fixes
+review findings directly, then uses at most one fresh closure limited to named
+finding IDs and the fix delta.
 
 ## Upstream and repository discipline
 

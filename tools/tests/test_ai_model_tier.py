@@ -24,6 +24,7 @@ class AiModelTierTest(unittest.TestCase):
                 name: {
                     "model": f"{model}{suffix}",
                     "variant": "medium",
+                    "steps": 48,
                     "permission": {"task": "deny"},
                 }
                 for name, model in AGENT_MODELS.items()
@@ -50,6 +51,7 @@ class AiModelTierTest(unittest.TestCase):
                 agent = updated["agent"][name]
                 self.assertEqual(agent["model"], f"{model}-fast")
                 self.assertEqual(agent["variant"], "medium")
+                self.assertEqual(agent["steps"], 48)
                 self.assertEqual(agent["permission"], {"task": "deny"})
 
     def test_switches_fast_models_back_to_standard(self) -> None:
@@ -85,6 +87,13 @@ class AiModelTierTest(unittest.TestCase):
                 switch_model_tier(path, "standard")
 
             self.assertEqual(path.read_bytes(), original)
+
+    def test_manages_only_integrated_primary_research_and_review_roles(self) -> None:
+        self.assertEqual(
+            set(AGENT_MODELS),
+            {"android-tv", "scout", "android-reviewer", "tv-ux-reviewer"},
+        )
+        self.assertEqual(set(AGENT_MODELS.values()), {"openai/gpt-5.6-sol"})
 
     def test_reports_mixed_tier(self) -> None:
         config = self.config(fast=True)

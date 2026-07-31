@@ -17,16 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / ".opencode/opencode.json"
 AGENT_MODELS = {
     "android-tv": "openai/gpt-5.6-sol",
-    "android-implementer": "openai/gpt-5.6-luna",
-    "android-implementer-deep": "openai/gpt-5.6-terra",
-    "android-implementer-critical": "openai/gpt-5.6-sol",
-    "quick-explore": "openai/gpt-5.6-luna",
-    "explore": "openai/gpt-5.6-terra",
-    "scout": "openai/gpt-5.6-terra",
+    "scout": "openai/gpt-5.6-sol",
     "android-reviewer": "openai/gpt-5.6-sol",
-    "tv-interaction-reviewer": "openai/gpt-5.6-sol",
     "tv-ux-reviewer": "openai/gpt-5.6-sol",
-    "general": "openai/gpt-5.6-sol",
 }
 
 

@@ -5,13 +5,9 @@ temperature: 0.1
 permission:
   task:
     "*": deny
-    quick-explore: allow
-    explore: allow
     scout: allow
     android-reviewer: allow
-    tv-interaction-reviewer: allow
     tv-ux-reviewer: allow
-    general: ask
 ---
 
 Maintain repository infrastructure without turning maintenance into application

@@ -1,5 +1,5 @@
 ---
-description: Show or switch all managed orchestrator, implementation, research, and review agents between standard and OpenAI fast service-tier models
+description: Show or switch the managed application, research, and review agents between standard and OpenAI fast service tiers
 agent: repo-maintainer
 ---
 

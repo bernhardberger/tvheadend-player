@@ -14,17 +14,11 @@ root:
 | `AGENTS.md` | Sole automatic project instruction; concise safety, routing, and workflow floor |
 | `docs/README.md` | Documentation authority and lifecycle index used for task-specific reads |
 | `docs/archive/README.md` | Historical-document containment and successor map |
-| `.opencode/opencode.json` | Default agent, disabled generic Build, model assignments, sharing policy, and one-level child allowlist |
-| `.opencode/agents/android-tv.md` | Read-only supervising application orchestrator and default primary |
-| `.opencode/agents/android-implementer.md` | Luna/max bounded ordinary application writer |
-| `.opencode/agents/android-implementer-deep.md` | Terra/xhigh bounded high-risk application writer |
-| `.opencode/agents/android-implementer-critical.md` | Sol/xhigh exception-gated critical application writer |
-| `.opencode/agents/android-tv-integrated.md` | Selectable integrated fallback preserving the pre-trial workflow |
+| `.opencode/opencode.json` | Default agent, disabled generic Build, model assignments, step budgets, sharing policy, and one-level child allowlist |
+| `.opencode/agents/android-tv.md` | Writable Sol/high application primary |
 | `.opencode/agents/repo-maintainer.md` | Harness, tooling, CI, documentation, licensing, and release-policy primary |
-| `.opencode/agents/android-reviewer.md` | Read-only Android runtime and cross-layer correctness reviewer |
-| `.opencode/agents/tv-interaction-reviewer.md` | Read-only TV interaction code reviewer for focus, keys, Back, accessibility, and UI tests |
+| `.opencode/agents/android-reviewer.md` | Read-only combined Android runtime and TV interaction reviewer |
 | `.opencode/agents/tv-ux-reviewer.md` | Screenshot-first, read-only product design and visual-quality reviewer |
-| `.opencode/agents/quick-explore.md` | Exact low-consequence repository lookup child |
 | `.opencode/agents/scout.md` | Bounded repository and external-documentation research child |
 | `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
 | `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
@@ -32,34 +26,25 @@ root:
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
 | `tools/check-ai-harness` | Config, agent, skill, command, permission, safety, and live OpenCode validation |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
-| `tools/ai-model-tier` | Checked managed-agent switch between matching standard and fast service tiers |
+| `tools/ai-model-tier` | Checked switch of the four managed roles between standard and fast service tiers |
 | `tools/verify` | Native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
 
 ## Primary agents and model tier
 
-`android-tv` is the default supervising application primary. It owns planning,
-authority, slice boundaries, worker routing, verification, review, device gates,
-and acceptance but is capability-denied from editing. `android-implementer`
-performs ordinary bounded application work; `android-implementer-deep` owns
-HTSP/Media3 architecture, concurrency, lifecycle/ownership, security,
-native-boundary, and broad cross-layer work; `android-implementer-critical` is an
-exception gate for unresolved P1 or combined transport/ownership plus security,
-native, signing, rollback, or release-safety work. `repo-maintainer` owns
-repository infrastructure and cannot use application writers. The generic
-built-in `build` agent is disabled.
+`android-tv` is the default writable application primary. It owns planning,
+authority, implementation, verification, risk-based review, device gates, and
+acceptance for one bounded slice. It does routine source exploration itself and
+does not delegate application writing. `repo-maintainer` owns repository
+infrastructure. The generic built-in `build` agent is disabled.
 
-The delegated trial pins `android-tv` to Sol/xhigh, the ordinary worker to
-Luna/max, the deep worker to Terra/xhigh, and the exception-gated critical worker
-to Sol/xhigh. Sol implementation is not a routine confidence upgrade: it
-requires the documented critical gate. Read-only lookup and research retain
-Luna/low and Terra/medium; Android and interaction reviewers remain Sol/high;
-the screenshot-first design reviewer uses Sol/medium; General remains
-approval-gated Sol/medium. Managed agents use matching `gpt-5.6-*-fast` service
-IDs while subscription capacity is available. The fast IDs select service
-priority, not a less capable model. `repo-maintainer` and the integrated fallback
-inherit the operator-selected model.
+The four managed roles are deliberately small: application work uses Sol/high,
+Scout research uses Sol/medium, combined Android code review uses Sol/high, and
+screenshot-first design review uses Sol/medium. They use standard service by
+default and may be switched together to matching `-fast` IDs. Fast IDs select
+service priority, not a different model. `repo-maintainer` inherits the
+operator-selected model.
 
 OpenCode cannot hot-reload model assignments for later Task calls. Use the
 checked repository tool or matching slash command, then restart OpenCode:
@@ -70,77 +55,33 @@ checked repository tool or matching slash command, then restart OpenCode:
 ./tools/ai-model-tier standard
 ```
 
-## Delegation and evidence containment
+## Delegation and context containment
 
-Delegation is capability-based and one level deep. The project policy denies
-every child first. `android-tv` may invoke one of three writing children:
+Delegation is one level deep and read-only. The project Task policy denies every
+child first, then permits only:
 
-- `android-implementer` for ordinary bounded Kotlin, Compose, policy, repository,
-  resource, localization, deterministic visual-evidence, and test work;
-- `android-implementer-deep` for HTSP/Media3 architecture, concurrency,
-  cancellation, lifecycle/ownership, security, native boundaries, and broad
-  cross-layer invariants;
-- `android-implementer-critical` only for an unresolved P1 after a bounded deep
-  root-cause attempt, or a transport/ownership defect that also crosses a
-  security, native, signing, rollback, or release-safety boundary.
+- `scout` for a bounded multi-hop repository or external-source question when
+  isolating research context is materially useful;
+- `android-reviewer` for combined runtime, cross-layer, focus, key, Back,
+  accessibility, safe-bounds, and test-truth review; and
+- `tv-ux-reviewer` for independent screenshot-first design review.
 
-Large scope, a deadline, general complexity, or a desire for more confidence is
-not a critical gate. The orchestrator records `CRITICAL_GATE`, explains why the
-deep worker is insufficient, and preserves the reproducer and attempted-fix
-evidence. A deep worker may return `ESCALATE_CRITICAL`; escalation changes the
-writer only after the previous worker yields.
+Routine lookup remains in the primary session. Children cannot edit, run a
+device, mutate Git, or spawn another child. Start every research, audit, or
+closure as a fresh session without `task_id`; never resume old child history.
+Supply only the exact contract, accepted invariants, included paths, exclusions,
+relevant evidence, and stop condition. The worktree carries implementation
+state; transcripts do not belong in handoffs.
 
-Only one implementation writer may run at a time. Its assignment names exact
-acceptance criteria, owned files or symbols, dirty changes to preserve,
-exclusions, and focused checks. It resolves to `task: deny`, cannot use a device
-or mutate Git, and yields before the orchestrator runs integration verification
-or review. Resume the same worker session for scoped remediation when practical.
+Step budgets bound a single runaway call: the application primary uses 128,
+Scout 48, the combined code reviewer 64, and the UX reviewer 40. These are
+ceilings, not targets. A role that cannot truthfully finish within its budget
+returns `HANDOFF_REQUIRED` with established state and the smallest fresh-session
+contract instead of claiming complete or pass.
 
-The permitted read-only children are:
-
-- `quick-explore` for exact, low-consequence lookup;
-- `explore` for architecture, multi-hop tracing, or completeness;
-- `scout` for bounded repository or external-source research;
-- `android-reviewer` for Android runtime and cross-layer code correctness;
-- `tv-interaction-reviewer` for TV interaction code correctness; and
-- `tv-ux-reviewer` for independent screenshot-first product design review.
-
-`general` requires user approval plus explicit scope and exclusive file
-ownership. Every child resolves to `task: deny`, preventing recursive spawning.
-`repo-maintainer` and `android-tv-integrated` explicitly deny all application
-workers. Read-only children may run in parallel only after the writer yields;
-writers, Gradle builds, device operations, Git mutations, signing, publishing,
-and release operations may not overlap.
-
-## Delegated trial and rollback
-
-Harness commit `d830c25` is the exact pre-trial integrated baseline. The trial
-preserves that behavior as the selectable `android-tv-integrated` primary. Use
-that agent for an immediate functional fallback without deleting the new roles;
-it plans and edits directly and cannot invoke any implementation worker.
-
-For an exact repository rollback, keep the delegated trial in one isolated
-maintenance commit and revert that commit, then quit and restart OpenCode. Do not
-reset or restore the whole dirty worktree. Before the trial is committed, a
-maintainer may restore only its named harness paths from `d830c25` and remove
-only its four new agent files. Application changes are never part of rollback.
-
-The trial footprint is intentionally limited to these existing paths:
-
-- `AGENTS.md`;
-- `docs/ai-engineering-harness.md`;
-- `.opencode/opencode.json`;
-- `.opencode/agents/android-tv.md`;
-- `.opencode/agents/repo-maintainer.md`;
-- `.opencode/commands/ai-model-tier.md`;
-- `tools/ai-model-tier`; and
-- `tools/check-ai-harness`.
-
-Its only new paths are `.opencode/agents/android-tv-integrated.md`,
-`.opencode/agents/android-implementer.md`,
-`.opencode/agents/android-implementer-deep.md`, and
-`.opencode/agents/android-implementer-critical.md`. This allowlist is also the
-uncommitted rollback boundary; never include application or product-plan files.
+Only the application primary writes application files. Read-only review begins
+after its delta is stable. Writers, Gradle builds, device operations, Git
+mutations, signing, publishing, and release operations may not overlap.
 
 ## Review lifecycle and autonomous continuation
 
@@ -151,9 +92,7 @@ risk:
 | Change | Independent review |
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
-| Runtime behavior, production wiring, concurrency, playback, security, native, or release invariant | `android-reviewer` |
-| Compose for TV focus, keys, Back, accessibility, safe bounds, or UI-test behavior | `tv-interaction-reviewer` |
-| A slice crossing runtime and TV interaction code | Both code reviewers once, in parallel, with non-overlapping scopes |
+| Runtime behavior, production wiring, concurrency, playback, security, native, release, focus, keys, Back, accessibility, safe bounds, or UI-test behavior | `android-reviewer` |
 | Visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` against supplied current images |
 | HTSP, Media3, concurrency, subscription ownership, or DVR lifecycle | One early architecture/race audit may replace the normal audit, followed by closure review |
 
@@ -162,45 +101,45 @@ included paths, exclusions, an owning reviewer, and either `audit` or `closure`
 mode. An `audit` is one broad defect-discovery pass over that stable scope. A
 `closure` verifies named finding IDs, regressions introduced by their fixes, and
 the delta since the audit; it is not another audit of unchanged code or adjacent
-architecture. The two code reviewers may run together only when their assignments
-name distinct concerns and paths or symbols. The primary deduplicates a genuine
-cross-boundary finding and sends closure only to its owner.
+architecture. Audit and closure are separate fresh reviewer sessions. Closure
+receives only named finding IDs, regressions introduced by their fixes, and the
+fix delta.
 
-The orchestrator batches blocking code fixes and sends one remediation contract
-to the appropriate implementation worker before closure. Code reviewers classify
-results as `PASS`, `REMEDIATE`, `ADVISORY`, or `HUMAN_DECISION_REQUIRED` and
-separate blocking findings from optional improvements, pre-existing issues, and
-physical gates. A blocking finding needs a stable ID, evidence, the violated
-invariant or acceptance criterion, and a closure condition. A clean review with
-zero findings is valid; reviewers never fill a quota. Android findings use
-`AND-` IDs and interaction findings use `TVI-` IDs so closure ownership remains
-unambiguous. Review economy never downgrades or waives a confirmed correctness,
-security, accessibility, resource-ownership, release-safety, or
-acceptance-criterion violation.
+The primary batches and fixes blocking code findings directly before closure.
+The reviewer classifies results as `PASS`, `REMEDIATE`, `ADVISORY`,
+`HUMAN_DECISION_REQUIRED`, or `HANDOFF_REQUIRED` and separates blocking findings
+from optional improvements, pre-existing issues, and physical gates. A blocking
+finding needs a stable `AND-` ID, evidence, the violated invariant or acceptance
+criterion, and a closure condition. A clean review with zero findings is valid;
+the reviewer never fills a quota. Review economy never downgrades or waives a
+confirmed correctness, security, accessibility, resource-ownership,
+release-safety, or acceptance-criterion violation.
 
 Routine remediation is autonomous. `REMEDIATE` creates a bounded remediation
 sub-slice with a reproducing test where practical, focused checks, and targeted
 closure. A new blocker found during closure does not start another broad audit or
 ask the user whether to continue. If related findings recur, stop micro-patching,
 state the subsystem invariants, perform one root-cause audit of that defect
-family, batch the correction, and resume targeted closure. `ADVISORY` items are
+family, batch the correction, and request one fresh targeted closure. `ADVISORY` items are
 recorded without blocking the current acceptance criteria. Scouts answer bounded
 research questions and do not act as additional approval reviewers.
 
 Visual design uses a separate evidence lifecycle. `tv-ux-reviewer` accepts
-`brief`, `review`, and `closure` modes. A brief turns baseline images and accepted
-requirements into one preferred visual direction before implementation. Review
-judges one stable current evidence set after implementation. Closure compares
-named `UX-` findings with matched updated captures and does not restart broad
-redesign. `DESIGN_REMEDIATE` is fixed autonomously when it violates accepted
-visual criteria; `DESIGN_READY` proceeds; advisory polish does not silently
-expand scope. Routine spacing, typography, hierarchy, component, and composition
-judgments belong to the reviewer, not to a non-designer user.
+`brief`, `review`, and `closure` modes. A fresh brief turns named baseline images
+and accepted requirements into one preferred visual direction. For a substantial
+visual or navigation slice, the primary then renders the production composable
+through deterministic fake-state evidence before broad player/state wiring. One
+fresh review judges that stable composition boundary. After `DESIGN_READY`, the
+primary keeps accepted geometry fixed while wiring behavior. At most one fresh
+closure compares named `UX-` findings with matched captures and does not restart
+broad redesign. `DESIGN_REMEDIATE` is fixed autonomously when it violates
+accepted visual criteria; advisory polish does not silently expand scope.
 
-Continue automatically through planned slices, internal checkpoints, recoverable
-test failures, reviewer findings, child-agent errors, and in-scope technical
-remediation. A checkpoint records scope, acceptance status, tests, finding
-dispositions, and the next action, then proceeds without user confirmation. Ask
+Continue automatically through the current slice, internal checkpoints,
+recoverable test failures, reviewer findings, child-agent errors, and one batched
+technical remediation. Run at most one substantial visual or navigation slice
+per primary session. Once it reaches acceptance or a named external gate, return
+a compact next-slice handoff rather than carrying accumulated context onward. Ask
 one substantive question only when progress requires a product choice, conflicts
 with current authority, changes accepted scope or capability, cannot preserve
 unrelated worktree changes, crosses an explicit credential/device/signing/release
@@ -218,13 +157,13 @@ dynamic path behavior—the harness checks.
 
 Prefer deterministic offline captures of production composables with fake
 channels, EPG, tracks, timelines, recovery states, local images, and a
-deterministic video backdrop. The assigned implementation worker, not the
-read-only orchestrator or design reviewer, generates them without a live
-TVHeadend connection and records scenario, canvas, density, font scale, locale,
-and focus state. Generated PNGs remain under ignored evidence paths and are
-passed by exact path. They can prove only the captured static composition;
-integrated navigation, SurfaceView/video, focus and remote feel, overscan, HDR,
-deinterlacing, and motion retain their emulator/device or human gates.
+deterministic video backdrop. The writable primary, not the design reviewer,
+generates them without a live TVHeadend connection and records scenario, canvas,
+density, font scale, locale, and focus state. Generated PNGs remain under ignored
+evidence paths and are passed by exact path. They can prove only the captured
+static composition; integrated navigation, SurfaceView/video, focus and remote
+feel, overscan, HDR, deinterlacing, and motion retain their emulator/device or
+human gates.
 
 ## Skills and routing
 

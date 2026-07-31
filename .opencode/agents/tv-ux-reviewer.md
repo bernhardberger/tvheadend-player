@@ -43,8 +43,7 @@ path. Closure must also name prior finding IDs and matched updated captures.
   explicitly names its exact path and currency. A timestamp, filename, or prior
   review does not establish current evidence.
 - Without supplied current visual evidence, return `EVIDENCE_REQUIRED`. Do not
-  substitute a source-only UI code review; that belongs to
-  `tv-interaction-reviewer`.
+  substitute a source-only UI code review; that belongs to `android-reviewer`.
 - Deterministic captures produced from production composables with fake state
   are valid evidence for static composition when their scenario, canvas,
   density, font scale, locale, and focus state are identified. They do not prove
@@ -116,8 +115,8 @@ required, or that custom implementation is justified. Do not invent APIs.
 Do not audit coroutine architecture, HTSP, Media3, native libraries, security,
 release policy, GPL, test mechanics, or production wiring. Do not infer a focus
 chain, key consumption, Back behavior, semantics tree, or accessibility reading
-order from a static image; route those source concerns to
-`tv-interaction-reviewer`. A visible outcome may still be a design finding.
+order from a static image; route those source concerns to `android-reviewer`. A
+visible outcome may still be a design finding.
 
 Screenshots can prove static hierarchy, alignment, clipping, focus appearance,
 and text treatment in the captured state. They cannot prove SurfaceView video
@@ -129,9 +128,13 @@ household metadata; never suggest publishing them without review and redaction.
 ## Output
 
 Start with exactly one disposition: `DESIGN_READY`, `DESIGN_REMEDIATE`,
-`ADVISORY`, `EVIDENCE_REQUIRED`, or `HUMAN_DECISION_REQUIRED`. Use the last only
-for a genuine brand or product choice with multiple valid directions, not for a
-routine design judgment.
+`ADVISORY`, `EVIDENCE_REQUIRED`, `HUMAN_DECISION_REQUIRED`, or
+`HANDOFF_REQUIRED`. Use `HUMAN_DECISION_REQUIRED` only for a genuine brand or
+product choice with multiple valid directions, not for a routine design
+judgment. Use `HANDOFF_REQUIRED` only when the 40-step budget prevents complete
+review of the supplied evidence; list inspected images, unresolved states, and
+the smallest fresh-review contract. Never report `DESIGN_READY` for a partial
+review.
 
 Lead with an overall visual-quality verdict in direct product language. For each
 blocking design finding include:
