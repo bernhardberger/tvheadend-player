@@ -35,10 +35,16 @@ DETERMINISTIC_VECTOR_ARTWORK = (
 
 
 class ArtworkTest(unittest.TestCase):
-    def test_diamond_identity_reaches_launcher_and_dark_splash(self):
+    def test_dark_field_diamond_identity_reaches_launcher_and_splash(self):
         colors = self._color_resources()
-        self.assertEqual("#00BCFA", colors["ic_launcher_background"])
+        self.assertEqual("#0F1014", colors["ic_launcher_background"])
         self.assertEqual("#0F1014", colors["splash_screen_background"])
+
+        logo_svg = (ROOT / "artwork/tvheadend-player-logo.svg").read_text()
+        self.assertIn('<rect width="960" height="300" fill="#0F1014"/>', logo_svg)
+        self.assertIn('<path fill="#00BCFA"', logo_svg)
+        self.assertIn('<path fill="#171717"', logo_svg)
+        self.assertNotIn("#0B1B2E", logo_svg.upper())
 
         themes = (ROOT / "app/src/main/res/values/themes.xml").read_text()
         self.assertIn(
@@ -59,7 +65,10 @@ class ArtworkTest(unittest.TestCase):
         readme = (ROOT / "README.md").read_text()
         self.assertIn("![TVHeadend Player](artwork/tvheadend-player-logo.png)", readme)
         identity = (ROOT / "docs/product-identity-plan.md").read_text()
-        self.assertIn("The mark is a diamond aperture on a cyan field", identity)
+        self.assertIn(
+            "The mark is a cyan diamond aperture on a dark neutral field",
+            identity,
+        )
 
     def test_renderer_regenerates_expected_surfaces(self):
         with tempfile.TemporaryDirectory() as directory:

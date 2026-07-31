@@ -1,44 +1,46 @@
 # TVHeadend Player artwork
 
-The mark is a diamond aperture on a cyan field, layered outward from the play
-symbol: orange play, navy core, cyan band, navy keyline. The cyan lives inside
-the mark rather than behind it, so the whole thing is self-contained and holds
-on any ground — white, black, a screenshot, or the launcher's own cyan.
+The mark is a cyan diamond aperture on a dark neutral field, layered outward
+from the play symbol: orange play, neutral charcoal core, cyan diamond. Cyan is
+the complete outer silhouette; there is no redundant dark keyline around it.
 
 The rotated square is a deliberate nod to the diamond at the center of the
 Tvheadend logo. The four chevrons that surround that diamond are not reproduced,
 and no upstream path geometry is reused. The color roles are inverted: upstream
-puts orange at the source and cyan on the distribution, while here the navy
-carries the shape and the orange marks playback. TVHeadend Player is not
+puts orange at the source and cyan on the distribution, while here cyan carries
+the shape and orange marks playback. TVHeadend Player is not
 affiliated with or endorsed by the Tvheadend project.
 
-## Why the field is cyan
+## Why the field is dark
 
-The previous mark was dark navy on a dark navy field, which collapsed into an
-unreadable smudge on a television at viewing distance. The cyan is now the
-ground, so the icon keeps a bright silhouette from across a room.
+The dark field matches the app and Android starting splash, avoids a bright
+full-screen flash, and lets the cyan diamond remain the dominant silhouette at
+television distance. Expanding cyan to the former keyline boundary preserves the
+mark's launcher footprint without retaining an outline that served only to
+separate cyan from a cyan field.
 
-Orange on cyan measures 1.18:1 and is effectively invisible, so the orange play
-symbol never touches the field directly — the navy core always separates them.
-Navy on cyan is 7.91:1 and orange on navy is 6.69:1.
+The orange play symbol never touches cyan directly; the neutral charcoal core
+separates the accents without introducing a blue or navy cast.
 
 Orange is the accent, not a second primary. Measured as a share of the mark's own
 ink it is 13.2%, against 18.9% for the upstream emblem.
 
 ## Palette
 
-- Field: `#00BCFA`
-- Mark ink: `#0B1B2E`
+- Field: `#0F1014`
+- Diamond: `#00BCFA`
+- Core: `#171717`
 - Play symbol: `#FA7F00`
-- Wordmark: `#0B1B2E`, subtitle at 75% opacity
+- Wordmark: `#E3E3E8`, subtitle at 75% opacity
 
 ## Geometry
 
-`RenderArtwork` normalizes the mark to the 66dp adaptive safe zone. Three nested
+`RenderArtwork` normalizes the mark to the 66dp adaptive safe zone. Two nested
 diamonds — each a rounded square turned through 45 degrees — take half-diagonals
-of 33, 29.5, and 24 units on that 66-unit square, with corner radii of 13, 11.5,
-and 9.5. The outer diamond's vertices sit on the safe zone, so neither the
-circular nor the rounded-square launcher mask clips the mark.
+of 33 and 27 units on that 66-unit square, with corner radii of 13 and 10.5. The
+cyan diamond's vertices sit on the safe zone, so neither the circular nor the
+rounded-square launcher mask clips it. The six-unit inset leaves a cyan band
+about 9% of the diamond span.
 
 The play symbol is a triangle unioned with its own round-joined outline. Its
 horizontal center sits at 35.4 rather than 33 on the 66-unit square — quoted on
@@ -46,8 +48,8 @@ the 108dp adaptive grid, that is 56.4 rather than 54. A right-pointing triangle 
 its mass toward the flat back edge, so centering the bounding box leaves the area
 centroid about two units left of where it reads as centered.
 
-The monochrome layer is the outer diamond with the cyan band and the play symbol
-subtracted, emitted as one even-odd path from the same geometry as the rasters.
+The monochrome layer combines the diamond ring and play symbol into one path
+emitted from the same geometry as the rasters.
 
 ## Exports
 

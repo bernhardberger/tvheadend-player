@@ -45,21 +45,22 @@ during validation, but it is a separate Android application.
 
 ## Visual identity
 
-The mark is a diamond aperture on a cyan field, layered outward from the play
-symbol: orange play, navy core, cyan band, navy keyline. The rotated square is a
-deliberate nod to the diamond at the center of the Tvheadend logo; the four
-chevrons around that diamond are not reproduced, and no upstream path geometry is
-reused. The colors invert the upstream roles, so the orange marks playback rather
-than the source.
+The mark is a cyan diamond aperture on a dark neutral field, layered outward
+from the play symbol: orange play, neutral charcoal core, cyan diamond. The
+rotated square is a deliberate nod to the diamond at the center of the Tvheadend
+logo; the four chevrons around that diamond are not reproduced, and no upstream
+path geometry is reused. The colors invert the upstream roles, so orange marks
+playback rather than the source.
 
-Because the outermost layer is navy and the cyan sits inside the mark, the mark
-is self-contained: it holds on any ground rather than depending on the cyan field
-behind it. It remains legible at launcher scale and reads directly as a live-TV
-player without implying affiliation or endorsement.
+Cyan forms the complete outer silhouette without a dark keyline. The dark field
+matches the app and starting splash, while the neutral core separates orange
+from cyan without introducing a navy cast. The mark remains legible at launcher
+scale and reads directly as a live-TV player without implying affiliation or
+endorsement.
 
 - Source and exports live in `artwork/`.
-- `tools/RenderArtwork.java` is the canonical generator for the Android launcher layers,
-  density fallbacks, monochrome adaptive layer, 512x512 Play listing icon,
+- `tools/RenderArtwork.java` is the canonical generator for the Android launcher
+  layers, density fallbacks, monochrome adaptive layer, 512x512 Play listing icon,
   320x180 TV banner, SVG/logo, and GitHub social preview.
 - The monochrome layer and SVG paths are emitted from the same geometry as the
   rasters, so themed and colored artwork cannot drift apart.

@@ -22,10 +22,10 @@ import javax.imageio.ImageIO;
  * Reproducible launcher, banner, and marketing artwork for TVHeadend Player.
  *
  * Mark: a diamond aperture layered outward from the play symbol — orange play,
- * navy core, cyan band, navy keyline. The rotated square is a deliberate nod to
- * the diamond at the centre of the Tvheadend logo; the chevrons around it are
- * not reproduced. Because the outermost layer is navy and the cyan sits inside
- * the mark, the whole thing is self-contained and holds on any ground.
+ * neutral charcoal core, and cyan diamond on a dark field. The rotated square
+ * is a deliberate nod to the diamond at the centre of the Tvheadend logo; the
+ * chevrons around it are not reproduced. The cyan diamond is the complete outer
+ * silhouette, without a redundant dark keyline.
  *
  * Every surface derives from {@link #diamond} and {@link #playSymbol}, so raster
  * exports, the monochrome adaptive layer, and the SVG wordmark cannot drift apart.
@@ -34,20 +34,20 @@ public final class RenderArtwork {
     // Tvheadend-inspired palette; all mark geometry is original.
     private static final Color CYAN = new Color(0x00, 0xBC, 0xFA);
     private static final Color ORANGE = new Color(0xFA, 0x7F, 0x00);
-    private static final Color NAVY = new Color(0x0B, 0x1B, 0x2E);
-    private static final Color MUTED = new Color(0x0B, 0x1B, 0x2E, 190);
+    private static final Color FIELD = new Color(0x0F, 0x10, 0x14);
+    private static final Color CORE = new Color(0x17, 0x17, 0x17);
+    private static final Color TEXT = new Color(0xE3, 0xE3, 0xE8);
+    private static final Color MUTED = new Color(0xE3, 0xE3, 0xE8, 190);
 
     /** Adaptive-icon safe zone: 66dp of the 108dp grid. */
     private static final double SAFE_ZONE = 66.0 / 108.0;
 
-    // Mark geometry, normalised to the safe-zone square. Half-diagonals and
-    // corner radii for the three nested diamonds, outermost first.
+    // Mark geometry, normalised to the safe-zone square. The cyan outer diamond
+    // fills the safe zone; the core leaves a band about 9% of the diamond span.
     private static final double OUTER_HALF = 0.5;
-    private static final double BAND_HALF = 29.5 / 66.0;
-    private static final double CORE_HALF = 24.0 / 66.0;
+    private static final double CORE_HALF = 27.0 / 66.0;
     private static final double OUTER_CORNER = 13.0 / 66.0;
-    private static final double BAND_CORNER = 11.5 / 66.0;
-    private static final double CORE_CORNER = 9.5 / 66.0;
+    private static final double CORE_CORNER = 10.5 / 66.0;
 
     /**
      * The play symbol's horizontal centre. A right-pointing triangle carries its
@@ -82,9 +82,9 @@ public final class RenderArtwork {
         return graphics;
     }
 
-    /** The cyan ground every surface sits on. */
+    /** The dark neutral ground every surface sits on. */
     private static void paintField(Graphics2D graphics, int width, int height) {
-        graphics.setColor(CYAN);
+        graphics.setColor(FIELD);
         graphics.fillRect(0, 0, width, height);
     }
 
@@ -123,15 +123,13 @@ public final class RenderArtwork {
     }
 
     /**
-     * The mark's ink as a single silhouette, with the cyan band and the play
-     * symbol knocked out. Themed icons and the monochrome layer use this.
+     * The cyan diamond ring and play symbol as one monochrome silhouette.
+     * Themed icons and the monochrome layer use this.
      */
     private static Shape markSilhouette(double x, double y, double size) {
         Area ink = new Area(diamond(x, y, size, OUTER_HALF, OUTER_CORNER));
-        Area band = new Area(diamond(x, y, size, BAND_HALF, BAND_CORNER));
-        band.subtract(new Area(diamond(x, y, size, CORE_HALF, CORE_CORNER)));
-        ink.subtract(band);
-        ink.subtract(new Area(playSymbol(x, y, size)));
+        ink.subtract(new Area(diamond(x, y, size, CORE_HALF, CORE_CORNER)));
+        ink.add(new Area(playSymbol(x, y, size)));
         return ink;
     }
 
@@ -139,11 +137,9 @@ public final class RenderArtwork {
 
     /** Draws the mark in a square of {@code size} with origin at ({@code x},{@code y}). */
     private static void drawMark(Graphics2D graphics, double x, double y, double size) {
-        graphics.setColor(NAVY);
-        graphics.fill(diamond(x, y, size, OUTER_HALF, OUTER_CORNER));
         graphics.setColor(CYAN);
-        graphics.fill(diamond(x, y, size, BAND_HALF, BAND_CORNER));
-        graphics.setColor(NAVY);
+        graphics.fill(diamond(x, y, size, OUTER_HALF, OUTER_CORNER));
+        graphics.setColor(CORE);
         graphics.fill(diamond(x, y, size, CORE_HALF, CORE_CORNER));
         graphics.setColor(ORANGE);
         graphics.fill(playSymbol(x, y, size));
@@ -156,7 +152,7 @@ public final class RenderArtwork {
     }
 
     private static void drawWordmark(Graphics2D graphics, int x, int titleBaseline, int titleSize, int subtitleBaseline) {
-        graphics.setColor(NAVY);
+        graphics.setColor(TEXT);
         graphics.setFont(new Font("DejaVu Sans", Font.BOLD, titleSize));
         graphics.drawString("TVHeadend Player for TV", x, titleBaseline);
         graphics.setColor(MUTED);
@@ -169,7 +165,7 @@ public final class RenderArtwork {
         Graphics2D graphics = graphics(image);
         paintField(graphics, 320, 180);
         drawMark(graphics, 37, 55, 71);
-        graphics.setColor(NAVY);
+        graphics.setColor(TEXT);
         graphics.setFont(new Font("DejaVu Sans", Font.BOLD, 26));
         graphics.drawString("TVHeadend", 132, 84);
         graphics.drawString("Player", 132, 113);
@@ -193,7 +189,7 @@ public final class RenderArtwork {
         paintField(graphics, 1280, 640);
         drawMark(graphics, 100, 155, 330);
         drawWordmark(graphics, 505, 295, 46, 350);
-        graphics.setColor(NAVY);
+        graphics.setColor(TEXT);
         graphics.setFont(new Font("DejaVu Sans", Font.BOLD, 21));
         graphics.drawString("REMOTE-FIRST  /  OPEN SOURCE  /  ANDROID TV", 505, 410);
         graphics.dispose();
@@ -323,23 +319,21 @@ public final class RenderArtwork {
         double markSize = 180;
         double markOrigin = 60;
         String outer = toPathData(diamond(markOrigin, markOrigin, markSize, OUTER_HALF, OUTER_CORNER));
-        String band = toPathData(diamond(markOrigin, markOrigin, markSize, BAND_HALF, BAND_CORNER));
         String core = toPathData(diamond(markOrigin, markOrigin, markSize, CORE_HALF, CORE_CORNER));
         String play = toPathData(playSymbol(markOrigin, markOrigin, markSize));
         String svg = """
                 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="300" viewBox="0 0 960 300">
                   <title>TVHeadend Player logo</title>
-                  <rect width="960" height="300" fill="#00BCFA"/>
+                  <rect width="960" height="300" fill="#0F1014"/>
                   <!-- Diamond aperture, layered outward from the play symbol -->
-                  <path fill="#0B1B2E" d="%s"/>
                   <path fill="#00BCFA" d="%s"/>
-                  <path fill="#0B1B2E" d="%s"/>
+                  <path fill="#171717" d="%s"/>
                   <!-- Player symbol -->
                   <path fill="#FA7F00" d="%s"/>
-                  <text x="290" y="145" fill="#0b1b2e" font-family="DejaVu Sans, sans-serif" font-size="43" font-weight="700">TVHeadend Player for TV</text>
-                  <text x="290" y="190" fill="#0b1b2e" fill-opacity="0.75" font-family="DejaVu Sans, sans-serif" font-size="18">Live TV client for TVHeadend servers</text>
+                  <text x="290" y="145" fill="#E3E3E8" font-family="DejaVu Sans, sans-serif" font-size="43" font-weight="700">TVHeadend Player for TV</text>
+                  <text x="290" y="190" fill="#E3E3E8" fill-opacity="0.75" font-family="DejaVu Sans, sans-serif" font-size="18">Live TV client for TVHeadend servers</text>
                 </svg>
-                """.formatted(outer, band, core, play);
+                """.formatted(outer, core, play);
         Files.writeString(Path.of("artwork/tvheadend-player-logo.svg"), svg, StandardCharsets.UTF_8);
     }
 
