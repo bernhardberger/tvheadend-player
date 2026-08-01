@@ -261,7 +261,7 @@ private fun PinFeedbackRow(
     kind: PinFeedbackKind,
 ) {
     val color = when (kind) {
-        PinFeedbackKind.SUCCESS -> MaterialTheme.colorScheme.primary
+        PinFeedbackKind.SUCCESS -> MaterialTheme.colorScheme.onSurface
         PinFeedbackKind.ERROR -> MaterialTheme.colorScheme.error
     }
     val icon = when (kind) {

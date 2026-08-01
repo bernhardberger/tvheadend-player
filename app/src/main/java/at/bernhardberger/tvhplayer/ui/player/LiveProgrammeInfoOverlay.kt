@@ -50,6 +50,7 @@ import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.ui.TvSpacing56
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -211,7 +212,7 @@ internal fun LiveProgrammeInfoOverlay(
                                         text = stringResource(
                                             R.string.recording_already_scheduled
                                         ),
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = TvRecordingColor,
                                     )
                                 }
                                 Row(
@@ -370,7 +371,7 @@ internal fun ProgrammeRecordingConfirmation(
                     color = if (state is LiveInfoRecordingState.Failed) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.onSurface
                     },
                 )
             }

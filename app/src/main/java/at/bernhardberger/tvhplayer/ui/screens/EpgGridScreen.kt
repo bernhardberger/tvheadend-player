@@ -115,7 +115,10 @@ import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.ui.TvEpgPanelAlpha
+import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
+import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.core.programmeHasAired
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
@@ -942,7 +945,7 @@ private fun TimelineTimeRuler(
                 .fillMaxHeight(),
             shape = MaterialTheme.shapes.small,
             colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
         ) {
@@ -960,7 +963,7 @@ private fun TimelineTimeRuler(
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
         ) {
             repeat(6) { markerIndex ->
                 val markerOffset = maxWidth * (markerIndex / 6f)
@@ -981,7 +984,7 @@ private fun TimelineTimeRuler(
                             .width(1.dp)
                             .weight(1f)
                             .background(
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)
                             )
                     )
                 }
@@ -1069,7 +1072,7 @@ private fun TimelineChannelRow(
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvEpgPanelAlpha)),
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
         ) {
             visibleEvents.forEach { event ->
                 val span = timelineEventSpan(
@@ -1138,7 +1141,7 @@ internal fun TimelineChannelHeader(
                 containerColor = if (selected) {
                     MaterialTheme.colorScheme.surfaceVariant
                 } else {
-                    MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                    MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)
                 },
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
@@ -1230,7 +1233,7 @@ internal fun TimelineProgrammeCell(
                 .fillMaxSize()
                 .padding(horizontal = 1.dp, vertical = 2.dp)
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvPanelDenseAlpha))
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
                 .onPreviewKeyEvent { keyEvent ->
@@ -1410,7 +1413,11 @@ private fun ProgrammeDetailsPanel(
                                 R.string.recording_status,
                                 dvrStateLabel(it.state),
                             ),
-                            color = MaterialTheme.colorScheme.primary,
+                            color = when (it.state) {
+                                DvrState.SCHEDULED, DvrState.RECORDING -> TvRecordingColor
+                                DvrState.FAILED -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     }
                     it.failureReason?.takeIf(String::isNotBlank)?.let { reason ->
@@ -1426,7 +1433,7 @@ private fun ProgrammeDetailsPanel(
                         color = if (it is DvrActionResult.Failed) {
                             MaterialTheme.colorScheme.error
                         } else {
-                            MaterialTheme.colorScheme.primary
+                            MaterialTheme.colorScheme.onSurface
                         },
                     )
                 }
@@ -1618,7 +1625,7 @@ private fun DialogScrim(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.72f))
+                .background(Color.Black.copy(alpha = TvScrimModalAlpha))
                 .focusGroup()
                 .then(if (wide) Modifier.padding(contentPadding) else Modifier),
             contentAlignment = if (wide) Alignment.CenterEnd else Alignment.Center,
@@ -1754,7 +1761,7 @@ private fun GuideEmptyState(
     Surface(
         modifier = Modifier.fillMaxSize(),
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvEpgPanelAlpha),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {

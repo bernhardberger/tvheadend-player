@@ -277,7 +277,7 @@ fun OverlayControlsTv(
             }
             timeshiftFeedback?.let {
                 Spacer(Modifier.height(6.dp))
-                Text(it, color = MaterialTheme.colorScheme.primary)
+                Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Spacer(Modifier.height(TvOverlayTimelineBlockGap))

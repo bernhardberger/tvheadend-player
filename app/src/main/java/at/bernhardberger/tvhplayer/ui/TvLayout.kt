@@ -37,11 +37,6 @@ const val TvScrimModalAlpha = 0.76f
 const val TvTrackAlpha = 0.20f
 const val TvGhostFillAlpha = 0.40f
 
-const val TvNavigationScrimAlpha = 0.50f
-const val TvBrowsePanelAlpha = 0.84f
-const val TvEpgPanelAlpha = 0.88f
-const val TvSettingsPanelAlpha = 0.90f
-
 /** Browse safe-area input owned and passed down by the global navigation shell. */
 val TvScreenPadding = PaddingValues(
     start = 24.dp,

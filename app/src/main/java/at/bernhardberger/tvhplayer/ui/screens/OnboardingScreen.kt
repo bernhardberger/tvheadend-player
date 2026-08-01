@@ -50,6 +50,9 @@ enum class OnboardingStep {
     CONNECTION,
 }
 
+internal fun ConnectionProbeUiState.isActionableFailure(): Boolean =
+    (this as? ConnectionProbeUiState.Complete)?.result is ConnectionProbeResult.Failure
+
 @Composable
 fun OnboardingScreen(
     settingsStore: ServerSettingsStore = koinInject(),
@@ -210,12 +213,10 @@ private fun OnboardingConnection(
         )
 
         if (message != null) {
-            val successful = (probeState as? ConnectionProbeUiState.Complete)
-                ?.result is ConnectionProbeResult.Success
             Text(
                 text = message,
-                color = if (successful) {
-                    MaterialTheme.colorScheme.primary
+                color = if (probeState.isActionableFailure()) {
+                    MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },

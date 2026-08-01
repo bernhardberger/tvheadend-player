@@ -365,8 +365,10 @@ internal fun PlaybackOptionsOverlayFrame(
                     },
                 shape = MaterialTheme.shapes.large,
                 colors = SurfaceDefaults.colors(
-                    containerColor = Color(0xFF0D1117).copy(alpha = TvPanelDenseAlpha),
-                    contentColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.surface.copy(
+                        alpha = TvPanelDenseAlpha
+                    ),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             ) {
                 content()

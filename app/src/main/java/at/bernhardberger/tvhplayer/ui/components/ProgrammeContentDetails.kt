@@ -120,7 +120,7 @@ private fun ContentDetails(
                 Text(
                     text = metadata,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (!body.isNullOrBlank()) {

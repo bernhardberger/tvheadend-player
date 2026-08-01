@@ -1063,7 +1063,7 @@ fun AppRoot(
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = TvNavigationScrimAlpha))
+                            .background(Color.Black.copy(alpha = TvScrimNavigationAlpha))
                     )
                 }
             }

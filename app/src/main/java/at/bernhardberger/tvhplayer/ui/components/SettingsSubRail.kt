@@ -42,7 +42,7 @@ import at.bernhardberger.tvhplayer.models.RailItem
 import at.bernhardberger.tvhplayer.ui.SettingsCategoryPaneWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.screens.SettingsRoutes
-import at.bernhardberger.tvhplayer.ui.TvSettingsPanelAlpha
+import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 
 @Composable
 fun SettingsSubRail(
@@ -75,7 +75,7 @@ fun SettingsSubRail(
             .fillMaxHeight()
             .clip(MaterialTheme.shapes.medium)
             .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha)
+                MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)
             )
             .padding(TvSpacing8)
             .verticalScroll(rememberScrollState())

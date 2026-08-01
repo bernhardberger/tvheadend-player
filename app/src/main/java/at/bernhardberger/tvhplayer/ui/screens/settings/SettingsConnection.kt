@@ -30,7 +30,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.ConnectionProbeResult
 import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
@@ -40,6 +39,7 @@ import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.screens.ConnectionProbeUiState
 import at.bernhardberger.tvhplayer.ui.screens.connectionProbeMessage
+import at.bernhardberger.tvhplayer.ui.screens.isActionableFailure
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -164,12 +164,10 @@ fun SettingsConnection(
             )
         }
         if (probeMessage != null) {
-            val successful = (probeState as? ConnectionProbeUiState.Complete)
-                ?.result is ConnectionProbeResult.Success
             Text(
                 text = probeMessage,
-                color = if (successful) {
-                    MaterialTheme.colorScheme.primary
+                color = if (probeState.isActionableFailure()) {
+                    MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },

@@ -21,7 +21,9 @@ answer.
 
 ### 1.1 Scheme
 
-Dark is the product default. `primary` is the product's own cyan.
+The product is dark-only; it exposes no light scheme. `primary` is the product's
+own cyan. Every Material for TV role is explicitly pinned so a dependency update
+cannot silently repaint inherited roles; `surfaceTint` is product cyan.
 
 | Role | Value | Notes |
 |---|---|---|
@@ -71,12 +73,11 @@ Consequences that follow, and are not negotiable once orange is reserved:
 
 ### 1.3 One recording red
 
-There are currently three warm reds: `error` `#F2B8B5`, a hardcoded
-`RecordingRed = 0xFFE53935` in `RecordingStatusIndicator.kt:18`, and `error`
-reused as a REC badge in `ProgrammeCard`. Collapse to two roles:
+There are two warm roles: `TvRecordingColor` `#FF5449` for recording state and
+`error` `#F2B8B5` for actionable failures:
 
-- **Recording** — one token, used by every REC badge, dot and "recording now"
-  label. Currently `primary` at `RecordingsScreen.kt:1074`; that must move.
+- **Recording** — `TvRecordingColor`, used by every REC badge, dot, scheduled
+  label and "recording now" label.
 - **Error** — `error`, for failures only.
 
 No component may declare its own red.

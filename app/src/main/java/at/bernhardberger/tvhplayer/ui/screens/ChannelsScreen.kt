@@ -84,7 +84,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
-import at.bernhardberger.tvhplayer.ui.TvBrowsePanelAlpha
+import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
@@ -328,11 +328,10 @@ fun ChannelsScreen(
 
         if (useCards) {
             Surface(
-                tonalElevation = 2.dp,
                 shape = MaterialTheme.shapes.medium,
                 colors = SurfaceDefaults.colors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(
-                        alpha = TvBrowsePanelAlpha
+                        alpha = TvPanelBrowseAlpha
                     ),
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
@@ -404,11 +403,10 @@ fun ChannelsScreen(
                     .fillMaxSize(),
             ) {
                 Surface(
-                    tonalElevation = 2.dp,
                     shape = MaterialTheme.shapes.medium,
                     colors = SurfaceDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.surface.copy(
-                            alpha = TvBrowsePanelAlpha
+                            alpha = TvPanelBrowseAlpha
                         ),
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
@@ -482,11 +480,10 @@ fun ChannelsScreen(
                 Spacer(Modifier.width(24.dp))
 
                 Surface(
-                    tonalElevation = 2.dp,
                     shape = MaterialTheme.shapes.medium,
                     colors = SurfaceDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.surface.copy(
-                            alpha = TvBrowsePanelAlpha
+                            alpha = TvPanelBrowseAlpha
                         ),
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
@@ -512,10 +509,9 @@ fun ChannelsScreen(
 @Composable
 private fun EmptyTagState(modifier: Modifier = Modifier) {
     Surface(
-        tonalElevation = 2.dp,
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvBrowsePanelAlpha),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelBrowseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         modifier = modifier,
@@ -552,10 +548,9 @@ private fun EmptyChannelsState(
     }
 
     Surface(
-        tonalElevation = 2.dp,
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvBrowsePanelAlpha),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelBrowseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         modifier = modifier,
@@ -797,7 +792,7 @@ private fun EpgDetailPane(
                 Text(
                     text = metadata,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (summaryText != null) {

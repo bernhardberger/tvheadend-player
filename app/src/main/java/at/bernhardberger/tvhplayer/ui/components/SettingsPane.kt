@@ -15,7 +15,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.ui.TvSettingsPanelAlpha
+import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 
 @Composable
 fun SettingsPane(
@@ -26,7 +26,7 @@ fun SettingsPane(
         modifier = Modifier.fillMaxSize(),
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvSettingsPanelAlpha),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {

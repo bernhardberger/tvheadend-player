@@ -115,8 +115,12 @@ import at.bernhardberger.tvhplayer.repositories.DvrRepository
 import at.bernhardberger.tvhplayer.repositories.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -644,14 +648,14 @@ private fun RecordingModeTabs(
         val scheme = MaterialTheme.colorScheme
         val tabColors = TabDefaults.pillIndicatorTabColors(
             // Raise unselected contrast so Archive/Schedule/Problems all read as enabled.
-            contentColor = scheme.onSurface.copy(alpha = 0.88f),
-            inactiveContentColor = scheme.onSurface.copy(alpha = 0.88f),
+            contentColor = scheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
+            inactiveContentColor = scheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
             selectedContentColor = scheme.onSurface,
             focusedContentColor = scheme.inverseOnSurface,
             focusedSelectedContentColor = scheme.inverseOnSurface,
-            disabledContentColor = scheme.onSurface.copy(alpha = 0.38f),
-            disabledInactiveContentColor = scheme.onSurface.copy(alpha = 0.38f),
-            disabledSelectedContentColor = scheme.onSurface.copy(alpha = 0.38f),
+            disabledContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
+            disabledInactiveContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
+            disabledSelectedContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
         )
         DvrLibraryMode.entries.forEach { mode ->
             Tab(
@@ -694,7 +698,7 @@ private fun RecordingBrowserSurface(
     Surface(
         modifier = modifier,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         shape = MaterialTheme.shapes.medium,
@@ -1037,7 +1041,7 @@ private fun RecordingMetadataPane(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         recordingEpisodeMetadata(entry)?.let {
-            Text(text = it, color = MaterialTheme.colorScheme.primary)
+            Text(text = it, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         entry.summary?.takeIf(String::isNotBlank)?.let {
             Text(text = it, maxLines = 4, overflow = TextOverflow.Ellipsis)
@@ -1530,7 +1534,7 @@ private fun RecordingDetailsPanel(
                     color = if (actionResult is DvrActionResult.Failed) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.onSurface
                     },
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1886,7 +1890,7 @@ private fun RecordingDialogSurface(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.76f))
+            .background(Color.Black.copy(alpha = TvScrimModalAlpha))
             .onPreviewKeyEvent { event ->
                 if (!backEnabled || event.key != Key.Back) {
                     false

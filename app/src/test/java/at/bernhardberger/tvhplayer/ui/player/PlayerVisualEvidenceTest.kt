@@ -57,9 +57,15 @@ import at.bernhardberger.tvhplayer.player.PlaybackTransportDiagnostics
 import at.bernhardberger.tvhplayer.player.PlaybackTunerDiagnostics
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
+import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvPlaybackPadding
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
 import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
+import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import coil3.ImageLoader
 import com.android.resources.Density
@@ -99,7 +105,74 @@ class PlayerVisualEvidenceTest {
 
         captureLiveEvidence()
         captureRecordingEvidence()
+        captureColorSystemEvidence()
         evidenceOutput.writeManifest()
+    }
+
+    private fun captureColorSystemEvidence() {
+        capture(
+            "color-01-neutral-success",
+            "Connection and PIN success feedback",
+            "en",
+            1f,
+            "none",
+            provenance = REPRESENTATIVE_PRODUCTION_PRIMITIVES,
+        ) {
+            ColorSemanticEvidence(ColorEvidenceScenario.SUCCESS)
+        }
+        capture(
+            "color-02-epg-recording",
+            "EPG recording status and accepted result",
+            "en",
+            1f,
+            "none",
+            provenance = REPRESENTATIVE_PRODUCTION_PRIMITIVES,
+        ) {
+            ColorSemanticEvidence(ColorEvidenceScenario.EPG_RECORDING)
+        }
+        capture(
+            "color-03-recording-result",
+            "Recording episode metadata and accepted action result",
+            "en",
+            1f,
+            "none",
+            provenance = REPRESENTATIVE_PRODUCTION_PRIMITIVES,
+        ) {
+            ColorSemanticEvidence(ColorEvidenceScenario.RECORDING_RESULT)
+        }
+        capture(
+            "color-04-live-recording-result",
+            "Live programme recording succeeded",
+            "en",
+            1f,
+            "Close",
+        ) {
+            EvidenceBackdrop {
+                LiveInfo(
+                    event = germanEvent,
+                    confirmation = LiveInfoRecordingState.Succeeded(germanEvent.recordingTarget()),
+                )
+            }
+        }
+        capture(
+            "color-05-panel-tiers",
+            "Channels, EPG, and Settings panel opacity tiers",
+            "en",
+            1f,
+            "none",
+            provenance = REPRESENTATIVE_PRODUCTION_PRIMITIVES,
+        ) {
+            PanelTierEvidence()
+        }
+        capture(
+            "color-06-playback-options",
+            "Playback options panel over deterministic video backdrop",
+            "en",
+            1f,
+            "Audio track",
+        ) {
+            EvidenceBackdrop { Options(page = PlaybackOptionsPage.ROOT) }
+        }
     }
 
     private fun captureLiveEvidence() {
@@ -374,6 +447,87 @@ class PlayerVisualEvidenceTest {
         }
         paparazzi.snapshot(view = view, name = "warmup-$id", offsetMillis = 300L)
         paparazzi.snapshot(view = view, name = id, offsetMillis = 300L)
+    }
+}
+
+private enum class ColorEvidenceScenario {
+    SUCCESS,
+    EPG_RECORDING,
+    RECORDING_RESULT,
+}
+
+@Composable
+private fun ColorSemanticEvidence(scenario: ColorEvidenceScenario) {
+    EvidenceBackdrop {
+        Surface(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(620.dp),
+            colors = SurfaceDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                when (scenario) {
+                    ColorEvidenceScenario.SUCCESS -> {
+                        Text("Connection test succeeded", color = MaterialTheme.colorScheme.onSurface)
+                        Text("PIN updated", color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    ColorEvidenceScenario.EPG_RECORDING -> {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RecordingStatusIndicator(state = DvrState.SCHEDULED)
+                            Text("Recording status: Scheduled", color = TvRecordingColor)
+                        }
+                        Text("Recording scheduled", color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    ColorEvidenceScenario.RECORDING_RESULT -> {
+                        ProgrammeContentDetails(
+                            event = germanEvent,
+                            subtitle = "ORF 1 HD • 20:15–21:00",
+                        )
+                        Text("S02 E04", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Recording cancelled", color = MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PanelTierEvidence() {
+    EvidenceBackdrop {
+        Row(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .padding(horizontal = 48.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            EvidencePanel("Channels", TvPanelBrowseAlpha, Modifier.weight(1f))
+            EvidencePanel("EPG", TvPanelDenseAlpha, Modifier.weight(1f))
+            EvidencePanel("Settings", TvPanelDenseAlpha, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun EvidencePanel(label: String, alpha: Float, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.heightIn(min = 220.dp),
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = alpha),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) {
+        Box(contentAlignment = Alignment.Center) { Text(label) }
     }
 }
 
