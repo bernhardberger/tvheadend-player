@@ -1522,9 +1522,10 @@ private fun RecordingDetailsPanel(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("recording-details-metadata-anchor"),
             )
+            val failureReason = entry.failureReason
             when {
-                !entry.failureReason.isNullOrBlank() -> Text(
-                    entry.failureReason,
+                !failureReason.isNullOrBlank() -> Text(
+                    failureReason,
                     color = MaterialTheme.colorScheme.error,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -1553,7 +1554,7 @@ private fun RecordingDetailsPanel(
                 )
             }
             if (
-                entry.failureReason.isNullOrBlank() &&
+                failureReason.isNullOrBlank() &&
                 actionResult == null &&
                 progressCapability != RecordingProgressCapability.ReadOnly &&
                 progressCapability != RecordingProgressCapability.Unsupported

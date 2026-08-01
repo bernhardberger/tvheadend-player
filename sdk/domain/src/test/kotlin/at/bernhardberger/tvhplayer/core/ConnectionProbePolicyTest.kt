@@ -1,13 +1,16 @@
 package at.bernhardberger.tvhplayer.core
 
 import java.net.UnknownHostException
-import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.fail
 import org.junit.Test
 
 class ConnectionProbePolicyTest {
     @Test
-    fun probePerformsHelloAuthenticationAndMetadataSyncBeforeSuccess() = runBlocking {
+    fun probePerformsHelloAuthenticationAndMetadataSyncBeforeSuccess() = runTest {
         val session = FakeProbeSession(serverVersion = 43, channelCount = 12)
 
         val result = runConnectionProbe(session)
@@ -17,7 +20,7 @@ class ConnectionProbePolicyTest {
     }
 
     @Test
-    fun probeDistinguishesEveryObservableFailure() = runBlocking {
+    fun probeDistinguishesEveryObservableFailure() = runTest {
         assertEquals(
             ConnectionProbeResult.Failure(ConnectionFailureKind.INCOMPATIBLE_SERVER),
             runConnectionProbe(FakeProbeSession(serverVersion = 18, channelCount = 1)),
@@ -48,11 +51,62 @@ class ConnectionProbePolicyTest {
         )
     }
 
+    @Test
+    fun cancellationFromProbeWorkPropagatesAfterClose() = runTest {
+        val cancellation = CancellationException("cancel probe")
+        val session = FakeProbeSession(
+            serverVersion = 43,
+            channelCount = 1,
+            connectFailure = cancellation,
+        )
+
+        try {
+            runConnectionProbe(session)
+            fail("Expected probe cancellation to propagate")
+        } catch (actual: CancellationException) {
+            assertSame(cancellation, actual)
+        }
+        assertEquals(listOf("connect", "close"), session.calls)
+    }
+
+    @Test
+    fun cancellationFromClosePropagates() = runTest {
+        val cancellation = CancellationException("cancel close")
+        val session = FakeProbeSession(
+            serverVersion = 43,
+            channelCount = 1,
+            closeFailure = cancellation,
+        )
+
+        try {
+            runConnectionProbe(session)
+            fail("Expected close cancellation to propagate")
+        } catch (actual: CancellationException) {
+            assertSame(cancellation, actual)
+        }
+        assertEquals(listOf("connect", "sync", "close"), session.calls)
+    }
+
+    @Test
+    fun ordinaryCloseFailureDoesNotReplaceProbeResult() = runTest {
+        val session = FakeProbeSession(
+            serverVersion = 43,
+            channelCount = 12,
+            closeFailure = IllegalStateException("close failed"),
+        )
+
+        assertEquals(
+            ConnectionProbeResult.Success(serverVersion = 43, channelCount = 12),
+            runConnectionProbe(session),
+        )
+    }
+
     private class FakeProbeSession(
         private val serverVersion: Int,
         private val channelCount: Int,
         private val connectFailure: Throwable? = null,
         private val syncFailure: Throwable? = null,
+        private val closeFailure: Throwable? = null,
     ) : ConnectionProbeSession {
         val calls = mutableListOf<String>()
 
@@ -70,6 +124,7 @@ class ConnectionProbePolicyTest {
 
         override suspend fun close() {
             calls += "close"
+            closeFailure?.let { throw it }
         }
     }
 }

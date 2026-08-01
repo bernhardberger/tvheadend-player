@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "TVHeadendPlayer"
 include(":app")
+include(":sdk:domain")
+include(":sdk:htsp")

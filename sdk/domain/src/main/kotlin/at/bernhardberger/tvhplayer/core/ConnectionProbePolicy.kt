@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import kotlin.coroutines.cancellation.CancellationException
+
 const val MIN_SUPPORTED_HTSP_VERSION = 19
 
 interface ConnectionProbeSession {
@@ -34,7 +36,10 @@ suspend fun runConnectionProbe(
         channelCount = channelCount,
     )
 } catch (error: Throwable) {
+    if (error is CancellationException) throw error
     ConnectionProbeResult.Failure(connectionFailureKind(error))
 } finally {
-    runCatching { session.close() }
+    runCatching { session.close() }.onFailure { error ->
+        if (error is CancellationException) throw error
+    }
 }

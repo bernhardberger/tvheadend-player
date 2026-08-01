@@ -104,39 +104,6 @@ data class HtspMuxEvent(
     val muxSequence: Long = 0L,
 )
 
-data class ChannelUi(
-    val id: Int,
-    val name: String,
-    val number: Int?,
-    val icon: String?,
-    val tagIds: Set<Int> = emptySet(),
-)
-
-data class ChannelTagUi(
-    val id: Int,
-    val name: String,
-    val index: Int,
-)
-
-data class EpgEventEntry(
-    val eventId: Int,
-    val channelId: Int,
-    val start: Long,
-    val stop: Long,
-    val title: String,
-    val summary: String? = null,
-    val description: String? = null,
-    val genre: String? = null,
-    val contentType: Int? = null,
-    val seasonNumber: Int? = null,
-    val episodeNumber: Int? = null,
-    val episodeCount: Int? = null,
-    val partNumber: Int? = null,
-    val partCount: Int? = null,
-    val episodeId: Int? = null,
-    val seriesLinkId: Int? = null,
-)
-
 fun epgEventFromFields(fields: Map<String, Any?>): EpgEventEntry? {
     val eventId = fields.intValue("eventId", "id") ?: return null
     val channelId = fields.intValue("channelId", "channel") ?: return null
