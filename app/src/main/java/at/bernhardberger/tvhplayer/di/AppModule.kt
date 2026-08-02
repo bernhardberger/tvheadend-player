@@ -1,13 +1,19 @@
 package at.bernhardberger.tvhplayer.di
 
+import at.bernhardberger.tvhplayer.BuildConfig
 import coil3.ImageLoader
-import at.bernhardberger.tvhplayer.htsp.HtspService
-import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
+import at.bernhardberger.tvhplayer.htsp.HtspClientIdentity
+import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.htsp.DvrRuntime
+import at.bernhardberger.tvhplayer.htsp.HtspLogLevel
+import at.bernhardberger.tvhplayer.htsp.HtspLogger
+import at.bernhardberger.tvhplayer.htsp.TvheadendClient
 import at.bernhardberger.tvhplayer.htsp.buildImageLoader
-import at.bernhardberger.tvhplayer.player.PlayerSession
-import at.bernhardberger.tvhplayer.repositories.TvhRepository
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.player.PlaybackPreferencesProvider
+import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import at.bernhardberger.tvhplayer.player.createMedia3PlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsPlaybackPreferencesProvider
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
@@ -28,26 +34,58 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import org.koin.dsl.onClose
+import timber.log.Timber
 
 val appModule = module {
     single<CoroutineDispatcher>(qualifier = named("io")) { Dispatchers.IO }
 
-    single { HtspService(ioDispatcher = get(named("io"))) }
-    single { HtspConnectionProbe(ioDispatcher = get(named("io"))) }
     single {
-        TvhRepository(
-            htsp = get(), ioDispatcher = get(named("io")),
+        HtspClientIdentity(
+            clientName = "TVHeadend Player / ${BuildConfig.VERSION_NAME}",
+            clientVersion = BuildConfig.VERSION_NAME,
         )
     }
-    single {
-        DvrRepository(
-            htsp = get(), ioDispatcher = get(named("io")),
-        )
+    single<HtspLogger> {
+        HtspLogger { level, message, cause ->
+            when (level) {
+                HtspLogLevel.WARNING -> if (cause == null) {
+                    Timber.w(message)
+                } else {
+                    Timber.w(cause, message)
+                }
+                HtspLogLevel.ERROR -> if (cause == null) {
+                    Timber.e(message)
+                } else {
+                    Timber.e(cause, message)
+                }
+            }
+        }
     }
+    single {
+        val client = TvheadendClient(
+            ioDispatcher = get(named("io")),
+            clientIdentity = get(),
+            logger = get(),
+        )
+        val playbackRuntime = createMedia3PlaybackRuntime(
+            context = androidContext(),
+            client = client,
+            preferencesProvider = get(),
+        )
+        SdkRuntimeOwner(client, playbackRuntime)
+    } onClose { owner -> owner?.requestClose() }
+    single<TvheadendClient> { get<SdkRuntimeOwner>().client }
+    single<PlaybackRuntime> { get<SdkRuntimeOwner>().playbackRuntime }
+    single<ChannelEpgRuntime> { get<TvheadendClient>() }
+    single<DvrRuntime> { get<TvheadendClient>() }
 
     single { ServerSettingsStore(context = get()) }
     single { SecurePasswordStore(context = get()) }
     single { PlayerSettingsStore(context = get()) }
+    single<PlaybackPreferencesProvider> {
+        PlayerSettingsPlaybackPreferencesProvider(settingsStore = get())
+    }
     single { ChannelTagSettingsStore(context = get()) }
     single { UiSettingsStore(context = get()) }
     single { SimpleTvSettingsStore(context = get()) }
@@ -57,20 +95,16 @@ val appModule = module {
     single { GuidePositionStore() }
     single { SimpleTvSession() }
 
-    single { PlayerSession(htsp = get(), playerSettingsStore = get(), dvrRepository = get()) }
-
     single<ImageLoader> {
         buildImageLoader(
             context = androidContext(),
-            htsp = get<HtspService>()
+            client = get(),
         )
     }
 
     viewModel {
         AppConnectionViewModel(
-            htsp = get(),
-            repo = get(),
-            dvrRepository = get(),
+            client = get(),
             settings = get(),
             passwords = get(),
         )
@@ -84,14 +118,13 @@ val appModule = module {
             savedStateHandle = get(),
         )
     }
-    viewModel { VideoPlayerViewModel(playerSession = get(), repo = get(), htspService = get()) }
-    viewModel { ChannelsViewModel(repo = get(), tagSettings = get()) }
+    viewModel { VideoPlayerViewModel(playbackRuntime = get(), channelRuntime = get(), client = get()) }
+    viewModel { ChannelsViewModel(runtime = get(), tagSettings = get()) }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),
-            playerSession = get(),
-            htsp = get(),
-            io = get(named("io"))
+            playbackRuntime = get(),
+            client = get(),
         )
     }
 }

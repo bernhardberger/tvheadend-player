@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.htsp
 
+@PlaybackIntegrationApi
 data class HtspMessage(
     val method: String?,               // null pro reply, pokud to tak máš
     val seq: Int?,                     // seq pro korelaci
@@ -82,6 +83,7 @@ data class HtspMessage(
     }
 }
 
+@PlaybackIntegrationApi
 sealed interface HtspEvent {
     val connectionAttemptId: Long
 
@@ -97,6 +99,7 @@ sealed interface HtspEvent {
     ) : HtspEvent
 }
 
+@PlaybackIntegrationApi
 data class HtspMuxEvent(
     val msg: HtspMessage,
     val connectionAttemptId: Long,
@@ -104,7 +107,7 @@ data class HtspMuxEvent(
     val muxSequence: Long = 0L,
 )
 
-fun epgEventFromFields(fields: Map<String, Any?>): EpgEventEntry? {
+internal fun epgEventFromFields(fields: Map<String, Any?>): EpgEventEntry? {
     val eventId = fields.intValue("eventId", "id") ?: return null
     val channelId = fields.intValue("channelId", "channel") ?: return null
     val start = fields.longValue("start", "startTime") ?: return null
@@ -172,7 +175,7 @@ private fun Map<*, *>.stringValue(vararg keys: String): String? {
     return null
 }
 
-data class SubscriptionStatus
+internal data class SubscriptionStatus
     (
     val id: Int,
     val state: String? = null,   // "Running" / "No input" / "Scrambled" / ...

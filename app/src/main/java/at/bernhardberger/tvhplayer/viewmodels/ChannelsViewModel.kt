@@ -7,7 +7,7 @@ import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.TagScopeFallback
 import at.bernhardberger.tvhplayer.core.resolveChannelScope
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,12 +17,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ChannelsViewModel(
-    private val repo: TvhRepository,
+    private val runtime: ChannelEpgRuntime,
     private val tagSettings: ChannelTagSettingsStore,
 ) : ViewModel() {
     val scope: StateFlow<ChannelBrowsingScope> = combine(
-        repo.channelsUi,
-        repo.tagsUi,
+        runtime.channelsUi,
+        runtime.tagsUi,
         tagSettings.activeTagId,
         tagSettings.scopeVisibility,
         ::resolveChannelScope,
@@ -37,12 +37,12 @@ class ChannelsViewModel(
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
-    val allChannels = repo.channelsUi
+    val allChannels = runtime.channelsUi
     val unavailableTagNotice = tagSettings.unavailableTagNotice
 
     init {
         viewModelScope.launch {
-            combine(scope, repo.metadataReady, tagSettings.activeTagId) {
+            combine(scope, runtime.metadataReady, tagSettings.activeTagId) {
                     currentScope, metadataReady, requestedTagId ->
                 if (metadataReady && currentScope.activeTagId != requestedTagId) {
                     currentScope
@@ -59,7 +59,7 @@ class ChannelsViewModel(
             }
         }
         viewModelScope.launch {
-            combine(repo.tagsUi, repo.metadataReady, tagSettings.scopeVisibility) {
+            combine(runtime.tagsUi, runtime.metadataReady, tagSettings.scopeVisibility) {
                     tags, metadataReady, visibility ->
                 if (
                     metadataReady &&
@@ -90,12 +90,12 @@ class ChannelsViewModel(
         tagSettings.dismissUnavailableTagNotice()
     }
 
-    fun nowEvent(channelId: Int, nowSec: Long) = repo.nowEvent(channelId, nowSec)
+    fun nowEvent(channelId: Int, nowSec: Long) = runtime.nowEvent(channelId, nowSec)
 
     fun nextEvent(channelId: Int, nowSec: Long): EpgEventEntry? {
-        return repo.nextEvent(channelId, nowSec)
+        return runtime.nextEvent(channelId, nowSec)
     }
 
     fun epgForChannel(channelId: Int): StateFlow<List<EpgEventEntry>> =
-        repo.epgForChannel(channelId)
+        runtime.epgForChannel(channelId)
 }

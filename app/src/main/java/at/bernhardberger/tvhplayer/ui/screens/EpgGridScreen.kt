@@ -108,9 +108,9 @@ import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrConfig
 import at.bernhardberger.tvhplayer.htsp.DvrState
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.player.PlayerSession
-import at.bernhardberger.tvhplayer.repositories.TvhRepository
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.htsp.DvrRuntime
+import at.bernhardberger.tvhplayer.player.PlaybackRuntime
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -172,9 +172,9 @@ fun EpgGridScreen(
     category: ProgrammeCategory = ProgrammeCategory.ALL,
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
-    repository: TvhRepository = koinInject(),
-    dvrRepository: DvrRepository = koinInject(),
-    playerSession: PlayerSession = koinInject(),
+    repository: ChannelEpgRuntime = koinInject(),
+    dvrRepository: DvrRuntime = koinInject(),
+    playerSession: PlaybackRuntime = koinInject(),
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
     guidePositionStore: GuidePositionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
@@ -1026,7 +1026,7 @@ private fun TimelineChannelRow(
     windowEndSec: Long,
     nowSec: Long,
     imageLoader: ImageLoader,
-    repository: TvhRepository,
+    repository: ChannelEpgRuntime,
     category: ProgrammeCategory,
     connectionUiState: ConnectionUiState,
     frontierLoading: Boolean,
@@ -1797,7 +1797,7 @@ private fun GuideEmptyState(
 
 private fun nearestTargetAt(
     channels: List<ChannelUi>,
-    repository: TvhRepository,
+    repository: ChannelEpgRuntime,
     preferredChannelIndex: Int,
     targetSec: Long,
     category: ProgrammeCategory,

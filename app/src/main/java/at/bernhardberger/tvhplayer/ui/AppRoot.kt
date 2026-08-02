@@ -67,7 +67,7 @@ import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.PlayerSession
+import at.bernhardberger.tvhplayer.player.PlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettings
@@ -105,7 +105,8 @@ object Routes {
     const val PLAYER = "player"
     const val RECORDING_PLAYER = "recording-player"
     const val UNLOCK = "unlock"
-    fun epg(category: ProgrammeCategory): String = "$EPG/${category.routeValue}"
+    fun epg(category: ProgrammeCategory): String =
+        "$EPG/${programmeCategoryRouteValue(category)}"
     fun player(channelId: Int, serviceId: Int, channelName: String) =
         "player/$channelId/$serviceId/${android.net.Uri.encode(channelName)}"
     fun recordingPlayer(
@@ -480,11 +481,11 @@ fun AppRoot(
     val connectionUiState by appVm.uiState.collectAsStateWithLifecycle()
     val connectionState by appVm.connectionState.collectAsStateWithLifecycle()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
-    val playerSession: PlayerSession = koinInject()
+    val playbackRuntime: PlaybackRuntime = koinInject()
     val playerSettingsStore: PlayerSettingsStore = koinInject()
-    val playbackState by playerSession.state.collectAsStateWithLifecycle()
-    val activeServiceId by playerSession.activeServiceId.collectAsStateWithLifecycle()
-    val activeRecordingId by playerSession.activeRecordingId.collectAsStateWithLifecycle()
+    val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
+    val activeServiceId by playbackRuntime.activeServiceId.collectAsStateWithLifecycle()
+    val activeRecordingId by playbackRuntime.activeRecordingId.collectAsStateWithLifecycle()
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
     )
@@ -599,9 +600,9 @@ fun AppRoot(
             )
         ) {
             RecordingFinishedAction.NONE -> Unit
-            RecordingFinishedAction.STOP -> playerSession.stop()
+            RecordingFinishedAction.STOP -> playbackRuntime.stop()
             RecordingFinishedAction.STOP_AND_CLOSE_PLAYER -> {
-                playerSession.stop()
+                playbackRuntime.stop()
                 nav.popBackStack()
             }
         }
@@ -611,7 +612,7 @@ fun AppRoot(
         topRoute = topRoute,
         profile = capabilityProfile,
         recordingActive = activeRecordingId != null,
-        stopRecording = playerSession::stop,
+        stopRecording = playbackRuntime::stop,
         redirectToLive = {
             applianceLaunchRequests.requestStartup(autoStartPlayback = true)
         },
@@ -832,7 +833,7 @@ fun AppRoot(
                         ),
                     ) { entry ->
                         if (contentAllowed && capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
-                            val category = ProgrammeCategory.fromRoute(
+                            val category = programmeCategoryFromRoute(
                                 entry.arguments?.getString("category")
                             )
                             ContentContainer {
@@ -1054,7 +1055,7 @@ fun AppRoot(
                 )
             ) {
                 PlayerVideoSurface(
-                    player = playerSession.getOrCreatePlayer(context),
+                    player = playbackRuntime.player,
                     aspectRatio = playerSettings.aspectRatio,
                     debugVideoBackdropVisible = debugVideoBackdropVisible,
                     modifier = Modifier.fillMaxSize(),

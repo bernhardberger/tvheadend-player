@@ -30,7 +30,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
+import at.bernhardberger.tvhplayer.htsp.TvheadendClient
+import at.bernhardberger.tvhplayer.htsp.TvheadendConnection
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.StoredPassword
@@ -49,7 +50,7 @@ fun SettingsConnection(
     initialFocusRequester: FocusRequester,
     settingsStore: ServerSettingsStore = koinInject(),
     passwordStore: SecurePasswordStore = koinInject(),
-    connectionProbe: HtspConnectionProbe = koinInject(),
+    connectionClient: TvheadendClient = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current
@@ -195,11 +196,13 @@ fun SettingsConnection(
                             }
                         }
                         probeState = ConnectionProbeUiState.Complete(
-                            connectionProbe.test(
-                                host = host.trim(),
-                                port = endpointPort,
-                                username = user.trim(),
-                                password = testPassword,
+                            connectionClient.testConnection(
+                                TvheadendConnection(
+                                    host = host.trim(),
+                                    port = endpointPort,
+                                    username = user.trim(),
+                                    password = testPassword,
+                                )
                             )
                         )
                     }

@@ -39,7 +39,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -118,7 +117,7 @@ import at.bernhardberger.tvhplayer.core.timeshiftSeek
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.ConnectionState
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.htsp.DvrRuntime
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -194,7 +193,7 @@ fun VideoPlayerScreen(
     settingsStore: PlayerSettingsStore = koinInject(),
     channelsVm: ChannelsViewModel = koinViewModel(),
     imageLoader: ImageLoader = koinInject(),
-    dvrRepository: DvrRepository = koinInject(),
+    dvrRepository: DvrRuntime = koinInject(),
     channelId: Int,
     channelName: String,
     serviceId: Int,
@@ -265,11 +264,10 @@ fun VideoPlayerScreen(
     var currentChannelName by remember { mutableStateOf(channelName) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
-    val ctx = LocalContext.current
     val timeshiftUnavailableText = stringResource(R.string.timeshift_unavailable)
     val timeshiftReconnectLiveText = stringResource(R.string.timeshift_reconnect_live)
     val timeshiftSeekClampedText = stringResource(R.string.timeshift_seek_clamped)
-    val player = remember { videoPlayerViewModel.getPlayerInstance(ctx) }
+    val player = remember { videoPlayerViewModel.getPlayerInstance() }
     val playerPlaybackProgressing = rememberPlayerPlaybackProgressing(player)
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
@@ -308,7 +306,7 @@ fun VideoPlayerScreen(
         if (lastPlayedServiceId != -1) {
             videoPlayerViewModel.stop()
         }
-        if (videoPlayerViewModel.playService(ctx, currentServiceId)) {
+        if (videoPlayerViewModel.playService(currentServiceId)) {
             lastPlayedServiceId = currentServiceId
         }
     }
@@ -708,7 +706,7 @@ fun VideoPlayerScreen(
                     connectionLost = false
                     showControls()
 
-                    if (videoPlayerViewModel.playService(ctx, currentServiceId)) {
+                    if (videoPlayerViewModel.playService(currentServiceId)) {
                         lastPlayedServiceId = currentServiceId
                     }
                     if (restoreToLiveAfterReconnect) {

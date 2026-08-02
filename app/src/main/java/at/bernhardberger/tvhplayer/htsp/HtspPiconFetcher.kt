@@ -13,9 +13,7 @@ import coil3.key.Keyer
 import coil3.map.Mapper
 import coil3.request.Options
 import at.bernhardberger.tvhplayer.ui.components.HtspPiconData
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okio.Buffer
@@ -52,7 +50,7 @@ class HtspPiconKeyer : Keyer<HtspPiconData> {
 }
 
 class HtspPiconFetcher(
-    private val htsp: HtspService,
+    private val client: TvheadendClient,
     private val data: HtspPiconData
 ) : Fetcher {
 
@@ -64,63 +62,52 @@ class HtspPiconFetcher(
 
         val path = data.path.let { if (it.startsWith("/")) it else "/$it" }
 
-        val handle = htsp.fileOpen(path, timeoutMs = 3_000)
-        try {
-            val buf = Buffer()
-
-            while (currentCoroutineContext().isActive) {
-                val chunk = htsp.fileRead(handle, size = 64 * 1024, timeoutMs = 3_000)
-                if (chunk.isEmpty()) break
-                buf.write(chunk)
-            }
-
-            SourceFetchResult(
-                source = ImageSource(
-                    source = buf,
-                    fileSystem = FileSystem.SYSTEM
-                ),
-                mimeType = null,
-                dataSource = DataSource.NETWORK
-            )
-        } finally {
-            runCatching { htsp.fileClose(handle, timeoutMs = 1_500) }
-        }
+        val bytes = client.readFileBytes(path = path, maxBytes = MAX_PICON_BYTES)
+        SourceFetchResult(
+            source = ImageSource(
+                source = Buffer().write(bytes),
+                fileSystem = FileSystem.SYSTEM
+            ),
+            mimeType = null,
+            dataSource = DataSource.NETWORK
+        )
     }
 
     private suspend fun ensureConnectedOrWait(maxWaitMs: Long): Boolean {
-        if (htsp.state.value is ConnectionState.Connected) return true
+        if (client.connectionState.value is ConnectionState.Connected) return true
 
         val step = 100L
         var waited = 0L
-        while (waited < maxWaitMs && currentCoroutineContext().isActive) {
+        while (waited < maxWaitMs) {
             delay(step)
             waited += step
-            if (htsp.state.value is ConnectionState.Connected) return true
+            if (client.connectionState.value is ConnectionState.Connected) return true
         }
-        return htsp.state.value is ConnectionState.Connected
+        return client.connectionState.value is ConnectionState.Connected
     }
 
-    class Factory(private val htsp: HtspService) : Fetcher.Factory<HtspPiconData> {
+    class Factory(private val client: TvheadendClient) : Fetcher.Factory<HtspPiconData> {
         override fun create(
             data: HtspPiconData,
             options: Options,
             imageLoader: ImageLoader
         ): Fetcher {
-            return HtspPiconFetcher(htsp, data)
+            return HtspPiconFetcher(client, data)
         }
     }
 
     companion object {
+        private const val MAX_PICON_BYTES = 4 * 1024 * 1024
         private val piconSemaphore = Semaphore(permits = 3)
     }
 }
 
-fun buildImageLoader(context: Context, htsp: HtspService): ImageLoader {
+fun buildImageLoader(context: Context, client: TvheadendClient): ImageLoader {
     return ImageLoader.Builder(context)
         .components {
             add(HtspPiconMapper(defaultTtlMs = 6 * 60 * 60 * 1000L))
             add(HtspPiconKeyer())
-            add(HtspPiconFetcher.Factory(htsp))
+            add(HtspPiconFetcher.Factory(client))
         }
         .diskCache {
             DiskCache.Builder()

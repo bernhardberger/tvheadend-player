@@ -1,3 +1,5 @@
+@file:OptIn(at.bernhardberger.tvhplayer.htsp.PlaybackIntegrationApi::class)
+
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.activity.compose.BackHandler
@@ -22,12 +24,10 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
 import at.bernhardberger.tvhplayer.htsp.HtspMessage
-import at.bernhardberger.tvhplayer.htsp.HtspService
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
-import at.bernhardberger.tvhplayer.repositories.RecordingProgressCapability
+import at.bernhardberger.tvhplayer.testing.TestDvrRuntime as DvrRepository
+import at.bernhardberger.tvhplayer.htsp.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,10 +41,7 @@ class RecordingsScreenTest {
 
     @Test
     fun modeTabsUseTheTitleLeadingAnchorOnTheirOwnRow() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
 
         composeRule.setContent {
             TVHeadendPlayerTheme {
@@ -71,10 +68,7 @@ class RecordingsScreenTest {
 
     @Test
     fun completedRecordingOpensDetailsBeforeDeleteConfirmation() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         repository.applyAuthenticatedDvrAccess(true)
         runBlocking {
             repository.acceptDvrMessage(
@@ -141,10 +135,7 @@ class RecordingsScreenTest {
 
     @Test
     fun movingUpFromFolderPreviewReturnsToSelectedModeWithoutChangingIt() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -182,10 +173,7 @@ class RecordingsScreenTest {
 
     @Test
     fun backUnwindsPreviewFolderAndDetailsBeforeLeavingRecordings() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -233,10 +221,7 @@ class RecordingsScreenTest {
 
     @Test
     fun closingDetailsRestoresRecordingWhenAutomaticInitialFocusIsDisabled() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -281,10 +266,7 @@ class RecordingsScreenTest {
     @Test
     fun detailsConsumeBackBeforeTheShellAndRestoreTheRecording() {
         var shellBackCount = 0
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -326,10 +308,7 @@ class RecordingsScreenTest {
 
     @Test
     fun shortDetailsKeepPlaybackActionsAdjacentToMetadata() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -373,10 +352,7 @@ class RecordingsScreenTest {
     @Test
     fun resumableDetailsKeepSemanticFocusAndSendExplicitStartIntent() {
         var playbackIntent: RecordingPlaybackIntent? = null
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         repository.applyAuthenticatedDvrAccess(true)
         runBlocking {
             repository.acceptDvrMessage(
@@ -459,10 +435,7 @@ class RecordingsScreenTest {
     @Test
     fun disappearingResumeFallsBackToPlayAndLegacyPlaybackStartsOver() {
         var playbackIntent: RecordingPlaybackIntent? = null
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -521,10 +494,7 @@ class RecordingsScreenTest {
 
     @Test
     fun browserLocationAndFocusSurviveLeavingAndReturningToTheScreen() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -568,10 +538,7 @@ class RecordingsScreenTest {
     @Test
     fun archiveDoesNotMixScheduledOrFailedEntries() {
         val start = System.currentTimeMillis() / 1000L + 3600L
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             listOf(
                 mapOf(
@@ -622,10 +589,7 @@ class RecordingsScreenTest {
 
     @Test
     fun syntheticThreeHundredRecordingArchiveListRemainsScrollable() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             (1..300).forEach { id ->
                 repository.acceptDvrMessage(
@@ -659,10 +623,7 @@ class RecordingsScreenTest {
 
     @Test
     fun removingFocusedOffscreenRecordingRestoresFocusAtStartOfList() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             (1..50).forEach { id ->
                 repository.acceptDvrMessage(
@@ -707,10 +668,7 @@ class RecordingsScreenTest {
 
     @Test
     fun removingFocusedFolderPreviewRecordingRestoresFirstRemainingPreview() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             (1..2).forEach { id ->
                 repository.acceptDvrMessage(
@@ -759,10 +717,7 @@ class RecordingsScreenTest {
 
     @Test
     fun selectedRecordingShowsFullMetadataInPersistentPane() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
                 HtspMessage(
@@ -808,10 +763,7 @@ class RecordingsScreenTest {
 
     @Test
     fun longRecordingTitleDoesNotMoveLeadingOrTrailingContent() {
-        val repository = DvrRepository(
-            htsp = HtspService(Dispatchers.Unconfined),
-            ioDispatcher = Dispatchers.Unconfined,
-        )
+        val repository = DvrRepository()
         runBlocking {
             listOf(
                 1 to "News",

@@ -35,7 +35,8 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionProbeResult
-import at.bernhardberger.tvhplayer.htsp.HtspConnectionProbe
+import at.bernhardberger.tvhplayer.htsp.TvheadendClient
+import at.bernhardberger.tvhplayer.htsp.TvheadendConnection
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
@@ -57,7 +58,7 @@ internal fun ConnectionProbeUiState.isActionableFailure(): Boolean =
 fun OnboardingScreen(
     settingsStore: ServerSettingsStore = koinInject(),
     passwordStore: SecurePasswordStore = koinInject(),
-    connectionProbe: HtspConnectionProbe = koinInject(),
+    connectionClient: TvheadendClient = koinInject(),
 ) {
     val activity = LocalActivity.current
     DisposableEffect(activity) {
@@ -80,7 +81,7 @@ fun OnboardingScreen(
             OnboardingStep.CONNECTION -> OnboardingConnection(
                 settingsStore = settingsStore,
                 passwordStore = passwordStore,
-                connectionProbe = connectionProbe,
+                connectionClient = connectionClient,
                 onBack = { step = OnboardingStep.INTRODUCTION },
             )
         }
@@ -124,7 +125,7 @@ fun OnboardingIntroduction(onContinue: () -> Unit) {
 private fun OnboardingConnection(
     settingsStore: ServerSettingsStore,
     passwordStore: SecurePasswordStore,
-    connectionProbe: HtspConnectionProbe,
+    connectionClient: TvheadendClient,
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -240,11 +241,13 @@ private fun OnboardingConnection(
                     probeState = ConnectionProbeUiState.Testing
                     scope.launch {
                         probeState = ConnectionProbeUiState.Complete(
-                            connectionProbe.test(
-                                host = host.trim(),
-                                port = endpointPort,
-                                username = username.trim(),
-                                password = password,
+                            connectionClient.testConnection(
+                                TvheadendConnection(
+                                    host = host.trim(),
+                                    port = endpointPort,
+                                    username = username.trim(),
+                                    password = password,
+                                )
                             )
                         )
                     }

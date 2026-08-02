@@ -1,0 +1,32 @@
+package at.bernhardberger.tvhplayer.core
+
+import at.bernhardberger.tvhplayer.htsp.DvrEntry
+import at.bernhardberger.tvhplayer.htsp.DvrState
+
+sealed interface RecordingPlaybackAvailability {
+    data class Ready(
+        val path: String,
+        val size: Long?,
+        val growing: Boolean,
+    ) : RecordingPlaybackAvailability
+
+    data object NotReady : RecordingPlaybackAvailability
+    data object FileUnavailable : RecordingPlaybackAvailability
+}
+
+fun recordingPlaybackAvailability(entry: DvrEntry): RecordingPlaybackAvailability {
+    if (
+        entry.state != DvrState.COMPLETED &&
+        entry.state != DvrState.RECORDING &&
+        entry.state != DvrState.FAILED
+    ) {
+        return RecordingPlaybackAvailability.NotReady
+    }
+    val file = entry.files.firstOrNull { !it.path.isNullOrBlank() }
+        ?: return RecordingPlaybackAvailability.FileUnavailable
+    return RecordingPlaybackAvailability.Ready(
+        path = "/dvrfile/${entry.id}",
+        size = file.size,
+        growing = entry.state == DvrState.RECORDING,
+    )
+}

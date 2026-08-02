@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -71,12 +70,12 @@ import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.recordingSeekFeedbackSettled
 import at.bernhardberger.tvhplayer.core.recordingStackedSeekTarget
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.htsp.DvrRuntime
 import at.bernhardberger.tvhplayer.player.PlaybackFailureReason
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.PlayerSession
+import at.bernhardberger.tvhplayer.player.PlaybackRuntime
 import at.bernhardberger.tvhplayer.player.RecordingProgressSyncState
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
-import at.bernhardberger.tvhplayer.repositories.TvhRepository
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
@@ -112,10 +111,10 @@ internal fun recordingDegradedEpisodeActive(
 fun RecordingPlayerScreen(
     recordingId: Int,
     playbackIntent: RecordingPlaybackIntent = RecordingPlaybackIntent.DefaultPolicy,
-    repository: DvrRepository = koinInject(),
-    channelRepository: TvhRepository = koinInject(),
+    repository: DvrRuntime = koinInject(),
+    channelRepository: ChannelEpgRuntime = koinInject(),
     imageLoader: ImageLoader = koinInject(),
-    session: PlayerSession = koinInject(),
+    session: PlaybackRuntime = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     connectionAvailable: Boolean,
@@ -123,7 +122,6 @@ fun RecordingPlayerScreen(
     onUnlock: () -> Unit = {},
     onClose: () -> Unit,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val playbackState by session.state.collectAsStateWithLifecycle()
     val progressSyncState by session.recordingProgressSyncState.collectAsStateWithLifecycle()
@@ -141,7 +139,7 @@ fun RecordingPlayerScreen(
     val initialConnectionFailure = !recordingResolved && !connectionAvailable
     val availability = entry?.let(::recordingPlaybackAvailability)
     val ready = availability as? RecordingPlaybackAvailability.Ready
-    val player = remember { session.getOrCreatePlayer(context) }
+    val player = remember { session.player }
     val rootFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val showStop = simpleTvProfile.allows(SimpleTvCapability.STOP)
@@ -203,7 +201,7 @@ fun RecordingPlayerScreen(
     fun togglePlayPause() {
         if (player.isPlaying) {
             player.pause()
-            session.onRecordingPaused()
+            session.recordingPaused()
         } else {
             player.play()
         }
@@ -211,7 +209,7 @@ fun RecordingPlayerScreen(
 
     fun pausePlayback() {
         player.pause()
-        session.onRecordingPaused()
+        session.recordingPaused()
     }
 
     fun seekBy(deltaMs: Long) {
@@ -278,10 +276,7 @@ fun RecordingPlayerScreen(
             return@LaunchedEffect
         }
         session.playRecording(
-            context = context,
             entry = playableEntry,
-            path = ready.path,
-            knownSize = ready.size,
             intent = playbackIntent,
         )
     }
@@ -358,7 +353,7 @@ fun RecordingPlayerScreen(
     fun dispatchRecoveryRetry() {
         when (recoveryUiModel.retryCommand) {
             PlaybackRetryCommand.RECONNECT -> onReconnect()
-            PlaybackRetryCommand.RESUME_RECORDING -> session.requestRetryRecording()
+            PlaybackRetryCommand.RESUME_RECORDING -> scope.launch { session.retryRecording() }
             PlaybackRetryCommand.RETRY_LIVE,
             PlaybackRetryCommand.NONE -> Unit
         }
@@ -415,7 +410,7 @@ fun RecordingPlayerScreen(
         delay(RECORDING_SEEK_DEBOUNCE_MS)
         pendingSeekDispatched = true
         player.seekTo(targetMs)
-        session.onRecordingSeekSettled()
+        session.recordingSeekSettled()
         delay(RECORDING_SEEK_FEEDBACK_MIN_MS)
         while (
             !recordingSeekFeedbackSettled(

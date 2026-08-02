@@ -111,9 +111,9 @@ import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.htsp.ChannelUi
 import at.bernhardberger.tvhplayer.htsp.DvrEntry
 import at.bernhardberger.tvhplayer.htsp.DvrState
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
-import at.bernhardberger.tvhplayer.repositories.RecordingProgressCapability
-import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.htsp.RecordingProgressCapability
+import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.htsp.DvrRuntime
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -181,8 +181,8 @@ fun RecordingsScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     backEnabled: Boolean = true,
-    repository: DvrRepository = koinInject(),
-    channelRepository: TvhRepository = koinInject(),
+    repository: DvrRuntime = koinInject(),
+    channelRepository: ChannelEpgRuntime = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     progressCapabilityOverride: RecordingProgressCapability? = null,

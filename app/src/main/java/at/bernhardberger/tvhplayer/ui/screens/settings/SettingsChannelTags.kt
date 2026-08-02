@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
-import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
@@ -25,7 +25,7 @@ import org.koin.compose.koinInject
 @Composable
 fun SettingsChannelTags(
     initialFocusRequester: FocusRequester,
-    repository: TvhRepository = koinInject(),
+    repository: ChannelEpgRuntime = koinInject(),
     settingsStore: ChannelTagSettingsStore = koinInject(),
 ) {
     val tags by repository.tagsUi.collectAsStateWithLifecycle()

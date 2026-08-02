@@ -1,45 +1,46 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
-import at.bernhardberger.tvhplayer.htsp.HtspService
-import at.bernhardberger.tvhplayer.player.PlayerSession
-import at.bernhardberger.tvhplayer.repositories.TvhRepository
+import androidx.lifecycle.viewModelScope
+import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.htsp.TvheadendClient
+import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import kotlinx.coroutines.launch
 
 class VideoPlayerViewModel(
-    private val playerSession: PlayerSession,
-    private val repo: TvhRepository,
-    htspService: HtspService
+    private val playbackRuntime: PlaybackRuntime,
+    private val channelRuntime: ChannelEpgRuntime,
+    client: TvheadendClient,
 ) : ViewModel() {
-    val connectionState = htspService.state
-    val playbackState = playerSession.state
-    val activeServiceId = playerSession.activeServiceId
-    val playingLiveServiceId = playerSession.playingLiveServiceId
-    val timeshiftState = playerSession.timeshiftState
-    val liveSubscriptionFailure = playerSession.liveSubscriptionFailure
-    val diagnostics = playerSession.diagnostics
+    val connectionState = client.connectionState
+    val playbackState = playbackRuntime.state
+    val activeServiceId = playbackRuntime.activeServiceId
+    val playingLiveServiceId = playbackRuntime.playingLiveServiceId
+    val timeshiftState = playbackRuntime.timeshiftState
+    val liveSubscriptionFailure = playbackRuntime.liveSubscriptionFailure
+    val diagnostics = playbackRuntime.diagnostics
 
-    fun getPlayerInstance(context: Context) =
-        playerSession.getOrCreatePlayer(context)
+    fun getPlayerInstance() = playbackRuntime.player
 
-    suspend fun playService(context: Context, serviceId: Int): Boolean =
-        playerSession.playService(context, serviceId)
+    suspend fun playService(serviceId: Int): Boolean = playbackRuntime.playLive(serviceId)
 
     suspend fun stop() {
-        playerSession.stop()
+        playbackRuntime.stop()
     }
 
-    fun retryLiveNow() = playerSession.requestRetryLiveNow()
+    fun retryLiveNow() {
+        viewModelScope.launch { playbackRuntime.retryLive() }
+    }
 
-    suspend fun pauseTimeshift() = playerSession.pauseTimeshift()
+    suspend fun pauseTimeshift() = playbackRuntime.pauseTimeshift()
 
-    suspend fun resumeTimeshift() = playerSession.resumeTimeshift()
+    suspend fun resumeTimeshift() = playbackRuntime.resumeTimeshift()
 
-    suspend fun seekTimeshift(deltaMs: Long) = playerSession.seekTimeshift(deltaMs)
+    suspend fun seekTimeshift(deltaMs: Long) = playbackRuntime.seekTimeshift(deltaMs)
 
-    suspend fun goLive() = playerSession.goLive()
+    suspend fun goLive() = playbackRuntime.goLive()
 
-    fun setDiagnosticsEnabled(enabled: Boolean) = playerSession.setDiagnosticsEnabled(enabled)
+    fun setDiagnosticsEnabled(enabled: Boolean) = playbackRuntime.setDiagnosticsEnabled(enabled)
 
-    fun epgForChannel(channelId: Int) = repo.epgForChannel(channelId)
+    fun epgForChannel(channelId: Int) = channelRuntime.epgForChannel(channelId)
 }

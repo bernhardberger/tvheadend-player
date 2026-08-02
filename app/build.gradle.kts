@@ -43,6 +43,7 @@ android {
 dependencies {
     implementation(project(":sdk:domain"))
     implementation(project(":sdk:htsp"))
+    implementation(project(":sdk:playback-media3"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
@@ -74,10 +75,7 @@ dependencies {
 
     implementation(libs.timber)
 
-    // Media3 (ExoPlayer)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.exoplayer.dash)
-    implementation(libs.androidx.media3.exoplayer.hls)
+    // Media3 presentation API; concrete playback and codecs are SDK-owned.
     implementation(libs.androidx.media3.ui)
     implementation(libs.kotlinx.coroutines.core)
 
@@ -85,16 +83,16 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
-
-    implementation(files("libs/lib-decoder-ffmpeg-release.aar"))
-
     // Unit tests (JVM)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 
     // Instrumented / Compose UI tests (run on a device)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // Device-only surface lifecycle fixture intentionally constructs a concrete player.
+    androidTestImplementation(libs.androidx.media3.exoplayer)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

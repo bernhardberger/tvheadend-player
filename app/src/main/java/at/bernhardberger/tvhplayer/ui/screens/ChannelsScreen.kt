@@ -65,7 +65,7 @@ import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.repositories.DvrRepository
+import at.bernhardberger.tvhplayer.htsp.DvrRuntime
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -116,7 +116,7 @@ fun ChannelsScreen(
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
-    dvrRepository: DvrRepository = koinInject(),
+    dvrRepository: DvrRuntime = koinInject(),
     uiSettingsStore: UiSettingsStore = koinInject(),
     playingChannelId: Int?,
     connectionUiState: ConnectionUiState,

@@ -5,9 +5,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import at.bernhardberger.tvhplayer.htsp.HtspService
-import at.bernhardberger.tvhplayer.htsp.ProfileItem
+import at.bernhardberger.tvhplayer.player.PlaybackPreferences
+import at.bernhardberger.tvhplayer.player.PlaybackPreferencesProvider
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
@@ -88,5 +89,20 @@ class PlayerSettingsStore(private val context: Context) {
         context.dataStore.edit { p ->
             p[Keys.REFRESH_RATE_MATCHING_ENABLED] = enabled
         }
+    }
+}
+
+class PlayerSettingsPlaybackPreferencesProvider(
+    private val settingsStore: PlayerSettingsStore,
+) : PlaybackPreferencesProvider {
+    override suspend fun currentPreferences(): PlaybackPreferences {
+        val settings = settingsStore.playerSettings.first()
+        return PlaybackPreferences(
+            profile = settings.profile,
+            audioLanguage = settings.audioLanguage,
+            subtitleLanguage = settings.subtitleLanguage,
+            timeshiftEnabled = settings.timeshiftEnabled,
+            refreshRateMatchingEnabled = settings.refreshRateMatchingEnabled,
+        )
     }
 }
