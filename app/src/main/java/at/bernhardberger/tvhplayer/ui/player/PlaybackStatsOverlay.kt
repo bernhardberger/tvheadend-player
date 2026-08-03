@@ -1,3 +1,5 @@
+@file:OptIn(at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class)
+
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.layout.Arrangement
@@ -20,13 +22,13 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSnapshot
-import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSource
-import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.PlaybackThermalLevel
-import at.bernhardberger.tvhplayer.player.droppedFramePercentage
+import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSnapshot
+import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSource
+import at.bernhardberger.tvheadend.playback.PlaybackSessionState
+import at.bernhardberger.tvheadend.playback.PlaybackThermalLevel
+import at.bernhardberger.tvheadend.playback.droppedFramePercentage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
-import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvheadend.core.TimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale

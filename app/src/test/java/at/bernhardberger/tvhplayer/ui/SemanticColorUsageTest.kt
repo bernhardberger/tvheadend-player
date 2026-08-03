@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
-import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.core.ConnectionProbeResult
+import at.bernhardberger.tvheadend.core.ConnectionFailureKind
+import at.bernhardberger.tvheadend.core.ConnectionProbeResult
 import at.bernhardberger.tvhplayer.ui.screens.ConnectionProbeUiState
 import at.bernhardberger.tvhplayer.ui.screens.isActionableFailure
 import java.io.File

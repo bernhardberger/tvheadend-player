@@ -1,6 +1,8 @@
+@file:OptIn(at.bernhardberger.tvheadend.playback.ExperimentalRecordingCoordinationApi::class)
+
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvhplayer.player.RecordingProgressSyncState
+import at.bernhardberger.tvheadend.playback.RecordingProgressSyncState
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -86,15 +86,15 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.DvrActionFailure
-import at.bernhardberger.tvhplayer.core.DvrActionResult
+import at.bernhardberger.tvheadend.core.DvrActionFailure
+import at.bernhardberger.tvheadend.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
+import at.bernhardberger.tvheadend.core.RecordingPlaybackAvailability
+import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
@@ -103,17 +103,17 @@ import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
-import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
-import at.bernhardberger.tvhplayer.core.recordingResumeCandidateSeconds
-import at.bernhardberger.tvhplayer.core.recordingSecondsToMediaMilliseconds
+import at.bernhardberger.tvheadend.core.recordingPlaybackAvailability
+import at.bernhardberger.tvheadend.core.recordingResumeCandidateSeconds
+import at.bernhardberger.tvheadend.core.recordingSecondsToMediaMilliseconds
 import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
-import at.bernhardberger.tvhplayer.htsp.DvrEntry
-import at.bernhardberger.tvhplayer.htsp.DvrState
-import at.bernhardberger.tvhplayer.htsp.RecordingProgressCapability
-import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.htsp.DvrRuntime
+import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.client.DvrRuntime
+import at.bernhardberger.tvheadend.client.RecordingProgressCapability
+import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvheadend.core.DvrEntry
+import at.bernhardberger.tvheadend.core.DvrState
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -197,8 +197,8 @@ fun RecordingsScreen(
     val canModifyRecordings by repository.canModifyRecordings.collectAsStateWithLifecycle()
     val observedProgressCapability by repository.progressCapability.collectAsStateWithLifecycle()
     val progressCapability = progressCapabilityOverride ?: observedProgressCapability
-    val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
-    val channelsById = remember(channels) { channels.associateBy(ChannelUi::id) }
+    val channels by channelRepository.channels.collectAsStateWithLifecycle()
+    val channelsById = remember(channels) { channels.associateBy(Channel::channelId) }
     val library = remember(entries) { partitionDvrLibrary(entries) }
     val archive = remember(library.archive) { buildDvrArchive(library.archive) }
     val scope = rememberCoroutineScope()

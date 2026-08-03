@@ -1,5 +1,3 @@
-@file:OptIn(at.bernhardberger.tvhplayer.htsp.PlaybackIntegrationApi::class)
-
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.activity.compose.BackHandler
@@ -23,10 +21,10 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
-import at.bernhardberger.tvhplayer.htsp.HtspMessage
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
+import at.bernhardberger.tvheadend.client.RecordingProgressCapability
+import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
+import at.bernhardberger.tvhplayer.testing.DvrTestMessage as HtspMessage
 import at.bernhardberger.tvhplayer.testing.TestDvrRuntime as DvrRepository
-import at.bernhardberger.tvhplayer.htsp.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.core.TimeshiftState
+
 /** Initial D-pad/repeat seek step. */
 const val SEEKBAR_STEP_INITIAL_MS = 30_000L
 

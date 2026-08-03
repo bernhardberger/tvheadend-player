@@ -1,3 +1,7 @@
+@file:kotlin.OptIn(
+    at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class,
+)
+
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.os.SystemClock
@@ -110,14 +114,14 @@ import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvhplayer.core.TimeshiftState
-import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
+import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
+import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvheadend.core.timeshiftSeek
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
-import at.bernhardberger.tvhplayer.core.timeshiftSeek
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
-import at.bernhardberger.tvhplayer.htsp.ConnectionState
-import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.htsp.DvrRuntime
+import at.bernhardberger.tvheadend.client.ConnectionState
+import at.bernhardberger.tvheadend.client.DvrRuntime
+import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvheadend.playback.PlaybackSessionState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -210,8 +214,8 @@ fun VideoPlayerScreen(
 
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
-    val playingLiveServiceId by
-        videoPlayerViewModel.playingLiveServiceId.collectAsStateWithLifecycle()
+    val playingLiveChannelId by
+        videoPlayerViewModel.playingLiveChannelId.collectAsStateWithLifecycle()
     val timeshiftState by videoPlayerViewModel.timeshiftState.collectAsStateWithLifecycle()
     val subscriptionFailure by
         videoPlayerViewModel.liveSubscriptionFailure.collectAsStateWithLifecycle()
@@ -228,8 +232,8 @@ fun VideoPlayerScreen(
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
-    val orderedChannelIds = remember(channels) { channels.map { it.id } }
-    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
+    val orderedChannelIds = remember(channels) { channels.map { it.channelId } }
+    val channelNumbers = remember(channels) { channels.associate { it.channelId to it.number } }
     val selectedInitId by selection.selectedId.collectAsStateWithLifecycle()
     var selectedId by remember { mutableIntStateOf(selectedInitId) }
 
@@ -311,8 +315,8 @@ fun VideoPlayerScreen(
         }
     }
 
-    LaunchedEffect(playingLiveServiceId, currentChannelId, currentServiceId) {
-        if (playingLiveServiceId == currentServiceId) {
+    LaunchedEffect(playingLiveChannelId, currentChannelId, currentServiceId) {
+        if (playingLiveChannelId == currentServiceId) {
             lastPlayedChannelStore.setChannelId(currentChannelId)
         }
     }
@@ -442,23 +446,25 @@ fun VideoPlayerScreen(
         }
     }
 
-    fun tuneChannel(channel: ChannelUi): Boolean {
+    fun tuneChannel(channel: Channel): Boolean {
         timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
         timeshiftSeekToken++
         timeshiftSeekFeedbackJob?.cancel()
         timeshiftSeekFeedbackJob = null
         timeshiftSeekPreview = null
         channelNumberInput = ""
-        selection.setSelected(channel.id)
-        selectedId = channel.id
+        selection.setSelected(channel.channelId)
+        selectedId = channel.channelId
 
-        if (channelPickAction(currentChannelId, channel.id) == ChannelPickAction.CLOSE_DRAWER) {
+        if (
+            channelPickAction(currentChannelId, channel.channelId) == ChannelPickAction.CLOSE_DRAWER
+        ) {
             drawerOpen = false
             return true
         }
 
-        currentChannelId = channel.id
-        currentServiceId = channel.id
+        currentChannelId = channel.channelId
+        currentServiceId = channel.channelId
         currentChannelName = channel.name
         timeshiftFeedback = null
 
@@ -474,7 +480,7 @@ fun VideoPlayerScreen(
             direction = direction,
         ) ?: return false
 
-        val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
+        val channel = channels.firstOrNull { it.channelId == adjacentId } ?: return false
         return tuneChannel(channel)
     }
 
@@ -488,7 +494,7 @@ fun VideoPlayerScreen(
         )
         channelNumberInput = ""
 
-        val channel = channels.firstOrNull { it.id == channelId }
+        val channel = channels.firstOrNull { it.channelId == channelId }
         return channel?.let(::tuneChannel) ?: true
     }
 
@@ -517,7 +523,7 @@ fun VideoPlayerScreen(
     val nowEvent = remember(epg, nowSec) { epg.nowEvent(nowSec) }
     val nextEvent = remember(epg, nowEvent) { epg.nextAfter(nowEvent) }
     val currentChannel = remember(allChannels, currentChannelId) {
-        allChannels.firstOrNull { it.id == currentChannelId }
+        allChannels.firstOrNull { it.channelId == currentChannelId }
     }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(

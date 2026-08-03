@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.di
 
-import at.bernhardberger.tvhplayer.htsp.TvheadendClient
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred

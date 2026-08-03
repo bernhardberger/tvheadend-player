@@ -2,12 +2,13 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvhplayer.core.ConnectionPolicy
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.deriveCurrentChannelReadiness
-import at.bernhardberger.tvhplayer.htsp.TvheadendClient
-import at.bernhardberger.tvhplayer.htsp.TvheadendConnection
+import at.bernhardberger.tvhplayer.core.toConnectionUiState
+import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvheadend.client.TvheadendConnection
+import at.bernhardberger.tvheadend.core.ConnectionPolicy
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.StoredPassword
@@ -30,8 +31,8 @@ class AppConnectionViewModel(
     private val localState = MutableStateFlow<ConnectionUiState?>(null)
     val uiState: StateFlow<ConnectionUiState> = combine(
         localState,
-        client.frontendState,
-    ) { local, runtime -> local ?: runtime }
+        client.clientState,
+    ) { local, runtime -> local ?: runtime.toConnectionUiState() }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
@@ -84,7 +85,7 @@ class AppConnectionViewModel(
                         password = passwordValue,
                     )
                     val previous = lastConnection
-                    if (previous == connection) {
+                    if (!connectionRequiresReplacement(previous, connection)) {
                         localState.value = null
                         return@collectLatest
                     }

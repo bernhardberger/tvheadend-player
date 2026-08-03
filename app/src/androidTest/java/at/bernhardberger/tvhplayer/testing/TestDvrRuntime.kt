@@ -1,18 +1,15 @@
-@file:OptIn(at.bernhardberger.tvhplayer.htsp.PlaybackIntegrationApi::class)
-
 package at.bernhardberger.tvhplayer.testing
 
-import at.bernhardberger.tvhplayer.core.DvrActionFailure
-import at.bernhardberger.tvhplayer.core.DvrActionResult
-import at.bernhardberger.tvhplayer.core.RecordingWriteCapability
-import at.bernhardberger.tvhplayer.htsp.DvrConfig
-import at.bernhardberger.tvhplayer.htsp.DvrEntry
-import at.bernhardberger.tvhplayer.htsp.DvrFile
-import at.bernhardberger.tvhplayer.htsp.DvrRuntime
-import at.bernhardberger.tvhplayer.htsp.HtspMessage
-import at.bernhardberger.tvhplayer.htsp.RecordingProgressCapability
-import at.bernhardberger.tvhplayer.htsp.RecordingProgressUpdateResult
-import at.bernhardberger.tvhplayer.htsp.dvrState
+import at.bernhardberger.tvheadend.client.DvrRuntime
+import at.bernhardberger.tvheadend.client.RecordingProgressCapability
+import at.bernhardberger.tvheadend.client.RecordingProgressUpdateResult
+import at.bernhardberger.tvheadend.core.DvrActionFailure
+import at.bernhardberger.tvheadend.core.DvrActionResult
+import at.bernhardberger.tvheadend.core.DvrConfig
+import at.bernhardberger.tvheadend.core.DvrEntry
+import at.bernhardberger.tvheadend.core.DvrFile
+import at.bernhardberger.tvheadend.core.DvrState
+import at.bernhardberger.tvheadend.core.RecordingWriteCapability
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -41,7 +38,7 @@ class TestDvrRuntime : DvrRuntime {
         mutableCanModifyRecordings.value = capability == RecordingWriteCapability.Allowed
     }
 
-    suspend fun acceptDvrMessage(message: HtspMessage) {
+    suspend fun acceptDvrMessage(message: DvrTestMessage) {
         when (message.method) {
             "dvrEntryAdd", "dvrEntryUpdate" -> {
                 val entry = mergeEntry(message) ?: return
@@ -91,7 +88,7 @@ class TestDvrRuntime : DvrRuntime {
         mutableEntries.value = workingEntries.values.sortedWith(compareBy({ it.start }, { it.id }))
     }
 
-    private fun mergeEntry(message: HtspMessage): DvrEntry? {
+    private fun mergeEntry(message: DvrTestMessage): DvrEntry? {
         val id = message.int("id") ?: message.int("dvrId") ?: return null
         val existing = workingEntries[id]
         val error = message.str("error") ?: message.str("statusError") ?: existing?.failureReason
@@ -108,7 +105,7 @@ class TestDvrRuntime : DvrRuntime {
             subtitle = message.str("subtitle") ?: existing?.subtitle,
             summary = message.str("summary") ?: existing?.summary,
             description = message.str("description") ?: existing?.description,
-            state = dvrState(
+            state = testDvrState(
                 message.str("state") ?: message.str("status") ?: existing?.state?.name,
                 error,
             ),
@@ -135,6 +132,34 @@ class TestDvrRuntime : DvrRuntime {
             autorecId = message.str("autorecId") ?: existing?.autorecId,
             timerecId = message.str("timerecId") ?: existing?.timerecId,
         )
+    }
+}
+
+data class DvrTestMessage(
+    val method: String?,
+    val seq: Int?,
+    val fields: Map<String, Any?>,
+) {
+    fun int(name: String): Int? = (fields[name] as? Number)?.toInt()
+    fun long(name: String): Long? = (fields[name] as? Number)?.toLong()
+    fun str(name: String): String? = fields[name] as? String
+    fun list(name: String): List<Any?>? = fields[name] as? List<Any?>
+}
+
+private fun testDvrState(value: String?, error: String? = null): DvrState {
+    val normalized = value?.lowercase().orEmpty()
+    val normalizedError = error?.lowercase().orEmpty()
+    return when {
+        "cancel" in normalized || "user" in normalizedError && "cancel" in normalizedError ->
+            DvrState.CANCELLED
+        "recording" in normalized || "running" in normalized -> DvrState.RECORDING
+        "scheduled" in normalized || "pending" in normalized || "waiting" in normalized ->
+            DvrState.SCHEDULED
+        "completed" in normalized || "finished" in normalized ->
+            if (error.isNullOrBlank()) DvrState.COMPLETED else DvrState.FAILED
+        "failed" in normalized || "missed" in normalized || "invalid" in normalized ||
+            error?.isNotBlank() == true -> DvrState.FAILED
+        else -> DvrState.UNKNOWN
     }
 }
 

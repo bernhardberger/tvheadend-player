@@ -48,8 +48,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvheadend.core.TimeshiftState
 import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward

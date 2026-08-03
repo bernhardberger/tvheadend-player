@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
+import at.bernhardberger.tvheadend.core.EpgEventEntry
 
 /** Summary with description fallback for compact detail panes. */
 fun programmeSummaryText(event: EpgEventEntry): String? {

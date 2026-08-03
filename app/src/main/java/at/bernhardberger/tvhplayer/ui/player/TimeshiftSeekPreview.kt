@@ -18,8 +18,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
-import at.bernhardberger.tvhplayer.core.TimeshiftState
+import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
+import at.bernhardberger.tvheadend.core.TimeshiftState
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.programmeAnchoredAxis

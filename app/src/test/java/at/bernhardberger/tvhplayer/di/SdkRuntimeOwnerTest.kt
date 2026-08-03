@@ -1,16 +1,21 @@
+@file:kotlin.OptIn(
+    at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class,
+    at.bernhardberger.tvheadend.playback.ExperimentalRecordingCoordinationApi::class,
+)
+
 package at.bernhardberger.tvhplayer.di
 
 import androidx.media3.common.Player
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
-import at.bernhardberger.tvhplayer.core.SubscriptionFailureKind
-import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
-import at.bernhardberger.tvhplayer.core.TimeshiftState
-import at.bernhardberger.tvhplayer.htsp.DvrEntry
-import at.bernhardberger.tvhplayer.htsp.TvheadendClient
-import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSnapshot
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
-import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.RecordingProgressSyncState
+import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvheadend.core.DvrEntry
+import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
+import at.bernhardberger.tvheadend.core.SubscriptionFailureKind
+import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
+import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSnapshot
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvheadend.playback.PlaybackSessionState
+import at.bernhardberger.tvheadend.playback.RecordingProgressSyncState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,8 +93,8 @@ private class FakePlaybackRuntime(
         get() = error("The shutdown test does not borrow a Player")
     override val state: StateFlow<PlaybackSessionState> =
         MutableStateFlow(PlaybackSessionState.Idle)
-    override val activeServiceId: StateFlow<Int?> = MutableStateFlow(null)
-    override val playingLiveServiceId: StateFlow<Int?> = MutableStateFlow(null)
+    override val activeChannelId: StateFlow<Int?> = MutableStateFlow(null)
+    override val playingLiveChannelId: StateFlow<Int?> = MutableStateFlow(null)
     override val activeRecordingId: StateFlow<Int?> = MutableStateFlow(null)
     override val timeshiftState: StateFlow<TimeshiftState> = MutableStateFlow(TimeshiftState())
     override val liveSubscriptionFailure: StateFlow<SubscriptionFailureKind?> =
@@ -99,7 +104,7 @@ private class FakePlaybackRuntime(
     override val diagnostics: StateFlow<PlaybackDiagnosticsSnapshot> =
         MutableStateFlow(PlaybackDiagnosticsSnapshot())
 
-    override suspend fun playLive(serviceId: Int): Boolean = false
+    override suspend fun playLive(channelId: Int): Boolean = false
 
     override suspend fun playRecording(entry: DvrEntry, intent: RecordingPlaybackIntent) = Unit
 

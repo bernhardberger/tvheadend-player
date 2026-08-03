@@ -50,7 +50,7 @@ import androidx.tv.material3.StandardCardContainer
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.channelInitials
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import at.bernhardberger.tvhplayer.ui.ChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.TvCardSpacing
@@ -61,7 +61,7 @@ import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import coil3.ImageLoader
 
 data class ChannelCardModel(
-    val channel: ChannelUi,
+    val channel: Channel,
     val number: Int?,
     val programmeTitle: String,
     val playingNow: Boolean = false,
@@ -79,7 +79,7 @@ fun ChannelCardGrid(
     items: List<ChannelCardModel>,
     imageLoader: ImageLoader,
     onFocusChannel: (Int) -> Unit,
-    onConfirmChannel: (ChannelUi) -> Unit,
+    onConfirmChannel: (Channel) -> Unit,
     modifier: Modifier = Modifier,
     focusRequesters: Map<Int, FocusRequester> = emptyMap(),
     gridState: LazyGridState = rememberLazyGridState(),
@@ -103,23 +103,23 @@ fun ChannelCardGrid(
                 .focusGroup()
                 .focusRestorer(),
         ) {
-            items(items, key = { it.channel.id }) { item ->
-                var focused by remember(item.channel.id) { mutableStateOf(false) }
+            items(items, key = { it.channel.channelId }) { item ->
+                var focused by remember(item.channel.channelId) { mutableStateOf(false) }
                 ChannelCard(
                     item = item,
                     focused = focused,
                     imageLoader = imageLoader,
                     modifier = Modifier.width(cardWidth),
                     interactiveModifier = Modifier
-                        .testTag("channel-card-${item.channel.id}")
+                        .testTag("channel-card-${item.channel.channelId}")
                         .then(
-                            focusRequesters[item.channel.id]?.let {
+                            focusRequesters[item.channel.channelId]?.let {
                                 Modifier.focusRequester(it)
                             } ?: Modifier,
                         )
                         .onFocusChanged { focusState ->
                             focused = focusState.isFocused
-                            if (focusState.isFocused) onFocusChannel(item.channel.id)
+                            if (focusState.isFocused) onFocusChannel(item.channel.channelId)
                         },
                     onClick = { onConfirmChannel(item.channel) },
                 )
@@ -261,7 +261,7 @@ private fun ChannelCard(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("channel-card-progress-${item.channel.id}"),
+                            .testTag("channel-card-progress-${item.channel.channelId}"),
                     )
                 }
             }

@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.core.ConnectionProbeResult
+import at.bernhardberger.tvheadend.core.ConnectionFailureKind
+import at.bernhardberger.tvheadend.core.ConnectionProbeResult
 
 sealed interface ConnectionProbeUiState {
     data object Idle : ConnectionProbeUiState

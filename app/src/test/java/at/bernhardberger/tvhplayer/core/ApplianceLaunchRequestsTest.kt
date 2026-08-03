@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -442,8 +442,8 @@ class ApplianceLaunchRequestsTest {
         assertEquals(ApplianceLaunchState.Entering(secondTarget), requests.state.value)
     }
 
-    private fun channel(id: Int, name: String) = ChannelUi(
-        id = id,
+    private fun channel(id: Int, name: String) = Channel(
+        channelId = id,
         name = name,
         number = null,
         icon = null,

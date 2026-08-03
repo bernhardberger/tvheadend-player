@@ -61,11 +61,11 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.channelNowStatus
-import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
+import at.bernhardberger.tvheadend.core.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.htsp.DvrRuntime
+import at.bernhardberger.tvheadend.client.DvrRuntime
+import at.bernhardberger.tvheadend.core.EpgEventEntry
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -141,11 +141,11 @@ fun ChannelsScreen(
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
-    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val orderedChannelIds = remember(channels) { channels.map { it.channelId } }
     val rowFocusRequesters = remember(orderedChannelIds) {
         orderedChannelIds.associateWith { FocusRequester() }
     }
-    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
+    val channelNumbers = remember(channels) { channels.associate { it.channelId to it.number } }
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
@@ -167,7 +167,7 @@ fun ChannelsScreen(
     }
 
     fun pageChannels(direction: Int): Boolean {
-        val currentIndex = channels.indexOfFirst { it.id == selectedId }
+        val currentIndex = channels.indexOfFirst { it.channelId == selectedId }
         val visibleCount = if (useCards) {
             gridState.layoutInfo.visibleItemsInfo.size
         } else {
@@ -181,7 +181,7 @@ fun ChannelsScreen(
         ) ?: return true
         if (targetIndex == currentIndex) return true
 
-        val targetId = channels[targetIndex].id
+        val targetId = channels[targetIndex].channelId
         val targetFocus = rowFocusRequesters[targetId] ?: return true
         val generation = ++pageGeneration
         isRestoring = true
@@ -210,9 +210,11 @@ fun ChannelsScreen(
         return true
     }
 
-    val focusedChannel = channels.firstOrNull { it.id == selectedId }
+    val focusedChannel = channels.firstOrNull { it.channelId == selectedId }
     val emptyFocusedEvents = remember { MutableStateFlow<List<EpgEventEntry>>(emptyList()) }
-    val focusedEventsFlow = focusedChannel?.let { channelViewModel.epgForChannel(it.id) }
+    val focusedEventsFlow = focusedChannel?.let {
+        channelViewModel.epgForChannel(it.channelId)
+    }
         ?: emptyFocusedEvents
     val focusedEvents by focusedEventsFlow.collectAsStateWithLifecycle()
     val focusedNow = remember(focusedEvents, nowSec) {
@@ -242,7 +244,7 @@ fun ChannelsScreen(
 
         val id = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
         if (selectedId != id) selection.setSelected(id)
-        val idx = channels.indexOfFirst { it.id == id }
+        val idx = channels.indexOfFirst { it.channelId == id }
         if (idx < 0) return@LaunchedEffect
 
         isRestoring = true
@@ -354,9 +356,9 @@ fun ChannelsScreen(
                         noEpg,
                     ) {
                         channels.map { ch ->
-                            val now = channelViewModel.nowEvent(ch.id, nowSec)
+                            val now = channelViewModel.nowEvent(ch.channelId, nowSec)
                             val status = channelNowStatus(
-                                channelId = ch.id,
+                                channelId = ch.channelId,
                                 playingChannelId = playingChannelId,
                                 recordingChannelIds = recordingChannelIds,
                             )
@@ -365,7 +367,7 @@ fun ChannelsScreen(
                                 number = ChannelNavigation.numberForId(
                                     orderedChannelIds,
                                     channelNumbers,
-                                    ch.id,
+                                    ch.channelId,
                                 ),
                                 programmeTitle = now?.title ?: noEpg,
                                 playingNow = status.playingNow,
@@ -382,7 +384,9 @@ fun ChannelsScreen(
                         onFocusChannel = {
                             if (!isRestoring) selection.setSelected(it)
                         },
-                        onConfirmChannel = { ch -> onPlay(ch.id, ch.id, ch.name) },
+                        onConfirmChannel = { ch ->
+                            onPlay(ch.channelId, ch.channelId, ch.name)
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .onPreviewKeyEvent { event ->
@@ -437,27 +441,27 @@ fun ChannelsScreen(
                                     )?.let(::pageChannels) ?: false
                                 }
                         ) {
-                            items(channels, key = { ch -> ch.id }) { ch ->
-                                val isSelected = ch.id == selectedId
+                            items(channels, key = { ch -> ch.channelId }) { ch ->
+                                val isSelected = ch.channelId == selectedId
                                 val now =
-                                    remember(ch.id, nowSec) {
-                                        channelViewModel.nowEvent(ch.id, nowSec)
+                                    remember(ch.channelId, nowSec) {
+                                        channelViewModel.nowEvent(ch.channelId, nowSec)
                                     }
                                 val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
                                 val status = channelNowStatus(
-                                    channelId = ch.id,
+                                    channelId = ch.channelId,
                                     playingChannelId = playingChannelId,
                                     recordingChannelIds = recordingChannelIds,
                                 )
 
                                 ChannelRow(
                                     modifier = Modifier.focusRequester(
-                                        rowFocusRequesters.getValue(ch.id)
+                                        rowFocusRequesters.getValue(ch.channelId)
                                     ),
                                     number = ChannelNavigation.numberForId(
                                         orderedChannelIds,
                                         channelNumbers,
-                                        ch.id,
+                                        ch.channelId,
                                     ),
                                     name = ch.name,
                                     programTitle = now?.title ?: stringResource(R.string.no_epg),
@@ -468,9 +472,11 @@ fun ChannelsScreen(
                                     recordingNow = status.recordingNow,
                                     playingNow = status.playingNow,
                                     onFocus = {
-                                        if (!isRestoring) selection.setSelected(ch.id)
+                                        if (!isRestoring) selection.setSelected(ch.channelId)
                                     },
-                                    onConfirm = { onPlay(ch.id, ch.id, ch.name) }
+                                    onConfirm = {
+                                        onPlay(ch.channelId, ch.channelId, ch.name)
+                                    }
                                 )
                             }
                         }

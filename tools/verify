@@ -39,6 +39,7 @@ printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
     lintDebug \
     compileDebugAndroidTestKotlin \
     assembleDebug \
+    :app:verifyExternalSdkConsumption \
     --no-daemon
 
 apk="app/build/outputs/apk/debug/app-debug.apk"

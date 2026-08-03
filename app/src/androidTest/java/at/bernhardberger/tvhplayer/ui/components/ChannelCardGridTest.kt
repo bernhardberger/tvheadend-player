@@ -22,7 +22,7 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import org.junit.Assert.assertNotEquals
@@ -45,7 +45,7 @@ class ChannelCardGridTest {
                 ChannelCardGrid(
                     items = (1..3).map { id ->
                         ChannelCardModel(
-                            channel = ChannelUi(id, "Channel $id", id, null),
+                            channel = Channel(id, "Channel $id", id, null),
                             number = id,
                             programmeTitle = "Programme $id",
                         )
@@ -76,7 +76,7 @@ class ChannelCardGridTest {
                 ChannelCardGrid(
                     items = listOf(
                         ChannelCardModel(
-                            channel = ChannelUi(1, "Channel", 1, null),
+                            channel = Channel(1, "Channel", 1, null),
                             number = 1,
                             programmeTitle = "Programme",
                             playingNow = true,
@@ -109,7 +109,7 @@ class ChannelCardGridTest {
                     ChannelCardGrid(
                         items = listOf(
                             ChannelCardModel(
-                                channel = ChannelUi(1, "Channel", 1, null),
+                                channel = Channel(1, "Channel", 1, null),
                                 number = 1,
                                 programmeTitle = "Programme",
                                 progress = 0.25f,

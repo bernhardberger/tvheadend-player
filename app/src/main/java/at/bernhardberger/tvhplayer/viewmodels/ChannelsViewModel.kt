@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.TagScopeFallback
 import at.bernhardberger.tvhplayer.core.resolveChannelScope
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.core.EpgEventEntry
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,8 +21,8 @@ class ChannelsViewModel(
     private val tagSettings: ChannelTagSettingsStore,
 ) : ViewModel() {
     val scope: StateFlow<ChannelBrowsingScope> = combine(
-        runtime.channelsUi,
-        runtime.tagsUi,
+        runtime.channels,
+        runtime.channelTags,
         tagSettings.activeTagId,
         tagSettings.scopeVisibility,
         ::resolveChannelScope,
@@ -37,7 +37,7 @@ class ChannelsViewModel(
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
-    val allChannels = runtime.channelsUi
+    val allChannels = runtime.channels
     val unavailableTagNotice = tagSettings.unavailableTagNotice
 
     init {
@@ -59,7 +59,7 @@ class ChannelsViewModel(
             }
         }
         viewModelScope.launch {
-            combine(runtime.tagsUi, runtime.metadataReady, tagSettings.scopeVisibility) {
+            combine(runtime.channelTags, runtime.metadataReady, tagSettings.scopeVisibility) {
                     tags, metadataReady, visibility ->
                 if (
                     metadataReady &&

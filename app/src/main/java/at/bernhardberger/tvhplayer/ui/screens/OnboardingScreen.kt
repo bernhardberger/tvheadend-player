@@ -34,9 +34,9 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.ConnectionProbeResult
-import at.bernhardberger.tvhplayer.htsp.TvheadendClient
-import at.bernhardberger.tvhplayer.htsp.TvheadendConnection
+import at.bernhardberger.tvheadend.core.ConnectionProbeResult
+import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvheadend.client.TvheadendConnection
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding

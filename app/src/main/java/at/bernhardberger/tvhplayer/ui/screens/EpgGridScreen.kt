@@ -76,8 +76,8 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.core.DvrActionFailure
+import at.bernhardberger.tvheadend.core.ConnectionFailureKind
+import at.bernhardberger.tvheadend.core.DvrActionFailure
 import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
@@ -85,7 +85,7 @@ import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.GuideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.GuideScopeExitFocusTarget
-import at.bernhardberger.tvhplayer.core.DvrActionResult
+import at.bernhardberger.tvheadend.core.DvrActionResult
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
@@ -103,14 +103,14 @@ import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
-import at.bernhardberger.tvhplayer.htsp.DvrEntry
-import at.bernhardberger.tvhplayer.htsp.DvrConfig
-import at.bernhardberger.tvhplayer.htsp.DvrState
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
-import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.htsp.DvrRuntime
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.client.DvrRuntime
+import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvheadend.core.DvrConfig
+import at.bernhardberger.tvheadend.core.DvrEntry
+import at.bernhardberger.tvheadend.core.DvrState
+import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -198,7 +198,7 @@ fun EpgGridScreen(
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
-    val playingChannelId by playerSession.activeServiceId.collectAsStateWithLifecycle()
+    val playingChannelId by playerSession.activeChannelId.collectAsStateWithLifecycle()
     val timeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
@@ -302,7 +302,7 @@ fun EpgGridScreen(
     }
 
     val selectedIndex = selectedTarget?.channelIndex ?: pendingInitialChannelIndex
-    val channelIds = remember(channels) { channels.map { it.id } }
+    val channelIds = remember(channels) { channels.map { it.channelId } }
     val focusRowsFlow = remember(channelIds, category, repository) {
         if (channelIds.isEmpty()) {
             flowOf(emptyList())
@@ -324,7 +324,7 @@ fun EpgGridScreen(
     val emptyEventsFlow = remember {
         kotlinx.coroutines.flow.MutableStateFlow<List<EpgEventEntry>>(emptyList())
     }
-    val selectedEventsFlow = selectedChannel?.let { repository.epgForChannel(it.id) }
+    val selectedEventsFlow = selectedChannel?.let { repository.epgForChannel(it.channelId) }
         ?: emptyEventsFlow
     val unfilteredSelectedChannelEvents by selectedEventsFlow.collectAsStateWithLifecycle()
     val selectedChannelEvents = remember(unfilteredSelectedChannelEvents, category) {
@@ -341,7 +341,7 @@ fun EpgGridScreen(
         val pageStart = (channelIndex.coerceAtLeast(0) / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
         val ids = channels
             .subList(pageStart, (pageStart + CHANNEL_PAGE_SIZE).coerceAtMost(channels.size))
-            .map { it.id }
+            .map { it.channelId }
         repository.requestEpgAtFrontier(ids, anchorSec)
     }
 
@@ -358,14 +358,14 @@ fun EpgGridScreen(
         }
         val preferredId = playingChannelId ?: lastPlayedId ?: selectedChannelId
         val restored = restoredPosition?.takeIf { position ->
-            channels.any { it.id == position.channelId }
+            channels.any { it.channelId == position.channelId }
         }
         val channelId = browsingFocusChannelId(
             channels,
             restored?.channelId ?: preferredId,
         )
             ?: return@LaunchedEffect
-        val channelIndex = channels.indexOfFirst { it.id == channelId }
+        val channelIndex = channels.indexOfFirst { it.channelId == channelId }
         pendingInitialChannelIndex = channelIndex
         val target = initialTimelineEpgFocus(
             rows = focusRows,
@@ -376,7 +376,7 @@ fun EpgGridScreen(
 
         val targetChannelIndex = target?.channelIndex ?: channelIndex
         pendingInitialChannelIndex = targetChannelIndex
-        selection.setSelected(channels[targetChannelIndex].id)
+        selection.setSelected(channels[targetChannelIndex].channelId)
         requestVisibleWindow(windowStartSec, targetChannelIndex)
         if (target != null) {
             selectedTarget = target
@@ -406,7 +406,7 @@ fun EpgGridScreen(
         selectedTarget = replacement
         if (replacement != null) {
             pendingInitialChannelIndex = replacement.channelIndex
-            selection.setSelected(channels[replacement.channelIndex].id)
+            selection.setSelected(channels[replacement.channelIndex].channelId)
         }
     }
 
@@ -444,7 +444,7 @@ fun EpgGridScreen(
             return@LaunchedEffect
         }
         val event = filteredEvents(
-            channels.getOrNull(target.channelIndex)?.id ?: return@LaunchedEffect
+            channels.getOrNull(target.channelIndex)?.channelId ?: return@LaunchedEffect
         ).firstOrNull { it.eventId == target.eventId } ?: return@LaunchedEffect
         when {
             event.start < windowStartSec -> windowStartSec = floorToHour(event.start)
@@ -535,7 +535,7 @@ fun EpgGridScreen(
                 return true
             }
             move.extendTimeFrontier -> {
-                val currentEvent = filteredEvents(channels[current.channelIndex].id)
+                val currentEvent = filteredEvents(channels[current.channelIndex].channelId)
                     .firstOrNull { it.eventId == current.eventId }
                 val after = currentEvent?.stop ?: windowEndSec
                 windowStartSec += FRONTIER_STEP_SEC
@@ -773,7 +773,7 @@ fun EpgGridScreen(
                         .focusGroup()
                         .testTag("epg-programme-viewport"),
                 ) {
-                    itemsIndexed(channels, key = { _, channel -> channel.id }) {
+                    itemsIndexed(channels, key = { _, channel -> channel.channelId }) {
                             channelIndex, channel ->
                         TimelineChannelRow(
                             channel = channel,
@@ -809,7 +809,7 @@ fun EpgGridScreen(
         }
 
         detailsEvent?.let { event ->
-            val channel = channels.firstOrNull { it.id == event.channelId }
+            val channel = channels.firstOrNull { it.channelId == event.channelId }
             val recording = dvrEntries.firstOrNull { it.eventId == event.eventId }
             val timeshiftCoversEvent = playingChannelId == event.channelId &&
                 simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT) &&
@@ -830,7 +830,9 @@ fun EpgGridScreen(
                     when (action) {
                         ProgrammeAction.WATCH -> {
                             detailsEvent = null
-                            channel?.let { onPlay(it.id, it.id, it.name) }
+                            channel?.let {
+                                onPlay(it.channelId, it.channelId, it.name)
+                            }
                         }
                         ProgrammeAction.WATCH_FROM_START -> {
                             if (recording != null) {
@@ -843,7 +845,7 @@ fun EpgGridScreen(
                                     )
                                 }
                                 detailsEvent = null
-                                onPlay(channel.id, channel.id, channel.name)
+                                onPlay(channel.channelId, channel.channelId, channel.name)
                             }
                         }
                         ProgrammeAction.RECORD -> when (val choice = chooseDvrConfig(dvrConfigs)) {
@@ -1017,9 +1019,9 @@ private fun TimelineTimeRuler(
 
 @Composable
 private fun TimelineChannelRow(
-    channel: ChannelUi,
+    channel: Channel,
     channelIndex: Int,
-    allChannels: List<ChannelUi>,
+    allChannels: List<Channel>,
     selectedTarget: EpgFocusTarget?,
     eventFocusRequesters: MutableMap<Int, FocusRequester>,
     windowStartSec: Long,
@@ -1035,7 +1037,7 @@ private fun TimelineChannelRow(
     onOpenDetails: (EpgEventEntry) -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
 ) {
-    val events by repository.epgForChannel(channel.id).collectAsStateWithLifecycle()
+    val events by repository.epgForChannel(channel.channelId).collectAsStateWithLifecycle()
     val filteredEvents = remember(events, category) {
         events.filter { it.matchesProgrammeCategory(category) }
     }
@@ -1051,8 +1053,8 @@ private fun TimelineChannelRow(
         filterActive = category != ProgrammeCategory.ALL,
         matchingCachedEvents = filteredEvents,
     )
-    val orderedIds = remember(allChannels) { allChannels.map { it.id } }
-    val numbers = remember(allChannels) { allChannels.associate { it.id to it.number } }
+    val orderedIds = remember(allChannels) { allChannels.map { it.channelId } }
+    val numbers = remember(allChannels) { allChannels.associate { it.channelId to it.number } }
 
     Row(
         modifier = Modifier
@@ -1062,7 +1064,7 @@ private fun TimelineChannelRow(
     ) {
         TimelineChannelHeader(
             channel = channel,
-            number = ChannelNavigation.numberForId(orderedIds, numbers, channel.id),
+            number = ChannelNavigation.numberForId(orderedIds, numbers, channel.channelId),
             imageLoader = imageLoader,
             selected = selectedTarget?.channelIndex == channelIndex,
         )
@@ -1128,7 +1130,7 @@ private fun TimelineChannelRow(
 
 @Composable
 internal fun TimelineChannelHeader(
-    channel: ChannelUi,
+    channel: Channel,
     number: Int?,
     imageLoader: ImageLoader,
     selected: Boolean = false,
@@ -1176,7 +1178,7 @@ internal fun TimelineChannelHeader(
 @Composable
 internal fun TimelineProgrammeCell(
     event: EpgEventEntry,
-    channel: ChannelUi,
+    channel: Channel,
     recording: DvrEntry?,
     nowSec: Long,
     selected: Boolean,
@@ -1351,7 +1353,7 @@ private fun JumpToTimeDialog(
 private fun ProgrammeDetailsPanel(
     contentPadding: PaddingValues,
     event: EpgEventEntry,
-    channel: ChannelUi?,
+    channel: Channel?,
     recording: DvrEntry?,
     nowSec: Long,
     serverTimeshiftCoversEvent: Boolean,
@@ -1796,7 +1798,7 @@ private fun GuideEmptyState(
 }
 
 private fun nearestTargetAt(
-    channels: List<ChannelUi>,
+    channels: List<Channel>,
     repository: ChannelEpgRuntime,
     preferredChannelIndex: Int,
     targetSec: Long,
@@ -1805,8 +1807,8 @@ private fun nearestTargetAt(
     return initialTimelineEpgFocus(
         rows = channels.map { channel ->
             EpgFocusColumn(
-                channel.id,
-                repository.epgForChannel(channel.id).value.filter {
+                channel.channelId,
+                repository.epgForChannel(channel.channelId).value.filter {
                     it.matchesProgrammeCategory(category)
                 },
             )

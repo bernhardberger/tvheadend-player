@@ -89,6 +89,7 @@
     <string name="language_english">Englisch</string>
     <string name="profile">Streamprofil</string>
     <string name="profile_direct_streaming">Direktes Streaming</string>
+    <string name="stream_profiles_unavailable">Streamprofile sind nicht verfügbar.</string>
     <string name="audio_language">Audiosprache</string>
     <string name="subtitle_language">Untertitelsprache</string>
 

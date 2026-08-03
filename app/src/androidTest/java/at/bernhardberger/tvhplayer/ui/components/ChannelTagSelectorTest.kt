@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.htsp.ChannelTagUi
+import at.bernhardberger.tvheadend.core.ChannelTag
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -51,7 +51,7 @@ class ChannelTagSelectorTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ChannelTagSelector(
-                    tags = listOf(ChannelTagUi(id = 7, name = "News", index = 1)),
+                    tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
                     activeTagId = selectedTagId,
                     onSelectTag = { selectedTagId = it },
                 )
@@ -81,7 +81,7 @@ class ChannelTagSelectorTest {
                 Row {
                     Button(onClick = {}) { Text("Before scopes") }
                     ChannelTagSelector(
-                        tags = listOf(ChannelTagUi(id = 7, name = "News", index = 1)),
+                        tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
                         activeTagId = 7,
                         onSelectTag = {},
                         onMoveToContent = {
@@ -112,7 +112,7 @@ class ChannelTagSelectorTest {
             TVHeadendPlayerTheme {
                 Column {
                     ChannelTagSelector(
-                        tags = listOf(ChannelTagUi(id = 7, name = "News", index = 1)),
+                        tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
                         activeTagId = 7,
                         onSelectTag = {},
                         onMoveToContent = contentFocus::requestFocus,
@@ -143,7 +143,7 @@ class ChannelTagSelectorTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ChannelTagSelector(
-                    tags = listOf(ChannelTagUi(id = 7, name = "News", index = 1)),
+                    tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
                     activeTagId = 7,
                     allChannelsVisible = false,
                     onSelectTag = {},
@@ -158,7 +158,7 @@ class ChannelTagSelectorTest {
     @Test
     fun tabsFallBackToFirstVisibleScopeWhenActiveTagDisappears() {
         var tags by mutableStateOf(
-            (1..20).map { id -> ChannelTagUi(id = id, name = "Tag $id", index = id) }
+            (1..20).map { id -> ChannelTag(id = id, name = "Tag $id", index = id) }
         )
         composeRule.setContent {
             TVHeadendPlayerTheme {
@@ -268,8 +268,8 @@ class ChannelTagSelectorTest {
         }
     }
 
-    private fun longTags(): List<ChannelTagUi> = (1..5).map { id ->
-        ChannelTagUi(
+    private fun longTags(): List<ChannelTag> = (1..5).map { id ->
+        ChannelTag(
             id = id,
             name = "Long channel scope $id",
             index = id,

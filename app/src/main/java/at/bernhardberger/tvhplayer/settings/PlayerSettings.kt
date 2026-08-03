@@ -5,8 +5,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import at.bernhardberger.tvhplayer.player.PlaybackPreferences
-import at.bernhardberger.tvhplayer.player.PlaybackPreferencesProvider
+import at.bernhardberger.tvheadend.playback.PlaybackPreferences
+import at.bernhardberger.tvheadend.playback.PlaybackPreferencesProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map

@@ -65,8 +65,8 @@ fun SettingsPlayer(
                 else stringResource(R.string.not_connected)
             )
             ProfilesUiState.Loading -> Text(stringResource(R.string.loading))
-            is ProfilesUiState.Error -> Text(
-                text = stringResource(R.string.error_prefix) + " " + profiles.message,
+            ProfilesUiState.Error -> Text(
+                text = stringResource(R.string.stream_profiles_unavailable),
                 color = MaterialTheme.colorScheme.error,
             )
             is ProfilesUiState.Ready -> {

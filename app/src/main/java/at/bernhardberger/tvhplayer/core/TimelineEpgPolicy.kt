@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
+import at.bernhardberger.tvheadend.core.ConnectionFailureKind
+import at.bernhardberger.tvheadend.core.EpgEventEntry
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min

@@ -1,3 +1,5 @@
+@file:OptIn(at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class)
+
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.content.res.Configuration
@@ -26,17 +28,17 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.core.TimeshiftState
-import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSnapshot
-import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSource
-import at.bernhardberger.tvhplayer.player.PlaybackFormatDiagnostics
-import at.bernhardberger.tvhplayer.player.PlaybackOutputMode
-import at.bernhardberger.tvhplayer.player.PlaybackQueueDiagnostics
-import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.PlaybackSystemDiagnostics
-import at.bernhardberger.tvhplayer.player.PlaybackThermalLevel
-import at.bernhardberger.tvhplayer.player.PlaybackTransportDiagnostics
-import at.bernhardberger.tvhplayer.player.PlaybackTunerDiagnostics
+import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSnapshot
+import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSource
+import at.bernhardberger.tvheadend.playback.PlaybackFormatDiagnostics
+import at.bernhardberger.tvheadend.playback.PlaybackOutputMode
+import at.bernhardberger.tvheadend.playback.PlaybackQueueDiagnostics
+import at.bernhardberger.tvheadend.playback.PlaybackSessionState
+import at.bernhardberger.tvheadend.playback.PlaybackSystemDiagnostics
+import at.bernhardberger.tvheadend.playback.PlaybackThermalLevel
+import at.bernhardberger.tvheadend.playback.PlaybackTransportDiagnostics
+import at.bernhardberger.tvheadend.playback.PlaybackTunerDiagnostics
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.util.Locale

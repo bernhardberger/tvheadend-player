@@ -21,7 +21,7 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode

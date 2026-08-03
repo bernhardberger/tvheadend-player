@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import java.util.concurrent.CancellationException
@@ -258,8 +258,8 @@ class StartupBootstrapCoordinatorTest {
                         request = pending.request,
                         readiness = CurrentChannelReadiness.Ready(
                             listOf(
-                                ChannelUi(
-                                    id = 20,
+                                Channel(
+                                    channelId = 20,
                                     name = "Twenty",
                                     number = null,
                                     icon = null,

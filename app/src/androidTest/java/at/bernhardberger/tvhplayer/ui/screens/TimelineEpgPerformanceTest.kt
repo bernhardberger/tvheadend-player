@@ -19,8 +19,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
+import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvheadend.core.EpgEventEntry
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
@@ -35,8 +35,8 @@ class TimelineEpgPerformanceTest {
     @Test
     fun syntheticThreeHundredTimelineRowsRemainVirtualizedAndScrollable() {
         val channels = (1..300).map { number ->
-            ChannelUi(
-                id = number,
+            Channel(
+                channelId = number,
                 name = "Channel $number",
                 number = number,
                 icon = null,
@@ -47,7 +47,7 @@ class TimelineEpgPerformanceTest {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 LazyColumn(Modifier.testTag("timeline-rows")) {
-                    items(channels, key = { it.id }) { channel ->
+                    items(channels, key = { it.channelId }) { channel ->
                         Box(Modifier.width(190.dp).height(76.dp)) {
                             TimelineChannelHeader(
                                 channel = channel,
@@ -66,7 +66,7 @@ class TimelineEpgPerformanceTest {
 
     @Test
     fun consecutiveShortProgrammeCardsDoNotOverlap() {
-        val channel = ChannelUi(id = 1, name = "Channel", number = 1, icon = null)
+        val channel = Channel(channelId = 1, name = "Channel", number = 1, icon = null)
         val first = event(id = 1, start = 0, stop = 5 * 60)
         val second = event(id = 2, start = 5 * 60, stop = 10 * 60)
         val cardWidth = 600.dp / 36f

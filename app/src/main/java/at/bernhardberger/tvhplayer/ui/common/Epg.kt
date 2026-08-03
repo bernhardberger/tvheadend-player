@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.common
 
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
+import at.bernhardberger.tvheadend.core.EpgEventEntry
 import kotlin.math.abs
 
 fun List<EpgEventEntry>.nowEvent(nowSec: Long): EpgEventEntry? =

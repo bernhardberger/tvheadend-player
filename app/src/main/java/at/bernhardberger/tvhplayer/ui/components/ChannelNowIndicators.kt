@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.htsp.DvrState
+import at.bernhardberger.tvheadend.core.DvrState
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 
 @Composable

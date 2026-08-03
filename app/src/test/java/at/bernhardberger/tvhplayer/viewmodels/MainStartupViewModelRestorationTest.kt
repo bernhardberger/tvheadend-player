@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,8 +45,8 @@ class MainStartupViewModelRestorationTest {
                 request = pending.request,
                 readiness = CurrentChannelReadiness.Ready(
                     listOf(
-                        ChannelUi(
-                            id = 7,
+                        Channel(
+                            channelId = 7,
                             name = "Sensitive channel name",
                             number = null,
                             icon = null,

@@ -93,6 +93,7 @@
     <string name="language_english">English</string>
     <string name="profile">Stream profile</string>
     <string name="profile_direct_streaming">Direct streaming</string>
+    <string name="stream_profiles_unavailable">Stream profiles are unavailable.</string>
     <string name="audio_language">Audio Language</string>
     <string name="subtitle_language">Subtitle Language</string>
 

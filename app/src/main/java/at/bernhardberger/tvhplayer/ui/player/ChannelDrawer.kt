@@ -41,7 +41,7 @@ import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.channelNowStatus
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelCardGrid
 import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
@@ -54,7 +54,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ChannelDrawer(
-    channels: List<ChannelUi>,
+    channels: List<Channel>,
     selectedId: Int,
     playingChannelId: Int,
     recordingChannelIds: Set<Int>,
@@ -62,7 +62,7 @@ fun ChannelDrawer(
     channelsVm: ChannelsViewModel,
     imageLoader: ImageLoader,
     onFocusChannel: (Int) -> Unit,
-    onPickChannel: (ChannelUi) -> Unit,
+    onPickChannel: (Channel) -> Unit,
     onCloseDrawer: () -> Unit,
     largeCards: Boolean = false,
 ) {
@@ -70,11 +70,11 @@ fun ChannelDrawer(
     val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val orderedChannelIds = remember(channels) { channels.map { it.channelId } }
     val rowFocusRequesters = remember(orderedChannelIds) {
         orderedChannelIds.associateWith { FocusRequester() }
     }
-    val channelNumbers = remember(channels) { channels.associate { it.id to it.number } }
+    val channelNumbers = remember(channels) { channels.associate { it.channelId to it.number } }
     val noEpg = stringResource(R.string.no_epg)
 
     var didInitialRestore by remember { mutableStateOf(false) }
@@ -82,7 +82,7 @@ fun ChannelDrawer(
     var pageGeneration by remember { mutableIntStateOf(0) }
 
     fun pageChannels(direction: Int): Boolean {
-        val currentIndex = channels.indexOfFirst { it.id == selectedId }
+        val currentIndex = channels.indexOfFirst { it.channelId == selectedId }
         val visibleCount = if (largeCards) {
             gridState.layoutInfo.visibleItemsInfo.size
         } else {
@@ -96,7 +96,7 @@ fun ChannelDrawer(
         ) ?: return true
         if (targetIndex == currentIndex) return true
 
-        val targetId = channels[targetIndex].id
+        val targetId = channels[targetIndex].channelId
         val targetFocus = rowFocusRequesters[targetId] ?: return true
         val generation = ++pageGeneration
         isRestoring = true
@@ -129,8 +129,8 @@ fun ChannelDrawer(
         if (didInitialRestore) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
 
-        val id = if (selectedId == -1) channels.first().id else selectedId
-        val idx = channels.indexOfFirst { it.id == id }
+        val id = if (selectedId == -1) channels.first().channelId else selectedId
+        val idx = channels.indexOfFirst { it.channelId == id }
         if (idx < 0) return@LaunchedEffect
 
         isRestoring = true
@@ -212,9 +212,9 @@ fun ChannelDrawer(
                 noEpg,
             ) {
                 channels.map { ch ->
-                    val now = channelsVm.nowEvent(ch.id, nowSec)
+                    val now = channelsVm.nowEvent(ch.channelId, nowSec)
                     val status = channelNowStatus(
-                        channelId = ch.id,
+                        channelId = ch.channelId,
                         playingChannelId = playingChannelId,
                         recordingChannelIds = recordingChannelIds,
                     )
@@ -223,7 +223,7 @@ fun ChannelDrawer(
                         number = ChannelNavigation.numberForId(
                             orderedChannelIds,
                             channelNumbers,
-                            ch.id,
+                            ch.channelId,
                         ),
                         programmeTitle = now?.title ?: noEpg,
                         playingNow = status.playingNow,
@@ -254,25 +254,27 @@ fun ChannelDrawer(
                     .focusGroup()
                     .focusRestorer()
             ) {
-                items(channels, key = { ch -> ch.id }) { ch ->
-                    val isSelected = ch.id == selectedId
+                items(channels, key = { ch -> ch.channelId }) { ch ->
+                    val isSelected = ch.channelId == selectedId
 
-                    val now = remember(ch.id, nowSec) { channelsVm.nowEvent(ch.id, nowSec) }
+                    val now = remember(ch.channelId, nowSec) {
+                        channelsVm.nowEvent(ch.channelId, nowSec)
+                    }
                     val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
                     val status = channelNowStatus(
-                        channelId = ch.id,
+                        channelId = ch.channelId,
                         playingChannelId = playingChannelId,
                         recordingChannelIds = recordingChannelIds,
                     )
 
                     ChannelRow(
                         modifier = Modifier.focusRequester(
-                            rowFocusRequesters.getValue(ch.id)
+                            rowFocusRequesters.getValue(ch.channelId)
                         ),
                         number = ChannelNavigation.numberForId(
                             orderedChannelIds,
                             channelNumbers,
-                            ch.id,
+                            ch.channelId,
                         ),
                         name = ch.name,
                         programTitle = now?.title ?: noEpg,
@@ -282,7 +284,7 @@ fun ChannelDrawer(
                         focused = isSelected,
                         recordingNow = status.recordingNow,
                         playingNow = status.playingNow,
-                        onFocus = { if (!isRestoring) onFocusChannel(ch.id) },
+                        onFocus = { if (!isRestoring) onFocusChannel(ch.channelId) },
                         onConfirm = { onPickChannel(ch) }
                     )
                 }

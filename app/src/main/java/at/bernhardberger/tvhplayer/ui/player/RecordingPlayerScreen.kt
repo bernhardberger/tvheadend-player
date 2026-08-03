@@ -1,3 +1,8 @@
+@file:OptIn(
+    at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class,
+    at.bernhardberger.tvheadend.playback.ExperimentalRecordingCoordinationApi::class,
+)
+
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.KeyEvent as AndroidKeyEvent
@@ -50,8 +55,8 @@ import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.PlayerSurface
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackAvailability
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
+import at.bernhardberger.tvheadend.core.RecordingPlaybackAvailability
+import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
@@ -64,18 +69,18 @@ import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.recordingKeyActionStartsOpeningCycle
-import at.bernhardberger.tvhplayer.core.recordingPlaybackAvailability
+import at.bernhardberger.tvheadend.core.recordingPlaybackAvailability
 import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.recordingSeekFeedbackSettled
 import at.bernhardberger.tvhplayer.core.recordingStackedSeekTarget
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
-import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.htsp.DvrRuntime
-import at.bernhardberger.tvhplayer.player.PlaybackFailureReason
-import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
-import at.bernhardberger.tvhplayer.player.RecordingProgressSyncState
+import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.client.DvrRuntime
+import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvheadend.playback.PlaybackFailureReason
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvheadend.playback.PlaybackSessionState
+import at.bernhardberger.tvheadend.playback.RecordingProgressSyncState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
@@ -131,8 +136,8 @@ fun RecordingPlayerScreen(
     )
     val entries by repository.entries.collectAsStateWithLifecycle()
     val entriesReady by repository.entriesReady.collectAsStateWithLifecycle()
-    val channels by channelRepository.channelsUi.collectAsStateWithLifecycle()
-    val channelsById = remember(channels) { channels.associateBy(ChannelUi::id) }
+    val channels by channelRepository.channels.collectAsStateWithLifecycle()
+    val channelsById = remember(channels) { channels.associateBy(Channel::channelId) }
     val entry = entries.firstOrNull { it.id == recordingId }
     val recordingResolved = entry != null || entriesReady
     val recordingLoading = !recordingResolved && connectionAvailable

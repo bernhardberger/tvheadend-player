@@ -2,11 +2,13 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.htsp.TvheadendClient
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalPlaybackDiagnosticsApi::class)
 class VideoPlayerViewModel(
     private val playbackRuntime: PlaybackRuntime,
     private val channelRuntime: ChannelEpgRuntime,
@@ -14,8 +16,8 @@ class VideoPlayerViewModel(
 ) : ViewModel() {
     val connectionState = client.connectionState
     val playbackState = playbackRuntime.state
-    val activeServiceId = playbackRuntime.activeServiceId
-    val playingLiveServiceId = playbackRuntime.playingLiveServiceId
+    val activeChannelId = playbackRuntime.activeChannelId
+    val playingLiveChannelId = playbackRuntime.playingLiveChannelId
     val timeshiftState = playbackRuntime.timeshiftState
     val liveSubscriptionFailure = playbackRuntime.liveSubscriptionFailure
     val diagnostics = playbackRuntime.diagnostics

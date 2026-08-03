@@ -69,14 +69,14 @@ class ApplianceLaunchRequests(
     ): ApplianceLaunchTarget? {
         val ready = readiness as? CurrentChannelReadiness.Ready ?: return null
         val channelId = LastPlayedChannelPolicy.resolve(
-            orderedIds = ready.channels.map { it.id },
+            orderedIds = ready.channels.map { it.channelId },
             persistedId = persistedId,
         ) ?: return null
-        val channel = ready.channels.firstOrNull { it.id == channelId } ?: return null
+        val channel = ready.channels.firstOrNull { it.channelId == channelId } ?: return null
         val target = ApplianceLaunchTarget(
             request = request,
-            channelId = channel.id,
-            serviceId = channel.id,
+            channelId = channel.channelId,
+            serviceId = channel.channelId,
             channelName = channel.name,
         )
         val pending = ApplianceLaunchState.Pending(request)

@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
-import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
@@ -28,7 +28,7 @@ fun SettingsChannelTags(
     repository: ChannelEpgRuntime = koinInject(),
     settingsStore: ChannelTagSettingsStore = koinInject(),
 ) {
-    val tags by repository.tagsUi.collectAsStateWithLifecycle()
+    val tags by repository.channelTags.collectAsStateWithLifecycle()
     val visibility by settingsStore.scopeVisibility.collectAsStateWithLifecycle(
         initialValue = ChannelScopeVisibility()
     )

@@ -2,10 +2,10 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvhplayer.htsp.ConnectionState
-import at.bernhardberger.tvhplayer.htsp.ProfileItem
-import at.bernhardberger.tvhplayer.htsp.TvheadendClient
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import at.bernhardberger.tvheadend.client.ConnectionState
+import at.bernhardberger.tvheadend.client.StreamProfile
+import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +21,8 @@ import kotlinx.coroutines.launch
 sealed interface ProfilesUiState {
     data object Idle : ProfilesUiState
     data object Loading : ProfilesUiState
-    data class Ready(val items: List<ProfileItem>) : ProfilesUiState
-    data class Error(val message: String) : ProfilesUiState
+    data class Ready(val items: List<StreamProfile>) : ProfilesUiState
+    data object Error : ProfilesUiState
 }
 
 data class SettingsPlayerUiState(
@@ -101,7 +101,7 @@ class SettingsPlayerViewModel(
                         },
                         onFailure = { t ->
                             _ui.value.copy(
-                                profiles = ProfilesUiState.Error(t.message ?: t.toString())
+                                profiles = profileDiscoveryFailureState(t)
                             )
                         }
                     )
@@ -109,7 +109,7 @@ class SettingsPlayerViewModel(
         }
     }
 
-    fun onProfileSelected(profile: ProfileItem) {
+    fun onProfileSelected(profile: StreamProfile) {
         _ui.value = _ui.value.copy(selectedProfileUuid = profile.id)
 
         viewModelScope.launch {

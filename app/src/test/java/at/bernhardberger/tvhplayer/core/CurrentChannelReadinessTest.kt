@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
-import at.bernhardberger.tvhplayer.htsp.ConnectionState
+import at.bernhardberger.tvheadend.client.ConnectionState
+import at.bernhardberger.tvheadend.core.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -72,8 +72,8 @@ class CurrentChannelReadinessTest {
         assertEquals(listOf(expected), readiness.channels)
     }
 
-    private fun channel(id: Int) = ChannelUi(
-        id = id,
+    private fun channel(id: Int) = Channel(
+        channelId = id,
         name = "Channel $id",
         number = id,
         icon = null,

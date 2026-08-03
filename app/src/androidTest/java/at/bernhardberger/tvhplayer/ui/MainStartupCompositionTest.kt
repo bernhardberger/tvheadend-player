@@ -24,7 +24,7 @@ import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
@@ -655,8 +655,8 @@ class MainStartupCompositionTest {
         channelName = name,
     )
 
-    private fun channel(id: Int, name: String) = ChannelUi(
-        id = id,
+    private fun channel(id: Int, name: String) = Channel(
+        channelId = id,
         name = name,
         number = id,
         icon = null,

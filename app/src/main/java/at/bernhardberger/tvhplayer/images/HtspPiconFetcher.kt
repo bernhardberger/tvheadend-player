@@ -1,4 +1,4 @@
-package at.bernhardberger.tvhplayer.htsp
+package at.bernhardberger.tvhplayer.images
 
 import android.content.Context
 import coil3.ImageLoader
@@ -12,6 +12,8 @@ import coil3.fetch.SourceFetchResult
 import coil3.key.Keyer
 import coil3.map.Mapper
 import coil3.request.Options
+import at.bernhardberger.tvheadend.client.ConnectionState
+import at.bernhardberger.tvheadend.client.TvheadendClient
 import at.bernhardberger.tvhplayer.ui.components.HtspPiconData
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Semaphore

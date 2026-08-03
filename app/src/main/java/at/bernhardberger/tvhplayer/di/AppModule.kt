@@ -2,16 +2,14 @@ package at.bernhardberger.tvhplayer.di
 
 import at.bernhardberger.tvhplayer.BuildConfig
 import coil3.ImageLoader
-import at.bernhardberger.tvhplayer.htsp.HtspClientIdentity
-import at.bernhardberger.tvhplayer.htsp.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.htsp.DvrRuntime
-import at.bernhardberger.tvhplayer.htsp.HtspLogLevel
-import at.bernhardberger.tvhplayer.htsp.HtspLogger
-import at.bernhardberger.tvhplayer.htsp.TvheadendClient
-import at.bernhardberger.tvhplayer.htsp.buildImageLoader
-import at.bernhardberger.tvhplayer.player.PlaybackPreferencesProvider
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
-import at.bernhardberger.tvhplayer.player.createMedia3PlaybackRuntime
+import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
+import at.bernhardberger.tvheadend.client.DvrRuntime
+import at.bernhardberger.tvheadend.client.HtspClientIdentity
+import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvheadend.playback.PlaybackPreferencesProvider
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvheadend.playback.createMedia3PlaybackRuntime
+import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsPlaybackPreferencesProvider
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
@@ -35,7 +33,6 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.koin.dsl.onClose
-import timber.log.Timber
 
 val appModule = module {
     single<CoroutineDispatcher>(qualifier = named("io")) { Dispatchers.IO }
@@ -46,27 +43,10 @@ val appModule = module {
             clientVersion = BuildConfig.VERSION_NAME,
         )
     }
-    single<HtspLogger> {
-        HtspLogger { level, message, cause ->
-            when (level) {
-                HtspLogLevel.WARNING -> if (cause == null) {
-                    Timber.w(message)
-                } else {
-                    Timber.w(cause, message)
-                }
-                HtspLogLevel.ERROR -> if (cause == null) {
-                    Timber.e(message)
-                } else {
-                    Timber.e(cause, message)
-                }
-            }
-        }
-    }
     single {
         val client = TvheadendClient(
             ioDispatcher = get(named("io")),
             clientIdentity = get(),
-            logger = get(),
         )
         val playbackRuntime = createMedia3PlaybackRuntime(
             context = androidContext(),

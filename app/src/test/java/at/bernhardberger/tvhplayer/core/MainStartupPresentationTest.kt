@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvheadend.core.ConnectionFailureKind
+import at.bernhardberger.tvheadend.core.SubscriptionFailureKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -246,8 +248,8 @@ class MainStartupPresentationTest {
         ),
     )
 
-    private fun channel(id: Int) = ChannelUi(
-        id = id,
+    private fun channel(id: Int) = Channel(
+        channelId = id,
         name = "Channel $id",
         number = id,
         icon = null,

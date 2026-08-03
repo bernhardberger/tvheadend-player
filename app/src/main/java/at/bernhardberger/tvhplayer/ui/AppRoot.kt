@@ -58,16 +58,16 @@ import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.SimpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackIntent
+import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
 import at.bernhardberger.tvhplayer.core.simpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
-import at.bernhardberger.tvhplayer.htsp.ConnectionState
-import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.PlaybackRuntime
+import at.bernhardberger.tvheadend.client.ConnectionState
+import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvheadend.playback.PlaybackSessionState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettings
@@ -141,9 +141,9 @@ internal fun warmLivePlayerTarget(
 ): WarmLivePlayerTarget {
     val channel = (readiness as? CurrentChannelReadiness.Ready)
         ?.channels
-        ?.firstOrNull { it.id == activeServiceId }
+        ?.firstOrNull { it.channelId == activeServiceId }
     return WarmLivePlayerTarget(
-        channelId = channel?.id ?: activeServiceId,
+        channelId = channel?.channelId ?: activeServiceId,
         serviceId = activeServiceId,
         channelName = channel?.name.orEmpty(),
     )
@@ -484,7 +484,7 @@ fun AppRoot(
     val playbackRuntime: PlaybackRuntime = koinInject()
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
-    val activeServiceId by playbackRuntime.activeServiceId.collectAsStateWithLifecycle()
+    val activeServiceId by playbackRuntime.activeChannelId.collectAsStateWithLifecycle()
     val activeRecordingId by playbackRuntime.activeRecordingId.collectAsStateWithLifecycle()
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)

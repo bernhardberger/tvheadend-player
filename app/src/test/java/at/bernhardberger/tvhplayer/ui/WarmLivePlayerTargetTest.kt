@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvhplayer.htsp.ChannelUi
+import at.bernhardberger.tvheadend.core.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -34,5 +34,5 @@ class WarmLivePlayerTargetTest {
         )
     }
 
-    private fun channel(id: Int, name: String) = ChannelUi(id, name, id, null)
+    private fun channel(id: Int, name: String) = Channel(id, name, id, null)
 }
