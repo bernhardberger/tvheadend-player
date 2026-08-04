@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify bundled native AAR integrity and Android page-size compatibility."""
+"""Verify the external SDK decoder coordinate and the decoder packaged in the APK."""
 
 from __future__ import annotations
 
@@ -8,14 +8,146 @@ import hashlib
 import json
 import struct
 import sys
+import xml.etree.ElementTree as ElementTree
 import zipfile
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-LIB_DIR = ROOT / "app/libs"
-MANIFEST_PATH = LIB_DIR / "native-dependencies.json"
+SDK_GROUP = "at.bernhardberger.tvheadend"
+SDK_MODULE = "decoder-ffmpeg"
+SDK_VERSION = "0.1.0-SNAPSHOT"
+LOCAL_SDK_REPOSITORY = (
+    ROOT.parent / "tvheadend-player-sdk" / "build" / "local-maven"
+)
+VERSION_DIRECTORY = (
+    LOCAL_SDK_REPOSITORY
+    / "at"
+    / "bernhardberger"
+    / "tvheadend"
+    / SDK_MODULE
+    / SDK_VERSION
+)
+EXPECTED_AAR_SHA256 = (
+    "1716bd964aa4ac3e7cd868ee036161f8d5cfa47fe6564a3d57b3b8723ab3f2e0"
+)
+EXPECTED_ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+EXPECTED_LIBRARY = "libffmpegJNI.so"
+EXPECTED_MINIMUM_ALIGNMENT = 16384
+EXPECTED_MEDIA3_REVISION = "5fb306449733dd71595700c1227ad6087578c559"
+EXPECTED_FFMPEG_REVISION = "c41ff724ede7da657762d61097e26fac296c53bf"
+METADATA_ROOT = "META-INF/tvheadend-player-sdk"
+EXPECTED_SOURCES_SHA256 = (
+    "d34915cdfd1fa2d1a2de82c642a7656227e5c3458a45fe353ffc3cdcc335fd02"
+)
+EXPECTED_SOURCE_ENTRY_SHA256 = {
+    "META-INF/LICENSE": (
+        "e1c0ad728983d8a57335e52cf1064f1affd1d454173d8cebd3ed8b4a72b48704"
+    ),
+    "META-INF/NOTICE.md": (
+        "bfbbb125728d0c8a1716dc6f6e1ca56d1e26154e0747b716ce4a6e86f4636258"
+    ),
+    f"{METADATA_ROOT}/README.md": (
+        "3e92b714762b06e07d3d71205fcaa7c1b135d88005b0c777ce05ed4a85aef0f6"
+    ),
+    f"{METADATA_ROOT}/native-dependencies.json": (
+        "80fd549740337c924955b518f73a03d77a10c6df36b62f8549d71ae0a3b1d12d"
+    ),
+    f"{METADATA_ROOT}/tools/build-media3-ffmpeg": (
+        "f4215fd5e53b3012fad48c11d7a90394d924f290677924372f40ddc2aa2eadd5"
+    ),
+    f"{METADATA_ROOT}/patches/media3-ffmpeg-disable-iconv.patch": (
+        "9ac6ff30b7c2dd19ed5e1678999b8fa920afab68226ebfbbad4f5e1eb4bd4f0d"
+    ),
+    f"{METADATA_ROOT}/licenses/media3-APACHE-2.0.txt": (
+        "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    ),
+    f"{METADATA_ROOT}/licenses/ffmpeg-LGPL-2.1.txt": (
+        "b634ab5640e258563c536e658cad87080553df6f34f62269a21d554844e58bfe"
+    ),
+    f"{METADATA_ROOT}/licenses/ffmpeg-LICENSE.md": (
+        "cb48bf09a11f5fb576cddb0431c8f5ed0a60157a9ec942adffc13907cbe083f2"
+    ),
+}
+EXPECTED_PROVENANCE = {
+    "schemaVersion": 1,
+    "auditDate": "2026-07-28",
+    "requiredAbis": list(EXPECTED_ABIS),
+    "minimumElfLoadAlignment": EXPECTED_MINIMUM_ALIGNMENT,
+    "artifacts": [
+        {
+            "file": "lib-decoder-ffmpeg-release.aar",
+            "sha256": EXPECTED_AAR_SHA256,
+            "librariesPerAbi": [EXPECTED_LIBRARY],
+            "media3Module": "androidx.media3.decoder.ffmpeg",
+            "media3Tag": "1.10.1",
+            "media3Revision": EXPECTED_MEDIA3_REVISION,
+            "nativeProject": "FFmpeg",
+            "nativeTag": "n6.0.1",
+            "nativeRevision": EXPECTED_FFMPEG_REVISION,
+            "enabledDecoders": ["mp1", "mp2", "mp3"],
+            "configureOverrides": ["--disable-iconv"],
+            "linkerOverrides": ["--build-id=none", "-z max-page-size=16384"],
+            "toolchain": {
+                "ffmpegNdk": "26.1.10909125 (r26b)",
+                "jniWrapperNdk": "27.0.12077973 (r27)",
+                "androidApi": 28,
+                "wrapperCompileSdk": 36,
+                "cmake": "3.22.1",
+                "androidGradlePlugin": "8.12.3",
+                "gradle": "8.13",
+                "java": "21",
+            },
+            "buildScript": "tools/build-media3-ffmpeg",
+            "buildPatch": (
+                "sdk/decoder-ffmpeg-binary/patches/"
+                "media3-ffmpeg-disable-iconv.patch"
+            ),
+            "license": "LGPL-2.1-or-later",
+            "licenseFiles": [
+                "sdk/decoder-ffmpeg-binary/licenses/media3-APACHE-2.0.txt",
+                "sdk/decoder-ffmpeg-binary/licenses/ffmpeg-LGPL-2.1.txt",
+                "sdk/decoder-ffmpeg-binary/licenses/ffmpeg-LICENSE.md",
+            ],
+            "correspondingSource": (
+                "tools/build-media3-ffmpeg generates the exact Media3 and FFmpeg "
+                "source archive required beside every APK release"
+            ),
+            "releaseApproved": True,
+            "releaseBlocker": None,
+        }
+    ],
+}
 PT_LOAD = 1
+
+
+class DuplicateJsonKey(ValueError):
+    pass
+
+
+def reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateJsonKey(f"duplicate JSON object key {key!r}")
+        result[key] = value
+    return result
+
+
+def parse_json(data: bytes, label: str, errors: list[str]) -> object | None:
+    try:
+        return json.loads(
+            data.decode("utf-8"),
+            object_pairs_hook=reject_duplicate_json_keys,
+        )
+    except (UnicodeError, json.JSONDecodeError, DuplicateJsonKey) as exc:
+        errors.append(f"{label}: invalid JSON: {exc}")
+        return None
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def sha256(path: Path) -> str:
@@ -24,6 +156,23 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def one_regular_file(
+    directory: Path,
+    pattern: str,
+    label: str,
+    errors: list[str],
+) -> Path | None:
+    matches = sorted(directory.glob(pattern)) if directory.is_dir() else []
+    regular = [path for path in matches if path.is_file() and not path.is_symlink()]
+    if len(regular) != 1 or len(matches) != 1:
+        errors.append(
+            f"{label}: expected exactly one regular {pattern!r} file, "
+            f"found {[path.name for path in matches]}"
+        )
+        return None
+    return regular[0]
 
 
 def load_alignments(data: bytes, label: str) -> list[int]:
@@ -65,14 +214,311 @@ def load_alignments(data: bytes, label: str) -> list[int]:
             raise ValueError(f"{label}: truncated program-header table")
         segment_type = struct.unpack_from(f"{endian}I", data, entry)[0]
         if segment_type == PT_LOAD:
-            alignment = struct.unpack_from(
-                f"{endian}{align_format}", data, entry + align_offset
-            )[0]
-            alignments.append(alignment)
-
+            alignments.append(
+                struct.unpack_from(
+                    f"{endian}{align_format}",
+                    data,
+                    entry + align_offset,
+                )[0]
+            )
     if not alignments:
         raise ValueError(f"{label}: ELF has no load segments")
     return alignments
+
+
+def validate_native_archive(
+    archive: zipfile.ZipFile,
+    prefix: str,
+    label: str,
+    require_only_decoder_library: bool,
+    errors: list[str],
+) -> dict[str, bytes]:
+    expected_entries = {
+        f"{prefix}/{abi}/{EXPECTED_LIBRARY}" for abi in EXPECTED_ABIS
+    }
+    native_entry_list = [
+        name
+        for name in archive.namelist()
+        if name.startswith(f"{prefix}/") and name.endswith(".so")
+    ]
+    if len(native_entry_list) != len(set(native_entry_list)):
+        errors.append(f"{label}: duplicate native ZIP entries are forbidden")
+    decoder_entry_list = [
+        name
+        for name in native_entry_list
+        if name.endswith(f"/{EXPECTED_LIBRARY}")
+    ]
+    checked_entries = (
+        set(native_entry_list)
+        if require_only_decoder_library
+        else set(decoder_entry_list)
+    )
+    if checked_entries != expected_entries:
+        errors.append(
+            f"{label}: decoder entries {sorted(checked_entries)} do not match "
+            f"{sorted(expected_entries)}"
+        )
+
+    libraries: dict[str, bytes] = {}
+    for abi in EXPECTED_ABIS:
+        entry = f"{prefix}/{abi}/{EXPECTED_LIBRARY}"
+        if entry not in checked_entries:
+            continue
+        data = archive.read(entry)
+        libraries[abi] = data
+        try:
+            alignments = load_alignments(data, f"{label}!/{entry}")
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        below_minimum = [
+            alignment
+            for alignment in alignments
+            if alignment < EXPECTED_MINIMUM_ALIGNMENT
+        ]
+        if below_minimum:
+            errors.append(
+                f"{label}!/{entry}: load alignment below "
+                f"{EXPECTED_MINIMUM_ALIGNMENT}: {below_minimum}"
+            )
+    return libraries
+
+
+def validate_snapshot_metadata(
+    metadata_path: Path,
+    artifacts: dict[tuple[str, str | None], Path],
+    errors: list[str],
+) -> None:
+    try:
+        root = ElementTree.parse(metadata_path).getroot()
+    except (OSError, ElementTree.ParseError) as exc:
+        errors.append(f"published decoder metadata is unreadable: {exc}")
+        return
+
+    expected_identity = {
+        "groupId": SDK_GROUP,
+        "artifactId": SDK_MODULE,
+        "version": SDK_VERSION,
+    }
+    for element, expected in expected_identity.items():
+        actual = root.findtext(element)
+        if actual != expected:
+            errors.append(
+                f"published decoder metadata {element} is {actual!r}, expected {expected!r}"
+            )
+
+    selected: dict[tuple[str, str | None], str] = {}
+    for entry in root.findall("./versioning/snapshotVersions/snapshotVersion"):
+        extension = entry.findtext("extension")
+        value = entry.findtext("value")
+        classifier = entry.findtext("classifier")
+        if not extension or not value:
+            errors.append("published decoder metadata has an incomplete snapshot entry")
+            continue
+        key = extension, classifier
+        if key in selected:
+            errors.append(f"published decoder metadata repeats snapshot entry {key}")
+        selected[key] = value
+
+    if set(selected) != set(artifacts):
+        errors.append(
+            f"published decoder snapshot variants {sorted(map(str, selected))} do not "
+            f"match {sorted(map(str, artifacts))}"
+        )
+        return
+    for (extension, classifier), value in selected.items():
+        classifier_suffix = f"-{classifier}" if classifier else ""
+        expected_name = f"{SDK_MODULE}-{value}{classifier_suffix}.{extension}"
+        if artifacts[(extension, classifier)].name != expected_name:
+            errors.append(
+                f"published decoder metadata selects {expected_name}, found "
+                f"{artifacts[(extension, classifier)].name}"
+            )
+
+
+def validate_pom(path: Path, errors: list[str]) -> None:
+    try:
+        root = ElementTree.parse(path).getroot()
+    except (OSError, ElementTree.ParseError) as exc:
+        errors.append(f"published decoder POM is unreadable: {exc}")
+        return
+
+    namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
+    expected_identity = {
+        "groupId": SDK_GROUP,
+        "artifactId": SDK_MODULE,
+        "version": SDK_VERSION,
+        "packaging": "aar",
+    }
+    for element, expected in expected_identity.items():
+        actual = root.findtext(f"m:{element}", namespaces=namespace)
+        if actual != expected:
+            errors.append(
+                f"published decoder POM {element} is {actual!r}, expected {expected!r}"
+            )
+
+    properties_element = root.find("m:properties", namespace)
+    properties = (
+        {
+            child.tag.rsplit("}", 1)[-1]: child.text
+            for child in properties_element
+        }
+        if properties_element is not None
+        else {}
+    )
+    expected_properties = {
+        "tvheadend.sdk.native.aar.sha256": EXPECTED_AAR_SHA256,
+        "tvheadend.sdk.native.provenance.path": (
+            f"{METADATA_ROOT}/native-dependencies.json"
+        ),
+        "tvheadend.sdk.native.build.path": (
+            f"{METADATA_ROOT}/tools/build-media3-ffmpeg"
+        ),
+        "tvheadend.sdk.native.media3.revision": EXPECTED_MEDIA3_REVISION,
+        "tvheadend.sdk.native.ffmpeg.revision": EXPECTED_FFMPEG_REVISION,
+        "tvheadend.sdk.native.media3.license": "Apache-2.0",
+        "tvheadend.sdk.native.ffmpeg.license": "LGPL-2.1-or-later",
+        "tvheadend.sdk.native.corresponding-source": (
+            "tools/build-media3-ffmpeg generates the exact Media3 and FFmpeg source "
+            "archive required beside every APK release"
+        ),
+    }
+    for name, expected in expected_properties.items():
+        if properties.get(name) != expected:
+            errors.append(
+                f"published decoder POM property {name} is {properties.get(name)!r}, "
+                f"expected {expected!r}"
+            )
+
+    licenses = {
+        element.text
+        for element in root.findall("./m:licenses/m:license/m:name", namespace)
+        if element.text
+    }
+    required_license_markers = (
+        "GNU General Public License v3.0",
+        "Apache",
+        "GNU Lesser General Public License",
+    )
+    for marker in required_license_markers:
+        if not any(marker in license_name for license_name in licenses):
+            errors.append(f"published decoder POM lacks the {marker} license declaration")
+
+
+def validate_module_metadata(
+    path: Path,
+    aar: Path,
+    sources: Path,
+    errors: list[str],
+) -> None:
+    metadata = parse_json(path.read_bytes(), "published decoder module metadata", errors)
+    if not isinstance(metadata, dict):
+        return
+    expected_component = {
+        "group": SDK_GROUP,
+        "module": SDK_MODULE,
+        "version": SDK_VERSION,
+    }
+    component = metadata.get("component")
+    if not isinstance(component, dict) or any(
+        component.get(name) != value for name, value in expected_component.items()
+    ):
+        errors.append(
+            f"published decoder module component {component!r} does not match "
+            f"{expected_component!r}"
+        )
+
+    variants = metadata.get("variants")
+    if not isinstance(variants, list):
+        errors.append("published decoder module metadata lacks variants")
+        return
+    runtime_variants = [
+        variant
+        for variant in variants
+        if isinstance(variant, dict)
+        and isinstance(variant.get("attributes"), dict)
+        and variant["attributes"].get("org.gradle.usage") == "java-runtime"
+        and variant["attributes"].get("org.gradle.libraryelements") == "aar"
+    ]
+    source_variants = [
+        variant
+        for variant in variants
+        if isinstance(variant, dict)
+        and isinstance(variant.get("attributes"), dict)
+        and variant["attributes"].get("org.gradle.docstype") == "sources"
+    ]
+    if len(runtime_variants) != 1:
+        errors.append(
+            f"published decoder metadata has {len(runtime_variants)} runtime AAR variants"
+        )
+    else:
+        attributes = runtime_variants[0]["attributes"]
+        if attributes.get("org.gradle.jvm.version") != 17:
+            errors.append("published decoder runtime metadata must target JVM 17")
+        files = runtime_variants[0].get("files")
+        if not isinstance(files, list) or len(files) != 1:
+            errors.append("published decoder runtime metadata must declare one AAR")
+        elif files[0].get("sha256") != sha256(aar):
+            errors.append("published decoder runtime metadata AAR hash does not match its file")
+    if len(source_variants) != 1:
+        errors.append(
+            f"published decoder metadata has {len(source_variants)} sources variants"
+        )
+    else:
+        files = source_variants[0].get("files")
+        if not isinstance(files, list) or len(files) != 1:
+            errors.append("published decoder sources metadata must declare one sources JAR")
+        elif files[0].get("sha256") != sha256(sources):
+            errors.append(
+                "published decoder sources metadata hash does not match its file"
+            )
+
+
+def validate_provenance(
+    manifest: object,
+    release: bool,
+    errors: list[str],
+) -> None:
+    if manifest != EXPECTED_PROVENANCE:
+        mode = "release " if release else ""
+        errors.append(
+            f"published decoder {mode}provenance does not match the pinned reviewed manifest"
+        )
+
+
+def validate_published_sources(path: Path, release: bool, errors: list[str]) -> None:
+    required_entries = set(EXPECTED_SOURCE_ENTRY_SHA256)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = set(archive.namelist())
+            missing = required_entries - names
+            if missing:
+                errors.append(
+                    f"published decoder sources are missing {sorted(missing)}"
+                )
+            for entry, expected_hash in EXPECTED_SOURCE_ENTRY_SHA256.items():
+                if entry not in names:
+                    continue
+                actual_hash = sha256_bytes(archive.read(entry))
+                if actual_hash != expected_hash:
+                    errors.append(
+                        f"published decoder source {entry} SHA-256 {actual_hash} does "
+                        f"not match {expected_hash}"
+                    )
+
+            manifest_entry = f"{METADATA_ROOT}/native-dependencies.json"
+            if manifest_entry not in names:
+                return
+            manifest = parse_json(
+                archive.read(manifest_entry),
+                "published decoder provenance",
+                errors,
+            )
+            if not isinstance(manifest, dict):
+                return
+            validate_provenance(manifest, release, errors)
+    except (OSError, zipfile.BadZipFile) as exc:
+        errors.append(f"published decoder sources JAR is unreadable: {exc}")
 
 
 def main() -> int:
@@ -80,120 +526,139 @@ def main() -> int:
     parser.add_argument(
         "--release",
         action="store_true",
-        help="also require complete, explicitly approved source provenance",
+        help="require complete release provenance and default to the unsigned release APK",
+    )
+    parser.add_argument(
+        "--apk",
+        type=Path,
+        help="APK to inspect instead of the default debug or unsigned release APK",
     )
     args = parser.parse_args()
 
-    try:
-        manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"error: cannot read {MANIFEST_PATH.relative_to(ROOT)}: {exc}", file=sys.stderr)
-        return 1
+    apk = args.apk
+    if apk is None:
+        apk = ROOT / (
+            "app/build/outputs/apk/release/app-release-unsigned.apk"
+            if args.release
+            else "app/build/outputs/apk/debug/app-debug.apk"
+        )
+    elif not apk.is_absolute():
+        apk = ROOT / apk
 
     errors: list[str] = []
-    blockers: list[str] = []
-    provenance_fields = (
-        "media3Revision",
-        "nativeRevision",
-        "toolchain",
-        "buildScript",
-        "license",
-        "licenseFiles",
-        "correspondingSource",
+    metadata = one_regular_file(
+        VERSION_DIRECTORY,
+        "maven-metadata.xml",
+        "published decoder snapshot metadata",
+        errors,
     )
-    required_abis = set(manifest["requiredAbis"])
-    minimum_alignment = int(manifest["minimumElfLoadAlignment"])
-    declared_files = {artifact["file"] for artifact in manifest["artifacts"]}
-    actual_files = {path.name for path in LIB_DIR.glob("*.aar")}
+    aar = one_regular_file(
+        VERSION_DIRECTORY,
+        f"{SDK_MODULE}-*.aar",
+        "published decoder AAR",
+        errors,
+    )
+    pom = one_regular_file(
+        VERSION_DIRECTORY,
+        f"{SDK_MODULE}-*.pom",
+        "published decoder POM",
+        errors,
+    )
+    module = one_regular_file(
+        VERSION_DIRECTORY,
+        f"{SDK_MODULE}-*.module",
+        "published decoder Gradle metadata",
+        errors,
+    )
+    sources = one_regular_file(
+        VERSION_DIRECTORY,
+        f"{SDK_MODULE}-*-sources.jar",
+        "published decoder sources JAR",
+        errors,
+    )
+    if not apk.is_file() or apk.is_symlink():
+        errors.append(f"packaged APK is missing or not a regular file: {apk}")
 
-    for undeclared in sorted(actual_files - declared_files):
-        errors.append(f"undeclared native AAR: app/libs/{undeclared}")
-    for missing in sorted(declared_files - actual_files):
-        errors.append(f"missing native AAR: app/libs/{missing}")
+    required = (metadata, aar, pom, module, sources)
+    if all(path is not None for path in required):
+        assert metadata is not None
+        assert aar is not None
+        assert pom is not None
+        assert module is not None
+        assert sources is not None
+        validate_snapshot_metadata(
+            metadata,
+            {
+                ("aar", None): aar,
+                ("pom", None): pom,
+                ("module", None): module,
+                ("jar", "sources"): sources,
+            },
+            errors,
+        )
+        validate_pom(pom, errors)
+        validate_module_metadata(module, aar, sources, errors)
+        validate_published_sources(sources, args.release, errors)
 
-    for artifact in manifest["artifacts"]:
-        relative = Path("app/libs") / artifact["file"]
-        path = ROOT / relative
-        if not path.is_file():
-            continue
-
-        actual_hash = sha256(path)
-        if actual_hash != artifact["sha256"]:
+        actual_sources_hash = sha256(sources)
+        if actual_sources_hash != EXPECTED_SOURCES_SHA256:
             errors.append(
-                f"{relative}: SHA-256 {actual_hash} does not match the audited hash"
+                f"published decoder sources SHA-256 {actual_sources_hash} does not "
+                f"match {EXPECTED_SOURCES_SHA256}"
             )
 
-        expected_libraries = set(artifact["librariesPerAbi"])
+        actual_aar_hash = sha256(aar)
+        if actual_aar_hash != EXPECTED_AAR_SHA256:
+            errors.append(
+                f"published decoder AAR SHA-256 {actual_aar_hash} does not match "
+                f"{EXPECTED_AAR_SHA256}"
+            )
+        aar_libraries: dict[str, bytes] = {}
         try:
-            with zipfile.ZipFile(path) as archive:
-                native_entries = {
-                    name
-                    for name in archive.namelist()
-                    if name.startswith("jni/") and name.endswith(".so")
-                }
-                found_abis = {name.split("/")[1] for name in native_entries}
-                if found_abis != required_abis:
-                    errors.append(
-                        f"{relative}: ABIs {sorted(found_abis)} do not match "
-                        f"{sorted(required_abis)}"
+            with zipfile.ZipFile(aar) as archive:
+                aar_libraries = validate_native_archive(
+                    archive,
+                    "jni",
+                    "published decoder AAR",
+                    True,
+                    errors,
+                )
+        except (OSError, zipfile.BadZipFile) as exc:
+            errors.append(f"published decoder AAR is unreadable: {exc}")
+
+        if apk.is_file() and not apk.is_symlink():
+            try:
+                with zipfile.ZipFile(apk) as archive:
+                    apk_libraries = validate_native_archive(
+                        archive,
+                        "lib",
+                        "packaged APK",
+                        False,
+                        errors,
                     )
-
-                for abi in sorted(required_abis):
-                    found_libraries = {
-                        name.split("/")[-1]
-                        for name in native_entries
-                        if name.startswith(f"jni/{abi}/")
-                    }
-                    if found_libraries != expected_libraries:
-                        errors.append(
-                            f"{relative}: {abi} libraries {sorted(found_libraries)} "
-                            f"do not match {sorted(expected_libraries)}"
-                        )
-
-                for entry in sorted(native_entries):
-                    try:
-                        alignments = load_alignments(archive.read(entry), f"{relative}!/{entry}")
-                    except ValueError as exc:
-                        errors.append(str(exc))
-                        continue
-                    bad = [value for value in alignments if value < minimum_alignment]
-                    if bad:
-                        errors.append(
-                            f"{relative}!/{entry}: load alignment below "
-                            f"{minimum_alignment}: {bad}"
-                        )
-        except zipfile.BadZipFile as exc:
-            errors.append(f"{relative}: invalid AAR archive: {exc}")
-
-        if artifact.get("releaseApproved", False):
-            for field in provenance_fields:
-                if not artifact.get(field):
-                    blockers.append(f"{relative}: approved provenance is missing {field}")
-            for evidence in (artifact.get("buildScript"), *artifact.get("licenseFiles", [])):
-                if evidence and not (ROOT / evidence).is_file():
-                    blockers.append(f"{relative}: provenance evidence does not exist: {evidence}")
-        else:
-            blockers.append(f"{relative}: {artifact['releaseBlocker']}")
-
-    if args.release:
-        errors.extend(f"release provenance incomplete: {blocker}" for blocker in blockers)
-    else:
-        for blocker in blockers:
-            print(f"warning: {blocker}")
+            except (OSError, zipfile.BadZipFile) as exc:
+                errors.append(f"packaged APK is unreadable: {exc}")
+                apk_libraries = {}
+            for abi in EXPECTED_ABIS:
+                if abi not in aar_libraries or abi not in apk_libraries:
+                    continue
+                if aar_libraries[abi] != apk_libraries[abi]:
+                    errors.append(
+                        f"packaged APK {abi}/{EXPECTED_LIBRARY} differs from the "
+                        "published decoder AAR"
+                    )
 
     for error in errors:
         print(f"error: {error}", file=sys.stderr)
     if errors:
         return 1
 
+    mode = "release" if args.release else "debug"
     print(
-        f"Native AAR integrity passed: {len(manifest['artifacts'])} artifacts, "
-        f"{len(required_abis)} ABIs, {minimum_alignment}-byte ELF alignment"
+        f"External decoder gate passed: {SDK_GROUP}:{SDK_MODULE}:{SDK_VERSION}, "
+        f"SHA-256 {EXPECTED_AAR_SHA256}, {len(EXPECTED_ABIS)} ABIs, "
+        f"{EXPECTED_MINIMUM_ALIGNMENT}-byte ELF alignment, and matching {mode} APK"
     )
-    if blockers:
-        print(
-            f"Release remains blocked by incomplete provenance for {len(blockers)} artifacts"
-        )
     return 0
 
 

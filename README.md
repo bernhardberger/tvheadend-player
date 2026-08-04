@@ -172,9 +172,10 @@ owner-controlled host.
 The bundled decoder is a pinned Media3 1.10.1 FFmpeg extension containing only
 the MP1, MP2, and MP3 decoders from FFmpeg n6.0.1. Its exact revisions,
 toolchains, configuration, hashes, licenses, build procedure, and corresponding
-source are recorded in [`app/libs/README.md`](app/libs/README.md). Every binary
-release must include both application and native corresponding-source archives
-and their checksums.
+source are owned by the transitive
+[`at.bernhardberger.tvheadend:decoder-ffmpeg`](https://github.com/bernhardberger/tvheadend-player-sdk/tree/main/sdk/decoder-ffmpeg-binary)
+SDK artifact. Every binary release must include both application and SDK/native
+corresponding-source archives and their checksums.
 
 See [`docs/release-process.md`](docs/release-process.md) for the complete release,
 signature, source, and rollback gates.

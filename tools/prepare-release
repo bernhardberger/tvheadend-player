@@ -2,18 +2,29 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SDK_ROOT="$(cd -- "$ROOT_DIR/../tvheadend-player-sdk" && pwd)"
 ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 APPLICATION_ID="at.bernhardberger.tvhplayer"
+SDK_SOURCE_COMMIT="ccaee28991a3c3577444bc5b7c9b72111c3dc088"
+SDK_SOURCE_NAME="tvheadend-player-sdk-${SDK_SOURCE_COMMIT}-source.tar.gz"
 NATIVE_SOURCE_NAME="tvheadend-player-native-source-media3-1.10.1-ffmpeg-n6.0.1.tar.gz"
-NATIVE_SOURCE="${1:-$ROOT_DIR/build/native-release/$NATIVE_SOURCE_NAME}"
+NATIVE_SOURCE="${1:-$SDK_ROOT/build/native-release/$NATIVE_SOURCE_NAME}"
 
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=normal)" ]]; then
     printf 'error: release preparation requires a clean worktree\n' >&2
     exit 1
 fi
+if [[ -n "$(git -C "$SDK_ROOT" status --porcelain --untracked-files=normal)" ]]; then
+    printf 'error: release preparation requires a clean external SDK worktree\n' >&2
+    exit 1
+fi
+if [[ "$(git -C "$SDK_ROOT" rev-parse HEAD)" != "$SDK_SOURCE_COMMIT" ]]; then
+    printf 'error: external SDK HEAD does not match required source commit %s\n' "$SDK_SOURCE_COMMIT" >&2
+    exit 1
+fi
 if [[ ! -f "$NATIVE_SOURCE" ]]; then
     printf 'error: native corresponding-source archive does not exist: %s\n' "$NATIVE_SOURCE" >&2
-    printf 'Run tools/build-media3-ffmpeg first.\n' >&2
+    printf 'Run the external SDK tools/build-media3-ffmpeg first.\n' >&2
     exit 1
 fi
 
@@ -50,9 +61,29 @@ fi
 temporary_dir="$(mktemp -d)"
 trap 'rm -rf "$temporary_dir"' EXIT
 cp "$NATIVE_SOURCE" "$temporary_dir/$NATIVE_SOURCE_NAME"
+git -C "$SDK_ROOT" archive \
+    --format=tar.gz \
+    --prefix="tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/" \
+    --output="$temporary_dir/$SDK_SOURCE_NAME" \
+    "$SDK_SOURCE_COMMIT"
+sdk_source_entries="$(tar -tzf "$temporary_dir/$SDK_SOURCE_NAME")"
+required_sdk_source_entries=(
+    "tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/AGENTS.md"
+    "tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/LICENSE"
+    "tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/tools/verify-sdk"
+    "tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/sdk/domain/build.gradle.kts"
+    "tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/sdk/htsp/build.gradle.kts"
+    "tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/sdk/playback-media3/build.gradle.kts"
+    "tvheadend-player-sdk-${SDK_SOURCE_COMMIT}/sdk/decoder-ffmpeg-binary/native-dependencies.json"
+)
+for entry in "${required_sdk_source_entries[@]}"; do
+    if [[ "$sdk_source_entries" != *"$entry"* ]]; then
+        printf 'error: external SDK source archive is missing %s\n' "$entry" >&2
+        exit 1
+    fi
+done
 
 cd "$ROOT_DIR"
-./tools/check-native-libs --release
 ./tools/verify
 ./gradlew clean assembleRelease --no-daemon
 
@@ -61,6 +92,7 @@ if [[ ! -f "$built_apk" ]]; then
     printf 'error: expected unsigned release APK was not produced: %s\n' "$built_apk" >&2
     exit 1
 fi
+./tools/check-native-libs --release --apk "$built_apk"
 # apksigner verify must fail before and after alignment, proving this host did not sign the APK.
 if "$apksigner" verify "$built_apk" >/dev/null 2>&1; then
     printf 'error: Gradle unexpectedly produced a signed release APK\n' >&2
@@ -108,6 +140,7 @@ source_tar_name="tvheadend-player-${version_name}-source.tar.gz"
 source_zip_name="tvheadend-player-${version_name}-source.zip"
 cp "$aligned_apk" "$release_dir/$apk_name"
 cp "$temporary_dir/$NATIVE_SOURCE_NAME" "$release_dir/$NATIVE_SOURCE_NAME"
+cp "$temporary_dir/$SDK_SOURCE_NAME" "$release_dir/$SDK_SOURCE_NAME"
 git archive --format=tar.gz --prefix="tvheadend-player-${version_name}/" \
     -o "$release_dir/$source_tar_name" HEAD
 git archive --format=zip --prefix="tvheadend-player-${version_name}/" \
@@ -118,10 +151,12 @@ python3 tools/release_metadata.py create-unsigned \
     --version-code "$version_code" \
     --version-name "$version_name" \
     --source-commit "$(git rev-parse HEAD)" \
+    --sdk-source-commit "$SDK_SOURCE_COMMIT" \
     --unsigned-apk "$release_dir/$apk_name" \
     --source-tar-gz "$release_dir/$source_tar_name" \
     --source-zip "$release_dir/$source_zip_name" \
     --native-source-tar-gz "$release_dir/$NATIVE_SOURCE_NAME" \
+    --sdk-source-tar-gz "$release_dir/$SDK_SOURCE_NAME" \
     --output "$release_dir/release-manifest.json"
 (
     cd "$release_dir"
@@ -130,6 +165,7 @@ python3 tools/release_metadata.py create-unsigned \
         "$source_tar_name" \
         "$source_zip_name" \
         "$NATIVE_SOURCE_NAME" \
+        "$SDK_SOURCE_NAME" \
         release-manifest.json > SHA256SUMS
 )
 

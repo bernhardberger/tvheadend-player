@@ -15,7 +15,7 @@ CANONICAL_CERTIFICATE_SHA256 = (
     "1E:18:48:62:F5:BB:A2:D1:C8:40:6D:6A:7A:79:65:7F:"
     "F3:A7:3D:25:8C:1E:1B:75:FA:25:02:58:75:E5:AB:C9"
 )
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 _CHECKSUM_LINE_PATTERN = re.compile(r"([0-9a-fA-F]{64}) [ *](.+)")
@@ -92,6 +92,7 @@ def _build_manifest(
     version_code: int,
     version_name: str,
     source_commit: str,
+    sdk_source_commit: str,
     artifacts: dict[str, dict[str, str]],
 ) -> dict[str, Any]:
     if not application_id:
@@ -102,6 +103,8 @@ def _build_manifest(
         raise ValueError("versionName must not be empty")
     if not _COMMIT_PATTERN.fullmatch(source_commit.lower()):
         raise ValueError("source commit must be a full 40-digit Git object ID")
+    if not _COMMIT_PATTERN.fullmatch(sdk_source_commit.lower()):
+        raise ValueError("SDK source commit must be a full 40-digit Git object ID")
     return {
         "schemaVersion": SCHEMA_VERSION,
         "stage": stage,
@@ -109,6 +112,7 @@ def _build_manifest(
         "versionCode": version_code,
         "versionName": version_name,
         "sourceCommit": source_commit.lower(),
+        "sdkSourceCommit": sdk_source_commit.lower(),
         "artifacts": artifacts,
     }
 
@@ -119,11 +123,18 @@ def build_unsigned_manifest(
     version_code: int,
     version_name: str,
     source_commit: str,
+    sdk_source_commit: str,
     artifacts: dict[str, dict[str, str]],
 ) -> dict[str, Any]:
     _validate_artifacts(
         artifacts,
-        {"unsignedApk", "sourceTarGz", "sourceZip", "nativeSourceTarGz"},
+        {
+            "unsignedApk",
+            "sourceTarGz",
+            "sourceZip",
+            "nativeSourceTarGz",
+            "sdkSourceTarGz",
+        },
     )
     return _build_manifest(
         stage="unsigned",
@@ -131,6 +142,7 @@ def build_unsigned_manifest(
         version_code=version_code,
         version_name=version_name,
         source_commit=source_commit,
+        sdk_source_commit=sdk_source_commit,
         artifacts=artifacts,
     )
 
@@ -159,12 +171,23 @@ def validate_unsigned_manifest(
     source_commit = manifest.get("sourceCommit", "")
     if not isinstance(source_commit, str) or not _COMMIT_PATTERN.fullmatch(source_commit):
         raise ValueError("manifest source commit is invalid")
+    sdk_source_commit = manifest.get("sdkSourceCommit", "")
+    if not isinstance(sdk_source_commit, str) or not _COMMIT_PATTERN.fullmatch(
+        sdk_source_commit
+    ):
+        raise ValueError("manifest SDK source commit is invalid")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         raise ValueError("manifest artifacts are invalid")
     _validate_artifacts(
         artifacts,
-        {"unsignedApk", "sourceTarGz", "sourceZip", "nativeSourceTarGz"},
+        {
+            "unsignedApk",
+            "sourceTarGz",
+            "sourceZip",
+            "nativeSourceTarGz",
+            "sdkSourceTarGz",
+        },
     )
 
 
@@ -180,12 +203,23 @@ def validate_signed_manifest(manifest: dict[str, Any]) -> None:
     source_commit = manifest.get("sourceCommit", "")
     if not isinstance(source_commit, str) or not _COMMIT_PATTERN.fullmatch(source_commit):
         raise ValueError("signed manifest source commit is invalid")
+    sdk_source_commit = manifest.get("sdkSourceCommit", "")
+    if not isinstance(sdk_source_commit, str) or not _COMMIT_PATTERN.fullmatch(
+        sdk_source_commit
+    ):
+        raise ValueError("signed manifest SDK source commit is invalid")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         raise ValueError("signed manifest artifacts are invalid")
     _validate_artifacts(
         artifacts,
-        {"signedApk", "sourceTarGz", "sourceZip", "nativeSourceTarGz"},
+        {
+            "signedApk",
+            "sourceTarGz",
+            "sourceZip",
+            "nativeSourceTarGz",
+            "sdkSourceTarGz",
+        },
     )
     signing = manifest.get("signing")
     if not isinstance(signing, dict) or signing.get("keyAlias") != CANONICAL_KEY_ALIAS:
@@ -202,6 +236,7 @@ def build_signed_manifest(
     source_tar_gz: Path,
     source_zip: Path,
     native_source_tar_gz: Path,
+    sdk_source_tar_gz: Path,
 ) -> dict[str, Any]:
     validate_unsigned_manifest(
         unsigned_manifest,
@@ -217,10 +252,17 @@ def build_signed_manifest(
         "sourceTarGz": _artifact(source_tar_gz),
         "sourceZip": _artifact(source_zip),
         "nativeSourceTarGz": _artifact(native_source_tar_gz),
+        "sdkSourceTarGz": _artifact(sdk_source_tar_gz),
     }
     _validate_artifacts(
         artifacts,
-        {"signedApk", "sourceTarGz", "sourceZip", "nativeSourceTarGz"},
+        {
+            "signedApk",
+            "sourceTarGz",
+            "sourceZip",
+            "nativeSourceTarGz",
+            "sdkSourceTarGz",
+        },
     )
     manifest = _build_manifest(
         stage="signed",
@@ -228,6 +270,7 @@ def build_signed_manifest(
         version_code=unsigned_manifest["versionCode"],
         version_name=unsigned_manifest["versionName"],
         source_commit=unsigned_manifest["sourceCommit"],
+        sdk_source_commit=unsigned_manifest["sdkSourceCommit"],
         artifacts=artifacts,
     )
     manifest["signing"] = {
@@ -235,6 +278,25 @@ def build_signed_manifest(
         "certificateSha256": certificate,
     }
     return manifest
+
+
+def validate_source_lineage(
+    unsigned_manifest: dict[str, Any],
+    signed_manifest: dict[str, Any],
+) -> None:
+    for field in ("sourceCommit", "sdkSourceCommit"):
+        if unsigned_manifest.get(field) != signed_manifest.get(field):
+            raise ValueError(f"signed and unsigned manifests have different {field}")
+    for name in (
+        "sourceTarGz",
+        "sourceZip",
+        "nativeSourceTarGz",
+        "sdkSourceTarGz",
+    ):
+        unsigned_artifact = unsigned_manifest.get("artifacts", {}).get(name)
+        signed_artifact = signed_manifest.get("artifacts", {}).get(name)
+        if unsigned_artifact != signed_artifact:
+            raise ValueError(f"signed bundle changed source artifact: {name}")
 
 
 def _artifact(path: Path) -> dict[str, str]:
@@ -267,6 +329,7 @@ def _create_unsigned(args: argparse.Namespace) -> None:
         "sourceTarGz": _artifact(args.source_tar_gz),
         "sourceZip": _artifact(args.source_zip),
         "nativeSourceTarGz": _artifact(args.native_source_tar_gz),
+        "sdkSourceTarGz": _artifact(args.sdk_source_tar_gz),
     }
     _write_manifest(
         args.output,
@@ -275,6 +338,7 @@ def _create_unsigned(args: argparse.Namespace) -> None:
             version_code=args.version_code,
             version_name=args.version_name,
             source_commit=args.source_commit,
+            sdk_source_commit=args.sdk_source_commit,
             artifacts=artifacts,
         ),
     )
@@ -321,6 +385,7 @@ def _create_signed(args: argparse.Namespace) -> None:
             source_tar_gz=args.source_tar_gz,
             source_zip=args.source_zip,
             native_source_tar_gz=args.native_source_tar_gz,
+            sdk_source_tar_gz=args.sdk_source_tar_gz,
         ),
     )
 
@@ -337,10 +402,12 @@ def _parser() -> argparse.ArgumentParser:
     create_unsigned = subparsers.add_parser("create-unsigned")
     add_identity_arguments(create_unsigned)
     create_unsigned.add_argument("--source-commit", required=True)
+    create_unsigned.add_argument("--sdk-source-commit", required=True)
     create_unsigned.add_argument("--unsigned-apk", required=True, type=Path)
     create_unsigned.add_argument("--source-tar-gz", required=True, type=Path)
     create_unsigned.add_argument("--source-zip", required=True, type=Path)
     create_unsigned.add_argument("--native-source-tar-gz", required=True, type=Path)
+    create_unsigned.add_argument("--sdk-source-tar-gz", required=True, type=Path)
     create_unsigned.add_argument("--output", required=True, type=Path)
     create_unsigned.set_defaults(handler=_create_unsigned)
 
@@ -363,6 +430,7 @@ def _parser() -> argparse.ArgumentParser:
     create_signed.add_argument("--source-tar-gz", required=True, type=Path)
     create_signed.add_argument("--source-zip", required=True, type=Path)
     create_signed.add_argument("--native-source-tar-gz", required=True, type=Path)
+    create_signed.add_argument("--sdk-source-tar-gz", required=True, type=Path)
     create_signed.add_argument("--certificate-sha256", required=True)
     create_signed.add_argument("--output", required=True, type=Path)
     create_signed.set_defaults(handler=_create_signed)

@@ -16,6 +16,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent.parent
+SDK_ROOT = ROOT.parent / "tvheadend-player-sdk"
 LOCAL_CONFIG = ROOT / ".tvhplayer-release.json"
 APPLICATION_ID = "at.bernhardberger.tvhplayer"
 CONFIG_FIELDS = {
@@ -237,11 +238,7 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
         version_code=manifest["versionCode"],
         version_name=manifest["versionName"],
     )
-    if unsigned["sourceCommit"] != manifest["sourceCommit"]:
-        raise ValueError("signed and unsigned manifests have different source commits")
-    for name in ("sourceTarGz", "sourceZip", "nativeSourceTarGz"):
-        if unsigned["artifacts"][name] != manifest["artifacts"][name]:
-            raise ValueError(f"signed bundle changed source artifact: {name}")
+    release_metadata.validate_source_lineage(unsigned, manifest)
 
     apk = path / manifest["artifacts"]["signedApk"]["file"]
     aapt, apksigner, zipalign = _find_android_tools()
@@ -272,7 +269,7 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
 def _prepare(args: argparse.Namespace) -> None:
     source_commit = ensure_release_ready()
     if not args.reuse_native_source:
-        _run([str(ROOT / "tools/build-media3-ffmpeg")])
+        _run([str(SDK_ROOT / "tools/build-media3-ffmpeg")])
     _run([str(ROOT / "tools/prepare-release")])
     bundle, _ = _unsigned_bundle(None, source_commit)
     print(f"unsignedBundle={bundle}")

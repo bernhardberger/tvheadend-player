@@ -47,8 +47,6 @@ REQUIRED_FILES = (
     "docs/test-device-credential-provisioning.md",
     "app/src/debug/AndroidManifest.xml",
     "app/src/debug/java/at/bernhardberger/tvhplayer/DebugApp.kt",
-    "app/libs/native-dependencies.json",
-    "app/libs/licenses/media3-APACHE-2.0.txt",
     ".github/workflows/build.yml",
     "tools/verify",
     "tools/ai-model-tier",

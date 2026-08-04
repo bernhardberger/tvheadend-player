@@ -7,9 +7,9 @@ description: Use for Media3, ExoPlayer, PlayerSession, PlayerView, HTSP data sou
 
 The accepted custom HTSP-to-Media3 path is a regression boundary. Read the
 relevant current playback decisions selected through `docs/README.md` and
-`app/libs/native-dependencies.json` before changing it. Read a dated audit or
-upgrade assessment only when the task names that specific finding or upgrade;
-revalidate it against current source.
+the external SDK's `sdk/decoder-ffmpeg-binary/native-dependencies.json` before
+changing it. Read a dated audit or upgrade assessment only when the task names
+that specific finding or upgrade; revalidate it against current source.
 
 ## Scope the change before editing
 

@@ -37,6 +37,7 @@ class ReleaseMetadataTest(unittest.TestCase):
             version_code=1,
             version_name="0.1.0",
             source_commit="a" * 40,
+            sdk_source_commit="b" * 40,
             artifacts=self._artifacts("unsigned"),
         )
 
@@ -58,6 +59,7 @@ class ReleaseMetadataTest(unittest.TestCase):
                 version_code=1,
                 version_name="0.1.0",
                 source_commit="a" * 40,
+                sdk_source_commit="b" * 40,
                 artifacts=artifacts,
             )
 
@@ -80,6 +82,7 @@ class ReleaseMetadataTest(unittest.TestCase):
                 version_code=1,
                 version_name="0.1.0",
                 source_commit="a" * 40,
+                sdk_source_commit="b" * 40,
                 artifacts=self._artifacts("unsigned"),
             )
 
@@ -91,7 +94,61 @@ class ReleaseMetadataTest(unittest.TestCase):
                     source_tar_gz=signed_apk,
                     source_zip=signed_apk,
                     native_source_tar_gz=signed_apk,
+                    sdk_source_tar_gz=signed_apk,
                 )
+
+    def test_unsigned_manifest_requires_exact_sdk_source(self) -> None:
+        artifacts = self._artifacts("unsigned")
+        artifacts.pop("sdkSourceTarGz")
+
+        with self.assertRaisesRegex(ValueError, "sdkSourceTarGz"):
+            release_metadata.build_unsigned_manifest(
+                application_id="at.bernhardberger.tvhplayer",
+                version_code=1,
+                version_name="0.1.0",
+                source_commit="a" * 40,
+                sdk_source_commit="b" * 40,
+                artifacts=artifacts,
+            )
+
+        with self.assertRaisesRegex(ValueError, "SDK source commit"):
+            release_metadata.build_unsigned_manifest(
+                application_id="at.bernhardberger.tvhplayer",
+                version_code=1,
+                version_name="0.1.0",
+                source_commit="a" * 40,
+                sdk_source_commit="not-a-commit",
+                artifacts=self._artifacts("unsigned"),
+            )
+
+    def test_signed_manifest_preserves_exact_sdk_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            artifact = Path(directory) / "artifact"
+            artifact.write_bytes(b"artifact")
+            unsigned = release_metadata.build_unsigned_manifest(
+                application_id="at.bernhardberger.tvhplayer",
+                version_code=1,
+                version_name="0.1.0",
+                source_commit="a" * 40,
+                sdk_source_commit="b" * 40,
+                artifacts=self._artifacts("unsigned"),
+            )
+
+            signed = release_metadata.build_signed_manifest(
+                unsigned_manifest=unsigned,
+                signed_apk=artifact,
+                certificate_sha256=release_metadata.CANONICAL_CERTIFICATE_SHA256,
+                source_tar_gz=artifact,
+                source_zip=artifact,
+                native_source_tar_gz=artifact,
+                sdk_source_tar_gz=artifact,
+            )
+
+            self.assertEqual(signed["sdkSourceCommit"], "b" * 40)
+            self.assertEqual(
+                signed["artifacts"]["sdkSourceTarGz"]["sha256"],
+                release_metadata.sha256_file(artifact),
+            )
 
     def test_checksum_file_rejects_paths_outside_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -123,6 +180,49 @@ class ReleaseMetadataTest(unittest.TestCase):
         self.assertIn("TVHPLAYER_SIGNING_STORE_PASS_FILE", sign)
         self.assertIn("TVHPLAYER_SIGNING_KEY_PASS_FILE", sign)
 
+    def test_release_scripts_preserve_external_sdk_source(self) -> None:
+        prepare = (ROOT / "tools/prepare-release").read_text(encoding="utf-8")
+        sign = (ROOT / "tools/sign-release").read_text(encoding="utf-8")
+        release = (ROOT / "tools/release").read_text(encoding="utf-8")
+        metadata = (ROOT / "tools/release_metadata.py").read_text(encoding="utf-8")
+
+        self.assertIn('git -C "$SDK_ROOT" archive', prepare)
+        self.assertIn("--sdk-source-commit", prepare)
+        self.assertIn("--sdk-source-tar-gz", prepare)
+        self.assertIn('["artifacts"]["sdkSourceTarGz"]', sign)
+        self.assertIn("--sdk-source-tar-gz", sign)
+        self.assertIn("validate_source_lineage", release)
+        self.assertIn('"sdkSourceTarGz"', metadata)
+        self.assertIn('"sdkSourceCommit"', metadata)
+
+    def test_signed_lineage_rejects_sdk_source_substitution(self) -> None:
+        unsigned = {
+            "sourceCommit": "a" * 40,
+            "sdkSourceCommit": "b" * 40,
+            "artifacts": self._artifacts("unsigned"),
+        }
+        signed = {
+            "sourceCommit": "a" * 40,
+            "sdkSourceCommit": "c" * 40,
+            "artifacts": {
+                **self._artifacts("signed"),
+                "sourceTarGz": unsigned["artifacts"]["sourceTarGz"],
+                "sourceZip": unsigned["artifacts"]["sourceZip"],
+                "nativeSourceTarGz": unsigned["artifacts"]["nativeSourceTarGz"],
+                "sdkSourceTarGz": unsigned["artifacts"]["sdkSourceTarGz"],
+            },
+        }
+        with self.assertRaisesRegex(ValueError, "sdkSourceCommit"):
+            release_metadata.validate_source_lineage(unsigned, signed)
+
+        signed["sdkSourceCommit"] = unsigned["sdkSourceCommit"]
+        signed["artifacts"]["sdkSourceTarGz"] = {
+            "file": "substituted-sdk-source.tar.gz",
+            "sha256": "f" * 64,
+        }
+        with self.assertRaisesRegex(ValueError, "sdkSourceTarGz"):
+            release_metadata.validate_source_lineage(unsigned, signed)
+
     @staticmethod
     def _artifacts(stage: str) -> dict[str, dict[str, str]]:
         apk_name = "unsigned.apk" if stage == "unsigned" else "signed.apk"
@@ -133,6 +233,10 @@ class ReleaseMetadataTest(unittest.TestCase):
             "nativeSourceTarGz": {
                 "file": "native-source.tar.gz",
                 "sha256": "4" * 64,
+            },
+            "sdkSourceTarGz": {
+                "file": "sdk-source.tar.gz",
+                "sha256": "5" * 64,
             },
         }
 

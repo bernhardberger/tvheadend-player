@@ -79,11 +79,12 @@ native-source archive was produced and reviewed in the current workspace.
 
 The lower-level commands below remain available for diagnosis and manual use.
 
-Install the exact Android and native toolchains listed in `app/libs/README.md`,
-then build the decoder and its corresponding source:
+Install the exact Android and native toolchains listed by the external SDK's
+`sdk/decoder-ffmpeg-binary/README.md`, then build the decoder and its
+corresponding source from the sibling SDK checkout:
 
 ```bash
-./tools/build-media3-ffmpeg
+(cd ../tvheadend-player-sdk && ./tools/build-media3-ffmpeg)
 ```
 
 Commit the intended release source and confirm the worktree is clean, then run:

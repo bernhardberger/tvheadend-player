@@ -53,7 +53,7 @@ Read and load only the matching row:
 | Compose UI, focus, remote keys, accessibility, TV surfaces | `docs/tv-design-spec.md`; `android-tv-compose-ux`; every focused Kotlin/Compose skill whose trigger matches |
 | Channels, EPG, recordings, DVR | `live-tv-dvr-conventions`; the relevant appliance specification/plan sections only when appliance behavior is involved |
 | Appliance launch, HOME, GUIDE, wake, Simple TV | `docs/appliance-mode-spec.md`, relevant sections of `docs/appliance-mode-plan.md` |
-| Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; `app/libs/native-dependencies.json`; dated assessments only when the task names that upgrade/finding |
+| Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; the external SDK's `sdk/decoder-ffmpeg-binary/native-dependencies.json`; dated assessments only when the task names that upgrade/finding |
 | Physical TV, ADB, install, screenshots, remote keys | `docs/device-targets.md`; `android-tv-device-testing` |
 | Product identity | `docs/product-identity-plan.md` |
 | Signing, publication, rollback | `docs/release-process.md` |

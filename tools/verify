@@ -27,9 +27,6 @@ if [[ ! -d "$ANDROID_HOME" ]]; then
     exit 1
 fi
 
-printf '==> Native dependency integrity\n'
-./tools/check-native-libs
-
 printf '==> Tool policy tests\n'
 python3 -m unittest discover -s tools/tests
 
@@ -41,6 +38,9 @@ printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
     assembleDebug \
     :app:verifyExternalSdkConsumption \
     --no-daemon
+
+printf '==> External native dependency and packaged APK integrity\n'
+./tools/check-native-libs
 
 apk="app/build/outputs/apk/debug/app-debug.apk"
 if [[ ! -f "$apk" ]]; then
