@@ -532,9 +532,9 @@ tasks.register("verifyExternalSdkConsumption") {
 
         val expectedSdkArtifactSha256 = mapOf(
             "client-htsp" to
-                "c8e1261def3490902101b2c070f51d2ccb48abba54fb16eed73ca1e3c1b43ddd",
+                "ad4ea327b4c490dfe450328e57e6514de0cda8c2dad3774f8f86a9d7dbad99ed",
             "core" to
-                "363addb54978e095b361a7aa145133729f1c9777002a429becdf91a11f1417ba",
+                "0c1ee0a9724e960cacfcf13f26ce77a281d2ae3f48f519dbdb45f430cdf298c1",
             "decoder-ffmpeg" to
                 "1716bd964aa4ac3e7cd868ee036161f8d5cfa47fe6564a3d57b3b8723ab3f2e0",
             "playback-media3" to

@@ -62,7 +62,7 @@ class NativePublicationEvidenceTest(unittest.TestCase):
     def test_complete_sources_archive_is_independently_pinned(self) -> None:
         self.assertEqual(
             CHECKER["EXPECTED_SOURCES_SHA256"],
-            "d34915cdfd1fa2d1a2de82c642a7656227e5c3458a45fe353ffc3cdcc335fd02",
+            "7c1a39c1953b821dbf53c28e24c76e31600a768309bb7bda9c73146570485e1f",
         )
 
     def test_every_pinned_source_document_mutation_and_removal_is_rejected(self) -> None:
@@ -104,7 +104,7 @@ class NativePublicationEvidenceTest(unittest.TestCase):
                 "META-INF/LICENSE":
                     "e1c0ad728983d8a57335e52cf1064f1affd1d454173d8cebd3ed8b4a72b48704",
                 "META-INF/NOTICE.md":
-                    "bfbbb125728d0c8a1716dc6f6e1ca56d1e26154e0747b716ce4a6e86f4636258",
+                    "a4d0fc1cc787d346563100709e9c909c6e02ee6123a8c394078021b23ac89928",
                 "META-INF/tvheadend-player-sdk/README.md":
                     "3e92b714762b06e07d3d71205fcaa7c1b135d88005b0c777ce05ed4a85aef0f6",
                 "META-INF/tvheadend-player-sdk/native-dependencies.json":
