@@ -72,7 +72,6 @@ val appModule = module {
             player = player,
             coordinator = coordinator,
             settings = get(),
-            streamProfileDiscovery = streamProfileDiscovery,
             recordingProgressCapability = dataRuntime.progressCapability,
             scope = applicationScope,
         )

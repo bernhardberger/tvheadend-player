@@ -21,7 +21,7 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
-import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.testing.DvrTestMessage as HtspMessage
 import at.bernhardberger.tvhplayer.testing.TestDvrRuntime as DvrRepository
@@ -349,7 +349,7 @@ class RecordingsScreenTest {
 
     @Test
     fun resumableDetailsKeepSemanticFocusAndSendExplicitStartIntent() {
-        var playbackIntent: RecordingPlaybackIntent? = null
+        var playbackStart: RecordingPlaybackStart? = null
         val repository = DvrRepository()
         repository.applyAuthenticatedDvrAccess(true)
         runBlocking {
@@ -379,7 +379,7 @@ class RecordingsScreenTest {
                 RecordingsScreen(
                     repository = repository,
                     progressCapabilityOverride = RecordingProgressCapability.ReadOnly,
-                    onPlayRecording = { _, intent -> playbackIntent = intent },
+                    onPlayRecording = { _, start -> playbackStart = start },
                 )
             }
         }
@@ -425,14 +425,14 @@ class RecordingsScreenTest {
         }
         composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused().performClick()
         composeRule.runOnIdle {
-            assertEquals(RecordingPlaybackIntent.FromBeginning, playbackIntent)
+            assertEquals(RecordingPlaybackStart.START_OVER, playbackStart)
         }
         composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
     }
 
     @Test
     fun disappearingResumeFallsBackToPlayAndLegacyPlaybackStartsOver() {
-        var playbackIntent: RecordingPlaybackIntent? = null
+        var playbackStart: RecordingPlaybackStart? = null
         val repository = DvrRepository()
         runBlocking {
             repository.acceptDvrMessage(
@@ -462,7 +462,7 @@ class RecordingsScreenTest {
                 RecordingsScreen(
                     repository = repository,
                     progressCapabilityOverride = capability.value,
-                    onPlayRecording = { _, intent -> playbackIntent = intent },
+                    onPlayRecording = { _, start -> playbackStart = start },
                 )
             }
         }
@@ -486,7 +486,7 @@ class RecordingsScreenTest {
         ).assertIsDisplayed()
         composeRule.onNodeWithTag("recording-details-play").assertIsFocused().performClick()
         composeRule.runOnIdle {
-            assertEquals(RecordingPlaybackIntent.FromBeginning, playbackIntent)
+            assertEquals(RecordingPlaybackStart.START_OVER, playbackStart)
         }
     }
 

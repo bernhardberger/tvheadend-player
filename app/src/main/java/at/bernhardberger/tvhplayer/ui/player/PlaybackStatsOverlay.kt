@@ -23,9 +23,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
-import at.bernhardberger.tvhplayer.playback.AppPlaybackThermalLevel
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
-import at.bernhardberger.tvhplayer.playback.droppedFramePercentage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.common.formatHms
@@ -41,11 +39,6 @@ internal fun PlaybackStatsOverlay(
     val locale = Locale.ROOT
     val video = diagnostics.video
     val audio = diagnostics.audio
-    val system = diagnostics.system
-    val droppedPercent = droppedFramePercentage(
-        diagnostics.renderedFrames,
-        diagnostics.droppedFrames,
-    )
     Surface(
         modifier = modifier
             .width(820.dp)
@@ -67,7 +60,7 @@ internal fun PlaybackStatsOverlay(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     StatsSection(stringResource(R.string.stats_playback))
@@ -133,25 +126,6 @@ internal fun PlaybackStatsOverlay(
                     .joinToString(" · ").ifBlank { stringResource(R.string.stats_unavailable) },
                     )
                     StatLine(
-                stringResource(R.string.stats_video_decoder),
-                diagnostics.videoDecoder ?: stringResource(R.string.stats_unavailable),
-                    )
-                    StatLine(
-                stringResource(R.string.stats_frames),
-                droppedPercent?.let {
-                    stringResource(
-                        R.string.stats_frames_value_with_percentage,
-                        formatCount(diagnostics.renderedFrames.toLong(), locale),
-                        formatCount(diagnostics.droppedFrames.toLong(), locale),
-                        it.oneDecimal(locale),
-                    )
-                } ?: stringResource(
-                    R.string.stats_frames_value,
-                    formatCount(diagnostics.renderedFrames.toLong(), locale),
-                    formatCount(diagnostics.droppedFrames.toLong(), locale),
-                ),
-                    )
-                    StatLine(
                 stringResource(R.string.stats_audio),
                 listOfNotNull(
                     audio?.codec,
@@ -165,25 +139,6 @@ internal fun PlaybackStatsOverlay(
                 ).joinToString(" · ").ifBlank { stringResource(R.string.stats_unavailable) },
                     )
                     StatLine(
-                stringResource(R.string.stats_audio_decoder),
-                diagnostics.audioDecoder ?: stringResource(R.string.stats_unavailable),
-                    )
-                    StatLine(
-                        stringResource(R.string.stats_underruns),
-                        formatCount(diagnostics.audioUnderruns.toLong(), locale),
-                    )
-                    StatLine(
-                stringResource(
-                    if (diagnostics.source == AppPlaybackSource.RECORDING) {
-                        R.string.stats_file_read_rate
-                    } else {
-                        R.string.stats_stream_read_rate
-                    }
-                ),
-                diagnostics.readRateBitsPerSecond?.let { formatBitRate(it, locale) }
-                    ?: stringResource(R.string.stats_unavailable),
-                    )
-                    StatLine(
                 stringResource(R.string.stats_display_mode),
                 stringResource(
                     when (aspectRatio) {
@@ -195,45 +150,6 @@ internal fun PlaybackStatsOverlay(
                     )
                 }
 
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
-                ) {
-                    if (system != null) {
-                        StatsSection(stringResource(R.string.stats_system))
-                        system.outputMode?.let { mode ->
-                            StatLine(
-                                stringResource(R.string.stats_output),
-                                stringResource(
-                                    R.string.stats_output_value,
-                                    mode.width,
-                                    mode.height,
-                                    mode.refreshRateHz.oneDecimal(locale),
-                                ),
-                            )
-                        }
-                        system.thermalLevel?.let { level ->
-                            StatLine(
-                                stringResource(R.string.stats_thermal),
-                                stringResource(level.labelResource()),
-                            )
-                        }
-                        system.appPssBytes?.let { bytes ->
-                            StatLine(
-                                stringResource(R.string.stats_app_memory),
-                                formatBytes(bytes, locale),
-                            )
-                        }
-                        system.lowMemory?.let { lowMemory ->
-                            StatLine(
-                                stringResource(R.string.stats_low_memory),
-                                stringResource(
-                                    if (lowMemory) R.string.stats_yes else R.string.stats_no
-                                ),
-                            )
-                        }
-                    }
-                }
             }
         }
     }
@@ -275,46 +191,7 @@ private fun StatLine(label: String, value: String) {
 
 private fun Float.oneDecimal(locale: Locale): String = formatDecimal(toDouble(), 1, locale)
 
-@Composable
-private fun formatBitRate(bitsPerSecond: Long, locale: Locale): String = when {
-    bitsPerSecond >= 1_000_000L -> stringResource(
-        R.string.stats_bit_rate_mbps,
-        formatDecimal(bitsPerSecond / 1_000_000.0, 2, locale),
-    )
-    bitsPerSecond >= 1_000L -> stringResource(
-        R.string.stats_bit_rate_kbps,
-        formatDecimal(bitsPerSecond / 1_000.0, 0, locale),
-    )
-    else -> stringResource(
-        R.string.stats_bit_rate_bps,
-        formatCount(bitsPerSecond, locale),
-    )
-}
-
 private fun formatCount(value: Long, locale: Locale): String = String.format(locale, "%,d", value)
-
-@Composable
-private fun formatBytes(bytes: Long, locale: Locale): String = when {
-    bytes >= 1024L * 1024L -> stringResource(
-        R.string.stats_bytes_mb,
-        formatDecimal(bytes / (1024.0 * 1024.0), 1, locale),
-    )
-    bytes >= 1024L -> stringResource(
-        R.string.stats_bytes_kb,
-        formatDecimal(bytes / 1024.0, 1, locale),
-    )
-    else -> stringResource(R.string.stats_bytes_b, formatCount(bytes, locale))
-}
 
 private fun formatDecimal(value: Double, fractionDigits: Int, locale: Locale): String =
     String.format(locale, "%.${fractionDigits}f", value)
-
-private fun AppPlaybackThermalLevel.labelResource(): Int = when (this) {
-    AppPlaybackThermalLevel.NONE -> R.string.stats_thermal_none
-    AppPlaybackThermalLevel.LIGHT -> R.string.stats_thermal_light
-    AppPlaybackThermalLevel.MODERATE -> R.string.stats_thermal_moderate
-    AppPlaybackThermalLevel.SEVERE -> R.string.stats_thermal_severe
-    AppPlaybackThermalLevel.CRITICAL -> R.string.stats_thermal_critical
-    AppPlaybackThermalLevel.EMERGENCY -> R.string.stats_thermal_emergency
-    AppPlaybackThermalLevel.SHUTDOWN -> R.string.stats_thermal_shutdown
-}

@@ -1,40 +1,40 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvhplayer.playback.AppRecordingProgressState
+import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecordingProgressStatusPolicyTest {
     @Test
-    fun degradedEpisodeSurvivesRetrySavingAndClearsOnlyAtStableOutcome() {
-        var active = recordingDegradedEpisodeActive(
-            currentlyActive = false,
-            syncState = AppRecordingProgressState.DEGRADED,
+    fun disconnectedCapabilityIsDegradedOnlyForTheActiveRecording() {
+        assertTrue(
+            recordingDegradedEpisodeActive(
+                capability = RecordingProgressCapability.Disconnected,
+                recordingActive = true,
+            )
         )
-        assertTrue(active)
-
-        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.SAVING)
-        assertTrue(active)
-        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.DEGRADED)
-        assertTrue(active)
-
-        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.AVAILABLE)
-        assertFalse(active)
-        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.DEGRADED)
-        assertTrue(active)
+        assertFalse(
+            recordingDegradedEpisodeActive(
+                capability = RecordingProgressCapability.Disconnected,
+                recordingActive = false,
+            )
+        )
     }
 
     @Test
-    fun readOnlyUnsupportedAndInactiveEndDegradationEpisode() {
-        assertFalse(
-            recordingDegradedEpisodeActive(true, AppRecordingProgressState.READ_ONLY)
-        )
-        assertFalse(
-            recordingDegradedEpisodeActive(true, AppRecordingProgressState.UNSUPPORTED)
-        )
-        assertFalse(
-            recordingDegradedEpisodeActive(true, AppRecordingProgressState.INACTIVE)
-        )
+    fun stableCapabilitiesAreNotReportedAsDegraded() {
+        listOf(
+            RecordingProgressCapability.Full,
+            RecordingProgressCapability.ReadOnly,
+            RecordingProgressCapability.Unsupported,
+        ).forEach { capability ->
+            assertFalse(
+                recordingDegradedEpisodeActive(
+                    capability = capability,
+                    recordingActive = true,
+                )
+            )
+        }
     }
 }

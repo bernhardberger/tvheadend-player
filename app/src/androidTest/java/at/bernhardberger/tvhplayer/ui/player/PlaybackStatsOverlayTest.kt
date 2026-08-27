@@ -25,11 +25,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
-import at.bernhardberger.tvhplayer.playback.AppPlaybackOutputMode
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
-import at.bernhardberger.tvhplayer.playback.AppPlaybackSystemDiagnostics
-import at.bernhardberger.tvhplayer.playback.AppPlaybackThermalLevel
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -171,27 +168,11 @@ class PlaybackStatsOverlayTest {
             resolution = "3840x2160",
             frameRate = 59.94f,
         ),
-        videoDecoder = "c2.vendor.hevc.decoder.secure.long-name",
-        renderedFrames = 1_234_567,
-        droppedFrames = 12_345,
         audio = AppPlaybackFormatDiagnostics(
             codec = "audio/eac3-joc",
             language = "Deutsch (Österreich)",
             channelCount = 8,
             sampleRateHz = 192_000,
-        ),
-        audioDecoder = "c2.vendor.eac3.decoder.long-name",
-        audioUnderruns = 12_345,
-        readRateBitsPerSecond = 123_456_789L,
-        system = AppPlaybackSystemDiagnostics(
-            outputMode = AppPlaybackOutputMode(
-                width = 3840,
-                height = 2160,
-                refreshRateHz = 59.94f,
-            ),
-            thermalLevel = AppPlaybackThermalLevel.EMERGENCY,
-            appPssBytes = 987_654_321L,
-            lowMemory = true,
         ),
     )
 }

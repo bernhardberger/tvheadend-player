@@ -9,16 +9,13 @@ data class ApplianceLaunchRequest(val id: Long)
 data class ApplianceLaunchTarget(
     val request: ApplianceLaunchRequest,
     val channelId: Int,
-    val serviceId: Int,
     val channelName: String,
 ) {
     fun matchesPlayer(
         channelId: Int,
-        serviceId: Int,
         channelName: String,
     ): Boolean =
         this.channelId == channelId &&
-            this.serviceId == serviceId &&
             this.channelName == channelName
 }
 
@@ -76,7 +73,6 @@ class ApplianceLaunchRequests(
         val target = ApplianceLaunchTarget(
             request = request,
             channelId = channel.channelId,
-            serviceId = channel.channelId,
             channelName = channel.name,
         )
         val pending = ApplianceLaunchState.Pending(request)
@@ -101,10 +97,9 @@ class ApplianceLaunchRequests(
     fun completePlayerVisibility(
         target: ApplianceLaunchTarget,
         channelId: Int,
-        serviceId: Int,
         channelName: String,
     ): Boolean {
-        if (!target.matchesPlayer(channelId, serviceId, channelName)) return false
+        if (!target.matchesPlayer(channelId, channelName)) return false
         return transition(
             ApplianceLaunchState.Entering(target),
             ApplianceLaunchState.Idle,

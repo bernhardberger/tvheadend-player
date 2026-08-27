@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 
 const val TIMESHIFT_SEEK_STEP_MS = 30_000L
 const val TIMESHIFT_LIVE_EDGE_TOLERANCE_MS = 5_000L
@@ -75,9 +75,9 @@ fun queueTimeshiftSeek(
     )
 }
 
-fun queuedTimeshiftSeekDecision(queue: TimeshiftSeekQueueState): AppTimeshiftSeekResult.Applied {
+fun queuedTimeshiftSeekDecision(queue: TimeshiftSeekQueueState): TimeshiftSeekDecision {
     val targetMs = requireNotNull(queue.pendingTargetMs)
-    return AppTimeshiftSeekResult.Applied(
+    return TimeshiftSeekDecision(
         targetMs = targetMs,
         deltaMs = queue.pendingDeltaMs,
         clamped = queue.pendingClamped,
@@ -104,16 +104,17 @@ fun beginTimeshiftSeekDispatch(queue: TimeshiftSeekQueueState): TimeshiftSeekDis
 
 fun completeTimeshiftSeekDispatch(
     queue: TimeshiftSeekQueueState,
-    decision: AppTimeshiftSeekResult,
+    accepted: Boolean,
 ): TimeshiftSeekQueueState {
-    if (decision !is AppTimeshiftSeekResult.Applied) return TimeshiftSeekQueueState()
+    if (!accepted) return TimeshiftSeekQueueState()
+    val targetMs = requireNotNull(queue.inFlightTargetMs)
     return queue.copy(
-        pendingDeltaMs = queue.pendingTargetMs?.minus(decision.targetMs) ?: 0L,
+        pendingDeltaMs = queue.pendingTargetMs?.minus(targetMs) ?: 0L,
         dispatchInFlight = false,
         inFlightBaseMs = null,
         inFlightTargetMs = null,
         projectedFromPositionMs = queue.inFlightBaseMs,
-        projectedPositionMs = decision.targetMs,
+        projectedPositionMs = targetMs,
     )
 }
 

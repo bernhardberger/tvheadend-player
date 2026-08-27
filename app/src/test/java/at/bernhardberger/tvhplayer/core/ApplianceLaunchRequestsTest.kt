@@ -135,7 +135,6 @@ class ApplianceLaunchRequestsTest {
             requests.completePlayerVisibility(
                 target = restoredTarget,
                 channelId = restoredTarget.channelId,
-                serviceId = restoredTarget.serviceId,
                 channelName = restoredTarget.channelName,
             )
         )
@@ -222,7 +221,6 @@ class ApplianceLaunchRequestsTest {
             ApplianceLaunchTarget(
                 request = pending.request,
                 channelId = 20,
-                serviceId = 20,
                 channelName = "Twenty",
             ),
             target,
@@ -243,7 +241,6 @@ class ApplianceLaunchRequestsTest {
         )
 
         assertEquals(10, target?.channelId)
-        assertEquals(10, target?.serviceId)
         assertEquals("Ten", target?.channelName)
     }
 
@@ -329,7 +326,6 @@ class ApplianceLaunchRequestsTest {
             requests.completePlayerVisibility(
                 target = target,
                 channelId = target.channelId,
-                serviceId = target.serviceId,
                 channelName = target.channelName,
             )
         )
@@ -360,7 +356,6 @@ class ApplianceLaunchRequestsTest {
             requests.completePlayerVisibility(
                 target = target,
                 channelId = 10,
-                serviceId = target.serviceId,
                 channelName = target.channelName,
             )
         )
@@ -368,15 +363,6 @@ class ApplianceLaunchRequestsTest {
             requests.completePlayerVisibility(
                 target = target,
                 channelId = target.channelId,
-                serviceId = 10,
-                channelName = target.channelName,
-            )
-        )
-        assertFalse(
-            requests.completePlayerVisibility(
-                target = target,
-                channelId = target.channelId,
-                serviceId = target.serviceId,
                 channelName = "Stale name",
             )
         )
@@ -400,7 +386,6 @@ class ApplianceLaunchRequestsTest {
             requests.completePlayerVisibility(
                 target = target,
                 channelId = target.channelId,
-                serviceId = target.serviceId,
                 channelName = target.channelName,
             )
         )
@@ -435,7 +420,6 @@ class ApplianceLaunchRequestsTest {
             requests.completePlayerVisibility(
                 target = firstTarget,
                 channelId = firstTarget.channelId,
-                serviceId = firstTarget.serviceId,
                 channelName = firstTarget.channelName,
             )
         )

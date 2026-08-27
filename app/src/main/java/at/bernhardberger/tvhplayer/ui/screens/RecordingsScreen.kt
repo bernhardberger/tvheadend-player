@@ -95,7 +95,7 @@ import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
 import at.bernhardberger.tvhplayer.data.RecordingPlaybackAvailability
-import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
@@ -188,7 +188,7 @@ fun RecordingsScreen(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     progressCapabilityOverride: RecordingProgressCapability? = null,
     onRetry: () -> Unit = {},
-    onPlayRecording: (Int, RecordingPlaybackIntent) -> Unit = { _, _ -> },
+    onPlayRecording: (Int, RecordingPlaybackStart) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -1425,7 +1425,7 @@ private fun RecordingDetailsPanel(
     progressCapability: RecordingProgressCapability,
     initialAction: RecordingDetailsAction?,
     backEnabled: Boolean,
-    onPlay: (RecordingPlaybackIntent) -> Unit,
+    onPlay: (RecordingPlaybackStart) -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit,
@@ -1580,7 +1580,7 @@ private fun RecordingDetailsPanel(
                     recordingDurationForAccessibility(resumeSeconds),
                 )
                 Button(
-                    onClick = { onPlay(RecordingPlaybackIntent.Resume(resumeSeconds)) },
+                    onClick = { onPlay(RecordingPlaybackStart.RESUME) },
                     modifier = Modifier
                         .focusRequester(primaryFocus)
                         .onFocusChanged {
@@ -1607,7 +1607,7 @@ private fun RecordingDetailsPanel(
                     )
                 }
                 Button(
-                    onClick = { onPlay(RecordingPlaybackIntent.FromBeginning) },
+                    onClick = { onPlay(RecordingPlaybackStart.START_OVER) },
                     modifier = Modifier
                         .focusRequester(secondaryFocus)
                         .onFocusChanged {
@@ -1634,9 +1634,9 @@ private fun RecordingDetailsPanel(
                     onClick = {
                         onPlay(
                             if (progressCapability == RecordingProgressCapability.Unsupported) {
-                                RecordingPlaybackIntent.FromBeginning
+                                RecordingPlaybackStart.START_OVER
                             } else {
-                                RecordingPlaybackIntent.DefaultPolicy
+                                RecordingPlaybackStart.RESUME
                             }
                         )
                     },

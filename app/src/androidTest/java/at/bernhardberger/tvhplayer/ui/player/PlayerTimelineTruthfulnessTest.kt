@@ -50,8 +50,8 @@ import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
 import at.bernhardberger.tvhplayer.core.SeekbarRange
 import at.bernhardberger.tvhplayer.data.EpgEventEntry
-import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -107,7 +107,7 @@ class PlayerTimelineTruthfulnessTest {
                         )
                         TimeshiftSeekPreview(
                             state = state,
-                            decision = AppTimeshiftSeekResult.Applied(
+                            decision = TimeshiftSeekDecision(
                                 targetMs = -120_000L,
                                 deltaMs = -30_000L,
                                 clamped = false,
@@ -162,7 +162,7 @@ class PlayerTimelineTruthfulnessTest {
                 )
                 TimeshiftSeekPreview(
                     state = state,
-                    decision = AppTimeshiftSeekResult.Applied(
+                    decision = TimeshiftSeekDecision(
                         targetMs = -2_000_000L,
                         deltaMs = -100_000L,
                         clamped = false,

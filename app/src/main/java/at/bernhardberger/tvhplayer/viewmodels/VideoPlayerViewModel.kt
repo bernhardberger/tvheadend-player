@@ -4,7 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
 import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class VideoPlayerViewModel(
@@ -14,8 +18,9 @@ class VideoPlayerViewModel(
 ) : ViewModel() {
     val connectionState = runtime.connectionState
     val playbackState = playbackRuntime.state
-    val activeChannelId = playbackRuntime.activeLiveServiceId
-    val playingLiveChannelId = playbackRuntime.playingLiveServiceId
+    val playingLiveChannelId = playbackRuntime.activeTarget
+        .map { (it as? AppPlaybackTarget.Live)?.channelId }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val timeshiftState = playbackRuntime.timeshiftState
     val liveSubscriptionFailure = playbackRuntime.livePlaybackIssue
     val diagnostics = playbackRuntime.diagnostics
@@ -26,7 +31,7 @@ class VideoPlayerViewModel(
 
     fun pause() = playbackRuntime.pause()
 
-    suspend fun playService(serviceId: Int) = playbackRuntime.playLive(serviceId)
+    suspend fun playChannel(channelId: Int) = playbackRuntime.playLive(channelId)
 
     suspend fun stop() {
         playbackRuntime.stop()

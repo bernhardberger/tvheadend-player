@@ -122,7 +122,7 @@ fun ChannelsScreen(
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
-    onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit
+    onPlay: (channelId: Int, channelName: String) -> Unit
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -385,7 +385,7 @@ fun ChannelsScreen(
                             if (!isRestoring) selection.setSelected(it)
                         },
                         onConfirmChannel = { ch ->
-                            onPlay(ch.channelId, ch.channelId, ch.name)
+                            onPlay(ch.channelId, ch.name)
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -475,7 +475,7 @@ fun ChannelsScreen(
                                         if (!isRestoring) selection.setSelected(ch.channelId)
                                     },
                                     onConfirm = {
-                                        onPlay(ch.channelId, ch.channelId, ch.name)
+                                        onPlay(ch.channelId, ch.name)
                                     }
                                 )
                             }

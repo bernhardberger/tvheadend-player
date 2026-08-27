@@ -243,7 +243,6 @@ class MainStartupPresentationTest {
         ApplianceLaunchTarget(
             request = ApplianceLaunchRequest(2),
             channelId = 2,
-            serviceId = 2,
             channelName = "Two",
         ),
     )

@@ -48,10 +48,7 @@ import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSnapshot
 import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSource
 import at.bernhardberger.tvhplayer.player.PlaybackFormatDiagnostics
-import at.bernhardberger.tvhplayer.player.PlaybackOutputMode
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
-import at.bernhardberger.tvhplayer.player.PlaybackSystemDiagnostics
-import at.bernhardberger.tvhplayer.player.PlaybackThermalLevel
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
@@ -896,23 +893,11 @@ private val maximumDiagnostics = PlaybackDiagnosticsSnapshot(
         resolution = "3840x2160",
         frameRate = 59.94f,
     ),
-    videoDecoder = "c2.vendor.hevc.decoder.secure.long-name",
-    renderedFrames = 1_234_567,
-    droppedFrames = 12_345,
     audio = PlaybackFormatDiagnostics(
         codec = "audio/eac3-joc",
         language = "Deutsch (Österreich)",
         channelCount = 8,
         sampleRateHz = 192_000,
-    ),
-    audioDecoder = "c2.vendor.eac3.decoder.long-name",
-    audioUnderruns = 12_345,
-    readRateBitsPerSecond = 123_456_789L,
-    system = PlaybackSystemDiagnostics(
-        outputMode = PlaybackOutputMode(3840, 2160, 59.94f),
-        thermalLevel = PlaybackThermalLevel.EMERGENCY,
-        appPssBytes = 987_654_321L,
-        lowMemory = true,
     ),
 )
 

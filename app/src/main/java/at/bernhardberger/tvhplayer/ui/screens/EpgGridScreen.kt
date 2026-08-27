@@ -111,6 +111,8 @@ import at.bernhardberger.tvhplayer.data.DvrEntry
 import at.bernhardberger.tvhplayer.data.DvrState
 import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -184,7 +186,7 @@ fun EpgGridScreen(
     onClearCategory: () -> Unit = {},
     onPlayRecording: (Int) -> Unit = {},
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
-    onPlay: (channelId: Int, serviceId: Int, channelName: String) -> Unit,
+    onPlay: (channelId: Int, channelName: String) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -198,8 +200,10 @@ fun EpgGridScreen(
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
-    val playingChannelId by playerSession.activeLiveServiceId.collectAsStateWithLifecycle()
-    val timeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
+    val activePlaybackTarget by playerSession.activeTarget.collectAsStateWithLifecycle()
+    val playingChannelId = (activePlaybackTarget as? AppPlaybackTarget.Live)?.channelId
+    val sdkTimeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
+    val timeshiftState = sdkTimeshiftState.toAppPresentation()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
     val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
@@ -831,7 +835,7 @@ fun EpgGridScreen(
                         ProgrammeAction.WATCH -> {
                             detailsEvent = null
                             channel?.let {
-                                onPlay(it.channelId, it.channelId, it.name)
+                                onPlay(it.channelId, it.name)
                             }
                         }
                         ProgrammeAction.WATCH_FROM_START -> {
@@ -845,7 +849,7 @@ fun EpgGridScreen(
                                     )
                                 }
                                 detailsEvent = null
-                                onPlay(channel.channelId, channel.channelId, channel.name)
+                                onPlay(channel.channelId, channel.name)
                             }
                         }
                         ProgrammeAction.RECORD -> when (val choice = chooseDvrConfig(dvrConfigs)) {

@@ -73,7 +73,6 @@ class MainStartupViewModelRestorationTest {
             requests.completePlayerVisibility(
                 target = target,
                 channelId = target.channelId,
-                serviceId = target.serviceId,
                 channelName = target.channelName,
             )
         )

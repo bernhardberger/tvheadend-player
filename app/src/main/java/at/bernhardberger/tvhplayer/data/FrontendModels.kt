@@ -147,12 +147,6 @@ sealed interface ConnectionState {
     data class Error(val kind: ConnectionFailureKind) : ConnectionState
 }
 
-sealed interface RecordingPlaybackIntent {
-    data object DefaultPolicy : RecordingPlaybackIntent
-    data object FromBeginning : RecordingPlaybackIntent
-    data class Resume(val positionSeconds: Long) : RecordingPlaybackIntent
-}
-
 sealed interface RecordingPlaybackAvailability {
     data class Ready(val path: String, val size: Long?, val growing: Boolean) : RecordingPlaybackAvailability
     data object NotReady : RecordingPlaybackAvailability

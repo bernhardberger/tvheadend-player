@@ -1,83 +1,97 @@
 package at.bernhardberger.tvhplayer.playback
 
-import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
-import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
-import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.yield
+import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppPlaybackRuntimeTest {
     @Test
-    fun droppedFramePercentageUsesRenderedPlusDroppedFrames() {
-        assertEquals(20f, droppedFramePercentage(renderedFrames = 80, droppedFrames = 20))
-        assertNull(droppedFramePercentage(renderedFrames = 0, droppedFrames = 0))
-    }
-
-    @Test
-    fun everyCanonicalSubscriptionIssueRetainsADistinctAppOutcome() {
+    fun selectedProfileUsesTheReleasedSdkIdentifierDirectly() {
         assertEquals(
-            SubscriptionIssue.entries.size,
-            SubscriptionIssue.entries.map { it.toApp() }.toSet().size,
-        )
-    }
-
-    @Test
-    fun everyReleasedTargetAndTimeshiftOutcomeRetainsADistinctAppOutcome() {
-        assertEquals(
-            PlaybackTargetResult.entries.size,
-            PlaybackTargetResult.entries.map { it.toAppCommandResult() }.toSet().size,
-        )
-        assertEquals(
-            TimeshiftCommandResult.entries.size,
-            TimeshiftCommandResult.entries.map { it.toAppCommandResult() }.toSet().size,
-        )
-    }
-
-    @Test
-    fun selectedProfileDiscoveryCompletesBeforeTuneSubmission() = runTest {
-        val calls = mutableListOf<String>()
-
-        val selected = prepareSelectedStreamProfile(
             "11111111111111111111111111111111",
-        ) {
-            calls += "discover"
-            StreamProfilesResult.NotReady
-        }
-        calls += "submit"
-
-        assertEquals("11111111111111111111111111111111", selected?.value)
-        assertEquals(listOf("discover", "submit"), calls)
+            selectedStreamProfileId("11111111111111111111111111111111")?.value,
+        )
+        assertNull(selectedStreamProfileId(""))
     }
 
     @Test
-    fun delayedTuneCannotSubmitAfterANewerStopCommand() = runTest {
-        val gate = AppPlaybackCommandGate()
-        val tuneEntered = CompletableDeferred<Unit>()
-        val releaseTune = CompletableDeferred<Unit>()
-        val calls = mutableListOf<String>()
+    fun unavailableSdkTimeshiftStateHasUnavailablePresentation() {
+        assertEquals(
+            AppTimeshiftState(),
+            LiveTimeshiftState.Unavailable.toAppPresentation(),
+        )
+    }
 
-        val tune = async {
-            gate.run {
-                calls += "tune.settings"
-                tuneEntered.complete(Unit)
-                releaseTune.await()
-                calls += "tune.submit"
-            }
-        }
-        tuneEntered.await()
-        val stop = async { gate.run { calls += "stop.submit" } }
-        yield()
-        assertEquals(listOf("tune.settings"), calls)
+    @Test
+    fun olderTargetCompletionCannotOverwriteANewerFailedTarget() {
+        val epoch = PlaybackPresentationEpoch()
+        var target: AppPlaybackTarget? = null
+        var state: AppPlaybackState = AppPlaybackState.Idle
+        val olderLive = epoch.begin()
+        val newerRecording = epoch.begin()
 
-        releaseTune.complete(Unit)
-        tune.await()
-        stop.await()
-        assertEquals(listOf("tune.settings", "tune.submit", "stop.submit"), calls)
+        assertFalse(epoch.publishIfCurrent(olderLive) {
+            target = AppPlaybackTarget.Live(7)
+            state = AppPlaybackState.Playing
+        })
+        assertTrue(epoch.publishIfCurrent(newerRecording) {
+            target = null
+            state = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
+        })
+
+        assertNull(target)
+        assertEquals(
+            AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED),
+            state,
+        )
+    }
+
+    @Test
+    fun olderTargetCompletionCannotSurviveANewerStop() {
+        val epoch = PlaybackPresentationEpoch()
+        var target: AppPlaybackTarget? = null
+        var state: AppPlaybackState = AppPlaybackState.Starting
+        val targetCommand = epoch.begin()
+        val stopCommand = epoch.begin()
+
+        assertFalse(epoch.publishIfCurrent(targetCommand) {
+            target = AppPlaybackTarget.Live(9)
+        })
+        assertTrue(epoch.publishIfCurrent(stopCommand) {
+            target = null
+            state = AppPlaybackState.Idle
+        })
+
+        assertNull(target)
+        assertEquals(AppPlaybackState.Idle, state)
+    }
+
+    @Test
+    fun onlyTheLatestSuccessfulTargetCanPublishPresentation() {
+        val epoch = PlaybackPresentationEpoch()
+        var target: AppPlaybackTarget? = null
+        val olderRecording = epoch.begin()
+        val newerLive = epoch.begin()
+
+        assertTrue(epoch.publishIfCurrent(newerLive) {
+            target = AppPlaybackTarget.Live(12)
+        })
+        assertFalse(epoch.publishIfCurrent(olderRecording) {
+            target = AppPlaybackTarget.Recording(3)
+        })
+
+        assertEquals(AppPlaybackTarget.Live(12), target)
+    }
+
+    @Test
+    fun recoveryCannotStartFromATargetSupersededByStop() {
+        val epoch = PlaybackPresentationEpoch()
+        val activeTarget = epoch.begin()
+        epoch.begin()
+
+        assertNull(epoch.beginIfCurrent(activeTarget))
     }
 }

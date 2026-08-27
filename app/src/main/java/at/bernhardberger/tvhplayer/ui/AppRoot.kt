@@ -30,6 +30,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
@@ -58,7 +59,6 @@ import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.SimpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
-import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
@@ -68,6 +68,7 @@ import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettings
@@ -107,18 +108,17 @@ object Routes {
     const val UNLOCK = "unlock"
     fun epg(category: ProgrammeCategory): String =
         "$EPG/${programmeCategoryRouteValue(category)}"
-    fun player(channelId: Int, serviceId: Int, channelName: String) =
-        "player/$channelId/$serviceId/${android.net.Uri.encode(channelName)}"
+    fun player(channelId: Int, channelName: String) =
+        "player/$channelId/${android.net.Uri.encode(channelName)}"
     fun recordingPlayer(
         recordingId: Int,
-        intent: RecordingPlaybackIntent = RecordingPlaybackIntent.DefaultPolicy,
+        start: RecordingPlaybackStart = RecordingPlaybackStart.RESUME,
     ): String {
-        val (mode, position) = when (intent) {
-            RecordingPlaybackIntent.DefaultPolicy -> "default" to -1L
-            RecordingPlaybackIntent.FromBeginning -> "beginning" to -1L
-            is RecordingPlaybackIntent.Resume -> "resume" to intent.positionSeconds
+        val mode = when (start) {
+            RecordingPlaybackStart.START_OVER -> "beginning"
+            RecordingPlaybackStart.RESUME -> "resume"
         }
-        return "recording-player/$recordingId/$mode/$position"
+        return "recording-player/$recordingId/$mode"
     }
 }
 
@@ -131,20 +131,18 @@ internal data class MainStartupCompositionState(
 
 internal data class WarmLivePlayerTarget(
     val channelId: Int,
-    val serviceId: Int,
     val channelName: String,
 )
 
 internal fun warmLivePlayerTarget(
-    activeServiceId: Int,
+    activeChannelId: Int,
     readiness: CurrentChannelReadiness,
 ): WarmLivePlayerTarget {
     val channel = (readiness as? CurrentChannelReadiness.Ready)
         ?.channels
-        ?.firstOrNull { it.channelId == activeServiceId }
+        ?.firstOrNull { it.channelId == activeChannelId }
     return WarmLivePlayerTarget(
-        channelId = channel?.channelId ?: activeServiceId,
-        serviceId = activeServiceId,
+        channelId = channel?.channelId ?: activeChannelId,
         channelName = channel?.name.orEmpty(),
     )
 }
@@ -160,9 +158,8 @@ internal fun completeEnteringPlayerVisibility(
     requests: ApplianceLaunchRequests,
     target: ApplianceLaunchTarget,
     channelId: Int,
-    serviceId: Int,
     channelName: String,
-): Boolean = requests.completePlayerVisibility(target, channelId, serviceId, channelName)
+): Boolean = requests.completePlayerVisibility(target, channelId, channelName)
 
 internal fun shouldShowMainNavigationRail(
     simpleTvActive: Boolean,
@@ -439,7 +436,6 @@ fun AppRoot(
                 } else {
                     Routes.player(
                         channelId = launchState.target.channelId,
-                        serviceId = launchState.target.serviceId,
                         channelName = launchState.target.channelName,
                     )
                 }
@@ -484,8 +480,9 @@ fun AppRoot(
     val playbackRuntime: AppPlaybackRuntime = koinInject()
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
-    val activeServiceId by playbackRuntime.activeLiveServiceId.collectAsStateWithLifecycle()
-    val activeRecordingId by playbackRuntime.activeRecordingId.collectAsStateWithLifecycle()
+    val activeTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
+    val activeChannelId = (activeTarget as? AppPlaybackTarget.Live)?.channelId
+    val activeRecordingId = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
     )
@@ -526,11 +523,6 @@ fun AppRoot(
     } else {
         null
     }
-    val visibleLivePlayerServiceId = if (topRoute == Routes.PLAYER) {
-        backStackEntry?.arguments?.getInt("serviceId")
-    } else {
-        null
-    }
     val visibleLivePlayerName = if (topRoute == Routes.PLAYER) {
         backStackEntry?.arguments?.getString("channelName")
     } else {
@@ -538,11 +530,9 @@ fun AppRoot(
     }
     val matchingEnteringPlayerVisible = enteringLaunchTarget?.let { target ->
         visibleLivePlayerChannelId != null &&
-            visibleLivePlayerServiceId != null &&
             visibleLivePlayerName != null &&
             target.matchesPlayer(
                 channelId = visibleLivePlayerChannelId,
-                serviceId = visibleLivePlayerServiceId,
                 channelName = visibleLivePlayerName,
             )
     } == true
@@ -557,7 +547,6 @@ fun AppRoot(
         is ApplianceLaunchState.Entering -> {
             val exactStart = Routes.player(
                 channelId = launchState.target.channelId,
-                serviceId = launchState.target.serviceId,
                 channelName = launchState.target.channelName,
             )
             enteringNavigationAllowed(
@@ -582,10 +571,10 @@ fun AppRoot(
     // before returning to the player so root Back cannot loop. Player Back alone
     // does not re-arm.
     var warmReturn by remember { mutableStateOf(WarmReturnOpportunity()) }
-    val currentWarmTarget = warmPlaybackTarget(activeServiceId, activeRecordingId)
-    LaunchedEffect(activeServiceId, activeRecordingId) {
+    val currentWarmTarget = warmPlaybackTarget(activeChannelId, activeRecordingId)
+    LaunchedEffect(activeChannelId, activeRecordingId) {
         warmReturn = when {
-            activeServiceId != null -> armWarmReturn(WarmPlaybackTarget.LIVE)
+            activeChannelId != null -> armWarmReturn(WarmPlaybackTarget.LIVE)
             activeRecordingId != null -> armWarmReturn(WarmPlaybackTarget.RECORDING)
             else -> clearWarmReturn()
         }
@@ -623,24 +612,20 @@ fun AppRoot(
     LaunchedEffect(
         enteringLaunchTarget,
         visibleLivePlayerChannelId,
-        visibleLivePlayerServiceId,
         visibleLivePlayerName,
     ) {
         val target = enteringLaunchTarget
         val channelId = visibleLivePlayerChannelId
-        val serviceId = visibleLivePlayerServiceId
         val channelName = visibleLivePlayerName
         if (
             target != null &&
             channelId != null &&
-            serviceId != null &&
             channelName != null
         ) {
             completeEnteringPlayerVisibility(
                 requests = applianceLaunchRequests,
                 target = target,
                 channelId = channelId,
-                serviceId = serviceId,
                 channelName = channelName,
             )
         }
@@ -659,7 +644,6 @@ fun AppRoot(
         ) ?: return@LaunchedEffect
         val targetRoute = Routes.player(
             channelId = target.channelId,
-            serviceId = target.serviceId,
             channelName = target.channelName,
         )
         if (nav.currentBackStackEntry == null && navigationStartDestination == null) {
@@ -712,15 +696,14 @@ fun AppRoot(
                 warmReturn = consumeWarmReturn(warmReturn)
                 when (target) {
                     WarmPlaybackTarget.LIVE -> {
-                        val serviceId = activeServiceId ?: return@rootBack
+                        val channelId = activeChannelId ?: return@rootBack
                         val playerTarget = warmLivePlayerTarget(
-                            activeServiceId = serviceId,
+                            activeChannelId = channelId,
                             readiness = currentChannelReadiness,
                         )
                         nav.navigate(
                             Routes.player(
                                 channelId = playerTarget.channelId,
-                                serviceId = playerTarget.serviceId,
                                 channelName = playerTarget.channelName,
                             )
                         ) {
@@ -767,21 +750,21 @@ fun AppRoot(
                                 ChannelsScreen(
                                     contentPadding = contentPadding,
                                     initialFocusEnabled = !drawerActive,
-                                    playingChannelId = activeServiceId,
+                                    playingChannelId = activeChannelId,
                                     connectionUiState = connectionUiState,
                                     onRetryConnection = appVm::reconnectNow,
                                     onOpenConnectionSettings = {
                                         navigateTopLevel(Routes.SETTINGS)
                                     },
-                                    onPlay = { channelId, serviceId, name ->
+                                    onPlay = { channelId, name ->
                                         warmReturn = rearmWarmReturnForPlaybackSelection(
                                             current = warmReturn,
                                             currentWarmTarget = currentWarmTarget,
                                             requestedTarget = WarmPlaybackTarget.LIVE,
-                                            currentIdentity = activeServiceId,
-                                            requestedIdentity = serviceId,
+                                            currentIdentity = activeChannelId,
+                                            requestedIdentity = channelId,
                                         )
-                                        nav.navigate(Routes.player(channelId, serviceId, name))
+                                        nav.navigate(Routes.player(channelId, name))
                                     }
                                 )
                             }
@@ -811,15 +794,15 @@ fun AppRoot(
                                             )
                                             nav.navigate(Routes.recordingPlayer(recordingId))
                                         },
-                                        onPlay = { channelId, serviceId, name ->
+                                        onPlay = { channelId, name ->
                                             warmReturn = rearmWarmReturnForPlaybackSelection(
                                                 current = warmReturn,
                                                 currentWarmTarget = currentWarmTarget,
                                                 requestedTarget = WarmPlaybackTarget.LIVE,
-                                                currentIdentity = activeServiceId,
-                                                requestedIdentity = serviceId,
+                                                currentIdentity = activeChannelId,
+                                                requestedIdentity = channelId,
                                             )
-                                            nav.navigate(Routes.player(channelId, serviceId, name))
+                                            nav.navigate(Routes.player(channelId, name))
                                         }
                                     )
                             }
@@ -860,15 +843,15 @@ fun AppRoot(
                                             )
                                             nav.navigate(Routes.recordingPlayer(recordingId))
                                         },
-                                        onPlay = { channelId, serviceId, name ->
+                                        onPlay = { channelId, name ->
                                             warmReturn = rearmWarmReturnForPlaybackSelection(
                                                 current = warmReturn,
                                                 currentWarmTarget = currentWarmTarget,
                                                 requestedTarget = WarmPlaybackTarget.LIVE,
-                                                currentIdentity = activeServiceId,
-                                                requestedIdentity = serviceId,
+                                                currentIdentity = activeChannelId,
+                                                requestedIdentity = channelId,
                                             )
-                                            nav.navigate(Routes.player(channelId, serviceId, name))
+                                            nav.navigate(Routes.player(channelId, name))
                                         },
                                     )
                             }
@@ -934,7 +917,7 @@ fun AppRoot(
                                     },
                                     onBack = {
                                         nav.popBackStack()
-                                        if (simpleTvActive && activeServiceId == null) {
+                                        if (simpleTvActive && activeChannelId == null) {
                                             applianceLaunchRequests.request()
                                         }
                                     },
@@ -943,22 +926,19 @@ fun AppRoot(
                     }
 
                     composable(
-                        route = "${Routes.PLAYER}/{channelId}/{serviceId}/{channelName}",
+                        route = "${Routes.PLAYER}/{channelId}/{channelName}",
                         arguments = listOf(
                             navArgument("channelId") { type = NavType.IntType },
-                            navArgument("serviceId") { type = NavType.IntType },
                             navArgument("channelName") { type = NavType.StringType },
                         )
                     ) { entry ->
                         val channelId = entry.arguments?.getInt("channelId") ?: 0
-                        val serviceId = entry.arguments?.getInt("serviceId") ?: 0
                         val channelName = entry.arguments?.getString("channelName") ?: ""
 
                         StartupGatedPlayerContent(contentAllowed = contentAllowed) {
                             VideoPlayerScreen(
                                 channelId = channelId,
                                 channelName = channelName,
-                                serviceId = serviceId,
                                 simpleTvProfile = capabilityProfile,
                                 onReconnect = appVm::reconnectNow,
                                 onUnlock = { nav.navigate(Routes.UNLOCK) },
@@ -974,19 +954,16 @@ fun AppRoot(
                     }
 
                     composable(
-                        route = "${Routes.RECORDING_PLAYER}/{recordingId}/{startMode}/{startPosition}",
+                        route = "${Routes.RECORDING_PLAYER}/{recordingId}/{startMode}",
                         arguments = listOf(
                             navArgument("recordingId") { type = NavType.IntType },
                             navArgument("startMode") { type = NavType.StringType },
-                            navArgument("startPosition") { type = NavType.LongType },
                         ),
                     ) { entry ->
                         val recordingId = entry.arguments?.getInt("recordingId") ?: 0
-                        val startPosition = entry.arguments?.getLong("startPosition") ?: -1L
-                        val intent = when (entry.arguments?.getString("startMode")) {
-                            "beginning" -> RecordingPlaybackIntent.FromBeginning
-                            "resume" -> RecordingPlaybackIntent.Resume(startPosition)
-                            else -> RecordingPlaybackIntent.DefaultPolicy
+                        val start = when (entry.arguments?.getString("startMode")) {
+                            "beginning" -> RecordingPlaybackStart.START_OVER
+                            else -> RecordingPlaybackStart.RESUME
                         }
                         if (
                             contentAllowed &&
@@ -994,7 +971,7 @@ fun AppRoot(
                         ) {
                             RecordingPlayerScreen(
                                 recordingId = recordingId,
-                                playbackIntent = intent,
+                                playbackStart = start,
                                 simpleTvProfile = capabilityProfile,
                                 connectionAvailable = connectionState is ConnectionState.Connected,
                                 onReconnect = appVm::reconnectNow,
@@ -1117,7 +1094,6 @@ private fun ApplianceLaunchTarget.matchesPlayerEntry(entry: NavBackStackEntry?):
     val channelName = arguments.getString("channelName") ?: return false
     return matchesPlayer(
         channelId = arguments.getInt("channelId"),
-        serviceId = arguments.getInt("serviceId"),
         channelName = channelName,
     )
 }
