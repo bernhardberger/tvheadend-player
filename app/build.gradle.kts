@@ -530,30 +530,95 @@ tasks.register("verifyExternalSdkConsumption") {
             "App runtime SDK artifacts $resolvedSdkArtifacts do not match $expectedSdkArtifacts"
         }
 
-        val expectedSdkArtifactSha256 = mapOf(
+        fun normalizedJarSha256(file: File): String = ZipFile(file).use { archive ->
+            val entries = archive.entries().asSequence().toList()
+            val duplicateEntryNames = entries
+                .groupingBy { entry -> entry.name }
+                .eachCount()
+                .filterValues { count -> count > 1 }
+                .keys
+                .sorted()
+            check(duplicateEntryNames.isEmpty()) {
+                "JAR ${file.name} contains duplicate entries: $duplicateEntryNames"
+            }
+
+            val regularEntries = entries
+                .filterNot { entry -> entry.isDirectory }
+                .sortedBy { entry -> entry.name }
+            val entryNames = entries.map { entry -> entry.name }
+            val directoriesMasqueradingAsFiles = regularEntries
+                .map { entry -> entry.name }
+                .filter { regularName ->
+                    entryNames.any { entryName -> entryName.startsWith("$regularName/") }
+                }
+            check(directoriesMasqueradingAsFiles.isEmpty()) {
+                "JAR ${file.name} contains directories masquerading as files: " +
+                    directoriesMasqueradingAsFiles
+            }
+
+            val digest = MessageDigest.getInstance("SHA-256")
+            fun updateLength(length: Long) {
+                for (shift in 56 downTo 0 step 8) {
+                    digest.update((length ushr shift).toByte())
+                }
+            }
+            regularEntries.forEach { entry ->
+                val nameBytes = entry.name.toByteArray(Charsets.UTF_8)
+                val contentBytes = archive.getInputStream(entry).use { input -> input.readBytes() }
+                updateLength(nameBytes.size.toLong())
+                digest.update(nameBytes)
+                updateLength(contentBytes.size.toLong())
+                digest.update(contentBytes)
+            }
+            digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+        }
+
+        val expectedJvmArtifactContentSha256 = mapOf(
             "client-htsp" to
-                "ad4ea327b4c490dfe450328e57e6514de0cda8c2dad3774f8f86a9d7dbad99ed",
+                "76d145f0ec4f56ce6777ef0742d13e497ced01ebf1d77e994a3ef4346ae800e1",
             "core" to
-                "0c1ee0a9724e960cacfcf13f26ce77a281d2ae3f48f519dbdb45f430cdf298c1",
+                "4b4399e8e3005439790efc60df3eda15bb75bc9ac4ee32ff2810afb25a1bdcdb",
+        )
+        val expectedRawSdkArtifactSha256 = mapOf(
             "decoder-ffmpeg" to
                 "1716bd964aa4ac3e7cd868ee036161f8d5cfa47fe6564a3d57b3b8723ab3f2e0",
             "playback-media3" to
                 "7995314ae9852fb902d6d1fdb3527bb267d8eee0887ea692fde3388d753b6deb",
         )
-        val resolvedSdkArtifactSha256 = runtimeClasspath.incoming.artifacts.artifacts
+        val resolvedJvmArtifactContentSha256 = runtimeClasspath.incoming.artifacts.artifacts
             .mapNotNull { artifact ->
                 val identifier = artifact.id.componentIdentifier as? ModuleComponentIdentifier
                     ?: return@mapNotNull null
-                if (identifier.group != sdkGroup) return@mapNotNull null
+                if (identifier.group != sdkGroup ||
+                    identifier.module !in expectedJvmArtifactContentSha256
+                ) {
+                    return@mapNotNull null
+                }
+                identifier.module to normalizedJarSha256(artifact.file)
+            }
+            .toMap()
+        check(resolvedJvmArtifactContentSha256 == expectedJvmArtifactContentSha256) {
+            "App runtime JVM SDK artifact content hashes $resolvedJvmArtifactContentSha256 " +
+                "do not match $expectedJvmArtifactContentSha256"
+        }
+        val resolvedRawSdkArtifactSha256 = runtimeClasspath.incoming.artifacts.artifacts
+            .mapNotNull { artifact ->
+                val identifier = artifact.id.componentIdentifier as? ModuleComponentIdentifier
+                    ?: return@mapNotNull null
+                if (identifier.group != sdkGroup ||
+                    identifier.module !in expectedRawSdkArtifactSha256
+                ) {
+                    return@mapNotNull null
+                }
                 val sha256 = MessageDigest.getInstance("SHA-256")
                     .digest(artifact.file.readBytes())
                     .joinToString("") { byte -> "%02x".format(byte) }
                 identifier.module to sha256
             }
             .toMap()
-        check(resolvedSdkArtifactSha256 == expectedSdkArtifactSha256) {
-            "App runtime SDK artifact hashes $resolvedSdkArtifactSha256 do not match " +
-                expectedSdkArtifactSha256
+        check(resolvedRawSdkArtifactSha256 == expectedRawSdkArtifactSha256) {
+            "App runtime raw SDK artifact hashes $resolvedRawSdkArtifactSha256 do not match " +
+                expectedRawSdkArtifactSha256
         }
 
         val siblingSdkRoot = rootDir.resolve("../tvheadend-player-sdk").canonicalFile
