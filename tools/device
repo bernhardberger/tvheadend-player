@@ -419,10 +419,28 @@ def acceptance_instrumentation_outcome(
     return "PASS" if passed else "FAIL"
 
 
-def package_path_present(result: subprocess.CompletedProcess[str]) -> bool:
-    return result.returncode == 0 and any(
-        line.startswith("package:") for line in (result.stdout or "").splitlines()
+def package_query_command(adb: str, serial: str) -> list[str]:
+    return adb_command(
+        adb,
+        serial,
+        "shell",
+        "pm",
+        "list",
+        "packages",
+        "--user",
+        "0",
+        TEST_PACKAGE,
     )
+
+
+def package_query_outcome(result: subprocess.CompletedProcess[str]) -> str:
+    if result.returncode != 0:
+        return "INVALID"
+    if result.stdout == "":
+        return "ABSENT"
+    if (result.stdout or "").splitlines() == [f"package:{TEST_PACKAGE}"]:
+        return "PRESENT"
+    return "INVALID"
 
 
 def package_mutation_succeeded(result: subprocess.CompletedProcess[str] | None) -> bool:
@@ -652,17 +670,20 @@ def run_debug_acceptance(
 
         preparation_started = time.monotonic()
         stale_test = run_bounded_redacted(
-            adb_command(adb, serial, "shell", "pm", "path", TEST_PACKAGE),
+            package_query_command(adb, serial),
             timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
         )
-        if stale_test is None or stale_test.returncode != 0:
+        stale_test_outcome = (
+            "INVALID" if stale_test is None else package_query_outcome(stale_test)
+        )
+        if stale_test_outcome == "INVALID":
             methods.append({
                 "name": "prepareInstrumentation",
                 "outcome": "TIMEOUT" if stale_test is None else "FAIL",
                 "durationMs": max(0, round((time.monotonic() - preparation_started) * 1000)),
             })
             raise AcceptanceRunStopped
-        if package_path_present(stale_test):
+        if stale_test_outcome == "PRESENT":
             removed = run_bounded_redacted(
                 adb_command(adb, serial, "uninstall", TEST_PACKAGE),
                 timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
@@ -703,28 +724,43 @@ def run_debug_acceptance(
     except AcceptanceRunStopped:
         pass
     finally:
-        cleanup_commands = (
+        force_stop_commands = (
             adb_command(adb, serial, "shell", "am", "force-stop", DEFAULT_PACKAGE),
             adb_command(adb, serial, "shell", "am", "force-stop", TEST_PACKAGE),
-            adb_command(adb, serial, "uninstall", TEST_PACKAGE),
         )
-        cleanup_results = [
+        force_stop_results = [
             run_bounded_redacted(command, timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS)
-            for command in cleanup_commands
+            for command in force_stop_commands
         ]
+        installed_before_cleanup = run_bounded_redacted(
+            package_query_command(adb, serial),
+            timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+        )
+        installed_before_cleanup_outcome = (
+            "INVALID"
+            if installed_before_cleanup is None
+            else package_query_outcome(installed_before_cleanup)
+        )
+        if installed_before_cleanup_outcome == "PRESENT":
+            removed = run_bounded_redacted(
+                adb_command(adb, serial, "uninstall", TEST_PACKAGE),
+                timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+            )
+            removal_succeeded = package_mutation_succeeded(removed)
+        else:
+            removal_succeeded = installed_before_cleanup_outcome == "ABSENT"
         absent = run_bounded_redacted(
-            adb_command(adb, serial, "shell", "pm", "path", TEST_PACKAGE),
+            package_query_command(adb, serial),
             timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
         )
         cleanup = "PASS" if (
             all(
                 result is not None and result.returncode == 0
-                for result in cleanup_results[:2]
+                for result in force_stop_results
             )
-            and package_mutation_succeeded(cleanup_results[2])
+            and removal_succeeded
             and absent is not None
-            and absent.returncode == 0
-            and not package_path_present(absent)
+            and package_query_outcome(absent) == "ABSENT"
         ) else "FAIL"
     return methods, cleanup
 

@@ -233,11 +233,11 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertEqual(DEVICE["acceptance_instrumentation_outcome"](passed), "PASS")
         self.assertEqual(DEVICE["acceptance_instrumentation_outcome"](failed), "FAIL")
 
-    def test_acceptance_package_presence_requires_a_package_path_not_only_exit_zero(self) -> None:
+    def test_acceptance_package_query_distinguishes_exact_presence_absence_and_invalid_output(self) -> None:
         present = subprocess.CompletedProcess(
             args=["adb"],
             returncode=0,
-            stdout="package:/data/app/test/base.apk\n",
+            stdout=f"package:{DEVICE['TEST_PACKAGE']}\n",
             stderr="",
         )
         absent = subprocess.CompletedProcess(
@@ -246,9 +246,19 @@ class DevicePolicyTest(unittest.TestCase):
             stdout="",
             stderr="",
         )
+        wrong = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout=(
+                f"package:{DEVICE['TEST_PACKAGE']}\n"
+                "package:wrong.package\n"
+            ),
+            stderr="",
+        )
 
-        self.assertTrue(DEVICE["package_path_present"](present))
-        self.assertFalse(DEVICE["package_path_present"](absent))
+        self.assertEqual(DEVICE["package_query_outcome"](present), "PRESENT")
+        self.assertEqual(DEVICE["package_query_outcome"](absent), "ABSENT")
+        self.assertEqual(DEVICE["package_query_outcome"](wrong), "INVALID")
 
     def test_acceptance_package_mutation_requires_explicit_success_output(self) -> None:
         success = subprocess.CompletedProcess(
@@ -269,13 +279,20 @@ class DevicePolicyTest(unittest.TestCase):
 
     def test_acceptance_orchestration_runs_named_methods_and_always_removes_test_package(self) -> None:
         commands: list[list[str]] = []
+        package_queries = 0
 
         def fake_run(command: list[str], *, timeout_seconds: int):
+            nonlocal package_queries
             commands.append(command)
             if "instrument" in command:
                 stdout = "OK (1 test)\nINSTRUMENTATION_CODE: -1\n"
-            elif command[-3:] == ["pm", "path", DEVICE["TEST_PACKAGE"]]:
-                stdout = ""
+            elif command == DEVICE["package_query_command"]("adb", "configured-serial"):
+                package_queries += 1
+                stdout = (
+                    f"package:{DEVICE['TEST_PACKAGE']}\n"
+                    if package_queries == 2
+                    else ""
+                )
             else:
                 stdout = "Success\n"
             return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
@@ -300,12 +317,76 @@ class DevicePolicyTest(unittest.TestCase):
             commands,
         )
 
+    def test_acceptance_preparation_fails_closed_for_wrong_package_query_output(self) -> None:
+        for wrong_output in (
+            "package:wrong.package\n",
+            f"package:{DEVICE['TEST_PACKAGE']}\npackage:wrong.package\n",
+        ):
+            with self.subTest(wrong_output=wrong_output):
+                package_queries = 0
+
+                def fake_run(command: list[str], *, timeout_seconds: int):
+                    nonlocal package_queries
+                    if command == DEVICE["package_query_command"]("adb", "configured-serial"):
+                        package_queries += 1
+                        stdout = wrong_output if package_queries == 1 else ""
+                        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+                    return subprocess.CompletedProcess(command, 0, stdout="Success\n", stderr="")
+
+                with patch.dict(
+                    DEVICE["run_debug_acceptance"].__globals__,
+                    {"run_bounded_redacted": fake_run},
+                ):
+                    methods, cleanup = DEVICE["run_debug_acceptance"](
+                        "adb",
+                        "configured-serial",
+                        {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                        Path("/private/app-debug.apk"),
+                        Path("/private/app-debug-androidTest.apk"),
+                    )
+
+                self.assertEqual(
+                    methods,
+                    [{"name": "prepareInstrumentation", "outcome": "FAIL", "durationMs": 0}],
+                )
+                self.assertEqual(cleanup, "PASS")
+
+    def test_acceptance_cleanup_fails_closed_for_wrong_package_query_output(self) -> None:
+        package_queries = 0
+
+        def fake_run(command: list[str], *, timeout_seconds: int):
+            nonlocal package_queries
+            if command == DEVICE["package_query_command"]("adb", "configured-serial"):
+                package_queries += 1
+                stdout = "" if package_queries == 1 else "package:wrong.package\n"
+                return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+            if "instrument" in command:
+                stdout = "OK (1 test)\nINSTRUMENTATION_CODE: -1\n"
+            else:
+                stdout = "Success\n"
+            return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+        with patch.dict(
+            DEVICE["run_debug_acceptance"].__globals__,
+            {"run_bounded_redacted": fake_run},
+        ):
+            methods, cleanup = DEVICE["run_debug_acceptance"](
+                "adb",
+                "configured-serial",
+                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                Path("/private/app-debug.apk"),
+                Path("/private/app-debug-androidTest.apk"),
+            )
+
+        self.assertTrue(all(item["outcome"] == "PASS" for item in methods))
+        self.assertEqual(cleanup, "FAIL")
+
     def test_acceptance_preparation_timeout_records_elapsed_time_and_cleanup_truthfully(self) -> None:
         package_queries = 0
 
         def fake_run(command: list[str], *, timeout_seconds: int):
             nonlocal package_queries
-            if command[-3:] == ["pm", "path", DEVICE["TEST_PACKAGE"]]:
+            if command == DEVICE["package_query_command"]("adb", "configured-serial"):
                 package_queries += 1
                 if package_queries == 1:
                     return None
