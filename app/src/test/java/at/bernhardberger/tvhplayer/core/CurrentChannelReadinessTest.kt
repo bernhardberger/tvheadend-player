@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.client.ConnectionState
 import at.bernhardberger.tvheadend.core.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -12,7 +11,7 @@ class CurrentChannelReadinessTest {
         assertEquals(
             CurrentChannelReadiness.Waiting,
             deriveCurrentChannelReadiness(
-                connectionState = ConnectionState.Disconnected,
+                connected = false,
                 metadataReady = true,
                 channels = listOf(channel(id = 1)),
             ),
@@ -24,7 +23,7 @@ class CurrentChannelReadinessTest {
         assertEquals(
             CurrentChannelReadiness.Waiting,
             deriveCurrentChannelReadiness(
-                connectionState = connected,
+                connected = true,
                 metadataReady = false,
                 channels = listOf(channel(id = 1)),
             ),
@@ -38,7 +37,7 @@ class CurrentChannelReadinessTest {
         assertEquals(
             CurrentChannelReadiness.Ready(channels),
             deriveCurrentChannelReadiness(
-                connectionState = connected,
+                connected = true,
                 metadataReady = true,
                 channels = channels,
             ),
@@ -50,7 +49,7 @@ class CurrentChannelReadinessTest {
         assertEquals(
             CurrentChannelReadiness.Ready(emptyList()),
             deriveCurrentChannelReadiness(
-                connectionState = connected,
+                connected = true,
                 metadataReady = true,
                 channels = emptyList(),
             ),
@@ -63,7 +62,7 @@ class CurrentChannelReadinessTest {
         val source = mutableListOf(expected)
 
         val readiness = deriveCurrentChannelReadiness(
-            connectionState = connected,
+            connected = true,
             metadataReady = true,
             channels = source,
         ) as CurrentChannelReadiness.Ready
@@ -78,12 +77,4 @@ class CurrentChannelReadinessTest {
         number = id,
         icon = null,
     )
-
-    private companion object {
-        val connected = ConnectionState.Connected(
-            host = "example.invalid",
-            port = 9982,
-            htspVersion = 42,
-        )
-    }
 }

@@ -6,9 +6,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
@@ -34,9 +32,6 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvheadend.core.ConnectionProbeResult
-import at.bernhardberger.tvheadend.client.TvheadendClient
-import at.bernhardberger.tvheadend.client.TvheadendConnection
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
@@ -51,14 +46,10 @@ enum class OnboardingStep {
     CONNECTION,
 }
 
-internal fun ConnectionProbeUiState.isActionableFailure(): Boolean =
-    (this as? ConnectionProbeUiState.Complete)?.result is ConnectionProbeResult.Failure
-
 @Composable
 fun OnboardingScreen(
     settingsStore: ServerSettingsStore = koinInject(),
     passwordStore: SecurePasswordStore = koinInject(),
-    connectionClient: TvheadendClient = koinInject(),
 ) {
     val activity = LocalActivity.current
     DisposableEffect(activity) {
@@ -81,7 +72,6 @@ fun OnboardingScreen(
             OnboardingStep.CONNECTION -> OnboardingConnection(
                 settingsStore = settingsStore,
                 passwordStore = passwordStore,
-                connectionClient = connectionClient,
                 onBack = { step = OnboardingStep.INTRODUCTION },
             )
         }
@@ -125,7 +115,6 @@ fun OnboardingIntroduction(onContinue: () -> Unit) {
 private fun OnboardingConnection(
     settingsStore: ServerSettingsStore,
     passwordStore: SecurePasswordStore,
-    connectionClient: TvheadendClient,
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -135,12 +124,10 @@ private fun OnboardingConnection(
     var port by rememberSaveable { mutableStateOf("9982") }
     var username by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var probeState by remember { mutableStateOf<ConnectionProbeUiState>(ConnectionProbeUiState.Idle) }
     var saveFailed by remember { mutableStateOf(false) }
 
     val parsedPort = port.toIntOrNull()?.takeIf { it in 1..65535 }
     val valid = host.isNotBlank() && parsedPort != null
-    val message = connectionProbeMessage(probeState)
 
     LaunchedEffect(Unit) { hostFocus.requestFocus() }
 
@@ -167,10 +154,7 @@ private fun OnboardingConnection(
             editingId = editingId,
             setEditingId = { editingId = it },
             value = host,
-            onValueChange = {
-                host = it
-                probeState = ConnectionProbeUiState.Idle
-            },
+            onValueChange = { host = it },
             label = { Text(stringResource(R.string.host)) },
             modifier = Modifier
                 .width(560.dp)
@@ -181,10 +165,7 @@ private fun OnboardingConnection(
             editingId = editingId,
             setEditingId = { editingId = it },
             value = port,
-            onValueChange = {
-                port = it
-                probeState = ConnectionProbeUiState.Idle
-            },
+            onValueChange = { port = it },
             label = { Text(stringResource(R.string.port_htsp)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.width(560.dp),
@@ -194,10 +175,7 @@ private fun OnboardingConnection(
             editingId = editingId,
             setEditingId = { editingId = it },
             value = username,
-            onValueChange = {
-                username = it
-                probeState = ConnectionProbeUiState.Idle
-            },
+            onValueChange = { username = it },
             label = { Text(stringResource(R.string.username)) },
             modifier = Modifier.width(560.dp),
         )
@@ -206,23 +184,10 @@ private fun OnboardingConnection(
             editingId = editingId,
             setEditingId = { editingId = it },
             value = password,
-            onValueChange = {
-                password = it
-                probeState = ConnectionProbeUiState.Idle
-            },
+            onValueChange = { password = it },
             modifier = Modifier.width(560.dp),
         )
 
-        if (message != null) {
-            Text(
-                text = message,
-                color = if (probeState.isActionableFailure()) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-            )
-        }
         if (saveFailed) {
             Text(
                 text = stringResource(R.string.credential_save_failed),
@@ -233,27 +198,6 @@ private fun OnboardingConnection(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onBack) {
                 Text(stringResource(R.string.back))
-            }
-            OutlinedButton(
-                enabled = valid && probeState != ConnectionProbeUiState.Testing,
-                onClick = {
-                    val endpointPort = parsedPort ?: return@OutlinedButton
-                    probeState = ConnectionProbeUiState.Testing
-                    scope.launch {
-                        probeState = ConnectionProbeUiState.Complete(
-                            connectionClient.testConnection(
-                                TvheadendConnection(
-                                    host = host.trim(),
-                                    port = endpointPort,
-                                    username = username.trim(),
-                                    password = password,
-                                )
-                            )
-                        )
-                    }
-                },
-            ) {
-                Text(stringResource(R.string.test_connection))
             }
             Button(
                 enabled = valid,

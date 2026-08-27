@@ -3,9 +3,10 @@ package at.bernhardberger.tvhplayer.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.client.ConnectionState
-import at.bernhardberger.tvheadend.client.StreamProfile
 import at.bernhardberger.tvheadend.client.TvheadendClient
 import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvhplayer.core.StreamProfileSelectionOption
+import at.bernhardberger.tvhplayer.core.selectedStreamProfileUuid
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,7 @@ import kotlinx.coroutines.launch
 sealed interface ProfilesUiState {
     data object Idle : ProfilesUiState
     data object Loading : ProfilesUiState
-    data class Ready(val items: List<StreamProfile>) : ProfilesUiState
+    data class Ready(val items: List<StreamProfileSelectionOption>) : ProfilesUiState
     data object Error : ProfilesUiState
 }
 
@@ -60,7 +61,7 @@ class SettingsPlayerViewModel(
 
         viewModelScope.launch {
             client.connectionState.collect { st ->
-                _ui.value = _ui.value.copy(connected = st is ConnectionState.Connected)
+                _ui.update { it.copy(connected = st is ConnectionState.Connected) }
             }
         }
 
@@ -70,11 +71,11 @@ class SettingsPlayerViewModel(
                 .distinctUntilChanged()
                 .collectLatest { key ->
                     if (key == null) {
-                        _ui.value = _ui.value.copy(profiles = ProfilesUiState.Idle)
+                        _ui.update { it.copy(profiles = ProfilesUiState.Idle) }
                         return@collectLatest
                     }
 
-                    _ui.value = _ui.value.copy(profiles = ProfilesUiState.Loading)
+                    _ui.update { it.copy(profiles = ProfilesUiState.Loading) }
 
                     val result = try {
                         Result.success(client.discoverProfiles())
@@ -83,42 +84,50 @@ class SettingsPlayerViewModel(
                     } catch (error: Exception) {
                         Result.failure(error)
                     }
-                    _ui.value = result.fold(
+                    result.fold(
                         onSuccess = { items ->
-                            val savedName = settingsStore.playerSettings.first().profile
-
-                            val matchByName = items.firstOrNull { it.name == savedName }
-
-                            val newSelectedUuid =
-                                matchByName?.id
-                                    ?: _ui.value.selectedProfileUuid
-                                    ?: items.firstOrNull()?.id
-
-                            _ui.value.copy(
-                                profiles = ProfilesUiState.Ready(items),
-                                selectedProfileUuid = newSelectedUuid
-                            )
+                            val discoveredProfiles = items.map { profile ->
+                                StreamProfileSelectionOption(
+                                    id = profile.id,
+                                    name = profile.name,
+                                )
+                            }
+                            val savedSelection = settingsStore.playerSettings.first()
+                            _ui.update { current ->
+                                current.copy(
+                                    profiles = ProfilesUiState.Ready(discoveredProfiles),
+                                    selectedProfileUuid = selectedStreamProfileUuid(
+                                        persistedUuid = savedSelection.profile,
+                                        legacyName = savedSelection.legacyProfileName,
+                                        currentUuid = current.selectedProfileUuid,
+                                        discoveredProfiles = discoveredProfiles,
+                                    ),
+                                )
+                            }
                         },
                         onFailure = { t ->
-                            _ui.value.copy(
-                                profiles = profileDiscoveryFailureState(t)
-                            )
+                            _ui.update {
+                                it.copy(profiles = profileDiscoveryFailureState(t))
+                            }
                         }
                     )
                 }
         }
     }
 
-    fun onProfileSelected(profile: StreamProfile) {
-        _ui.value = _ui.value.copy(selectedProfileUuid = profile.id)
+    fun onProfileSelected(profile: StreamProfileSelectionOption) {
+        _ui.update { it.copy(selectedProfileUuid = profile.id) }
 
         viewModelScope.launch {
-            settingsStore.setProfile(profile.name)
+            settingsStore.setProfile(
+                profileUuid = profile.id,
+                legacyProfileName = profile.name,
+            )
         }
     }
 
     fun onTimeshiftEnabledChanged(enabled: Boolean) {
-        _ui.value = _ui.value.copy(timeshiftEnabled = enabled)
+        _ui.update { it.copy(timeshiftEnabled = enabled) }
         viewModelScope.launch {
             settingsStore.setTimeshiftEnabled(enabled)
         }

@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
-import at.bernhardberger.tvheadend.client.TvheadendConnection
+import at.bernhardberger.tvhplayer.settings.ServerConnectionConfiguration
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -31,9 +31,9 @@ class AppConnectionReplacementPolicyTest {
         port: Int = 9982,
         username: String = "test-user",
         password: String = "test-password",
-    ): TvheadendConnection = TvheadendConnection(
+    ): ServerConnectionConfiguration = ServerConnectionConfiguration(
         host = host,
-        port = port,
+        htspPort = port,
         username = username,
         password = password,
     )

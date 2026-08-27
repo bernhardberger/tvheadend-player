@@ -62,21 +62,7 @@
     <string name="trusted_network_guidance">Verbinden Sie sich nur in einem vertrauenswürdigen Heimnetz oder über einen geschützten Tunnel. HTSP verschlüsselt weder Senderdaten noch Videostreams.</string>
     <string name="onboarding_continue">TVHeadend einrichten</string>
     <string name="onboarding_connection_title">Mit dem TVHeadend-Server verbinden</string>
-    <string name="test_connection">Verbindung testen</string>
     <string name="save_and_continue">Speichern und fortfahren</string>
-    <string name="connection_test_running">Begrüßung, Anmeldung und Senderzugriff werden geprüft…</string>
-    <plurals name="connection_test_success">
-        <item quantity="one">Verbindung erfolgreich. 1 Sender ist verfügbar.</item>
-        <item quantity="other">Verbindung erfolgreich. %d Sender sind verfügbar.</item>
-    </plurals>
-    <string name="connection_test_authentication">TVHeadend hat Benutzername oder Passwort abgelehnt. Prüfen Sie die Eingaben.</string>
-    <string name="connection_test_dns">Der Servername wurde nicht gefunden. Prüfen Sie Hostnamen und Netzwerk.</string>
-    <string name="connection_test_unreachable">Der Server ist nicht erreichbar. Prüfen Sie Host, HTSP-Port und Netzwerk.</string>
-    <string name="connection_test_timeout">Der Server hat nicht rechtzeitig geantwortet. Prüfen Sie TVHeadend und HTSP.</string>
-    <string name="connection_test_incompatible">Dieser TVHeadend-Server verwendet eine nicht unterstützte HTSP-Version.</string>
-    <string name="connection_test_permission">Das Konto ist verbunden, darf aber keine Senderdaten lesen. Prüfen Sie die TVHeadend-Berechtigungen.</string>
-    <string name="connection_test_zero_channels">Das Konto ist verbunden, aber es sind keine Sender dafür sichtbar.</string>
-    <string name="connection_test_other">Der Verbindungstest ist fehlgeschlagen. Prüfen Sie die Einstellungen.</string>
 
     <string name="settings_player">Wiedergabe</string>
     <string name="settings_connection_nav">Verbindung</string>

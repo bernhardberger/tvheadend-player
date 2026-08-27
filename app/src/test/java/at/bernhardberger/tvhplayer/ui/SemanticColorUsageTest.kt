@@ -1,9 +1,5 @@
 package at.bernhardberger.tvhplayer.ui
 
-import at.bernhardberger.tvheadend.core.ConnectionFailureKind
-import at.bernhardberger.tvheadend.core.ConnectionProbeResult
-import at.bernhardberger.tvhplayer.ui.screens.ConnectionProbeUiState
-import at.bernhardberger.tvhplayer.ui.screens.isActionableFailure
 import java.io.File
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -16,8 +12,8 @@ class SemanticColorUsageTest {
 
     @Test
     fun successMetadataRecordingAndFailureUseTheirOwnedRoles() {
-        assertContains("ui/screens/OnboardingScreen.kt", "probeState.isActionableFailure()")
-        assertContains("ui/screens/settings/SettingsConnection.kt", "probeState.isActionableFailure()")
+        assertContains("ui/screens/OnboardingScreen.kt", "MaterialTheme.colorScheme.error")
+        assertContains("ui/screens/settings/SettingsConnection.kt", "MaterialTheme.colorScheme.error")
         assertContains(
             "ui/screens/settings/SettingsSimpleTv.kt",
             "PinFeedbackKind.SUCCESS -> MaterialTheme.colorScheme.onSurface",
@@ -50,23 +46,6 @@ class SemanticColorUsageTest {
         }
         assertTrue(scopedSources.contains("MaterialTheme.colorScheme.error"))
     }
-
-    @Test
-    fun onlyCompletedConnectionProbeFailuresAreActionableFailures() {
-        assertFalse(ConnectionProbeUiState.Idle.isActionableFailure())
-        assertFalse(ConnectionProbeUiState.Testing.isActionableFailure())
-        assertFalse(
-            ConnectionProbeUiState.Complete(
-                ConnectionProbeResult.Success(serverVersion = 42, channelCount = 12),
-            ).isActionableFailure()
-        )
-        assertTrue(
-            ConnectionProbeUiState.Complete(
-                ConnectionProbeResult.Failure(ConnectionFailureKind.AUTHENTICATION),
-            ).isActionableFailure()
-        )
-    }
-
     private fun assertContains(relativePath: String, expected: String) {
         assertTrue("$relativePath must contain $expected", source(relativePath).contains(expected))
     }

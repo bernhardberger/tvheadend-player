@@ -6,10 +6,12 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.deriveCurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
+import at.bernhardberger.tvheadend.client.ConnectionState
 import at.bernhardberger.tvheadend.client.TvheadendClient
 import at.bernhardberger.tvheadend.client.TvheadendConnection
 import at.bernhardberger.tvheadend.core.ConnectionPolicy
 import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
+import at.bernhardberger.tvhplayer.settings.ServerConnectionConfiguration
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.settings.StoredPassword
 import kotlinx.coroutines.Dispatchers
@@ -43,21 +45,26 @@ class AppConnectionViewModel(
         client.connectionState,
         client.metadataReady,
         client.channels,
-        ::deriveCurrentChannelReadiness,
-    ).stateIn(
+    ) { connectionState, metadataReady, channels ->
+        deriveCurrentChannelReadiness(
+            connected = connectionState is ConnectionState.Connected,
+            metadataReady = metadataReady,
+            channels = channels,
+        )
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = CurrentChannelReadiness.Waiting,
     )
 
     @Volatile
-    private var lastConnection: TvheadendConnection? = null
+    private var lastConnection: ServerConnectionConfiguration? = null
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             combine(
-                    settings.serverSettings,
-                    passwords.passwordState,
+                settings.serverSettings,
+                passwords.passwordState,
             ) { server, password -> server to password }
                 .collectLatest { (server, password) ->
                     if (!ConnectionPolicy.isAutoConnectReady(server.host, server.htspPort)) {
@@ -78,9 +85,9 @@ class AppConnectionViewModel(
                         }
                     }
 
-                    val connection = TvheadendConnection(
+                    val connection = ServerConnectionConfiguration(
                         host = server.host,
-                        port = server.htspPort,
+                        htspPort = server.htspPort,
                         username = server.username,
                         password = passwordValue,
                     )
@@ -92,7 +99,7 @@ class AppConnectionViewModel(
                     lastConnection = connection
                     localState.value = null
                     client.connect(
-                        connection = connection,
+                        connection = connection.toPredecessorConnection(),
                         reuseMatchingConnection = previous == null,
                         preservePublishedMetadata = previous == null,
                     )
@@ -104,27 +111,16 @@ class AppConnectionViewModel(
         val connection = lastConnection ?: return
         viewModelScope.launch(Dispatchers.IO) {
             client.reconnect(
-                connection = connection,
+                connection = connection.toPredecessorConnection(),
                 preservePublishedMetadata = true,
             )
         }
     }
 
-    fun connectOnceFromUi(
-        host: String,
-        htspPort: Int,
-        username: String,
-        password: String,
-    ) {
-        val connection = TvheadendConnection(host, htspPort, username, password)
-        lastConnection = connection
-        localState.value = null
-        viewModelScope.launch(Dispatchers.IO) {
-            client.connect(
-                connection = connection,
-                reuseMatchingConnection = false,
-                preservePublishedMetadata = false,
-            )
-        }
-    }
+    private fun ServerConnectionConfiguration.toPredecessorConnection() = TvheadendConnection(
+        host = host,
+        port = htspPort,
+        username = username,
+        password = password,
+    )
 }

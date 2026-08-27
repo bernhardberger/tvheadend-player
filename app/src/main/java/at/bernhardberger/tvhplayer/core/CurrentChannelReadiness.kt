@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.client.ConnectionState
 import at.bernhardberger.tvheadend.core.Channel
 
 sealed interface CurrentChannelReadiness {
@@ -9,11 +8,11 @@ sealed interface CurrentChannelReadiness {
 }
 
 internal fun deriveCurrentChannelReadiness(
-    connectionState: ConnectionState,
+    connected: Boolean,
     metadataReady: Boolean,
     channels: List<Channel>,
 ): CurrentChannelReadiness {
-    if (connectionState !is ConnectionState.Connected || !metadataReady) {
+    if (!connected || !metadataReady) {
         return CurrentChannelReadiness.Waiting
     }
 
