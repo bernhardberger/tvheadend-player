@@ -27,6 +27,9 @@ if [[ ! -d "$ANDROID_HOME" ]]; then
     exit 1
 fi
 
+printf '==> AI harness\n'
+./tools/check-ai-harness
+
 printf '==> Tool policy tests\n'
 python3 -m unittest discover -s tools/tests
 

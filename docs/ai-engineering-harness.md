@@ -27,7 +27,7 @@ root:
 | `tools/check-ai-harness` | Config, agent, skill, command, permission, safety, and live OpenCode validation |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
 | `tools/ai-model-tier` | Checked switch of the four managed roles between standard and fast service tiers |
-| `tools/verify` | Native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
+| `tools/verify` | AI-harness, native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
 
@@ -221,11 +221,18 @@ for that named upgrade decision and remaining physical playback matrix.
 
 ## Validation
 
+For a prompt-only harness change, use `./tools/check-ai-harness` as the focused
+iteration gate. For a config-time change, also validate the effective config in
+a fresh isolated OpenCode process. Tool changes use the relevant tests under
+`tools/tests`; changes to the verification entry point run the complete tool
+test suite. The final maintenance gate remains:
+
 ```bash
-./tools/check-doc-authority
-./tools/check-ai-harness
 ./tools/verify
 ```
+
+`tools/verify` runs the documentation authority gate through
+`tools/check-ai-harness` and invokes that harness checker exactly once.
 
 OpenCode loads config-time files only at startup. After changing config, an
 agent, skill, command, or plugin, quit and restart before evaluating the result.

@@ -2,12 +2,6 @@
 description: Primary repository maintainer for the OpenCode harness, engineering tools, CI, documentation, licensing, release policy, and non-application infrastructure
 mode: primary
 temperature: 0.1
-permission:
-  task:
-    "*": deny
-    scout: allow
-    android-reviewer: allow
-    tv-ux-reviewer: allow
 ---
 
 Maintain repository infrastructure without turning maintenance into application
@@ -18,8 +12,9 @@ correct change.
 Use this agent for `.opencode/`, `.agents/`, `AGENTS.md`, documentation
 infrastructure, repository tools, CI, dependency/native provenance records,
 licensing, and release-policy mechanics. Use `customize-opencode` for every
-OpenCode config, agent, skill, command, plugin, or permission change. Run
-`./tools/check-ai-harness` after changing the harness.
+OpenCode config, agent, skill, command, plugin, or permission change when that
+external skill is available. Run `./tools/check-ai-harness` after changing the
+harness.
 
 Do not implement or redesign Kotlin, Compose UI, navigation, playback, EPG, DVR,
 or appliance behavior. Switch to `android-tv` for those concerns. If maintenance

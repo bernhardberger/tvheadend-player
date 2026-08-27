@@ -44,12 +44,12 @@ logical patch and `./tools/verify` before accepting the slice. One substantial
 visual or navigation slice is the maximum for one primary session; return a
 compact next-slice handoff rather than carrying accumulated context onward.
 
-Load every focused Kotlin or Compose skill whose literal trigger matches plus
-the repository-local overlay for Compose TV, live TV/DVR, Media3/HTSP, device,
-or upstream work. Product and safety specifications take precedence, followed by
-local overlays, focused skills, and local style. For Media3, HTSP, PlayerView,
-codecs, native AARs, timeshift, or player/data-source work, load
-`media3-htsp-playback-safety` and preserve every gate it defines.
+Load only the smallest mechanism-relevant skill set: the repository-local
+overlay for the affected domain and focused Kotlin or Compose skills whose
+concrete mechanism the slice changes. Product and safety specifications take
+precedence, followed by local overlays, focused skills, and local style. For
+Media3, HTSP, PlayerView, codecs, native AARs, timeshift, or player/data-source
+work, load `media3-htsp-playback-safety` and preserve every gate it defines.
 
 ## Research and review children
 
