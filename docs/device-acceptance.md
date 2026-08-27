@@ -12,11 +12,14 @@ operations.
 - The ignored `.tvhplayer-device.json` target must be named `g10`, have role
   `test`, and declare all four exact expected identity values: manufacturer
   `TCL`, model `Smart TV Pro`, device `G10`, and product `G10_4K_GB`.
-- Configure two distinct positive scalar values,
-  `acceptance_progressive_channel_id` and
-  `acceptance_interlaced_channel_id`. Their labels record the operator's known
-  server fixtures; the harness does not infer scan type from dimensions,
-  decoder names, or frame rate.
+- Configure two distinct exact channel-name selectors,
+  `acceptance_progressive_channel_selector` and
+  `acceptance_interlaced_channel_selector`, for the operator's known server
+  fixtures. The debug app resolves each selector uniquely against current
+  channel metadata immediately before use; missing or duplicate matches fail
+  closed. The harness does not infer scan type from dimensions, decoder names,
+  or frame rate. Selector values and resolved channel IDs are never written to
+  acceptance evidence or console output.
 - Run `./tools/verify` from a clean committed app tree first. It produces both
   `app-debug.apk`, the matching debug instrumentation APK, and an owner-only
   attestation binding clean HEAD, the released SDK coordinate, and both hashes.

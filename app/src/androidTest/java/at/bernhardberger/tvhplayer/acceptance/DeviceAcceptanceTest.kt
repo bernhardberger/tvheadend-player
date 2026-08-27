@@ -36,6 +36,7 @@ import org.junit.Test
 import org.junit.rules.TestWatcher
 import org.junit.runner.Description
 import org.junit.runner.RunWith
+import org.junit.runners.model.MultipleFailureException
 import org.koin.core.context.GlobalContext
 
 @RunWith(AndroidJUnit4::class)
@@ -75,6 +76,7 @@ class DeviceAcceptanceTest {
         await(30.seconds) { runtime.metadataReady.first { it } }
         val channels = runtime.channels.value
         assertTrue("ACCEPTANCE_CHANNEL_METADATA_EMPTY", channels.isNotEmpty())
+        resolveFixture(channels)
 
         val profiles = streamProfileDiscovery.discover()
         assertTrue("ACCEPTANCE_PROFILES_UNAVAILABLE", profiles is StreamProfilesResult.Available)
@@ -100,21 +102,19 @@ class DeviceAcceptanceTest {
 
     @Test
     fun progressiveLivePlayback() = runTest(timeout = 120.seconds) {
-        verifyLivePlayback(channelId("progressiveChannelId"))
+        verifyLivePlayback(FixtureRole.Progressive)
     }
 
     @Test
     fun interlacedLivePlayback() = runTest(timeout = 120.seconds) {
-        verifyLivePlayback(channelId("interlacedChannelId"))
+        verifyLivePlayback(FixtureRole.Interlaced)
     }
 
     @Test
     fun channelReplacement() = runTest(timeout = 120.seconds) {
-        connectReady()
-        val first = channelId("progressiveChannelId")
-        val second = channelId("interlacedChannelId")
-        requireKnownChannel(first)
-        requireKnownChannel(second)
+        val fixture = connectAndResolveFixture()
+        val first = fixture.progressiveChannelId
+        val second = fixture.interlacedChannelId
         submitLive(first, "ACCEPTANCE_INITIAL_TUNE_REJECTED")
         awaitPlaying(first)
         submitLive(second, "ACCEPTANCE_REPLACEMENT_REJECTED")
@@ -123,8 +123,8 @@ class DeviceAcceptanceTest {
 
     @Test
     fun timeshiftControls() = runTest(timeout = 120.seconds) {
-        val channel = channelId("progressiveChannelId")
-        verifyLivePlayback(channel)
+        val channel = connectAndResolveFixture().progressiveChannelId
+        verifyConnectedLivePlayback(channel)
         await(30.seconds) { playback.timeshiftState.first { it.available } }
         assertEquals(
             "ACCEPTANCE_TIMESHIFT_PAUSE_REJECTED",
@@ -167,9 +167,7 @@ class DeviceAcceptanceTest {
         connectReady()
         onMain { runtime.session.disconnect() }
         await(15.seconds) { runtime.session.state.first { it is SessionState.Disconnected } }
-        connectReady()
-        val channel = channelId("progressiveChannelId")
-        requireKnownChannel(channel)
+        val channel = connectAndResolveFixture().progressiveChannelId
         submitLive(channel, "ACCEPTANCE_TEARDOWN_TUNE_REJECTED")
         awaitPlaying(channel)
         val stopResult = onMain { playback.stop() }
@@ -187,9 +185,16 @@ class DeviceAcceptanceTest {
         await(15.seconds) { runtime.session.state.first { it is SessionState.Disconnected } }
     }
 
-    private suspend fun verifyLivePlayback(channel: Int) {
-        connectReady()
-        requireKnownChannel(channel)
+    private suspend fun verifyLivePlayback(role: FixtureRole) {
+        val fixture = connectAndResolveFixture()
+        val channel = when (role) {
+            FixtureRole.Progressive -> fixture.progressiveChannelId
+            FixtureRole.Interlaced -> fixture.interlacedChannelId
+        }
+        verifyConnectedLivePlayback(channel)
+    }
+
+    private suspend fun verifyConnectedLivePlayback(channel: Int) {
         onMain { playback.setDiagnosticsEnabled(true) }
         submitLive(channel, "ACCEPTANCE_LIVE_TUNE_REJECTED")
         awaitPlaying(channel)
@@ -218,6 +223,30 @@ class DeviceAcceptanceTest {
         assertTrue("ACCEPTANCE_CONNECTION_FAILED", terminal is SessionState.Ready)
     }
 
+    private suspend fun connectAndResolveFixture(): AcceptanceChannelFixtureResolution.Resolved {
+        connectReady()
+        await(30.seconds) { runtime.metadataReady.first { it } }
+        val channels = runtime.channels.value
+        assertTrue("ACCEPTANCE_CHANNEL_METADATA_EMPTY", channels.isNotEmpty())
+        return resolveFixture(channels)
+    }
+
+    private fun resolveFixture(
+        channels: List<at.bernhardberger.tvhplayer.data.Channel>,
+    ): AcceptanceChannelFixtureResolution.Resolved {
+        val resolution = resolveAcceptanceChannelFixture(
+            channels = channels,
+            progressiveSelector = fixtureSelector("progressiveChannelSelector"),
+            interlacedSelector = fixtureSelector("interlacedChannelSelector"),
+        )
+        return when (resolution) {
+            is AcceptanceChannelFixtureResolution.Resolved -> resolution
+            AcceptanceChannelFixtureResolution.Missing -> failFixture("ACCEPTANCE_FIXTURE_SELECTOR_MISSING")
+            AcceptanceChannelFixtureResolution.Ambiguous -> failFixture("ACCEPTANCE_FIXTURE_SELECTOR_AMBIGUOUS")
+            AcceptanceChannelFixtureResolution.SameChannel -> failFixture("ACCEPTANCE_FIXTURE_SELECTOR_SAME_CHANNEL")
+        }
+    }
+
     private suspend fun submitLive(channel: Int, rejectionCode: String) {
         if (playbackSurface == null) {
             val attached = onMain { createAcceptancePlaybackSurface() }
@@ -240,18 +269,17 @@ class DeviceAcceptanceTest {
         assertEquals("ACCEPTANCE_ACTIVE_CHANNEL_MISMATCH", channel, playback.activeLiveServiceId.value)
     }
 
-    private fun requireKnownChannel(channel: Int) {
-        assertTrue(
-            "ACCEPTANCE_FIXTURE_CHANNEL_MISSING",
-            runtime.channels.value.any { it.channelId == channel },
-        )
+    private fun fixtureSelector(name: String): String {
+        val value = InstrumentationRegistry.getArguments().getString(name)
+        if (value.isNullOrBlank() || value.length > 256 || value.any(Char::isISOControl)) {
+            failFixture("ACCEPTANCE_FIXTURE_SELECTOR_INVALID")
+        }
+        return value
     }
 
-    private fun channelId(name: String): Int {
-        val value = InstrumentationRegistry.getArguments().getString(name)?.toIntOrNull()
-        assertTrue("ACCEPTANCE_CHANNEL_ARGUMENT_INVALID", value != null && value > 0)
-        return checkNotNull(value)
-    }
+    private fun failFixture(code: String): Nothing = throw AssertionError(code)
+
+    private enum class FixtureRole { Progressive, Interlaced }
 
     private suspend fun <T> onMain(block: suspend () -> T): T =
         withContext(Dispatchers.Main.immediate) { block() }
@@ -262,17 +290,12 @@ class DeviceAcceptanceTest {
 
 class AcceptanceFailureCodeReporter : TestWatcher() {
     override fun failed(failure: Throwable, description: Description) {
-        val code = generateSequence(failure) { it.cause }
-            .mapNotNull { cause -> FAILURE_CODE.find(cause.message.orEmpty())?.value }
-            .firstOrNull()
-            ?: "UNCLASSIFIED"
+        val failures = if (failure is MultipleFailureException) failure.failures else listOf(failure)
         InstrumentationRegistry.getInstrumentation().sendStatus(
             2,
-            Bundle().apply { putString("acceptanceFailureCode", code) },
+            Bundle().apply {
+                putString("acceptanceFailureCode", acceptanceFailureCode(failures))
+            },
         )
-    }
-
-    private companion object {
-        val FAILURE_CODE = Regex("""(?<![A-Z0-9_])ACCEPTANCE_[A-Z0-9_]{1,96}(?![A-Z0-9_])""")
     }
 }

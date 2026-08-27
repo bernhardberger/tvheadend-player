@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import runpy
+import shlex
 import stat
 import subprocess
 import tempfile
@@ -178,43 +179,73 @@ class DevicePolicyTest(unittest.TestCase):
             with self.subTest(case=case):
                 self.assertTrue(DEVICE["acceptance_policy_errors"](**(defaults | case)))
 
-    def test_acceptance_fixture_requires_two_distinct_positive_channel_ids(self) -> None:
+    def test_acceptance_fixture_requires_two_distinct_bounded_selectors(self) -> None:
         self.assertEqual(
             DEVICE["acceptance_fixture"](
                 {
-                    "acceptance_progressive_channel_id": "101",
-                    "acceptance_interlaced_channel_id": "202",
+                    "acceptance_progressive_channel_selector": " Progressive fixture",
+                    "acceptance_interlaced_channel_selector": "Interlaced fixture ",
                 },
             ),
-            {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+            {
+                "progressiveChannelSelector": " Progressive fixture",
+                "interlacedChannelSelector": "Interlaced fixture ",
+            },
         )
         for config in (
             {},
-            {"acceptance_progressive_channel_id": "0", "acceptance_interlaced_channel_id": "2"},
-            {"acceptance_progressive_channel_id": "2", "acceptance_interlaced_channel_id": "2"},
-            {"acceptance_progressive_channel_id": "secret", "acceptance_interlaced_channel_id": "2"},
+            {
+                "acceptance_progressive_channel_selector": "",
+                "acceptance_interlaced_channel_selector": "Interlaced fixture",
+            },
+            {
+                "acceptance_progressive_channel_selector": "   ",
+                "acceptance_interlaced_channel_selector": "Interlaced fixture",
+            },
+            {
+                "acceptance_progressive_channel_selector": "Same fixture",
+                "acceptance_interlaced_channel_selector": "Same fixture",
+            },
+            {
+                "acceptance_progressive_channel_selector": "Bad\nselector",
+                "acceptance_interlaced_channel_selector": "Interlaced fixture",
+            },
+            {
+                "acceptance_progressive_channel_selector": "x" * 257,
+                "acceptance_interlaced_channel_selector": "Interlaced fixture",
+            },
         ):
             with self.subTest(config=config):
                 with self.assertRaisesRegex(SystemExit, "2"):
                     DEVICE["acceptance_fixture"](config)
 
     def test_acceptance_instrumentation_is_bounded_to_named_methods_and_safe_arguments(self) -> None:
+        progressive = "Progressive fixture; $(not-a-command) 'quoted'"
+        interlaced = 'Interlaced fixture "quoted"'
         command = DEVICE["acceptance_instrumentation_command"](
             "adb",
             "configured-serial",
             "progressiveLivePlayback",
-            {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+            {
+                "progressiveChannelSelector": progressive,
+                "interlacedChannelSelector": interlaced,
+            },
         )
 
-        self.assertEqual(command[:6], ["adb", "-s", "configured-serial", "shell", "am", "instrument"])
+        self.assertEqual(command[:4], ["adb", "-s", "configured-serial", "shell"])
+        self.assertEqual(len(command), 5)
+        remote_arguments = shlex.split(command[4])
+        self.assertEqual(remote_arguments[:2], ["am", "instrument"])
+        self.assertEqual(remote_arguments[remote_arguments.index("progressiveChannelSelector") + 1], progressive)
+        self.assertEqual(remote_arguments[remote_arguments.index("interlacedChannelSelector") + 1], interlaced)
         self.assertIn(
             "at.bernhardberger.tvhplayer.acceptance.DeviceAcceptanceTest#progressiveLivePlayback",
-            command,
+            remote_arguments,
         )
-        self.assertEqual(command[-1], "at.bernhardberger.tvhplayer.test/androidx.test.runner.AndroidJUnitRunner")
-        self.assertNotIn("logcat", command)
-        self.assertNotIn("uiautomator", command)
-        self.assertNotIn("dumpsys", command)
+        self.assertEqual(remote_arguments[-1], "at.bernhardberger.tvhplayer.test/androidx.test.runner.AndroidJUnitRunner")
+        self.assertNotIn("logcat", remote_arguments)
+        self.assertNotIn("uiautomator", remote_arguments)
+        self.assertNotIn("dumpsys", remote_arguments)
 
     def test_acceptance_playback_surface_requires_no_activity_component(self) -> None:
         activity = "at.bernhardberger.tvhplayer.acceptance.AcceptancePlaybackSurfaceActivity"
@@ -282,7 +313,7 @@ class DevicePolicyTest(unittest.TestCase):
                     if package_queries == 2
                     else ""
                 )
-            elif "instrument" in command:
+            elif len(command) == 5 and command[4].startswith("am instrument "):
                 stdout = (
                     "java.lang.AssertionError: ACCEPTANCE_PLAYBACK_FAILED_BAD_SIGNAL\n"
                     "private server detail\nFAILURES!!!\nINSTRUMENTATION_CODE: -1\n"
@@ -303,7 +334,10 @@ class DevicePolicyTest(unittest.TestCase):
             methods, cleanup = DEVICE["run_debug_acceptance"](
                 "adb",
                 "configured-serial",
-                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                {
+                    "progressiveChannelSelector": "Progressive fixture",
+                    "interlacedChannelSelector": "Interlaced fixture",
+                },
                 Path("/private/app-debug.apk"),
                 Path("/private/app-debug-androidTest.apk"),
             )
@@ -365,7 +399,7 @@ class DevicePolicyTest(unittest.TestCase):
         def fake_run(command: list[str], *, timeout_seconds: int):
             nonlocal package_queries
             commands.append(command)
-            if "instrument" in command:
+            if len(command) == 5 and command[4].startswith("am instrument "):
                 stdout = "OK (1 test)\nINSTRUMENTATION_CODE: -1\n"
             elif command == DEVICE["package_query_command"]("adb", "configured-serial"):
                 package_queries += 1
@@ -385,7 +419,10 @@ class DevicePolicyTest(unittest.TestCase):
             methods, cleanup = DEVICE["run_debug_acceptance"](
                 "adb",
                 "configured-serial",
-                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                {
+                    "progressiveChannelSelector": "Progressive fixture",
+                    "interlacedChannelSelector": "Interlaced fixture",
+                },
                 Path("/private/app-debug.apk"),
                 Path("/private/app-debug-androidTest.apk"),
             )
@@ -421,7 +458,10 @@ class DevicePolicyTest(unittest.TestCase):
                     methods, cleanup = DEVICE["run_debug_acceptance"](
                         "adb",
                         "configured-serial",
-                        {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                        {
+                            "progressiveChannelSelector": "Progressive fixture",
+                            "interlacedChannelSelector": "Interlaced fixture",
+                        },
                         Path("/private/app-debug.apk"),
                         Path("/private/app-debug-androidTest.apk"),
                     )
@@ -441,7 +481,7 @@ class DevicePolicyTest(unittest.TestCase):
                 package_queries += 1
                 stdout = "" if package_queries == 1 else "package:wrong.package\n"
                 return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
-            if "instrument" in command:
+            if len(command) == 5 and command[4].startswith("am instrument "):
                 stdout = "OK (1 test)\nINSTRUMENTATION_CODE: -1\n"
             else:
                 stdout = "Success\n"
@@ -454,7 +494,10 @@ class DevicePolicyTest(unittest.TestCase):
             methods, cleanup = DEVICE["run_debug_acceptance"](
                 "adb",
                 "configured-serial",
-                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                {
+                    "progressiveChannelSelector": "Progressive fixture",
+                    "interlacedChannelSelector": "Interlaced fixture",
+                },
                 Path("/private/app-debug.apk"),
                 Path("/private/app-debug-androidTest.apk"),
             )
@@ -485,7 +528,10 @@ class DevicePolicyTest(unittest.TestCase):
             methods, cleanup = DEVICE["run_debug_acceptance"](
                 "adb",
                 "configured-serial",
-                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                {
+                    "progressiveChannelSelector": "Progressive fixture",
+                    "interlacedChannelSelector": "Interlaced fixture",
+                },
                 Path("/private/app-debug.apk"),
                 Path("/private/app-debug-androidTest.apk"),
             )

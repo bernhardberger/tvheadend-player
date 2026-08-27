@@ -380,16 +380,17 @@ def acceptance_policy_errors(
 def acceptance_fixture(config: dict[str, str]) -> dict[str, str]:
     fixture: dict[str, str] = {}
     for config_name, argument_name in (
-        ("acceptance_progressive_channel_id", "progressiveChannelId"),
-        ("acceptance_interlaced_channel_id", "interlacedChannelId"),
+        ("acceptance_progressive_channel_selector", "progressiveChannelSelector"),
+        ("acceptance_interlaced_channel_selector", "interlacedChannelSelector"),
     ):
         raw = config.get(config_name, "")
-        value = raw.strip()
-        if not value.isascii() or not value.isdigit() or int(value) <= 0:
-            fail(f"{config_name} must be a positive decimal channel ID")
-        fixture[argument_name] = str(int(value))
-    if fixture["progressiveChannelId"] == fixture["interlacedChannelId"]:
-        fail("progressive and interlaced acceptance channel IDs must differ")
+        if not isinstance(raw, str):
+            fail(f"{config_name} must be a bounded printable selector")
+        if not raw.strip() or len(raw) > 256 or not raw.isprintable():
+            fail(f"{config_name} must be a bounded printable selector")
+        fixture[argument_name] = raw
+    if fixture["progressiveChannelSelector"] == fixture["interlacedChannelSelector"]:
+        fail("progressive and interlaced acceptance selectors must differ")
     return fixture
 
 
@@ -401,11 +402,11 @@ def acceptance_instrumentation_command(
 ) -> list[str]:
     if method not in ACCEPTANCE_METHODS:
         fail("acceptance instrumentation method is not approved")
-    command = adb_command(adb, serial, "shell", "am", "instrument", "-w", "-r")
-    for name in ("progressiveChannelId", "interlacedChannelId"):
-        command.extend(("-e", name, fixture[name]))
-    command.extend(("-e", "class", f"{ACCEPTANCE_TEST_CLASS}#{method}", TEST_RUNNER))
-    return command
+    remote_arguments = ["am", "instrument", "-w", "-r"]
+    for name in ("progressiveChannelSelector", "interlacedChannelSelector"):
+        remote_arguments.extend(("-e", name, fixture[name]))
+    remote_arguments.extend(("-e", "class", f"{ACCEPTANCE_TEST_CLASS}#{method}", TEST_RUNNER))
+    return adb_command(adb, serial, "shell", shlex.join(remote_arguments))
 
 
 def acceptance_instrumentation_outcome(
