@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import java.util.concurrent.CancellationException

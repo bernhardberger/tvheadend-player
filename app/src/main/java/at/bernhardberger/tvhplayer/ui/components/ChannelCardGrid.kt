@@ -50,7 +50,7 @@ import androidx.tv.material3.StandardCardContainer
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.channelInitials
-import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.ui.ChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.TvCardSpacing

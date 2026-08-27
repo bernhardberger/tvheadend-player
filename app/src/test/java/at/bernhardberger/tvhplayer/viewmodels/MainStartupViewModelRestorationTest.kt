@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvhplayer.data.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

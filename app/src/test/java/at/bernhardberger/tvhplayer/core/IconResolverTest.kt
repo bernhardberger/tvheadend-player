@@ -7,16 +7,23 @@ import org.junit.Test
 class IconResolverTest {
 
     @Test
-    fun serverRelativePath_isWrappedAsHtspPicon() {
+    fun positiveImagecacheSelector_isWrappedAsAuthenticatedArtwork() {
         assertEquals(
-            "htsp-picon://default/imagecache/123",
+            AppArtworkSource("imagecache/123"),
             resolvePiconModel("default", "imagecache/123")
         )
-        // Leading slash is normalised away.
         assertEquals(
-            "htsp-picon://default/picon/foo.png",
-            resolvePiconModel("default", "/picon/foo.png")
+            AppArtworkSource("imagecache/456"),
+            resolvePiconModel("default", "/imagecache/456")
         )
+    }
+
+    @Test
+    fun nonImagecacheAndMalformedSelectors_areRejected() {
+        assertNull(resolvePiconModel("default", "/picon/foo.png"))
+        assertNull(resolvePiconModel("default", "imagecache/0"))
+        assertNull(resolvePiconModel("default", "imagecache/not-an-id"))
+        assertNull(resolvePiconModel("default", "imagecache/1/extra"))
     }
 
     @Test

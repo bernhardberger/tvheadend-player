@@ -17,7 +17,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.runtime.mutableStateOf
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding

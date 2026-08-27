@@ -78,7 +78,7 @@ fun rememberChannelAccent(
 private suspend fun sampleChannelAccent(
     imageLoader: ImageLoader,
     context: Context,
-    model: String,
+    model: Any,
 ): Int = withContext(Dispatchers.Default) {
     val request = ImageRequest.Builder(context)
         .data(model)

@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.Channel
-import at.bernhardberger.tvheadend.core.ChannelTag
+import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvhplayer.data.ChannelTag
 
 enum class TagScopeFallback {
     TAG_UNAVAILABLE,

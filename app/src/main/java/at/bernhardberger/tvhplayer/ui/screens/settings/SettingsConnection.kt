@@ -30,12 +30,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
+import at.bernhardberger.tvhplayer.settings.replacementCredentialsComplete
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -43,7 +44,6 @@ import org.koin.compose.koinInject
 fun SettingsConnection(
     initialFocusRequester: FocusRequester,
     settingsStore: ServerSettingsStore = koinInject(),
-    passwordStore: SecurePasswordStore = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current
@@ -62,16 +62,24 @@ fun SettingsConnection(
     var user by rememberSaveable { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     var passwordChanged by remember { mutableStateOf(false) }
+    var passwordConfigured by remember { mutableStateOf(false) }
     var credentialError by remember { mutableStateOf(false) }
     var auto by rememberSaveable { mutableStateOf(true) }
     val parsedPort = htspPort.toIntOrNull()?.takeIf { it in 1..65535 }
-    val validEndpoint = host.isNotBlank() && parsedPort != null
+    val credentialsComplete = replacementCredentialsComplete(
+        passwordConfigured = passwordConfigured,
+        username = user,
+        password = pass,
+        passwordChanged = passwordChanged,
+    )
+    val validEndpoint = host.isNotBlank() && parsedPort != null && credentialsComplete
 
     LaunchedEffect(Unit) {
         val s = settingsStore.serverSettings.first()
         host = s.host
         htspPort = s.htspPort.toString()
         user = s.username
+        passwordConfigured = s.passwordConfigured
     }
 
     SettingsPane(title = stringResource(R.string.settings_server)) {
@@ -150,11 +158,20 @@ fun SettingsConnection(
                 val pHtsp = parsedPort ?: return@Button
                 scope.launch {
                     try {
-                        if (passwordChanged) passwordStore.setPassword(pass)
-                        settingsStore.saveServer(host.trim(), pHtsp, user.trim(), auto)
+                        if (user.isBlank()) {
+                            settingsStore.saveServer(host.trim(), pHtsp, "", auto)
+                            passwordConfigured = false
+                        } else {
+                            settingsStore.savePasswordServer(
+                                host.trim(), pHtsp, user, pass, auto,
+                            )
+                            passwordConfigured = true
+                        }
                         pass = ""
                         passwordChanged = false
                         credentialError = false
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (_: Exception) {
                         credentialError = true
                     }
@@ -166,10 +183,18 @@ fun SettingsConnection(
             OutlinedButton(onClick = {
                 scope.launch {
                     try {
-                        passwordStore.clear()
+                        val current = settingsStore.serverSettings.first()
+                        if (current.host.isNotBlank()) {
+                            settingsStore.saveServer(current.host, current.htspPort, "", auto)
+                        } else {
+                            settingsStore.clearProfile()
+                        }
                         pass = ""
+                        passwordConfigured = false
                         passwordChanged = false
                         credentialError = false
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (_: Exception) {
                         credentialError = true
                     }

@@ -22,7 +22,7 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import org.junit.Assert.assertNotEquals

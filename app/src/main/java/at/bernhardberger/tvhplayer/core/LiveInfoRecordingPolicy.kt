@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.DvrActionFailure
-import at.bernhardberger.tvheadend.core.DvrActionResult
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.DvrActionFailure
+import at.bernhardberger.tvhplayer.data.DvrActionResult
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 
 fun EpgEventEntry.programmeRecordingTarget(): ProgrammeRecordingTarget =
     ProgrammeRecordingTarget.from(this)

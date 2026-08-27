@@ -10,7 +10,9 @@ package at.bernhardberger.tvhplayer.core
  * the UI falls back to the placeholder. To get such icons to show, enable
  * TVHeadend's imagecache so the icon is served as an HTSP-openable path instead.
  */
-fun resolvePiconModel(serverTag: String, piconPath: String?): String? {
+data class AppArtworkSource(val selector: String)
+
+fun resolvePiconModel(serverTag: String, piconPath: String?): AppArtworkSource? {
     if (serverTag.isBlank() || piconPath.isNullOrBlank()) return null
 
     val trimmed = piconPath.trim()
@@ -21,5 +23,8 @@ fun resolvePiconModel(serverTag: String, piconPath: String?): String? {
     }
 
     val p = trimmed.trimStart('/')
-    return "htsp-picon://$serverTag/$p"
+    if (!p.startsWith("imagecache/")) return null
+    val id = p.removePrefix("imagecache/")
+    if (id.toIntOrNull()?.let { it > 0 } != true) return null
+    return AppArtworkSource(p)
 }

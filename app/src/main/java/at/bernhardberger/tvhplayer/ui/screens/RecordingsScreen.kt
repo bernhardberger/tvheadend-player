@@ -65,6 +65,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
@@ -86,15 +87,15 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvheadend.core.DvrActionFailure
-import at.bernhardberger.tvheadend.core.DvrActionResult
+import at.bernhardberger.tvhplayer.data.DvrActionFailure
+import at.bernhardberger.tvhplayer.data.DvrActionResult
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
-import at.bernhardberger.tvheadend.core.RecordingPlaybackAvailability
-import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
+import at.bernhardberger.tvhplayer.data.RecordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
@@ -103,17 +104,17 @@ import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
-import at.bernhardberger.tvheadend.core.recordingPlaybackAvailability
-import at.bernhardberger.tvheadend.core.recordingResumeCandidateSeconds
-import at.bernhardberger.tvheadend.core.recordingSecondsToMediaMilliseconds
+import at.bernhardberger.tvhplayer.data.recordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.data.recordingResumeCandidateSeconds
+import at.bernhardberger.tvhplayer.data.recordingSecondsToMediaMilliseconds
 import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
-import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
-import at.bernhardberger.tvheadend.client.DvrRuntime
-import at.bernhardberger.tvheadend.client.RecordingProgressCapability
-import at.bernhardberger.tvheadend.core.Channel
-import at.bernhardberger.tvheadend.core.DvrEntry
-import at.bernhardberger.tvheadend.core.DvrState
+import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.data.DvrRuntime
+import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
+import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvhplayer.data.DvrEntry
+import at.bernhardberger.tvhplayer.data.DvrState
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -1965,13 +1966,16 @@ private fun ModeEmptyState(message: Int) {
 }
 
 @Composable
-private fun scheduleSectionLabel(section: DvrScheduleSection): String = when (section.kind) {
-    DvrScheduleSectionKind.RECORDING_NOW -> stringResource(R.string.recordings_recording_now)
-    DvrScheduleSectionKind.TODAY -> stringResource(R.string.today)
-    DvrScheduleSectionKind.TOMORROW -> stringResource(R.string.tomorrow)
-    DvrScheduleSectionKind.DATE -> section.date?.format(
-        DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())
-    ).orEmpty()
+private fun scheduleSectionLabel(section: DvrScheduleSection): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return when (section.kind) {
+        DvrScheduleSectionKind.RECORDING_NOW -> stringResource(R.string.recordings_recording_now)
+        DvrScheduleSectionKind.TODAY -> stringResource(R.string.today)
+        DvrScheduleSectionKind.TOMORROW -> stringResource(R.string.tomorrow)
+        DvrScheduleSectionKind.DATE -> section.date?.format(
+            DateTimeFormatter.ofPattern("EEEE d MMMM", locale)
+        ).orEmpty()
+    }
 }
 
 @Composable

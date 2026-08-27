@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

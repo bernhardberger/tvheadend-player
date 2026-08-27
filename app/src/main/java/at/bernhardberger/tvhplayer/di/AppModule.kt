@@ -1,34 +1,38 @@
+@file:androidx.media3.common.util.UnstableApi
+
 package at.bernhardberger.tvhplayer.di
 
-import at.bernhardberger.tvhplayer.BuildConfig
-import coil3.ImageLoader
-import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
-import at.bernhardberger.tvheadend.client.DvrRuntime
-import at.bernhardberger.tvheadend.client.HtspClientIdentity
-import at.bernhardberger.tvheadend.client.TvheadendClient
-import at.bernhardberger.tvheadend.playback.PlaybackPreferencesProvider
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
-import at.bernhardberger.tvheadend.playback.createMedia3PlaybackRuntime
+import androidx.media3.exoplayer.ExoPlayer
+import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
+import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
+import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
+import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
+import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.data.DvrRuntime
+import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
-import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.settings.PlayerSettingsPlaybackPreferencesProvider
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
-import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
+import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
+import at.bernhardberger.tvhplayer.settings.ServerProfileMigration
 import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
+import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.stores.SimpleTvSession
-import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
+import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -37,76 +41,84 @@ import org.koin.dsl.onClose
 
 val appModule = module {
     single<CoroutineDispatcher>(qualifier = named("io")) { Dispatchers.IO }
+    single { TvheadendServerProfileStore(androidContext()) }
+    single { ServerSettingsStore(androidContext(), get()) }
+    single { LegacyCredentialSource(androidContext()) }
+    single { ServerProfileMigration(get(), get(), get()) }
+    single { PlayerSettingsStore(androidContext()) }
+    single { ChannelTagSettingsStore(androidContext()) }
+    single { UiSettingsStore(androidContext()) }
+    single { SimpleTvSettingsStore(androidContext()) }
 
     single {
-        HtspClientIdentity(
-            clientName = "TVHeadend Player / ${BuildConfig.VERSION_NAME}",
-            clientVersion = BuildConfig.VERSION_NAME,
+        val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val session = createTvheadendSession()
+        val player = ExoPlayer.Builder(androidContext())
+            .setRenderersFactory(createTvheadendRenderersFactory(androidContext()))
+            .build()
+        val dataRuntime = TvheadendDataRuntime(session, applicationScope)
+        lateinit var playbackRuntime: AppPlaybackRuntime
+        val coordinator = createTvheadendPlaybackCoordinator(
+            session = session,
+            player = player,
+            onRecoveryRequired = { reason -> playbackRuntime.onRecoveryRequired(reason) },
         )
-    }
-    single {
-        val client = TvheadendClient(
-            ioDispatcher = get(named("io")),
-            clientIdentity = get(),
+        playbackRuntime = AppPlaybackRuntime(
+            player = player,
+            coordinator = coordinator,
+            settings = get(),
+            recordingProgressCapability = dataRuntime.progressCapability,
+            scope = applicationScope,
         )
-        val playbackRuntime = createMedia3PlaybackRuntime(
-            context = androidContext(),
-            client = client,
-            preferencesProvider = get(),
+        SdkRuntimeOwner.create(
+            session = session,
+            dataRuntime = dataRuntime,
+            playbackRuntime = playbackRuntime,
+            coordinator = coordinator,
+            player = player,
+            applicationScope = applicationScope,
         )
-        SdkRuntimeOwner(client, playbackRuntime)
     } onClose { owner -> owner?.requestClose() }
-    single<TvheadendClient> { get<SdkRuntimeOwner>().client }
-    single<AppPlaybackRuntime> { get<SdkRuntimeOwner>().playbackRuntime }
-    single<PlaybackRuntime> { get<SdkRuntimeOwner>().legacyPlaybackRuntime }
-    single<ChannelEpgRuntime> { get<TvheadendClient>() }
-    single<DvrRuntime> { get<TvheadendClient>() }
 
-    single { ServerSettingsStore(context = get()) }
-    single { SecurePasswordStore(context = get()) }
-    single { PlayerSettingsStore(context = get()) }
-    single<PlaybackPreferencesProvider> {
-        PlayerSettingsPlaybackPreferencesProvider(settingsStore = get())
-    }
-    single { ChannelTagSettingsStore(context = get()) }
-    single { UiSettingsStore(context = get()) }
-    single { SimpleTvSettingsStore(context = get()) }
+    single { get<SdkRuntimeOwner>().session }
+    single { get<SdkRuntimeOwner>().dataRuntime }
+    single<ChannelEpgRuntime> { get<TvheadendDataRuntime>() }
+    single<DvrRuntime> { get<TvheadendDataRuntime>() }
+    single { get<SdkRuntimeOwner>().playbackRuntime }
 
     single { ChannelSelectionStore() }
-    single { LastPlayedChannelStore(context = get()) }
+    single { LastPlayedChannelStore(androidContext()) }
     single { GuidePositionStore() }
     single { SimpleTvSession() }
 
-    single<ImageLoader> {
-        buildImageLoader(
-            context = androidContext(),
-            client = get(),
-        )
-    }
+    single<ImageLoader> { buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session) }
 
     viewModel {
         AppConnectionViewModel(
-            client = get(),
-            settings = get(),
-            passwords = get(),
+            runtime = get(),
+            profileStore = get(),
+            profileMigration = get(),
+            serverSettings = get(),
+            playerSettings = get(),
         )
     }
     viewModel {
         MainStartupViewModel(
             serverSettingsStore = get(),
+            serverProfileMigration = get(),
             uiSettingsStore = get(),
             simpleTvSettingsStore = get(),
             simpleTvSession = get(),
             savedStateHandle = get(),
         )
     }
-    viewModel { VideoPlayerViewModel(playbackRuntime = get(), channelRuntime = get(), client = get()) }
+    viewModel { VideoPlayerViewModel(playbackRuntime = get(), channelRuntime = get(), runtime = get()) }
     viewModel { ChannelsViewModel(runtime = get(), tagSettings = get()) }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),
             playbackRuntime = get(),
-            client = get(),
+            session = get(),
         )
     }
 }

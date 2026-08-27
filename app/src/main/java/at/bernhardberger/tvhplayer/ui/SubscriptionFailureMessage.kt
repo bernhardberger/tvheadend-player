@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui
 
 import androidx.annotation.StringRes
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvheadend.core.SubscriptionFailureKind
+import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 
 @StringRes
 internal fun subscriptionFailureMessageResource(kind: SubscriptionFailureKind): Int = when (kind) {

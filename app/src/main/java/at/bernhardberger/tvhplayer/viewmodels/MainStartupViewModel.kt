@@ -8,6 +8,7 @@ import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.core.StartupBootstrapCoordinator
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
+import at.bernhardberger.tvhplayer.settings.ServerProfileMigration
 import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.SimpleTvSession
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
 
 class MainStartupViewModel(
     serverSettingsStore: ServerSettingsStore,
+    private val serverProfileMigration: ServerProfileMigration,
     uiSettingsStore: UiSettingsStore,
     simpleTvSettingsStore: SimpleTvSettingsStore,
     simpleTvSession: SimpleTvSession,
@@ -48,6 +50,7 @@ class MainStartupViewModel(
 
     init {
         viewModelScope.launch {
+            serverProfileMigration.await()
             bootstrapCoordinator.bootstrap()
             // Ready keeps the immutable startup decision; this observation only
             // refreshes the configured/onboarding branch after bootstrap.

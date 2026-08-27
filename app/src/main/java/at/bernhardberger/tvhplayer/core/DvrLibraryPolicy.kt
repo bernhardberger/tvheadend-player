@@ -1,10 +1,10 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.DvrConfig
-import at.bernhardberger.tvheadend.core.DvrEntry
-import at.bernhardberger.tvheadend.core.DvrState
-import at.bernhardberger.tvheadend.core.RecordingPlaybackAvailability
-import at.bernhardberger.tvheadend.core.recordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.data.DvrConfig
+import at.bernhardberger.tvhplayer.data.DvrEntry
+import at.bernhardberger.tvhplayer.data.DvrState
+import at.bernhardberger.tvhplayer.data.RecordingPlaybackAvailability
+import at.bernhardberger.tvhplayer.data.recordingPlaybackAvailability
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId

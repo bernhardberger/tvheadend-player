@@ -19,7 +19,7 @@ backs out to those screens.
 
 - Android API 28 minimum / API 36 target
 - Kotlin 2.3.10, Jetpack Compose, and AndroidX TV Material 1.1.0 for focusable UI
-- AndroidX Media3 / ExoPlayer 1.10.1
+- AndroidX Media3 / ExoPlayer 1.11.0 through the released SDK boundary
 - TVHeadend HTSP through the existing custom extractor
 - Preferences DataStore for non-secret last-channel state
 - Android Keystore/AES-GCM for the TVHeadend password, with backup and device

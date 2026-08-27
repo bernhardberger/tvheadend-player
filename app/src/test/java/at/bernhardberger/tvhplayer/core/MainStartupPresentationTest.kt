@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.Channel
-import at.bernhardberger.tvheadend.core.ConnectionFailureKind
-import at.bernhardberger.tvheadend.core.SubscriptionFailureKind
+import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

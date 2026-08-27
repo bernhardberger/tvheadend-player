@@ -2,11 +2,12 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvheadend.client.ConnectionState
-import at.bernhardberger.tvheadend.client.TvheadendClient
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.StreamProfileSelectionOption
 import at.bernhardberger.tvhplayer.core.selectedStreamProfileUuid
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,8 +37,8 @@ data class SettingsPlayerUiState(
 
 class SettingsPlayerViewModel(
     private val settingsStore: PlayerSettingsStore,
-    private val playbackRuntime: PlaybackRuntime,
-    private val client: TvheadendClient,
+    private val playbackRuntime: AppPlaybackRuntime,
+    private val session: TvheadendSession,
 ) : ViewModel() {
 
 
@@ -60,17 +61,17 @@ class SettingsPlayerViewModel(
         }
 
         viewModelScope.launch {
-            client.connectionState.collect { st ->
-                _ui.update { it.copy(connected = st is ConnectionState.Connected) }
+            session.state.collect { st ->
+                _ui.update { it.copy(connected = st is SessionState.Ready) }
             }
         }
 
         viewModelScope.launch {
-            client.connectionState
-                .map { st -> (st as? ConnectionState.Connected)?.let { it.host to it.port } }
+            session.state
+                .map { st -> st is SessionState.Ready }
                 .distinctUntilChanged()
-                .collectLatest { key ->
-                    if (key == null) {
+                .collectLatest { connected ->
+                    if (!connected) {
                         _ui.update { it.copy(profiles = ProfilesUiState.Idle) }
                         return@collectLatest
                     }
@@ -78,7 +79,10 @@ class SettingsPlayerViewModel(
                     _ui.update { it.copy(profiles = ProfilesUiState.Loading) }
 
                     val result = try {
-                        Result.success(client.discoverProfiles())
+                        when (val profiles = session.getStreamProfiles()) {
+                            is StreamProfilesResult.Available -> Result.success(profiles.profiles)
+                            else -> Result.failure(IllegalStateException(profiles::class.simpleName))
+                        }
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (error: Exception) {
@@ -88,10 +92,11 @@ class SettingsPlayerViewModel(
                         onSuccess = { items ->
                             val discoveredProfiles = items.map { profile ->
                                 StreamProfileSelectionOption(
-                                    id = profile.id,
+                                    id = profile.id.value,
                                     name = profile.name,
                                 )
                             }
+                            settingsStore.migrateLegacyProfileSelection(discoveredProfiles)
                             val savedSelection = settingsStore.playerSettings.first()
                             _ui.update { current ->
                                 current.copy(

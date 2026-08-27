@@ -116,9 +116,9 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
-import at.bernhardberger.tvheadend.client.ConnectionState
-import at.bernhardberger.tvheadend.client.DvrRuntime
-import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.data.DvrRuntime
+import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -149,6 +149,11 @@ private fun AppLivePlaybackIssue.messageResource(): Int = when (this) {
     AppLivePlaybackIssue.BAD_SIGNAL -> R.string.tvh_bad_signal
     AppLivePlaybackIssue.SCRAMBLED -> R.string.tvh_scrambled
     AppLivePlaybackIssue.OVERRIDDEN -> R.string.tvh_subscription_overridden
+    AppLivePlaybackIssue.ACCESS_DENIED,
+    AppLivePlaybackIssue.CONNECTION_LIMIT,
+    AppLivePlaybackIssue.NO_DISK_SPACE,
+    AppLivePlaybackIssue.UNKNOWN -> R.string.player_playback_failed
+    AppLivePlaybackIssue.WEAK_STREAM -> R.string.tvh_bad_signal
     AppLivePlaybackIssue.NO_INPUT -> R.string.tvh_no_input
 }
 
@@ -433,7 +438,7 @@ fun VideoPlayerScreen(
                             } else {
                                 null
                             }
-                            AppTimeshiftSeekResult.Unavailable -> timeshiftUnavailableText
+                            is AppTimeshiftSeekResult.Unavailable -> timeshiftUnavailableText
                         }
                         timeshiftSeekFeedbackJob?.cancel()
                         timeshiftSeekFeedbackJob = scope.launch {
@@ -449,7 +454,9 @@ fun VideoPlayerScreen(
                 if (timeshiftSeekQueue.dispatchInFlight) {
                     timeshiftSeekQueue = completeTimeshiftSeekDispatch(
                         timeshiftSeekQueue,
-                        decision = AppTimeshiftSeekResult.Unavailable,
+                        decision = AppTimeshiftSeekResult.Unavailable(
+                            AppPlaybackCommandResult.UNAVAILABLE,
+                        ),
                     )
                 }
                 timeshiftSeekJob = null

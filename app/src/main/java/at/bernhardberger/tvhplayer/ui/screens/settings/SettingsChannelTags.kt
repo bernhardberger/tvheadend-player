@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
-import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow

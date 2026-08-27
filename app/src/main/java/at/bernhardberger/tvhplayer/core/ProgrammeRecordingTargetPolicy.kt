@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 
 data class ProgrammeRecordingTarget(
     val eventId: Int,

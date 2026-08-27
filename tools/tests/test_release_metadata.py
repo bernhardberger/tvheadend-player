@@ -186,7 +186,9 @@ class ReleaseMetadataTest(unittest.TestCase):
         release = (ROOT / "tools/release").read_text(encoding="utf-8")
         metadata = (ROOT / "tools/release_metadata.py").read_text(encoding="utf-8")
 
-        self.assertIn('git -C "$SDK_ROOT" archive', prepare)
+        self.assertNotIn('git -C "$SDK_ROOT" archive', prepare)
+        self.assertIn(":app:syncReleasedSdkEvidence", prepare)
+        self.assertIn("sdk-media3-${SDK_VERSION}-ffmpeg-sources.tar.xz", prepare)
         self.assertIn("--sdk-source-commit", prepare)
         self.assertIn("--sdk-source-tar-gz", prepare)
         self.assertIn('["artifacts"]["sdkSourceTarGz"]', sign)

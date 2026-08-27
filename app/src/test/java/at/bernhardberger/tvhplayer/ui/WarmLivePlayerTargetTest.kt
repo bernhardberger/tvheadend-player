@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvhplayer.data.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

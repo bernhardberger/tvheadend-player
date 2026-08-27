@@ -6,8 +6,8 @@ import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.TagScopeFallback
 import at.bernhardberger.tvhplayer.core.resolveChannelScope
-import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

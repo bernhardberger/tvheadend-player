@@ -61,11 +61,11 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.channelNowStatus
-import at.bernhardberger.tvheadend.core.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
-import at.bernhardberger.tvheadend.client.DvrRuntime
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.DvrRuntime
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore

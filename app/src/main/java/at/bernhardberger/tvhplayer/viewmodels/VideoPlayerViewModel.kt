@@ -2,17 +2,17 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
-import at.bernhardberger.tvheadend.client.TvheadendClient
+import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
+import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import kotlinx.coroutines.launch
 
 class VideoPlayerViewModel(
     private val playbackRuntime: AppPlaybackRuntime,
     private val channelRuntime: ChannelEpgRuntime,
-    client: TvheadendClient,
+    runtime: TvheadendDataRuntime,
 ) : ViewModel() {
-    val connectionState = client.connectionState
+    val connectionState = runtime.connectionState
     val playbackState = playbackRuntime.state
     val activeChannelId = playbackRuntime.activeLiveServiceId
     val playingLiveChannelId = playbackRuntime.playingLiveServiceId

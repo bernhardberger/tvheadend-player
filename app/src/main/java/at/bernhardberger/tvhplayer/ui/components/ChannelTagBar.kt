@@ -38,7 +38,7 @@ import androidx.tv.material3.TabDefaults
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvheadend.core.ChannelTag
+import at.bernhardberger.tvhplayer.data.ChannelTag
 import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing16

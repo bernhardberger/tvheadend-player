@@ -84,10 +84,10 @@ Generic fixes can still be extracted into narrow predecessor-compatible commits.
 No signed binary may be published until all of these gates pass:
 
 1. `./tools/verify` passes from a clean checkout.
-2. `./tools/check-native-libs --release` has complete corresponding-source,
-   revision, toolchain, license, notice, and patent evidence for every native
-   AAR. The current pinned MP1/MP2/MP3-only FFmpeg extension passes this gate;
-   its generated native source archive must accompany every APK.
+2. `./tools/check-native-libs --release` matches the byte-pinned public SDK AAR,
+   released source classifiers, required legal/source entries, shipped ABI
+   matrix, applicable 16 KiB ELF alignment, and APK native bytes. The published
+   Media3/FFmpeg corresponding-source classifier must accompany every APK.
 3. Stable signing is configured outside Git and reviewed separately.
 4. Progressive and interlaced playback, D-pad focus, launcher artwork, HOME,
    GUIDE, wake, reboot, and rollback behavior pass on the designated test TV.

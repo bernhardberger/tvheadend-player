@@ -34,8 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.core.programmeDetailsBody
-import at.bernhardberger.tvheadend.core.DvrEntry
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.DvrEntry
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import kotlinx.coroutines.launch
 

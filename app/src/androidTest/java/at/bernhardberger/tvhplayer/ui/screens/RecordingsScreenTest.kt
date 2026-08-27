@@ -21,8 +21,8 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
-import at.bernhardberger.tvheadend.client.RecordingProgressCapability
-import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
+import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
+import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.testing.DvrTestMessage as HtspMessage
 import at.bernhardberger.tvhplayer.testing.TestDvrRuntime as DvrRepository
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme

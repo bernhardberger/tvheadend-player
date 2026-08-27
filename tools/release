@@ -16,7 +16,6 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent.parent
-SDK_ROOT = ROOT.parent / "tvheadend-player-sdk"
 LOCAL_CONFIG = ROOT / ".tvhplayer-release.json"
 APPLICATION_ID = "at.bernhardberger.tvhplayer"
 CONFIG_FIELDS = {
@@ -268,8 +267,6 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
 
 def _prepare(args: argparse.Namespace) -> None:
     source_commit = ensure_release_ready()
-    if not args.reuse_native_source:
-        _run([str(SDK_ROOT / "tools/build-media3-ffmpeg")])
     _run([str(ROOT / "tools/prepare-release")])
     bundle, _ = _unsigned_bundle(None, source_commit)
     print(f"unsignedBundle={bundle}")
@@ -335,7 +332,6 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="action", required=True)
 
     prepare = subparsers.add_parser("prepare", help="Build and verify an unsigned release bundle")
-    prepare.add_argument("--reuse-native-source", action="store_true")
     prepare.set_defaults(handler=_prepare)
 
     sign = subparsers.add_parser("sign", help="Transfer, sign, retrieve, and verify a bundle")

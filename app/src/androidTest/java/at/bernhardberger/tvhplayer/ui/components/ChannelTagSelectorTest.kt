@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.core.ChannelTag
+import at.bernhardberger.tvhplayer.data.ChannelTag
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule

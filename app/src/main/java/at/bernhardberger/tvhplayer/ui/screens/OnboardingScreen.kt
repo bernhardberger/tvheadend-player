@@ -32,13 +32,13 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.SecurePasswordStore
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import org.koin.compose.koinInject
 
 enum class OnboardingStep {
@@ -49,7 +49,6 @@ enum class OnboardingStep {
 @Composable
 fun OnboardingScreen(
     settingsStore: ServerSettingsStore = koinInject(),
-    passwordStore: SecurePasswordStore = koinInject(),
 ) {
     val activity = LocalActivity.current
     DisposableEffect(activity) {
@@ -71,7 +70,6 @@ fun OnboardingScreen(
             )
             OnboardingStep.CONNECTION -> OnboardingConnection(
                 settingsStore = settingsStore,
-                passwordStore = passwordStore,
                 onBack = { step = OnboardingStep.INTRODUCTION },
             )
         }
@@ -114,7 +112,6 @@ fun OnboardingIntroduction(onContinue: () -> Unit) {
 @Composable
 private fun OnboardingConnection(
     settingsStore: ServerSettingsStore,
-    passwordStore: SecurePasswordStore,
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -127,7 +124,9 @@ private fun OnboardingConnection(
     var saveFailed by remember { mutableStateOf(false) }
 
     val parsedPort = port.toIntOrNull()?.takeIf { it in 1..65535 }
-    val valid = host.isNotBlank() && parsedPort != null
+    val credentialsComplete = (username.isBlank() && password.isBlank()) ||
+        (username.isNotBlank() && password.isNotBlank())
+    val valid = host.isNotBlank() && parsedPort != null && credentialsComplete
 
     LaunchedEffect(Unit) { hostFocus.requestFocus() }
 
@@ -205,15 +204,26 @@ private fun OnboardingConnection(
                     val endpointPort = parsedPort ?: return@Button
                     scope.launch {
                         try {
-                            passwordStore.setPassword(password)
-                            settingsStore.saveServer(
-                                host = host.trim(),
-                                htspPort = endpointPort,
-                                username = username.trim(),
-                                autoConnect = true,
-                            )
+                            if (username.isBlank()) {
+                                settingsStore.saveServer(
+                                    host = host.trim(),
+                                    htspPort = endpointPort,
+                                    username = "",
+                                    autoConnect = true,
+                                )
+                            } else {
+                                settingsStore.savePasswordServer(
+                                    host = host.trim(),
+                                    htspPort = endpointPort,
+                                    username = username,
+                                    password = password,
+                                    autoConnect = true,
+                                )
+                            }
                             password = ""
                             saveFailed = false
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
                         } catch (_: Exception) {
                             saveFailed = true
                         }

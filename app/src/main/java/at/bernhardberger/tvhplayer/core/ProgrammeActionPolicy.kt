@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.DvrEntry
-import at.bernhardberger.tvheadend.core.DvrState
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.DvrEntry
+import at.bernhardberger.tvhplayer.data.DvrState
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import kotlin.math.abs
 
 enum class ProgrammeAction {

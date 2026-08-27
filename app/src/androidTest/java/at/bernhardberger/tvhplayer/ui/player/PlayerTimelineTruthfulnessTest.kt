@@ -49,7 +49,7 @@ import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
 import at.bernhardberger.tvhplayer.core.SeekbarRange
-import at.bernhardberger.tvheadend.core.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.playerBackAction

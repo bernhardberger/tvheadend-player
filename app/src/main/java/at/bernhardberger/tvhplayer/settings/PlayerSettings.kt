@@ -7,10 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import at.bernhardberger.tvheadend.playback.PlaybackPreferences
-import at.bernhardberger.tvheadend.playback.PlaybackPreferencesProvider
+import at.bernhardberger.tvhplayer.core.StreamProfileSelectionOption
+import at.bernhardberger.tvhplayer.core.exactLegacyProfileUuid
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
@@ -63,6 +62,22 @@ class PlayerSettingsStore(private val context: Context) {
         context.dataStore.edit { p ->
             p.writeProfileSelection(profileUuid, legacyProfileName)
         }
+    }
+
+    suspend fun migrateLegacyProfileSelection(
+        discoveredProfiles: List<StreamProfileSelectionOption>,
+    ): String? {
+        var migratedUuid: String? = null
+        context.dataStore.edit { preferences ->
+            if (preferences[Keys.PROFILE_UUID].isNullOrEmpty()) {
+                migratedUuid = exactLegacyProfileUuid(
+                    preferences[Keys.LEGACY_PROFILE_NAME],
+                    discoveredProfiles,
+                )
+                migratedUuid?.let { preferences[Keys.PROFILE_UUID] = it }
+            }
+        }
+        return migratedUuid
     }
 
     suspend fun setAspectRatio(aspectRatio: AspectRatioMode) {
@@ -119,23 +134,4 @@ internal fun MutablePreferences.writeProfileSelection(
     legacyProfileName: String?,
 ) {
     PlayerSettingsStore.writeProfileSelection(this, profileUuid, legacyProfileName)
-}
-
-class PlayerSettingsPlaybackPreferencesProvider internal constructor(
-    private val loadSettings: suspend () -> PlayerSettings,
-) : PlaybackPreferencesProvider {
-    constructor(settingsStore: PlayerSettingsStore) : this(
-        loadSettings = { settingsStore.playerSettings.first() },
-    )
-
-    override suspend fun currentPreferences(): PlaybackPreferences {
-        val settings = loadSettings()
-        return PlaybackPreferences(
-            profile = settings.legacyProfileName.orEmpty(),
-            audioLanguage = settings.audioLanguage,
-            subtitleLanguage = settings.subtitleLanguage,
-            timeshiftEnabled = settings.timeshiftEnabled,
-            refreshRateMatchingEnabled = settings.refreshRateMatchingEnabled,
-        )
-    }
 }

@@ -1,15 +1,15 @@
 package at.bernhardberger.tvhplayer.testing
 
-import at.bernhardberger.tvheadend.client.DvrRuntime
-import at.bernhardberger.tvheadend.client.RecordingProgressCapability
-import at.bernhardberger.tvheadend.client.RecordingProgressUpdateResult
-import at.bernhardberger.tvheadend.core.DvrActionFailure
-import at.bernhardberger.tvheadend.core.DvrActionResult
-import at.bernhardberger.tvheadend.core.DvrConfig
-import at.bernhardberger.tvheadend.core.DvrEntry
-import at.bernhardberger.tvheadend.core.DvrFile
-import at.bernhardberger.tvheadend.core.DvrState
-import at.bernhardberger.tvheadend.core.RecordingWriteCapability
+import at.bernhardberger.tvhplayer.data.DvrActionFailure
+import at.bernhardberger.tvhplayer.data.DvrActionResult
+import at.bernhardberger.tvhplayer.data.DvrConfig
+import at.bernhardberger.tvhplayer.data.DvrEntry
+import at.bernhardberger.tvhplayer.data.DvrFile
+import at.bernhardberger.tvhplayer.data.DvrRuntime
+import at.bernhardberger.tvhplayer.data.DvrState
+import at.bernhardberger.tvhplayer.data.DvrTimeRecordingRule
+import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
+import at.bernhardberger.tvhplayer.data.RecordingProgressUpdateResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -18,24 +18,18 @@ class TestDvrRuntime : DvrRuntime {
     private val mutableEntries = MutableStateFlow<List<DvrEntry>>(emptyList())
     private val mutableEntriesReady = MutableStateFlow(false)
     private val mutableConfigs = MutableStateFlow<List<DvrConfig>>(emptyList())
-    private val mutableWriteCapability = MutableStateFlow(RecordingWriteCapability.Unknown)
     private val mutableCanModifyRecordings = MutableStateFlow(false)
 
     override val entries: StateFlow<List<DvrEntry>> = mutableEntries
     override val entriesReady: StateFlow<Boolean> = mutableEntriesReady
     override val configs: StateFlow<List<DvrConfig>> = mutableConfigs
-    override val writeCapability: StateFlow<RecordingWriteCapability> = mutableWriteCapability
     override val canModifyRecordings: StateFlow<Boolean> = mutableCanModifyRecordings
     override val progressCapability = MutableStateFlow(RecordingProgressCapability.Disconnected)
+    override val timeRecordingRules = MutableStateFlow<List<DvrTimeRecordingRule>>(emptyList())
+    override val timeRecordingRulesReady = MutableStateFlow(false)
 
     fun applyAuthenticatedDvrAccess(dvrAccess: Boolean?) {
-        val capability = when (dvrAccess) {
-            true -> RecordingWriteCapability.Allowed
-            false -> RecordingWriteCapability.Denied
-            null -> return
-        }
-        mutableWriteCapability.value = capability
-        mutableCanModifyRecordings.value = capability == RecordingWriteCapability.Allowed
+        mutableCanModifyRecordings.value = dvrAccess ?: return
     }
 
     suspend fun acceptDvrMessage(message: DvrTestMessage) {
@@ -68,6 +62,9 @@ class TestDvrRuntime : DvrRuntime {
     ): DvrActionResult = DvrActionResult.Failed(DvrActionFailure.REJECTED)
 
     override suspend fun cancelEntry(entryId: Int): DvrActionResult =
+        DvrActionResult.Failed(DvrActionFailure.REJECTED)
+
+    override suspend fun stopEntry(entryId: Int): DvrActionResult =
         DvrActionResult.Failed(DvrActionFailure.REJECTED)
 
     override suspend fun deleteEntry(entryId: Int): DvrActionResult =

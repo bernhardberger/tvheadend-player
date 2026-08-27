@@ -24,7 +24,7 @@ import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
-import at.bernhardberger.tvheadend.core.Channel
+import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode

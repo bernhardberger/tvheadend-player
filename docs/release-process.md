@@ -27,8 +27,9 @@ immediate rollback clients.
 ## Host boundary
 
 - LXC 106 builds and verifies an unsigned, zip-aligned APK from a clean commit.
-  It also packages application source, native corresponding source, checksums,
-  and a JSON manifest. It has no release key and Gradle has no signing setup.
+  It also packages application source, released SDK source classifiers, native
+  corresponding source, checksums, and a JSON manifest. It has no release key
+  and Gradle has no signing setup.
 - LXC 117 holds the stable product key. It verifies every incoming byte before
   prompting for passwords, signs the already aligned APK, and rejects any
   certificate other than the pinned product certificate.
@@ -67,27 +68,21 @@ commands are:
 ./tools/release verify-signed build/release/signed/0.1.4
 ```
 
-`prepare` rebuilds the pinned native dependency and creates the unsigned bundle.
+`prepare` resolves the byte-pinned SDK 0.2.0 artifacts and source classifiers
+from the public repositories, verifies them, and creates the unsigned bundle.
 `sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source
 commit, and signs non-interactively using owner-only password files configured
 in the LXC 117 SSH environment. It retrieves the signed
 bundle and independently verifies checksums, source continuity, APK identity,
 alignment, and the pinned certificate. It never installs to a TV or publishes a
-release. Use `prepare --reuse-native-source` only when the existing ignored
-native-source archive was produced and reviewed in the current workspace.
+release. It never reads or builds a sibling SDK checkout.
 
 The lower-level commands below remain available for diagnosis and manual use.
 
-Install the exact Android and native toolchains listed by the external SDK's
-`sdk/decoder-ffmpeg-binary/README.md`, then build the decoder and its
-corresponding source from the sibling SDK checkout:
-
-```bash
-(cd ../tvheadend-player-sdk && ./tools/build-media3-ffmpeg)
-```
-
-Commit the intended release source and confirm the worktree is clean, then run:
+Commit the intended release source, confirm the worktree is clean, and ensure
+the pinned public dependencies are available through Google Maven and Maven
+Central. Then run:
 
 ```bash
 ./tools/prepare-release
@@ -99,7 +94,8 @@ creates `build/release/unsigned/<version>/` containing:
 
 - the unsigned APK;
 - `.tar.gz` and `.zip` application corresponding-source archives;
-- exact Media3/FFmpeg corresponding source and build patch;
+- exact released SDK source classifiers and the SDK-published Media3/FFmpeg
+  corresponding-source classifier;
 - `release-manifest.json` with identity, version, source commit, and hashes;
 - `SHA256SUMS` covering the complete unsigned bundle.
 
@@ -127,7 +123,8 @@ The signed output contains:
 
 - the signed APK;
 - both application corresponding-source formats;
-- exact Media3/FFmpeg corresponding source and build patch;
+- exact released SDK source classifiers and the SDK-published Media3/FFmpeg
+  corresponding-source classifier;
 - the original unsigned manifest;
 - a signed `release-manifest.json` with source commit and certificate identity;
 - `SHA256SUMS` and the complete `apksigner` verification report.
@@ -147,7 +144,8 @@ through the approved debug staging flow or enter them normally in the release
 app.
 
 Validate initial install and then an update signed by the same key with a higher
-`versionCode`. Repeat progressive and interlaced playback, MP1/MP2 fallback,
+`versionCode`. Repeat progressive and interlaced playback, representative
+AC-3/E-AC-3/MP3 platform-first fallback,
 D-pad and physical key behavior, HOME/GUIDE, standby/wake, reboot, and Back/Stop
 checks. Record only package, version, source commit, APK checksum, and signing
 fingerprint. Do not record addresses, credentials, or unrestricted logs.
@@ -195,9 +193,9 @@ work remains behind `tools/device`. Do not remove Headent, the diagnostic client
 Google Basic TV, or their data during validation.
 
 For an already accepted product release, prepare a forward-versioned rollback
-APK from the last-known-good source commit, rebuild the pinned native artifact,
-sign with the same stable product key, run the complete release and G10 matrix,
-then install it as a normal update.
+APK from the last-known-good source commit, resolve and verify the byte-pinned
+public SDK artifacts and corresponding source, sign with the same stable product
+key, run the complete release and G10 matrix, then install it as a normal update.
 
 Do not mutate the bedroom G08 until the exact signed candidate has passed G10
 acceptance and the owner explicitly approves production deployment. Keep the

@@ -17,12 +17,6 @@ import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 
-data class HtspPiconData(
-    val serverTag: String,
-    val path: String,
-    val ttlMs: Long
-)
-
 @Composable
 fun PiconBox(
     imageLoader: ImageLoader,

@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.DvrEntry
-import at.bernhardberger.tvheadend.core.DvrState
+import at.bernhardberger.tvhplayer.data.DvrEntry
+import at.bernhardberger.tvhplayer.data.DvrState
 
 data class ChannelNowStatus(
     val playingNow: Boolean,

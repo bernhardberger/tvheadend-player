@@ -1,33 +1,44 @@
-@file:OptIn(
-    at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class,
-    at.bernhardberger.tvheadend.playback.ExperimentalRecordingCoordinationApi::class,
-    kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi::class,
-)
+@file:androidx.media3.common.util.UnstableApi
 
 package at.bernhardberger.tvhplayer.playback
 
+import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import at.bernhardberger.tvheadend.core.DvrEntry
-import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
-import at.bernhardberger.tvheadend.core.SubscriptionFailureKind
-import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
-import at.bernhardberger.tvheadend.core.TimeshiftState
-import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSnapshot
-import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSource
-import at.bernhardberger.tvheadend.playback.PlaybackFailureReason
-import at.bernhardberger.tvheadend.playback.PlaybackFormatDiagnostics
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
-import at.bernhardberger.tvheadend.playback.PlaybackSessionState
-import at.bernhardberger.tvheadend.playback.PlaybackSystemDiagnostics
-import at.bernhardberger.tvheadend.playback.PlaybackThermalLevel
-import at.bernhardberger.tvheadend.playback.RecordingProgressSyncState
-import kotlinx.coroutines.flow.FlowCollector
+import androidx.media3.exoplayer.ExoPlayer
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
+import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvhplayer.data.DvrEntry
+import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
+import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
+import at.bernhardberger.tvhplayer.settings.PlayerSettings
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 sealed interface AppPlaybackState {
     data object Idle : AppPlaybackState
@@ -38,21 +49,40 @@ sealed interface AppPlaybackState {
     data class Failed(val reason: AppPlaybackFailureReason) : AppPlaybackState
 }
 
-enum class AppPlaybackFailureReason {
-    RECORDING_READ_FAILED,
-    OTHER,
-}
-
+enum class AppPlaybackFailureReason { RECORDING_READ_FAILED, OTHER }
 sealed interface AppPlaybackTarget {
     data class Live(val serviceId: Int) : AppPlaybackTarget
     data class Recording(val recordingId: Int) : AppPlaybackTarget
 }
-
 enum class AppPlaybackCommandResult {
     SUBMITTED,
+    STOPPED,
+    ALREADY_STOPPED,
+    NOT_RUNNING,
+    SHUT_DOWN,
+    NOT_READY,
+    RECORDING_PROGRESS_UNSUPPORTED,
+    TARGET_UNAVAILABLE,
+    GROWING_RECORDING_RESUME_UNSUPPORTED,
+    GROWING_RECORDING_DEFERRED,
+    PLAYER_UNAVAILABLE,
+    REJECTED,
     UNAVAILABLE,
+    ALREADY_PENDING,
+    NOT_ACKNOWLEDGED,
+    ACKNOWLEDGEMENT_TIMEOUT,
+    PENDING_QUEUE_OVERFLOW,
+    UNCERTAIN_REQUEST_OUTCOME,
+    UNRECOGNIZED_ACKNOWLEDGEMENT,
+    RESUMED_SEGMENT_UNANCHORABLE,
+    SUBSCRIPTION_ENDED,
+    SERVER_REJECTED,
+    ACCESS_DENIED,
+    CONNECTION_LIMIT,
+    TIMEOUT,
+    TRANSPORT_UNAVAILABLE,
+    NOT_SUPPORTED,
 }
-
 data class AppTimeshiftState(
     val available: Boolean = false,
     val paused: Boolean = false,
@@ -60,53 +90,18 @@ data class AppTimeshiftState(
     val positionMs: Long = 0L,
     val liveEdgeMs: Long = 0L,
 )
-
 sealed interface AppTimeshiftSeekResult {
-    data class Applied(
-        val targetMs: Long,
-        val deltaMs: Long,
-        val clamped: Boolean,
-    ) : AppTimeshiftSeekResult
-
-    data object Unavailable : AppTimeshiftSeekResult
+    data class Applied(val targetMs: Long, val deltaMs: Long, val clamped: Boolean) : AppTimeshiftSeekResult
+    data class Unavailable(val reason: AppPlaybackCommandResult) : AppTimeshiftSeekResult
 }
-
 enum class AppLivePlaybackIssue {
-    INVALID_TARGET,
-    NO_FREE_ADAPTER,
-    MUX_NOT_ENABLED,
-    TUNING_FAILED,
-    BAD_SIGNAL,
-    SCRAMBLED,
-    OVERRIDDEN,
-    NO_INPUT,
+    INVALID_TARGET, NO_FREE_ADAPTER, MUX_NOT_ENABLED, TUNING_FAILED, BAD_SIGNAL,
+    SCRAMBLED, OVERRIDDEN, ACCESS_DENIED, CONNECTION_LIMIT, WEAK_STREAM,
+    NO_DISK_SPACE, UNKNOWN, NO_INPUT,
 }
-
-enum class AppRecordingProgressState {
-    INACTIVE,
-    AVAILABLE,
-    SAVING,
-    DEGRADED,
-    READ_ONLY,
-    UNSUPPORTED,
-}
-
-enum class AppPlaybackSource {
-    NONE,
-    LIVE_TV,
-    RECORDING,
-}
-
-enum class AppPlaybackThermalLevel {
-    NONE,
-    LIGHT,
-    MODERATE,
-    SEVERE,
-    CRITICAL,
-    EMERGENCY,
-    SHUTDOWN,
-}
-
+enum class AppRecordingProgressState { INACTIVE, AVAILABLE, SAVING, DEGRADED, READ_ONLY, UNSUPPORTED }
+enum class AppPlaybackSource { NONE, LIVE_TV, RECORDING }
+enum class AppPlaybackThermalLevel { NONE, LIGHT, MODERATE, SEVERE, CRITICAL, EMERGENCY, SHUTDOWN }
 data class AppPlaybackFormatDiagnostics(
     val codec: String?,
     val resolution: String? = null,
@@ -115,20 +110,13 @@ data class AppPlaybackFormatDiagnostics(
     val channelCount: Int? = null,
     val sampleRateHz: Int? = null,
 )
-
-data class AppPlaybackOutputMode(
-    val width: Int,
-    val height: Int,
-    val refreshRateHz: Float,
-)
-
+data class AppPlaybackOutputMode(val width: Int, val height: Int, val refreshRateHz: Float)
 data class AppPlaybackSystemDiagnostics(
     val outputMode: AppPlaybackOutputMode? = null,
     val thermalLevel: AppPlaybackThermalLevel? = null,
     val appPssBytes: Long? = null,
     val lowMemory: Boolean? = null,
 )
-
 data class AppPlaybackDiagnostics(
     val source: AppPlaybackSource = AppPlaybackSource.NONE,
     val state: AppPlaybackState = AppPlaybackState.Idle,
@@ -147,300 +135,362 @@ data class AppPlaybackDiagnostics(
     val system: AppPlaybackSystemDiagnostics? = null,
 )
 
-/**
- * Application-owned playback surface. The predecessor runtime is a replaceable
- * target/source adapter until the released SDK cutover.
- */
-class AppPlaybackRuntime internal constructor(
-    private val backend: PlaybackRuntime,
+/** App presentation adapter over the released coordinator and app-owned player. */
+class AppPlaybackRuntime(
+    val player: ExoPlayer,
+    private val coordinator: TvheadendPlaybackCoordinator,
+    private val settings: PlayerSettingsStore,
+    private val recordingProgressCapability: StateFlow<RecordingProgressCapability>,
+    private val scope: CoroutineScope,
 ) {
-    private val lifecycleLock = Any()
+    private val commandGate = AppPlaybackCommandGate()
     private val _submittedTarget = MutableStateFlow<AppPlaybackTarget?>(null)
-    private var commandGeneration = 0L
-    private var released = false
-    private var releaseCompletion: CompletableDeferred<Unit>? = null
+    private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
+    private val _activeLive = MutableStateFlow<Int?>(null)
+    private val _playingLive = MutableStateFlow<Int?>(null)
+    private val _activeRecording = MutableStateFlow<Int?>(null)
+    private val _diagnostics = MutableStateFlow(AppPlaybackDiagnostics())
+    private var diagnosticsEnabled = false
+    private var lastRecordingRequest: Pair<DvrEntry, RecordingPlaybackIntent>? = null
+    private var recoveryJob: Job? = null
 
-    val player: Player
-        get() = backend.player
-    val submittedTarget: StateFlow<AppPlaybackTarget?> = _submittedTarget.asStateFlow()
-    val state: StateFlow<AppPlaybackState> = backend.state.mapState(::appPlaybackState)
-    val activeLiveServiceId: StateFlow<Int?> = backend.activeChannelId
-    val playingLiveServiceId: StateFlow<Int?> = backend.playingLiveChannelId
-    val activeRecordingId: StateFlow<Int?> = backend.activeRecordingId
-    val timeshiftState: StateFlow<AppTimeshiftState> =
-        backend.timeshiftState.mapState(TimeshiftState::toAppState)
-    val livePlaybackIssue: StateFlow<AppLivePlaybackIssue?> =
-        backend.liveSubscriptionFailure.mapState { it?.toAppIssue() }
-    val recordingProgressState: StateFlow<AppRecordingProgressState> =
-        backend.recordingProgressSyncState.mapState(RecordingProgressSyncState::toAppState)
-    val diagnostics: StateFlow<AppPlaybackDiagnostics> =
-        backend.diagnostics.mapState(PlaybackDiagnosticsSnapshot::toAppDiagnostics)
+    val submittedTarget = _submittedTarget.asStateFlow()
+    val state = _state.asStateFlow()
+    val activeLiveServiceId = _activeLive.asStateFlow()
+    val playingLiveServiceId = _playingLive.asStateFlow()
+    val activeRecordingId = _activeRecording.asStateFlow()
+    val timeshiftState: StateFlow<AppTimeshiftState> = coordinator.timeshiftState
+        .map { it.toApp() }
+        .stateIn(scope, SharingStarted.Eagerly, coordinator.timeshiftState.value.toApp())
+    val livePlaybackIssue: StateFlow<AppLivePlaybackIssue?> = coordinator.subscriptionIssue
+        .map { it?.toApp() }
+        .stateIn(scope, SharingStarted.Eagerly, coordinator.subscriptionIssue.value?.toApp())
+    val recordingProgressState: StateFlow<AppRecordingProgressState> = combine(
+        _activeRecording,
+        recordingProgressCapability,
+    ) { recordingId, capability ->
+        if (recordingId == null) AppRecordingProgressState.INACTIVE else capability.toPlaybackState()
+    }.stateIn(scope, SharingStarted.Eagerly, AppRecordingProgressState.INACTIVE)
+    val diagnostics = _diagnostics.asStateFlow()
 
-    suspend fun playLive(serviceId: Int): AppPlaybackCommandResult {
-        val generation = beginTargetCommand(AppPlaybackTarget.Live(serviceId))
-            ?: return AppPlaybackCommandResult.UNAVAILABLE
-        val accepted = backend.playLive(serviceId)
-        return commandResult(generation, accepted)
+    private val settingsJob = scope.launch {
+        settings.playerSettings.distinctUntilChanged().collect(::applyPlayerSettings)
+    }
+
+    private val listener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) = publishPlayerState()
+        override fun onIsPlayingChanged(isPlaying: Boolean) = publishPlayerState()
+        override fun onPlayerError(error: PlaybackException) {
+            _state.value = AppPlaybackState.Failed(
+                if (_activeRecording.value != null) AppPlaybackFailureReason.RECORDING_READ_FAILED
+                else AppPlaybackFailureReason.OTHER,
+            )
+            publishDiagnostics()
+        }
+    }
+
+    init {
+        player.addListener(listener)
+    }
+
+    suspend fun playLive(serviceId: Int): AppPlaybackCommandResult = commandGate.run {
+        playLiveLocked(serviceId, recovering = false)
+    }
+
+    private suspend fun playLiveLocked(
+        serviceId: Int,
+        recovering: Boolean,
+    ): AppPlaybackCommandResult {
+        val target = AppPlaybackTarget.Live(serviceId)
+        _submittedTarget.value = target
+        _activeLive.value = null
+        _playingLive.value = null
+        _activeRecording.value = null
+        if (!recovering) _state.value = AppPlaybackState.Starting
+        val playerSettings = settings.playerSettings.first()
+        val profile = playerSettings.profile.takeIf { it.isNotBlank() }?.let { value ->
+            runCatching { StreamProfileId(value) }.getOrNull()
+        }
+        val result = coordinator.setLiveTarget(
+            ChannelId(serviceId.toLong()),
+            LivePlaybackOptions(
+                streamProfileId = profile,
+                timeshiftPeriod = if (playerSettings.timeshiftEnabled) 2.hours else kotlin.time.Duration.ZERO,
+            ),
+        )
+        val appResult = result.toAppCommandResult()
+        return if (appResult == AppPlaybackCommandResult.SUBMITTED) {
+            _activeLive.value = serviceId
+            _playingLive.value = serviceId
+            publishDiagnostics()
+            appResult
+        } else {
+            _submittedTarget.value = null
+            _state.value = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)
+            appResult
+        }
     }
 
     suspend fun playRecording(
         entry: DvrEntry,
         intent: RecordingPlaybackIntent,
+    ): AppPlaybackCommandResult = commandGate.run {
+        playRecordingLocked(entry, intent)
+    }
+
+    private suspend fun playRecordingLocked(
+        entry: DvrEntry,
+        intent: RecordingPlaybackIntent,
     ): AppPlaybackCommandResult {
-        val generation = beginTargetCommand(AppPlaybackTarget.Recording(entry.id))
-            ?: return AppPlaybackCommandResult.UNAVAILABLE
-        backend.playRecording(entry, intent)
-        return commandResult(generation, accepted = true)
+        val target = AppPlaybackTarget.Recording(entry.id)
+        lastRecordingRequest = entry to intent
+        _submittedTarget.value = target
+        _state.value = AppPlaybackState.Starting
+        _activeLive.value = null
+        _playingLive.value = null
+        _activeRecording.value = null
+        val start = if (intent == RecordingPlaybackIntent.FromBeginning) {
+            RecordingPlaybackStart.START_OVER
+        } else {
+            RecordingPlaybackStart.RESUME
+        }
+        val result = coordinator.setRecordingTarget(DvrEntryId(entry.id.toLong()), start)
+        val appResult = result.toAppCommandResult()
+        return if (appResult == AppPlaybackCommandResult.SUBMITTED) {
+            _activeRecording.value = entry.id
+            publishDiagnostics()
+            appResult
+        } else {
+            _submittedTarget.value = null
+            _state.value = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
+            appResult
+        }
     }
 
-    suspend fun stop() {
-        val generation = beginBarrierCommand() ?: return
-        try {
-            backend.stop()
-        } finally {
-            synchronized(lifecycleLock) {
-                if (!released && commandGeneration == generation) {
-                    _submittedTarget.value = null
-                }
+    suspend fun stop(): AppPlaybackCommandResult = commandGate.run {
+        recoveryJob?.cancel()
+        recoveryJob = null
+        val result = coordinator.stop().toAppCommandResult()
+        _submittedTarget.value = null
+        _activeLive.value = null
+        _playingLive.value = null
+        _activeRecording.value = null
+        _state.value = AppPlaybackState.Idle
+        publishDiagnostics()
+        result
+    }
+
+    suspend fun retryLive(): AppPlaybackCommandResult = commandGate.run {
+        _activeLive.value?.let { playLiveLocked(it, recovering = true) }
+            ?: AppPlaybackCommandResult.UNAVAILABLE
+    }
+    suspend fun retryRecording(): AppPlaybackCommandResult = commandGate.run {
+        lastRecordingRequest?.let { (entry, intent) -> playRecordingLocked(entry, intent) }
+            ?: AppPlaybackCommandResult.UNAVAILABLE
+    }
+    suspend fun pauseTimeshift() = commandGate.run { coordinator.pauseTimeshift().toAppCommandResult() }
+    suspend fun resumeTimeshift() = commandGate.run { coordinator.resumeTimeshift().toAppCommandResult() }
+    suspend fun seekTimeshift(deltaMs: Long): AppTimeshiftSeekResult = commandGate.run {
+        val before = timeshiftState.value
+        val result = coordinator.seekTimeshift(deltaMs.milliseconds).toAppCommandResult()
+        if (result != AppPlaybackCommandResult.SUBMITTED) {
+            return@run AppTimeshiftSeekResult.Unavailable(result)
+        }
+        val target = (before.positionMs + deltaMs).coerceIn(before.bufferStartMs, before.liveEdgeMs)
+        AppTimeshiftSeekResult.Applied(target, target - before.positionMs, target != before.positionMs + deltaMs)
+    }
+    suspend fun goLive(): AppTimeshiftSeekResult = commandGate.run {
+        val before = timeshiftState.value
+        val result = coordinator.returnToLive().toAppCommandResult()
+        if (result != AppPlaybackCommandResult.SUBMITTED) {
+            return@run AppTimeshiftSeekResult.Unavailable(result)
+        }
+        AppTimeshiftSeekResult.Applied(0L, -before.positionMs, false)
+    }
+    fun play() = player.play()
+    fun pause() = player.pause()
+    fun seekTo(positionMs: Long) = player.seekTo(positionMs)
+    fun recordingPaused() = Unit
+    fun recordingSeekSettled() = Unit
+    fun setDiagnosticsEnabled(enabled: Boolean) {
+        diagnosticsEnabled = enabled
+        publishDiagnostics()
+    }
+    fun setRefreshRateMatchingEnabled(enabled: Boolean) {
+        player.setVideoChangeFrameRateStrategy(
+            if (enabled) C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
+            else C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF,
+        )
+    }
+    internal fun onRecoveryRequired(@Suppress("UNUSED_PARAMETER") reason: PlaybackRecoveryReason) {
+        val serviceId = _activeLive.value ?: return
+        _state.value = AppPlaybackState.Recovering(retryDelayMillis = 0L)
+        recoveryJob?.cancel()
+        recoveryJob = scope.launch {
+            val result = retryLive()
+            if (result != AppPlaybackCommandResult.SUBMITTED && _activeLive.value == serviceId) {
+                _state.value = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)
             }
         }
     }
 
-    suspend fun retryLive(): AppPlaybackCommandResult {
-        val generation = currentCommandGeneration()
-            ?: return AppPlaybackCommandResult.UNAVAILABLE
-        return commandResult(generation, backend.retryLive())
+    fun detach() {
+        recoveryJob?.cancel()
+        recoveryJob = null
+        settingsJob.cancel()
+        player.removeListener(listener)
     }
 
-    suspend fun retryRecording(): AppPlaybackCommandResult {
-        val generation = currentCommandGeneration()
-            ?: return AppPlaybackCommandResult.UNAVAILABLE
-        return commandResult(generation, backend.retryRecording())
+    private fun applyPlayerSettings(value: PlayerSettings) {
+        val audioLanguages: Array<String> = value.audioLanguage?.let { arrayOf(it) } ?: emptyArray()
+        val subtitleLanguages: Array<String> =
+            value.subtitleLanguage?.let { arrayOf(it) } ?: emptyArray()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setPreferredAudioLanguages(*audioLanguages)
+            .setPreferredTextLanguages(*subtitleLanguages)
+            .build()
+        setRefreshRateMatchingEnabled(value.refreshRateMatchingEnabled)
     }
 
-    suspend fun pauseTimeshift(): AppPlaybackCommandResult {
-        val generation = currentCommandGeneration()
-            ?: return AppPlaybackCommandResult.UNAVAILABLE
-        return commandResult(generation, backend.pauseTimeshift())
-    }
-
-    suspend fun resumeTimeshift(): AppPlaybackCommandResult {
-        val generation = currentCommandGeneration()
-            ?: return AppPlaybackCommandResult.UNAVAILABLE
-        return commandResult(generation, backend.resumeTimeshift())
-    }
-
-    suspend fun seekTimeshift(deltaMs: Long): AppTimeshiftSeekResult {
-        val generation = currentCommandGeneration()
-            ?: return AppTimeshiftSeekResult.Unavailable
-        val result = backend.seekTimeshift(deltaMs).toAppResult()
-        return result.takeIf { commandIsCurrent(generation) }
-            ?: AppTimeshiftSeekResult.Unavailable
-    }
-
-    suspend fun goLive(): AppTimeshiftSeekResult {
-        val generation = currentCommandGeneration()
-            ?: return AppTimeshiftSeekResult.Unavailable
-        val result = backend.goLive().toAppResult()
-        return result.takeIf { commandIsCurrent(generation) }
-            ?: AppTimeshiftSeekResult.Unavailable
-    }
-
-    fun play() = withActivePlayer(Player::play)
-
-    fun pause() = withActivePlayer(Player::pause)
-
-    fun seekTo(positionMs: Long) = withActivePlayer { it.seekTo(positionMs) }
-
-    fun recordingPaused() = withActiveRuntime(backend::recordingPaused)
-
-    fun recordingSeekSettled() = withActiveRuntime(backend::recordingSeekSettled)
-
-    fun setDiagnosticsEnabled(enabled: Boolean) = withActiveRuntime {
-        backend.setDiagnosticsEnabled(enabled)
-    }
-
-    suspend fun release() {
-        val (completion, ownsRelease) = synchronized(lifecycleLock) {
-            releaseCompletion?.let { it to false } ?: CompletableDeferred<Unit>().let {
-                releaseCompletion = it
-                released = true
-                commandGeneration++
-                _submittedTarget.value = null
-                it to true
-            }
+    private fun publishPlayerState() {
+        _state.value = when {
+            player.playerError != null -> _state.value
+            player.playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
+            player.isPlaying -> AppPlaybackState.Playing
+            player.playbackState == Player.STATE_BUFFERING -> AppPlaybackState.Starting
+            player.playbackState == Player.STATE_IDLE -> AppPlaybackState.Idle
+            else -> _state.value
         }
-        if (!ownsRelease) {
-            completion.await()
+        publishDiagnostics()
+    }
+
+    private fun publishDiagnostics() {
+        if (!diagnosticsEnabled) {
+            _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
             return
         }
-        withContext(NonCancellable) {
-            try {
-                backend.release()
-                completion.complete(Unit)
-            } catch (error: Throwable) {
-                completion.completeExceptionally(error)
-                throw error
-            }
-        }
+        val video = player.videoFormat
+        val audio = player.audioFormat
+        _diagnostics.value = AppPlaybackDiagnostics(
+            source = source(),
+            state = _state.value,
+            isPlaying = player.isPlaying,
+            positionMs = player.currentPosition.coerceAtLeast(0L),
+            durationMs = player.duration.takeIf { it != C.TIME_UNSET && it >= 0L },
+            bufferedMs = player.bufferedPosition.coerceAtLeast(0L),
+            video = video?.let {
+                AppPlaybackFormatDiagnostics(
+                    codec = it.codecs,
+                    resolution = if (it.width > 0 && it.height > 0) "${it.width}×${it.height}" else null,
+                    frameRate = it.frameRate.takeIf { rate -> rate > 0f },
+                )
+            },
+            audio = audio?.let {
+                AppPlaybackFormatDiagnostics(
+                    codec = it.codecs,
+                    language = it.language,
+                    channelCount = it.channelCount.takeIf { count -> count > 0 },
+                    sampleRateHz = it.sampleRate.takeIf { rate -> rate > 0 },
+                )
+            },
+        )
     }
 
-    private fun beginTargetCommand(target: AppPlaybackTarget): Long? =
-        synchronized(lifecycleLock) {
-            if (released) return null
-            (++commandGeneration).also { _submittedTarget.value = target }
-        }
-
-    private fun beginBarrierCommand(): Long? = synchronized(lifecycleLock) {
-        if (released) return null
-        ++commandGeneration
+    private fun source() = when {
+        _activeLive.value != null -> AppPlaybackSource.LIVE_TV
+        _activeRecording.value != null -> AppPlaybackSource.RECORDING
+        else -> AppPlaybackSource.NONE
     }
+}
 
-    private fun currentCommandGeneration(): Long? = synchronized(lifecycleLock) {
-        commandGeneration.takeUnless { released }
-    }
+internal class AppPlaybackCommandGate {
+    private val mutex = Mutex()
 
-    private fun commandIsCurrent(generation: Long): Boolean = synchronized(lifecycleLock) {
-        !released && commandGeneration == generation
-    }
-
-    private fun commandResult(
-        generation: Long,
-        accepted: Boolean,
-    ): AppPlaybackCommandResult = if (accepted && commandIsCurrent(generation)) {
-        AppPlaybackCommandResult.SUBMITTED
-    } else {
-        AppPlaybackCommandResult.UNAVAILABLE
-    }
-
-    private inline fun withActivePlayer(command: (Player) -> Unit) =
-        synchronized(lifecycleLock) {
-            if (!released) command(player)
-        }
-
-    private inline fun withActiveRuntime(command: () -> Unit) = synchronized(lifecycleLock) {
-        if (!released) command()
-    }
+    suspend fun <T> run(command: suspend () -> T): T = mutex.withLock { command() }
 }
 
 fun droppedFramePercentage(renderedFrames: Int, droppedFrames: Int): Float? {
     val total = renderedFrames.toLong() + droppedFrames.toLong()
-    return if (total <= 0) null else droppedFrames * 100f / total
+    return if (total <= 0L) null else droppedFrames * 100f / total
 }
 
-private fun TimeshiftSeekDecision?.toAppResult(): AppTimeshiftSeekResult = this?.let {
-    AppTimeshiftSeekResult.Applied(
-        targetMs = it.targetMs,
-        deltaMs = it.deltaMs,
-        clamped = it.clamped,
-    )
-} ?: AppTimeshiftSeekResult.Unavailable
-
-private fun appPlaybackState(state: PlaybackSessionState): AppPlaybackState = when (state) {
-    PlaybackSessionState.Idle -> AppPlaybackState.Idle
-    PlaybackSessionState.Starting -> AppPlaybackState.Starting
-    PlaybackSessionState.Playing -> AppPlaybackState.Playing
-    PlaybackSessionState.Finished -> AppPlaybackState.Finished
-    is PlaybackSessionState.Recovering -> AppPlaybackState.Recovering(state.retryDelayMillis)
-    is PlaybackSessionState.Failed -> AppPlaybackState.Failed(
-        reason = if (state.reason == PlaybackFailureReason.RECORDING_READ_FAILED) {
-            AppPlaybackFailureReason.RECORDING_READ_FAILED
-        } else {
-            AppPlaybackFailureReason.OTHER
-        },
-    )
-}
-
-private fun TimeshiftState.toAppState() = AppTimeshiftState(
-    available = available,
-    paused = paused,
-    bufferStartMs = bufferStartMs,
-    positionMs = positionMs,
-    liveEdgeMs = liveEdgeMs,
-)
-
-private fun SubscriptionFailureKind.toAppIssue(): AppLivePlaybackIssue = when (this) {
-    SubscriptionFailureKind.INVALID_TARGET -> AppLivePlaybackIssue.INVALID_TARGET
-    SubscriptionFailureKind.NO_FREE_ADAPTER -> AppLivePlaybackIssue.NO_FREE_ADAPTER
-    SubscriptionFailureKind.MUX_NOT_ENABLED -> AppLivePlaybackIssue.MUX_NOT_ENABLED
-    SubscriptionFailureKind.TUNING_FAILED -> AppLivePlaybackIssue.TUNING_FAILED
-    SubscriptionFailureKind.BAD_SIGNAL -> AppLivePlaybackIssue.BAD_SIGNAL
-    SubscriptionFailureKind.SCRAMBLED -> AppLivePlaybackIssue.SCRAMBLED
-    SubscriptionFailureKind.OVERRIDDEN -> AppLivePlaybackIssue.OVERRIDDEN
-    SubscriptionFailureKind.NO_INPUT -> AppLivePlaybackIssue.NO_INPUT
-}
-
-private fun RecordingProgressSyncState.toAppState(): AppRecordingProgressState = when (this) {
-    RecordingProgressSyncState.Inactive -> AppRecordingProgressState.INACTIVE
-    RecordingProgressSyncState.Available -> AppRecordingProgressState.AVAILABLE
-    RecordingProgressSyncState.Saving -> AppRecordingProgressState.SAVING
-    RecordingProgressSyncState.Degraded -> AppRecordingProgressState.DEGRADED
-    RecordingProgressSyncState.ReadOnly -> AppRecordingProgressState.READ_ONLY
-    RecordingProgressSyncState.Unsupported -> AppRecordingProgressState.UNSUPPORTED
-}
-
-private fun PlaybackDiagnosticsSnapshot.toAppDiagnostics() = AppPlaybackDiagnostics(
-    source = when (source) {
-        PlaybackDiagnosticsSource.NONE -> AppPlaybackSource.NONE
-        PlaybackDiagnosticsSource.LIVE_TV -> AppPlaybackSource.LIVE_TV
-        PlaybackDiagnosticsSource.RECORDING -> AppPlaybackSource.RECORDING
-    },
-    state = appPlaybackState(state),
-    isPlaying = isPlaying,
-    positionMs = positionMs,
-    durationMs = durationMs,
-    bufferedMs = bufferedMs,
-    video = video?.toAppDiagnostics(),
-    videoDecoder = videoDecoder,
-    renderedFrames = renderedFrames,
-    droppedFrames = droppedFrames,
-    audio = audio?.toAppDiagnostics(),
-    audioDecoder = audioDecoder,
-    audioUnderruns = audioUnderruns,
-    readRateBitsPerSecond = readRateBitsPerSecond,
-    system = system?.toAppDiagnostics(),
-)
-
-private fun PlaybackFormatDiagnostics.toAppDiagnostics() = AppPlaybackFormatDiagnostics(
-    codec = codec,
-    resolution = resolution,
-    frameRate = frameRate,
-    language = language,
-    channelCount = channelCount,
-    sampleRateHz = sampleRateHz,
-)
-
-private fun PlaybackSystemDiagnostics.toAppDiagnostics() = AppPlaybackSystemDiagnostics(
-    outputMode = outputMode?.let {
-        AppPlaybackOutputMode(
-            width = it.width,
-            height = it.height,
-            refreshRateHz = it.refreshRateHz,
-        )
-    },
-    thermalLevel = thermalLevel?.toAppLevel(),
-    appPssBytes = appPssBytes,
-    lowMemory = lowMemory,
-)
-
-private fun PlaybackThermalLevel.toAppLevel(): AppPlaybackThermalLevel = when (this) {
-    PlaybackThermalLevel.NONE -> AppPlaybackThermalLevel.NONE
-    PlaybackThermalLevel.LIGHT -> AppPlaybackThermalLevel.LIGHT
-    PlaybackThermalLevel.MODERATE -> AppPlaybackThermalLevel.MODERATE
-    PlaybackThermalLevel.SEVERE -> AppPlaybackThermalLevel.SEVERE
-    PlaybackThermalLevel.CRITICAL -> AppPlaybackThermalLevel.CRITICAL
-    PlaybackThermalLevel.EMERGENCY -> AppPlaybackThermalLevel.EMERGENCY
-    PlaybackThermalLevel.SHUTDOWN -> AppPlaybackThermalLevel.SHUTDOWN
-}
-
-private fun <T, R> StateFlow<T>.mapState(transform: (T) -> R): StateFlow<R> =
-    object : StateFlow<R> {
-        override val replayCache: List<R>
-            get() = listOf(value)
-
-        override val value: R
-            get() = transform(this@mapState.value)
-
-        override suspend fun collect(collector: FlowCollector<R>): Nothing =
-            this@mapState.collect { collector.emit(transform(it)) }
+private fun LiveTimeshiftState.toApp(): AppTimeshiftState = when (this) {
+    LiveTimeshiftState.Unavailable -> AppTimeshiftState()
+    is LiveTimeshiftState.Available -> {
+        val behind = positionBehindLive?.inWholeMilliseconds?.coerceAtLeast(0L) ?: 0L
+        val buffered = bufferedDuration?.inWholeMilliseconds?.coerceAtLeast(behind)
+            ?: grantedPeriod.inWholeMilliseconds
+        AppTimeshiftState(true, serverPaused == true, -buffered, -behind, 0L)
     }
+}
+
+internal fun SubscriptionIssue.toApp(): AppLivePlaybackIssue = when (this) {
+    SubscriptionIssue.INVALID_TARGET -> AppLivePlaybackIssue.INVALID_TARGET
+    SubscriptionIssue.NO_FREE_ADAPTER -> AppLivePlaybackIssue.NO_FREE_ADAPTER
+    SubscriptionIssue.MUX_NOT_ENABLED -> AppLivePlaybackIssue.MUX_NOT_ENABLED
+    SubscriptionIssue.TUNING_FAILED -> AppLivePlaybackIssue.TUNING_FAILED
+    SubscriptionIssue.BAD_SIGNAL -> AppLivePlaybackIssue.BAD_SIGNAL
+    SubscriptionIssue.SCRAMBLED -> AppLivePlaybackIssue.SCRAMBLED
+    SubscriptionIssue.SUBSCRIPTION_OVERRIDDEN -> AppLivePlaybackIssue.OVERRIDDEN
+    SubscriptionIssue.USER_ACCESS -> AppLivePlaybackIssue.ACCESS_DENIED
+    SubscriptionIssue.USER_LIMIT -> AppLivePlaybackIssue.CONNECTION_LIMIT
+    SubscriptionIssue.WEAK_STREAM -> AppLivePlaybackIssue.WEAK_STREAM
+    SubscriptionIssue.NO_DISK_SPACE -> AppLivePlaybackIssue.NO_DISK_SPACE
+    SubscriptionIssue.UNKNOWN -> AppLivePlaybackIssue.UNKNOWN
+}
+
+internal fun PlaybackTargetResult.toAppCommandResult(): AppPlaybackCommandResult = when (this) {
+    PlaybackTargetResult.STARTED -> AppPlaybackCommandResult.SUBMITTED
+    PlaybackTargetResult.NOT_RUNNING -> AppPlaybackCommandResult.NOT_RUNNING
+    PlaybackTargetResult.SHUT_DOWN -> AppPlaybackCommandResult.SHUT_DOWN
+    PlaybackTargetResult.NOT_READY -> AppPlaybackCommandResult.NOT_READY
+    PlaybackTargetResult.RECORDING_PROGRESS_UNSUPPORTED ->
+        AppPlaybackCommandResult.RECORDING_PROGRESS_UNSUPPORTED
+    PlaybackTargetResult.TARGET_UNAVAILABLE -> AppPlaybackCommandResult.TARGET_UNAVAILABLE
+    PlaybackTargetResult.GROWING_RECORDING_RESUME_UNSUPPORTED ->
+        AppPlaybackCommandResult.GROWING_RECORDING_RESUME_UNSUPPORTED
+    PlaybackTargetResult.GROWING_RECORDING_DEFERRED ->
+        AppPlaybackCommandResult.GROWING_RECORDING_DEFERRED
+    PlaybackTargetResult.PLAYER_UNAVAILABLE -> AppPlaybackCommandResult.PLAYER_UNAVAILABLE
+}
+
+internal fun PlaybackStopResult.toAppCommandResult(): AppPlaybackCommandResult = when (this) {
+    PlaybackStopResult.STOPPED -> AppPlaybackCommandResult.STOPPED
+    PlaybackStopResult.ALREADY_STOPPED -> AppPlaybackCommandResult.ALREADY_STOPPED
+    PlaybackStopResult.NOT_RUNNING -> AppPlaybackCommandResult.NOT_RUNNING
+    PlaybackStopResult.SHUT_DOWN -> AppPlaybackCommandResult.SHUT_DOWN
+    PlaybackStopResult.PLAYER_UNAVAILABLE -> AppPlaybackCommandResult.PLAYER_UNAVAILABLE
+}
+
+internal fun TimeshiftCommandResult.toAppCommandResult(): AppPlaybackCommandResult = when (this) {
+    TimeshiftCommandResult.ACCEPTED -> AppPlaybackCommandResult.SUBMITTED
+    TimeshiftCommandResult.REJECTED -> AppPlaybackCommandResult.REJECTED
+    TimeshiftCommandResult.UNAVAILABLE -> AppPlaybackCommandResult.UNAVAILABLE
+    TimeshiftCommandResult.ALREADY_PENDING -> AppPlaybackCommandResult.ALREADY_PENDING
+    TimeshiftCommandResult.NOT_ACKNOWLEDGED -> AppPlaybackCommandResult.NOT_ACKNOWLEDGED
+    TimeshiftCommandResult.ACKNOWLEDGEMENT_TIMEOUT -> AppPlaybackCommandResult.ACKNOWLEDGEMENT_TIMEOUT
+    TimeshiftCommandResult.PENDING_QUEUE_OVERFLOW -> AppPlaybackCommandResult.PENDING_QUEUE_OVERFLOW
+    TimeshiftCommandResult.UNCERTAIN_REQUEST_OUTCOME -> AppPlaybackCommandResult.UNCERTAIN_REQUEST_OUTCOME
+    TimeshiftCommandResult.UNRECOGNIZED_ACKNOWLEDGEMENT ->
+        AppPlaybackCommandResult.UNRECOGNIZED_ACKNOWLEDGEMENT
+    TimeshiftCommandResult.RESUMED_SEGMENT_UNANCHORABLE ->
+        AppPlaybackCommandResult.RESUMED_SEGMENT_UNANCHORABLE
+    TimeshiftCommandResult.SUBSCRIPTION_ENDED -> AppPlaybackCommandResult.SUBSCRIPTION_ENDED
+    TimeshiftCommandResult.SERVER_REJECTED -> AppPlaybackCommandResult.SERVER_REJECTED
+    TimeshiftCommandResult.ACCESS_DENIED -> AppPlaybackCommandResult.ACCESS_DENIED
+    TimeshiftCommandResult.CONNECTION_LIMIT -> AppPlaybackCommandResult.CONNECTION_LIMIT
+    TimeshiftCommandResult.TIMEOUT -> AppPlaybackCommandResult.TIMEOUT
+    TimeshiftCommandResult.TRANSPORT_UNAVAILABLE -> AppPlaybackCommandResult.TRANSPORT_UNAVAILABLE
+    TimeshiftCommandResult.NOT_SUPPORTED -> AppPlaybackCommandResult.NOT_SUPPORTED
+    TimeshiftCommandResult.NOT_RUNNING -> AppPlaybackCommandResult.NOT_RUNNING
+    TimeshiftCommandResult.SHUT_DOWN -> AppPlaybackCommandResult.SHUT_DOWN
+}
+
+private fun RecordingProgressCapability.toPlaybackState(): AppRecordingProgressState = when (this) {
+    RecordingProgressCapability.Disconnected -> AppRecordingProgressState.DEGRADED
+    RecordingProgressCapability.Unsupported -> AppRecordingProgressState.UNSUPPORTED
+    RecordingProgressCapability.ReadOnly -> AppRecordingProgressState.READ_ONLY
+    RecordingProgressCapability.Full -> AppRecordingProgressState.AVAILABLE
+}
+
+private val Int.hours get() = this.seconds * 3_600

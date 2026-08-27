@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.ClientState
-import at.bernhardberger.tvheadend.core.ConnectionFailureKind
-import at.bernhardberger.tvheadend.core.SubscriptionFailureKind
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 
 sealed interface ConnectionUiState {
     data object NeedsConfiguration : ConnectionUiState
@@ -15,11 +15,21 @@ sealed interface ConnectionUiState {
     data class SubscriptionError(val kind: SubscriptionFailureKind) : ConnectionUiState
 }
 
-fun ClientState.toConnectionUiState(): ConnectionUiState = when (this) {
-    ClientState.Connecting -> ConnectionUiState.Connecting
-    ClientState.SyncingChannels -> ConnectionUiState.SyncingChannels
-    ClientState.Ready -> ConnectionUiState.Ready
-    ClientState.Reconnecting -> ConnectionUiState.Reconnecting
-    is ClientState.Error -> ConnectionUiState.Error(kind)
-    is ClientState.SubscriptionError -> ConnectionUiState.SubscriptionError(kind)
+fun SessionState.toConnectionUiState(): ConnectionUiState = when (this) {
+    SessionState.Disconnected -> ConnectionUiState.NeedsConfiguration
+    SessionState.Connecting -> ConnectionUiState.Connecting
+    SessionState.Synchronizing -> ConnectionUiState.SyncingChannels
+    is SessionState.Ready -> ConnectionUiState.Ready
+    is SessionState.Unavailable -> ConnectionUiState.Error(
+        when (reason) {
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.AuthenticationRejected -> ConnectionFailureKind.AUTHENTICATION
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.PermissionDenied -> ConnectionFailureKind.PERMISSION_DENIED
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.IncompatibleServer -> ConnectionFailureKind.INCOMPATIBLE_SERVER
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.NoChannels -> ConnectionFailureKind.ZERO_CHANNELS
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.ServerUnreachable,
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.NetworkUnavailable,
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.TransportUnavailable -> ConnectionFailureKind.UNREACHABLE
+            else -> ConnectionFailureKind.OTHER
+        },
+    )
 }

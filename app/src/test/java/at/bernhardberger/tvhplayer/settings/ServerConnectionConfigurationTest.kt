@@ -52,6 +52,35 @@ class ServerConnectionConfigurationTest {
         )
     }
 
+    @Test
+    fun passwordProfileRequiresRealCredentialReentryInsteadOfSubmittingARedactionMarker() {
+        val editable = serverSettingsForEditing(
+            host = "tvheadend.example.invalid",
+            htspPort = 9982,
+            passwordConfigured = true,
+        )
+
+        assertEquals("", editable.username)
+        assertTrue(editable.passwordConfigured)
+        assertFalse(editable.username.contains("•"))
+        assertFalse(
+            replacementCredentialsComplete(
+                passwordConfigured = true,
+                username = "",
+                password = "",
+                passwordChanged = false,
+            ),
+        )
+        assertTrue(
+            replacementCredentialsComplete(
+                passwordConfigured = true,
+                username = "viewer",
+                password = "replacement",
+                passwordChanged = true,
+            ),
+        )
+    }
+
     private fun configuration(
         host: String = "tvheadend.example.invalid",
         htspPort: Int = 9982,

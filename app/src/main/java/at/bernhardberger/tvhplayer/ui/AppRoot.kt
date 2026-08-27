@@ -58,14 +58,14 @@ import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.SimpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
-import at.bernhardberger.tvheadend.core.RecordingPlaybackIntent
+import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
 import at.bernhardberger.tvhplayer.core.simpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
-import at.bernhardberger.tvheadend.client.ConnectionState
+import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings

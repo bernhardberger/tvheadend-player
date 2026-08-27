@@ -169,13 +169,15 @@ deliberately separated: reproducible unsigned bundles are prepared on the
 engineering host, while the stable private signing key remains on an isolated
 owner-controlled host.
 
-The bundled decoder is a pinned Media3 1.10.1 FFmpeg extension containing only
-the MP1, MP2, and MP3 decoders from FFmpeg n6.0.1. Its exact revisions,
-toolchains, configuration, hashes, licenses, build procedure, and corresponding
-source are owned by the transitive
-[`at.bernhardberger.tvheadend:decoder-ffmpeg`](https://github.com/bernhardberger/tvheadend-player-sdk/tree/main/sdk/decoder-ffmpeg-binary)
-SDK artifact. Every binary release must include both application and SDK/native
-corresponding-source archives and their checksums.
+The app consumes the released
+`at.bernhardberger.tvheadend:sdk-media3:0.2.0` artifact, which keeps Media3
+1.11.0 and its bundled FFmpeg extension on one release boundary. Playback is
+platform-first with the native extension retained as the AC-3/E-AC-3/MP3
+fallback. The release gate pins the public AAR and source-classifier hashes,
+checks the shipped ABI matrix and applicable 16 KiB ELF alignment, and proves
+that the APK contains the same native bytes. Every binary release must include
+application source, all released SDK source classifiers, the published
+Media3/FFmpeg corresponding-source classifier, and their checksums.
 
 See [`docs/release-process.md`](docs/release-process.md) for the complete release,
 signature, source, and rollback gates.

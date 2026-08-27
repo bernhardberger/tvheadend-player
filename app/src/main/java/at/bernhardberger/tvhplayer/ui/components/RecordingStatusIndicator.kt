@@ -12,7 +12,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvheadend.core.DvrState
+import at.bernhardberger.tvhplayer.data.DvrState
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
 @Composable

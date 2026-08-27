@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.EpgEventEntry
-import at.bernhardberger.tvheadend.core.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
