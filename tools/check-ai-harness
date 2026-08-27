@@ -745,15 +745,19 @@ def main() -> int:
                 ):
                     errors.append("resolved build primary must remain writable")
                 if effective_permission(build, "bash", "git status -sb") != "allow":
-                    errors.append("resolved build must allow bounded Git inspection")
+                    errors.append("resolved build must allow local Git inspection")
                 if effective_permission(
                     build, "bash", "python3 -c 'write source'"
-                ) != "ask":
-                    errors.append(
-                        "resolved build must ask before unclassified Bash commands"
-                    )
-                if effective_permission(build, "bash", "git push origin main") != "deny":
-                    errors.append("resolved build must deny Git pushes")
+                ) != "allow":
+                    errors.append("resolved build must allow routine local Bash commands")
+                if effective_permission(build, "bash", "git push origin main") != "allow":
+                    errors.append("resolved build must inherit the trusted Bash posture")
+                if effective_permission(build, "webfetch", "*") != "allow":
+                    errors.append("resolved build must allow web fetches")
+                if effective_permission(
+                    build, "external_directory", "/root/projects/tvheadend-sdk/**"
+                ) != "allow":
+                    errors.append("resolved build must allow package-authorized external paths")
 
             for name in ALL_CHILD_AGENTS:
                 agent = resolved_agent_details.get(name)

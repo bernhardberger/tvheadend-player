@@ -41,6 +41,13 @@ authority. The orchestrator selects GPT-5.6 Sol at the ledger's exact `medium`,
 `high`, `xhigh`, or `max` effort. No custom writable primary or repository-configured primary step
 ceiling exists.
 
+Like the SDK workspace, the trusted writable primary receives edit, Bash, web
+fetch, and external-directory capabilities directly from server-side project
+configuration. The ledger, package packet, and `AGENTS.md` define what it may
+do; there is no per-command approval relay or duplicated command deny list.
+Read-only children retain their own explicit restrictions and the exact Task
+allowlist remains deny-by-default.
+
 The six managed read-only roles have explicit non-inheriting assignments:
 `app-locator` uses Luna/low/20, `app-planner` Sol/high/45, `app-analyze`
 Sol/medium/30, `app-research` Sol/low/35, `android-reviewer` Sol/high/45, and
