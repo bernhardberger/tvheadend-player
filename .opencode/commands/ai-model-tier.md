@@ -1,6 +1,6 @@
 ---
-description: Show or switch the managed application, research, and review agents between standard and OpenAI fast service tiers
-agent: repo-maintainer
+description: Show or switch the managed read-only child agents between standard and OpenAI fast service tiers
+agent: build
 ---
 
 Accept exactly one argument from `$ARGUMENTS`: `status`, `fast`, or `standard`.

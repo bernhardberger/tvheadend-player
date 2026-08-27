@@ -79,25 +79,35 @@ class AiModelTierTest(unittest.TestCase):
     def test_rejects_unexpected_model_without_modifying_config(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config = self.config(fast=True)
-            config["agent"]["scout"]["model"] = "other/model"
+            config["agent"]["app-locator"]["model"] = "other/model"
             path = self.write_config(directory, config)
             original = path.read_bytes()
 
-            with self.assertRaisesRegex(ValueError, "scout.*unexpected model"):
+            with self.assertRaisesRegex(ValueError, "app-locator.*unexpected model"):
                 switch_model_tier(path, "standard")
 
             self.assertEqual(path.read_bytes(), original)
 
-    def test_manages_only_integrated_primary_research_and_review_roles(self) -> None:
+    def test_manages_only_read_only_child_roles(self) -> None:
         self.assertEqual(
             set(AGENT_MODELS),
-            {"android-tv", "scout", "android-reviewer", "tv-ux-reviewer"},
+            {
+                "app-locator",
+                "app-planner",
+                "app-analyze",
+                "app-research",
+                "android-reviewer",
+                "tv-ux-reviewer",
+            },
         )
-        self.assertEqual(set(AGENT_MODELS.values()), {"openai/gpt-5.6-sol"})
+        self.assertEqual(
+            set(AGENT_MODELS.values()),
+            {"openai/gpt-5.6-luna", "openai/gpt-5.6-sol"},
+        )
 
     def test_reports_mixed_tier(self) -> None:
         config = self.config(fast=True)
-        config["agent"]["scout"]["model"] = AGENT_MODELS["scout"]
+        config["agent"]["app-locator"]["model"] = AGENT_MODELS["app-locator"]
 
         self.assertEqual(model_tier(config), "mixed")
 

@@ -13,10 +13,9 @@ Before non-trivial work:
    worktree change and stop if another writer is active in the same checkout.
 2. Use `docs/README.md` to select only the documents relevant to the task. Do
    not read the whole documentation tree.
-3. Use the writable `android-tv` primary for application Kotlin, Compose,
-   navigation, playback, EPG, DVR, or appliance behavior. It implements one
-   bounded slice directly. Use `repo-maintainer` for repository and harness
-   infrastructure.
+3. Use the built-in writable `build` primary for both application and repository
+   work. The active package and repository rules define its scope; no second
+   writable project agent exists.
 4. State assumptions before ambiguous or architectural work and implement one
    small, independently verifiable slice.
 5. Fetch remotes before upstream synchronization, contribution preparation, or
@@ -68,6 +67,9 @@ repository-local domain overlays, then the focused skill, then local style.
 
 - Make the smallest correct change. Do not introduce an abstraction for one
   use or combine unrelated cleanup with behavior work.
+- Do not add compatibility façades, SDK model/result mirrors, protocol-shaped
+  test translators, bespoke verification frameworks, or production test seams
+  when released APIs and test fakes already own the behavior.
 - For behavior changes, write the failing test first. Keep pure policy outside
   Android UI where practical so JVM tests can cover it.
 - Run focused checks while iterating and `./tools/verify` before considering a
@@ -132,23 +134,26 @@ it does not replace integrated or physical-TV gates.
 
 ## Delegation and evidence
 
-Delegation is limited to one child level and all children are read-only.
-`android-tv` performs routine repository lookup and application implementation
-itself. Use `scout` only for a bounded multi-hop repository or external-source
-question when isolating research context is materially useful. Use
-`android-reviewer` for one risk-based source audit covering runtime,
-cross-layer correctness, focus, keys, Back, accessibility, and test truthfulness.
-Use `tv-ux-reviewer` only as a screenshot-first design critic against exact
-current-evidence paths. Children cannot delegate, edit, run a device, mutate
-Git, or act as additional approval layers.
+Delegation is limited to one child level and all children are read-only. The
+`build` primary performs routine work itself and uses zero children by default.
+Use `app-locator` only for mechanical retrieval, `app-planner` for one optional
+bounded design second opinion, `app-analyze` for one concrete post-plan
+contradiction, and `app-research` only when exact local and cached dependency
+sources cannot answer one authoritative external-source question. Use
+`android-reviewer` once on a frozen tested packet when risk requires source
+review, and `tv-ux-reviewer` only for screenshot-first design review against
+exact supplied evidence. Children cannot edit, use shell, run builds or devices,
+delegate, mutate Git, or read project instructions, ledgers, handoffs, archives,
+or broad plans. Their configured model variants and step limits do not inherit
+the writable primary's `high` or `max` effort.
 
-Start each research, audit, or closure child as a fresh session by omitting
-`task_id`; never resume old child history. Supply only the exact contract,
-accepted invariants, included paths, exclusions, relevant evidence, and stop
-condition. A child that reaches its step budget returns `HANDOFF_REQUIRED`
-instead of claiming complete or pass. The writable primary batches and fixes
-review findings directly, then uses at most one fresh closure limited to named
-finding IDs and the fix delta.
+Start each child as a fresh session by omitting `task_id`; never resume old child
+history. Supply one self-contained question with accepted invariants, included
+paths, exclusions, relevant evidence, and a stop condition. A child that reaches
+its terminal budget reports inspected scope and the exact remaining evidence
+gap instead of claiming completion. The writable primary adjudicates and fixes
+in-scope review findings directly; a broad new concern becomes a separately
+authorized package rather than an expanding review loop.
 
 ## Upstream and repository discipline
 
