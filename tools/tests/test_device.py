@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import runpy
 import stat
 import subprocess
@@ -7,7 +8,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -111,6 +112,287 @@ class DevicePolicyTest(unittest.TestCase):
         args = parser.parse_args(["--target", "g10", "doctor"])
 
         self.assertEqual(args.target, "g10")
+
+    def test_accept_debug_is_an_exact_named_g10_action_without_overrides(self) -> None:
+        parser = DEVICE["build_parser"]()
+        args = parser.parse_args(["--target", "g10", "accept-debug"])
+
+        self.assertEqual(args.action, "accept-debug")
+        self.assertEqual(
+            DEVICE["acceptance_policy_errors"](
+                requested_target=args.target,
+                selected_target="g10",
+                role="test",
+                package_name=DEVICE["DEFAULT_PACKAGE"],
+                serial_overridden=False,
+                package_overridden=False,
+                config={
+                    "expected_manufacturer": "TCL",
+                    "expected_model": "Smart TV Pro",
+                    "expected_device": "G10",
+                    "expected_product": "G10_4K_GB",
+                },
+                properties={
+                    "manufacturer": "TCL",
+                    "model": "Smart TV Pro",
+                    "device": "G10",
+                    "product": "G10_4K_GB",
+                },
+            ),
+            [],
+        )
+
+    def test_accept_debug_rejects_g08_unnamed_unclassified_and_identity_overrides(self) -> None:
+        valid_config = {
+            "expected_manufacturer": "TCL",
+            "expected_model": "Smart TV Pro",
+            "expected_device": "G10",
+            "expected_product": "G10_4K_GB",
+        }
+        valid_properties = {
+            "manufacturer": "TCL",
+            "model": "Smart TV Pro",
+            "device": "G10",
+            "product": "G10_4K_GB",
+        }
+        cases = (
+            {"requested_target": None},
+            {"requested_target": "g08", "selected_target": "g08"},
+            {"role": "unclassified"},
+            {"serial_overridden": True},
+            {"package_overridden": True},
+            {"properties": {**valid_properties, "device": "G08", "product": "G08_4K_GB"}},
+        )
+        defaults = {
+            "requested_target": "g10",
+            "selected_target": "g10",
+            "role": "test",
+            "package_name": DEVICE["DEFAULT_PACKAGE"],
+            "serial_overridden": False,
+            "package_overridden": False,
+            "config": valid_config,
+            "properties": valid_properties,
+        }
+
+        for case in cases:
+            with self.subTest(case=case):
+                self.assertTrue(DEVICE["acceptance_policy_errors"](**(defaults | case)))
+
+    def test_acceptance_fixture_requires_two_distinct_positive_channel_ids(self) -> None:
+        self.assertEqual(
+            DEVICE["acceptance_fixture"](
+                {
+                    "acceptance_progressive_channel_id": "101",
+                    "acceptance_interlaced_channel_id": "202",
+                },
+            ),
+            {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+        )
+        for config in (
+            {},
+            {"acceptance_progressive_channel_id": "0", "acceptance_interlaced_channel_id": "2"},
+            {"acceptance_progressive_channel_id": "2", "acceptance_interlaced_channel_id": "2"},
+            {"acceptance_progressive_channel_id": "secret", "acceptance_interlaced_channel_id": "2"},
+        ):
+            with self.subTest(config=config):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    DEVICE["acceptance_fixture"](config)
+
+    def test_acceptance_instrumentation_is_bounded_to_named_methods_and_safe_arguments(self) -> None:
+        command = DEVICE["acceptance_instrumentation_command"](
+            "adb",
+            "configured-serial",
+            "progressiveLivePlayback",
+            {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+        )
+
+        self.assertEqual(command[:6], ["adb", "-s", "configured-serial", "shell", "am", "instrument"])
+        self.assertIn(
+            "at.bernhardberger.tvhplayer.acceptance.DeviceAcceptanceTest#progressiveLivePlayback",
+            command,
+        )
+        self.assertEqual(command[-1], "at.bernhardberger.tvhplayer.test/androidx.test.runner.AndroidJUnitRunner")
+        self.assertNotIn("logcat", command)
+        self.assertNotIn("uiautomator", command)
+        self.assertNotIn("dumpsys", command)
+
+    def test_acceptance_result_parser_fails_closed(self) -> None:
+        passed = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="OK (1 test)\nINSTRUMENTATION_CODE: -1\n",
+            stderr="",
+        )
+        failed = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="FAILURES!!!\nTests run: 1, Failures: 1\nINSTRUMENTATION_CODE: -1\n",
+            stderr="server detail that must not be retained",
+        )
+
+        self.assertEqual(DEVICE["acceptance_instrumentation_outcome"](passed), "PASS")
+        self.assertEqual(DEVICE["acceptance_instrumentation_outcome"](failed), "FAIL")
+
+    def test_acceptance_package_presence_requires_a_package_path_not_only_exit_zero(self) -> None:
+        present = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="package:/data/app/test/base.apk\n",
+            stderr="",
+        )
+        absent = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+        self.assertTrue(DEVICE["package_path_present"](present))
+        self.assertFalse(DEVICE["package_path_present"](absent))
+
+    def test_acceptance_package_mutation_requires_explicit_success_output(self) -> None:
+        success = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="Performing Streamed Install\nSuccess\n",
+            stderr="",
+        )
+        ambiguous = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="Failure [unknown]\n",
+            stderr="",
+        )
+
+        self.assertTrue(DEVICE["package_mutation_succeeded"](success))
+        self.assertFalse(DEVICE["package_mutation_succeeded"](ambiguous))
+
+    def test_acceptance_orchestration_runs_named_methods_and_always_removes_test_package(self) -> None:
+        commands: list[list[str]] = []
+
+        def fake_run(command: list[str], *, timeout_seconds: int):
+            commands.append(command)
+            if "instrument" in command:
+                stdout = "OK (1 test)\nINSTRUMENTATION_CODE: -1\n"
+            elif command[-3:] == ["pm", "path", DEVICE["TEST_PACKAGE"]]:
+                stdout = ""
+            else:
+                stdout = "Success\n"
+            return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+        with patch.dict(
+            DEVICE["run_debug_acceptance"].__globals__,
+            {"run_bounded_redacted": fake_run},
+        ):
+            methods, cleanup = DEVICE["run_debug_acceptance"](
+                "adb",
+                "configured-serial",
+                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                Path("/private/app-debug.apk"),
+                Path("/private/app-debug-androidTest.apk"),
+            )
+
+        self.assertEqual([item["name"] for item in methods], list(DEVICE["ACCEPTANCE_METHODS"]))
+        self.assertTrue(all(item["outcome"] == "PASS" for item in methods))
+        self.assertEqual(cleanup, "PASS")
+        self.assertIn(
+            ["adb", "-s", "configured-serial", "uninstall", DEVICE["TEST_PACKAGE"]],
+            commands,
+        )
+
+    def test_acceptance_preparation_timeout_records_elapsed_time_and_cleanup_truthfully(self) -> None:
+        package_queries = 0
+
+        def fake_run(command: list[str], *, timeout_seconds: int):
+            nonlocal package_queries
+            if command[-3:] == ["pm", "path", DEVICE["TEST_PACKAGE"]]:
+                package_queries += 1
+                if package_queries == 1:
+                    return None
+                return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+            return subprocess.CompletedProcess(command, 0, stdout="Success\n", stderr="")
+
+        with patch.dict(
+            DEVICE["run_debug_acceptance"].__globals__,
+            {"run_bounded_redacted": fake_run},
+        ), patch.object(
+            DEVICE["time"],
+            "monotonic",
+            side_effect=[0.0, 1.0, 10.0, 40.0],
+        ):
+            methods, cleanup = DEVICE["run_debug_acceptance"](
+                "adb",
+                "configured-serial",
+                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                Path("/private/app-debug.apk"),
+                Path("/private/app-debug-androidTest.apk"),
+            )
+
+        self.assertEqual(
+            methods,
+            [{"name": "prepareInstrumentation", "outcome": "TIMEOUT", "durationMs": 30_000}],
+        )
+        self.assertEqual(cleanup, "PASS")
+
+    def test_acceptance_attestation_binds_commit_coordinate_and_both_apks(self) -> None:
+        expected = {
+            "schemaVersion": 1,
+            "appCommit": "0123456789abcdef",
+            "sdkCoordinate": "at.bernhardberger.tvheadend:sdk-media3:0.2.0",
+            "appApkSha256": "a" * 64,
+            "testApkSha256": "b" * 64,
+        }
+
+        self.assertEqual(
+            DEVICE["acceptance_attestation_errors"](
+                expected,
+                revision="0123456789abcdef",
+                sdk_coordinate="at.bernhardberger.tvheadend:sdk-media3:0.2.0",
+                app_apk_sha256="a" * 64,
+                test_apk_sha256="b" * 64,
+            ),
+            [],
+        )
+        self.assertTrue(
+            DEVICE["acceptance_attestation_errors"](
+                {**expected, "testApkSha256": "c" * 64},
+                revision="0123456789abcdef",
+                sdk_coordinate="at.bernhardberger.tvheadend:sdk-media3:0.2.0",
+                app_apk_sha256="a" * 64,
+                test_apk_sha256="b" * 64,
+            ),
+        )
+
+    def test_acceptance_evidence_is_owner_only_and_contains_only_curated_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "acceptance.json"
+            DEVICE["write_acceptance_evidence"](
+                output,
+                revision="0123456789abcdef",
+                sdk_coordinate="at.bernhardberger.tvheadend:sdk-media3:0.2.0",
+                apk_sha256="a" * 64,
+                target={
+                    "name": "g10",
+                    "role": "test",
+                    "manufacturer": "TCL",
+                    "model": "Smart TV Pro",
+                    "device": "G10",
+                    "product": "G10_4K_GB",
+                },
+                methods=[
+                    {"name": "readMetadataProfilesAndArtwork", "outcome": "PASS", "durationMs": 123},
+                ],
+                cleanup="PASS",
+            )
+
+            evidence = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(
+                set(evidence),
+                {"schemaVersion", "appCommit", "sdkCoordinate", "apkSha256", "target", "methods", "cleanup", "result"},
+            )
+            self.assertEqual(evidence["result"], "PASS")
+            self.assertNotIn("configured-serial", output.read_text(encoding="utf-8"))
+            self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
 
     def test_bounded_remote_navigation_keys_are_available(self) -> None:
         self.assertEqual(key_events["up"], "KEYCODE_DPAD_UP")
@@ -426,6 +708,53 @@ class DevicePolicyTest(unittest.TestCase):
                 'ro.product.cpu.abilist; do getprop "$property"; done',
             ],
         )
+
+    def test_acceptance_identity_read_is_bounded_and_does_not_announce_the_serial(self) -> None:
+        ready = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="device\n",
+            stderr="",
+        )
+        identity = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="TCL\nSmart TV Pro\nG10\nG10_4K_GB\n12\narmeabi-v7a\n",
+            stderr="",
+        )
+        with patch.dict(
+            DEVICE["read_acceptance_device_properties"].__globals__,
+            {"run_bounded_redacted": Mock(side_effect=[ready, identity])},
+        ), patch("builtins.print") as print_mock:
+            properties = DEVICE["read_acceptance_device_properties"](
+                "adb",
+                "private-configured-serial",
+            )
+
+        self.assertEqual(properties["device"], "G10")
+        print_mock.assert_not_called()
+
+    def test_acceptance_identity_failure_discards_device_output_and_serial(self) -> None:
+        failed = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=1,
+            stdout="private-configured-serial",
+            stderr="private device detail",
+        )
+        with patch.dict(
+            DEVICE["read_acceptance_device_properties"].__globals__,
+            {"run_bounded_redacted": Mock(return_value=failed)},
+        ), patch("builtins.print") as print_mock:
+            with self.assertRaisesRegex(SystemExit, "2"):
+                DEVICE["read_acceptance_device_properties"](
+                    "adb",
+                    "private-configured-serial",
+                )
+
+        output = "\n".join(" ".join(map(str, call.args)) for call in print_mock.call_args_list)
+        self.assertNotIn("private-configured-serial", output)
+        self.assertNotIn("private device detail", output)
+        self.assertIn("redacted", output)
 
     def test_missing_credential_file_is_rejected_without_secret_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

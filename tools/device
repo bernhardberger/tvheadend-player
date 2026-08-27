@@ -9,6 +9,7 @@ credentials.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -19,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import NoReturn
@@ -29,15 +31,47 @@ LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
 DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
 LEGACY_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
+DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+ACCEPTANCE_ATTESTATION = ROOT / "app/build/outputs/device-acceptance/attestation.json"
 RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 CAPTURE_ROOT = ROOT / "captures/device"
+ACCEPTANCE_ROOT = CAPTURE_ROOT / "acceptance"
 DEFAULT_SCREENSHOT_NAME = "current-screen"
 DEBUG_VIDEO_BACKDROP_ACTION = "at.bernhardberger.tvhplayer.action.DEBUG_VIDEO_BACKDROP"
 DEBUG_VIDEO_BACKDROP_EXTRA = "visible"
 DEBUG_VIDEO_BACKDROP_RESULT = -1
 MAX_CREDENTIAL_FILE_BYTES = 64 * 1024
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+TEST_PACKAGE = f"{DEFAULT_PACKAGE}.test"
+TEST_RUNNER = f"{TEST_PACKAGE}/androidx.test.runner.AndroidJUnitRunner"
+ACCEPTANCE_TEST_CLASS = (
+    "at.bernhardberger.tvhplayer.acceptance.DeviceAcceptanceTest"
+)
+ACCEPTANCE_METHODS = (
+    "readMetadataProfilesAndArtwork",
+    "progressiveLivePlayback",
+    "interlacedLivePlayback",
+    "channelReplacement",
+    "timeshiftControls",
+    "reconnectAndTeardown",
+)
+ACCEPTANCE_METHOD_TIMEOUT_SECONDS = 120
+ACCEPTANCE_ADB_TIMEOUT_SECONDS = 30
+G10_IDENTITY = {
+    "manufacturer": "TCL",
+    "model": "Smart TV Pro",
+    "device": "G10",
+    "product": "G10_4K_GB",
+}
+DEVICE_PROPERTIES = {
+    "manufacturer": "ro.product.manufacturer",
+    "model": "ro.product.model",
+    "device": "ro.product.device",
+    "product": "ro.product.name",
+    "android": "ro.build.version.release",
+    "abis": "ro.product.cpu.abilist",
+}
 KEY_EVENTS = {
     "up": "KEYCODE_DPAD_UP",
     "down": "KEYCODE_DPAD_DOWN",
@@ -60,11 +94,16 @@ TEST_DEVICE_ACTIONS = {
     "screenshot",
     "provision-test-credentials",
     "allow-appliance-autostart",
+    "accept-debug",
 }
 RELEASE_DEVICE_ACTIONS = {"install-release"}
 PRODUCTION_DEVICE_ACTIONS = {"uninstall-legacy"}
 VALID_ROLES = {"production", "test", "unclassified"}
 TARGET_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
+
+
+class AcceptanceRunStopped(Exception):
+    """Internal fail-closed control flow that still executes exact cleanup."""
 
 
 def fail(message: str) -> NoReturn:
@@ -306,6 +345,390 @@ def identity_errors(
     return errors
 
 
+def acceptance_policy_errors(
+    *,
+    requested_target: str | None,
+    selected_target: str | None,
+    role: str,
+    package_name: str,
+    serial_overridden: bool,
+    package_overridden: bool,
+    config: dict[str, str],
+    properties: dict[str, str] | None,
+) -> list[str]:
+    errors: list[str] = []
+    if requested_target != "g10" or selected_target != "g10":
+        errors.append("accept-debug requires the explicit named target --target g10")
+    if role != "test":
+        errors.append("accept-debug requires target g10 to have role 'test'")
+    if package_name != DEFAULT_PACKAGE:
+        errors.append(f"accept-debug is available only for package {DEFAULT_PACKAGE}")
+    if serial_overridden or package_overridden:
+        errors.append("accept-debug rejects serial and package identity overrides")
+    for field, expected in G10_IDENTITY.items():
+        configured = config.get(f"expected_{field}")
+        if configured != expected:
+            errors.append(f"accept-debug requires expected_{field}={expected!r}")
+        if properties is not None and properties.get(field) != expected:
+            errors.append(f"accept-debug rejected live {field} identity")
+    return errors
+
+
+def acceptance_fixture(config: dict[str, str]) -> dict[str, str]:
+    fixture: dict[str, str] = {}
+    for config_name, argument_name in (
+        ("acceptance_progressive_channel_id", "progressiveChannelId"),
+        ("acceptance_interlaced_channel_id", "interlacedChannelId"),
+    ):
+        raw = config.get(config_name, "")
+        value = raw.strip()
+        if not value.isascii() or not value.isdigit() or int(value) <= 0:
+            fail(f"{config_name} must be a positive decimal channel ID")
+        fixture[argument_name] = str(int(value))
+    if fixture["progressiveChannelId"] == fixture["interlacedChannelId"]:
+        fail("progressive and interlaced acceptance channel IDs must differ")
+    return fixture
+
+
+def acceptance_instrumentation_command(
+    adb: str,
+    serial: str,
+    method: str,
+    fixture: dict[str, str],
+) -> list[str]:
+    if method not in ACCEPTANCE_METHODS:
+        fail("acceptance instrumentation method is not approved")
+    command = adb_command(adb, serial, "shell", "am", "instrument", "-w", "-r")
+    for name in ("progressiveChannelId", "interlacedChannelId"):
+        command.extend(("-e", name, fixture[name]))
+    command.extend(("-e", "class", f"{ACCEPTANCE_TEST_CLASS}#{method}", TEST_RUNNER))
+    return command
+
+
+def acceptance_instrumentation_outcome(
+    result: subprocess.CompletedProcess[str],
+) -> str:
+    output = result.stdout or ""
+    passed = (
+        result.returncode == 0
+        and "OK (1 test)" in output
+        and "INSTRUMENTATION_CODE: -1" in output
+        and "FAILURES!!!" not in output
+        and "INSTRUMENTATION_FAILED" not in output
+    )
+    return "PASS" if passed else "FAIL"
+
+
+def package_path_present(result: subprocess.CompletedProcess[str]) -> bool:
+    return result.returncode == 0 and any(
+        line.startswith("package:") for line in (result.stdout or "").splitlines()
+    )
+
+
+def package_mutation_succeeded(result: subprocess.CompletedProcess[str] | None) -> bool:
+    return result is not None and result.returncode == 0 and any(
+        line.strip() == "Success" for line in (result.stdout or "").splitlines()
+    )
+
+
+def run_bounded_redacted(
+    command: list[str],
+    *,
+    timeout_seconds: int,
+) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return subprocess.run(
+            command,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+
+
+def parse_device_properties(output: str) -> dict[str, str] | None:
+    values = output.splitlines()
+    if len(values) != len(DEVICE_PROPERTIES):
+        return None
+    return dict(zip(DEVICE_PROPERTIES, values, strict=True))
+
+
+def read_acceptance_device_properties(adb: str, serial: str) -> dict[str, str]:
+    state = run_bounded_redacted(
+        adb_command(adb, serial, "get-state"),
+        timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+    )
+    if state is None or state.returncode != 0 or state.stdout.strip() != "device":
+        fail("configured G10 is not ready; device output was redacted")
+    result = run_bounded_redacted(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "for property in "
+            + " ".join(DEVICE_PROPERTIES.values())
+            + '; do getprop "$property"; done',
+        ),
+        timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+    )
+    properties = None if result is None else parse_device_properties(result.stdout)
+    if result is None or result.returncode != 0 or properties is None:
+        fail("configured G10 returned invalid identity; device output was redacted")
+    return properties
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def load_acceptance_attestation(path: Path) -> dict[str, object]:
+    try:
+        if path.is_symlink() or not path.is_file():
+            fail("device-acceptance build attestation is missing; run ./tools/verify from clean HEAD")
+        file_stat = path.stat()
+        if file_stat.st_uid != os.getuid() or stat.S_IMODE(file_stat.st_mode) & (stat.S_IRWXG | stat.S_IRWXO):
+            fail("device-acceptance build attestation must be owner-only")
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        fail("device-acceptance build attestation is unreadable")
+    if not isinstance(value, dict):
+        fail("device-acceptance build attestation is invalid")
+    return value
+
+
+def acceptance_attestation_errors(
+    attestation: dict[str, object],
+    *,
+    revision: str,
+    sdk_coordinate: str,
+    app_apk_sha256: str,
+    test_apk_sha256: str,
+) -> list[str]:
+    expected = {
+        "schemaVersion": 1,
+        "appCommit": revision,
+        "sdkCoordinate": sdk_coordinate,
+        "appApkSha256": app_apk_sha256,
+        "testApkSha256": test_apk_sha256,
+    }
+    errors: list[str] = []
+    if set(attestation) != set(expected):
+        errors.append("device-acceptance build attestation fields do not match")
+    for name, value in expected.items():
+        if attestation.get(name) != value:
+            errors.append(f"device-acceptance build attestation {name} does not match")
+    return errors
+
+
+def acceptance_revision() -> str:
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=normal"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if revision.returncode != 0 or status.returncode != 0 or not revision.stdout.strip():
+        fail("cannot establish the app revision for device acceptance")
+    if status.stdout.strip():
+        fail("accept-debug requires a clean app worktree")
+    return revision.stdout.strip()
+
+
+def released_sdk_coordinate() -> str:
+    try:
+        with (ROOT / "gradle/libs.versions.toml").open("rb") as stream:
+            version = tomllib.load(stream)["versions"]["tvheadend-sdk"]
+    except (OSError, KeyError, TypeError, tomllib.TOMLDecodeError):
+        fail("cannot read the released SDK coordinate")
+    if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        fail("released SDK version is invalid")
+    return f"at.bernhardberger.tvheadend:sdk-media3:{version}"
+
+
+def default_acceptance_output(
+    revision: str,
+    *,
+    now: datetime | None = None,
+) -> Path:
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    return (
+        ACCEPTANCE_ROOT
+        / revision[:12]
+        / f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}-debug-acceptance.json"
+    )
+
+
+def write_acceptance_evidence(
+    output: Path,
+    *,
+    revision: str,
+    sdk_coordinate: str,
+    apk_sha256: str,
+    target: dict[str, str],
+    methods: list[dict[str, object]],
+    cleanup: str,
+) -> None:
+    result = "PASS" if methods and all(item["outcome"] == "PASS" for item in methods) and cleanup == "PASS" else "FAIL"
+    evidence = {
+        "schemaVersion": 1,
+        "appCommit": revision,
+        "sdkCoordinate": sdk_coordinate,
+        "apkSha256": apk_sha256,
+        "target": target,
+        "methods": methods,
+        "cleanup": cleanup,
+        "result": result,
+    }
+    output.parent.mkdir(mode=stat.S_IRWXU, parents=True, exist_ok=True)
+    directories = [output.parent]
+    if output == ACCEPTANCE_ROOT or ACCEPTANCE_ROOT in output.parents:
+        directories.extend((CAPTURE_ROOT, ACCEPTANCE_ROOT))
+    for directory in directories:
+        os.chmod(directory, stat.S_IRWXU)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{output.name}.", dir=output.parent)
+    temporary = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, stat.S_IRUSR | stat.S_IWUSR)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(evidence, stream, sort_keys=True, separators=(",", ":"))
+            stream.write("\n")
+        os.replace(temporary, output)
+        os.chmod(output, stat.S_IRUSR | stat.S_IWUSR)
+    except OSError as exc:
+        fail(f"cannot write device-acceptance evidence: {exc.strerror or 'I/O error'}")
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def run_debug_acceptance(
+    adb: str,
+    serial: str,
+    fixture: dict[str, str],
+    app_apk: Path,
+    test_apk: Path,
+) -> tuple[list[dict[str, object]], str]:
+    methods: list[dict[str, object]] = []
+    cleanup = "FAIL"
+    try:
+        app_install_started = time.monotonic()
+        app_installed = run_bounded_redacted(
+            adb_command(adb, serial, "install", "-r", str(app_apk)),
+            timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+        )
+        app_install_duration = max(0, round((time.monotonic() - app_install_started) * 1000))
+        if not package_mutation_succeeded(app_installed):
+            methods.append({
+                "name": "installAppUnderTest",
+                "outcome": "TIMEOUT" if app_installed is None else "FAIL",
+                "durationMs": app_install_duration,
+            })
+            raise AcceptanceRunStopped
+        installed_debuggable = run_bounded_redacted(
+            adb_command(adb, serial, "shell", "run-as", DEFAULT_PACKAGE, "true"),
+            timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+        )
+        if installed_debuggable is None or installed_debuggable.returncode != 0:
+            methods.append({
+                "name": "installAppUnderTest",
+                "outcome": "FAIL",
+                "durationMs": app_install_duration,
+            })
+            raise AcceptanceRunStopped
+
+        preparation_started = time.monotonic()
+        stale_test = run_bounded_redacted(
+            adb_command(adb, serial, "shell", "pm", "path", TEST_PACKAGE),
+            timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+        )
+        if stale_test is None or stale_test.returncode != 0:
+            methods.append({
+                "name": "prepareInstrumentation",
+                "outcome": "TIMEOUT" if stale_test is None else "FAIL",
+                "durationMs": max(0, round((time.monotonic() - preparation_started) * 1000)),
+            })
+            raise AcceptanceRunStopped
+        if package_path_present(stale_test):
+            removed = run_bounded_redacted(
+                adb_command(adb, serial, "uninstall", TEST_PACKAGE),
+                timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+            )
+            if not package_mutation_succeeded(removed):
+                methods.append({
+                    "name": "prepareInstrumentation",
+                    "outcome": "TIMEOUT" if removed is None else "FAIL",
+                    "durationMs": max(0, round((time.monotonic() - preparation_started) * 1000)),
+                })
+                raise AcceptanceRunStopped
+
+        install_started = time.monotonic()
+        installed = run_bounded_redacted(
+            adb_command(adb, serial, "install", "-r", str(test_apk)),
+            timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+        )
+        install_duration = max(0, round((time.monotonic() - install_started) * 1000))
+        if not package_mutation_succeeded(installed):
+            methods.append({
+                "name": "installInstrumentation",
+                "outcome": "TIMEOUT" if installed is None else "FAIL",
+                "durationMs": install_duration,
+            })
+            raise AcceptanceRunStopped
+
+        for method in ACCEPTANCE_METHODS:
+            started = time.monotonic()
+            result = run_bounded_redacted(
+                acceptance_instrumentation_command(adb, serial, method, fixture),
+                timeout_seconds=ACCEPTANCE_METHOD_TIMEOUT_SECONDS,
+            )
+            duration_ms = max(0, round((time.monotonic() - started) * 1000))
+            outcome = "TIMEOUT" if result is None else acceptance_instrumentation_outcome(result)
+            methods.append({"name": method, "outcome": outcome, "durationMs": duration_ms})
+            if outcome != "PASS":
+                break
+    except AcceptanceRunStopped:
+        pass
+    finally:
+        cleanup_commands = (
+            adb_command(adb, serial, "shell", "am", "force-stop", DEFAULT_PACKAGE),
+            adb_command(adb, serial, "shell", "am", "force-stop", TEST_PACKAGE),
+            adb_command(adb, serial, "uninstall", TEST_PACKAGE),
+        )
+        cleanup_results = [
+            run_bounded_redacted(command, timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS)
+            for command in cleanup_commands
+        ]
+        absent = run_bounded_redacted(
+            adb_command(adb, serial, "shell", "pm", "path", TEST_PACKAGE),
+            timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+        )
+        cleanup = "PASS" if (
+            all(
+                result is not None and result.returncode == 0
+                for result in cleanup_results[:2]
+            )
+            and package_mutation_succeeded(cleanup_results[2])
+            and absent is not None
+            and absent.returncode == 0
+            and not package_path_present(absent)
+        ) else "FAIL"
+    return methods, cleanup
+
+
 def require_device_ready(adb: str, serial: str) -> None:
     state = run(adb_command(adb, serial, "get-state"), capture=True, check=False)
     if state.returncode != 0 or state.stdout.strip() != "device":
@@ -314,29 +737,21 @@ def require_device_ready(adb: str, serial: str) -> None:
 
 
 def read_device_properties(adb: str, serial: str) -> dict[str, str]:
-    names = {
-        "manufacturer": "ro.product.manufacturer",
-        "model": "ro.product.model",
-        "device": "ro.product.device",
-        "product": "ro.product.name",
-        "android": "ro.build.version.release",
-        "abis": "ro.product.cpu.abilist",
-    }
     result = run(
         adb_command(
             adb,
             serial,
             "shell",
             "for property in "
-            + " ".join(names.values())
+            + " ".join(DEVICE_PROPERTIES.values())
             + '; do getprop "$property"; done',
         ),
         capture=True,
     )
-    values = result.stdout.splitlines()
-    if len(values) != len(names):
+    properties = parse_device_properties(result.stdout)
+    if properties is None:
         fail("device returned an unexpected property response")
-    return dict(zip(names, values, strict=True))
+    return properties
 
 
 def verify_configured_identity(
@@ -759,6 +1174,10 @@ def build_parser() -> argparse.ArgumentParser:
         "provision-test-credentials",
         help="Provision credentials from the configured local secret file into a debug app",
     )
+    subparsers.add_parser(
+        "accept-debug",
+        help="Run bounded application acceptance on the exact configured G10 debug target",
+    )
 
     key_parser = subparsers.add_parser("key", help="Send one approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
@@ -790,6 +1209,25 @@ def main() -> int:
         fail(
             f"invalid device role {role!r}; expected production, test, or unclassified"
         )
+
+    if args.action == "accept-debug":
+        static_policy_errors = acceptance_policy_errors(
+            requested_target=args.target,
+            selected_target=target_name,
+            role=role,
+            package_name=package_name,
+            serial_overridden=(
+                args.serial is not None or os.environ.get("TVHPLAYER_ADB_SERIAL") is not None
+            ),
+            package_overridden=(
+                args.package_name is not None
+                or os.environ.get("TVHPLAYER_ANDROID_PACKAGE") is not None
+            ),
+            config=config,
+            properties=None,
+        )
+        if static_policy_errors:
+            fail("; ".join(static_policy_errors))
 
     policy_error = action_policy_error(role, args.action)
     if policy_error:
@@ -830,10 +1268,81 @@ def main() -> int:
         )
         return 0
 
-    if args.action in TEST_DEVICE_ACTIONS | RELEASE_DEVICE_ACTIONS | PRODUCTION_DEVICE_ACTIONS:
+    if args.action == "accept-debug":
+        properties = read_acceptance_device_properties(adb, serial)
+        verify_configured_identity(properties, config, require_expected=True)
+    elif args.action in TEST_DEVICE_ACTIONS | RELEASE_DEVICE_ACTIONS | PRODUCTION_DEVICE_ACTIONS:
         require_device_ready(adb, serial)
         properties = read_device_properties(adb, serial)
         verify_configured_identity(properties, config, require_expected=True)
+
+    if args.action == "accept-debug":
+        policy_errors = acceptance_policy_errors(
+            requested_target=args.target,
+            selected_target=target_name,
+            role=role,
+            package_name=package_name,
+            serial_overridden=False,
+            package_overridden=False,
+            config=config,
+            properties=properties,
+        )
+        if policy_errors:
+            fail("; ".join(policy_errors))
+        fixture = acceptance_fixture(config)
+        for path, label in (
+            (DEFAULT_APK, "debug app APK"),
+            (DEFAULT_TEST_APK, "debug instrumentation APK"),
+        ):
+            if path.is_symlink() or not path.is_file():
+                fail(f"{label} is missing; run ./tools/verify first")
+        debuggable = run_bounded_redacted(
+            adb_command(adb, serial, "shell", "run-as", DEFAULT_PACKAGE, "true"),
+            timeout_seconds=ACCEPTANCE_ADB_TIMEOUT_SECONDS,
+        )
+        if debuggable is None or debuggable.returncode != 0:
+            fail("accept-debug requires the installed app to be debuggable; cleanup was not attempted")
+
+        revision = acceptance_revision()
+        sdk_coordinate = released_sdk_coordinate()
+        app_apk_sha256 = sha256_file(DEFAULT_APK)
+        test_apk_sha256 = sha256_file(DEFAULT_TEST_APK)
+        attestation_errors = acceptance_attestation_errors(
+            load_acceptance_attestation(ACCEPTANCE_ATTESTATION),
+            revision=revision,
+            sdk_coordinate=sdk_coordinate,
+            app_apk_sha256=app_apk_sha256,
+            test_apk_sha256=test_apk_sha256,
+        )
+        if attestation_errors:
+            fail("; ".join(attestation_errors))
+        output = default_acceptance_output(revision)
+        methods, cleanup = run_debug_acceptance(
+            adb,
+            serial,
+            fixture,
+            DEFAULT_APK,
+            DEFAULT_TEST_APK,
+        )
+        write_acceptance_evidence(
+            output,
+            revision=revision,
+            sdk_coordinate=sdk_coordinate,
+            apk_sha256=app_apk_sha256,
+            target={
+                "name": "g10",
+                "role": "test",
+                **G10_IDENTITY,
+            },
+            methods=methods,
+            cleanup=cleanup,
+        )
+        passed = methods and all(item["outcome"] == "PASS" for item in methods) and cleanup == "PASS"
+        print(f"acceptanceEvidence={output}")
+        print(f"acceptanceResult={'PASS' if passed else 'FAIL'}")
+        if not passed:
+            fail("debug acceptance failed; raw instrumentation output was discarded")
+        return 0
 
     if args.action == "install-debug":
         apk = args.apk.expanduser().resolve()

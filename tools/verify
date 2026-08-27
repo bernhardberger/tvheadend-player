@@ -33,11 +33,11 @@ printf '==> AI harness\n'
 printf '==> Tool policy tests\n'
 python3 -m unittest discover -s tools/tests
 
-printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
+printf '==> JVM tests, lint, debug app APK, and debug instrumentation APK\n'
 ./gradlew \
     testDebugUnitTest \
     lintDebug \
-    compileDebugAndroidTestKotlin \
+    assembleDebugAndroidTest \
     assembleDebug \
     :app:verifyExternalSdkConsumption \
     --no-daemon
@@ -142,5 +142,8 @@ printf '%s\n' "$badging" | while IFS= read -r line; do
     esac
 done
 sha256sum "$apk"
+
+printf '==> Device-acceptance APK attestation\n'
+python3 ./tools/attest-device-acceptance
 
 printf '==> Verification passed\n'

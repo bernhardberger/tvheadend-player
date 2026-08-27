@@ -25,6 +25,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `ai-engineering-harness.md` | Current AI-harness architecture and operation; harness work only. |
 | `appliance-mode-spec.md` | Appliance-profile behavior; appliance work only. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
+| `device-acceptance.md` | Exact G10 debug application-acceptance harness, evidence boundary, and cleanup contract. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
 | `test-device-credential-provisioning.md` | Test-device credential workflow; provisioning work only. |
