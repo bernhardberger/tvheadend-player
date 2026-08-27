@@ -10,8 +10,8 @@ import at.bernhardberger.tvheadend.core.DvrEntry
 import at.bernhardberger.tvheadend.core.DvrFile
 import at.bernhardberger.tvheadend.core.DvrState
 import at.bernhardberger.tvheadend.core.EpgEventEntry
-import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
-import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -142,7 +142,7 @@ class AppOwnedSdkRemovalPolicyTest {
 
     @Test
     fun timeshiftPresentationAndQueueUseOneInclusiveLiveEdgeTolerance() {
-        val state = TimeshiftState(
+        val state = AppTimeshiftState(
             available = true,
             bufferStartMs = -120_000,
             positionMs = -TIMESHIFT_LIVE_EDGE_TOLERANCE_MS,
@@ -158,7 +158,7 @@ class AppOwnedSdkRemovalPolicyTest {
             -35_000L,
             completeTimeshiftSeekDispatch(
                 dispatch.queue,
-                TimeshiftSeekDecision(-35_000, -30_000, clamped = false),
+                AppTimeshiftSeekResult.Applied(-35_000, -30_000, clamped = false),
             ).projectedPositionMs,
         )
     }

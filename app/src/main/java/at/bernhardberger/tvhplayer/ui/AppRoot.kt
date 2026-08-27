@@ -66,8 +66,8 @@ import at.bernhardberger.tvhplayer.core.simpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvheadend.client.ConnectionState
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
-import at.bernhardberger.tvheadend.playback.PlaybackSessionState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettings
@@ -481,10 +481,10 @@ fun AppRoot(
     val connectionUiState by appVm.uiState.collectAsStateWithLifecycle()
     val connectionState by appVm.connectionState.collectAsStateWithLifecycle()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
-    val playbackRuntime: PlaybackRuntime = koinInject()
+    val playbackRuntime: AppPlaybackRuntime = koinInject()
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
-    val activeServiceId by playbackRuntime.activeChannelId.collectAsStateWithLifecycle()
+    val activeServiceId by playbackRuntime.activeLiveServiceId.collectAsStateWithLifecycle()
     val activeRecordingId by playbackRuntime.activeRecordingId.collectAsStateWithLifecycle()
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
@@ -594,7 +594,7 @@ fun AppRoot(
     LaunchedEffect(playbackState, activeRecordingId, topRoute) {
         when (
             recordingFinishedAction(
-                recordingFinished = playbackState is PlaybackSessionState.Finished,
+                recordingFinished = playbackState is AppPlaybackState.Finished,
                 activeRecordingId = activeRecordingId,
                 recordingPlayerVisible = topRoute == Routes.RECORDING_PLAYER,
             )
@@ -1050,7 +1050,7 @@ fun AppRoot(
         registerActivityKeyContract = registerActivityKeyContract,
         persistentSurface = {
             if (shouldMountPersistentPlayerSurface(
-                    hasActivePlayback = playbackState !is PlaybackSessionState.Idle,
+                    hasActivePlayback = playbackState !is AppPlaybackState.Idle,
                     isPlayerRoute = isPlayer,
                 )
             ) {

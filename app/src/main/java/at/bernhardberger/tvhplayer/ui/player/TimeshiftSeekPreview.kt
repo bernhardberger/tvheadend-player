@@ -18,8 +18,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
-import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.programmeAnchoredAxis
@@ -32,8 +32,8 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 
 @Composable
 internal fun TimeshiftSeekPreview(
-    state: TimeshiftState,
-    decision: TimeshiftSeekDecision,
+    state: AppTimeshiftState,
+    decision: AppTimeshiftSeekResult.Applied,
     nowEpochSec: Long,
     programmeStartSec: Long?,
     programmeStopSec: Long?,

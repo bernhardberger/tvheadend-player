@@ -50,8 +50,8 @@ import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
 import at.bernhardberger.tvhplayer.core.SeekbarRange
 import at.bernhardberger.tvheadend.core.EpgEventEntry
-import at.bernhardberger.tvheadend.core.TimeshiftState
-import at.bernhardberger.tvheadend.core.timeshiftSeek
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -99,7 +99,7 @@ class PlayerTimelineTruthfulnessTest {
                             .size(960.dp, 540.dp)
                             .testTag("timeline-test-viewport")
                     ) {
-                        val state = TimeshiftState(
+                        val state = AppTimeshiftState(
                             available = true,
                             bufferStartMs = -900_000L,
                             positionMs = -90_000L,
@@ -107,7 +107,11 @@ class PlayerTimelineTruthfulnessTest {
                         )
                         TimeshiftSeekPreview(
                             state = state,
-                            decision = timeshiftSeek(state, -30_000L),
+                            decision = AppTimeshiftSeekResult.Applied(
+                                targetMs = -120_000L,
+                                deltaMs = -30_000L,
+                                clamped = false,
+                            ),
                             nowEpochSec = 5_400L,
                             programmeStartSec = 3_600L,
                             programmeStopSec = 7_200L,
@@ -150,7 +154,7 @@ class PlayerTimelineTruthfulnessTest {
     fun preProgrammeTimeshiftTargetUsesTruthfulOffsetAndBoundaryState() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                val state = TimeshiftState(
+                val state = AppTimeshiftState(
                     available = true,
                     bufferStartMs = -3_600_000L,
                     positionMs = -1_900_000L,
@@ -158,7 +162,11 @@ class PlayerTimelineTruthfulnessTest {
                 )
                 TimeshiftSeekPreview(
                     state = state,
-                    decision = timeshiftSeek(state, -100_000L),
+                    decision = AppTimeshiftSeekResult.Applied(
+                        targetMs = -2_000_000L,
+                        deltaMs = -100_000L,
+                        clamped = false,
+                    ),
                     nowEpochSec = 5_400L,
                     programmeStartSec = 3_600L,
                     programmeStopSec = 7_200L,
@@ -467,7 +475,7 @@ class PlayerTimelineTruthfulnessTest {
                     onStopPlayback = {},
                     onUserInteraction = {},
                     onOpenOptions = {},
-                    timeshiftState = TimeshiftState(
+                    timeshiftState = AppTimeshiftState(
                         available = true,
                         bufferStartMs = -600_000L,
                         positionMs = positionMs(),

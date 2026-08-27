@@ -1,8 +1,3 @@
-@file:OptIn(
-    at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class,
-    at.bernhardberger.tvheadend.playback.ExperimentalRecordingCoordinationApi::class,
-)
-
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.KeyEvent as AndroidKeyEvent
@@ -77,10 +72,10 @@ import at.bernhardberger.tvhplayer.core.recordingStackedSeekTarget
 import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
 import at.bernhardberger.tvheadend.client.DvrRuntime
 import at.bernhardberger.tvheadend.core.Channel
-import at.bernhardberger.tvheadend.playback.PlaybackFailureReason
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
-import at.bernhardberger.tvheadend.playback.PlaybackSessionState
-import at.bernhardberger.tvheadend.playback.RecordingProgressSyncState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppRecordingProgressState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
@@ -102,14 +97,14 @@ private const val RECORDING_SEEK_FEEDBACK_SETTLED_GRACE_MS = 350L
 
 internal fun recordingDegradedEpisodeActive(
     currentlyActive: Boolean,
-    syncState: RecordingProgressSyncState,
+    syncState: AppRecordingProgressState,
 ): Boolean = when (syncState) {
-    RecordingProgressSyncState.Degraded -> true
-    RecordingProgressSyncState.Saving -> currentlyActive
-    RecordingProgressSyncState.Inactive,
-    RecordingProgressSyncState.Available,
-    RecordingProgressSyncState.ReadOnly,
-    RecordingProgressSyncState.Unsupported -> false
+    AppRecordingProgressState.DEGRADED -> true
+    AppRecordingProgressState.SAVING -> currentlyActive
+    AppRecordingProgressState.INACTIVE,
+    AppRecordingProgressState.AVAILABLE,
+    AppRecordingProgressState.READ_ONLY,
+    AppRecordingProgressState.UNSUPPORTED -> false
 }
 
 @Composable
@@ -119,7 +114,7 @@ fun RecordingPlayerScreen(
     repository: DvrRuntime = koinInject(),
     channelRepository: ChannelEpgRuntime = koinInject(),
     imageLoader: ImageLoader = koinInject(),
-    session: PlaybackRuntime = koinInject(),
+    session: AppPlaybackRuntime = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     connectionAvailable: Boolean,
@@ -129,7 +124,7 @@ fun RecordingPlayerScreen(
 ) {
     val scope = rememberCoroutineScope()
     val playbackState by session.state.collectAsStateWithLifecycle()
-    val progressSyncState by session.recordingProgressSyncState.collectAsStateWithLifecycle()
+    val progressSyncState by session.recordingProgressState.collectAsStateWithLifecycle()
     val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
@@ -205,15 +200,15 @@ fun RecordingPlayerScreen(
 
     fun togglePlayPause() {
         if (player.isPlaying) {
-            player.pause()
+            session.pause()
             session.recordingPaused()
         } else {
-            player.play()
+            session.play()
         }
     }
 
     fun pausePlayback() {
-        player.pause()
+        session.pause()
         session.recordingPaused()
     }
 
@@ -275,8 +270,8 @@ fun RecordingPlayerScreen(
         if (
             session.activeRecordingId.value == recordingId &&
             playbackIntent == RecordingPlaybackIntent.DefaultPolicy &&
-            playbackState !is PlaybackSessionState.Idle &&
-            playbackState !is PlaybackSessionState.Failed
+            playbackState !is AppPlaybackState.Idle &&
+            playbackState !is AppPlaybackState.Failed
         ) {
             return@LaunchedEffect
         }
@@ -302,14 +297,14 @@ fun RecordingPlayerScreen(
             controlsVisible = controlsVisible,
             playbackProgressing = isPlaying,
             playbackStable = availability is RecordingPlaybackAvailability.Ready &&
-                playbackState is PlaybackSessionState.Playing,
+                playbackState is AppPlaybackState.Playing,
             seekPending = pendingSeekTargetMs != null,
             modalVisible = optionsPage != null || infoOpen,
-            recoveryVisible = playbackState is PlaybackSessionState.Recovering,
+            recoveryVisible = playbackState is AppPlaybackState.Recovering,
             actionableErrorVisible = initialConnectionFailure ||
                 (recordingResolved &&
                     (availability !is RecordingPlaybackAvailability.Ready ||
-                        playbackState is PlaybackSessionState.Failed)),
+                        playbackState is AppPlaybackState.Failed)),
         )
     )
     PlayerControlsAutoHideEffect(
@@ -332,22 +327,22 @@ fun RecordingPlayerScreen(
             optionsPage = optionsPage,
             numberEntryVisible = false,
             channelDrawerVisible = false,
-            recoveryVisible = playbackState is PlaybackSessionState.Recovering,
+            recoveryVisible = playbackState is AppPlaybackState.Recovering,
             terminalErrorVisible = initialConnectionFailure ||
                 (recordingResolved &&
                     (availability !is RecordingPlaybackAvailability.Ready ||
-                        playbackState is PlaybackSessionState.Failed)),
+                        playbackState is AppPlaybackState.Failed)),
             seekPreviewPhase = seekPreviewPhase,
             controlsVisible = controlsVisible &&
                 availability is RecordingPlaybackAvailability.Ready,
             statsEnabled = statsVisible,
         )
     )
-    val failureReason = (playbackState as? PlaybackSessionState.Failed)?.reason
+    val failureReason = (playbackState as? AppPlaybackState.Failed)?.reason
     val retryTargetAvailable =
         initialConnectionFailure ||
             (availability is RecordingPlaybackAvailability.Ready &&
-                failureReason == PlaybackFailureReason.RECORDING_READ_FAILED)
+                failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED)
     val recoveryUiModel = playbackRecoveryUiModel(
         surface = PlaybackRecoverySurface.RECORDING,
         connectionAvailable = connectionAvailable,
@@ -400,7 +395,7 @@ fun RecordingPlayerScreen(
         if (
             !controlsVisible &&
             availability is RecordingPlaybackAvailability.Ready &&
-            playbackState !is PlaybackSessionState.Failed
+            playbackState !is AppPlaybackState.Failed
         ) {
             rootFocus.requestFocus()
         }
@@ -414,7 +409,7 @@ fun RecordingPlayerScreen(
         val targetMs = pendingSeekTargetMs ?: return@LaunchedEffect
         delay(RECORDING_SEEK_DEBOUNCE_MS)
         pendingSeekDispatched = true
-        player.seekTo(targetMs)
+        session.seekTo(targetMs)
         session.recordingSeekSettled()
         delay(RECORDING_SEEK_FEEDBACK_MIN_MS)
         while (
@@ -423,7 +418,7 @@ fun RecordingPlayerScreen(
                 playerEnded = player.playbackState == Player.STATE_ENDED,
                 playWhenReady = player.playWhenReady,
                 isPlaying = player.isPlaying,
-                playbackFailed = session.state.value is PlaybackSessionState.Failed,
+                playbackFailed = session.state.value is AppPlaybackState.Failed,
             )
         ) {
             delay(RECORDING_SEEK_FEEDBACK_POLL_MS)
@@ -437,7 +432,7 @@ fun RecordingPlayerScreen(
     val dispatchBack = rememberPlayerBackDispatcher(handlePlaybackBack)
     KeepScreenOn(
         enabled = availability is RecordingPlaybackAvailability.Ready &&
-            playbackState !is PlaybackSessionState.Failed,
+            playbackState !is AppPlaybackState.Failed,
     )
 
     Box(
@@ -469,7 +464,7 @@ fun RecordingPlayerScreen(
                 )
                 if (mediaAction != MediaPlaybackAction.NONE) {
                     when (mediaAction) {
-                        MediaPlaybackAction.PLAY -> player.play()
+                        MediaPlaybackAction.PLAY -> session.play()
                         MediaPlaybackAction.PAUSE -> pausePlayback()
                         MediaPlaybackAction.TOGGLE -> togglePlayPause()
                         MediaPlaybackAction.NONE -> Unit
@@ -614,7 +609,7 @@ fun RecordingPlayerScreen(
 
             if (
                 degradedEpisodeActive &&
-                playbackState !is PlaybackSessionState.Failed
+                playbackState !is AppPlaybackState.Failed
             ) {
                 Text(
                     text = stringResource(R.string.recording_progress_save_failed),
@@ -626,11 +621,11 @@ fun RecordingPlayerScreen(
             }
 
             val statusText = when {
-                controlsVisible && progressSyncState == RecordingProgressSyncState.Degraded ->
+                controlsVisible && progressSyncState == AppRecordingProgressState.DEGRADED ->
                     stringResource(R.string.recording_progress_save_failed)
-                controlsVisible && progressSyncState == RecordingProgressSyncState.ReadOnly ->
+                controlsVisible && progressSyncState == AppRecordingProgressState.READ_ONLY ->
                     stringResource(R.string.recording_progress_read_only)
-                controlsVisible && progressSyncState == RecordingProgressSyncState.Unsupported ->
+                controlsVisible && progressSyncState == AppRecordingProgressState.UNSUPPORTED ->
                     stringResource(R.string.recording_progress_unsupported)
                 else -> null
             }
@@ -642,7 +637,7 @@ fun RecordingPlayerScreen(
                         .semantics {
                             if (
                                 controlsVisible &&
-                                progressSyncState == RecordingProgressSyncState.Degraded
+                                progressSyncState == AppRecordingProgressState.DEGRADED
                             ) {
                                 hideFromAccessibility()
                             }
@@ -673,7 +668,7 @@ fun RecordingPlayerScreen(
         TvRecoveryOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
             message = stringResource(
-                if (failureReason == PlaybackFailureReason.RECORDING_READ_FAILED) {
+                if (failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED) {
                     R.string.recording_playback_interrupted_title
                 } else {
                     R.string.recording_unavailable_title
@@ -682,7 +677,7 @@ fun RecordingPlayerScreen(
             detail = entry?.title,
             hint = stringResource(
                 when {
-                    failureReason == PlaybackFailureReason.RECORDING_READ_FAILED ->
+                    failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED ->
                         R.string.recording_read_failed
                     initialConnectionFailure -> R.string.recording_connection_unavailable
                     availability == RecordingPlaybackAvailability.NotReady ->
@@ -728,8 +723,8 @@ fun RecordingPlayerScreen(
                 page = page,
                 player = player,
                 tracksResolving =
-                    playbackState is PlaybackSessionState.Starting ||
-                        playbackState is PlaybackSessionState.Recovering,
+                    playbackState is AppPlaybackState.Starting ||
+                        playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
                 showSimpleTvExit = showUnlock,

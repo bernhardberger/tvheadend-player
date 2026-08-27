@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.di
 
 import at.bernhardberger.tvheadend.client.TvheadendClient
 import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -12,9 +13,10 @@ import kotlinx.coroutines.async
 /** Process-lifetime owner used by DI teardown; screens only borrow its runtimes. */
 internal class SdkRuntimeOwner(
     val client: TvheadendClient,
-    val playbackRuntime: PlaybackRuntime,
+    val legacyPlaybackRuntime: PlaybackRuntime,
     shutdownDispatcher: CoroutineDispatcher = Dispatchers.Main,
 ) {
+    val playbackRuntime = AppPlaybackRuntime(legacyPlaybackRuntime)
     private val shutdownJob = SupervisorJob()
     private val shutdownScope = CoroutineScope(shutdownJob + shutdownDispatcher)
     private val shutdownLock = Any()

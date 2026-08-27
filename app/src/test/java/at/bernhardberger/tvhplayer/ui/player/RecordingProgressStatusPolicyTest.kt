@@ -1,8 +1,6 @@
-@file:OptIn(at.bernhardberger.tvheadend.playback.ExperimentalRecordingCoordinationApi::class)
-
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvheadend.playback.RecordingProgressSyncState
+import at.bernhardberger.tvhplayer.playback.AppRecordingProgressState
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,31 +10,31 @@ class RecordingProgressStatusPolicyTest {
     fun degradedEpisodeSurvivesRetrySavingAndClearsOnlyAtStableOutcome() {
         var active = recordingDegradedEpisodeActive(
             currentlyActive = false,
-            syncState = RecordingProgressSyncState.Degraded,
+            syncState = AppRecordingProgressState.DEGRADED,
         )
         assertTrue(active)
 
-        active = recordingDegradedEpisodeActive(active, RecordingProgressSyncState.Saving)
+        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.SAVING)
         assertTrue(active)
-        active = recordingDegradedEpisodeActive(active, RecordingProgressSyncState.Degraded)
+        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.DEGRADED)
         assertTrue(active)
 
-        active = recordingDegradedEpisodeActive(active, RecordingProgressSyncState.Available)
+        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.AVAILABLE)
         assertFalse(active)
-        active = recordingDegradedEpisodeActive(active, RecordingProgressSyncState.Degraded)
+        active = recordingDegradedEpisodeActive(active, AppRecordingProgressState.DEGRADED)
         assertTrue(active)
     }
 
     @Test
     fun readOnlyUnsupportedAndInactiveEndDegradationEpisode() {
         assertFalse(
-            recordingDegradedEpisodeActive(true, RecordingProgressSyncState.ReadOnly)
+            recordingDegradedEpisodeActive(true, AppRecordingProgressState.READ_ONLY)
         )
         assertFalse(
-            recordingDegradedEpisodeActive(true, RecordingProgressSyncState.Unsupported)
+            recordingDegradedEpisodeActive(true, AppRecordingProgressState.UNSUPPORTED)
         )
         assertFalse(
-            recordingDegradedEpisodeActive(true, RecordingProgressSyncState.Inactive)
+            recordingDegradedEpisodeActive(true, AppRecordingProgressState.INACTIVE)
         )
     }
 }

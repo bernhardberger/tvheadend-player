@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
-import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 
 const val TIMESHIFT_SEEK_STEP_MS = 30_000L
 const val TIMESHIFT_LIVE_EDGE_TOLERANCE_MS = 5_000L
@@ -38,21 +38,21 @@ fun timeshiftPositionPresentation(
     )
 }
 
-fun timeshiftPositionPresentation(state: TimeshiftState): TimeshiftPositionPresentation =
+fun timeshiftPositionPresentation(state: AppTimeshiftState): TimeshiftPositionPresentation =
     timeshiftPositionPresentation(
         positionMs = state.positionMs,
         liveEdgeMs = state.liveEdgeMs,
     )
 
-fun canSeekTimeshiftBackward(state: TimeshiftState): Boolean =
+fun canSeekTimeshiftBackward(state: AppTimeshiftState): Boolean =
     state.available && state.positionMs - state.bufferStartMs > 1_000L
 
-fun canSeekTimeshiftForward(state: TimeshiftState): Boolean =
+fun canSeekTimeshiftForward(state: AppTimeshiftState): Boolean =
     state.available && !timeshiftPositionPresentation(state).atLiveEdge
 
 fun queueTimeshiftSeek(
     queue: TimeshiftSeekQueueState,
-    state: TimeshiftState,
+    state: AppTimeshiftState,
     requestedDeltaMs: Long,
 ): TimeshiftSeekQueueState {
     val observedProjection = queue.projectedPositionMs?.takeUnless {
@@ -75,9 +75,9 @@ fun queueTimeshiftSeek(
     )
 }
 
-fun queuedTimeshiftSeekDecision(queue: TimeshiftSeekQueueState): TimeshiftSeekDecision {
+fun queuedTimeshiftSeekDecision(queue: TimeshiftSeekQueueState): AppTimeshiftSeekResult.Applied {
     val targetMs = requireNotNull(queue.pendingTargetMs)
-    return TimeshiftSeekDecision(
+    return AppTimeshiftSeekResult.Applied(
         targetMs = targetMs,
         deltaMs = queue.pendingDeltaMs,
         clamped = queue.pendingClamped,
@@ -104,9 +104,9 @@ fun beginTimeshiftSeekDispatch(queue: TimeshiftSeekQueueState): TimeshiftSeekDis
 
 fun completeTimeshiftSeekDispatch(
     queue: TimeshiftSeekQueueState,
-    decision: TimeshiftSeekDecision?,
+    decision: AppTimeshiftSeekResult,
 ): TimeshiftSeekQueueState {
-    if (decision == null) return TimeshiftSeekQueueState()
+    if (decision !is AppTimeshiftSeekResult.Applied) return TimeshiftSeekQueueState()
     return queue.copy(
         pendingDeltaMs = queue.pendingTargetMs?.minus(decision.targetMs) ?: 0L,
         dispatchInFlight = false,

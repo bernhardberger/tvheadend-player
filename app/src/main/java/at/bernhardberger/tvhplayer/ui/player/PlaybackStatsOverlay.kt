@@ -1,5 +1,3 @@
-@file:OptIn(at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class)
-
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.layout.Arrangement
@@ -22,29 +20,27 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSnapshot
-import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSource
-import at.bernhardberger.tvheadend.playback.PlaybackSessionState
-import at.bernhardberger.tvheadend.playback.PlaybackThermalLevel
-import at.bernhardberger.tvheadend.playback.droppedFramePercentage
+import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackThermalLevel
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.droppedFramePercentage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
-import at.bernhardberger.tvheadend.core.TimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale
 
 @Composable
 internal fun PlaybackStatsOverlay(
-    diagnostics: PlaybackDiagnosticsSnapshot,
+    diagnostics: AppPlaybackDiagnostics,
     aspectRatio: AspectRatioMode,
     modifier: Modifier = Modifier,
-    timeshiftState: TimeshiftState? = null,
+    timeshiftState: AppTimeshiftState? = null,
 ) {
     val locale = Locale.ROOT
     val video = diagnostics.video
     val audio = diagnostics.audio
-    val tuner = diagnostics.transport?.tuner
-    val queue = diagnostics.transport?.queue
     val system = diagnostics.system
     val droppedPercent = droppedFramePercentage(
         diagnostics.renderedFrames,
@@ -78,27 +74,27 @@ internal fun PlaybackStatsOverlay(
                     StatLine(
                 stringResource(R.string.stats_source),
                 when (diagnostics.source) {
-                    PlaybackDiagnosticsSource.LIVE_TV -> stringResource(R.string.stats_source_live)
-                    PlaybackDiagnosticsSource.RECORDING -> stringResource(R.string.stats_source_recording)
-                    PlaybackDiagnosticsSource.NONE -> stringResource(R.string.stats_unavailable)
+                    AppPlaybackSource.LIVE_TV -> stringResource(R.string.stats_source_live)
+                    AppPlaybackSource.RECORDING -> stringResource(R.string.stats_source_recording)
+                    AppPlaybackSource.NONE -> stringResource(R.string.stats_unavailable)
                 },
                     )
                     StatLine(
                 stringResource(R.string.stats_state),
                 when (diagnostics.state) {
-                    PlaybackSessionState.Idle -> stringResource(R.string.stats_state_idle)
-                    PlaybackSessionState.Starting -> stringResource(R.string.stats_state_starting)
-                    PlaybackSessionState.Playing -> stringResource(
+                    AppPlaybackState.Idle -> stringResource(R.string.stats_state_idle)
+                    AppPlaybackState.Starting -> stringResource(R.string.stats_state_starting)
+                    AppPlaybackState.Playing -> stringResource(
                         if (diagnostics.isPlaying) {
                             R.string.stats_state_playing
                         } else {
                             R.string.stats_state_paused
                         },
                     )
-                    PlaybackSessionState.Finished -> stringResource(R.string.stats_state_finished)
-                    is PlaybackSessionState.Recovering ->
+                    AppPlaybackState.Finished -> stringResource(R.string.stats_state_finished)
+                    is AppPlaybackState.Recovering ->
                         stringResource(R.string.stats_state_recovering)
-                    is PlaybackSessionState.Failed -> stringResource(R.string.stats_state_failed)
+                    is AppPlaybackState.Failed -> stringResource(R.string.stats_state_failed)
                 },
                     )
                     StatLine(
@@ -178,7 +174,7 @@ internal fun PlaybackStatsOverlay(
                     )
                     StatLine(
                 stringResource(
-                    if (diagnostics.source == PlaybackDiagnosticsSource.RECORDING) {
+                    if (diagnostics.source == AppPlaybackSource.RECORDING) {
                         R.string.stats_file_read_rate
                     } else {
                         R.string.stats_stream_read_rate
@@ -203,67 +199,6 @@ internal fun PlaybackStatsOverlay(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    if (tuner != null) {
-                        StatsSection(stringResource(R.string.stats_tuner))
-                        tuner.status?.let {
-                            StatLine(stringResource(R.string.stats_tuner_status), it)
-                        }
-                        (tuner.signalMilliDbm?.let {
-                            formatMilliUnit(it, R.string.stats_unit_dbm, locale)
-                        } ?: tuner.signalPercent?.let { formatPercent(it, locale) })?.let {
-                            StatLine(stringResource(R.string.stats_signal), it)
-                        }
-                        (tuner.snrMilliDb?.let {
-                            formatMilliUnit(it, R.string.stats_unit_db, locale)
-                        } ?: tuner.snrPercent?.let { formatPercent(it, locale) })?.let {
-                            StatLine(stringResource(R.string.stats_snr), it)
-                        }
-                        tuner.bitErrorRate?.let {
-                            StatLine(stringResource(R.string.stats_ber), formatCount(it, locale))
-                        }
-                        tuner.uncorrectedBlocks?.let {
-                            StatLine(
-                                stringResource(R.string.stats_uncorrected_blocks),
-                                formatCount(it, locale),
-                            )
-                        }
-                    }
-
-                    if (queue != null) {
-                        StatsSection(stringResource(R.string.stats_server_queue))
-                        StatLine(
-                            stringResource(R.string.stats_queued),
-                            listOfNotNull(
-                                queue.packets?.let {
-                                    stringResource(
-                                        R.string.stats_packet_count,
-                                        formatCount(it, locale),
-                                    )
-                                },
-                                queue.bytes?.let { formatBytes(it, locale) },
-                            ).joinToString(" · ")
-                                .ifBlank { stringResource(R.string.stats_unavailable) },
-                        )
-                        queue.delayMicros?.let {
-                            StatLine(
-                                stringResource(R.string.stats_queue_delay),
-                                stringResource(
-                                    R.string.stats_queue_delay_value,
-                                    formatDecimal(it / 1_000.0, 1, locale),
-                                ),
-                            )
-                        }
-                        StatLine(
-                            stringResource(R.string.stats_server_drops),
-                            stringResource(
-                                R.string.stats_server_drops_value,
-                                formatCount(queue.iFrameDrops ?: 0, locale),
-                                formatCount(queue.pFrameDrops ?: 0, locale),
-                                formatCount(queue.bFrameDrops ?: 0, locale),
-                            ),
-                        )
-                    }
-
                     if (system != null) {
                         StatsSection(stringResource(R.string.stats_system))
                         system.outputMode?.let { mode ->
@@ -356,13 +291,6 @@ private fun formatBitRate(bitsPerSecond: Long, locale: Locale): String = when {
     )
 }
 
-private fun formatPercent(value: Float, locale: Locale): String =
-    "${value.oneDecimal(locale)}%"
-
-@Composable
-private fun formatMilliUnit(value: Long, unitResource: Int, locale: Locale): String =
-    stringResource(unitResource, formatDecimal(value / 1_000.0, 1, locale))
-
 private fun formatCount(value: Long, locale: Locale): String = String.format(locale, "%,d", value)
 
 @Composable
@@ -381,12 +309,12 @@ private fun formatBytes(bytes: Long, locale: Locale): String = when {
 private fun formatDecimal(value: Double, fractionDigits: Int, locale: Locale): String =
     String.format(locale, "%.${fractionDigits}f", value)
 
-private fun PlaybackThermalLevel.labelResource(): Int = when (this) {
-    PlaybackThermalLevel.NONE -> R.string.stats_thermal_none
-    PlaybackThermalLevel.LIGHT -> R.string.stats_thermal_light
-    PlaybackThermalLevel.MODERATE -> R.string.stats_thermal_moderate
-    PlaybackThermalLevel.SEVERE -> R.string.stats_thermal_severe
-    PlaybackThermalLevel.CRITICAL -> R.string.stats_thermal_critical
-    PlaybackThermalLevel.EMERGENCY -> R.string.stats_thermal_emergency
-    PlaybackThermalLevel.SHUTDOWN -> R.string.stats_thermal_shutdown
+private fun AppPlaybackThermalLevel.labelResource(): Int = when (this) {
+    AppPlaybackThermalLevel.NONE -> R.string.stats_thermal_none
+    AppPlaybackThermalLevel.LIGHT -> R.string.stats_thermal_light
+    AppPlaybackThermalLevel.MODERATE -> R.string.stats_thermal_moderate
+    AppPlaybackThermalLevel.SEVERE -> R.string.stats_thermal_severe
+    AppPlaybackThermalLevel.CRITICAL -> R.string.stats_thermal_critical
+    AppPlaybackThermalLevel.EMERGENCY -> R.string.stats_thermal_emergency
+    AppPlaybackThermalLevel.SHUTDOWN -> R.string.stats_thermal_shutdown
 }

@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 
 /** Initial D-pad/repeat seek step. */
 const val SEEKBAR_STEP_INITIAL_MS = 30_000L
@@ -53,7 +53,7 @@ data class ProgrammeAxis(
  * back to the timeshift buffer axis.
  */
 fun programmeAnchoredAxis(
-    state: TimeshiftState,
+    state: AppTimeshiftState,
     nowEpochSec: Long,
     programmeStartSec: Long?,
     programmeStopSec: Long?,
@@ -98,7 +98,7 @@ fun recordingTimelinePresentation(
     }
 }
 
-fun timeshiftSeekbarRange(state: TimeshiftState): SeekbarRange =
+fun timeshiftSeekbarRange(state: AppTimeshiftState): SeekbarRange =
     SeekbarRange(
         domain = SeekbarDomain.TIMESHIFT,
         startMs = state.bufferStartMs,

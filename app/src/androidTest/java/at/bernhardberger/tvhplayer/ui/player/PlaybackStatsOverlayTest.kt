@@ -1,5 +1,3 @@
-@file:OptIn(at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class)
-
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.content.res.Configuration
@@ -14,10 +12,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
@@ -25,20 +21,16 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvheadend.core.TimeshiftState
-import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSnapshot
-import at.bernhardberger.tvheadend.playback.PlaybackDiagnosticsSource
-import at.bernhardberger.tvheadend.playback.PlaybackFormatDiagnostics
-import at.bernhardberger.tvheadend.playback.PlaybackOutputMode
-import at.bernhardberger.tvheadend.playback.PlaybackQueueDiagnostics
-import at.bernhardberger.tvheadend.playback.PlaybackSessionState
-import at.bernhardberger.tvheadend.playback.PlaybackSystemDiagnostics
-import at.bernhardberger.tvheadend.playback.PlaybackThermalLevel
-import at.bernhardberger.tvheadend.playback.PlaybackTransportDiagnostics
-import at.bernhardberger.tvheadend.playback.PlaybackTunerDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackOutputMode
+import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackSystemDiagnostics
+import at.bernhardberger.tvhplayer.playback.AppPlaybackThermalLevel
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.util.Locale
@@ -66,13 +58,6 @@ class PlaybackStatsOverlayTest {
             overlay,
         )
 
-        val labelLayouts = mutableListOf<TextLayoutResult>()
-        composeRule.onNodeWithText("Server frame drops")
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action ->
-                action(labelLayouts)
-            }
-        assertTrue(labelLayouts.single().lineCount == 1)
-
         composeRule.onNodeWithText("Stats for nerds").assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading),
         )
@@ -82,6 +67,8 @@ class PlaybackStatsOverlayTest {
         composeRule.onNodeWithText("System").assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading),
         )
+        composeRule.onNodeWithText("Tuner").assertDoesNotExist()
+        composeRule.onNodeWithText("Server queue").assertDoesNotExist()
         composeRule.onNodeWithTag("playback-stats-overlay")
             .assertHasNoClickAction()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
@@ -98,7 +85,6 @@ class PlaybackStatsOverlayTest {
         composeRule.onNodeWithText("12,345").assertIsDisplayed()
         composeRule.onNodeWithText("59.9 fps", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Frames").assertIsDisplayed()
-        composeRule.onNodeWithText("Server frame drops").assertIsDisplayed()
         composeRule.onNodeWithText("Display mode").assertIsDisplayed()
         composeRule.onNodeWithText("Auto (original aspect)").assertIsDisplayed()
         composeRule.onNodeWithText("Bildformat").assertDoesNotExist()
@@ -109,7 +95,7 @@ class PlaybackStatsOverlayTest {
     fun timeshiftValuesRemainCanonicalUnderGermanConfiguration() {
         setStats(
             locale = Locale.GERMAN,
-            timeshiftState = TimeshiftState(
+            timeshiftState = AppTimeshiftState(
                 available = true,
                 bufferStartMs = -3_600_000L,
                 positionMs = -30_000L,
@@ -121,24 +107,10 @@ class PlaybackStatsOverlayTest {
         composeRule.onNodeWithText("00:30 hinter Live").assertDoesNotExist()
     }
 
-    @Test
-    fun percentagesUseCanonicalTechnicalFormatting() {
-        setStats(
-            locale = Locale.GERMAN,
-            diagnostics = maximumDiagnostics.copy(
-                transport = PlaybackTransportDiagnostics(
-                    tuner = PlaybackTunerDiagnostics(signalPercent = 12.3f),
-                ),
-            ),
-        )
-
-        composeRule.onNodeWithText("12.3%").assertIsDisplayed()
-    }
-
     private fun setStats(
         locale: Locale,
-        diagnostics: PlaybackDiagnosticsSnapshot = maximumDiagnostics,
-        timeshiftState: TimeshiftState? = null,
+        diagnostics: AppPlaybackDiagnostics = maximumDiagnostics,
+        timeshiftState: AppTimeshiftState? = null,
     ) {
         composeRule.setContent {
             val context = LocalContext.current
@@ -188,13 +160,13 @@ class PlaybackStatsOverlayTest {
         }
     }
 
-    private val maximumDiagnostics = PlaybackDiagnosticsSnapshot(
-        source = PlaybackDiagnosticsSource.LIVE_TV,
-        state = PlaybackSessionState.Recovering(retryDelayMillis = 1_500L),
+    private val maximumDiagnostics = AppPlaybackDiagnostics(
+        source = AppPlaybackSource.LIVE_TV,
+        state = AppPlaybackState.Recovering(retryDelayMillis = 1_500L),
         positionMs = 7_200_000L,
         durationMs = 14_400_000L,
         bufferedMs = 75_000L,
-        video = PlaybackFormatDiagnostics(
+        video = AppPlaybackFormatDiagnostics(
             codec = "video/hevc (Main 10 profile)",
             resolution = "3840x2160",
             frameRate = 59.94f,
@@ -202,7 +174,7 @@ class PlaybackStatsOverlayTest {
         videoDecoder = "c2.vendor.hevc.decoder.secure.long-name",
         renderedFrames = 1_234_567,
         droppedFrames = 12_345,
-        audio = PlaybackFormatDiagnostics(
+        audio = AppPlaybackFormatDiagnostics(
             codec = "audio/eac3-joc",
             language = "Deutsch (Österreich)",
             channelCount = 8,
@@ -211,30 +183,13 @@ class PlaybackStatsOverlayTest {
         audioDecoder = "c2.vendor.eac3.decoder.long-name",
         audioUnderruns = 12_345,
         readRateBitsPerSecond = 123_456_789L,
-        transport = PlaybackTransportDiagnostics(
-            tuner = PlaybackTunerDiagnostics(
-                status = "LOCKED WITH A DELIBERATELY LONG FRONTEND STATUS",
-                signalMilliDbm = -123_456L,
-                snrMilliDb = 45_678L,
-                bitErrorRate = 1_234_567L,
-                uncorrectedBlocks = 9_876_543L,
-            ),
-            queue = PlaybackQueueDiagnostics(
-                packets = 9_876_543L,
-                bytes = 987_654_321L,
-                delayMicros = 123_456L,
-                bFrameDrops = 987_654L,
-                pFrameDrops = 876_543L,
-                iFrameDrops = 765_432L,
-            ),
-        ),
-        system = PlaybackSystemDiagnostics(
-            outputMode = PlaybackOutputMode(
+        system = AppPlaybackSystemDiagnostics(
+            outputMode = AppPlaybackOutputMode(
                 width = 3840,
                 height = 2160,
                 refreshRateHz = 59.94f,
             ),
-            thermalLevel = PlaybackThermalLevel.EMERGENCY,
+            thermalLevel = AppPlaybackThermalLevel.EMERGENCY,
             appPssBytes = 987_654_321L,
             lowMemory = true,
         ),

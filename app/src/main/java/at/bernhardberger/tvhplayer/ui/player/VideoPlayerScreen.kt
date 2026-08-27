@@ -1,7 +1,3 @@
-@file:kotlin.OptIn(
-    at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi::class,
-)
-
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.os.SystemClock
@@ -114,21 +110,21 @@ import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvheadend.core.TimeshiftSeekDecision
-import at.bernhardberger.tvheadend.core.TimeshiftState
-import at.bernhardberger.tvheadend.core.timeshiftSeek
+import at.bernhardberger.tvhplayer.playback.AppLivePlaybackIssue
+import at.bernhardberger.tvhplayer.playback.AppPlaybackCommandResult
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftSeekResult
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvheadend.client.ConnectionState
 import at.bernhardberger.tvheadend.client.DvrRuntime
 import at.bernhardberger.tvheadend.core.Channel
-import at.bernhardberger.tvheadend.playback.PlaybackSessionState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.nextAfter
 import at.bernhardberger.tvhplayer.ui.common.nowEvent
-import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
 import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
@@ -145,9 +141,20 @@ private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 private const val TIMESHIFT_SEEK_DEBOUNCE_MS = 400L
 private const val TIMESHIFT_SEEK_FEEDBACK_MS = 950L
 
+private fun AppLivePlaybackIssue.messageResource(): Int = when (this) {
+    AppLivePlaybackIssue.INVALID_TARGET -> R.string.tvh_target_invalid
+    AppLivePlaybackIssue.NO_FREE_ADAPTER -> R.string.tvh_no_free_adapter
+    AppLivePlaybackIssue.MUX_NOT_ENABLED -> R.string.tvh_mux_not_enabled
+    AppLivePlaybackIssue.TUNING_FAILED -> R.string.tvh_tuning_failed
+    AppLivePlaybackIssue.BAD_SIGNAL -> R.string.tvh_bad_signal
+    AppLivePlaybackIssue.SCRAMBLED -> R.string.tvh_scrambled
+    AppLivePlaybackIssue.OVERRIDDEN -> R.string.tvh_subscription_overridden
+    AppLivePlaybackIssue.NO_INPUT -> R.string.tvh_no_input
+}
+
 private data class LiveTimeshiftSeekPreview(
     val token: Int,
-    val decision: TimeshiftSeekDecision,
+    val decision: AppTimeshiftSeekResult.Applied,
     val dispatched: Boolean,
 )
 
@@ -225,7 +232,7 @@ fun VideoPlayerScreen(
     ) {
         timeshiftState
     } else {
-        TimeshiftState()
+        AppTimeshiftState()
     }
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
     val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
@@ -310,7 +317,10 @@ fun VideoPlayerScreen(
         if (lastPlayedServiceId != -1) {
             videoPlayerViewModel.stop()
         }
-        if (videoPlayerViewModel.playService(currentServiceId)) {
+        if (
+            videoPlayerViewModel.playService(currentServiceId) ==
+            AppPlaybackCommandResult.SUBMITTED
+        ) {
             lastPlayedServiceId = currentServiceId
         }
     }
@@ -413,16 +423,17 @@ fun VideoPlayerScreen(
                         decision,
                     )
                     val previewIsCurrent = timeshiftSeekPreview?.token == dispatchToken
-                    if (decision != null && previewIsCurrent) {
+                    if (decision is AppTimeshiftSeekResult.Applied && previewIsCurrent) {
                         timeshiftSeekPreview = timeshiftSeekPreview?.copy(decision = decision)
                     }
                     if (previewIsCurrent) {
-                        timeshiftFeedback = if (decision?.clamped == true) {
-                            timeshiftSeekClampedText
-                        } else if (decision == null) {
-                            timeshiftUnavailableText
-                        } else {
-                            null
+                        timeshiftFeedback = when (decision) {
+                            is AppTimeshiftSeekResult.Applied -> if (decision.clamped) {
+                                timeshiftSeekClampedText
+                            } else {
+                                null
+                            }
+                            AppTimeshiftSeekResult.Unavailable -> timeshiftUnavailableText
                         }
                         timeshiftSeekFeedbackJob?.cancel()
                         timeshiftSeekFeedbackJob = scope.launch {
@@ -438,7 +449,7 @@ fun VideoPlayerScreen(
                 if (timeshiftSeekQueue.dispatchInFlight) {
                     timeshiftSeekQueue = completeTimeshiftSeekDispatch(
                         timeshiftSeekQueue,
-                        decision = null,
+                        decision = AppTimeshiftSeekResult.Unavailable,
                     )
                 }
                 timeshiftSeekJob = null
@@ -555,10 +566,10 @@ fun VideoPlayerScreen(
     val currentSubscriptionFailure = subscriptionFailure
     val statusPresentation = playbackStatusPresentation(
         connectionAvailable = connState is ConnectionState.Connected,
-        playbackStarting = playbackState is PlaybackSessionState.Starting,
-        playbackRecovering = playbackState is PlaybackSessionState.Recovering,
-        playbackPlaying = playbackState is PlaybackSessionState.Playing,
-        playbackFailed = playbackState is PlaybackSessionState.Failed ||
+        playbackStarting = playbackState is AppPlaybackState.Starting,
+        playbackRecovering = playbackState is AppPlaybackState.Recovering,
+        playbackPlaying = playbackState is AppPlaybackState.Playing,
+        playbackFailed = playbackState is AppPlaybackState.Failed ||
             currentSubscriptionFailure != null,
     )
     val recoveryVisible = screenActive &&
@@ -566,7 +577,7 @@ fun VideoPlayerScreen(
     val recoveryUiModel = playbackRecoveryUiModel(
         surface = PlaybackRecoverySurface.LIVE,
         connectionAvailable = connState is ConnectionState.Connected,
-        retryTargetAvailable = playbackState is PlaybackSessionState.Recovering ||
+        retryTargetAvailable = playbackState is AppPlaybackState.Recovering ||
             currentSubscriptionFailure != null,
         simpleTvActive = simpleTvProfile.active,
     )
@@ -603,7 +614,7 @@ fun VideoPlayerScreen(
             playbackProgressing = playerPlaybackProgressing &&
                 !effectiveTimeshiftState.paused,
             playbackStable = connState is ConnectionState.Connected &&
-                playbackState is PlaybackSessionState.Playing &&
+                playbackState is AppPlaybackState.Playing &&
                 statusPresentation == PlaybackStatusPresentation.NONE,
             seekPending = timeshiftSeekQueue.pendingDeltaMs != 0L,
             modalVisible = optionsPage != null ||
@@ -612,7 +623,7 @@ fun VideoPlayerScreen(
                 channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
             actionableErrorVisible = connState is ConnectionState.Error ||
-                playbackState is PlaybackSessionState.Failed,
+                playbackState is AppPlaybackState.Failed,
         )
     )
     PlayerControlsAutoHideEffect(
@@ -712,7 +723,10 @@ fun VideoPlayerScreen(
                     connectionLost = false
                     showControls()
 
-                    if (videoPlayerViewModel.playService(currentServiceId)) {
+                    if (
+                        videoPlayerViewModel.playService(currentServiceId) ==
+                        AppPlaybackCommandResult.SUBMITTED
+                    ) {
                         lastPlayedServiceId = currentServiceId
                     }
                     if (restoreToLiveAfterReconnect) {
@@ -807,19 +821,25 @@ fun VideoPlayerScreen(
                 ) {
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> {
-                            player.play()
+                            videoPlayerViewModel.play()
                             scope.launch {
-                                if (!videoPlayerViewModel.resumeTimeshift()) {
+                                if (
+                                    videoPlayerViewModel.resumeTimeshift() !=
+                                    AppPlaybackCommandResult.SUBMITTED
+                                ) {
                                     timeshiftFeedback =
                                         timeshiftUnavailableText
                                 }
                             }
                         }
                         MediaPlaybackAction.PAUSE -> {
-                            player.pause()
+                            videoPlayerViewModel.pause()
                             scope.launch {
-                                if (!videoPlayerViewModel.pauseTimeshift()) {
-                                    player.play()
+                                if (
+                                    videoPlayerViewModel.pauseTimeshift() !=
+                                    AppPlaybackCommandResult.SUBMITTED
+                                ) {
+                                    videoPlayerViewModel.play()
                                     timeshiftFeedback =
                                         timeshiftUnavailableText
                                 }
@@ -827,18 +847,24 @@ fun VideoPlayerScreen(
                         }
                         MediaPlaybackAction.TOGGLE -> {
                             if (effectiveTimeshiftState.paused || !player.playWhenReady) {
-                                player.play()
+                                videoPlayerViewModel.play()
                                 scope.launch {
-                                    if (!videoPlayerViewModel.resumeTimeshift()) {
+                                    if (
+                                        videoPlayerViewModel.resumeTimeshift() !=
+                                        AppPlaybackCommandResult.SUBMITTED
+                                    ) {
                                         timeshiftFeedback =
                                             timeshiftUnavailableText
                                     }
                                 }
                             } else {
-                                player.pause()
+                                videoPlayerViewModel.pause()
                                 scope.launch {
-                                    if (!videoPlayerViewModel.pauseTimeshift()) {
-                                        player.play()
+                                    if (
+                                        videoPlayerViewModel.pauseTimeshift() !=
+                                        AppPlaybackCommandResult.SUBMITTED
+                                    ) {
+                                        videoPlayerViewModel.play()
                                         timeshiftFeedback =
                                             timeshiftUnavailableText
                                     }
@@ -926,13 +952,16 @@ fun VideoPlayerScreen(
                     }
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
                         if (effectiveTimeshiftState.paused || !player.playWhenReady) {
-                            player.play()
+                            videoPlayerViewModel.play()
                             scope.launch { videoPlayerViewModel.resumeTimeshift() }
                         } else {
-                            player.pause()
+                            videoPlayerViewModel.pause()
                             scope.launch {
-                                if (!videoPlayerViewModel.pauseTimeshift()) {
-                                    player.play()
+                                if (
+                                    videoPlayerViewModel.pauseTimeshift() !=
+                                    AppPlaybackCommandResult.SUBMITTED
+                                ) {
+                                    videoPlayerViewModel.play()
                                 }
                             }
                         }
@@ -1034,18 +1063,24 @@ fun VideoPlayerScreen(
                 timeshiftFeedback = timeshiftFeedback,
                 onToggleTimeshiftPause = {
                     if (effectiveTimeshiftState.paused) {
-                        player.play()
+                        videoPlayerViewModel.play()
                         scope.launch {
-                            if (!videoPlayerViewModel.resumeTimeshift()) {
+                            if (
+                                videoPlayerViewModel.resumeTimeshift() !=
+                                AppPlaybackCommandResult.SUBMITTED
+                            ) {
                                 timeshiftFeedback =
                                     timeshiftUnavailableText
                             }
                         }
                     } else {
-                        player.pause()
+                        videoPlayerViewModel.pause()
                         scope.launch {
-                            if (!videoPlayerViewModel.pauseTimeshift()) {
-                                player.play()
+                            if (
+                                videoPlayerViewModel.pauseTimeshift() !=
+                                AppPlaybackCommandResult.SUBMITTED
+                            ) {
+                                videoPlayerViewModel.play()
                                 timeshiftFeedback =
                                     timeshiftUnavailableText
                             }
@@ -1058,10 +1093,14 @@ fun VideoPlayerScreen(
                 onGoLive = {
                     scope.launch {
                         val decision = videoPlayerViewModel.goLive()
-                        if (decision == null || !videoPlayerViewModel.resumeTimeshift()) {
+                        if (
+                            decision !is AppTimeshiftSeekResult.Applied ||
+                            videoPlayerViewModel.resumeTimeshift() !=
+                            AppPlaybackCommandResult.SUBMITTED
+                        ) {
                             timeshiftFeedback = timeshiftUnavailableText
                         } else {
-                            player.play()
+                            videoPlayerViewModel.play()
                             timeshiftFeedback = null
                         }
                     }
@@ -1143,8 +1182,8 @@ fun VideoPlayerScreen(
                 page = page,
                 player = player,
                 tracksResolving =
-                    playbackState is PlaybackSessionState.Starting ||
-                        playbackState is PlaybackSessionState.Recovering,
+                    playbackState is AppPlaybackState.Starting ||
+                        playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
                 showSimpleTvExit = simpleTvProfile.active,
@@ -1201,12 +1240,12 @@ fun VideoPlayerScreen(
             message = stringResource(
                 when {
                     currentSubscriptionFailure != null ->
-                        subscriptionFailureMessageResource(currentSubscriptionFailure)
+                        currentSubscriptionFailure.messageResource()
                     simpleTvProfile.active && connState !is ConnectionState.Connected ->
                         R.string.simple_tv_recovery_connection
                     simpleTvProfile.active -> R.string.simple_tv_recovery_playback
                     connState !is ConnectionState.Connected -> R.string.player_connection_recovering
-                    playbackState is PlaybackSessionState.Failed -> R.string.player_playback_failed
+                    playbackState is AppPlaybackState.Failed -> R.string.player_playback_failed
                     else -> R.string.player_playback_recovering
                 }
             ),

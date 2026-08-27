@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.playback.PlaybackPreferencesProvider
 import at.bernhardberger.tvheadend.playback.PlaybackRuntime
 import at.bernhardberger.tvheadend.playback.createMedia3PlaybackRuntime
 import at.bernhardberger.tvhplayer.images.buildImageLoader
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsPlaybackPreferencesProvider
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
@@ -56,7 +57,8 @@ val appModule = module {
         SdkRuntimeOwner(client, playbackRuntime)
     } onClose { owner -> owner?.requestClose() }
     single<TvheadendClient> { get<SdkRuntimeOwner>().client }
-    single<PlaybackRuntime> { get<SdkRuntimeOwner>().playbackRuntime }
+    single<AppPlaybackRuntime> { get<SdkRuntimeOwner>().playbackRuntime }
+    single<PlaybackRuntime> { get<SdkRuntimeOwner>().legacyPlaybackRuntime }
     single<ChannelEpgRuntime> { get<TvheadendClient>() }
     single<DvrRuntime> { get<TvheadendClient>() }
 

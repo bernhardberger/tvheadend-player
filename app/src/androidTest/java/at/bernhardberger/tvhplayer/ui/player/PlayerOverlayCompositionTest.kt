@@ -18,7 +18,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.runtime.mutableStateOf
 import at.bernhardberger.tvheadend.core.EpgEventEntry
-import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -101,7 +101,7 @@ class PlayerOverlayCompositionTest {
                     onStopPlayback = {},
                     onUserInteraction = {},
                     onOpenOptions = {},
-                    timeshiftState = TimeshiftState(
+                    timeshiftState = AppTimeshiftState(
                         available = true,
                         bufferStartMs = -3_600_000,
                         positionMs = -30_000,
@@ -196,7 +196,7 @@ class PlayerOverlayCompositionTest {
                     onStopPlayback = {},
                     onUserInteraction = {},
                     onOpenOptions = {},
-                    timeshiftState = TimeshiftState(
+                    timeshiftState = AppTimeshiftState(
                         available = true,
                         bufferStartMs = -3_600_000,
                         positionMs = -4_000,
@@ -243,7 +243,7 @@ class PlayerOverlayCompositionTest {
                     onStopPlayback = {},
                     onUserInteraction = {},
                     onOpenOptions = {},
-                    timeshiftState = TimeshiftState(
+                    timeshiftState = AppTimeshiftState(
                         available = true,
                         bufferStartMs = -60_000,
                         positionMs = -30_000,
@@ -328,7 +328,7 @@ class PlayerOverlayCompositionTest {
                     onStopPlayback = {},
                     onUserInteraction = {},
                     onOpenOptions = {},
-                    timeshiftState = TimeshiftState(),
+                    timeshiftState = AppTimeshiftState(),
                     timeshiftFeedback = null,
                     onToggleTimeshiftPause = {},
                     onSeekTimeshift = {},

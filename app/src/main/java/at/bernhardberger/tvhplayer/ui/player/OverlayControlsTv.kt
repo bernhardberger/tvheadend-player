@@ -49,7 +49,7 @@ import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvheadend.core.EpgEventEntry
-import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward
@@ -85,7 +85,7 @@ fun OverlayControlsTv(
     onStopPlayback: () -> Unit,
     onUserInteraction: () -> Unit,
     onOpenOptions: () -> Unit,
-    timeshiftState: TimeshiftState,
+    timeshiftState: AppTimeshiftState,
     timeshiftFeedback: String?,
     onToggleTimeshiftPause: () -> Unit,
     onSeekTimeshift: (Long) -> Unit,

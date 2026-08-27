@@ -4,27 +4,29 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.client.ChannelEpgRuntime
 import at.bernhardberger.tvheadend.client.TvheadendClient
-import at.bernhardberger.tvheadend.playback.ExperimentalPlaybackDiagnosticsApi
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalPlaybackDiagnosticsApi::class)
 class VideoPlayerViewModel(
-    private val playbackRuntime: PlaybackRuntime,
+    private val playbackRuntime: AppPlaybackRuntime,
     private val channelRuntime: ChannelEpgRuntime,
     client: TvheadendClient,
 ) : ViewModel() {
     val connectionState = client.connectionState
     val playbackState = playbackRuntime.state
-    val activeChannelId = playbackRuntime.activeChannelId
-    val playingLiveChannelId = playbackRuntime.playingLiveChannelId
+    val activeChannelId = playbackRuntime.activeLiveServiceId
+    val playingLiveChannelId = playbackRuntime.playingLiveServiceId
     val timeshiftState = playbackRuntime.timeshiftState
-    val liveSubscriptionFailure = playbackRuntime.liveSubscriptionFailure
+    val liveSubscriptionFailure = playbackRuntime.livePlaybackIssue
     val diagnostics = playbackRuntime.diagnostics
 
     fun getPlayerInstance() = playbackRuntime.player
 
-    suspend fun playService(serviceId: Int): Boolean = playbackRuntime.playLive(serviceId)
+    fun play() = playbackRuntime.play()
+
+    fun pause() = playbackRuntime.pause()
+
+    suspend fun playService(serviceId: Int) = playbackRuntime.playLive(serviceId)
 
     suspend fun stop() {
         playbackRuntime.stop()

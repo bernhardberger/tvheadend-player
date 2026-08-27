@@ -110,7 +110,7 @@ import at.bernhardberger.tvheadend.core.DvrConfig
 import at.bernhardberger.tvheadend.core.DvrEntry
 import at.bernhardberger.tvheadend.core.DvrState
 import at.bernhardberger.tvheadend.core.EpgEventEntry
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -174,7 +174,7 @@ fun EpgGridScreen(
     selection: ChannelSelectionStore = koinInject(),
     repository: ChannelEpgRuntime = koinInject(),
     dvrRepository: DvrRuntime = koinInject(),
-    playerSession: PlaybackRuntime = koinInject(),
+    playerSession: AppPlaybackRuntime = koinInject(),
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
     guidePositionStore: GuidePositionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
@@ -198,7 +198,7 @@ fun EpgGridScreen(
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
-    val playingChannelId by playerSession.activeChannelId.collectAsStateWithLifecycle()
+    val playingChannelId by playerSession.activeLiveServiceId.collectAsStateWithLifecycle()
     val timeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
     val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
     val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()

@@ -21,7 +21,7 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
-import at.bernhardberger.tvheadend.playback.PlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
@@ -98,7 +98,7 @@ private fun Int.isStartupActivationKey(): Boolean = when (this) {
 
 class MainActivity : AppCompatActivity() {
     private val startupViewModel: MainStartupViewModel by viewModel()
-    private val playbackRuntime: PlaybackRuntime by inject()
+    private val playbackRuntime: AppPlaybackRuntime by inject()
     private var isPlayerVisible = false
     private var debugVideoBackdropVisible by mutableStateOf(false)
     private var debugVideoBackdropReceiverRegistered = false

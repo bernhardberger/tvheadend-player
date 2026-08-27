@@ -24,7 +24,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -43,7 +45,7 @@ class SdkRuntimeOwnerTest {
         val client = TvheadendClient(ioDispatcher = dispatcher)
         val owner = SdkRuntimeOwner(
             client = client,
-            playbackRuntime = playback,
+            legacyPlaybackRuntime = playback,
             shutdownDispatcher = dispatcher,
         )
 
@@ -64,6 +66,30 @@ class SdkRuntimeOwnerTest {
         runCurrent()
         shutdown.await()
 
+        assertClientClosed(client)
+    }
+
+    @Test
+    fun repeatedShutdownRequestsReleasePlaybackAndClientExactlyOnce() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        var releaseCalls = 0
+        val playback = FakePlaybackRuntime { releaseCalls++ }
+        val client = TvheadendClient(ioDispatcher = dispatcher)
+        val owner = SdkRuntimeOwner(
+            client = client,
+            legacyPlaybackRuntime = playback,
+            shutdownDispatcher = dispatcher,
+        )
+
+        val first = owner.requestClose()
+        val second = owner.requestClose()
+
+        assertSame(first, second)
+        runCurrent()
+        first.await()
+        owner.close()
+
+        assertEquals(1, releaseCalls)
         assertClientClosed(client)
     }
 

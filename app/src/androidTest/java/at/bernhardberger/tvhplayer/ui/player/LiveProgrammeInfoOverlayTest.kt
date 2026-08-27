@@ -44,7 +44,7 @@ import at.bernhardberger.tvhplayer.core.liveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingDismissed
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvheadend.core.EpgEventEntry
-import at.bernhardberger.tvheadend.core.TimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import org.junit.Assert.assertEquals
@@ -400,7 +400,7 @@ class LiveProgrammeInfoOverlayTest {
                         onStopPlayback = {},
                         onUserInteraction = {},
                         onOpenOptions = {},
-                        timeshiftState = TimeshiftState(),
+                        timeshiftState = AppTimeshiftState(),
                         timeshiftFeedback = null,
                         onToggleTimeshiftPause = {},
                         onSeekTimeshift = {},

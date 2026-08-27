@@ -49,12 +49,9 @@ import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSnapshot
 import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSource
 import at.bernhardberger.tvhplayer.player.PlaybackFormatDiagnostics
 import at.bernhardberger.tvhplayer.player.PlaybackOutputMode
-import at.bernhardberger.tvhplayer.player.PlaybackQueueDiagnostics
 import at.bernhardberger.tvhplayer.player.PlaybackSessionState
 import at.bernhardberger.tvhplayer.player.PlaybackSystemDiagnostics
 import at.bernhardberger.tvhplayer.player.PlaybackThermalLevel
-import at.bernhardberger.tvhplayer.player.PlaybackTransportDiagnostics
-import at.bernhardberger.tvhplayer.player.PlaybackTunerDiagnostics
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
@@ -911,23 +908,6 @@ private val maximumDiagnostics = PlaybackDiagnosticsSnapshot(
     audioDecoder = "c2.vendor.eac3.decoder.long-name",
     audioUnderruns = 12_345,
     readRateBitsPerSecond = 123_456_789L,
-    transport = PlaybackTransportDiagnostics(
-        tuner = PlaybackTunerDiagnostics(
-            status = "LOCKED WITH A DELIBERATELY LONG FRONTEND STATUS",
-            signalMilliDbm = -123_456L,
-            snrMilliDb = 45_678L,
-            bitErrorRate = 1_234_567L,
-            uncorrectedBlocks = 9_876_543L,
-        ),
-        queue = PlaybackQueueDiagnostics(
-            packets = 9_876_543L,
-            bytes = 987_654_321L,
-            delayMicros = 123_456L,
-            bFrameDrops = 987_654L,
-            pFrameDrops = 876_543L,
-            iFrameDrops = 765_432L,
-        ),
-    ),
     system = PlaybackSystemDiagnostics(
         outputMode = PlaybackOutputMode(3840, 2160, 59.94f),
         thermalLevel = PlaybackThermalLevel.EMERGENCY,
