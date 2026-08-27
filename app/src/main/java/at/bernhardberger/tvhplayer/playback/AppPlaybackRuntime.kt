@@ -9,6 +9,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
@@ -18,6 +19,7 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
 import at.bernhardberger.tvhplayer.data.DvrEntry
 import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.data.RecordingPlaybackIntent
@@ -140,6 +142,7 @@ class AppPlaybackRuntime(
     val player: ExoPlayer,
     private val coordinator: TvheadendPlaybackCoordinator,
     private val settings: PlayerSettingsStore,
+    private val streamProfileDiscovery: StreamProfileDiscovery,
     private val recordingProgressCapability: StateFlow<RecordingProgressCapability>,
     private val scope: CoroutineScope,
 ) {
@@ -208,9 +211,10 @@ class AppPlaybackRuntime(
         _activeRecording.value = null
         if (!recovering) _state.value = AppPlaybackState.Starting
         val playerSettings = settings.playerSettings.first()
-        val profile = playerSettings.profile.takeIf { it.isNotBlank() }?.let { value ->
-            runCatching { StreamProfileId(value) }.getOrNull()
-        }
+        val profile = prepareSelectedStreamProfile(
+            playerSettings.profile,
+            streamProfileDiscovery::discover,
+        )
         val result = coordinator.setLiveTarget(
             ChannelId(serviceId.toLong()),
             LivePlaybackOptions(
@@ -407,6 +411,17 @@ internal class AppPlaybackCommandGate {
     private val mutex = Mutex()
 
     suspend fun <T> run(command: suspend () -> T): T = mutex.withLock { command() }
+}
+
+internal suspend fun prepareSelectedStreamProfile(
+    value: String,
+    discover: suspend () -> StreamProfilesResult,
+): StreamProfileId? {
+    val profile = value.takeIf { it.isNotBlank() }?.let { selected ->
+        runCatching { StreamProfileId(selected) }.getOrNull()
+    }
+    if (profile != null) discover()
+    return profile
 }
 
 fun droppedFramePercentage(renderedFrames: Int, droppedFrames: Int): Float? {

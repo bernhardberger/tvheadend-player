@@ -37,7 +37,9 @@ The debug-only instrumentation invokes these app-level methods independently:
 
 Each invocation has a fixed timeout. Assertions report only typed acceptance
 codes. Raw instrumentation stdout and stderr are discarded rather than copied
-to evidence. The wrapper never requests broad logcat, UI hierarchy dumps,
+to evidence. A failed invocation retains only the first bounded
+`ACCEPTANCE_[A-Z0-9_]+` assertion code from stdout, or `UNCLASSIFIED` when none
+is present. The wrapper never requests broad logcat, UI hierarchy dumps,
 app-data export, preferences, keystore data, server addresses, credentials, or
 raw errors.
 
@@ -61,7 +63,8 @@ the app, export app data, or remove provisioned app-private credentials.
 The result is an ignored owner-only JSON file below
 `captures/device/acceptance/<12-char-commit>/`. Its schema contains only the full
 app commit, released SDK coordinate, debug APK SHA-256, public target name/role
-and four-property identity, method names, typed outcomes, bounded durations,
-cleanup result, and overall pass/fail. A failure prints no raw instrumentation
+and four-property identity, method names, typed outcomes, bounded durations, an
+optional bounded typed failure code, cleanup result, and overall pass/fail. A
+failure prints no raw instrumentation
 detail; inspect only the curated evidence and fix the named failing method before
 another authorized run.

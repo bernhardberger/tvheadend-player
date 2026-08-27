@@ -58,6 +58,9 @@ ACCEPTANCE_METHODS = (
 )
 ACCEPTANCE_METHOD_TIMEOUT_SECONDS = 120
 ACCEPTANCE_ADB_TIMEOUT_SECONDS = 30
+ACCEPTANCE_FAILURE_CODE_PATTERN = re.compile(
+    r"(?<![A-Z0-9_])(ACCEPTANCE_[A-Z0-9_]{1,96})(?![A-Z0-9_])"
+)
 G10_IDENTITY = {
     "manufacturer": "TCL",
     "model": "Smart TV Pro",
@@ -419,6 +422,13 @@ def acceptance_instrumentation_outcome(
     return "PASS" if passed else "FAIL"
 
 
+def acceptance_instrumentation_failure_code(
+    result: subprocess.CompletedProcess[str],
+) -> str:
+    match = ACCEPTANCE_FAILURE_CODE_PATTERN.search(result.stdout or "")
+    return match.group(1) if match else "UNCLASSIFIED"
+
+
 def package_query_command(adb: str, serial: str) -> list[str]:
     return adb_command(
         adb,
@@ -718,7 +728,14 @@ def run_debug_acceptance(
             )
             duration_ms = max(0, round((time.monotonic() - started) * 1000))
             outcome = "TIMEOUT" if result is None else acceptance_instrumentation_outcome(result)
-            methods.append({"name": method, "outcome": outcome, "durationMs": duration_ms})
+            method_evidence: dict[str, object] = {
+                "name": method,
+                "outcome": outcome,
+                "durationMs": duration_ms,
+            }
+            if outcome == "FAIL" and result is not None:
+                method_evidence["failureCode"] = acceptance_instrumentation_failure_code(result)
+            methods.append(method_evidence)
             if outcome != "PASS":
                 break
     except AcceptanceRunStopped:

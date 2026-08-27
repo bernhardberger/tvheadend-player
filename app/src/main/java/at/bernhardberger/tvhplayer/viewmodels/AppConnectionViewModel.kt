@@ -5,23 +5,21 @@ import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.SessionState
-import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
+import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
 import at.bernhardberger.tvhplayer.core.deriveCurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerProfileMigration
 import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
-import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.core.StreamProfileSelectionOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -31,6 +29,7 @@ class AppConnectionViewModel(
     private val profileMigration: ServerProfileMigration,
     private val serverSettings: ServerSettingsStore,
     private val playerSettings: PlayerSettingsStore,
+    private val streamProfileDiscovery: StreamProfileDiscovery,
 ) : ViewModel() {
     val connectionState = runtime.connectionState
     private val localState = MutableStateFlow<ConnectionUiState?>(ConnectionUiState.Connecting)
@@ -72,16 +71,12 @@ class AppConnectionViewModel(
             }
         }
         viewModelScope.launch {
-            runtime.session.state.filterIsInstance<SessionState.Ready>().collectLatest {
-                val profiles = runtime.session.getStreamProfiles()
-                if (profiles is StreamProfilesResult.Available) {
-                    playerSettings.migrateLegacyProfileSelection(
-                        profiles.profiles.map { profile ->
-                            StreamProfileSelectionOption(profile.id.value, profile.name)
-                        },
-                    )
-                }
-            }
+            collectReadyStreamProfileMigrations(
+                states = runtime.session.state,
+                currentState = { runtime.session.state.value },
+                discover = streamProfileDiscovery::discover,
+                migrate = playerSettings::migrateLegacyProfileSelection,
+            )
         }
     }
 

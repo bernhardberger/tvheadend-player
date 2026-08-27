@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
 import at.bernhardberger.tvhplayer.core.StreamProfileSelectionOption
 import at.bernhardberger.tvhplayer.core.selectedStreamProfileUuid
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -39,6 +40,7 @@ class SettingsPlayerViewModel(
     private val settingsStore: PlayerSettingsStore,
     private val playbackRuntime: AppPlaybackRuntime,
     private val session: TvheadendSession,
+    private val streamProfileDiscovery: StreamProfileDiscovery,
 ) : ViewModel() {
 
 
@@ -79,7 +81,7 @@ class SettingsPlayerViewModel(
                     _ui.update { it.copy(profiles = ProfilesUiState.Loading) }
 
                     val result = try {
-                        when (val profiles = session.getStreamProfiles()) {
+                        when (val profiles = streamProfileDiscovery.discover()) {
                             is StreamProfilesResult.Available -> Result.success(profiles.profiles)
                             else -> Result.failure(IllegalStateException(profiles::class.simpleName))
                         }

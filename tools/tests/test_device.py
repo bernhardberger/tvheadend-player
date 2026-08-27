@@ -216,6 +216,17 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertNotIn("uiautomator", command)
         self.assertNotIn("dumpsys", command)
 
+    def test_acceptance_playback_surface_requires_no_activity_component(self) -> None:
+        activity = "at.bernhardberger.tvhplayer.acceptance.AcceptancePlaybackSurfaceActivity"
+        debug_manifest = DEVICE["ROOT"] / "app/src/debug/AndroidManifest.xml"
+        instrumentation_manifest = DEVICE["ROOT"] / "app/src/androidTest/AndroidManifest.xml"
+
+        self.assertNotIn(activity, debug_manifest.read_text(encoding="utf-8"))
+        self.assertFalse(
+            instrumentation_manifest.exists()
+            and activity in instrumentation_manifest.read_text(encoding="utf-8")
+        )
+
     def test_acceptance_result_parser_fails_closed(self) -> None:
         passed = subprocess.CompletedProcess(
             args=["adb"],
@@ -232,6 +243,76 @@ class DevicePolicyTest(unittest.TestCase):
 
         self.assertEqual(DEVICE["acceptance_instrumentation_outcome"](passed), "PASS")
         self.assertEqual(DEVICE["acceptance_instrumentation_outcome"](failed), "FAIL")
+
+    def test_acceptance_failure_code_parser_retains_only_allowlisted_code(self) -> None:
+        failed = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout=(
+                "java.lang.AssertionError: ACCEPTANCE_PLAYBACK_FAILED_BAD_SIGNAL\n"
+                "private server detail\n"
+            ),
+            stderr="private transport detail",
+        )
+        unknown = subprocess.CompletedProcess(
+            args=["adb"],
+            returncode=0,
+            stdout="java.lang.AssertionError: private server detail\n",
+            stderr="ACCEPTANCE_CONNECTION_FAILED private transport detail",
+        )
+
+        self.assertEqual(
+            DEVICE["acceptance_instrumentation_failure_code"](failed),
+            "ACCEPTANCE_PLAYBACK_FAILED_BAD_SIGNAL",
+        )
+        self.assertEqual(
+            DEVICE["acceptance_instrumentation_failure_code"](unknown),
+            "UNCLASSIFIED",
+        )
+
+    def test_acceptance_orchestration_retains_only_typed_failure_code(self) -> None:
+        package_queries = 0
+
+        def fake_run(command: list[str], *, timeout_seconds: int):
+            nonlocal package_queries
+            if command == DEVICE["package_query_command"]("adb", "configured-serial"):
+                package_queries += 1
+                stdout = (
+                    f"package:{DEVICE['TEST_PACKAGE']}\n"
+                    if package_queries == 2
+                    else ""
+                )
+            elif "instrument" in command:
+                stdout = (
+                    "java.lang.AssertionError: ACCEPTANCE_PLAYBACK_FAILED_BAD_SIGNAL\n"
+                    "private server detail\nFAILURES!!!\nINSTRUMENTATION_CODE: -1\n"
+                )
+            else:
+                stdout = "Success\n"
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=stdout,
+                stderr="private transport detail",
+            )
+
+        with patch.dict(
+            DEVICE["run_debug_acceptance"].__globals__,
+            {"run_bounded_redacted": fake_run},
+        ):
+            methods, cleanup = DEVICE["run_debug_acceptance"](
+                "adb",
+                "configured-serial",
+                {"progressiveChannelId": "101", "interlacedChannelId": "202"},
+                Path("/private/app-debug.apk"),
+                Path("/private/app-debug-androidTest.apk"),
+            )
+
+        self.assertEqual(len(methods), 1)
+        self.assertEqual(methods[0]["name"], "readMetadataProfilesAndArtwork")
+        self.assertEqual(methods[0]["outcome"], "FAIL")
+        self.assertEqual(methods[0]["failureCode"], "ACCEPTANCE_PLAYBACK_FAILED_BAD_SIGNAL")
+        self.assertEqual(cleanup, "PASS")
 
     def test_acceptance_package_query_distinguishes_exact_presence_absence_and_invalid_output(self) -> None:
         present = subprocess.CompletedProcess(

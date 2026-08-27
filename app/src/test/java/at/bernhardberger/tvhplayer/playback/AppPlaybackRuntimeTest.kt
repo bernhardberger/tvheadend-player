@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.playback
 
+import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
@@ -36,6 +37,22 @@ class AppPlaybackRuntimeTest {
             TimeshiftCommandResult.entries.size,
             TimeshiftCommandResult.entries.map { it.toAppCommandResult() }.toSet().size,
         )
+    }
+
+    @Test
+    fun selectedProfileDiscoveryCompletesBeforeTuneSubmission() = runTest {
+        val calls = mutableListOf<String>()
+
+        val selected = prepareSelectedStreamProfile(
+            "11111111111111111111111111111111",
+        ) {
+            calls += "discover"
+            StreamProfilesResult.NotReady
+        }
+        calls += "submit"
+
+        assertEquals("11111111111111111111111111111111", selected?.value)
+        assertEquals(listOf("discover", "submit"), calls)
     }
 
     @Test

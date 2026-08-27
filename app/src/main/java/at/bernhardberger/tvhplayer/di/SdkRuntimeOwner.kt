@@ -5,6 +5,7 @@ package at.bernhardberger.tvhplayer.di
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
+import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
 import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import kotlin.time.Duration.Companion.seconds
@@ -23,6 +24,7 @@ internal class SdkRuntimeOwner(
     val session: TvheadendSession,
     val dataRuntime: TvheadendDataRuntime,
     val playbackRuntime: AppPlaybackRuntime,
+    val streamProfileDiscovery: StreamProfileDiscovery,
     private val coordinator: TvheadendPlaybackCoordinator,
     private val coordinatorRunJob: Job,
     private val player: ExoPlayer,
@@ -60,6 +62,7 @@ internal class SdkRuntimeOwner(
             session: TvheadendSession,
             dataRuntime: TvheadendDataRuntime,
             playbackRuntime: AppPlaybackRuntime,
+            streamProfileDiscovery: StreamProfileDiscovery,
             coordinator: TvheadendPlaybackCoordinator,
             player: ExoPlayer,
             applicationScope: CoroutineScope,
@@ -70,6 +73,7 @@ internal class SdkRuntimeOwner(
                 session,
                 dataRuntime,
                 playbackRuntime,
+                streamProfileDiscovery,
                 coordinator,
                 runJob,
                 player,

@@ -2,12 +2,14 @@
 
 package at.bernhardberger.tvhplayer.acceptance
 
+import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
+import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
 import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackCommandResult
@@ -20,6 +22,7 @@ import coil3.request.SuccessResult
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -28,24 +31,41 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 
 @RunWith(AndroidJUnit4::class)
 class DeviceAcceptanceTest {
+    @get:Rule
+    val failureCodeReporter = AcceptanceFailureCodeReporter()
+
     private val koin get() = GlobalContext.get()
     private val runtime get() = koin.get<TvheadendDataRuntime>()
     private val playback get() = koin.get<AppPlaybackRuntime>()
     private val profileStore get() = koin.get<TvheadendServerProfileStore>()
     private val imageLoader get() = koin.get<ImageLoader>()
+    private val streamProfileDiscovery get() = koin.get<StreamProfileDiscovery>()
+    private var playbackSurface: AcceptancePlaybackSurface? = null
 
     @After
     fun cleanUp() = runTest(timeout = 30.seconds) {
         try {
             onMain { playback.stop() }
         } finally {
-            onMain { runtime.session.disconnect() }
+            try {
+                playbackSurface?.let { attached ->
+                    onMain {
+                        playback.player.clearVideoSurface(attached.surface)
+                        attached.close()
+                    }
+                }
+            } finally {
+                onMain { runtime.session.disconnect() }
+            }
         }
     }
 
@@ -56,7 +76,7 @@ class DeviceAcceptanceTest {
         val channels = runtime.channels.value
         assertTrue("ACCEPTANCE_CHANNEL_METADATA_EMPTY", channels.isNotEmpty())
 
-        val profiles = onMain { runtime.session.getStreamProfiles() }
+        val profiles = streamProfileDiscovery.discover()
         assertTrue("ACCEPTANCE_PROFILES_UNAVAILABLE", profiles is StreamProfilesResult.Available)
         assertTrue(
             "ACCEPTANCE_PROFILES_EMPTY",
@@ -95,17 +115,9 @@ class DeviceAcceptanceTest {
         val second = channelId("interlacedChannelId")
         requireKnownChannel(first)
         requireKnownChannel(second)
-        assertEquals(
-            "ACCEPTANCE_INITIAL_TUNE_REJECTED",
-            AppPlaybackCommandResult.SUBMITTED,
-            onMain { playback.playLive(first) },
-        )
+        submitLive(first, "ACCEPTANCE_INITIAL_TUNE_REJECTED")
         awaitPlaying(first)
-        assertEquals(
-            "ACCEPTANCE_REPLACEMENT_REJECTED",
-            AppPlaybackCommandResult.SUBMITTED,
-            onMain { playback.playLive(second) },
-        )
+        submitLive(second, "ACCEPTANCE_REPLACEMENT_REJECTED")
         awaitPlaying(second)
     }
 
@@ -158,11 +170,7 @@ class DeviceAcceptanceTest {
         connectReady()
         val channel = channelId("progressiveChannelId")
         requireKnownChannel(channel)
-        assertEquals(
-            "ACCEPTANCE_TEARDOWN_TUNE_REJECTED",
-            AppPlaybackCommandResult.SUBMITTED,
-            onMain { playback.playLive(channel) },
-        )
+        submitLive(channel, "ACCEPTANCE_TEARDOWN_TUNE_REJECTED")
         awaitPlaying(channel)
         val stopResult = onMain { playback.stop() }
         assertEquals(
@@ -183,15 +191,19 @@ class DeviceAcceptanceTest {
         connectReady()
         requireKnownChannel(channel)
         onMain { playback.setDiagnosticsEnabled(true) }
-        assertEquals(
-            "ACCEPTANCE_LIVE_TUNE_REJECTED",
-            AppPlaybackCommandResult.SUBMITTED,
-            onMain { playback.playLive(channel) },
-        )
+        submitLive(channel, "ACCEPTANCE_LIVE_TUNE_REJECTED")
         awaitPlaying(channel)
         await(30.seconds) {
             playback.diagnostics.first { diagnostics ->
                 diagnostics.isPlaying && diagnostics.video != null && diagnostics.audio != null
+            }
+        }
+        withTimeout(30.seconds) {
+            while (onMain {
+                    playback.player.videoDecoderCounters?.renderedOutputBufferCount ?: 0
+                } <= 0
+            ) {
+                delay(100)
             }
         }
     }
@@ -204,6 +216,20 @@ class DeviceAcceptanceTest {
             runtime.session.state.first { it is SessionState.Ready || it is SessionState.Unavailable }
         }
         assertTrue("ACCEPTANCE_CONNECTION_FAILED", terminal is SessionState.Ready)
+    }
+
+    private suspend fun submitLive(channel: Int, rejectionCode: String) {
+        if (playbackSurface == null) {
+            val attached = onMain { createAcceptancePlaybackSurface() }
+            onMain { playback.player.setVideoSurface(attached.surface) }
+            playbackSurface = attached
+        }
+        assertEquals(
+            rejectionCode,
+            AppPlaybackCommandResult.SUBMITTED,
+            onMain { playback.playLive(channel) },
+        )
+        onMain { playback.play() }
     }
 
     private suspend fun awaitPlaying(channel: Int) {
@@ -232,4 +258,21 @@ class DeviceAcceptanceTest {
 
     private suspend fun <T> await(timeout: Duration, block: suspend () -> T): T =
         withContext(Dispatchers.Default) { withTimeout(timeout) { block() } }
+}
+
+class AcceptanceFailureCodeReporter : TestWatcher() {
+    override fun failed(failure: Throwable, description: Description) {
+        val code = generateSequence(failure) { it.cause }
+            .mapNotNull { cause -> FAILURE_CODE.find(cause.message.orEmpty())?.value }
+            .firstOrNull()
+            ?: "UNCLASSIFIED"
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            2,
+            Bundle().apply { putString("acceptanceFailureCode", code) },
+        )
+    }
+
+    private companion object {
+        val FAILURE_CODE = Regex("""(?<![A-Z0-9_])ACCEPTANCE_[A-Z0-9_]{1,96}(?![A-Z0-9_])""")
+    }
 }
