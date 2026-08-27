@@ -37,8 +37,8 @@ root:
 
 The built-in `build` is the sole writable primary for application and repository
 work. `AGENTS.md`, the active package packet, and `/continue-app` supply its
-authority. The orchestrator selects GPT-5.6 Sol at the ledger's exact `high` or
-`max` effort. No custom writable primary or repository-configured primary step
+authority. The orchestrator selects GPT-5.6 Sol at the ledger's exact `medium`,
+`high`, `xhigh`, or `max` effort. No custom writable primary or repository-configured primary step
 ceiling exists.
 
 The six managed read-only roles have explicit non-inheriting assignments:
@@ -46,7 +46,7 @@ The six managed read-only roles have explicit non-inheriting assignments:
 Sol/medium/30, `app-research` Sol/low/35, `android-reviewer` Sol/high/45, and
 `tv-ux-reviewer` Sol/medium/40. They use standard service by default and may be
 switched together to matching `-fast` IDs. Fast IDs select service priority, not
-a different model. Changing the writable primary to max never changes a child.
+a different model. Changing the writable primary effort never changes a child.
 
 OpenCode cannot hot-reload model assignments for later Task calls. Use the
 checked repository tool or matching slash command, then restart OpenCode:

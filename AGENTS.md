@@ -145,7 +145,7 @@ review, and `tv-ux-reviewer` only for screenshot-first design review against
 exact supplied evidence. Children cannot edit, use shell, run builds or devices,
 delegate, mutate Git, or read project instructions, ledgers, handoffs, archives,
 or broad plans. Their configured model variants and step limits do not inherit
-the writable primary's `high` or `max` effort.
+the writable primary's `medium`, `high`, `xhigh`, or `max` effort.
 
 Start each child as a fresh session by omitting `task_id`; never resume old child
 history. Supply one self-contained question with accepted invariants, included
