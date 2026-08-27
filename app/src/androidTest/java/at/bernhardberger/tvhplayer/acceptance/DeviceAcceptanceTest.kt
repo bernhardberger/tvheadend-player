@@ -19,10 +19,13 @@ import coil3.ImageLoader
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
+import java.util.concurrent.CancellationException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
@@ -186,7 +189,9 @@ class DeviceAcceptanceTest {
     }
 
     private suspend fun verifyLivePlayback(role: FixtureRole) {
-        val fixture = connectAndResolveFixture()
+        val fixture = withAcceptanceStage("ACCEPTANCE_STAGE_SETUP_FAILED") {
+            connectAndResolveFixture()
+        }
         val channel = when (role) {
             FixtureRole.Progressive -> fixture.progressiveChannelId
             FixtureRole.Interlaced -> fixture.interlacedChannelId
@@ -198,12 +203,12 @@ class DeviceAcceptanceTest {
         onMain { playback.setDiagnosticsEnabled(true) }
         submitLive(channel, "ACCEPTANCE_LIVE_TUNE_REJECTED")
         awaitPlaying(channel)
-        await(30.seconds) {
+        awaitStage(30.seconds, "ACCEPTANCE_STAGE_PLAYER_READINESS_FAILED") {
             playback.diagnostics.first { diagnostics ->
                 diagnostics.isPlaying && diagnostics.video != null && diagnostics.audio != null
             }
         }
-        withTimeout(30.seconds) {
+        awaitStage(30.seconds, "ACCEPTANCE_STAGE_RENDERED_FRAME_FAILED") {
             while (onMain {
                     playback.player.videoDecoderCounters?.renderedOutputBufferCount ?: 0
                 } <= 0
@@ -249,23 +254,40 @@ class DeviceAcceptanceTest {
 
     private suspend fun submitLive(channel: Int, rejectionCode: String) {
         if (playbackSurface == null) {
-            val attached = onMain { createAcceptancePlaybackSurface() }
-            onMain { playback.player.setVideoSurface(attached.surface) }
+            val attached = withAcceptanceStage("ACCEPTANCE_STAGE_SURFACE_SETUP_FAILED") {
+                onMain { createAcceptancePlaybackSurface() }
+            }
+            withAcceptanceStage("ACCEPTANCE_STAGE_SURFACE_SETUP_FAILED") {
+                onMain { playback.player.setVideoSurface(attached.surface) }
+            }
             playbackSurface = attached
         }
-        assertEquals(
-            rejectionCode,
-            AppPlaybackCommandResult.SUBMITTED,
-            onMain { playback.playLive(channel) },
-        )
-        onMain { playback.play() }
+        val result = withAcceptanceStage("ACCEPTANCE_STAGE_TARGET_ADMISSION_FAILED") {
+            onMain { playback.playLive(channel) }
+        }
+        if (result != AppPlaybackCommandResult.SUBMITTED) {
+            val code = if (rejectionCode == "ACCEPTANCE_LIVE_TUNE_REJECTED") {
+                acceptanceTargetFailureCode(result)
+            } else {
+                rejectionCode
+            }
+            failFixture(code)
+        }
+        withAcceptanceStage("ACCEPTANCE_STAGE_PLAYER_READINESS_FAILED") {
+            onMain { playback.play() }
+        }
     }
 
     private suspend fun awaitPlaying(channel: Int) {
-        val state = await(45.seconds) {
-            playback.state.first { it is AppPlaybackState.Playing || it is AppPlaybackState.Failed }
+        val (state, issue) = awaitStage(45.seconds, "ACCEPTANCE_STAGE_PLAYER_READINESS_FAILED") {
+            combine(playback.state, playback.livePlaybackIssue) { currentState, currentIssue ->
+                currentState to currentIssue
+            }.first { (currentState, currentIssue) ->
+                currentState is AppPlaybackState.Playing || currentIssue != null
+            }
         }
-        assertTrue("ACCEPTANCE_PLAYBACK_FAILED", state is AppPlaybackState.Playing)
+        issue?.let { failFixture(acceptanceSubscriptionFailureCode(it)) }
+        assertTrue("ACCEPTANCE_STAGE_PLAYER_READINESS_FAILED", state is AppPlaybackState.Playing)
         assertEquals("ACCEPTANCE_ACTIVE_CHANNEL_MISMATCH", channel, playback.activeLiveServiceId.value)
     }
 
@@ -286,6 +308,22 @@ class DeviceAcceptanceTest {
 
     private suspend fun <T> await(timeout: Duration, block: suspend () -> T): T =
         withContext(Dispatchers.Default) { withTimeout(timeout) { block() } }
+
+    private suspend fun <T> awaitStage(
+        timeout: Duration,
+        failureCode: String,
+        block: suspend () -> T,
+    ): T = try {
+        await(timeout, block)
+    } catch (_: TimeoutCancellationException) {
+        throw AssertionError(failureCode)
+    } catch (failure: CancellationException) {
+        throw failure
+    } catch (failure: AssertionError) {
+        throw failure
+    } catch (_: Exception) {
+        throw AssertionError(failureCode)
+    }
 }
 
 class AcceptanceFailureCodeReporter : TestWatcher() {
