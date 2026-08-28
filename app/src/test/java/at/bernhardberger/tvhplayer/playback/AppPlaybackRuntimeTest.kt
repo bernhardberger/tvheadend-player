@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.playback
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -10,6 +11,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppPlaybackRuntimeTest {
+    private val repositoryRoot = generateSequence(
+        File(requireNotNull(System.getProperty("user.dir"))),
+    ) { it.parentFile }.first { File(it, ".git").exists() }
+
+    @Test
+    fun liveTargetSetsAppOwnedPlayIntentBeforeCoordinatorInstall() {
+        val source = File(
+            repositoryRoot,
+            "app/src/main/java/at/bernhardberger/tvhplayer/playback/AppPlaybackRuntime.kt",
+        ).readText()
+        val playIndex = source.indexOf("player.play()")
+        val installIndex = source.indexOf("coordinator.setLiveTarget(")
+
+        assertTrue(playIndex >= 0)
+        assertTrue(playIndex < installIndex)
+    }
+
     @Test
     fun unavailableSdkTimeshiftStateHasUnavailablePresentation() {
         assertEquals(

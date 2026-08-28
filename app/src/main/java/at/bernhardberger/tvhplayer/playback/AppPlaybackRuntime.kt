@@ -167,13 +167,16 @@ class AppPlaybackRuntime(
                 selection.channelId,
             )
         ) {
-            is PlaybackBindingResult.Bound -> coordinator.setLiveTarget(
-                binding.binding,
-                LivePlaybackOptions(
-                    streamProfileId = streamProfileId,
-                    timeshiftPeriod = if (playerSettings.timeshiftEnabled) 2.hours else kotlin.time.Duration.ZERO,
-                ),
-            )
+            is PlaybackBindingResult.Bound -> {
+                player.play()
+                coordinator.setLiveTarget(
+                    binding.binding,
+                    LivePlaybackOptions(
+                        streamProfileId = streamProfileId,
+                        timeshiftPeriod = if (playerSettings.timeshiftEnabled) 2.hours else kotlin.time.Duration.ZERO,
+                    ),
+                )
+            }
             PlaybackBindingResult.ObservationExpired -> PlaybackTargetResult.NOT_READY
             PlaybackBindingResult.TargetUnavailable -> PlaybackTargetResult.TARGET_UNAVAILABLE
         }
