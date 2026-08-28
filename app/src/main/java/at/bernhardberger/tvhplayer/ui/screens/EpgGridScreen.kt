@@ -74,6 +74,7 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
@@ -211,7 +212,8 @@ fun EpgGridScreen(
         layoutDirection = layoutDirection,
     )
     val coroutineScope = rememberCoroutineScope()
-    val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
+    val channelScopeState by channelViewModel.scope.collectAsStateWithLifecycle()
+    val channelScope = channelScopeState.scope
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     val channels = channelScope.visibleChannels
@@ -777,6 +779,7 @@ fun EpgGridScreen(
                 GuideEmptyState(
                     isEmptyTag = channelScope.activeTagId != null,
                     connectionUiState = connectionUiState,
+                    channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
                     onRetry = onRetry,
                     onOpenConnectionSettings = onOpenConnectionSettings,
                     retryFocusRequester = guideRetryFocus,
@@ -1861,34 +1864,24 @@ private fun GuideConnectionRecovery(
 private fun GuideEmptyState(
     isEmptyTag: Boolean,
     connectionUiState: ConnectionUiState,
+    channelCatalogCurrent: Boolean,
     onRetry: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     retryFocusRequester: FocusRequester,
 ) {
     val permissionDenied = connectionUiState is ConnectionUiState.Error &&
         connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED
-    val message = if (isEmptyTag) {
-        stringResource(R.string.empty_channel_tag)
-    } else {
-        stringResource(
-            when (connectionUiState) {
-                ConnectionUiState.Connecting,
-                ConnectionUiState.SyncingChannels -> R.string.epg_loading
-                ConnectionUiState.Reconnecting -> R.string.epg_reconnecting
-                is ConnectionUiState.Error -> if (permissionDenied) {
-                    R.string.epg_permission_denied
-                } else {
-                    R.string.epg_server_failure
-                }
-                is ConnectionUiState.SubscriptionError -> R.string.epg_server_failure
-                ConnectionUiState.NeedsConfiguration -> R.string.connection_configuration_required
-                ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
-                ConnectionUiState.Ready -> R.string.no_channels_available
-            }
-        )
-    }
+    val message = stringResource(
+        guideEmptyMessageRes(
+            isEmptyTag = isEmptyTag,
+            connectionUiState = connectionUiState,
+            channelCatalogCurrent = channelCatalogCurrent,
+        ),
+    )
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("guide-empty-state"),
         colors = SurfaceDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -1921,6 +1914,29 @@ private fun GuideEmptyState(
                 }
             }
         }
+    }
+}
+
+internal fun guideEmptyMessageRes(
+    isEmptyTag: Boolean,
+    connectionUiState: ConnectionUiState,
+    channelCatalogCurrent: Boolean,
+): Int = when (connectionUiState) {
+    ConnectionUiState.Connecting,
+    ConnectionUiState.SyncingChannels -> R.string.epg_loading
+    ConnectionUiState.Reconnecting -> R.string.epg_reconnecting
+    is ConnectionUiState.Error -> if (connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED) {
+        R.string.epg_permission_denied
+    } else {
+        R.string.epg_server_failure
+    }
+    is ConnectionUiState.SubscriptionError -> R.string.epg_server_failure
+    ConnectionUiState.NeedsConfiguration -> R.string.connection_configuration_required
+    ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
+    ConnectionUiState.Ready -> when {
+        !channelCatalogCurrent -> R.string.epg_loading
+        isEmptyTag -> R.string.empty_channel_tag
+        else -> R.string.no_channels_available
     }
 }
 

@@ -35,6 +35,13 @@ fun resolveChannelScope(
     requestedTagId: ChannelTagId?,
     visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
 ): ChannelBrowsingScope {
+    val orderedChannels = channels.sortedWith(
+        compareBy<Channel> { it.number == null }
+            .thenBy { it.number }
+            .thenBy { it.numberMinor != null }
+            .thenBy { it.numberMinor }
+            .thenBy { it.id.value },
+    )
     val visibleTags = tags.filter { visibility.isTagVisible(it.id) }
     val allChannelsVisible = visibility.isAllChannelsVisible() || visibleTags.isEmpty()
     val requestedTag = requestedTagId?.let { id ->
@@ -54,11 +61,11 @@ fun resolveChannelScope(
     }
 
     return ChannelBrowsingScope(
-        allChannels = channels,
+        allChannels = orderedChannels,
         visibleChannels = if (activeTagId == null) {
-            channels
+            orderedChannels
         } else {
-            channels.filter { channel -> activeTagId in channel.tagIds.orEmpty() }
+            orderedChannels.filter { channel -> activeTagId in channel.tagIds.orEmpty() }
         },
         tags = visibleTags,
         allChannelsVisible = allChannelsVisible,

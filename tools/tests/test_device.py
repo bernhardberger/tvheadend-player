@@ -24,6 +24,8 @@ debug_video_backdrop_applied = DEVICE["debug_video_backdrop_applied"]
 resolve_screenshot_output = DEVICE["resolve_screenshot_output"]
 default_screenshot_output = DEVICE["default_screenshot_output"]
 sanitize_screenshot_name = DEVICE["sanitize_screenshot_name"]
+package_installation_status = DEVICE["package_installation_status"]
+run_channel_guide_check = DEVICE["run_channel_guide_check"]
 run = DEVICE["run"]
 read_device_properties = DEVICE["read_device_properties"]
 key_events = DEVICE["KEY_EVENTS"]
@@ -425,6 +427,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "keys",
                 "screenshot",
                 "provision-test-credentials",
+                "channel-guide-check",
                 "allow-appliance-autostart",
             ):
                 with self.subTest(role=role, action=action):
@@ -440,10 +443,243 @@ class DevicePolicyTest(unittest.TestCase):
             "keys",
             "screenshot",
             "provision-test-credentials",
+            "channel-guide-check",
             "allow-appliance-autostart",
         ):
             with self.subTest(action=action):
                 self.assertIsNone(action_policy_error("test", action))
+
+    def test_channel_guide_check_is_a_bounded_test_device_action(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["channel-guide-check"])
+
+        self.assertEqual(args.action, "channel-guide-check")
+        self.assertFalse(hasattr(args, "test_apk"))
+
+    def test_channel_guide_check_uses_fixed_instrumentation_and_cleans_up(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                completed,
+                completed,
+                completed,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                run_channel_guide_check(
+                    "adb",
+                    "test-device",
+                    "at.bernhardberger.tvhplayer",
+                )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertIn(
+            [
+                "adb",
+                "-s",
+                "test-device",
+                "shell",
+                "am",
+                "instrument",
+                "-w",
+                "-e",
+                "class",
+                DEVICE["CHANNEL_GUIDE_TEST"],
+                "at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner",
+            ],
+            commands,
+        )
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+
+    def test_channel_guide_check_cleans_up_after_install_failure(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        run_mock = Mock(side_effect=[completed, SystemExit(2), completed, completed])
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    run_channel_guide_check(
+                        "adb",
+                        "test-device",
+                        "at.bernhardberger.tvhplayer",
+                    )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+
+    def test_channel_guide_check_cleans_up_after_stale_state_cannot_be_verified(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        run_mock = Mock(side_effect=[completed, completed, completed])
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[None, False]),
+                },
+            ):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    run_channel_guide_check(
+                        "adb",
+                        "test-device",
+                        "at.bernhardberger.tvhplayer",
+                    )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+
+    def test_channel_guide_check_fails_when_cleanup_does_not_complete(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        cleanup_failure = subprocess.CompletedProcess(
+            ["adb"],
+            1,
+            stdout="",
+            stderr="force-stop failed",
+        )
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                completed,
+                completed,
+                cleanup_failure,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    run_channel_guide_check(
+                        "adb",
+                        "test-device",
+                        "at.bernhardberger.tvhplayer",
+                    )
+
+    def test_package_presence_query_distinguishes_absent_from_unverified(self) -> None:
+        absent = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        query_failure = subprocess.CompletedProcess(
+            ["adb"],
+            1,
+            stdout="",
+            stderr="device unavailable",
+        )
+        with patch.dict(
+            DEVICE_GLOBALS,
+            {"run": Mock(side_effect=[absent, query_failure])},
+        ):
+            self.assertFalse(
+                package_installation_status("adb", "test-device", "example.test")
+            )
+            self.assertIsNone(
+                package_installation_status("adb", "test-device", "example.test")
+            )
+
+    def test_channel_guide_check_rejects_unverified_or_remaining_cleanup_package(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        for cleanup_status in (None, True):
+            with self.subTest(cleanup_status=cleanup_status):
+                run_mock = Mock(
+                    side_effect=[
+                        completed,
+                        completed,
+                        instrumentation,
+                        completed,
+                        completed,
+                        completed,
+                    ]
+                )
+                with tempfile.TemporaryDirectory() as directory:
+                    test_apk = Path(directory) / "app-debug-androidTest.apk"
+                    test_apk.touch()
+                    with patch.dict(
+                        DEVICE_GLOBALS,
+                        {
+                            "DEFAULT_TEST_APK": test_apk,
+                            "run": run_mock,
+                            "package_installation_status": Mock(
+                                side_effect=[False, cleanup_status]
+                            ),
+                        },
+                    ):
+                        with self.assertRaisesRegex(SystemExit, "2"):
+                            run_channel_guide_check(
+                                "adb",
+                                "test-device",
+                                "at.bernhardberger.tvhplayer",
+                            )
+
+                self.assertEqual(
+                    run_mock.call_args_list[-1].args[0][-2:],
+                    ["force-stop", "at.bernhardberger.tvhplayer"],
+                )
 
     def test_read_only_actions_are_allowed_for_every_role(self) -> None:
         for role in ("production", "test", "unclassified"):

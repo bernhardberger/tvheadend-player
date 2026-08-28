@@ -13,6 +13,8 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import org.junit.Assert.assertEquals
@@ -20,6 +22,50 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class EpgGridObservationPolicyTest {
+    @Test
+    fun readyTransportDoesNotPresentEmptyBeforeTheChannelCatalogIsCurrent() {
+        assertEquals(
+            R.string.epg_loading,
+            guideEmptyMessageRes(
+                isEmptyTag = false,
+                connectionUiState = ConnectionUiState.Ready,
+                channelCatalogCurrent = false,
+            ),
+        )
+    }
+
+    @Test
+    fun currentEmptyChannelCatalogIsAuthoritative() {
+        assertEquals(
+            R.string.no_channels_available,
+            guideEmptyMessageRes(
+                isEmptyTag = false,
+                connectionUiState = ConnectionUiState.Ready,
+                channelCatalogCurrent = true,
+            ),
+        )
+    }
+
+    @Test
+    fun activeTagIsEmptyOnlyAfterTheChannelCatalogIsCurrent() {
+        assertEquals(
+            R.string.epg_loading,
+            guideEmptyMessageRes(
+                isEmptyTag = true,
+                connectionUiState = ConnectionUiState.Ready,
+                channelCatalogCurrent = false,
+            ),
+        )
+        assertEquals(
+            R.string.empty_channel_tag,
+            guideEmptyMessageRes(
+                isEmptyTag = true,
+                connectionUiState = ConnectionUiState.Ready,
+                channelCatalogCurrent = true,
+            ),
+        )
+    }
+
     @Test
     fun currentGenerationCannotSelectAStaleConfigurationId() {
         val staleConfiguration = configuration("generation-a")

@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -136,7 +137,8 @@ fun ChannelsScreen(
         contentPadding = contentPadding,
         layoutDirection = layoutDirection,
     )
-    val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
+    val channelScopeState by channelViewModel.scope.collectAsStateWithLifecycle()
+    val channelScope = channelScopeState.scope
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     val dvrEntries = observation.dvrEntries()
@@ -469,9 +471,9 @@ fun ChannelsScreen(
                                 )
 
                                 ChannelRow(
-                                    modifier = Modifier.focusRequester(
-                                        rowFocusRequesters.getValue(channelId)
-                                    ),
+                                    modifier = Modifier
+                                        .focusRequester(rowFocusRequesters.getValue(channelId))
+                                        .testTag("channel-row-${channelId.value}"),
                                     number = ChannelNavigation.numberForId(
                                         orderedChannelIds,
                                         channelNumbers,

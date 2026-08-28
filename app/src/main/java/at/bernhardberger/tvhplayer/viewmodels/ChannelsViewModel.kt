@@ -11,6 +11,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
+import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import at.bernhardberger.tvhplayer.core.TagScopeFallback
 import at.bernhardberger.tvhplayer.core.resolveChannelScope
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
@@ -21,41 +22,46 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+data class ChannelScopeState(
+    val scope: ChannelBrowsingScope,
+    val channelCatalogCurrent: Boolean,
+)
+
 class ChannelsViewModel(
     private val session: TvheadendSession,
     private val tagSettings: ChannelTagSettingsStore,
 ) : ViewModel() {
     val observation: StateFlow<SessionObservation> = session.observation
 
-    val scope: StateFlow<ChannelBrowsingScope> = combine(
+    val scope: StateFlow<ChannelScopeState> = combine(
         session.observation,
         tagSettings.activeTagId,
         tagSettings.scopeVisibility,
     ) { observation, activeTagId, visibility ->
-        val catalog = observation.channelCatalog()
-        resolveChannelScope(catalog.channels, catalog.tags, activeTagId, visibility)
+        resolveChannelScopeState(observation.channelState, activeTagId, visibility)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
-        initialValue = resolveChannelScope(emptyList(), emptyList(), null),
+        initialValue = resolveChannelScopeState(ChannelRepositoryState.Empty, null),
     )
 
-    val channels = scope.map { it.visibleChannels }.stateIn(
+    val channels = scope.map { it.scope.visibleChannels }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
-    val allChannels = session.observation.map { it.channelCatalog().channels }
+    val allChannels = session.observation.map { it.channelState.channelCatalog().channels }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val unavailableTagNotice = tagSettings.unavailableTagNotice
 
     init {
         viewModelScope.launch {
-            combine(scope, session.observation, tagSettings.activeTagId) {
-                    currentScope, observation, requestedTagId ->
-                val metadataReady = observation.channelState is ChannelRepositoryState.Current
-                if (metadataReady && currentScope.activeTagId != requestedTagId) {
-                    currentScope
+            combine(scope, tagSettings.activeTagId) { currentState, requestedTagId ->
+                if (
+                    currentState.channelCatalogCurrent &&
+                    currentState.scope.activeTagId != requestedTagId
+                ) {
+                    currentState.scope
                 } else {
                     null
                 }
@@ -70,7 +76,7 @@ class ChannelsViewModel(
         }
         viewModelScope.launch {
             combine(session.observation, tagSettings.scopeVisibility) { observation, visibility ->
-                val tags = observation.channelCatalog().tags
+                val tags = observation.channelState.channelCatalog().tags
                 val metadataReady = observation.channelState is ChannelRepositoryState.Current
                 if (
                     metadataReady &&
@@ -112,10 +118,22 @@ class ChannelsViewModel(
     }
 }
 
-private fun SessionObservation.channelCatalog(): ChannelCatalog = when (val state = channelState) {
-    is ChannelRepositoryState.Current -> state.catalog
-    is ChannelRepositoryState.Stale -> state.catalog
-    is ChannelRepositoryState.Synchronizing -> state.staleCatalog ?: ChannelCatalog.create()
+internal fun resolveChannelScopeState(
+    channelState: ChannelRepositoryState,
+    activeTagId: ChannelTagId?,
+    visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
+): ChannelScopeState {
+    val catalog = channelState.channelCatalog()
+    return ChannelScopeState(
+        scope = resolveChannelScope(catalog.channels, catalog.tags, activeTagId, visibility),
+        channelCatalogCurrent = channelState is ChannelRepositoryState.Current,
+    )
+}
+
+private fun ChannelRepositoryState.channelCatalog(): ChannelCatalog = when (this) {
+    is ChannelRepositoryState.Current -> catalog
+    is ChannelRepositoryState.Stale -> catalog
+    is ChannelRepositoryState.Synchronizing -> staleCatalog ?: ChannelCatalog.create()
     ChannelRepositoryState.Empty -> ChannelCatalog.create()
 }
 

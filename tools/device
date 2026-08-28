@@ -29,6 +29,10 @@ LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
 DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
 LEGACY_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
+DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+CHANNEL_GUIDE_TEST = (
+    "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest"
+)
 RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 CAPTURE_ROOT = ROOT / "captures/device"
@@ -63,6 +67,7 @@ TEST_DEVICE_ACTIONS = {
     "keys",
     "screenshot",
     "provision-test-credentials",
+    "channel-guide-check",
     "allow-appliance-autostart",
 }
 RELEASE_DEVICE_ACTIONS = {"install-release"}
@@ -530,15 +535,96 @@ def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
     print(f"autoStart={auto_start}")
 
 
-def package_is_installed(adb: str, serial: str, package_name: str) -> bool:
+def package_installation_status(
+    adb: str,
+    serial: str,
+    package_name: str,
+) -> bool | None:
     result = run(
-        adb_command(adb, serial, "shell", "pm", "path", package_name),
+        adb_command(adb, serial, "shell", "pm", "list", "packages", package_name),
         capture=True,
         check=False,
     )
-    return result.returncode == 0 and any(
-        line.startswith("package:") for line in result.stdout.splitlines()
+    if result.returncode != 0:
+        return None
+    return any(
+        line.strip() == f"package:{package_name}" for line in result.stdout.splitlines()
     )
+
+
+def package_is_installed(adb: str, serial: str, package_name: str) -> bool:
+    status = package_installation_status(adb, serial, package_name)
+    if status is None:
+        fail(f"could not verify package installation state: {package_name}")
+    return status
+
+
+def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
+    if package_name != DEFAULT_PACKAGE:
+        fail(f"channel-guide-check is available only for package {DEFAULT_PACKAGE}")
+    if DEFAULT_TEST_APK.is_symlink() or not DEFAULT_TEST_APK.is_file():
+        fail(f"instrumentation APK does not exist: {DEFAULT_TEST_APK}")
+
+    test_package = f"{package_name}.test"
+    runner = "androidx.test.runner.AndroidJUnitRunner"
+    expected_instrumentation = (
+        f"instrumentation:{test_package}/{runner} (target={package_name})"
+    )
+
+    try:
+        run(
+            adb_command(adb, serial, "uninstall", test_package),
+            capture=True,
+            check=False,
+        )
+        if package_is_installed(adb, serial, test_package):
+            fail(f"stale instrumentation package could not be removed: {test_package}")
+
+        run(adb_command(adb, serial, "install", "-r", str(DEFAULT_TEST_APK)))
+        installed_instrumentation = run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "pm",
+                "list",
+                "instrumentation",
+                package_name,
+            ),
+            capture=True,
+        )
+        if expected_instrumentation not in {
+            line.strip() for line in installed_instrumentation.stdout.splitlines()
+        }:
+            fail("installed instrumentation identity does not match the bounded check")
+        run(
+            adb_command(
+                adb,
+                serial,
+                "shell",
+                "am",
+                "instrument",
+                "-w",
+                "-e",
+                "class",
+                CHANNEL_GUIDE_TEST,
+                f"{test_package}/{runner}",
+            )
+        )
+    finally:
+        run(
+            adb_command(adb, serial, "uninstall", test_package),
+            capture=True,
+            check=False,
+        )
+        instrumentation_status = package_installation_status(adb, serial, test_package)
+        force_stop = run(
+            adb_command(adb, serial, "shell", "am", "force-stop", package_name),
+            capture=True,
+            check=False,
+        )
+        if instrumentation_status is not False or force_stop.returncode != 0:
+            fail("channel-guide-check cleanup did not complete")
 
 
 def resolve_verified_release_apk(bundle: Path) -> Path:
@@ -822,6 +908,10 @@ def build_parser() -> argparse.ArgumentParser:
         "provision-test-credentials",
         help="Provision credentials from the configured local secret file into a debug app",
     )
+    subparsers.add_parser(
+        "channel-guide-check",
+        help="Run the bounded real-catalog channel and Guide instrumentation check",
+    )
 
     key_parser = subparsers.add_parser("key", help="Send an approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
@@ -1054,6 +1144,10 @@ def main() -> int:
         if status != "ok":
             fail("debug app did not accept the credential payload; no sensitive output shown")
         print("test-device credentials provisioned into app-private storage")
+        return 0
+
+    if args.action == "channel-guide-check":
+        run_channel_guide_check(adb, serial, package_name)
         return 0
 
     if args.action == "launch":
