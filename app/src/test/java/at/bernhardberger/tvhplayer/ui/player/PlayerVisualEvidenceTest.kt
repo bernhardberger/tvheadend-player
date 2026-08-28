@@ -36,15 +36,30 @@ import androidx.tv.material3.Text
 import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.HtmlReportWriter
 import app.cash.paparazzi.Paparazzi
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.TimeshiftState
-import at.bernhardberger.tvhplayer.htsp.DvrEntry
-import at.bernhardberger.tvhplayer.htsp.DvrFile
-import at.bernhardberger.tvhplayer.htsp.DvrState
-import at.bernhardberger.tvhplayer.htsp.EpgEventEntry
 import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSnapshot
 import at.bernhardberger.tvhplayer.player.PlaybackDiagnosticsSource
 import at.bernhardberger.tvhplayer.player.PlaybackFormatDiagnostics
@@ -62,6 +77,8 @@ import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import coil3.ImageLoader
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.seconds
 import com.android.resources.Density
 import com.android.resources.Keyboard
 import com.android.resources.KeyboardState
@@ -476,7 +493,7 @@ private fun ColorSemanticEvidence(scenario: ColorEvidenceScenario) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RecordingStatusIndicator(state = DvrState.SCHEDULED)
+                            RecordingStatusIndicator(state = DvrEntryState.SCHEDULED)
                             Text("Recording status: Scheduled", color = TvRecordingColor)
                         }
                         Text("Recording scheduled", color = MaterialTheme.colorScheme.onSurface)
@@ -548,6 +565,7 @@ private fun LiveControls(
         val event = event(title = title)
         OverlayControlsTv(
             imageLoader = imageLoader,
+            currentSession = null,
             channelNumber = 1,
             channelName = channelName,
             piconPath = null,
@@ -588,6 +606,7 @@ private fun RecordingControls(
         val imageLoader = ImageLoader.Builder(LocalContext.current).build()
         RecordingOverlayControls(
             imageLoader = imageLoader,
+            currentSession = null,
             piconPath = null,
             title = title,
             subtitle = subtitle,
@@ -716,6 +735,7 @@ private fun EvidenceChannelDrawer() {
                     programTitle = item.third,
                     progress = 0.18f + index * 0.14f,
                     imageLoader = imageLoader,
+                    currentSession = null,
                     piconPath = null,
                     focused = index == 1,
                     playingNow = index == 0,
@@ -818,55 +838,76 @@ private fun event(
     start: Long = NOW_SEC - 1_800L,
     stop: Long = NOW_SEC + 1_800L,
     title: String = "Zeit im Bild",
-) = EpgEventEntry(
-    eventId = id,
-    channelId = 1,
-    start = start,
-    stop = stop,
+) = EpgEventEntry.create(
+    id = EventId(id.toLong()),
+    channelId = ChannelId(1),
+    start = Instant.fromEpochSeconds(start),
+    stop = Instant.fromEpochSeconds(stop),
     title = title,
     summary = "The most important stories, context, weather, and a detailed regional outlook.",
     description = "A deterministic programme synopsis long enough to exercise the player information panel without relying on a TVHeadend connection.",
     genre = "News",
-    seasonNumber = 4,
-    episodeNumber = 12,
+    episode = EpgEpisode(null, null, 4, null, 12, null, null, null, null),
 )
 
 private fun EpgEventEntry.recordingTarget() = ProgrammeRecordingTarget(
-    eventId = eventId,
+    eventId = id,
     channelId = channelId,
-    start = start,
-    stop = stop,
-    title = title,
+    start = start.epochSeconds,
+    stop = stop.epochSeconds,
+    title = title.orEmpty(),
+    currentSession = evidenceCurrentSession,
 )
 
-private val germanEvent = EpgEventEntry(
-    eventId = 99,
-    channelId = 1,
-    start = NOW_SEC - 1_800L,
-    stop = NOW_SEC + 1_800L,
+private val germanEvent = EpgEventEntry.create(
+    id = EventId(99),
+    channelId = ChannelId(1),
+    start = Instant.fromEpochSeconds(NOW_SEC - 1_800L),
+    stop = Instant.fromEpochSeconds(NOW_SEC + 1_800L),
     title = "Eine außergewöhnlich lange Nachrichtensendung mit ausführlicher Überschrift",
     summary = "Die wichtigsten Meldungen des Tages und ihre Hintergründe.",
     description = "Eine ausführliche, deterministische Programmbeschreibung für die Prüfung von Zeilenlängen, Informationshierarchie und Lesbarkeit aus großer Entfernung.",
     genre = "Nachrichten und Zeitgeschehen",
-    seasonNumber = 12,
-    episodeNumber = 348,
+    episode = EpgEpisode(null, null, 12, null, 348, null, null, null, null),
 )
 
-private val recordingEntry = DvrEntry(
-    id = 42,
-    eventId = 99,
-    channelId = 1,
-    start = NOW_SEC - 7_200L,
-    stop = NOW_SEC,
+private val recordingEntry = DvrEntry.create(
+    id = DvrEntryId(42),
+    eventId = EventId(99),
+    channelId = ChannelId(1),
+    start = Instant.fromEpochSeconds(NOW_SEC - 7_200L),
+    stop = Instant.fromEpochSeconds(NOW_SEC),
     title = "Eine außergewöhnlich lange deutschsprachige Aufnahme mit ausführlicher Überschrift",
     subtitle = "Folge 12 · Die Zukunft des öffentlich-rechtlichen Fernsehens",
     summary = "Eine ausführliche Zusammenfassung der aufgezeichneten Sendung mit genügend Text für eine realistische Zehn-Fuß-Prüfung.",
     description = "Deterministische Beschreibung ohne Netzwerk- oder Serverabhängigkeit.",
-    state = DvrState.COMPLETED,
-    files = listOf(DvrFile(id = 1, path = "/recordings/evidence.ts", size = 4_294_967_296L)),
+    state = DvrEntryState.COMPLETED,
+    files = listOf(
+        DvrRecordingFile(
+            fileId = 1,
+            path = "/recordings/evidence.ts",
+            start = null,
+            stop = null,
+            sizeBytes = 4_294_967_296L,
+        )
+    ),
     channelName = "Österreichischer Rundfunk Nachrichten International HD",
-    playPosition = 2_880L,
+    playPosition = 2_880.seconds,
 )
+
+private val evidenceCurrentSession = FakeSessionObservation(
+    SessionObservation.create(
+        sessionState = SessionState.Ready(
+            ServerCapabilities.create(
+                streaming = CapabilityAccess.ALLOWED,
+                dvrWrite = CapabilityAccess.ALLOWED,
+            )
+        ),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+    )
+).captureCurrentSession()
 
 private val liveEdgeTimeshift = TimeshiftState(
     available = true,

@@ -1,11 +1,11 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class CurrentChannelReadinessTest {
-
     @Test
     fun disconnectedTransportWithPublishedMetadataWaits() {
         assertEquals(
@@ -13,7 +13,7 @@ class CurrentChannelReadinessTest {
             deriveCurrentChannelReadiness(
                 connected = false,
                 metadataReady = true,
-                channels = listOf(channel(id = 1)),
+                channels = listOf(Channel.create(ChannelId(1))),
             ),
         )
     }
@@ -25,14 +25,14 @@ class CurrentChannelReadinessTest {
             deriveCurrentChannelReadiness(
                 connected = true,
                 metadataReady = false,
-                channels = listOf(channel(id = 1)),
+                channels = listOf(Channel.create(ChannelId(1))),
             ),
         )
     }
 
     @Test
     fun connectedTransportWithReadyMetadataCarriesExactChannelSnapshot() {
-        val channels = listOf(channel(id = 1), channel(id = 2))
+        val channels = listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2)))
 
         assertEquals(
             CurrentChannelReadiness.Ready(channels),
@@ -58,7 +58,7 @@ class CurrentChannelReadinessTest {
 
     @Test
     fun readyStateCopiesItsSourceSnapshot() {
-        val expected = channel(id = 1)
+        val expected = Channel.create(ChannelId(1))
         val source = mutableListOf(expected)
 
         val readiness = deriveCurrentChannelReadiness(
@@ -71,10 +71,4 @@ class CurrentChannelReadinessTest {
         assertEquals(listOf(expected), readiness.channels)
     }
 
-    private fun channel(id: Int) = Channel(
-        channelId = id,
-        name = "Channel $id",
-        number = id,
-        icon = null,
-    )
 }

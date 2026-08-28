@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.DvrEntry
-import at.bernhardberger.tvhplayer.data.DvrState
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import kotlin.math.abs
 
 enum class ProgrammeAction {
@@ -20,14 +20,15 @@ fun programmeActions(
     canModifyRecordings: Boolean = true,
 ): List<ProgrammeAction> {
     val actions = when {
-        event.start <= nowSec && nowSec < event.stop -> listOf(ProgrammeAction.WATCH)
-        event.start > nowSec -> when (recording?.state) {
-            DvrState.SCHEDULED, DvrState.RECORDING -> listOf(ProgrammeAction.CANCEL_RECORDING)
+        event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds -> listOf(ProgrammeAction.WATCH)
+        event.start.epochSeconds > nowSec -> when (recording?.state) {
+            DvrEntryState.SCHEDULED,
+            DvrEntryState.RECORDING -> listOf(ProgrammeAction.CANCEL_RECORDING)
             else -> listOf(ProgrammeAction.RECORD)
         }
         serverTimeshiftCoversEvent ||
-            recording?.state == DvrState.COMPLETED ||
-            recording?.state == DvrState.RECORDING -> listOf(ProgrammeAction.WATCH_FROM_START)
+            recording?.state == DvrEntryState.COMPLETED ||
+            recording?.state == DvrEntryState.RECORDING -> listOf(ProgrammeAction.WATCH_FROM_START)
         else -> emptyList()
     }
     if (canModifyRecordings) return actions
@@ -39,4 +40,4 @@ fun programmeActions(
 fun nearestProgrammeAt(
     events: List<EpgEventEntry>,
     targetStartSec: Long,
-): EpgEventEntry? = events.minByOrNull { abs(it.start - targetStartSec) }
+): EpgEventEntry? = events.minByOrNull { abs(it.start.epochSeconds - targetStartSec) }

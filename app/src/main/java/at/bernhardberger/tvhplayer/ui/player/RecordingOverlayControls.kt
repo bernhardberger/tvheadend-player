@@ -50,6 +50,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
@@ -71,6 +72,7 @@ import coil3.ImageLoader
 @Composable
 internal fun RecordingOverlayControls(
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation? = null,
     piconPath: String?,
     title: String,
     subtitle: String?,
@@ -184,6 +186,7 @@ internal fun RecordingOverlayControls(
     Box(Modifier.fillMaxSize()) {
         PlayerIdentityHeader(
             imageLoader = imageLoader,
+            currentSession = currentSession,
             piconPath = piconPath,
             eyebrow = channelName?.takeIf(String::isNotBlank),
             title = title,

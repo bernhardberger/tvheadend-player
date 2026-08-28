@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 
 sealed interface ConnectionUiState {
@@ -32,4 +33,13 @@ fun SessionState.toConnectionUiState(): ConnectionUiState = when (this) {
             else -> ConnectionFailureKind.OTHER
         },
     )
+}
+
+fun SessionState.toConnectionState(): ConnectionState = when (this) {
+    SessionState.Disconnected -> ConnectionState.Disconnected
+    SessionState.Connecting, SessionState.Synchronizing -> ConnectionState.Connecting
+    is SessionState.Ready -> ConnectionState.Connected
+    is SessionState.Unavailable -> ConnectionState.Error(toConnectionUiState().let {
+        (it as ConnectionUiState.Error).kind
+    })
 }

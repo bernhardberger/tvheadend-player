@@ -113,20 +113,27 @@ import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
+import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.data.ConnectionState
-import at.bernhardberger.tvhplayer.data.DvrRuntime
-import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.ui.common.nextAfter
-import at.bernhardberger.tvhplayer.ui.common.nowEvent
 import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
@@ -210,8 +217,8 @@ fun VideoPlayerScreen(
     settingsStore: PlayerSettingsStore = koinInject(),
     channelsVm: ChannelsViewModel = koinViewModel(),
     imageLoader: ImageLoader = koinInject(),
-    dvrRepository: DvrRuntime = koinInject(),
-    channelId: Int,
+    session: TvheadendSession = koinInject(),
+    channelId: ChannelId,
     channelName: String,
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     onReconnect: () -> Unit,
@@ -240,14 +247,17 @@ fun VideoPlayerScreen(
         AppTimeshiftState()
     }
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
-    val allChannels by channelsVm.allChannels.collectAsStateWithLifecycle()
-    val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
+    val observation by videoPlayerViewModel.observation.collectAsStateWithLifecycle()
+    val currentSession = observation.currentSession
+    val dvrEntries = observation.dvrEntries()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
-    val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
-    val orderedChannelIds = remember(channels) { channels.map { it.channelId } }
-    val channelNumbers = remember(channels) { channels.associate { it.channelId to it.number } }
+    val canModifyRecordings = currentSession != null
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
+    val channelNumbers = remember(channels) {
+        channels.associate { it.id to it.number?.toInt() }
+    }
     val selectedInitId by selection.selectedId.collectAsStateWithLifecycle()
-    var selectedId by remember { mutableIntStateOf(selectedInitId) }
+    var selectedId by remember { mutableStateOf(selectedInitId) }
 
     var connectionLost by remember { mutableStateOf(false) }
     var screenActive by remember { mutableStateOf(false) }
@@ -275,8 +285,10 @@ fun VideoPlayerScreen(
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
     val rootFocus = remember { FocusRequester() }
 
-    var currentChannelId by remember { mutableIntStateOf(channelId) }
+    var currentChannelId by remember { mutableStateOf(channelId) }
     var currentChannelName by remember { mutableStateOf(channelName) }
+    var requestedLiveSelection by remember { mutableStateOf<LivePlaybackSelection?>(null) }
+    var initialPlaybackResolved by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val timeshiftUnavailableText = stringResource(R.string.timeshift_unavailable)
@@ -309,23 +321,43 @@ fun VideoPlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    var lastPlayedChannelId by remember { mutableIntStateOf(-1) }
-    LaunchedEffect(screenActive, currentChannelId) {
+    var lastPlayedChannelId by remember { mutableStateOf<ChannelId?>(null) }
+    LaunchedEffect(screenActive, currentChannelId, currentSession, requestedLiveSelection) {
         if (!screenActive) {
-            lastPlayedChannelId = -1
+            lastPlayedChannelId = null
             return@LaunchedEffect
         }
 
         if (lastPlayedChannelId == currentChannelId) return@LaunchedEffect
+        if (
+            playingLiveChannelId == currentChannelId &&
+            playbackState !is AppPlaybackState.Idle &&
+            playbackState !is AppPlaybackState.Failed
+        ) {
+            lastPlayedChannelId = currentChannelId
+            requestedLiveSelection = null
+            initialPlaybackResolved = true
+            return@LaunchedEffect
+        }
 
-        if (lastPlayedChannelId != -1) {
+        if (lastPlayedChannelId != null) {
             videoPlayerViewModel.stop()
         }
+        if (playbackState is AppPlaybackState.Failed && requestedLiveSelection == null) {
+            return@LaunchedEffect
+        }
+        if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
+        val playbackSelection = requestedLiveSelection
+            ?.takeIf { it.channelId == currentChannelId }
+            ?: currentSession?.let { LivePlaybackSelection(it, currentChannelId) }
+            ?: return@LaunchedEffect
+        initialPlaybackResolved = true
         if (
-            videoPlayerViewModel.playChannel(currentChannelId) ==
+            videoPlayerViewModel.playChannel(playbackSelection) ==
             PlaybackTargetResult.STARTED
         ) {
             lastPlayedChannelId = currentChannelId
+            requestedLiveSelection = null
         }
     }
 
@@ -376,7 +408,7 @@ fun VideoPlayerScreen(
         selectedId = browsingFocusChannelId(
             visibleChannels = channels,
             currentFocusId = currentChannelId,
-        ) ?: -1
+        )
         hideControls()
         drawerOpen = true
     }
@@ -461,24 +493,29 @@ fun VideoPlayerScreen(
     }
 
     fun tuneChannel(channel: Channel): Boolean {
+        val channelId = channel.id
         timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
         timeshiftSeekToken++
         timeshiftSeekFeedbackJob?.cancel()
         timeshiftSeekFeedbackJob = null
         timeshiftSeekPreview = null
         channelNumberInput = ""
-        selection.setSelected(channel.channelId)
-        selectedId = channel.channelId
+        selection.setSelected(channelId)
+        selectedId = channelId
 
         if (
-            channelPickAction(currentChannelId, channel.channelId) == ChannelPickAction.CLOSE_DRAWER
+            channelPickAction(currentChannelId, channelId) == ChannelPickAction.CLOSE_DRAWER
         ) {
             drawerOpen = false
             return true
         }
 
-        currentChannelId = channel.channelId
-        currentChannelName = channel.name
+        val playbackSelection = currentSession?.let {
+            LivePlaybackSelection(it, channelId)
+        } ?: return true
+        requestedLiveSelection = playbackSelection
+        currentChannelId = channelId
+        currentChannelName = channel.name.orEmpty()
         timeshiftFeedback = null
 
         drawerOpen = false
@@ -493,7 +530,7 @@ fun VideoPlayerScreen(
             direction = direction,
         ) ?: return false
 
-        val channel = channels.firstOrNull { it.channelId == adjacentId } ?: return false
+        val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
         return tuneChannel(channel)
     }
 
@@ -507,7 +544,7 @@ fun VideoPlayerScreen(
         )
         channelNumberInput = ""
 
-        val channel = channels.firstOrNull { it.channelId == channelId }
+        val channel = channels.firstOrNull { it.id == channelId }
         return channel?.let(::tuneChannel) ?: true
     }
 
@@ -523,8 +560,6 @@ fun VideoPlayerScreen(
         tuneEnteredChannel()
     }
 
-    val epg by videoPlayerViewModel.epgForChannel(currentChannelId).collectAsStateWithLifecycle()
-
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -533,10 +568,20 @@ fun VideoPlayerScreen(
         }
     }
 
-    val nowEvent = remember(epg, nowSec) { epg.nowEvent(nowSec) }
-    val nextEvent = remember(epg, nowEvent) { epg.nextAfter(nowEvent) }
-    val currentChannel = remember(allChannels, currentChannelId) {
-        allChannels.firstOrNull { it.channelId == currentChannelId }
+    val nowEvent = remember(observation, currentChannelId, nowSec) {
+        observation.eventAt(
+            currentChannelId,
+            kotlin.time.Instant.fromEpochSeconds(nowSec),
+        )
+    }
+    val nextEvent = remember(observation, currentChannelId, nowSec) {
+        observation.nextEvent(
+            currentChannelId,
+            kotlin.time.Instant.fromEpochSeconds(nowSec),
+        )
+    }
+    val currentChannel = remember(observation, currentChannelId) {
+        observation.channel(currentChannelId)
     }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
@@ -545,10 +590,12 @@ fun VideoPlayerScreen(
             currentChannelId,
         )
     }
-    val currentRecording = remember(dvrEntries, nowEvent?.eventId) {
-        nowEvent?.let { event -> dvrEntries.firstOrNull { it.eventId == event.eventId } }
+    val currentRecording = remember(observation, nowEvent?.id) {
+        nowEvent?.let { observation.dvrEntryForEvent(it.id) }
     }
-    val currentRecordingTarget = nowEvent?.programmeRecordingTarget()
+    val currentRecordingTarget = currentSession?.let { capability ->
+        nowEvent?.programmeRecordingTarget(capability)
+    }
     val optimisticRecordingTarget = when (val state = infoRecordingState) {
         is LiveInfoRecordingState.Dispatching -> state.target
         is LiveInfoRecordingState.Succeeded -> state.target
@@ -684,7 +731,13 @@ fun VideoPlayerScreen(
             is LiveInfoRecordingDecision.Dispatch -> {
                 infoRecordingState = LiveInfoRecordingState.Dispatching(decision.target)
                 scope.launch {
-                    val result = dvrRepository.scheduleEvent(decision.target.eventId)
+                    val result = session.dvrRepository.scheduleEntry(
+                        decision.target.currentSession,
+                        DvrScheduleRequest(
+                            schedule = DvrSchedule.Programme(decision.target.eventId),
+                            title = decision.target.title,
+                        ),
+                    )
                     val completion = liveInfoRecordingCompletion(
                         state = infoRecordingState,
                         result = result,
@@ -725,12 +778,7 @@ fun VideoPlayerScreen(
                     connectionLost = false
                     showControls()
 
-                    if (
-                        videoPlayerViewModel.playChannel(currentChannelId) ==
-                        PlaybackTargetResult.STARTED
-                    ) {
-                        lastPlayedChannelId = currentChannelId
-                    }
+                    videoPlayerViewModel.retryLiveNow()
                     if (restoreToLiveAfterReconnect) {
                         timeshiftFeedback = timeshiftReconnectLiveText
                         restoreToLiveAfterReconnect = false
@@ -750,7 +798,7 @@ fun VideoPlayerScreen(
                             ).atLiveEdge
                     showControls()
                     videoPlayerViewModel.stop()
-                    lastPlayedChannelId = -1
+                    lastPlayedChannelId = null
                 }
             }
         }
@@ -1018,6 +1066,7 @@ fun VideoPlayerScreen(
                 nowSec = nowSec,
                 channelsVm = channelsVm,
                 imageLoader = imageLoader,
+                currentSession = currentSession,
                 onFocusChannel = { selectedId = it },
                 onPickChannel = { tuneChannel(it) },
                 onCloseDrawer = { drawerOpen = false },
@@ -1033,6 +1082,7 @@ fun VideoPlayerScreen(
         ) {
             OverlayControlsTv(
                 imageLoader = imageLoader,
+                currentSession = currentSession,
                 channelNumber = currentChannelNumber,
                 channelName = currentChannelName,
                 piconPath = currentChannel?.icon,
@@ -1123,8 +1173,8 @@ fun VideoPlayerScreen(
                 state = effectiveTimeshiftState,
                 decision = requireNotNull(timeshiftSeekPreview).decision,
                 nowEpochSec = nowSec,
-                programmeStartSec = nowEvent?.start,
-                programmeStopSec = nowEvent?.stop,
+                programmeStartSec = nowEvent?.start?.epochSeconds,
+                programmeStopSec = nowEvent?.stop?.epochSeconds,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -1148,8 +1198,9 @@ fun VideoPlayerScreen(
                 restoreRecordFocus = restoreRecordFocus,
                 onRecord = {
                     val event = nowEvent ?: return@LiveProgrammeInfoOverlay
+                    val capability = currentSession ?: return@LiveProgrammeInfoOverlay
                     infoRecordingState = LiveInfoRecordingState.Confirming(
-                        event.programmeRecordingTarget()
+                        event.programmeRecordingTarget(capability)
                     )
                     recordingDialogVisible = true
                     restoreRecordFocus = false
@@ -1160,6 +1211,7 @@ fun VideoPlayerScreen(
                 piconContent = {
                     PiconBox(
                         imageLoader = imageLoader,
+                        currentSession = currentSession,
                         piconPath = currentChannel?.icon,
                         modifier = Modifier.width(96.dp).height(54.dp),
                     )
@@ -1293,4 +1345,11 @@ fun VideoPlayerScreen(
             },
         )
     }
+}
+
+private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
+    is DvrRepositoryState.Current -> state.snapshot.entries
+    DvrRepositoryState.Empty,
+    is DvrRepositoryState.Stale,
+    is DvrRepositoryState.Synchronizing -> emptyList()
 }

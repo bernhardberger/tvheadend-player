@@ -49,7 +49,9 @@ import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
 import at.bernhardberger.tvhplayer.core.SeekbarRange
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.playerBackAction
@@ -57,6 +59,7 @@ import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import java.util.Locale
+import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -460,11 +463,11 @@ class PlayerTimelineTruthfulnessTest {
                     channelNumber = 1,
                     channelName = "Channel",
                     piconPath = null,
-                    nowEvent = EpgEventEntry(
-                        eventId = 1,
-                        channelId = 1,
-                        start = 3_600L,
-                        stop = 7_200L,
+                    nowEvent = EpgEvent.create(
+                        id = EventId(1),
+                        channelId = ChannelId(1),
+                        start = Instant.fromEpochSeconds(3_600L),
+                        stop = Instant.fromEpochSeconds(7_200L),
                         title = "Programme",
                     ),
                     nextEvent = null,

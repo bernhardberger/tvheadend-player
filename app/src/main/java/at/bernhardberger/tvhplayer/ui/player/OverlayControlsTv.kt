@@ -47,8 +47,9 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.ImageLoader
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.PlaybackOverlayFocusTarget
 import at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward
@@ -72,6 +73,7 @@ import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 @Composable
 fun OverlayControlsTv(
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation? = null,
     channelNumber: Int?,
     channelName: String,
     piconPath: String?,
@@ -165,12 +167,14 @@ fun OverlayControlsTv(
     val programmeAxis = programmeAnchoredAxis(
         state = timeshiftState,
         nowEpochSec = nowSec,
-        programmeStartSec = nowEvent?.start,
-        programmeStopSec = nowEvent?.stop,
+        programmeStartSec = nowEvent?.start?.epochSeconds,
+        programmeStopSec = nowEvent?.stop?.epochSeconds,
     )
-    val programmeDurationMs = nowEvent?.let { (it.stop - it.start).coerceAtLeast(0L) * 1_000L }
+    val programmeDurationMs = nowEvent?.let {
+        (it.stop.epochSeconds - it.start.epochSeconds).coerceAtLeast(0L) * 1_000L
+    }
     val programmePositionMs = nowEvent?.let {
-        ((playbackSec - it.start) * 1_000L).coerceIn(0L, programmeDurationMs ?: 0L)
+        ((playbackSec - it.start.epochSeconds) * 1_000L).coerceIn(0L, programmeDurationMs ?: 0L)
     }
     fun focusChanged(key: String, isFocused: Boolean) {
         if (isFocused) {
@@ -204,15 +208,16 @@ fun OverlayControlsTv(
     Box(Modifier.fillMaxSize()) {
         PlayerIdentityHeader(
             imageLoader = imageLoader,
+            currentSession = currentSession,
             piconPath = piconPath,
             eyebrow = channelTitleText(number = channelNumber, name = channelName),
             title = title.ifEmpty { channelName },
             support = nextEvent?.let {
-                stringResource(R.string.player_next_event_at, formatClock(it.start), it.title)
+                stringResource(R.string.player_next_event_at, formatClock(it.start.epochSeconds), it.title.orEmpty())
             },
             clock = clock,
             clockSupport = nowEvent?.let {
-                stringResource(R.string.player_ends_in, formatClock(it.stop))
+                stringResource(R.string.player_ends_in, formatClock(it.stop.epochSeconds))
             },
             tags = PlayerHeaderTags(
                 picon = "player-picon",

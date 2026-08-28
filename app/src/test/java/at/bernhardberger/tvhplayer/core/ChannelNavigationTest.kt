@@ -1,33 +1,33 @@
 package at.bernhardberger.tvhplayer.core
 
 import android.view.KeyEvent
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChannelNavigationTest {
-
-    private val channels = listOf(10, 20, 30)
-    private val channelNumbers = mapOf(10 to 1, 20 to 2, 30 to 4)
+    private val channels = listOf(cid(10), cid(20), cid(30))
+    private val channelNumbers = mapOf(cid(10) to 1, cid(20) to 2, cid(30) to 4)
 
     @Test
     fun next_returnsFollowingChannel() {
-        assertEquals(20, ChannelNavigation.adjacentId(channels, 10, 1))
+        assertEquals(cid(20), ChannelNavigation.adjacentId(channels, cid(10), 1))
     }
 
     @Test
     fun previous_returnsPrecedingChannel() {
-        assertEquals(20, ChannelNavigation.adjacentId(channels, 30, -1))
+        assertEquals(cid(20), ChannelNavigation.adjacentId(channels, cid(30), -1))
     }
 
     @Test
     fun next_wrapsAfterLastChannel() {
-        assertEquals(10, ChannelNavigation.adjacentId(channels, 30, 1))
+        assertEquals(cid(10), ChannelNavigation.adjacentId(channels, cid(30), 1))
     }
 
     @Test
     fun previous_wrapsBeforeFirstChannel() {
-        assertEquals(30, ChannelNavigation.adjacentId(channels, 10, -1))
+        assertEquals(cid(30), ChannelNavigation.adjacentId(channels, cid(10), -1))
     }
 
     @Test
@@ -72,13 +72,13 @@ class ChannelNavigationTest {
 
     @Test
     fun staleCurrentChannel_fallsBackToFirstCurrentChannel() {
-        assertEquals(10, ChannelNavigation.adjacentId(channels, 99, 1))
-        assertEquals(10, ChannelNavigation.adjacentId(channels, 99, -1))
+        assertEquals(cid(10), ChannelNavigation.adjacentId(channels, cid(99), 1))
+        assertEquals(cid(10), ChannelNavigation.adjacentId(channels, cid(99), -1))
     }
 
     @Test
     fun emptyChannelList_hasNoAdjacentChannel() {
-        assertNull(ChannelNavigation.adjacentId(emptyList(), 10, 1))
+        assertNull(ChannelNavigation.adjacentId(emptyList(), cid(10), 1))
     }
 
     @Test
@@ -134,9 +134,9 @@ class ChannelNavigationTest {
 
     @Test
     fun enteredNumber_selectsTvheadendChannelNumber() {
-        assertEquals(10, ChannelNavigation.idForNumber(channels, channelNumbers, "1"))
-        assertEquals(20, ChannelNavigation.idForNumber(channels, channelNumbers, "2"))
-        assertEquals(30, ChannelNavigation.idForNumber(channels, channelNumbers, "004"))
+        assertEquals(cid(10), ChannelNavigation.idForNumber(channels, channelNumbers, "1"))
+        assertEquals(cid(20), ChannelNavigation.idForNumber(channels, channelNumbers, "2"))
+        assertEquals(cid(30), ChannelNavigation.idForNumber(channels, channelNumbers, "004"))
     }
 
     @Test
@@ -148,20 +148,22 @@ class ChannelNavigationTest {
 
     @Test
     fun channelNumber_usesTvheadendChannelNumber() {
-        assertEquals(1, ChannelNavigation.numberForId(channels, channelNumbers, 10))
-        assertEquals(4, ChannelNavigation.numberForId(channels, channelNumbers, 30))
-        assertNull(ChannelNavigation.numberForId(channels, channelNumbers, 99))
+        assertEquals(1, ChannelNavigation.numberForId(channels, channelNumbers, cid(10)))
+        assertEquals(4, ChannelNavigation.numberForId(channels, channelNumbers, cid(30)))
+        assertNull(ChannelNavigation.numberForId(channels, channelNumbers, cid(99)))
     }
 
     @Test
     fun missingTvheadendNumber_isNotAssignedAConflictingPosition() {
-        assertNull(ChannelNavigation.numberForId(channels, channelNumbers - 20, 20))
-        assertNull(ChannelNavigation.idForNumber(channels, channelNumbers - 20, "3"))
+        assertNull(ChannelNavigation.numberForId(channels, channelNumbers - cid(20), cid(20)))
+        assertNull(ChannelNavigation.idForNumber(channels, channelNumbers - cid(20), "3"))
     }
 
     @Test
     fun serversWithoutChannelNumbers_fallBackToOneBasedPositions() {
-        assertEquals(20, ChannelNavigation.idForNumber(channels, emptyMap(), "2"))
-        assertEquals(3, ChannelNavigation.numberForId(channels, emptyMap(), 30))
+        assertEquals(cid(20), ChannelNavigation.idForNumber(channels, emptyMap(), "2"))
+        assertEquals(3, ChannelNavigation.numberForId(channels, emptyMap(), cid(30)))
     }
+
+    private fun cid(value: Int) = ChannelId(Int.MAX_VALUE.toLong() + value)
 }

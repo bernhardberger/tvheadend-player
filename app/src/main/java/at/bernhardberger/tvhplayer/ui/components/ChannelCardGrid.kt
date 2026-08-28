@@ -48,9 +48,11 @@ import androidx.tv.material3.Glow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.StandardCardContainer
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.channelInitials
-import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.ui.ChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.TvCardSpacing
@@ -78,10 +80,11 @@ data class ChannelCardModel(
 fun ChannelCardGrid(
     items: List<ChannelCardModel>,
     imageLoader: ImageLoader,
-    onFocusChannel: (Int) -> Unit,
+    currentSession: CurrentSessionObservation? = null,
+    onFocusChannel: (ChannelId) -> Unit,
     onConfirmChannel: (Channel) -> Unit,
     modifier: Modifier = Modifier,
-    focusRequesters: Map<Int, FocusRequester> = emptyMap(),
+    focusRequesters: Map<ChannelId, FocusRequester> = emptyMap(),
     gridState: LazyGridState = rememberLazyGridState(),
     contentPadding: PaddingValues = PaddingValues(12.dp),
 ) {
@@ -103,23 +106,25 @@ fun ChannelCardGrid(
                 .focusGroup()
                 .focusRestorer(),
         ) {
-            items(items, key = { it.channel.channelId }) { item ->
-                var focused by remember(item.channel.channelId) { mutableStateOf(false) }
+            items(items, key = { it.channel.id.value }) { item ->
+                val channelId = item.channel.id
+                var focused by remember(channelId) { mutableStateOf(false) }
                 ChannelCard(
                     item = item,
                     focused = focused,
                     imageLoader = imageLoader,
+                    currentSession = currentSession,
                     modifier = Modifier.width(cardWidth),
                     interactiveModifier = Modifier
-                        .testTag("channel-card-${item.channel.channelId}")
+                        .testTag("channel-card-${channelId.value}")
                         .then(
-                            focusRequesters[item.channel.channelId]?.let {
+                            focusRequesters[channelId]?.let {
                                 Modifier.focusRequester(it)
                             } ?: Modifier,
                         )
                         .onFocusChanged { focusState ->
                             focused = focusState.isFocused
-                            if (focusState.isFocused) onFocusChannel(item.channel.channelId)
+                            if (focusState.isFocused) onFocusChannel(channelId)
                         },
                     onClick = { onConfirmChannel(item.channel) },
                 )
@@ -142,11 +147,13 @@ private fun ChannelCard(
     item: ChannelCardModel,
     focused: Boolean,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     interactiveModifier: Modifier = Modifier,
 ) {
-    val initials = remember(item.channel.name) { channelInitials(item.channel.name) }
+    val channelName = item.channel.name.orEmpty()
+    val initials = remember(channelName) { channelInitials(channelName) }
     val playingNowDescription = stringResource(R.string.player_on_now)
     val recordingNowDescription = stringResource(R.string.recording_state_recording)
     val accessibilityLabel = buildString {
@@ -154,7 +161,7 @@ private fun ChannelCard(
             append(it)
             append(" ")
         }
-        append(item.channel.name)
+        append(channelName)
         append(". ")
         append(item.programmeTitle)
         if (item.playingNow) {
@@ -206,6 +213,7 @@ private fun ChannelCard(
                     } else {
                         PiconBox(
                             imageLoader = imageLoader,
+                            currentSession = currentSession,
                             piconPath = item.channel.icon,
                             modifier = Modifier
                                 .fillMaxWidth(0.7f)
@@ -235,7 +243,7 @@ private fun ChannelCard(
             Column(modifier = Modifier.padding(top = TvSpacing8)) {
                 ChannelTitle(
                     number = item.number,
-                    name = item.channel.name,
+                    name = channelName,
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
@@ -261,7 +269,7 @@ private fun ChannelCard(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("channel-card-progress-${item.channel.channelId}"),
+                            .testTag("channel-card-progress-${item.channel.id.value}"),
                     )
                 }
             }

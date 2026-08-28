@@ -19,14 +19,17 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.data.Channel
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Instant
 
 class TimelineEpgPerformanceTest {
     @get:Rule
@@ -35,11 +38,10 @@ class TimelineEpgPerformanceTest {
     @Test
     fun syntheticThreeHundredTimelineRowsRemainVirtualizedAndScrollable() {
         val channels = (1..300).map { number ->
-            Channel(
-                channelId = number,
+            Channel.create(
+                id = ChannelId(number.toLong()),
                 name = "Channel $number",
-                number = number,
-                icon = null,
+                number = number.toLong(),
             )
         }
 
@@ -47,11 +49,11 @@ class TimelineEpgPerformanceTest {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 LazyColumn(Modifier.testTag("timeline-rows")) {
-                    items(channels, key = { it.channelId }) { channel ->
+                    items(channels, key = { it.id.value }) { channel ->
                         Box(Modifier.width(190.dp).height(76.dp)) {
                             TimelineChannelHeader(
                                 channel = channel,
-                                number = channel.number,
+                                number = channel.number?.toInt(),
                                 imageLoader = imageLoader,
                             )
                         }
@@ -66,7 +68,7 @@ class TimelineEpgPerformanceTest {
 
     @Test
     fun consecutiveShortProgrammeCardsDoNotOverlap() {
-        val channel = Channel(channelId = 1, name = "Channel", number = 1, icon = null)
+        val channel = Channel.create(ChannelId(1), name = "Channel", number = 1)
         val first = event(id = 1, start = 0, stop = 5 * 60)
         val second = event(id = 2, start = 5 * 60, stop = 10 * 60)
         val cardWidth = 600.dp / 36f
@@ -139,11 +141,11 @@ class TimelineEpgPerformanceTest {
         composeRule.onNodeWithText("Back").assertIsFocused()
     }
 
-    private fun event(id: Int, start: Long, stop: Long) = EpgEventEntry(
-        eventId = id,
-        channelId = 1,
-        start = start,
-        stop = stop,
+    private fun event(id: Int, start: Long, stop: Long) = EpgEvent.create(
+        id = EventId(id.toLong()),
+        channelId = ChannelId(1),
+        start = Instant.fromEpochSeconds(start),
+        stop = Instant.fromEpochSeconds(stop),
         title = "Event $id",
     )
 }

@@ -15,7 +15,7 @@ private class AppArtworkMapper(
     private val session: TvheadendSession,
 ) : Mapper<AppArtworkSource, TvheadendArtwork> {
     override fun map(data: AppArtworkSource, options: Options): TvheadendArtwork? =
-        TvheadendArtwork.create(session, data.selector)
+        TvheadendArtwork.create(session, data.currentSession, data.selector)
 }
 
 fun buildImageLoader(context: Context, session: TvheadendSession): ImageLoader =

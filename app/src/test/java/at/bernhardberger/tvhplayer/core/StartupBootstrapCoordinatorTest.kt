@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import java.util.concurrent.CancellationException
@@ -257,16 +258,9 @@ class StartupBootstrapCoordinatorTest {
                     originalRequests.resolve(
                         request = pending.request,
                         readiness = CurrentChannelReadiness.Ready(
-                            listOf(
-                                Channel(
-                                    channelId = 20,
-                                    name = "Twenty",
-                                    number = null,
-                                    icon = null,
-                                )
-                            ),
+                            listOf(Channel.create(ChannelId(20), name = "Twenty")),
                         ),
-                        persistedId = 20,
+                        persistedId = ChannelId(20),
                     )
                 )
                 assertTrue(

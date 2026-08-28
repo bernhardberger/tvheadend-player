@@ -1,10 +1,9 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.DvrConfig
-import at.bernhardberger.tvhplayer.data.DvrEntry
-import at.bernhardberger.tvhplayer.data.DvrState
-import at.bernhardberger.tvhplayer.data.RecordingPlaybackAvailability
-import at.bernhardberger.tvhplayer.data.recordingPlaybackAvailability
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
+import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -46,7 +45,8 @@ data class DvrArchiveFolder(
     val recordings: List<DvrEntry>,
 ) {
     val newestRecordingStart: Long?
-        get() = (recordings.map { it.start } + folders.mapNotNull { it.newestRecordingStart })
+        get() = (recordings.mapNotNull { it.start?.epochSeconds } +
+            folders.mapNotNull { it.newestRecordingStart })
             .maxOrNull()
 
     fun folderAt(targetPath: List<String>): DvrArchiveFolder? {
@@ -65,12 +65,16 @@ data class DvrFolderSummary(
 )
 
 fun summarizeDvrFolder(folder: DvrArchiveFolder): DvrFolderSummary {
-    val recordings = folder.descendantRecordings().sortedByDescending { it.start }
+    val recordings = folder.descendantRecordings().sortedByDescending {
+        it.start?.epochSeconds ?: Long.MIN_VALUE
+    }
     return DvrFolderSummary(
         recordingCount = recordings.size,
-        totalSizeBytes = recordings.sumOf { entry -> entry.files.sumOf { it.size ?: 0L } },
-        oldestStart = recordings.minOfOrNull { it.start },
-        newestStart = recordings.maxOfOrNull { it.start },
+        totalSizeBytes = recordings.sumOf { entry ->
+            entry.files.orEmpty().sumOf { it.sizeBytes ?: 0L }
+        },
+        oldestStart = recordings.mapNotNull { it.start?.epochSeconds }.minOrNull(),
+        newestStart = recordings.mapNotNull { it.start?.epochSeconds }.maxOrNull(),
         recentRecordings = recordings.take(5),
     )
 }
@@ -79,31 +83,38 @@ private fun DvrArchiveFolder.descendantRecordings(): List<DvrEntry> =
     recordings + folders.flatMap { it.descendantRecordings() }
 
 sealed interface DvrConfigChoice {
-    data class Automatic(val configId: String?) : DvrConfigChoice
-    data class RequiresSelection(val configs: List<DvrConfig>) : DvrConfigChoice
+    data class Automatic(val configId: DvrConfigId?) : DvrConfigChoice
+    data class RequiresSelection(val configs: List<DvrConfiguration>) : DvrConfigChoice
 }
 
-fun chooseDvrConfig(configs: List<DvrConfig>): DvrConfigChoice {
-    val usable = configs.filter { it.enabled }
-    return when {
-        usable.size <= 1 -> DvrConfigChoice.Automatic(usable.singleOrNull()?.id)
-        else -> DvrConfigChoice.RequiresSelection(usable)
+fun chooseDvrConfig(configs: List<DvrConfiguration>): DvrConfigChoice = when {
+        configs.size <= 1 -> DvrConfigChoice.Automatic(configs.singleOrNull()?.id)
+        else -> DvrConfigChoice.RequiresSelection(configs)
     }
-}
 
 fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibraryPartition(
     archive = entries
         .filter {
-            it.state == DvrState.COMPLETED &&
-                recordingPlaybackAvailability(it) is RecordingPlaybackAvailability.Ready
+            it.state == DvrEntryState.COMPLETED
         }
-        .sortedByDescending { it.start },
+        .sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE },
     schedule = entries
-        .filter { it.state == DvrState.RECORDING || it.state == DvrState.SCHEDULED }
-        .sortedWith(compareBy<DvrEntry> { it.state != DvrState.RECORDING }.thenBy { it.start }),
+        .filter { it.state == DvrEntryState.RECORDING || it.state == DvrEntryState.SCHEDULED }
+        .sortedWith(
+            compareBy<DvrEntry> { it.state != DvrEntryState.RECORDING }
+                .thenBy { it.start?.epochSeconds ?: Long.MAX_VALUE },
+        ),
     problems = entries
-        .filter { it.state == DvrState.FAILED || it.state == DvrState.CANCELLED }
-        .sortedByDescending { it.start },
+        .filter {
+            it.state in setOf(
+                DvrEntryState.MISSED,
+                DvrEntryState.INVALID,
+                DvrEntryState.RECORDING_ERROR,
+                DvrEntryState.COMPLETED_ERROR,
+                DvrEntryState.FILE_MISSING,
+            )
+        }
+        .sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE },
 )
 
 fun buildDvrArchive(entries: List<DvrEntry>): DvrArchiveFolder {
@@ -127,15 +138,19 @@ fun groupDvrSchedule(
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): List<DvrScheduleSection> {
     val today = Instant.ofEpochSecond(nowSec).atZone(zoneId).toLocalDate()
-    val recordingNow = entries.filter { it.state == DvrState.RECORDING }.sortedBy { it.start }
-    val scheduledByDate = entries.filter { it.state == DvrState.SCHEDULED }
-        .sortedBy { it.start }
-        .groupBy { Instant.ofEpochSecond(it.start).atZone(zoneId).toLocalDate() }
+    val recordingNow = entries.filter { it.state == DvrEntryState.RECORDING }
+        .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
+    val scheduledByDate = entries.filter {
+        it.state == DvrEntryState.SCHEDULED && it.start != null
+    }
+        .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
+        .groupBy { Instant.ofEpochSecond(checkNotNull(it.start).epochSeconds).atZone(zoneId).toLocalDate() }
     return buildList {
         if (recordingNow.isNotEmpty()) {
             add(DvrScheduleSection(DvrScheduleSectionKind.RECORDING_NOW, null, recordingNow))
         }
-        scheduledByDate.filterKeys { it <= today }.values.flatten().sortedBy { it.start }
+        scheduledByDate.filterKeys { it <= today }.values.flatten()
+            .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
             .takeIf { it.isNotEmpty() }?.let {
                 add(DvrScheduleSection(DvrScheduleSectionKind.TODAY, null, it))
             }
@@ -155,10 +170,17 @@ fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEnt
     DvrProblemBucket.entries.associateWith { bucket ->
         entries.filter {
             when (bucket) {
-                DvrProblemBucket.FAILED -> it.state == DvrState.FAILED
-                DvrProblemBucket.CANCELLED -> it.state == DvrState.CANCELLED
+                DvrProblemBucket.FAILED -> it.state in setOf(
+                    DvrEntryState.RECORDING_ERROR,
+                    DvrEntryState.COMPLETED_ERROR,
+                    DvrEntryState.FILE_MISSING,
+                )
+                DvrProblemBucket.CANCELLED -> it.state in setOf(
+                    DvrEntryState.MISSED,
+                    DvrEntryState.INVALID,
+                )
             }
-        }.sortedByDescending { it.start }
+        }.sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
     }
 
 fun recordingListPageTargetIndex(
@@ -181,19 +203,19 @@ fun recordingListMetadata(
     entry: DvrEntry,
     problem: Boolean = false,
 ): String = buildList {
-    if (problem) entry.failureReason?.takeIf(String::isNotBlank)?.let(::add)
+    if (problem) entry.subscriptionError?.name?.let(::add)
     entry.subtitle
-        ?.takeIf { it.isNotBlank() && !it.equals(entry.title, ignoreCase = true) }
+        ?.takeIf { it.isNotBlank() && !it.equals(entry.title.orEmpty(), ignoreCase = true) }
         ?.let(::add)
     if (isEmpty()) {
         entry.summary
-            ?.takeIf { it.isNotBlank() && !it.equals(entry.title, ignoreCase = true) }
+            ?.takeIf { it.isNotBlank() && !it.equals(entry.title.orEmpty(), ignoreCase = true) }
             ?.let(::add)
     }
 }.joinToString(" • ")
 
 private fun recordingFolderPath(entry: DvrEntry): List<String>? {
-    val fileParents = entry.files.mapNotNull { file ->
+    val fileParents = entry.files.orEmpty().mapNotNull { file ->
         val components = safePathComponents(file.path) ?: return null
         components.dropLast(1)
     }
@@ -231,7 +253,9 @@ private class MutableArchiveFolder(
                     it.newestRecordingStart ?: Long.MIN_VALUE
                 }.thenBy { it.name.lowercase() }
             ),
-            recordings = recordings.sortedByDescending { it.start },
+            recordings = recordings.sortedByDescending {
+                it.start?.epochSeconds ?: Long.MIN_VALUE
+            },
         )
     }
 }

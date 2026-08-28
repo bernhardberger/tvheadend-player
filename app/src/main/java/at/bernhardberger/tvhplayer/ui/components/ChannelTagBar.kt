@@ -37,8 +37,9 @@ import androidx.tv.material3.Tab
 import androidx.tv.material3.TabDefaults
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.ChannelTag
+import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.data.ChannelTag
 import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
 import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -49,8 +50,8 @@ import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 @Composable
 fun ChannelTagSelector(
     tags: List<ChannelTag>,
-    activeTagId: Int?,
-    onSelectTag: (Int?) -> Unit,
+    activeTagId: ChannelTagId?,
+    onSelectTag: (ChannelTagId?) -> Unit,
     modifier: Modifier = Modifier,
     allChannelsVisible: Boolean = true,
     activeFocusRequester: FocusRequester = remember { FocusRequester() },
@@ -60,7 +61,7 @@ fun ChannelTagSelector(
     val scopes = remember(tags, allChannelsVisible, allChannelsLabel) {
         buildList {
             if (allChannelsVisible) add(null to allChannelsLabel)
-            addAll(tags.map { it.id to it.name })
+            addAll(tags.map { it.id to it.name.orEmpty() })
         }
     }
     if (scopes.isEmpty()) return

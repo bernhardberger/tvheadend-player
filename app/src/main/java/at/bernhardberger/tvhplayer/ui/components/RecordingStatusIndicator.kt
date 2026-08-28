@@ -11,20 +11,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.data.DvrState
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
 @Composable
 fun RecordingStatusIndicator(
-    state: DvrState,
+    state: DvrEntryState,
     modifier: Modifier = Modifier,
     announceState: Boolean = true,
 ) {
-    if (state != DvrState.RECORDING && state != DvrState.SCHEDULED) return
+    if (state != DvrEntryState.RECORDING && state != DvrEntryState.SCHEDULED) return
     val accessibilityModifier = if (announceState) {
         val description = stringResource(
-            if (state == DvrState.RECORDING) {
+            if (state == DvrEntryState.RECORDING) {
                 R.string.recording_state_recording
             } else {
                 R.string.recording_state_scheduled
@@ -39,7 +39,7 @@ fun RecordingStatusIndicator(
             .size(12.dp)
             .then(accessibilityModifier)
             .then(
-                if (state == DvrState.RECORDING) {
+                if (state == DvrEntryState.RECORDING) {
                     Modifier.background(TvRecordingColor, CircleShape)
                 } else {
                     Modifier.border(2.dp, TvRecordingColor, CircleShape)

@@ -1,11 +1,32 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgCoverage
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class EpgColumnStatePolicyTest {
+    @Test
+    fun frontierDecisionNeverUsesAStaleSnapshotAsCurrentCoverage() {
+        val channelId = ChannelId(1)
+        val requestedThrough = Instant.fromEpochSeconds(20_000)
+        val next = event(10_000, 11_000)
+        val snapshot = EpgSnapshot.create(
+            events = listOf(next),
+            coverages = listOf(EpgCoverage.empty(channelId, requestedThrough)),
+        )
+
+        assertNull(EpgRepositoryState.Stale(snapshot).currentEpgSnapshot())
+        assertSame(snapshot, EpgRepositoryState.Current(snapshot).currentEpgSnapshot())
+    }
     @Test
     fun derivesDistinctInlineStates() {
         assertEquals(
@@ -64,11 +85,11 @@ class EpgColumnStatePolicyTest {
         )
     }
 
-    private fun event(start: Long, stop: Long) = EpgEventEntry(
-        eventId = start.toInt(),
-        channelId = 1,
-        start = start,
-        stop = stop,
+    private fun event(start: Long, stop: Long) = EpgEvent.create(
+        id = EventId(start),
+        channelId = ChannelId(1),
+        start = Instant.fromEpochSeconds(start),
+        stop = Instant.fromEpochSeconds(stop),
         title = "Programme",
     )
 }

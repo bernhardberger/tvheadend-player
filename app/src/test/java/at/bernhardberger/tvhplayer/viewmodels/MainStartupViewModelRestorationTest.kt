@@ -1,10 +1,11 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.SavedStateHandle
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvhplayer.data.Channel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -44,16 +45,9 @@ class MainStartupViewModelRestorationTest {
             requests.resolve(
                 request = pending.request,
                 readiness = CurrentChannelReadiness.Ready(
-                    listOf(
-                        Channel(
-                            channelId = 7,
-                            name = "Sensitive channel name",
-                            number = null,
-                            icon = null,
-                        )
-                    ),
+                    listOf(Channel.create(ChannelId(7), name = "Sensitive channel name")),
                 ),
-                persistedId = 7,
+                persistedId = ChannelId(7),
             )
         )
         MainStartupViewModel.markStartupRequestCreationHandled(savedStateHandle)

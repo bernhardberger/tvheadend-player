@@ -55,6 +55,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelBrowseLayout
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -64,8 +68,6 @@ import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
-import at.bernhardberger.tvhplayer.data.DvrRuntime
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -85,11 +87,11 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
+import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -116,13 +118,12 @@ fun ChannelsScreen(
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
-    dvrRepository: DvrRuntime = koinInject(),
     uiSettingsStore: UiSettingsStore = koinInject(),
-    playingChannelId: Int?,
+    playingChannelId: ChannelId?,
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
-    onPlay: (channelId: Int, channelName: String) -> Unit
+    onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -136,16 +137,20 @@ fun ChannelsScreen(
         layoutDirection = layoutDirection,
     )
     val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
-    val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
+    val observation by channelViewModel.observation.collectAsStateWithLifecycle()
+    val currentSession = observation.currentSession
+    val dvrEntries = observation.dvrEntries()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
-    val orderedChannelIds = remember(channels) { channels.map { it.channelId } }
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val rowFocusRequesters = remember(orderedChannelIds) {
         orderedChannelIds.associateWith { FocusRequester() }
     }
-    val channelNumbers = remember(channels) { channels.associate { it.channelId to it.number } }
+    val channelNumbers = remember(channels) {
+        channels.associate { it.id to it.number?.toInt() }
+    }
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
@@ -167,7 +172,7 @@ fun ChannelsScreen(
     }
 
     fun pageChannels(direction: Int): Boolean {
-        val currentIndex = channels.indexOfFirst { it.channelId == selectedId }
+        val currentIndex = channels.indexOfFirst { it.id == selectedId }
         val visibleCount = if (useCards) {
             gridState.layoutInfo.visibleItemsInfo.size
         } else {
@@ -181,7 +186,7 @@ fun ChannelsScreen(
         ) ?: return true
         if (targetIndex == currentIndex) return true
 
-        val targetId = channels[targetIndex].channelId
+        val targetId = channels[targetIndex].id
         val targetFocus = rowFocusRequesters[targetId] ?: return true
         val generation = ++pageGeneration
         isRestoring = true
@@ -210,19 +215,16 @@ fun ChannelsScreen(
         return true
     }
 
-    val focusedChannel = channels.firstOrNull { it.channelId == selectedId }
-    val emptyFocusedEvents = remember { MutableStateFlow<List<EpgEventEntry>>(emptyList()) }
-    val focusedEventsFlow = focusedChannel?.let {
-        channelViewModel.epgForChannel(it.channelId)
+    val focusedChannel = channels.firstOrNull { it.id == selectedId }
+    val focusedNow = remember(observation, focusedChannel?.id, nowSec) {
+        focusedChannel?.id?.let {
+            observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+        }
     }
-        ?: emptyFocusedEvents
-    val focusedEvents by focusedEventsFlow.collectAsStateWithLifecycle()
-    val focusedNow = remember(focusedEvents, nowSec) {
-        focusedEvents.firstOrNull { it.start <= nowSec && nowSec < it.stop }
-            ?: focusedEvents.minByOrNull { kotlin.math.abs(it.start - nowSec) }
-    }
-    val focusedNext = remember(focusedEvents, nowSec) {
-        focusedEvents.firstOrNull { it.start > nowSec }
+    val focusedNext = remember(observation, focusedChannel?.id, nowSec) {
+        focusedChannel?.id?.let {
+            observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -244,7 +246,7 @@ fun ChannelsScreen(
 
         val id = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
         if (selectedId != id) selection.setSelected(id)
-        val idx = channels.indexOfFirst { it.channelId == id }
+        val idx = channels.indexOfFirst { it.id == id }
         if (idx < 0) return@LaunchedEffect
 
         isRestoring = true
@@ -350,15 +352,20 @@ fun ChannelsScreen(
                     val noEpg = stringResource(R.string.no_epg)
                     val cardItems = remember(
                         channels,
+                        observation,
                         nowSec,
                         playingChannelId,
                         recordingChannelIds,
                         noEpg,
                     ) {
                         channels.map { ch ->
-                            val now = channelViewModel.nowEvent(ch.channelId, nowSec)
+                            val channelId = ch.id
+                            val now = observation.eventAt(
+                                channelId,
+                                kotlin.time.Instant.fromEpochSeconds(nowSec),
+                            )
                             val status = channelNowStatus(
-                                channelId = ch.channelId,
+                                channelId = channelId,
                                 playingChannelId = playingChannelId,
                                 recordingChannelIds = recordingChannelIds,
                             )
@@ -367,7 +374,7 @@ fun ChannelsScreen(
                                 number = ChannelNavigation.numberForId(
                                     orderedChannelIds,
                                     channelNumbers,
-                                    ch.channelId,
+                                    channelId,
                                 ),
                                 programmeTitle = now?.title ?: noEpg,
                                 playingNow = status.playingNow,
@@ -379,13 +386,16 @@ fun ChannelsScreen(
                     ChannelCardGrid(
                         items = cardItems,
                         imageLoader = imageLoader,
+                        currentSession = currentSession,
                         focusRequesters = rowFocusRequesters,
                         gridState = gridState,
                         onFocusChannel = {
                             if (!isRestoring) selection.setSelected(it)
                         },
                         onConfirmChannel = { ch ->
-                            onPlay(ch.channelId, ch.name)
+                            currentSession?.let {
+                                onPlay(LivePlaybackSelection(it, ch.id), ch.name.orEmpty())
+                            }
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -441,41 +451,51 @@ fun ChannelsScreen(
                                     )?.let(::pageChannels) ?: false
                                 }
                         ) {
-                            items(channels, key = { ch -> ch.channelId }) { ch ->
-                                val isSelected = ch.channelId == selectedId
+                            items(channels, key = { ch -> ch.id.value }) { ch ->
+                                val channelId = ch.id
+                                val isSelected = channelId == selectedId
                                 val now =
-                                    remember(ch.channelId, nowSec) {
-                                        channelViewModel.nowEvent(ch.channelId, nowSec)
+                                    remember(channelId, observation, nowSec) {
+                                        observation.eventAt(
+                                            channelId,
+                                            kotlin.time.Instant.fromEpochSeconds(nowSec),
+                                        )
                                     }
                                 val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
                                 val status = channelNowStatus(
-                                    channelId = ch.channelId,
+                                    channelId = channelId,
                                     playingChannelId = playingChannelId,
                                     recordingChannelIds = recordingChannelIds,
                                 )
 
                                 ChannelRow(
                                     modifier = Modifier.focusRequester(
-                                        rowFocusRequesters.getValue(ch.channelId)
+                                        rowFocusRequesters.getValue(channelId)
                                     ),
                                     number = ChannelNavigation.numberForId(
                                         orderedChannelIds,
                                         channelNumbers,
-                                        ch.channelId,
+                                        channelId,
                                     ),
-                                    name = ch.name,
+                                    name = ch.name.orEmpty(),
                                     programTitle = now?.title ?: stringResource(R.string.no_epg),
                                     progress = if (now != null) prog else null,
                                     imageLoader = imageLoader,
+                                    currentSession = currentSession,
                                     piconPath = ch.icon,
                                     focused = isSelected,
                                     recordingNow = status.recordingNow,
                                     playingNow = status.playingNow,
                                     onFocus = {
-                                        if (!isRestoring) selection.setSelected(ch.channelId)
+                                        if (!isRestoring) selection.setSelected(channelId)
                                     },
                                     onConfirm = {
-                                        onPlay(ch.channelId, ch.name)
+                                        currentSession?.let {
+                                            onPlay(
+                                                LivePlaybackSelection(it, channelId),
+                                                ch.name.orEmpty(),
+                                            )
+                                        }
                                     }
                                 )
                             }
@@ -504,6 +524,7 @@ fun ChannelsScreen(
                         nowSec = nowSec,
                         next = focusedNext,
                         imageLoader = imageLoader,
+                        currentSession = currentSession,
                         piconPath = focusedChannel?.icon
                     )
                 }
@@ -736,6 +757,7 @@ private fun EpgDetailPane(
     next: EpgEventEntry?,
     nowSec: Long,
     imageLoader: ImageLoader,
+    currentSession: at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation?,
     piconPath: String? = null,
 ) {
     val progress = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
@@ -768,15 +790,19 @@ private fun EpgDetailPane(
                     .height(64.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                PiconBox(imageLoader = imageLoader, piconPath = piconPath)
+                PiconBox(
+                    imageLoader = imageLoader,
+                    currentSession = currentSession,
+                    piconPath = piconPath,
+                )
             }
         }
 
         Spacer(Modifier.height(10.dp))
 
         if (now != null) {
-            val start = now.start
-            val end = now.stop
+            val start = now.start.epochSeconds
+            val end = now.stop.epochSeconds
             val durMin = ((end - start) / 60).coerceAtLeast(0)
             Text(
                 text = stringResource(
@@ -817,13 +843,13 @@ private fun EpgDetailPane(
 
         if (next != null) {
             Text(
-                text = stringResource(R.string.epg_next, formatHm(next.start)),
+                text = stringResource(R.string.epg_next, formatHm(next.start.epochSeconds)),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = next.title,
+                text = next.title.orEmpty(),
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -831,4 +857,11 @@ private fun EpgDetailPane(
             )
         }
     }
+}
+
+private fun SessionObservation.dvrEntries() = when (val state = dvrState) {
+    is DvrRepositoryState.Current -> state.snapshot.entries
+    is DvrRepositoryState.Stale -> state.snapshot.entries
+    is DvrRepositoryState.Synchronizing -> state.staleSnapshot?.entries.orEmpty()
+    DvrRepositoryState.Empty -> emptyList()
 }

@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.selectAccentRgb
@@ -29,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Picons do not change while the app is running, so re-decoding them on every scroll
  * would be pure waste.
  */
-private val accentCache = ConcurrentHashMap<Int, Int>()
+private val accentCache = ConcurrentHashMap<ChannelId, Int>()
 
 /**
  * The channel's own brand colour, taken from its picon.
@@ -41,12 +43,15 @@ private val accentCache = ConcurrentHashMap<Int, Int>()
 @Composable
 fun rememberChannelAccent(
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     piconPath: String?,
-    channelId: Int,
+    channelId: ChannelId,
     serverTag: String = "default",
 ): Color {
     val context = LocalContext.current
-    val model = remember(serverTag, piconPath) { resolvePiconModel(serverTag, piconPath) }
+    val model = remember(currentSession, serverTag, piconPath) {
+        currentSession?.let { resolvePiconModel(it, serverTag, piconPath) }
+    }
     var rgb by remember(channelId) {
         mutableIntStateOf(accentCache[channelId] ?: NEUTRAL_ACCENT_RGB)
     }

@@ -35,15 +35,18 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.data.DvrActionFailure
-import at.bernhardberger.tvhplayer.data.DvrActionResult
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingCompletion
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingDismissed
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
@@ -53,11 +56,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.util.Locale
+import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class LiveProgrammeInfoOverlayTest {
     @get:Rule
     val composeRule = createComposeRule()
+    private val currentSession = checkNotNull(testSessionObservation().currentSession)
 
     @Test
     fun noEpgRemainsOpenChannelIdentifiedAndSafelyFocused() {
@@ -78,7 +83,7 @@ class LiveProgrammeInfoOverlayTest {
 
     @Test
     fun epgDisappearanceTransitionsToUnavailableWithoutClosingInfo() {
-        var currentEvent by mutableStateOf<EpgEventEntry?>(event(id = 42))
+        var currentEvent by mutableStateOf<EpgEvent?>(event(id = 42))
         setInfoOverlay(event = { currentEvent })
 
         composeRule.onNodeWithTag("live-info-record").requestFocus()
@@ -129,7 +134,9 @@ class LiveProgrammeInfoOverlayTest {
             recordingScheduled = { recordingScheduled },
             canRecord = { canRecord },
             onRecord = {
-                state = LiveInfoRecordingState.Confirming(event.programmeRecordingTarget())
+                state = LiveInfoRecordingState.Confirming(
+                    event.programmeRecordingTarget(currentSession)
+                )
                 confirmationVisible = true
             },
             onRecordingActivate = { dispatches++ },
@@ -175,7 +182,9 @@ class LiveProgrammeInfoOverlayTest {
             confirmationVisible = { confirmationVisible },
             restoreRecordFocus = { restoreRecordFocus },
             onRecord = {
-                state = LiveInfoRecordingState.Confirming(event.programmeRecordingTarget())
+                state = LiveInfoRecordingState.Confirming(
+                    event.programmeRecordingTarget(currentSession)
+                )
                 confirmationVisible = true
             },
             onRecordingActivate = { dispatches++ },
@@ -231,7 +240,9 @@ class LiveProgrammeInfoOverlayTest {
             confirmationVisible = { confirmationVisible },
             restoreRecordFocus = { restoreRecordFocus },
             onRecord = {
-                state = LiveInfoRecordingState.Confirming(event.programmeRecordingTarget())
+                state = LiveInfoRecordingState.Confirming(
+                    event.programmeRecordingTarget(currentSession)
+                )
                 confirmationVisible = true
             },
             onRecordingActivate = { dispatches++ },
@@ -268,7 +279,7 @@ class LiveProgrammeInfoOverlayTest {
             confirmationVisible = { confirmationVisible },
             onRecord = {
                 state = LiveInfoRecordingState.Confirming(
-                    currentEvent.programmeRecordingTarget()
+                    currentEvent.programmeRecordingTarget(currentSession)
                 )
                 confirmationVisible = true
             },
@@ -311,7 +322,7 @@ class LiveProgrammeInfoOverlayTest {
             currentEvent = event(id = 43, title = "New current programme")
             val completion = liveInfoRecordingCompletion(
                 state = state,
-                result = DvrActionResult.Accepted(entryId = 9),
+                result = DvrMutationResult.Confirmed(DvrEntryId(9)),
                 infoOpen = true,
             )
             state = completion.state
@@ -331,9 +342,9 @@ class LiveProgrammeInfoOverlayTest {
     @Test
     fun failureFocusesRetryAndRevalidatesBeforeRetryDispatch() {
         var currentEvent by mutableStateOf(event(id = 42, title = "Captured programme"))
-        val target = currentEvent.programmeRecordingTarget()
+        val target = currentEvent.programmeRecordingTarget(currentSession)
         var state by mutableStateOf<LiveInfoRecordingState>(
-            LiveInfoRecordingState.Failed(target, DvrActionFailure.CONNECTION)
+            LiveInfoRecordingState.Failed(target, DvrMutationResult.TransportUnavailable)
         )
         var confirmationVisible by mutableStateOf(true)
         var dispatches = 0
@@ -446,7 +457,7 @@ class LiveProgrammeInfoOverlayTest {
             id = 42,
             title = "Eine außergewöhnlich lange deutschsprachige Sendungsbezeichnung mit Zusatz",
         )
-        val target = event.programmeRecordingTarget()
+        val target = event.programmeRecordingTarget(currentSession)
         composeRule.setContent {
             val context = LocalContext.current
             val configuration = LocalConfiguration.current
@@ -534,7 +545,7 @@ class LiveProgrammeInfoOverlayTest {
     }
 
     private fun setInfoOverlay(
-        event: () -> EpgEventEntry?,
+        event: () -> EpgEvent?,
         recordingState: () -> LiveInfoRecordingState = { LiveInfoRecordingState.Idle },
         confirmationVisible: () -> Boolean = { false },
         restoreRecordFocus: () -> Boolean = { false },
@@ -606,11 +617,11 @@ class LiveProgrammeInfoOverlayTest {
         id: Int,
         channelId: Int = 7,
         title: String = "Programme $id",
-    ) = EpgEventEntry(
-        eventId = id,
-        channelId = channelId,
-        start = 1_000L,
-        stop = 2_000L,
+    ) = EpgEvent.create(
+        id = EventId(id.toLong()),
+        channelId = ChannelId(channelId.toLong()),
+        start = Instant.fromEpochSeconds(1_000L),
+        stop = Instant.fromEpochSeconds(2_000L),
         title = title,
         summary = "Summary",
         description = "Description",

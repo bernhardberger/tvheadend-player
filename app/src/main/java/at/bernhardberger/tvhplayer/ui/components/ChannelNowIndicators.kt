@@ -14,8 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.data.DvrState
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 
 @Composable
@@ -49,7 +49,7 @@ fun ChannelNowIndicators(
         }
         if (recordingNow) {
             RecordingStatusIndicator(
-                state = DvrState.RECORDING,
+                state = DvrEntryState.RECORDING,
                 announceState = announceState,
                 modifier = Modifier.testTag("channel-recording-indicator"),
             )

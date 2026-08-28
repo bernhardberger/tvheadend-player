@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -19,10 +22,10 @@ class TimelineEpgFocusPolicyTest {
         )
 
         assertEquals(
-            EpgFocusTarget(channelIndex = 3, eventId = 41),
+            EpgFocusTarget(channelIndex = 3, eventId = EventId(41)),
             timelinePageFocusTarget(
                 rows = rows,
-                current = EpgFocusTarget(channelIndex = 0, eventId = 11),
+                current = EpgFocusTarget(channelIndex = 0, eventId = EventId(11)),
                 preferredChannelIndex = 2,
                 direction = 1,
             ),
@@ -40,10 +43,10 @@ class TimelineEpgFocusPolicyTest {
         )
 
         assertEquals(
-            EpgFocusTarget(channelIndex = 2, eventId = 31),
+            EpgFocusTarget(channelIndex = 2, eventId = EventId(31)),
             timelinePageFocusTarget(
                 rows = rows,
-                current = EpgFocusTarget(channelIndex = 4, eventId = 51),
+                current = EpgFocusTarget(channelIndex = 4, eventId = EventId(51)),
                 preferredChannelIndex = 3,
                 direction = -1,
             ),
@@ -52,7 +55,7 @@ class TimelineEpgFocusPolicyTest {
 
     @Test
     fun reconciliationKeepsExistingSemanticEventTarget() {
-        val current = EpgFocusTarget(channelIndex = 1, eventId = 21)
+        val current = EpgFocusTarget(channelIndex = 1, eventId = EventId(21))
 
         assertEquals(
             current,
@@ -107,11 +110,11 @@ class TimelineEpgFocusPolicyTest {
     @Test
     fun leftAndRightMoveChronologicallyWithinChannelRow() {
         assertEquals(
-            12,
+            EventId(12),
             moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.RIGHT).target.eventId,
         )
         assertEquals(
-            11,
+            EventId(11),
             moveTimelineEpgFocus(rows, focus(0, 12), EpgFocusDirection.LEFT).target.eventId,
         )
     }
@@ -121,8 +124,8 @@ class TimelineEpgFocusPolicyTest {
         val down = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN)
         val up = moveTimelineEpgFocus(rows, down.target, EpgFocusDirection.UP)
 
-        assertEquals(21, down.target.eventId)
-        assertEquals(11, up.target.eventId)
+        assertEquals(EventId(21), down.target.eventId)
+        assertEquals(EventId(11), up.target.eventId)
     }
 
     @Test
@@ -162,7 +165,7 @@ class TimelineEpgFocusPolicyTest {
         )
 
         assertTrue(move.pageChannels)
-        assertEquals(31, move.target.eventId)
+        assertEquals(EventId(31), move.target.eventId)
     }
 
     @Test
@@ -233,7 +236,7 @@ class TimelineEpgFocusPolicyTest {
         val target = initialTimelineEpgFocus(
             rows = rows,
             preferredChannelIndex = 1,
-            preferredEventId = 21,
+            preferredEventId = EventId(21),
             targetSec = 100 * 60,
         )
 
@@ -268,37 +271,33 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun syntheticThreeHundredChannelLineupHasDeterministicVerticalFocusGraph() {
-        val large = (0 until 300).map { index ->
-            row(index, event(index + 1, 0, 60))
-        }
-        var current = focus(0, 1)
+    fun initialFocusPreservesChannelAndEventIdsAboveIntRange() {
+        val channelId = ChannelId(Int.MAX_VALUE.toLong() + 1L)
+        val eventId = EventId(Int.MAX_VALUE.toLong() + 2L)
+        val event = EpgEvent.create(
+            id = eventId,
+            channelId = channelId,
+            start = Instant.fromEpochSeconds(0),
+            stop = Instant.fromEpochSeconds(60),
+            title = "High ID",
+        )
 
-        repeat(299) {
-            current = moveTimelineEpgFocus(
-                rows = large,
-                current = current,
-                direction = EpgFocusDirection.DOWN,
-                visibleChannelRange = (current.channelIndex / 5 * 5)..(
-                    current.channelIndex / 5 * 5 + 4
-                ).coerceAtMost(299),
-            ).target
-        }
-
-        assertEquals(299, current.channelIndex)
-        assertEquals(300, current.eventId)
+        assertEquals(
+            EpgFocusTarget(channelIndex = 0, eventId = eventId),
+            initialTimelineEpgFocus(listOf(EpgFocusColumn(channelId, listOf(event))), 0, 30),
+        )
     }
 
-    private fun focus(channelIndex: Int, eventId: Int) = EpgFocusTarget(channelIndex, eventId)
+    private fun focus(channelIndex: Int, eventId: Int) = EpgFocusTarget(channelIndex, EventId(eventId.toLong()))
 
-    private fun row(channelId: Int, vararg events: EpgEventEntry) =
-        EpgFocusColumn(channelId, events.toList())
+    private fun row(channelId: Int, vararg events: EpgEvent) =
+        EpgFocusColumn(ChannelId(channelId.toLong()), events.toList())
 
-    private fun event(id: Int, startMinutes: Long, stopMinutes: Long) = EpgEventEntry(
-        eventId = id,
-        channelId = id / 10,
-        start = startMinutes * 60,
-        stop = stopMinutes * 60,
+    private fun event(id: Int, startMinutes: Long, stopMinutes: Long) = EpgEvent.create(
+        id = EventId(id.toLong()),
+        channelId = ChannelId((id / 10).toLong()),
+        start = Instant.fromEpochSeconds(startMinutes * 60),
+        stop = Instant.fromEpochSeconds(stopMinutes * 60),
         title = "Event $id",
     )
 }

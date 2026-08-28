@@ -1,11 +1,12 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.DvrActionFailure
-import at.bernhardberger.tvhplayer.data.DvrActionResult
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 
-fun EpgEventEntry.programmeRecordingTarget(): ProgrammeRecordingTarget =
-    ProgrammeRecordingTarget.from(this)
+fun EpgEventEntry.programmeRecordingTarget(
+    currentSession: CurrentSessionObservation,
+): ProgrammeRecordingTarget = ProgrammeRecordingTarget.from(this, currentSession)
 
 sealed interface LiveInfoRecordingState {
     data object Idle : LiveInfoRecordingState
@@ -24,7 +25,7 @@ sealed interface LiveInfoRecordingState {
 
     data class Failed(
         val target: ProgrammeRecordingTarget,
-        val reason: DvrActionFailure,
+        val result: DvrMutationResult<*>,
     ) : LiveInfoRecordingState
 }
 
@@ -50,7 +51,13 @@ fun liveInfoRecordingDecision(
         is LiveInfoRecordingState.Succeeded -> return LiveInfoRecordingDecision.Ignore
     }
     if (!actionEligible) return LiveInfoRecordingDecision.Invalidate
-    return if (currentEvent?.programmeRecordingTarget() == target) {
+    return if (
+        currentEvent?.id == target.eventId &&
+        currentEvent.channelId == target.channelId &&
+        currentEvent.start.epochSeconds == target.start &&
+        currentEvent.stop.epochSeconds == target.stop &&
+        currentEvent.title.orEmpty() == target.title
+    ) {
         LiveInfoRecordingDecision.Dispatch(target)
     } else {
         LiveInfoRecordingDecision.Invalidate
@@ -59,12 +66,13 @@ fun liveInfoRecordingDecision(
 
 fun liveInfoRecordingCompleted(
     state: LiveInfoRecordingState,
-    result: DvrActionResult,
+    result: DvrMutationResult<*>,
 ): LiveInfoRecordingState {
     val target = (state as? LiveInfoRecordingState.Dispatching)?.target ?: return state
     return when (result) {
-        is DvrActionResult.Accepted -> LiveInfoRecordingState.Succeeded(target)
-        is DvrActionResult.Failed -> LiveInfoRecordingState.Failed(target, result.reason)
+        is DvrMutationResult.Confirmed,
+        is DvrMutationResult.AcceptedButUnconfirmed -> LiveInfoRecordingState.Succeeded(target)
+        else -> LiveInfoRecordingState.Failed(target, result)
     }
 }
 
@@ -75,7 +83,7 @@ data class LiveInfoRecordingCompletion(
 
 fun liveInfoRecordingCompletion(
     state: LiveInfoRecordingState,
-    result: DvrActionResult,
+    result: DvrMutationResult<*>,
     infoOpen: Boolean,
 ): LiveInfoRecordingCompletion = LiveInfoRecordingCompletion(
     state = liveInfoRecordingCompleted(state, result),

@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 
 /** Summary with description fallback for compact detail panes. */
 fun programmeSummaryText(event: EpgEventEntry): String? {
@@ -28,4 +28,4 @@ private fun String.programmeDisplayText(): String =
     replace("\\r\\n", "\n").replace("\\n", "\n").trim()
 
 fun programmeHasAired(event: EpgEventEntry, nowSec: Long): Boolean =
-    event.stop <= nowSec
+    event.stop.epochSeconds <= nowSec

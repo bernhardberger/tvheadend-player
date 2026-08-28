@@ -13,9 +13,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
-import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
@@ -25,10 +26,16 @@ import org.koin.compose.koinInject
 @Composable
 fun SettingsChannelTags(
     initialFocusRequester: FocusRequester,
-    repository: ChannelEpgRuntime = koinInject(),
+    session: TvheadendSession = koinInject(),
     settingsStore: ChannelTagSettingsStore = koinInject(),
 ) {
-    val tags by repository.channelTags.collectAsStateWithLifecycle()
+    val observation by session.observation.collectAsStateWithLifecycle()
+    val tags = when (val state = observation.channelState) {
+        is ChannelRepositoryState.Current -> state.catalog.tags
+        is ChannelRepositoryState.Stale -> state.catalog.tags
+        is ChannelRepositoryState.Synchronizing -> state.staleCatalog?.tags.orEmpty()
+        ChannelRepositoryState.Empty -> emptyList()
+    }
     val visibility by settingsStore.scopeVisibility.collectAsStateWithLifecycle(
         initialValue = ChannelScopeVisibility()
     )
@@ -63,18 +70,19 @@ fun SettingsChannelTags(
                 .focusRequester(initialFocusRequester),
         )
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
-            items(tags, key = { it.id }) { tag ->
-                val checked = visibility.isTagVisible(tag.id)
+            items(tags, key = { it.id.value }) { tag ->
+                val tagId = tag.id
+                val checked = visibility.isTagVisible(tagId)
                 val enabled = !checked || visibleScopeCount > 1
                 SettingsSwitchRow(
-                    label = tag.name,
+                    label = tag.name.orEmpty(),
                     checked = checked,
                     enabled = enabled,
                     supportingText = if (!enabled) lastEnabledReason else null,
                     onClick = {
                         scope.launch {
                             settingsStore.setScopeVisible(
-                                tagId = tag.id,
+                                tagId = tagId,
                                 visible = !checked,
                                 availableTagIds = availableTagIds,
                             )

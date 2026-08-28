@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvheadend.sdk.core.Channel
 
 sealed interface CurrentChannelReadiness {
     data object Waiting : CurrentChannelReadiness

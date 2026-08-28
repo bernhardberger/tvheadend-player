@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -9,9 +10,9 @@ import org.junit.Test
 
 class ApplianceLaunchRequestsTest {
     private val channels = listOf(
-        channel(id = 10, name = "Ten"),
-        channel(id = 20, name = "Twenty"),
-        channel(id = 30, name = "Thirty"),
+        Channel.create(ChannelId(10), name = "Ten"),
+        Channel.create(ChannelId(20), name = "Twenty"),
+        Channel.create(ChannelId(30), name = "Thirty"),
     )
     private val ready = CurrentChannelReadiness.Ready(channels)
 
@@ -46,18 +47,18 @@ class ApplianceLaunchRequestsTest {
         )
         val restoredPending = restored.state.value as ApplianceLaunchState.Pending
         val currentReady = CurrentChannelReadiness.Ready(
-            listOf(channel(id = 20, name = "Current Twenty")),
+            listOf(Channel.create(ChannelId(20), name = "Current Twenty")),
         )
         val target = requireNotNull(
             restored.resolve(
                 request = restoredPending.request,
                 readiness = currentReady,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
         assertEquals(originalPending.request, restoredPending.request)
-        assertEquals(20, target.channelId)
+        assertEquals(ChannelId(20), target.channelId)
         assertEquals("Current Twenty", target.channelName)
     }
 
@@ -73,9 +74,9 @@ class ApplianceLaunchRequestsTest {
             original.resolve(
                 request = originalPending.request,
                 readiness = CurrentChannelReadiness.Ready(
-                    listOf(channel(id = 20, name = "Stale Twenty")),
+                    listOf(Channel.create(ChannelId(20), name = "Stale Twenty")),
                 ),
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         assertEquals(ApplianceLaunchState.Entering(staleTarget), original.state.value)
@@ -89,9 +90,9 @@ class ApplianceLaunchRequestsTest {
             restored.resolve(
                 request = restoredPending.request,
                 readiness = CurrentChannelReadiness.Ready(
-                    listOf(channel(id = 20, name = "Current Twenty")),
+                    listOf(Channel.create(ChannelId(20), name = "Current Twenty")),
                 ),
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
@@ -112,7 +113,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = restoredPending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         val restoredEntering = ApplianceLaunchState.Entering(restoredTarget)
@@ -125,7 +126,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = nextPending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
@@ -181,7 +182,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = CurrentChannelReadiness.Waiting,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         assertEquals(pending, requests.state.value)
@@ -197,7 +198,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = CurrentChannelReadiness.Ready(emptyList()),
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         assertEquals(pending, requests.state.value)
@@ -213,14 +214,14 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
         assertEquals(
             ApplianceLaunchTarget(
                 request = pending.request,
-                channelId = 20,
+                channelId = ChannelId(20),
                 channelName = "Twenty",
             ),
             target,
@@ -237,10 +238,10 @@ class ApplianceLaunchRequestsTest {
         val target = requests.resolve(
             request = pending.request,
             readiness = ready,
-            persistedId = 99,
+            persistedId = ChannelId(99),
         )
 
-        assertEquals(10, target?.channelId)
+        assertEquals(ChannelId(10), target?.channelId)
         assertEquals("Ten", target?.channelName)
     }
 
@@ -253,7 +254,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         val entering = ApplianceLaunchState.Entering(target)
@@ -266,7 +267,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
     }
@@ -282,7 +283,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = cancelled.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
@@ -292,7 +293,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = cancelled.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         assertEquals(next, requests.state.value)
@@ -308,7 +309,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         val entering = ApplianceLaunchState.Entering(target)
@@ -333,7 +334,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         assertEquals(ApplianceLaunchState.Idle, requests.state.value)
@@ -348,14 +349,14 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
         assertFalse(
             requests.completePlayerVisibility(
                 target = target,
-                channelId = 10,
+                channelId = ChannelId(10),
                 channelName = target.channelName,
             )
         )
@@ -378,7 +379,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = pending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
@@ -401,7 +402,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = firstPending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
         assertTrue(requests.cancel(ApplianceLaunchState.Entering(firstTarget)))
@@ -412,7 +413,7 @@ class ApplianceLaunchRequestsTest {
             requests.resolve(
                 request = secondPending.request,
                 readiness = ready,
-                persistedId = 20,
+                persistedId = ChannelId(20),
             )
         )
 
@@ -426,10 +427,4 @@ class ApplianceLaunchRequestsTest {
         assertEquals(ApplianceLaunchState.Entering(secondTarget), requests.state.value)
     }
 
-    private fun channel(id: Int, name: String) = Channel(
-        channelId = id,
-        name = name,
-        number = null,
-        icon = null,
-    )
 }

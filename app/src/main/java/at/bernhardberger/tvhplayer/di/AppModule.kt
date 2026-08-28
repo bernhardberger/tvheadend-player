@@ -8,9 +8,6 @@ import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
 import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
-import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.data.DvrRuntime
-import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
@@ -61,23 +58,20 @@ val appModule = module {
         val player = ExoPlayer.Builder(androidContext())
             .setRenderersFactory(createTvheadendRenderersFactory(androidContext()))
             .build()
-        val dataRuntime = TvheadendDataRuntime(session, applicationScope)
         lateinit var playbackRuntime: AppPlaybackRuntime
         val coordinator = createTvheadendPlaybackCoordinator(
-            session = session,
             player = player,
             onRecoveryRequired = { reason -> playbackRuntime.onRecoveryRequired(reason) },
         )
         playbackRuntime = AppPlaybackRuntime(
             player = player,
+            session = session,
             coordinator = coordinator,
             settings = get(),
-            recordingProgressCapability = dataRuntime.progressCapability,
             scope = applicationScope,
         )
         SdkRuntimeOwner.create(
             session = session,
-            dataRuntime = dataRuntime,
             playbackRuntime = playbackRuntime,
             streamProfileDiscovery = streamProfileDiscovery,
             coordinator = coordinator,
@@ -88,9 +82,7 @@ val appModule = module {
 
     single { get<SdkRuntimeOwner>().session }
     single { get<SdkRuntimeOwner>().streamProfileDiscovery }
-    single { get<SdkRuntimeOwner>().dataRuntime }
-    single<ChannelEpgRuntime> { get<TvheadendDataRuntime>() }
-    single<DvrRuntime> { get<TvheadendDataRuntime>() }
+    single { get<SdkRuntimeOwner>().session.epgRepository }
     single { get<SdkRuntimeOwner>().playbackRuntime }
 
     single { ChannelSelectionStore() }
@@ -102,7 +94,7 @@ val appModule = module {
 
     viewModel {
         AppConnectionViewModel(
-            runtime = get(),
+            session = get(),
             profileStore = get(),
             profileMigration = get(),
             serverSettings = get(),
@@ -120,8 +112,8 @@ val appModule = module {
             savedStateHandle = get(),
         )
     }
-    viewModel { VideoPlayerViewModel(playbackRuntime = get(), channelRuntime = get(), runtime = get()) }
-    viewModel { ChannelsViewModel(runtime = get(), tagSettings = get()) }
+    viewModel { VideoPlayerViewModel(playbackRuntime = get(), session = get()) }
+    viewModel { ChannelsViewModel(session = get(), tagSettings = get()) }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),

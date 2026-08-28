@@ -1,7 +1,9 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.Channel
-import at.bernhardberger.tvhplayer.data.ChannelTag
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelTag
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 
 enum class TagScopeFallback {
     TAG_UNAVAILABLE,
@@ -11,11 +13,11 @@ enum class TagScopeFallback {
 data class ChannelScopeVisibility(
     val configured: Boolean = false,
     val allChannelsVisible: Boolean = true,
-    val visibleTagIds: Set<Int> = emptySet(),
+    val visibleTagIds: Set<ChannelTagId> = emptySet(),
 ) {
     fun isAllChannelsVisible(): Boolean = !configured || allChannelsVisible
 
-    fun isTagVisible(tagId: Int): Boolean = !configured || tagId in visibleTagIds
+    fun isTagVisible(tagId: ChannelTagId): Boolean = !configured || tagId in visibleTagIds
 }
 
 data class ChannelBrowsingScope(
@@ -23,14 +25,14 @@ data class ChannelBrowsingScope(
     val visibleChannels: List<Channel>,
     val tags: List<ChannelTag>,
     val allChannelsVisible: Boolean,
-    val activeTagId: Int?,
+    val activeTagId: ChannelTagId?,
     val fallback: TagScopeFallback? = null,
 )
 
 fun resolveChannelScope(
     channels: List<Channel>,
     tags: List<ChannelTag>,
-    requestedTagId: Int?,
+    requestedTagId: ChannelTagId?,
     visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
 ): ChannelBrowsingScope {
     val visibleTags = tags.filter { visibility.isTagVisible(it.id) }
@@ -56,7 +58,7 @@ fun resolveChannelScope(
         visibleChannels = if (activeTagId == null) {
             channels
         } else {
-            channels.filter { activeTagId in it.tagIds }
+            channels.filter { channel -> activeTagId in channel.tagIds.orEmpty() }
         },
         tags = visibleTags,
         allChannelsVisible = allChannelsVisible,
@@ -67,8 +69,8 @@ fun resolveChannelScope(
 
 fun updateChannelScopeVisibility(
     current: ChannelScopeVisibility,
-    availableTagIds: Set<Int>,
-    tagId: Int?,
+    availableTagIds: Set<ChannelTagId>,
+    tagId: ChannelTagId?,
     visible: Boolean,
 ): ChannelScopeVisibility {
     val allChannelsVisible = if (current.configured) {
@@ -97,17 +99,17 @@ fun updateChannelScopeVisibility(
 
 fun browsingFocusChannelId(
     visibleChannels: List<Channel>,
-    currentFocusId: Int,
-): Int? = visibleChannels.firstOrNull { it.channelId == currentFocusId }?.channelId
-    ?: visibleChannels.firstOrNull()?.channelId
+    currentFocusId: ChannelId?,
+): ChannelId? = visibleChannels.firstOrNull { it.id == currentFocusId }?.id
+    ?: visibleChannels.firstOrNull()?.id
 
 fun adjacentTagId(
     tags: List<ChannelTag>,
-    activeTagId: Int?,
+    activeTagId: ChannelTagId?,
     direction: Int,
     allChannelsVisible: Boolean = true,
-): Int? {
-    val orderedIds = buildList<Int?> {
+): ChannelTagId? {
+    val orderedIds = buildList<ChannelTagId?> {
         if (allChannelsVisible) add(null)
         addAll(tags.map { it.id })
     }

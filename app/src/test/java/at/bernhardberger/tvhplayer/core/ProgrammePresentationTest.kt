@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -61,11 +64,11 @@ class ProgrammePresentationTest {
         description: String? = null,
         start: Long = 0,
         stop: Long = 60,
-    ) = EpgEventEntry(
-        eventId = 1,
-        channelId = 2,
-        start = start,
-        stop = stop,
+    ) = EpgEvent.create(
+        id = EventId(1),
+        channelId = ChannelId(2),
+        start = Instant.fromEpochSeconds(start),
+        stop = Instant.fromEpochSeconds(stop),
         title = "Title",
         summary = summary,
         description = description,

@@ -33,9 +33,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvhplayer.core.programmeDetailsBody
-import at.bernhardberger.tvhplayer.data.DvrEntry
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import kotlinx.coroutines.launch
 
@@ -55,7 +55,7 @@ fun ProgrammeContentDetails(
     val metadata = programmeMetadata(event)
 
     ContentDetails(
-        title = event.title,
+        title = event.title.orEmpty(),
         subtitle = subtitle,
         metadata = metadata,
         body = body,
@@ -72,7 +72,7 @@ fun RecordingContentDetails(
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
     ContentDetails(
-        title = entry.title,
+        title = entry.title.orEmpty(),
         subtitle = entry.subtitle,
         metadata = entry.channelName,
         body = entry.summary?.takeIf(String::isNotBlank) ?: entry.description,

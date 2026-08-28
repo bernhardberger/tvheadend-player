@@ -1,22 +1,30 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.EventId
 
 data class ProgrammeRecordingTarget(
-    val eventId: Int,
-    val channelId: Int,
+    val eventId: EventId,
+    val channelId: ChannelId?,
     val start: Long,
     val stop: Long,
     val title: String,
+    val currentSession: CurrentSessionObservation,
 ) {
     companion object {
-        fun from(event: EpgEventEntry): ProgrammeRecordingTarget =
+        fun from(
+            event: EpgEventEntry,
+            currentSession: CurrentSessionObservation,
+        ): ProgrammeRecordingTarget =
             ProgrammeRecordingTarget(
-                eventId = event.eventId,
+                eventId = event.id,
                 channelId = event.channelId,
-                start = event.start,
-                stop = event.stop,
-                title = event.title,
+                start = event.start.epochSeconds,
+                stop = event.stop.epochSeconds,
+                title = event.title.orEmpty(),
+                currentSession = currentSession,
             )
     }
 }

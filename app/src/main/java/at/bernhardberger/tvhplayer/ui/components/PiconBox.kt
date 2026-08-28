@@ -14,12 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 
 @Composable
 fun PiconBox(
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation? = null,
     serverTag: String = "default",
     piconPath: String?,
     contentScale: ContentScale = ContentScale.Fit,
@@ -27,8 +29,10 @@ fun PiconBox(
         .width(92.dp)
         .height(64.dp),
 ) {
-    val piconUrl = remember(serverTag, piconPath) {
-        at.bernhardberger.tvhplayer.core.resolvePiconModel(serverTag, piconPath)
+    val piconUrl = remember(currentSession, serverTag, piconPath) {
+        currentSession?.let {
+            at.bernhardberger.tvhplayer.core.resolvePiconModel(it, serverTag, piconPath)
+        }
     }
 
     Box(

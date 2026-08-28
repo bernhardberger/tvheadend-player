@@ -40,13 +40,13 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.data.DvrActionFailure
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
@@ -69,9 +69,7 @@ internal fun LiveInfoRecordingValidityEffect(
     onInvalidated: () -> Unit,
 ) {
     val latestOnInvalidated by rememberUpdatedState(onInvalidated)
-    val currentTarget = currentEvent?.programmeRecordingTarget()
-
-    LaunchedEffect(state, currentTarget, actionEligible, confirmationVisible) {
+    LaunchedEffect(state, currentEvent, actionEligible, confirmationVisible) {
         if (
             confirmationVisible &&
             state is LiveInfoRecordingState.Confirming &&
@@ -111,11 +109,11 @@ internal fun LiveProgrammeInfoOverlay(
         stringResource(R.string.player_info_pane_title)
     }
     val recordAvailable = event != null && !recordingScheduled && canRecord
-    var previousRecordAvailable by remember(event?.eventId) {
+    var previousRecordAvailable by remember(event?.id) {
         mutableStateOf(recordAvailable)
     }
 
-    LaunchedEffect(event?.eventId, showingRecordingDialog) {
+    LaunchedEffect(event?.id, showingRecordingDialog) {
         if (showingRecordingDialog || restoreRecordFocus) return@LaunchedEffect
         withFrameNanos { }
         closeFocus.requestFocus()
@@ -123,7 +121,7 @@ internal fun LiveProgrammeInfoOverlay(
 
     LaunchedEffect(
         restoreRecordFocus,
-        event?.eventId,
+        event?.id,
         showingRecordingDialog,
         recordingScheduled,
         canRecord,
@@ -201,9 +199,9 @@ internal fun LiveProgrammeInfoOverlay(
                             subtitle = buildString {
                                 append(channelIdentity)
                                 append(" • ")
-                                append(formatClock(event.start))
+                                append(formatClock(event.start.epochSeconds))
                                 append("–")
-                                append(formatClock(event.stop))
+                                append(formatClock(event.stop.epochSeconds))
                             },
                             modifier = Modifier.weight(1f),
                             footer = {
@@ -345,7 +343,7 @@ internal fun ProgrammeRecordingConfirmation(
             stringResource(
                 R.string.recording_request_failure_message,
                 target.title,
-                dvrFailureLabel(state.reason),
+                dvrFailureLabel(state.result),
             )
         LiveInfoRecordingState.Idle -> null
     }
@@ -456,12 +454,17 @@ internal fun ProgrammeRecordingConfirmation(
 }
 
 @Composable
-private fun dvrFailureLabel(reason: DvrActionFailure): String = stringResource(
-    when (reason) {
-        DvrActionFailure.PERMISSION_DENIED -> R.string.recording_action_permission
-        DvrActionFailure.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
-        DvrActionFailure.CONFLICT -> R.string.recording_action_conflict
-        DvrActionFailure.REJECTED -> R.string.recording_action_rejected
-        DvrActionFailure.CONNECTION -> R.string.recording_action_connection
+private fun dvrFailureLabel(result: DvrMutationResult<*>): String = stringResource(
+    when (result) {
+        DvrMutationResult.AccessDenied -> R.string.recording_action_permission
+        DvrMutationResult.ConnectionLimit -> R.string.recording_action_conn_limit
+        DvrMutationResult.ServerRejected,
+        DvrMutationResult.NotSupported -> R.string.recording_action_rejected
+        DvrMutationResult.NotReady,
+        DvrMutationResult.ObservationExpired,
+        DvrMutationResult.Timeout,
+        DvrMutationResult.TransportUnavailable -> R.string.recording_action_connection
+        is DvrMutationResult.Confirmed,
+        is DvrMutationResult.AcceptedButUnconfirmed -> R.string.recording_action_rejected
     }
 )

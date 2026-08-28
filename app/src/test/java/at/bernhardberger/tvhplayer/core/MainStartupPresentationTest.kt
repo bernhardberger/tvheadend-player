@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 import org.junit.Assert.assertEquals
@@ -16,7 +17,7 @@ class MainStartupPresentationTest {
                 startupState = MainStartupState.ResolvingLocal,
                 launchState = entering(),
                 connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(channel(1))),
+                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
                 simpleTvActive = true,
             ),
         )
@@ -30,7 +31,7 @@ class MainStartupPresentationTest {
                 startupState = readyBootstrap,
                 launchState = ApplianceLaunchState.Idle,
                 connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(channel(1))),
+                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
                 simpleTvActive = true,
             ),
         )
@@ -44,7 +45,7 @@ class MainStartupPresentationTest {
                 startupState = readyBootstrap,
                 launchState = entering(),
                 connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(channel(1))),
+                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
                 simpleTvActive = true,
             ),
         )
@@ -90,7 +91,7 @@ class MainStartupPresentationTest {
                 startupState = readyBootstrap,
                 launchState = pending,
                 connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(channel(1))),
+                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
                 simpleTvActive = false,
             ),
         )
@@ -100,7 +101,7 @@ class MainStartupPresentationTest {
                 startupState = readyBootstrap,
                 launchState = pending,
                 connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(channel(1))),
+                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
                 simpleTvActive = true,
             ),
         )
@@ -108,7 +109,7 @@ class MainStartupPresentationTest {
             MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING),
             presentation(
                 connectionState = ConnectionUiState.Connecting,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(channel(1))),
+                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
             ),
         )
         assertEquals(
@@ -117,7 +118,7 @@ class MainStartupPresentationTest {
                 startupState = readyBootstrap,
                 launchState = pending,
                 connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(channel(99))),
+                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(99)))),
                 simpleTvActive = false,
             ),
         )
@@ -242,16 +243,9 @@ class MainStartupPresentationTest {
     private fun entering() = ApplianceLaunchState.Entering(
         ApplianceLaunchTarget(
             request = ApplianceLaunchRequest(2),
-            channelId = 2,
+            channelId = ChannelId(2),
             channelName = "Two",
         ),
-    )
-
-    private fun channel(id: Int) = Channel(
-        channelId = id,
-        name = "Channel $id",
-        number = id,
-        icon = null,
     )
 
     private companion object {

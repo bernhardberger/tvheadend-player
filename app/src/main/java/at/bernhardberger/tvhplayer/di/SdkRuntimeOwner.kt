@@ -6,7 +6,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
-import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineDispatcher
@@ -22,7 +21,6 @@ import kotlinx.coroutines.launch
 /** Process-lifetime owner for the one released-SDK session/coordinator/player graph. */
 internal class SdkRuntimeOwner(
     val session: TvheadendSession,
-    val dataRuntime: TvheadendDataRuntime,
     val playbackRuntime: AppPlaybackRuntime,
     val streamProfileDiscovery: StreamProfileDiscovery,
     private val coordinator: TvheadendPlaybackCoordinator,
@@ -60,7 +58,6 @@ internal class SdkRuntimeOwner(
     companion object {
         fun create(
             session: TvheadendSession,
-            dataRuntime: TvheadendDataRuntime,
             playbackRuntime: AppPlaybackRuntime,
             streamProfileDiscovery: StreamProfileDiscovery,
             coordinator: TvheadendPlaybackCoordinator,
@@ -71,7 +68,6 @@ internal class SdkRuntimeOwner(
             val runJob = applicationScope.launch { coordinator.run() }
             return SdkRuntimeOwner(
                 session,
-                dataRuntime,
                 playbackRuntime,
                 streamProfileDiscovery,
                 coordinator,

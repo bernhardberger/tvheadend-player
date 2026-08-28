@@ -18,7 +18,7 @@ media3 = "1.11.0"
 navigationCompose = "2.9.7"
 timber = "5.0.1"
 tvMaterial = "1.1.0"
-tvheadend-sdk = "0.2.0"
+tvheadend-sdk = "0.3.0"
 junit = "4.13.2"
 androidxTestExt = "1.2.1"
 espresso = "3.6.1"
@@ -56,6 +56,7 @@ material = { group = "com.google.android.material", name = "material", version.r
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 tvheadend-sdk-android = { module = "at.bernhardberger.tvheadend:sdk-android" }
 tvheadend-sdk-media3 = { module = "at.bernhardberger.tvheadend:sdk-media3" }
+tvheadend-sdk-testing = { module = "at.bernhardberger.tvheadend:sdk-testing" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExt" }

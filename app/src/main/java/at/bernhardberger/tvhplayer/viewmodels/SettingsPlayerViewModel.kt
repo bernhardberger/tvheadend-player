@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
@@ -63,17 +62,17 @@ class SettingsPlayerViewModel(
         }
 
         viewModelScope.launch {
-            session.state.collect { st ->
-                _ui.update { it.copy(connected = st is SessionState.Ready) }
+            session.observation.collect { observation ->
+                _ui.update { it.copy(connected = observation.currentSession != null) }
             }
         }
 
         viewModelScope.launch {
-            session.state
-                .map { st -> st is SessionState.Ready }
+            session.observation
+                .map { it.currentSession }
                 .distinctUntilChanged()
-                .collectLatest { connected ->
-                    if (!connected) {
+                .collectLatest { currentSession ->
+                    if (currentSession == null) {
                         _ui.update { it.copy(profiles = ProfilesUiState.Idle) }
                         return@collectLatest
                     }
@@ -81,7 +80,7 @@ class SettingsPlayerViewModel(
                     _ui.update { it.copy(profiles = ProfilesUiState.Loading) }
 
                     val result = try {
-                        when (val profiles = streamProfileDiscovery.discover()) {
+                        when (val profiles = streamProfileDiscovery.discover(currentSession)) {
                             is StreamProfilesResult.Available -> Result.success(profiles.profiles)
                             else -> Result.failure(IllegalStateException(profiles::class.simpleName))
                         }
@@ -92,6 +91,9 @@ class SettingsPlayerViewModel(
                     }
                     result.fold(
                         onSuccess = { items ->
+                            if (session.observation.value.currentSession !== currentSession) {
+                                return@fold
+                            }
                             val discoveredProfiles = items.map { profile ->
                                 StreamProfileSelectionOption(
                                     id = profile.id.value,

@@ -38,10 +38,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
 import coil3.ImageLoader
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.channelNowStatus
-import at.bernhardberger.tvhplayer.data.Channel
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelCardGrid
 import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
@@ -55,13 +57,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChannelDrawer(
     channels: List<Channel>,
-    selectedId: Int,
-    playingChannelId: Int,
-    recordingChannelIds: Set<Int>,
+    selectedId: ChannelId?,
+    playingChannelId: ChannelId,
+    recordingChannelIds: Set<ChannelId>,
     nowSec: Long,
     channelsVm: ChannelsViewModel,
     imageLoader: ImageLoader,
-    onFocusChannel: (Int) -> Unit,
+    currentSession: CurrentSessionObservation? = null,
+    onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: () -> Unit,
     largeCards: Boolean = false,
@@ -70,11 +73,13 @@ fun ChannelDrawer(
     val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    val orderedChannelIds = remember(channels) { channels.map { it.channelId } }
+    val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val rowFocusRequesters = remember(orderedChannelIds) {
         orderedChannelIds.associateWith { FocusRequester() }
     }
-    val channelNumbers = remember(channels) { channels.associate { it.channelId to it.number } }
+    val channelNumbers = remember(channels) {
+        channels.associate { it.id to it.number?.toInt() }
+    }
     val noEpg = stringResource(R.string.no_epg)
 
     var didInitialRestore by remember { mutableStateOf(false) }
@@ -82,7 +87,7 @@ fun ChannelDrawer(
     var pageGeneration by remember { mutableIntStateOf(0) }
 
     fun pageChannels(direction: Int): Boolean {
-        val currentIndex = channels.indexOfFirst { it.channelId == selectedId }
+        val currentIndex = channels.indexOfFirst { it.id == selectedId }
         val visibleCount = if (largeCards) {
             gridState.layoutInfo.visibleItemsInfo.size
         } else {
@@ -96,7 +101,7 @@ fun ChannelDrawer(
         ) ?: return true
         if (targetIndex == currentIndex) return true
 
-        val targetId = channels[targetIndex].channelId
+        val targetId = channels[targetIndex].id
         val targetFocus = rowFocusRequesters[targetId] ?: return true
         val generation = ++pageGeneration
         isRestoring = true
@@ -129,8 +134,8 @@ fun ChannelDrawer(
         if (didInitialRestore) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
 
-        val id = if (selectedId == -1) channels.first().channelId else selectedId
-        val idx = channels.indexOfFirst { it.channelId == id }
+        val id = selectedId ?: channels.first().id
+        val idx = channels.indexOfFirst { it.id == id }
         if (idx < 0) return@LaunchedEffect
 
         isRestoring = true
@@ -212,9 +217,10 @@ fun ChannelDrawer(
                 noEpg,
             ) {
                 channels.map { ch ->
-                    val now = channelsVm.nowEvent(ch.channelId, nowSec)
+                    val channelId = ch.id
+                    val now = channelsVm.nowEvent(channelId, nowSec)
                     val status = channelNowStatus(
-                        channelId = ch.channelId,
+                        channelId = channelId,
                         playingChannelId = playingChannelId,
                         recordingChannelIds = recordingChannelIds,
                     )
@@ -223,7 +229,7 @@ fun ChannelDrawer(
                         number = ChannelNavigation.numberForId(
                             orderedChannelIds,
                             channelNumbers,
-                            ch.channelId,
+                            channelId,
                         ),
                         programmeTitle = now?.title ?: noEpg,
                         playingNow = status.playingNow,
@@ -235,6 +241,7 @@ fun ChannelDrawer(
             ChannelCardGrid(
                 items = cardItems,
                 imageLoader = imageLoader,
+                currentSession = currentSession,
                 focusRequesters = rowFocusRequesters,
                 gridState = gridState,
                 contentPadding = TvPlaybackPadding,
@@ -254,37 +261,39 @@ fun ChannelDrawer(
                     .focusGroup()
                     .focusRestorer()
             ) {
-                items(channels, key = { ch -> ch.channelId }) { ch ->
-                    val isSelected = ch.channelId == selectedId
+                items(channels, key = { ch -> ch.id.value }) { ch ->
+                    val channelId = ch.id
+                    val isSelected = channelId == selectedId
 
-                    val now = remember(ch.channelId, nowSec) {
-                        channelsVm.nowEvent(ch.channelId, nowSec)
+                    val now = remember(channelId, nowSec) {
+                        channelsVm.nowEvent(channelId, nowSec)
                     }
                     val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
                     val status = channelNowStatus(
-                        channelId = ch.channelId,
+                        channelId = channelId,
                         playingChannelId = playingChannelId,
                         recordingChannelIds = recordingChannelIds,
                     )
 
                     ChannelRow(
                         modifier = Modifier.focusRequester(
-                            rowFocusRequesters.getValue(ch.channelId)
+                            rowFocusRequesters.getValue(channelId)
                         ),
                         number = ChannelNavigation.numberForId(
                             orderedChannelIds,
                             channelNumbers,
-                            ch.channelId,
+                            channelId,
                         ),
-                        name = ch.name,
+                        name = ch.name.orEmpty(),
                         programTitle = now?.title ?: noEpg,
                         progress = if (now != null) prog else null,
                         imageLoader = imageLoader,
+                        currentSession = currentSession,
                         piconPath = ch.icon,
                         focused = isSelected,
                         recordingNow = status.recordingNow,
                         playingNow = status.playingNow,
-                        onFocus = { if (!isRestoring) onFocusChannel(ch.channelId) },
+                        onFocus = { if (!isRestoring) onFocusChannel(channelId) },
                         onConfirm = { onPickChannel(ch) }
                     )
                 }

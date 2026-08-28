@@ -25,7 +25,7 @@ are selected unmodified files from Chris Banes' `chrisbanes/skills` release
 content hashes are recorded in `skills-lock.json`; the upstream release retains
 the applicable Apache License text.
 
-The released `at.bernhardberger.tvheadend:sdk-media3:0.2.0` AAR contains
+The released `at.bernhardberger.tvheadend:sdk-media3:0.3.0` AAR contains
 AndroidX Media3 1.11.0's Apache-2.0 FFmpeg extension. FFmpeg remains under
 LGPL-2.1-or-later. The app uses the extension as the AC-3/E-AC-3/MP3 fallback
 behind platform decoding. Exact release hashes and complete Media3/FFmpeg source

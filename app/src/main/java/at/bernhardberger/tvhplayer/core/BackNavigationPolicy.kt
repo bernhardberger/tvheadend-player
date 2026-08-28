@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 enum class BackAction {
     POP_NAVIGATION,
     RETURN_TO_PARENT,
@@ -72,12 +74,12 @@ fun armWarmReturn(target: WarmPlaybackTarget): WarmReturnOpportunity =
 fun rearmWarmReturn(target: WarmPlaybackTarget): WarmReturnOpportunity =
     armWarmReturn(target)
 
-fun rearmWarmReturnForPlaybackSelection(
+fun <T> rearmWarmReturnForPlaybackSelection(
     current: WarmReturnOpportunity,
     currentWarmTarget: WarmPlaybackTarget,
     requestedTarget: WarmPlaybackTarget,
-    currentIdentity: Int?,
-    requestedIdentity: Int,
+    currentIdentity: T?,
+    requestedIdentity: T,
 ): WarmReturnOpportunity = if (
     currentWarmTarget != WarmPlaybackTarget.NONE &&
     currentWarmTarget == requestedTarget &&
@@ -90,8 +92,8 @@ fun rearmWarmReturnForPlaybackSelection(
 
 /** Map active session IDs to a warm playback target. */
 fun warmPlaybackTarget(
-    activeServiceId: Int?,
-    activeRecordingId: Int?,
+    activeServiceId: ChannelId?,
+    activeRecordingId: DvrEntryId?,
 ): WarmPlaybackTarget = when {
     activeServiceId != null -> WarmPlaybackTarget.LIVE
     activeRecordingId != null -> WarmPlaybackTarget.RECORDING

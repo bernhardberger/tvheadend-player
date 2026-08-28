@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import android.view.KeyEvent
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 
 enum class MediaPlaybackAction {
     NONE,
@@ -192,7 +193,7 @@ fun playerKeyAction(
     }
 }
 
-fun channelPickAction(currentChannelId: Int, pickedChannelId: Int): ChannelPickAction =
+fun channelPickAction(currentChannelId: ChannelId, pickedChannelId: ChannelId): ChannelPickAction =
     if (currentChannelId == pickedChannelId) {
         ChannelPickAction.CLOSE_DRAWER
     } else {

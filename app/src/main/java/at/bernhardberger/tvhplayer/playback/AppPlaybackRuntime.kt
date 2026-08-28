@@ -7,8 +7,12 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
@@ -18,7 +22,6 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
-import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Duration.Companion.milliseconds
@@ -43,9 +46,17 @@ sealed interface AppPlaybackState {
 
 enum class AppPlaybackFailureReason { RECORDING_READ_FAILED, OTHER }
 sealed interface AppPlaybackTarget {
-    data class Live(val channelId: Int) : AppPlaybackTarget
-    data class Recording(val recordingId: Int) : AppPlaybackTarget
+    data class Live(val channelId: ChannelId) : AppPlaybackTarget
+    data class Recording(val recordingId: DvrEntryId) : AppPlaybackTarget
 }
+data class LivePlaybackSelection(
+    val currentSession: CurrentSessionObservation,
+    val channelId: ChannelId,
+)
+data class RecordingPlaybackSelection(
+    val currentSession: CurrentSessionObservation,
+    val recordingId: DvrEntryId,
+)
 data class AppTimeshiftState(
     val available: Boolean = false,
     val paused: Boolean = false,
@@ -81,23 +92,28 @@ data class AppPlaybackDiagnostics(
 /** App presentation adapter over the released coordinator and app-owned player. */
 class AppPlaybackRuntime(
     val player: ExoPlayer,
+    private val session: TvheadendSession,
     private val coordinator: TvheadendPlaybackCoordinator,
     private val settings: PlayerSettingsStore,
-    val recordingProgressCapability: StateFlow<RecordingProgressCapability>,
     private val scope: CoroutineScope,
 ) {
     private val presentationEpoch = PlaybackPresentationEpoch()
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     private val _activeTarget = MutableStateFlow<AppPlaybackTarget?>(null)
+    private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
+    private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
     private val _diagnostics = MutableStateFlow(AppPlaybackDiagnostics())
     private var diagnosticsEnabled = false
     @Volatile
     private var activeTargetEpoch: Long? = null
-    private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
+    private var lastLiveSelection: LivePlaybackSelection? = null
+    private var lastRecordingRequest: Pair<RecordingPlaybackSelection, RecordingPlaybackStart>? = null
     private var recoveryJob: Job? = null
 
     val state = _state.asStateFlow()
     val activeTarget = _activeTarget.asStateFlow()
+    val recordingSelection = _recordingSelection.asStateFlow()
+    val recordingAdmission = _recordingAdmission.asStateFlow()
     val timeshiftState: StateFlow<LiveTimeshiftState> = coordinator.timeshiftState
     val livePlaybackIssue: StateFlow<SubscriptionIssue?> = coordinator.subscriptionIssue
     val diagnostics = _diagnostics.asStateFlow()
@@ -124,31 +140,43 @@ class AppPlaybackRuntime(
         player.addListener(listener)
     }
 
-    suspend fun playLive(channelId: Int): PlaybackTargetResult? =
-        playLive(channelId, recovering = false)
+    suspend fun playLive(selection: LivePlaybackSelection): PlaybackTargetResult? =
+        playLive(selection, recovering = false)
 
     private suspend fun playLive(
-        channelId: Int,
+        selection: LivePlaybackSelection,
         recovering: Boolean,
         epoch: Long = presentationEpoch.begin(),
     ): PlaybackTargetResult? {
         presentationEpoch.publishIfCurrent(epoch) {
             _activeTarget.value = null
+            _recordingSelection.value = null
+            _recordingAdmission.value = null
             activeTargetEpoch = null
             if (!recovering) _state.value = AppPlaybackState.Starting
         }
+        lastLiveSelection = selection
         val playerSettings = settings.playerSettings.first()
         if (!presentationEpoch.isCurrent(epoch)) return null
-        val result = coordinator.setLiveTarget(
-            ChannelId(channelId.toLong()),
-            LivePlaybackOptions(
-                streamProfileId = selectedStreamProfileId(playerSettings.profile),
-                timeshiftPeriod = if (playerSettings.timeshiftEnabled) 2.hours else kotlin.time.Duration.ZERO,
-            ),
-        )
+        val result = when (
+            val binding = session.bindLivePlayback(
+                selection.currentSession,
+                selection.channelId,
+            )
+        ) {
+            is PlaybackBindingResult.Bound -> coordinator.setLiveTarget(
+                binding.binding,
+                LivePlaybackOptions(
+                    streamProfileId = selectedStreamProfileId(playerSettings.profile),
+                    timeshiftPeriod = if (playerSettings.timeshiftEnabled) 2.hours else kotlin.time.Duration.ZERO,
+                ),
+            )
+            PlaybackBindingResult.ObservationExpired -> PlaybackTargetResult.NOT_READY
+            PlaybackBindingResult.TargetUnavailable -> PlaybackTargetResult.TARGET_UNAVAILABLE
+        }
         presentationEpoch.publishIfCurrent(epoch) {
             if (result == PlaybackTargetResult.STARTED) {
-                _activeTarget.value = AppPlaybackTarget.Live(channelId)
+                _activeTarget.value = AppPlaybackTarget.Live(selection.channelId)
                 activeTargetEpoch = epoch
                 publishDiagnostics()
             } else {
@@ -159,20 +187,40 @@ class AppPlaybackRuntime(
     }
 
     suspend fun playRecording(
-        recordingId: DvrEntryId,
+        selection: RecordingPlaybackSelection,
         start: RecordingPlaybackStart,
     ): PlaybackTargetResult? {
         val epoch = presentationEpoch.begin()
-        lastRecordingRequest = recordingId to start
+        lastRecordingRequest = selection to start
         presentationEpoch.publishIfCurrent(epoch) {
             _state.value = AppPlaybackState.Starting
             _activeTarget.value = null
+            _recordingSelection.value = selection
+            _recordingAdmission.value = null
             activeTargetEpoch = null
         }
-        val result = coordinator.setRecordingTarget(recordingId, start)
+        val result = when (
+            val binding = session.bindRecordingPlayback(
+                selection.currentSession,
+                selection.recordingId,
+            )
+        ) {
+            is PlaybackBindingResult.Bound -> {
+                _recordingAdmission.value = binding.binding.admission
+                coordinator.setRecordingTarget(binding.binding, start)
+            }
+            PlaybackBindingResult.ObservationExpired -> {
+                _recordingAdmission.value = RecordingPlaybackAdmission.ObservationExpired
+                PlaybackTargetResult.NOT_READY
+            }
+            PlaybackBindingResult.TargetUnavailable -> {
+                _recordingAdmission.value = RecordingPlaybackAdmission.TargetUnavailable
+                PlaybackTargetResult.TARGET_UNAVAILABLE
+            }
+        }
         presentationEpoch.publishIfCurrent(epoch) {
             if (result == PlaybackTargetResult.STARTED) {
-                _activeTarget.value = AppPlaybackTarget.Recording(recordingId.value.toInt())
+                _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
                 activeTargetEpoch = epoch
                 publishDiagnostics()
             } else {
@@ -189,6 +237,8 @@ class AppPlaybackRuntime(
         val result = coordinator.stop()
         presentationEpoch.publishIfCurrent(epoch) {
             _activeTarget.value = null
+            _recordingSelection.value = null
+            _recordingAdmission.value = null
             activeTargetEpoch = null
             _state.value = AppPlaybackState.Idle
             publishDiagnostics()
@@ -197,10 +247,9 @@ class AppPlaybackRuntime(
     }
 
     suspend fun retryLive(): PlaybackTargetResult? =
-        (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId
-            ?.let { playLive(it, recovering = true) }
+        lastLiveSelection?.let { playLive(it, recovering = true) }
     suspend fun retryRecording(): PlaybackTargetResult? =
-        lastRecordingRequest?.let { (recordingId, start) -> playRecording(recordingId, start) }
+        lastRecordingRequest?.let { (selection, start) -> playRecording(selection, start) }
     suspend fun pauseTimeshift(): TimeshiftCommandResult = coordinator.pauseTimeshift()
     suspend fun resumeTimeshift(): TimeshiftCommandResult = coordinator.resumeTimeshift()
     suspend fun seekTimeshift(deltaMs: Long): TimeshiftCommandResult =
@@ -220,7 +269,7 @@ class AppPlaybackRuntime(
         )
     }
     internal fun onRecoveryRequired(@Suppress("UNUSED_PARAMETER") reason: PlaybackRecoveryReason) {
-        val channelId = (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId ?: return
+        val selection = lastLiveSelection ?: return
         val targetEpoch = activeTargetEpoch ?: return
         val recoveryEpoch = presentationEpoch.beginIfCurrent(targetEpoch) ?: return
         presentationEpoch.publishIfCurrent(recoveryEpoch) {
@@ -228,7 +277,7 @@ class AppPlaybackRuntime(
         }
         recoveryJob?.cancel()
         recoveryJob = scope.launch {
-            playLive(channelId, recovering = true, epoch = recoveryEpoch)
+            playLive(selection, recovering = true, epoch = recoveryEpoch)
         }
     }
 

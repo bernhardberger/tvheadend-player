@@ -170,7 +170,7 @@ engineering host, while the stable private signing key remains on an isolated
 owner-controlled host.
 
 The app consumes the released
-`at.bernhardberger.tvheadend:sdk-media3:0.2.0` artifact, which keeps Media3
+`at.bernhardberger.tvheadend:sdk-media3:0.3.0` artifact, which keeps Media3
 1.11.0 and its bundled FFmpeg extension on one release boundary. Playback is
 platform-first with the native extension retained as the AC-3/E-AC-3/MP3
 fallback. The release gate pins the public AAR and source-classifier hashes,

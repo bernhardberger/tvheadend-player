@@ -24,7 +24,8 @@ import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
-import at.bernhardberger.tvhplayer.data.Channel
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
@@ -285,7 +286,7 @@ class MainStartupCompositionTest {
         assertEquals(Routes.CHANNELS, selectedRoot)
         assertFalse(requests.cancel(expected))
 
-        var retainedRoot = Routes.player(1, "One")
+        var retainedRoot = Routes.player(ChannelId(1), "One")
         closeNormalLivePlayer(
             simpleTvActive = false,
             popBackStack = { false },
@@ -293,13 +294,13 @@ class MainStartupCompositionTest {
         )
         assertEquals(Routes.CHANNELS, retainedRoot)
 
-        retainedRoot = Routes.player(2, "Two")
+        retainedRoot = Routes.player(ChannelId(2), "Two")
         closeNormalLivePlayer(
             simpleTvActive = false,
             popBackStack = { true },
             selectRoot = { retainedRoot = it },
         )
-        assertEquals(Routes.player(2, "Two"), retainedRoot)
+        assertEquals(Routes.player(ChannelId(2), "Two"), retainedRoot)
     }
 
     @Test
@@ -367,14 +368,14 @@ class MainStartupCompositionTest {
         val target = requests.resolve(
             request = pending.request,
             readiness = CurrentChannelReadiness.Ready(listOf(channel(11, "Eleven"))),
-            persistedId = 11,
+            persistedId = ChannelId(11),
         )!!
 
         assertFalse(
             completeEnteringPlayerVisibility(
                 requests = requests,
                 target = target,
-                channelId = target.channelId + 1,
+                channelId = ChannelId(target.channelId.value + 1),
                 channelName = target.channelName,
             ),
         )
@@ -401,7 +402,7 @@ class MainStartupCompositionTest {
                         presentation = MainStartupPresentation.Passive(
                             MainStartupMessageKind.STARTING_TELEVISION,
                         ),
-                        navigationStartDestination = Routes.player(91, "Wrong target"),
+                        navigationStartDestination = Routes.player(ChannelId(91), "Wrong target"),
                         navigationAllowed = false,
                     ),
                     simpleTvActive = false,
@@ -432,15 +433,15 @@ class MainStartupCompositionTest {
             enteringNavigationAllowed(
                 hasBackStackEntry = true,
                 navigationStartDestination = null,
-                exactStartDestination = Routes.player(1, "Exact"),
+                exactStartDestination = Routes.player(ChannelId(1), "Exact"),
                 matchingVisiblePlayer = false,
             ),
         )
         assertTrue(
             enteringNavigationAllowed(
                 hasBackStackEntry = false,
-                navigationStartDestination = Routes.player(1, "Exact"),
-                exactStartDestination = Routes.player(1, "Exact"),
+                navigationStartDestination = Routes.player(ChannelId(1), "Exact"),
+                exactStartDestination = Routes.player(ChannelId(1), "Exact"),
                 matchingVisiblePlayer = false,
             ),
         )
@@ -635,7 +636,7 @@ class MainStartupCompositionTest {
             composable(
                 route = "${Routes.PLAYER}/{channelId}/{channelName}",
                 arguments = listOf(
-                    navArgument("channelId") { type = NavType.IntType },
+                    navArgument("channelId") { type = NavType.LongType },
                     navArgument("channelName") { type = NavType.StringType },
                 ),
             ) {
@@ -646,15 +647,14 @@ class MainStartupCompositionTest {
 
     private fun target(requestId: Long, channelId: Int, name: String) = ApplianceLaunchTarget(
         request = ApplianceLaunchRequest(requestId),
-        channelId = channelId,
+        channelId = ChannelId(channelId.toLong()),
         channelName = name,
     )
 
-    private fun channel(id: Int, name: String) = Channel(
-        channelId = id,
+    private fun channel(id: Int, name: String) = Channel.create(
+        id = ChannelId(id.toLong()),
         name = name,
-        number = id,
-        icon = null,
+        number = id.toLong(),
     )
 
     private fun readyStartup(startSimpleTv: Boolean) =

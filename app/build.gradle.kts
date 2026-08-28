@@ -118,11 +118,17 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.tvheadend.sdk.testing) {
+        version { strictly(libs.versions.tvheadend.sdk.get()) }
+    }
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.tvheadend.sdk.testing) {
+        version { strictly(libs.versions.tvheadend.sdk.get()) }
+    }
     // Device-only surface fixture intentionally constructs a concrete player.
     androidTestImplementation(libs.androidx.media3.exoplayer)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
@@ -406,10 +412,10 @@ tasks.register("verifyExternalSdkConsumption") {
             "Runtime SDK artifact types ${sdkArtifacts.mapValues { it.value.extension }} do not match $expectedExtensions"
         }
         val expectedHashes = mapOf(
-            "sdk-android" to "44d6ded2c59b4d8c025c56094b19b112f9fc5d9ee9757c1e23b5c2fa00bddbab",
-            "sdk-core" to "a53558eb153eeaaab8fc513de0b1a369cd5631503977eb64d35a8078a171bd63",
-            "sdk-media3" to "79e1db44d3db3f778ff68619a37c153fe6637bf0b0200beb077d55ad31a7c5c9",
-            "sdk-playback" to "fcb9e62e7076a71448cafc127ffa212076a3934d9665d468320388d191abc942",
+            "sdk-android" to "b906882de78b32e0fb0975b73c96d9c732bac56ca62aace9dfdd409ad127de30",
+            "sdk-core" to "374264676150e687e5f2aa8b602ada24c102e81063330784baadf78dc505f77f",
+            "sdk-media3" to "a3d199ef83848a56b6ca0e8ef396348bd50be740f5e672967515d77b8eb53616",
+            "sdk-playback" to "15279da6e8263e341b2dd78bd12dc0e355be2a714c0617483486bad761e4c758",
         )
         val resolvedHashes = sdkArtifacts.mapValues { sha256(it.value) }
         check(resolvedHashes == expectedHashes) {
@@ -419,7 +425,7 @@ tasks.register("verifyExternalSdkConsumption") {
         val evidenceDirectory = layout.buildDirectory.dir("released-sdk-evidence").get().asFile
         val ffmpegSources = evidenceDirectory.resolve("sdk-media3-$sdkVersion-ffmpeg-sources.tar.xz")
         check(sha256(ffmpegSources) == "9eeca8490f794574185986c0df7800d65ccca2980f57dc26b630a398581d7929") {
-            "Resolved FFmpeg corresponding source does not match SDK 0.2.0 release evidence"
+            "Resolved FFmpeg corresponding source does not match SDK 0.3.0 release evidence"
         }
     }
 }

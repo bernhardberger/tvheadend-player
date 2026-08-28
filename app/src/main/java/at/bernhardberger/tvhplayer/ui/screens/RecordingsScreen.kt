@@ -84,17 +84,25 @@ import androidx.tv.material3.Tab
 import androidx.tv.material3.TabDefaults
 import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.data.DvrActionFailure
-import at.bernhardberger.tvhplayer.data.DvrActionResult
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
-import at.bernhardberger.tvhplayer.data.RecordingPlaybackAvailability
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
@@ -104,17 +112,9 @@ import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
-import at.bernhardberger.tvhplayer.data.recordingPlaybackAvailability
-import at.bernhardberger.tvhplayer.data.recordingResumeCandidateSeconds
-import at.bernhardberger.tvhplayer.data.recordingSecondsToMediaMilliseconds
 import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
-import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.data.DvrRuntime
-import at.bernhardberger.tvhplayer.data.RecordingProgressCapability
-import at.bernhardberger.tvhplayer.data.Channel
-import at.bernhardberger.tvhplayer.data.DvrEntry
-import at.bernhardberger.tvhplayer.data.DvrState
+import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -182,24 +182,56 @@ fun RecordingsScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     backEnabled: Boolean = true,
-    repository: DvrRuntime = koinInject(),
-    channelRepository: ChannelEpgRuntime = koinInject(),
+    session: TvheadendSession = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
-    progressCapabilityOverride: RecordingProgressCapability? = null,
     onRetry: () -> Unit = {},
-    onPlayRecording: (Int, RecordingPlaybackStart) -> Unit = { _, _ -> },
+    onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
+) {
+    val observation by session.observation.collectAsStateWithLifecycle()
+    RecordingsScreenContent(
+        observation = observation,
+        contentPadding = contentPadding,
+        initialFocusEnabled = initialFocusEnabled,
+        backEnabled = backEnabled,
+        imageLoader = imageLoader,
+        connectionUiState = connectionUiState,
+        onRetry = onRetry,
+        onPlayRecording = onPlayRecording,
+        state = state,
+        onCancelRecording = session.dvrRepository::cancelEntry,
+        onDeleteRecording = session.dvrRepository::deleteEntry,
+    )
+}
+
+@Composable
+internal fun RecordingsScreenContent(
+    observation: SessionObservation,
+    contentPadding: PaddingValues = PaddingValues(),
+    initialFocusEnabled: Boolean = true,
+    backEnabled: Boolean = true,
+    imageLoader: ImageLoader = koinInject(),
+    connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
+    onRetry: () -> Unit = {},
+    onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
+    state: RecordingsScreenState? = null,
+    onCancelRecording: suspend (
+        CurrentSessionObservation,
+        DvrEntryId,
+    ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+    onDeleteRecording: suspend (
+        CurrentSessionObservation,
+        DvrEntryId,
+    ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
-    val entries by repository.entries.collectAsStateWithLifecycle()
-    val canModifyRecordings by repository.canModifyRecordings.collectAsStateWithLifecycle()
-    val observedProgressCapability by repository.progressCapability.collectAsStateWithLifecycle()
-    val progressCapability = progressCapabilityOverride ?: observedProgressCapability
-    val channels by channelRepository.channels.collectAsStateWithLifecycle()
-    val channelsById = remember(channels) { channels.associateBy(Channel::channelId) }
+    val currentSession = observation.currentSession
+    val entries = observation.dvrEntries()
+    val channels = observation.channels()
+    val channelsById = remember(channels) { channels.associateBy { it.id } }
     val library = remember(entries) { partitionDvrLibrary(entries) }
     val archive = remember(library.archive) { buildDvrArchive(library.archive) }
     val scope = rememberCoroutineScope()
@@ -214,14 +246,17 @@ fun RecordingsScreen(
     var contentHasFocus by remember { mutableStateOf(false) }
     var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
     var folderPreviewFocused by remember { mutableStateOf(false) }
-    var folderPreviewRecordingId by remember { mutableStateOf<Int?>(null) }
+    var folderPreviewRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
     var detailsOpenedFromFolderPreview by remember { mutableStateOf(false) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
+    var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var detailsInitialAction by remember {
         mutableStateOf<RecordingDetailsAction?>(null)
     }
     var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
-    var actionResult by remember { mutableStateOf<DvrActionResult?>(null) }
+    var pendingCurrentSession by remember { mutableStateOf<CurrentSessionObservation?>(null) }
+    var pendingRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
+    var actionResult by remember { mutableStateOf<DvrMutationResult<*>?>(null) }
     var pendingDetailsReturn by remember {
         mutableStateOf<RecordingDetailsReturnTarget?>(null)
     }
@@ -452,10 +487,14 @@ fun RecordingsScreen(
                                     detailsOpenedFromFolderPreview = false
                                     detailsInitialAction = null
                                     detailsEntry = it
+                                    detailsObservation = observation
                                     actionResult = null
                                 },
                                 imageLoader = imageLoader,
-                                piconForEntry = { channelsById[it.channelId]?.icon },
+                                currentSession = currentSession,
+                                piconForEntry = { entry ->
+                                    entry.channelId?.let(channelsById::get)?.icon
+                                },
                             )
                         }
                     }
@@ -466,7 +505,10 @@ fun RecordingsScreen(
                             is ArchiveListItem.Folder -> FolderMetadataPane(
                                 folder = item.folder,
                                 imageLoader = imageLoader,
-                                piconForEntry = { channelsById[it.channelId]?.icon },
+                                currentSession = currentSession,
+                                piconForEntry = { entry ->
+                                    entry.channelId?.let(channelsById::get)?.icon
+                                },
                                 previewFocus = folderPreviewFocus,
                                 selectedPreviewId = folderPreviewRecordingId,
                                 restoreFocus = folderPreviewFocused,
@@ -480,15 +522,17 @@ fun RecordingsScreen(
                                     detailsOpenedFromFolderPreview = true
                                     detailsInitialAction = null
                                     detailsEntry = it
+                                    detailsObservation = observation
                                     actionResult = null
                                 },
                             )
                             else -> RecordingMetadataPane(
                                 entry = selectedRecording,
                                 piconPath = selectedRecording?.let {
-                                    channelsById[it.channelId]?.icon
+                                    it.channelId?.let(channelsById::get)?.icon
                                 },
                                 imageLoader = imageLoader,
+                                currentSession = currentSession,
                             )
                         }
                     }
@@ -510,10 +554,14 @@ fun RecordingsScreen(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
+                                detailsObservation = observation
                                 actionResult = null
                             },
                             imageLoader = imageLoader,
-                            piconForEntry = { channelsById[it.channelId]?.icon },
+                            currentSession = currentSession,
+                            piconForEntry = { entry ->
+                                entry.channelId?.let(channelsById::get)?.icon
+                            },
                             initialScrollIndex = archiveScrollPositions[location] ?: 0,
                             onScrollChanged = {
                                 if (generation == focusRecoveryGeneration) {
@@ -540,10 +588,14 @@ fun RecordingsScreen(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
+                                detailsObservation = observation
                                 actionResult = null
                             },
                             imageLoader = imageLoader,
-                            piconForEntry = { channelsById[it.channelId]?.icon },
+                            currentSession = currentSession,
+                            piconForEntry = { entry ->
+                                entry.channelId?.let(channelsById::get)?.icon
+                            },
                             initialScrollIndex = archiveScrollPositions[location] ?: 0,
                             onScrollChanged = {
                                 if (generation == focusRecoveryGeneration) {
@@ -559,28 +611,41 @@ fun RecordingsScreen(
 
     val opened = detailsEntry
     if (opened != null && pendingAction == null) {
-        val authoritative = entries.firstOrNull { it.id == opened.id } ?: opened
+        val selectedObservation = detailsObservation ?: observation
+        val authoritative = selectedObservation.dvrEntry(opened.id) ?: opened
+        val selectedCapability = selectedObservation.currentSession
+            ?.takeIf { observation.currentSession === it }
         RecordingDetailsPanel(
             contentPadding = contentPadding,
             entry = authoritative,
             actionResult = actionResult,
-            canModifyRecordings = canModifyRecordings,
-            progressCapability = progressCapability,
+            canModifyRecordings = selectedCapability != null,
+            playbackEligible = selectedCapability != null,
             initialAction = detailsInitialAction,
             backEnabled = backEnabled,
             onPlay = { intent ->
-                detailsEntry = null
-                detailsInitialAction = null
-                actionResult = null
-                requestContentFocus = true
-                onPlayRecording(authoritative.id, intent)
+                selectedCapability?.let { capability ->
+                    detailsEntry = null
+                    detailsObservation = null
+                    detailsInitialAction = null
+                    actionResult = null
+                    requestContentFocus = true
+                    onPlayRecording(
+                        RecordingPlaybackSelection(capability, authoritative.id),
+                        intent,
+                    )
+                }
             },
             onCancel = {
                 detailsInitialAction = RecordingDetailsAction.CANCEL
+                pendingCurrentSession = selectedCapability
+                pendingRecordingId = authoritative.id
                 pendingAction = PendingRecordingAction.CANCEL
             },
             onDelete = {
                 detailsInitialAction = RecordingDetailsAction.DELETE
+                pendingCurrentSession = selectedCapability
+                pendingRecordingId = authoritative.id
                 pendingAction = PendingRecordingAction.DELETE
             },
             onClose = {
@@ -600,6 +665,7 @@ fun RecordingsScreen(
                 }.getOrDefault(false)
                 pendingDetailsReturn = target.takeUnless { restoredBeforeDismissal }
                 detailsEntry = null
+                detailsObservation = null
                 detailsInitialAction = null
                 actionResult = null
             },
@@ -611,16 +677,24 @@ fun RecordingsScreen(
     if (action != null && target != null) {
         RecordingConfirmationDialog(
             action = action,
-            title = target.title,
+            title = target.title.orEmpty(),
             backEnabled = backEnabled,
             onDismiss = { pendingAction = null },
             onConfirm = {
                 pendingAction = null
                 scope.launch {
-                    actionResult = when (action) {
-                        PendingRecordingAction.CANCEL -> repository.cancelEntry(target.id)
-                        PendingRecordingAction.DELETE -> repository.deleteEntry(target.id)
+                    val capability = pendingCurrentSession
+                    val recordingId = pendingRecordingId
+                    actionResult = if (capability == null || recordingId == null) {
+                        DvrMutationResult.NotReady
+                    } else when (action) {
+                        PendingRecordingAction.CANCEL ->
+                            onCancelRecording(capability, recordingId)
+                        PendingRecordingAction.DELETE ->
+                            onDeleteRecording(capability, recordingId)
                     }
+                    pendingCurrentSession = null
+                    pendingRecordingId = null
                 }
             },
         )
@@ -720,6 +794,7 @@ private fun ArchiveList(
     onOpenFolder: (DvrArchiveFolder) -> Unit,
     onOpenRecording: (DvrEntry) -> Unit,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> String?,
 ) {
     if (items.isEmpty()) {
@@ -779,6 +854,7 @@ private fun ArchiveList(
                     entry = item.entry,
                     piconPath = piconForEntry(item.entry),
                     imageLoader = imageLoader,
+                    currentSession = currentSession,
                     selected = selected,
                     focusTarget = focusTarget,
                     selectedFocus = selectedFocus,
@@ -854,12 +930,13 @@ private fun FolderListRow(
 private fun FolderMetadataPane(
     folder: DvrArchiveFolder,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> String?,
     previewFocus: FocusRequester,
-    selectedPreviewId: Int?,
+    selectedPreviewId: DvrEntryId?,
     restoreFocus: Boolean,
     onPreviewFocusChanged: (Boolean) -> Unit,
-    onPreviewRecordingFocused: (Int) -> Unit,
+    onPreviewRecordingFocused: (DvrEntryId) -> Unit,
     onMoveToFolder: () -> Unit,
     onOpenRecording: (DvrEntry) -> Unit,
 ) {
@@ -909,6 +986,7 @@ private fun FolderMetadataPane(
                     FolderRecentRecordingRow(
                         entry = entry,
                         imageLoader = imageLoader,
+                        currentSession = currentSession,
                         piconPath = piconForEntry(entry),
                         selected = focusTargetId == entry.id,
                         modifier = Modifier
@@ -935,6 +1013,7 @@ private fun FolderMetadataPane(
 private fun FolderRecentRecordingRow(
     entry: DvrEntry,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     piconPath: String?,
     selected: Boolean,
     modifier: Modifier,
@@ -944,7 +1023,7 @@ private fun FolderRecentRecordingRow(
         selected = selected,
         onClick = onClick,
         headlineContent = {
-            Text(entry.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(entry.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         supportingContent = {
             Text(
@@ -957,6 +1036,7 @@ private fun FolderRecentRecordingRow(
         leadingContent = {
             PiconBox(
                 imageLoader = imageLoader,
+                currentSession = currentSession,
                 piconPath = piconPath,
                 modifier = Modifier.width(64.dp).height(42.dp),
             )
@@ -971,6 +1051,7 @@ private fun RecordingMetadataPane(
     entry: DvrEntry?,
     piconPath: String?,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
 ) {
     if (entry == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -991,10 +1072,13 @@ private fun RecordingMetadataPane(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         val artworkPath = (entry.image ?: entry.fanartImage)?.takeIf {
-            resolvePiconModel("default", it) != null
+            currentSession?.let { capability ->
+                resolvePiconModel(capability, "default", it)
+            } != null
         }
         PiconBox(
             imageLoader = imageLoader,
+            currentSession = currentSession,
             piconPath = artworkPath ?: piconPath,
             contentScale = if (artworkPath != null) ContentScale.Crop else ContentScale.Fit,
             modifier = Modifier
@@ -1006,19 +1090,24 @@ private fun RecordingMetadataPane(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            RecordingStatusIndicator(state = entry.state)
+        RecordingStatusIndicator(state = entry.state ?: DvrEntryState.UNKNOWN)
             Text(
                 text = dvrStateLabel(entry.state),
                 style = MaterialTheme.typography.labelLarge,
                 color = when (entry.state) {
-                    DvrState.SCHEDULED, DvrState.RECORDING -> TvRecordingColor
-                    DvrState.FAILED -> MaterialTheme.colorScheme.error
+                    DvrEntryState.SCHEDULED,
+                    DvrEntryState.RECORDING -> TvRecordingColor
+                    DvrEntryState.MISSED,
+                    DvrEntryState.INVALID,
+                    DvrEntryState.RECORDING_ERROR,
+                    DvrEntryState.COMPLETED_ERROR,
+                    DvrEntryState.FILE_MISSING -> MaterialTheme.colorScheme.error
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
         }
         Text(
-            text = entry.title,
+            text = entry.title.orEmpty(),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -1034,10 +1123,13 @@ private fun RecordingMetadataPane(
                 entry.channelName?.takeIf(String::isNotBlank)?.let {
                     append(it).append(" • ")
                 }
-                append(entry.start.recordingDateTime())
-                append('–').append(formatHm(entry.stop))
-                append(" • ").append((entry.stop - entry.start).coerceAtLeast(0L) / 60L)
-                append(' ').append(stringResource(R.string.recordings_minutes_short))
+                append(entry.start?.epochSeconds.recordingDateTime())
+                entry.stop?.epochSeconds?.let { append('–').append(formatHm(it)) }
+                val durationMinutes = recordingDurationMinutes(entry)
+                if (durationMinutes != null) {
+                    append(" • ").append(durationMinutes)
+                    append(' ').append(stringResource(R.string.recordings_minutes_short))
+                }
             },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -1055,7 +1147,7 @@ private fun RecordingMetadataPane(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        entry.failureReason?.takeIf(String::isNotBlank)?.let {
+        entry.subscriptionError?.name?.let {
             Text(text = it, color = MaterialTheme.colorScheme.error, maxLines = 2)
         }
         entry.playCount?.takeIf { it > 0 }?.let {
@@ -1067,23 +1159,26 @@ private fun RecordingMetadataPane(
     }
 }
 
-private fun recordingEpisodeMetadata(entry: DvrEntry): String? = buildList {
-    if (entry.seasonNumber != null || entry.episodeNumber != null) {
+private fun recordingEpisodeMetadata(entry: DvrEntry): String? {
+    val episode = entry.episode ?: return null
+    return buildList {
+    if (episode.seasonNumber != null || episode.episodeNumber != null) {
         add(
             buildString {
-                entry.seasonNumber?.let { append("S").append(it.toString().padStart(2, '0')) }
-                entry.episodeNumber?.let { append("E").append(it.toString().padStart(2, '0')) }
-                entry.episodeCount?.let { append('/').append(it) }
+                episode.seasonNumber?.let { append("S").append(it.toString().padStart(2, '0')) }
+                episode.episodeNumber?.let { append("E").append(it.toString().padStart(2, '0')) }
+                episode.episodeCount?.let { append('/').append(it) }
             }
         )
     }
-    entry.partNumber?.let { part ->
+    episode.partNumber?.let { part ->
         add(buildString {
             append("Part ").append(part)
-            entry.partCount?.let { append('/').append(it) }
+            episode.partCount?.let { append('/').append(it) }
         })
     }
 }.takeIf { it.isNotEmpty() }?.joinToString(" • ")
+}
 
 @Composable
 private fun RecordingSchedule(
@@ -1093,6 +1188,7 @@ private fun RecordingSchedule(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> String?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
@@ -1162,6 +1258,7 @@ private fun RecordingSchedule(
                     entry = entry,
                     piconPath = piconForEntry(entry),
                     imageLoader = imageLoader,
+                    currentSession = currentSession,
                     selected = selectedKey == "recording:${entry.id}",
                     focusTarget = focusTargetKey == "recording:${entry.id}",
                     selectedFocus = selectedFocus,
@@ -1182,6 +1279,7 @@ private fun RecordingProblems(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> String?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
@@ -1259,6 +1357,7 @@ private fun RecordingProblems(
                         entry = entry,
                         piconPath = piconForEntry(entry),
                         imageLoader = imageLoader,
+                        currentSession = currentSession,
                         selected = selectedKey == "recording:${entry.id}",
                         focusTarget = focusTargetKey == "recording:${entry.id}",
                         selectedFocus = selectedFocus,
@@ -1283,6 +1382,7 @@ private fun RecordingListRow(
     entry: DvrEntry,
     piconPath: String?,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     selected: Boolean,
     focusTarget: Boolean = selected,
     selectedFocus: FocusRequester,
@@ -1291,14 +1391,14 @@ private fun RecordingListRow(
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
 ) {
     val problem = kind == RecordingRowKind.PROBLEM
-    val active = kind == RecordingRowKind.SCHEDULE && entry.state == DvrState.RECORDING
+    val active = kind == RecordingRowKind.SCHEDULE && entry.state == DvrEntryState.RECORDING
     val metadata = recordingListMetadata(entry, problem = problem)
     TvListRow(
         selected = selected,
         onClick = onClick,
         headlineContent = {
             Text(
-                text = entry.title,
+                text = entry.title.orEmpty(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("recording-list-headline-${entry.id}"),
@@ -1325,7 +1425,7 @@ private fun RecordingListRow(
             ) {
                 if (active) {
                     RecordingStatusIndicator(
-                        state = DvrState.RECORDING,
+                        state = DvrEntryState.RECORDING,
                         announceState = false,
                     )
                 }
@@ -1339,6 +1439,7 @@ private fun RecordingListRow(
                 }
                 PiconBox(
                     imageLoader = imageLoader,
+                    currentSession = currentSession,
                     piconPath = piconPath,
                     modifier = Modifier.width(64.dp).height(42.dp),
                 )
@@ -1372,7 +1473,7 @@ private fun RecordingSectionHeader(
     ) {
         if (recordingNow) {
             RecordingStatusIndicator(
-                state = DvrState.RECORDING,
+                state = DvrEntryState.RECORDING,
                 announceState = false,
             )
         }
@@ -1385,15 +1486,15 @@ private fun RecordingSectionHeader(
 }
 
 @Composable
-private fun RecordingDateTime(start: Long) {
+private fun RecordingDateTime(start: kotlin.time.Instant?) {
     Column(
         // Size to content within a bounded range so titles keep more width.
         modifier = Modifier.widthIn(min = 72.dp, max = 110.dp),
         horizontalAlignment = Alignment.End,
     ) {
         // Inherit ListItem content colour so focused rows stay readable.
-        Text(start.recordingDay(), maxLines = 1, color = Color.Unspecified)
-        Text(formatHm(start), maxLines = 1, color = Color.Unspecified)
+        Text(start?.epochSeconds.recordingDay(), maxLines = 1, color = Color.Unspecified)
+        Text(start?.epochSeconds?.let(::formatHm).orEmpty(), maxLines = 1, color = Color.Unspecified)
     }
 }
 
@@ -1403,12 +1504,12 @@ private fun ScheduleTime(entry: DvrEntry) {
         modifier = Modifier.widthIn(min = 88.dp, max = 140.dp),
         horizontalAlignment = Alignment.End,
     ) {
-        Text(formatHm(entry.start), maxLines = 1, color = Color.Unspecified)
+        Text(entry.start?.epochSeconds?.let(::formatHm).orEmpty(), maxLines = 1, color = Color.Unspecified)
         Text(
             text = stringResource(
                 R.string.recordings_schedule_end_duration,
-                formatHm(entry.stop),
-                (entry.stop - entry.start).coerceAtLeast(0L) / 60L,
+                entry.stop?.epochSeconds?.let(::formatHm).orEmpty(),
+                recordingDurationMinutes(entry) ?: 0L,
             ),
             maxLines = 1,
             color = Color.Unspecified,
@@ -1420,9 +1521,9 @@ private fun ScheduleTime(entry: DvrEntry) {
 private fun RecordingDetailsPanel(
     contentPadding: PaddingValues,
     entry: DvrEntry,
-    actionResult: DvrActionResult?,
+    actionResult: DvrMutationResult<*>?,
     canModifyRecordings: Boolean,
-    progressCapability: RecordingProgressCapability,
+    playbackEligible: Boolean,
     initialAction: RecordingDetailsAction?,
     backEnabled: Boolean,
     onPlay: (RecordingPlaybackStart) -> Unit,
@@ -1437,18 +1538,22 @@ private fun RecordingDetailsPanel(
     val closeFocus = remember { FocusRequester() }
     var focusedAction by remember(entry.id) { mutableStateOf<RecordingDetailsAction?>(null) }
     val canCancel = canModifyRecordings &&
-        (entry.state == DvrState.SCHEDULED || entry.state == DvrState.RECORDING)
+        (entry.state == DvrEntryState.SCHEDULED || entry.state == DvrEntryState.RECORDING)
     val canDelete = canModifyRecordings &&
-        (entry.state == DvrState.COMPLETED || entry.state == DvrState.FAILED ||
-            entry.state == DvrState.CANCELLED)
-    val playbackAvailability = recordingPlaybackAvailability(entry)
-    val canPlay = playbackAvailability is RecordingPlaybackAvailability.Ready
-    val resumeSeconds = if (
-        canPlay && progressCapability != RecordingProgressCapability.Unsupported
-    ) {
-        recordingResumeCandidateSeconds(entry.state, entry.playPosition)
-    } else {
-        null
+        entry.state in setOf(
+            DvrEntryState.COMPLETED,
+            DvrEntryState.MISSED,
+            DvrEntryState.INVALID,
+            DvrEntryState.RECORDING_ERROR,
+            DvrEntryState.COMPLETED_ERROR,
+            DvrEntryState.FILE_MISSING,
+        )
+    val canPlay = playbackEligible && entry.state in setOf(
+        DvrEntryState.COMPLETED,
+        DvrEntryState.RECORDING,
+    )
+    val resumeSeconds = entry.playPosition?.inWholeSeconds?.takeIf {
+        canPlay && entry.state == DvrEntryState.COMPLETED && it > 0L
     }
     val primaryAction = when {
         resumeSeconds != null -> RecordingDetailsAction.RESUME
@@ -1499,7 +1604,7 @@ private fun RecordingDetailsPanel(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                entry.title,
+                entry.title.orEmpty(),
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 2,
                 modifier = Modifier.semantics { heading() },
@@ -1514,7 +1619,8 @@ private fun RecordingDetailsPanel(
             }
             Text(
                 buildString {
-                    append(entry.start.recordingDateTime()).append('–').append(formatHm(entry.stop))
+                    append(entry.start?.epochSeconds.recordingDateTime())
+                    entry.stop?.epochSeconds?.let { append('–').append(formatHm(it)) }
                     entry.channelName?.let { append(" • ").append(it) }
                     append(" • ").append(dvrStateLabel(entry.state))
                 },
@@ -1523,7 +1629,7 @@ private fun RecordingDetailsPanel(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("recording-details-metadata-anchor"),
             )
-            val failureReason = entry.failureReason
+            val failureReason = entry.subscriptionError?.name
             when {
                 !failureReason.isNullOrBlank() -> Text(
                     failureReason,
@@ -1533,7 +1639,7 @@ private fun RecordingDetailsPanel(
                 )
                 actionResult != null -> Text(
                     dvrActionResultLabel(actionResult),
-                    color = if (actionResult is DvrActionResult.Failed) {
+                    color = if (actionResult.isDvrMutationFailure()) {
                         MaterialTheme.colorScheme.error
                     } else {
                         MaterialTheme.colorScheme.onSurface
@@ -1541,24 +1647,10 @@ private fun RecordingDetailsPanel(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                progressCapability == RecordingProgressCapability.ReadOnly -> Text(
-                    stringResource(R.string.recording_progress_read_only),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                progressCapability == RecordingProgressCapability.Unsupported -> Text(
-                    stringResource(R.string.recording_progress_unsupported),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
             if (
                 failureReason.isNullOrBlank() &&
-                actionResult == null &&
-                progressCapability != RecordingProgressCapability.ReadOnly &&
-                progressCapability != RecordingProgressCapability.Unsupported
+                actionResult == null
             ) {
                 val synopsis = entry.summary?.takeIf(String::isNotBlank)
                     ?: entry.description?.takeIf(String::isNotBlank)
@@ -1601,7 +1693,7 @@ private fun RecordingDetailsPanel(
                         stringResource(
                             R.string.recording_resume_from,
                             formatPlaybackDuration(
-                                recordingSecondsToMediaMilliseconds(resumeSeconds) ?: 0L
+                                resumeSeconds.coerceAtMost(Long.MAX_VALUE / 1_000L) * 1_000L
                             ),
                         )
                     )
@@ -1633,7 +1725,7 @@ private fun RecordingDetailsPanel(
                 Button(
                     onClick = {
                         onPlay(
-                            if (progressCapability == RecordingProgressCapability.Unsupported) {
+                            if (entry.state == DvrEntryState.RECORDING) {
                                 RecordingPlaybackStart.START_OVER
                             } else {
                                 RecordingPlaybackStart.RESUME
@@ -1979,38 +2071,71 @@ private fun scheduleSectionLabel(section: DvrScheduleSection): String {
 }
 
 @Composable
-private fun dvrStateLabel(state: DvrState): String = stringResource(
+private fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
     when (state) {
-        DvrState.SCHEDULED -> R.string.recording_state_scheduled
-        DvrState.RECORDING -> R.string.recording_state_recording
-        DvrState.COMPLETED -> R.string.recording_state_completed
-        DvrState.FAILED -> R.string.recording_state_failed
-        DvrState.CANCELLED -> R.string.recording_state_cancelled
-        DvrState.UNKNOWN -> R.string.recording_state_unknown
+        DvrEntryState.SCHEDULED -> R.string.recording_state_scheduled
+        DvrEntryState.RECORDING -> R.string.recording_state_recording
+        DvrEntryState.COMPLETED -> R.string.recording_state_completed
+        DvrEntryState.MISSED,
+        DvrEntryState.INVALID -> R.string.recording_state_cancelled
+        DvrEntryState.RECORDING_ERROR,
+        DvrEntryState.COMPLETED_ERROR,
+        DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
+        DvrEntryState.UNKNOWN,
+        null -> R.string.recording_state_unknown
     }
 )
 
 @Composable
-private fun dvrActionResultLabel(result: DvrActionResult): String = stringResource(
+private fun dvrActionResultLabel(result: DvrMutationResult<*>): String = stringResource(
     when (result) {
-        is DvrActionResult.Accepted -> R.string.recording_action_accepted
-        is DvrActionResult.Failed -> when (result.reason) {
-            DvrActionFailure.PERMISSION_DENIED -> R.string.recording_action_permission
-            DvrActionFailure.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
-            DvrActionFailure.CONFLICT -> R.string.recording_action_conflict
-            DvrActionFailure.REJECTED -> R.string.recording_action_rejected
-            DvrActionFailure.CONNECTION -> R.string.recording_action_connection
-        }
+        is DvrMutationResult.Confirmed,
+        is DvrMutationResult.AcceptedButUnconfirmed -> R.string.recording_action_accepted
+        DvrMutationResult.AccessDenied -> R.string.recording_action_permission
+        DvrMutationResult.ConnectionLimit -> R.string.recording_action_conn_limit
+        DvrMutationResult.ServerRejected,
+        DvrMutationResult.NotSupported -> R.string.recording_action_rejected
+        DvrMutationResult.NotReady,
+        DvrMutationResult.ObservationExpired,
+        DvrMutationResult.Timeout,
+        DvrMutationResult.TransportUnavailable -> R.string.recording_action_connection
     }
 )
 
-private fun Long.recordingDateTime(): String = Instant.ofEpochSecond(this)
-    .atZone(ZoneId.systemDefault())
-    .format(DateTimeFormatter.ofPattern("EEE d MMM HH:mm"))
+private fun DvrMutationResult<*>.isDvrMutationFailure(): Boolean =
+    this !is DvrMutationResult.Confirmed && this !is DvrMutationResult.AcceptedButUnconfirmed
 
-private fun Long.recordingDay(): String = Instant.ofEpochSecond(this)
-    .atZone(ZoneId.systemDefault())
-    .format(DateTimeFormatter.ofPattern("EEE d MMM"))
+private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
+    is DvrRepositoryState.Current -> state.snapshot.entries
+    is DvrRepositoryState.Stale -> state.snapshot.entries
+    is DvrRepositoryState.Synchronizing -> state.staleSnapshot?.entries.orEmpty()
+    DvrRepositoryState.Empty -> emptyList()
+}
+
+private fun SessionObservation.channels(): List<Channel> = when (val state = channelState) {
+    is ChannelRepositoryState.Current -> state.catalog.channels
+    is ChannelRepositoryState.Stale -> state.catalog.channels
+    is ChannelRepositoryState.Synchronizing -> state.staleCatalog?.channels.orEmpty()
+    ChannelRepositoryState.Empty -> emptyList()
+}
+
+private fun Long?.recordingDateTime(): String = this?.let {
+    Instant.ofEpochSecond(it)
+        .atZone(ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofPattern("EEE d MMM HH:mm"))
+}.orEmpty()
+
+private fun Long?.recordingDay(): String = this?.let {
+    Instant.ofEpochSecond(it)
+        .atZone(ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofPattern("EEE d MMM"))
+}.orEmpty()
+
+private fun recordingDurationMinutes(entry: DvrEntry): Long? {
+    val start = entry.start ?: return null
+    val stop = entry.stop ?: return null
+    return (stop - start).inWholeMinutes.coerceAtLeast(0L)
+}
 
 private fun formatFileSize(sizeBytes: Long): String = when {
     sizeBytes >= 1_000_000_000_000L -> String.format(

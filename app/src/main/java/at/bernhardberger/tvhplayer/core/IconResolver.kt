@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+
 /**
  * Resolves the Coil model used to load a channel icon over the *pure HTSP* transport.
  *
@@ -10,9 +12,16 @@ package at.bernhardberger.tvhplayer.core
  * the UI falls back to the placeholder. To get such icons to show, enable
  * TVHeadend's imagecache so the icon is served as an HTSP-openable path instead.
  */
-data class AppArtworkSource(val selector: String)
+data class AppArtworkSource(
+    val currentSession: CurrentSessionObservation,
+    val selector: String,
+)
 
-fun resolvePiconModel(serverTag: String, piconPath: String?): AppArtworkSource? {
+fun resolvePiconModel(
+    currentSession: CurrentSessionObservation,
+    serverTag: String,
+    piconPath: String?,
+): AppArtworkSource? {
     if (serverTag.isBlank() || piconPath.isNullOrBlank()) return null
 
     val trimmed = piconPath.trim()
@@ -26,5 +35,5 @@ fun resolvePiconModel(serverTag: String, piconPath: String?): AppArtworkSource? 
     if (!p.startsWith("imagecache/")) return null
     val id = p.removePrefix("imagecache/")
     if (id.toIntOrNull()?.let { it > 0 } != true) return null
-    return AppArtworkSource(p)
+    return AppArtworkSource(currentSession, p)
 }

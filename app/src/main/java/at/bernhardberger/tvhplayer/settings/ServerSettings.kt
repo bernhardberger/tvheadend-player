@@ -20,7 +20,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-val Context.dataStore by preferencesDataStore(name = "tvhplayer_settings")
+val Context.dataStore by preferencesDataStore(
+    name = "tvhplayer_settings",
+    produceMigrations = { listOf(activeTagIdMigration()) },
+)
 
 data class ServerSettings(
     val host: String = "",

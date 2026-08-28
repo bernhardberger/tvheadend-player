@@ -1,16 +1,23 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.StreamProfile
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -22,9 +29,7 @@ class AppConnectionProfileMigrationTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun supersededReadyResultCannotMigrateAndReplacementGenerationStillCan() = runTest {
-        val firstReady = ready("first")
-        val secondReady = ready("second")
-        val states = MutableStateFlow<SessionState>(firstReady)
+        val observations = FakeSessionObservation(currentObservation("first"))
         val firstStarted = CompletableDeferred<Unit>()
         val releaseFirst = CompletableDeferred<Unit>()
         val migrations = mutableListOf<String>()
@@ -32,8 +37,8 @@ class AppConnectionProfileMigrationTest {
 
         backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
             collectReadyStreamProfileMigrations(
-                states = states,
-                currentState = states::value,
+                observations = observations.observation,
+                currentObservation = observations.observation::value,
                 discover = {
                     discoveries += 1
                     if (discoveries == 1) {
@@ -51,23 +56,31 @@ class AppConnectionProfileMigrationTest {
         }
 
         firstStarted.await()
-        states.value = SessionState.Disconnected
+        observations.retire(
+            SessionObservation.create(sessionState = SessionState.Disconnected)
+        )
         releaseFirst.complete(Unit)
         runCurrent()
-        states.value = secondReady
+        observations.publish(currentObservation("second"))
         runCurrent()
 
         assertEquals(2, discoveries)
         assertEquals(listOf("22222222222222222222222222222222"), migrations)
     }
 
-    private fun ready(serverName: String): SessionState.Ready = SessionState.Ready(
-        ServerCapabilities.create(
-            streaming = CapabilityAccess.ALLOWED,
-            dvrWrite = CapabilityAccess.DENIED,
-            serverName = serverName,
-        ),
-    )
+    private fun currentObservation(serverName: String): SessionObservation =
+        SessionObservation.create(
+            sessionState = SessionState.Ready(
+                ServerCapabilities.create(
+                    streaming = CapabilityAccess.ALLOWED,
+                    dvrWrite = CapabilityAccess.DENIED,
+                    serverName = serverName,
+                ),
+            ),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+        )
 
     private fun available(id: String): StreamProfilesResult.Available =
         StreamProfilesResult.Available.create(

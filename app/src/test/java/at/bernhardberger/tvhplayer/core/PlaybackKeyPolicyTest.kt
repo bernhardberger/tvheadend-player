@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import android.view.KeyEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -313,8 +314,8 @@ class PlaybackKeyPolicyTest {
 
     @Test
     fun pickingCurrentChannelClosesDrawerWithoutRetuning() {
-        assertEquals(ChannelPickAction.CLOSE_DRAWER, channelPickAction(33, 33))
-        assertEquals(ChannelPickAction.TUNE, channelPickAction(33, 34))
+        assertEquals(ChannelPickAction.CLOSE_DRAWER, channelPickAction(ChannelId(33), ChannelId(33)))
+        assertEquals(ChannelPickAction.TUNE, channelPickAction(ChannelId(33), ChannelId(34)))
     }
 
     @Test

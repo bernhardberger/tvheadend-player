@@ -18,6 +18,7 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -31,6 +32,7 @@ fun ChannelRow(
     programTitle: String,
     progress: Float?,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation? = null,
     piconPath: String?,
     focused: Boolean,
     recordingNow: Boolean = false,
@@ -85,6 +87,7 @@ fun ChannelRow(
         leadingContent = {
             PiconBox(
                 imageLoader = imageLoader,
+                currentSession = currentSession,
                 piconPath = piconPath,
                 modifier = Modifier
                     .testTag("channel-picon")

@@ -72,12 +72,29 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
+import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
+import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.data.DvrActionFailure
 import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
@@ -85,33 +102,31 @@ import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.GuideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.GuideScopeExitFocusTarget
-import at.bernhardberger.tvhplayer.data.DvrActionResult
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
+import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
+import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
+import at.bernhardberger.tvhplayer.core.epgFrontierSettled
 import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.programmeActions
+import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.reconcileTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.data.DvrRuntime
-import at.bernhardberger.tvhplayer.data.Channel
-import at.bernhardberger.tvhplayer.data.DvrConfig
-import at.bernhardberger.tvhplayer.data.DvrEntry
-import at.bernhardberger.tvhplayer.data.DvrState
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
+import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
@@ -137,9 +152,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
+import kotlin.time.Instant as KotlinInstant
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -156,6 +170,8 @@ private enum class GuideHeaderFocus {
     NOW,
     CLEAR_FILTER,
 }
+
+private data class FrontierRequest(val afterSec: Long, val throughSec: Long)
 
 internal fun guideTimelineContentPadding(
     contentPadding: PaddingValues,
@@ -174,8 +190,7 @@ fun EpgGridScreen(
     category: ProgrammeCategory = ProgrammeCategory.ALL,
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
-    repository: ChannelEpgRuntime = koinInject(),
-    dvrRepository: DvrRuntime = koinInject(),
+    session: TvheadendSession = koinInject(),
     playerSession: AppPlaybackRuntime = koinInject(),
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
     guidePositionStore: GuidePositionStore = koinInject(),
@@ -184,9 +199,9 @@ fun EpgGridScreen(
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
     onClearCategory: () -> Unit = {},
-    onPlayRecording: (Int) -> Unit = {},
+    onPlayRecording: (RecordingPlaybackSelection) -> Unit = {},
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
-    onPlay: (channelId: Int, channelName: String) -> Unit,
+    onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -197,6 +212,8 @@ fun EpgGridScreen(
     )
     val coroutineScope = rememberCoroutineScope()
     val channelScope by channelViewModel.scope.collectAsStateWithLifecycle()
+    val observation by channelViewModel.observation.collectAsStateWithLifecycle()
+    val currentSession = observation.currentSession
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
@@ -204,11 +221,9 @@ fun EpgGridScreen(
     val playingChannelId = (activePlaybackTarget as? AppPlaybackTarget.Live)?.channelId
     val sdkTimeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
     val timeshiftState = sdkTimeshiftState.toAppPresentation()
-    val dvrEntries by dvrRepository.entries.collectAsStateWithLifecycle()
-    val dvrConfigs by dvrRepository.configs.collectAsStateWithLifecycle()
-    val canModifyRecordings by dvrRepository.canModifyRecordings.collectAsStateWithLifecycle()
+    val dvrEntries = observation.dvrEntries()
     val channelListState = rememberLazyListState()
-    val eventFocusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
+    val eventFocusRequesters = remember { mutableMapOf<EventId, FocusRequester>() }
     val guideDateFocus = remember { FocusRequester() }
     val guideNowFocus = remember { FocusRequester() }
     val guideClearFilterFocus = remember { FocusRequester() }
@@ -238,15 +253,18 @@ fun EpgGridScreen(
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
+    var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var restoreDetailsFocus by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
-    var configChoices by remember { mutableStateOf<List<DvrConfig>?>(null) }
-    var selectedRecordConfigId by remember { mutableStateOf<String?>(null) }
-    var actionResult by remember { mutableStateOf<DvrActionResult?>(null) }
+    var configChoices by remember { mutableStateOf<List<DvrConfiguration>?>(null) }
+    var selectedRecordConfigId by remember { mutableStateOf<DvrConfigId?>(null) }
+    var pendingCurrentSession by remember { mutableStateOf<CurrentSessionObservation?>(null) }
+    var pendingRecordingTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
+    var pendingRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
+    var actionResult by remember { mutableStateOf<DvrMutationResult<*>?>(null) }
     var showJumpDialog by remember { mutableStateOf(false) }
-    var frontierAfterSec by remember { mutableStateOf<Long?>(null) }
-    var frontierLoading by remember { mutableStateOf(false) }
-    var lastPlayedId by remember { mutableStateOf<Int?>(null) }
+    var frontierRequest by remember { mutableStateOf<FrontierRequest?>(null) }
+    var lastPlayedId by remember { mutableStateOf<ChannelId?>(null) }
     var scopeRowFocused by remember { mutableStateOf(false) }
     var lastHeaderFocus by remember { mutableStateOf(GuideHeaderFocus.DATE) }
 
@@ -306,47 +324,43 @@ fun EpgGridScreen(
     }
 
     val selectedIndex = selectedTarget?.channelIndex ?: pendingInitialChannelIndex
-    val channelIds = remember(channels) { channels.map { it.channelId } }
-    val focusRowsFlow = remember(channelIds, category, repository) {
-        if (channelIds.isEmpty()) {
-            flowOf(emptyList())
-        } else {
-            combine(channelIds.map(repository::epgForChannel)) { eventsByChannel ->
-                channelIds.mapIndexed { index, channelId ->
-                    EpgFocusColumn(
-                        channelId = channelId,
-                        events = eventsByChannel[index].filter {
-                            it.matchesProgrammeCategory(category)
-                        },
-                    )
-                }
-            }
+    val epgState = observation.epgState
+    val epgSnapshot = when (val state = epgState) {
+        is EpgRepositoryState.Current -> state.snapshot
+        is EpgRepositoryState.Stale -> state.snapshot
+        is EpgRepositoryState.Synchronizing -> state.staleSnapshot
+        EpgRepositoryState.Empty -> null
+    }
+    val snapshotEvents = epgSnapshot?.events.orEmpty()
+    val focusRows = remember(channels, category, epgSnapshot) {
+        channels.map { channel ->
+            EpgFocusColumn(
+                channelId = channel.id,
+                events = snapshotEvents.filter {
+                    it.channelId == channel.id && it.matchesProgrammeCategory(category)
+                },
+            )
         }
     }
-    val focusRows by focusRowsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     val selectedChannel = channels.getOrNull(selectedIndex)
-    val emptyEventsFlow = remember {
-        kotlinx.coroutines.flow.MutableStateFlow<List<EpgEventEntry>>(emptyList())
-    }
-    val selectedEventsFlow = selectedChannel?.let { repository.epgForChannel(it.channelId) }
-        ?: emptyEventsFlow
-    val unfilteredSelectedChannelEvents by selectedEventsFlow.collectAsStateWithLifecycle()
-    val selectedChannelEvents = remember(unfilteredSelectedChannelEvents, category) {
-        unfilteredSelectedChannelEvents.filter { it.matchesProgrammeCategory(category) }
-    }
 
-    fun filteredEvents(channelId: Int): List<EpgEventEntry> = repository
-        .epgForChannel(channelId)
-        .value
-        .filter { it.matchesProgrammeCategory(category) }
+    fun filteredEvents(channelId: ChannelId): List<EpgEventEntry> = snapshotEvents.filter {
+        it.channelId == channelId && it.matchesProgrammeCategory(category)
+    }
 
     fun requestVisibleWindow(anchorSec: Long, channelIndex: Int) {
+        val capability = currentSession ?: return
         if (channels.isEmpty()) return
         val pageStart = (channelIndex.coerceAtLeast(0) / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
         val ids = channels
             .subList(pageStart, (pageStart + CHANNEL_PAGE_SIZE).coerceAtMost(channels.size))
-            .map { it.channelId }
-        repository.requestEpgAtFrontier(ids, anchorSec)
+            .map { it.id }
+        val through = KotlinInstant.fromEpochSeconds(anchorSec)
+        ids.forEach { channelId ->
+            coroutineScope.launch {
+                session.epgRepository.acquireCoverage(capability, channelId, through)
+            }
+        }
     }
 
     LaunchedEffect(
@@ -362,14 +376,14 @@ fun EpgGridScreen(
         }
         val preferredId = playingChannelId ?: lastPlayedId ?: selectedChannelId
         val restored = restoredPosition?.takeIf { position ->
-            channels.any { it.channelId == position.channelId }
+            channels.any { it.id == position.channelId }
         }
         val channelId = browsingFocusChannelId(
             channels,
             restored?.channelId ?: preferredId,
         )
             ?: return@LaunchedEffect
-        val channelIndex = channels.indexOfFirst { it.channelId == channelId }
+        val channelIndex = channels.indexOfFirst { it.id == channelId }
         pendingInitialChannelIndex = channelIndex
         val target = initialTimelineEpgFocus(
             rows = focusRows,
@@ -380,7 +394,7 @@ fun EpgGridScreen(
 
         val targetChannelIndex = target?.channelIndex ?: channelIndex
         pendingInitialChannelIndex = targetChannelIndex
-        selection.setSelected(channels[targetChannelIndex].channelId)
+        selection.setSelected(channels[targetChannelIndex].id)
         requestVisibleWindow(windowStartSec, targetChannelIndex)
         if (target != null) {
             selectedTarget = target
@@ -410,7 +424,7 @@ fun EpgGridScreen(
         selectedTarget = replacement
         if (replacement != null) {
             pendingInitialChannelIndex = replacement.channelIndex
-            selection.setSelected(channels[replacement.channelIndex].channelId)
+            selection.setSelected(channels[replacement.channelIndex].id)
         }
     }
 
@@ -447,21 +461,24 @@ fun EpgGridScreen(
             }
             return@LaunchedEffect
         }
-        val event = filteredEvents(
-            channels.getOrNull(target.channelIndex)?.channelId ?: return@LaunchedEffect
-        ).firstOrNull { it.eventId == target.eventId } ?: return@LaunchedEffect
+        val channelId = channels.getOrNull(target.channelIndex)?.id
+            ?: return@LaunchedEffect
+        val event = filteredEvents(channelId)
+            .firstOrNull { it.id == target.eventId }
+            ?: return@LaunchedEffect
         when {
-            event.start < windowStartSec -> windowStartSec = floorToHour(event.start)
-            event.stop > windowEndSec -> windowStartSec = floorToHour(
-                max(event.start - 30 * 60L, 0L)
+            event.start.epochSeconds < windowStartSec ->
+                windowStartSec = floorToHour(event.start.epochSeconds)
+            event.stop.epochSeconds > windowEndSec -> windowStartSec = floorToHour(
+                max(event.start.epochSeconds - 30 * 60L, 0L)
             )
         }
-        selection.setSelected(event.channelId)
+        selection.setSelected(channelId)
         guidePositionStore.save(
             GuidePosition(
-                channelId = event.channelId,
-                eventId = event.eventId,
-                eventStartSec = event.start,
+                channelId = channelId,
+                eventId = event.id,
+                eventStartSec = event.start.epochSeconds,
                 windowStartSec = windowStartSec,
                 firstVisibleColumn = channelListState.firstVisibleItemIndex,
             )
@@ -478,19 +495,26 @@ fun EpgGridScreen(
         }
     }
 
-    LaunchedEffect(selectedChannelEvents, frontierAfterSec, frontierLoading) {
-        if (!frontierLoading) return@LaunchedEffect
-        val after = frontierAfterSec ?: return@LaunchedEffect
-        val event = selectedChannelEvents
-            .filter { it.start >= after }
+    LaunchedEffect(epgState, selectedChannel, category, frontierRequest) {
+        val request = frontierRequest ?: return@LaunchedEffect
+        val channelId = selectedChannel?.id ?: return@LaunchedEffect
+        val through = KotlinInstant.fromEpochSeconds(request.throughSec)
+        val snapshot = epgState.currentEpgSnapshot() ?: return@LaunchedEffect
+        val event = snapshot.events.asSequence()
+            .filter { it.channelId == channelId && it.start.epochSeconds >= request.afterSec }
+            .filter { it.matchesProgrammeCategory(category) }
             .minByOrNull { it.start }
-            ?: return@LaunchedEffect
-        selectedTarget = selectedTarget?.copy(eventId = event.eventId)
-        frontierLoading = false
-        frontierAfterSec = null
+        if (event != null) {
+            selectedTarget = selectedTarget?.copy(eventId = event.id)
+        } else if (!epgFrontierSettled(
+                snapshot.coverages.firstOrNull { it.channelId == channelId },
+                through,
+            )
+        ) {
+            return@LaunchedEffect
+        }
+        frontierRequest = null
     }
-
-    fun focusColumns(): List<EpgFocusColumn> = focusRows
 
     fun pageColumns(direction: Int) {
         if (channels.isEmpty()) return
@@ -524,7 +548,7 @@ fun EpgGridScreen(
             visibleIndices.min()..visibleIndices.max()
         }
         val move = moveTimelineEpgFocus(
-            rows = focusColumns(),
+            rows = focusRows,
             current = current,
             direction = direction,
             visibleChannelRange = visibleRange,
@@ -539,12 +563,12 @@ fun EpgGridScreen(
                 return true
             }
             move.extendTimeFrontier -> {
-                val currentEvent = filteredEvents(channels[current.channelIndex].channelId)
-                    .firstOrNull { it.eventId == current.eventId }
-                val after = currentEvent?.stop ?: windowEndSec
+                val currentEvent = filteredEvents(
+                    channels[current.channelIndex].id,
+                ).firstOrNull { it.id == current.eventId }
+                val after = currentEvent?.stop?.epochSeconds ?: windowEndSec
                 windowStartSec += FRONTIER_STEP_SEC
-                frontierAfterSec = after
-                frontierLoading = true
+                frontierRequest = FrontierRequest(after, windowStartSec)
                 requestVisibleWindow(windowStartSec, current.channelIndex)
                 return true
             }
@@ -574,6 +598,7 @@ fun EpgGridScreen(
 
     fun closeDetails() {
         detailsEvent = null
+        detailsObservation = null
         restoreDetailsFocus = true
     }
 
@@ -638,7 +663,7 @@ fun EpgGridScreen(
                             )
                             selectedTarget = nearestTargetAt(
                                 channels,
-                                repository,
+                                snapshotEvents,
                                 selectedTarget?.channelIndex ?: 0,
                                 nowSec,
                                 category,
@@ -777,7 +802,7 @@ fun EpgGridScreen(
                         .focusGroup()
                         .testTag("epg-programme-viewport"),
                 ) {
-                    itemsIndexed(channels, key = { _, channel -> channel.channelId }) {
+                    itemsIndexed(channels, key = { _, channel -> channel.id.value }) {
                             channelIndex, channel ->
                         TimelineChannelRow(
                             channel = channel,
@@ -789,20 +814,28 @@ fun EpgGridScreen(
                             windowEndSec = windowEndSec,
                             nowSec = nowSec,
                             imageLoader = imageLoader,
-                            repository = repository,
+                            currentSession = currentSession,
+                            events = snapshotEvents.filter { it.channelId == channel.id },
                             category = category,
                             connectionUiState = connectionUiState,
-                            frontierLoading = frontierLoading &&
+                            frontierLoading = frontierRequest != null &&
                                 selectedTarget?.channelIndex == channelIndex,
                             onFocused = { event ->
-                                selectedTarget = EpgFocusTarget(channelIndex, event.eventId)
+                                selectedTarget = EpgFocusTarget(
+                                    channelIndex,
+                                    event.id,
+                                )
                             },
                             recordingForEvent = { eventId ->
-                                dvrEntries.firstOrNull { it.eventId == eventId }
+                                observation.dvrEntryForEvent(eventId)
                             },
                             onOpenDetails = {
-                                selectedTarget = EpgFocusTarget(channelIndex, it.eventId)
+                                selectedTarget = EpgFocusTarget(
+                                    channelIndex,
+                                    it.id,
+                                )
                                 detailsEvent = it
+                                detailsObservation = observation
                                 actionResult = null
                             },
                             onMoveFocus = ::moveFocus,
@@ -813,13 +846,18 @@ fun EpgGridScreen(
         }
 
         detailsEvent?.let { event ->
-            val channel = channels.firstOrNull { it.channelId == event.channelId }
-            val recording = dvrEntries.firstOrNull { it.eventId == event.eventId }
-            val timeshiftCoversEvent = playingChannelId == event.channelId &&
+            val selectedObservation = detailsObservation ?: return@let
+            val selectedCapability = selectedObservation.currentSession
+                ?.takeIf { observation.currentSession === it }
+            val eventChannelId = event.channelId
+            val channel = eventChannelId?.let(selectedObservation::channel)
+            val recording = selectedObservation.dvrEntryForEvent(event.id)
+            val timeshiftCoversEvent = playingChannelId == eventChannelId &&
                 simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT) &&
                 timeshiftState.available &&
-                event.stop <= nowSec &&
-                event.start * 1_000L >= nowSec * 1_000L + timeshiftState.bufferStartMs
+                event.stop.epochSeconds <= nowSec &&
+                event.start.epochSeconds * 1_000L >=
+                    nowSec * 1_000L + timeshiftState.bufferStartMs
             ProgrammeDetailsPanel(
                 contentPadding = contentPadding,
                 event = event,
@@ -828,40 +866,74 @@ fun EpgGridScreen(
                 nowSec = nowSec,
                 serverTimeshiftCoversEvent = timeshiftCoversEvent,
                 simpleTvProfile = simpleTvProfile,
-                canModifyRecordings = canModifyRecordings,
+                canModifyRecordings = selectedCapability != null,
                 actionResult = actionResult,
                 onAction = { action ->
                     when (action) {
                         ProgrammeAction.WATCH -> {
-                            detailsEvent = null
-                            channel?.let {
-                                onPlay(it.channelId, it.name)
+                            if (selectedCapability != null && channel != null) {
+                                detailsEvent = null
+                                detailsObservation = null
+                                onPlay(
+                                    LivePlaybackSelection(selectedCapability, channel.id),
+                                    channel.name.orEmpty(),
+                                )
                             }
                         }
                         ProgrammeAction.WATCH_FROM_START -> {
-                            if (recording != null) {
-                                onPlayRecording(recording.id)
-                            } else if (timeshiftCoversEvent && channel != null) {
-                                val targetPositionMs = (event.start - nowSec) * 1_000L
+                            if (recording != null && selectedCapability != null) {
+                                onPlayRecording(
+                                    RecordingPlaybackSelection(
+                                        selectedCapability,
+                                        recording.id,
+                                    )
+                                )
+                            } else if (
+                                timeshiftCoversEvent &&
+                                channel != null &&
+                                selectedCapability != null
+                            ) {
+                                val targetPositionMs =
+                                    (event.start.epochSeconds - nowSec) * 1_000L
                                 coroutineScope.launch {
                                     playerSession.seekTimeshift(
                                         targetPositionMs - timeshiftState.positionMs
                                     )
                                 }
                                 detailsEvent = null
-                                onPlay(channel.channelId, channel.name)
+                                detailsObservation = null
+                                onPlay(
+                                    LivePlaybackSelection(selectedCapability, channel.id),
+                                    channel.name.orEmpty(),
+                                )
                             }
                         }
-                        ProgrammeAction.RECORD -> when (val choice = chooseDvrConfig(dvrConfigs)) {
+                        ProgrammeAction.RECORD -> if (selectedCapability != null) when (
+                            val choice = chooseDvrConfig(
+                                selectedObservation.currentDvrConfigurations()
+                            )
+                        ) {
                             is DvrConfigChoice.Automatic -> {
                                 selectedRecordConfigId = choice.configId
+                                pendingRecordingTarget = event.programmeRecordingTarget(
+                                    selectedCapability
+                                )
                                 pendingAction = action
                             }
                             is DvrConfigChoice.RequiresSelection -> {
+                                pendingRecordingTarget = event.programmeRecordingTarget(
+                                    selectedCapability
+                                )
                                 configChoices = choice.configs
                             }
                         }
-                        ProgrammeAction.CANCEL_RECORDING -> pendingAction = action
+                        ProgrammeAction.CANCEL_RECORDING -> if (
+                            selectedCapability != null && recording != null
+                        ) {
+                            pendingCurrentSession = selectedCapability
+                            pendingRecordingId = recording.id
+                            pendingAction = action
+                        }
                     }
                 },
                 onClose = ::closeDetails,
@@ -871,25 +943,38 @@ fun EpgGridScreen(
         val confirmationAction = pendingAction
         val confirmationEvent = detailsEvent
         if (confirmationAction != null && confirmationEvent != null) {
-            val recording = dvrEntries.firstOrNull { it.eventId == confirmationEvent.eventId }
             ConfirmProgrammeActionDialog(
                 action = confirmationAction,
-                programmeTitle = confirmationEvent.title,
+                programmeTitle = confirmationEvent.title.orEmpty(),
                 onDismiss = { pendingAction = null },
                 onConfirm = {
                     pendingAction = null
                     coroutineScope.launch {
                         actionResult = when (confirmationAction) {
-                            ProgrammeAction.RECORD ->
-                                dvrRepository.scheduleEvent(
-                                    eventId = confirmationEvent.eventId,
-                                    configName = selectedRecordConfigId,
+                            ProgrammeAction.RECORD -> pendingRecordingTarget?.let { target ->
+                                session.dvrRepository.scheduleEntry(
+                                    target.currentSession,
+                                    DvrScheduleRequest(
+                                        schedule = DvrSchedule.Programme(target.eventId),
+                                        configId = selectedRecordConfigId,
+                                        title = target.title,
+                                    ),
                                 )
-                            ProgrammeAction.CANCEL_RECORDING -> recording?.let {
-                                dvrRepository.cancelEntry(it.id)
-                            } ?: DvrActionResult.Failed(DvrActionFailure.REJECTED)
+                            } ?: DvrMutationResult.NotReady
+                            ProgrammeAction.CANCEL_RECORDING -> {
+                                val capability = pendingCurrentSession
+                                val recordingId = pendingRecordingId
+                                if (capability != null && recordingId != null) {
+                                    session.dvrRepository.cancelEntry(capability, recordingId)
+                                } else {
+                                    DvrMutationResult.NotReady
+                                }
+                            }
                             else -> null
                         }
+                        pendingCurrentSession = null
+                        pendingRecordingTarget = null
+                        pendingRecordingId = null
                     }
                 },
             )
@@ -921,7 +1006,7 @@ fun EpgGridScreen(
                     )
                     selectedTarget = nearestTargetAt(
                         channels,
-                        repository,
+                        snapshotEvents,
                         selectedTarget?.channelIndex ?: 0,
                         target,
                         category,
@@ -1027,26 +1112,28 @@ private fun TimelineChannelRow(
     channelIndex: Int,
     allChannels: List<Channel>,
     selectedTarget: EpgFocusTarget?,
-    eventFocusRequesters: MutableMap<Int, FocusRequester>,
+    eventFocusRequesters: MutableMap<EventId, FocusRequester>,
     windowStartSec: Long,
     windowEndSec: Long,
     nowSec: Long,
     imageLoader: ImageLoader,
-    repository: ChannelEpgRuntime,
+    currentSession: CurrentSessionObservation?,
+    events: List<EpgEventEntry>,
     category: ProgrammeCategory,
     connectionUiState: ConnectionUiState,
     frontierLoading: Boolean,
-    recordingForEvent: (Int) -> DvrEntry?,
+    recordingForEvent: (EventId) -> DvrEntry?,
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
 ) {
-    val events by repository.epgForChannel(channel.channelId).collectAsStateWithLifecycle()
     val filteredEvents = remember(events, category) {
         events.filter { it.matchesProgrammeCategory(category) }
     }
     val visibleEvents = remember(filteredEvents, windowStartSec, windowEndSec) {
-        filteredEvents.filter { it.stop > windowStartSec && it.start < windowEndSec }
+        filteredEvents.filter {
+            it.stop.epochSeconds > windowStartSec && it.start.epochSeconds < windowEndSec
+        }
     }
     val state = epgColumnDataState(
         cachedEvents = events,
@@ -1057,8 +1144,10 @@ private fun TimelineChannelRow(
         filterActive = category != ProgrammeCategory.ALL,
         matchingCachedEvents = filteredEvents,
     )
-    val orderedIds = remember(allChannels) { allChannels.map { it.channelId } }
-    val numbers = remember(allChannels) { allChannels.associate { it.channelId to it.number } }
+    val orderedIds = remember(allChannels) { allChannels.map { it.id } }
+    val numbers = remember(allChannels) {
+        allChannels.associate { it.id to it.number?.toInt() }
+    }
 
     Row(
         modifier = Modifier
@@ -1068,8 +1157,9 @@ private fun TimelineChannelRow(
     ) {
         TimelineChannelHeader(
             channel = channel,
-            number = ChannelNavigation.numberForId(orderedIds, numbers, channel.channelId),
+            number = ChannelNavigation.numberForId(orderedIds, numbers, channel.id),
             imageLoader = imageLoader,
+            currentSession = currentSession,
             selected = selectedTarget?.channelIndex == channelIndex,
         )
         Spacer(Modifier.width(4.dp))
@@ -1082,8 +1172,8 @@ private fun TimelineChannelRow(
         ) {
             visibleEvents.forEach { event ->
                 val span = timelineEventSpan(
-                    eventStartSec = event.start,
-                    eventEndSec = event.stop,
+                    eventStartSec = event.start.epochSeconds,
+                    eventEndSec = event.stop.epochSeconds,
                     windowStartSec = windowStartSec,
                     windowEndSec = windowEndSec,
                 ) ?: return@forEach
@@ -1092,11 +1182,11 @@ private fun TimelineChannelRow(
                 TimelineProgrammeCell(
                     event = event,
                     channel = channel,
-                    recording = recordingForEvent(event.eventId),
+                    recording = recordingForEvent(event.id),
                     nowSec = nowSec,
                     selected = selectedTarget?.channelIndex == channelIndex &&
-                        selectedTarget.eventId == event.eventId,
-                    focusRequester = eventFocusRequesters.getOrPut(event.eventId) {
+                        selectedTarget.eventId == event.id,
+                    focusRequester = eventFocusRequesters.getOrPut(event.id) {
                         FocusRequester()
                     },
                     onFocused = { onFocused(event) },
@@ -1137,6 +1227,7 @@ internal fun TimelineChannelHeader(
     channel: Channel,
     number: Int?,
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation? = null,
     selected: Boolean = false,
 ) {
     Surface(
@@ -1162,6 +1253,7 @@ internal fun TimelineChannelHeader(
             ) {
                 PiconBox(
                     imageLoader = imageLoader,
+                    currentSession = currentSession,
                     piconPath = channel.icon,
                     modifier = Modifier
                         .width(44.dp)
@@ -1170,7 +1262,7 @@ internal fun TimelineChannelHeader(
                 Spacer(Modifier.width(TvSpacing8))
                 ChannelTitle(
                     number = number,
-                    name = channel.name,
+                    name = channel.name.orEmpty(),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 2,
                     modifier = Modifier.weight(1f),
@@ -1194,16 +1286,17 @@ internal fun TimelineProgrammeCell(
     modifier: Modifier,
 ) {
     val stateText = when {
-        event.start <= nowSec && nowSec < event.stop -> stringResource(R.string.epg_state_now)
-        event.start > nowSec -> stringResource(R.string.epg_state_future)
+        event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds ->
+            stringResource(R.string.epg_state_now)
+        event.start.epochSeconds > nowSec -> stringResource(R.string.epg_state_future)
         else -> stringResource(R.string.epg_state_past)
     }
     val description = stringResource(
         R.string.epg_cell_description,
-        channel.name,
-        event.start.formatDateTime(),
-        formatHm(event.stop),
-        event.title,
+        channel.name.orEmpty(),
+        event.start.epochSeconds.formatDateTime(),
+        formatHm(event.stop.epochSeconds),
+        event.title.orEmpty(),
         stateText,
     )
 
@@ -1214,7 +1307,7 @@ internal fun TimelineProgrammeCell(
             headlineContent = {
                 Text(
                     // Always render a label so no focusable cell is visually blank.
-                    text = event.title,
+                    text = event.title.orEmpty(),
                     maxLines = if (width >= 140.dp) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
@@ -1223,7 +1316,7 @@ internal fun TimelineProgrammeCell(
             supportingContent = if (width >= 90.dp) {
                 {
                     Text(
-                        text = "${formatHm(event.start)}–${formatHm(event.stop)}",
+                        text = "${formatHm(event.start.epochSeconds)}–${formatHm(event.stop.epochSeconds)}",
                         maxLines = 1,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -1255,10 +1348,10 @@ internal fun TimelineProgrammeCell(
                 .semantics { contentDescription = description },
         )
         recording?.takeIf {
-            it.state == DvrState.RECORDING || it.state == DvrState.SCHEDULED
+            it.state == DvrEntryState.RECORDING || it.state == DvrEntryState.SCHEDULED
         }?.let {
             RecordingStatusIndicator(
-                state = it.state,
+                state = checkNotNull(it.state),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .zIndex(2f)
@@ -1363,7 +1456,7 @@ private fun ProgrammeDetailsPanel(
     serverTimeshiftCoversEvent: Boolean,
     simpleTvProfile: SimpleTvProfile,
     canModifyRecordings: Boolean,
-    actionResult: DvrActionResult?,
+    actionResult: DvrMutationResult<*>?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -1388,15 +1481,15 @@ private fun ProgrammeDetailsPanel(
             ProgrammeAction.WATCH -> true
         }
     }
-    LaunchedEffect(event.eventId, actions) { initialFocus.requestFocus() }
+    LaunchedEffect(event.id, actions) { initialFocus.requestFocus() }
     val subtitle = buildString {
         append(channel?.name.orEmpty())
         if (isNotEmpty()) append(" • ")
-        append(event.start.formatDateTime())
+        append(event.start.epochSeconds.formatDateTime())
         append("–")
-        append(formatHm(event.stop))
+        append(formatHm(event.stop.epochSeconds))
         append(" • ")
-        append((event.stop - event.start).coerceAtLeast(0L) / 60L)
+        append((event.stop.epochSeconds - event.start.epochSeconds).coerceAtLeast(0L) / 60L)
         append(" min")
     }
     DialogScrim(
@@ -1413,20 +1506,25 @@ private fun ProgrammeDetailsPanel(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RecordingStatusIndicator(state = it.state)
+                        RecordingStatusIndicator(state = it.state ?: DvrEntryState.UNKNOWN)
                         Text(
                             text = stringResource(
                                 R.string.recording_status,
                                 dvrStateLabel(it.state),
                             ),
                             color = when (it.state) {
-                                DvrState.SCHEDULED, DvrState.RECORDING -> TvRecordingColor
-                                DvrState.FAILED -> MaterialTheme.colorScheme.error
+                                DvrEntryState.SCHEDULED,
+                                DvrEntryState.RECORDING -> TvRecordingColor
+                                DvrEntryState.MISSED,
+                                DvrEntryState.INVALID,
+                                DvrEntryState.RECORDING_ERROR,
+                                DvrEntryState.COMPLETED_ERROR,
+                                DvrEntryState.FILE_MISSING -> MaterialTheme.colorScheme.error
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         )
                     }
-                    it.failureReason?.takeIf(String::isNotBlank)?.let { reason ->
+                    it.subscriptionError?.name?.let { reason ->
                         Text(
                             text = stringResource(R.string.recording_failure_reason, reason),
                             color = MaterialTheme.colorScheme.error,
@@ -1436,7 +1534,7 @@ private fun ProgrammeDetailsPanel(
                 actionResult?.let {
                     Text(
                         text = dvrActionResultLabel(it),
-                        color = if (it is DvrActionResult.Failed) {
+                        color = if (it.isDvrMutationFailure()) {
                             MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.onSurface
@@ -1486,9 +1584,9 @@ private fun ProgrammeDetailsPanel(
 
 @Composable
 private fun DvrConfigDialog(
-    configs: List<DvrConfig>,
+    configs: List<DvrConfiguration>,
     onDismiss: () -> Unit,
-    onSelect: (DvrConfig) -> Unit,
+    onSelect: (DvrConfiguration) -> Unit,
 ) {
     val initialFocus = remember { FocusRequester() }
     LaunchedEffect(configs) { initialFocus.requestFocus() }
@@ -1512,7 +1610,7 @@ private fun DvrConfigDialog(
             ) {
                 Column {
                     Text(config.name)
-                    config.comment?.takeIf(String::isNotBlank)?.let {
+                    config.comment.takeIf(String::isNotBlank)?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -1588,30 +1686,55 @@ private fun programmeActionLabel(action: ProgrammeAction): String = stringResour
 )
 
 @Composable
-private fun dvrStateLabel(state: DvrState): String = stringResource(
+private fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
     when (state) {
-        DvrState.SCHEDULED -> R.string.recording_state_scheduled
-        DvrState.RECORDING -> R.string.recording_state_recording
-        DvrState.COMPLETED -> R.string.recording_state_completed
-        DvrState.FAILED -> R.string.recording_state_failed
-        DvrState.CANCELLED -> R.string.recording_state_cancelled
-        DvrState.UNKNOWN -> R.string.recording_state_unknown
+        DvrEntryState.SCHEDULED -> R.string.recording_state_scheduled
+        DvrEntryState.RECORDING -> R.string.recording_state_recording
+        DvrEntryState.COMPLETED -> R.string.recording_state_completed
+        DvrEntryState.MISSED,
+        DvrEntryState.INVALID -> R.string.recording_state_cancelled
+        DvrEntryState.RECORDING_ERROR,
+        DvrEntryState.COMPLETED_ERROR,
+        DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
+        DvrEntryState.UNKNOWN,
+        null -> R.string.recording_state_unknown
     }
 )
 
 @Composable
-private fun dvrActionResultLabel(result: DvrActionResult): String = stringResource(
+private fun dvrActionResultLabel(result: DvrMutationResult<*>): String = stringResource(
     when (result) {
-        is DvrActionResult.Accepted -> R.string.recording_action_accepted
-        is DvrActionResult.Failed -> when (result.reason) {
-            DvrActionFailure.PERMISSION_DENIED -> R.string.recording_action_permission
-            DvrActionFailure.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
-            DvrActionFailure.CONFLICT -> R.string.recording_action_conflict
-            DvrActionFailure.REJECTED -> R.string.recording_action_rejected
-            DvrActionFailure.CONNECTION -> R.string.recording_action_connection
-        }
+        is DvrMutationResult.Confirmed,
+        is DvrMutationResult.AcceptedButUnconfirmed -> R.string.recording_action_accepted
+        DvrMutationResult.AccessDenied -> R.string.recording_action_permission
+        DvrMutationResult.ConnectionLimit -> R.string.recording_action_conn_limit
+        DvrMutationResult.ServerRejected,
+        DvrMutationResult.NotSupported -> R.string.recording_action_rejected
+        DvrMutationResult.NotReady,
+        DvrMutationResult.ObservationExpired,
+        DvrMutationResult.Timeout,
+        DvrMutationResult.TransportUnavailable -> R.string.recording_action_connection
     }
 )
+
+private fun DvrMutationResult<*>.isDvrMutationFailure(): Boolean =
+    this !is DvrMutationResult.Confirmed && this !is DvrMutationResult.AcceptedButUnconfirmed
+
+private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
+    is DvrRepositoryState.Current -> state.snapshot.entries
+    is DvrRepositoryState.Stale -> state.snapshot.entries
+    is DvrRepositoryState.Synchronizing -> state.staleSnapshot?.entries.orEmpty()
+    DvrRepositoryState.Empty -> emptyList()
+}
+
+internal fun SessionObservation.currentDvrConfigurations(): List<DvrConfiguration> =
+    when (val state = dvrConfigurationsState) {
+        is DvrConfigurationsState.Current -> state.configurations
+        is DvrConfigurationsState.Stale,
+        is DvrConfigurationsState.Synchronizing,
+        DvrConfigurationsState.Denied,
+        DvrConfigurationsState.Unknown -> emptyList()
+    }
 
 @Composable
 private fun DialogScrim(
@@ -1803,7 +1926,7 @@ private fun GuideEmptyState(
 
 private fun nearestTargetAt(
     channels: List<Channel>,
-    repository: ChannelEpgRuntime,
+    events: List<EpgEventEntry>,
     preferredChannelIndex: Int,
     targetSec: Long,
     category: ProgrammeCategory,
@@ -1811,9 +1934,9 @@ private fun nearestTargetAt(
     return initialTimelineEpgFocus(
         rows = channels.map { channel ->
             EpgFocusColumn(
-                channel.channelId,
-                repository.epgForChannel(channel.channelId).value.filter {
-                    it.matchesProgrammeCategory(category)
+                channel.id,
+                events.filter {
+                    it.channelId == channel.id && it.matchesProgrammeCategory(category)
                 },
             )
         },
@@ -1821,9 +1944,6 @@ private fun nearestTargetAt(
         targetSec = targetSec,
     )
 }
-
-private fun overlapSeconds(left: EpgEventEntry, right: EpgEventEntry): Long =
-    max(0L, minOf(left.stop, right.stop) - max(left.start, right.start))
 
 private fun floorToHour(epochSec: Long): Long = epochSec - epochSec.mod(3600L)
 

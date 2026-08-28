@@ -2,8 +2,10 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvhplayer.data.ChannelEpgRuntime
-import at.bernhardberger.tvhplayer.data.TvheadendDataRuntime
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.core.toConnectionState
+import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,10 +15,17 @@ import kotlinx.coroutines.launch
 
 class VideoPlayerViewModel(
     private val playbackRuntime: AppPlaybackRuntime,
-    private val channelRuntime: ChannelEpgRuntime,
-    runtime: TvheadendDataRuntime,
+    private val session: TvheadendSession,
 ) : ViewModel() {
-    val connectionState = runtime.connectionState
+    val observation = session.observation
+    val activeTarget = playbackRuntime.activeTarget
+    val connectionState = session.observation
+        .map { it.sessionState.toConnectionState() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            at.bernhardberger.tvhplayer.data.ConnectionState.Disconnected,
+        )
     val playbackState = playbackRuntime.state
     val playingLiveChannelId = playbackRuntime.activeTarget
         .map { (it as? AppPlaybackTarget.Live)?.channelId }
@@ -31,7 +40,7 @@ class VideoPlayerViewModel(
 
     fun pause() = playbackRuntime.pause()
 
-    suspend fun playChannel(channelId: Int) = playbackRuntime.playLive(channelId)
+    suspend fun playChannel(selection: LivePlaybackSelection) = playbackRuntime.playLive(selection)
 
     suspend fun stop() {
         playbackRuntime.stop()
@@ -51,5 +60,12 @@ class VideoPlayerViewModel(
 
     fun setDiagnosticsEnabled(enabled: Boolean) = playbackRuntime.setDiagnosticsEnabled(enabled)
 
-    fun epgForChannel(channelId: Int) = channelRuntime.epgForChannel(channelId)
+    fun epgForChannel(channelId: ChannelId) = session.observation.map { observation ->
+        when (val state = observation.epgState) {
+            is at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Current -> state.snapshot
+            is at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Stale -> state.snapshot
+            is at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Synchronizing -> state.staleSnapshot
+            at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Empty -> null
+        }?.events?.filter { it.channelId == channelId }.orEmpty()
+    }
 }

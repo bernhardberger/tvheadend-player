@@ -22,7 +22,10 @@ class SemanticColorUsageTest {
             "ui/components/ProgrammeContentDetails.kt",
             "color = MaterialTheme.colorScheme.onSurfaceVariant",
         )
-        assertContains("ui/screens/EpgGridScreen.kt", "DvrState.SCHEDULED, DvrState.RECORDING -> TvRecordingColor")
+        assertContains(
+            "ui/screens/EpgGridScreen.kt",
+            "DvrEntryState.RECORDING -> TvRecordingColor",
+        )
         assertContains("ui/player/LiveProgrammeInfoOverlay.kt", "color = TvRecordingColor")
 
         val scopedSources = listOf(

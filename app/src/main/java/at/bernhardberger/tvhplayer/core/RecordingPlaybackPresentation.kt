@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+
 enum class RecordingFinishedAction {
     NONE,
     STOP,
@@ -8,7 +10,7 @@ enum class RecordingFinishedAction {
 
 fun recordingFinishedAction(
     recordingFinished: Boolean,
-    activeRecordingId: Int?,
+    activeRecordingId: DvrEntryId?,
     recordingPlayerVisible: Boolean,
 ): RecordingFinishedAction = when {
     !recordingFinished || activeRecordingId == null -> RecordingFinishedAction.NONE

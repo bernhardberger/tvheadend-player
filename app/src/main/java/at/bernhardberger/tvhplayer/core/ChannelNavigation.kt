@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import android.view.KeyEvent
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 
 object ChannelNavigation {
     private const val MAX_CHANNEL_NUMBER_DIGITS = 3
@@ -38,10 +39,10 @@ object ChannelNavigation {
     }
 
     fun idForNumber(
-        orderedIds: List<Int>,
-        channelNumbers: Map<Int, Int?>,
+        orderedIds: List<ChannelId>,
+        channelNumbers: Map<ChannelId, Int?>,
         enteredNumber: String,
-    ): Int? {
+    ): ChannelId? {
         val number = enteredNumber.toIntOrNull() ?: return null
         orderedIds.firstOrNull { channelNumbers[it] == number }?.let { return it }
 
@@ -51,9 +52,9 @@ object ChannelNavigation {
     }
 
     fun numberForId(
-        orderedIds: List<Int>,
-        channelNumbers: Map<Int, Int?>,
-        channelId: Int,
+        orderedIds: List<ChannelId>,
+        channelNumbers: Map<ChannelId, Int?>,
+        channelId: ChannelId,
     ): Int? {
         val index = orderedIds.indexOf(channelId)
         if (index < 0) return null
@@ -63,10 +64,10 @@ object ChannelNavigation {
     }
 
     fun adjacentId(
-        orderedIds: List<Int>,
-        currentId: Int,
+        orderedIds: List<ChannelId>,
+        currentId: ChannelId,
         direction: Int,
-    ): Int? {
+    ): ChannelId? {
         if (orderedIds.isEmpty()) return null
 
         val currentIndex = orderedIds.indexOf(currentId)

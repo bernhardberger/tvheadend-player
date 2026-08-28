@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -163,11 +165,14 @@ class BackNavigationPolicyTest {
     fun warmPlaybackTargetPrefersLiveOverRecording() {
         assertEquals(
             WarmPlaybackTarget.LIVE,
-            warmPlaybackTarget(activeServiceId = 7, activeRecordingId = 3),
+            warmPlaybackTarget(
+                activeServiceId = ChannelId(7),
+                activeRecordingId = DvrEntryId(3),
+            ),
         )
         assertEquals(
             WarmPlaybackTarget.RECORDING,
-            warmPlaybackTarget(activeServiceId = null, activeRecordingId = 3),
+            warmPlaybackTarget(activeServiceId = null, activeRecordingId = DvrEntryId(3)),
         )
         assertEquals(
             WarmPlaybackTarget.NONE,

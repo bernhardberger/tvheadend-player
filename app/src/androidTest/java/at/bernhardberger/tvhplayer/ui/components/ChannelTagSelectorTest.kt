@@ -34,7 +34,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.data.ChannelTag
+import at.bernhardberger.tvheadend.sdk.core.ChannelTag
+import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -47,11 +48,11 @@ class ChannelTagSelectorTest {
 
     @Test
     fun tabsCommitServerTagOnFocus() {
-        var selectedTagId by mutableStateOf<Int?>(null)
+        var selectedTagId by mutableStateOf<ChannelTagId?>(null)
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ChannelTagSelector(
-                    tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
+                    tags = listOf(tag(id = 7, name = "News")),
                     activeTagId = selectedTagId,
                     onSelectTag = { selectedTagId = it },
                 )
@@ -70,7 +71,7 @@ class ChannelTagSelectorTest {
             pressKey(Key.DirectionRight)
         }
         composeRule.onNodeWithText("News").assertIsFocused()
-        composeRule.runOnIdle { assertEquals(7, selectedTagId) }
+        composeRule.runOnIdle { assertEquals(tagId(7), selectedTagId) }
     }
 
     @Test
@@ -81,8 +82,8 @@ class ChannelTagSelectorTest {
                 Row {
                     Button(onClick = {}) { Text("Before scopes") }
                     ChannelTagSelector(
-                        tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
-                        activeTagId = 7,
+                        tags = listOf(tag(id = 7, name = "News")),
+                        activeTagId = tagId(7),
                         onSelectTag = {},
                         onMoveToContent = {
                             movedToContent += 1
@@ -112,8 +113,8 @@ class ChannelTagSelectorTest {
             TVHeadendPlayerTheme {
                 Column {
                     ChannelTagSelector(
-                        tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
-                        activeTagId = 7,
+                        tags = listOf(tag(id = 7, name = "News")),
+                        activeTagId = tagId(7),
                         onSelectTag = {},
                         onMoveToContent = contentFocus::requestFocus,
                     )
@@ -143,8 +144,8 @@ class ChannelTagSelectorTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ChannelTagSelector(
-                    tags = listOf(ChannelTag(id = 7, name = "News", index = 1)),
-                    activeTagId = 7,
+                    tags = listOf(tag(id = 7, name = "News")),
+                    activeTagId = tagId(7),
                     allChannelsVisible = false,
                     onSelectTag = {},
                 )
@@ -158,13 +159,13 @@ class ChannelTagSelectorTest {
     @Test
     fun tabsFallBackToFirstVisibleScopeWhenActiveTagDisappears() {
         var tags by mutableStateOf(
-            (1..20).map { id -> ChannelTag(id = id, name = "Tag $id", index = id) }
+            (1..20).map { id -> tag(id = id, name = "Tag $id") }
         )
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ChannelTagSelector(
                     tags = tags,
-                    activeTagId = 20,
+                    activeTagId = tagId(20),
                     onSelectTag = {},
                 )
             }
@@ -177,7 +178,7 @@ class ChannelTagSelectorTest {
 
     @Test
     fun overflowingInactiveTabsDoNotPaintOverTheBacking() {
-        var selectedTagId by mutableStateOf<Int?>(5)
+        var selectedTagId by mutableStateOf<ChannelTagId?>(tagId(5))
         val tags = longTags()
         composeRule.setContent {
             TVHeadendPlayerTheme {
@@ -194,7 +195,7 @@ class ChannelTagSelectorTest {
             }
         }
 
-        composeRule.onNodeWithText(tags.last().name).requestFocus().assertIsFocused()
+        composeRule.onNodeWithText(tags.last().name.orEmpty()).requestFocus().assertIsFocused()
         composeRule.waitForIdle()
 
         val overflowPixels = composeRule.onNodeWithTag("overflowing-scopes")
@@ -220,7 +221,7 @@ class ChannelTagSelectorTest {
                 TVHeadendPlayerTheme {
                     ChannelTagSelector(
                         tags = tags,
-                        activeTagId = 5,
+                        activeTagId = tagId(5),
                         onSelectTag = {},
                         modifier = Modifier
                             .width(260.dp)
@@ -232,7 +233,7 @@ class ChannelTagSelectorTest {
             }
         }
 
-        composeRule.onNodeWithText(tags.last().name).requestFocus().assertIsFocused()
+        composeRule.onNodeWithText(tags.last().name.orEmpty()).requestFocus().assertIsFocused()
         composeRule.waitForIdle()
 
         val pixels = composeRule.onNodeWithTag("rtl-overflowing-scopes")
@@ -245,34 +246,38 @@ class ChannelTagSelectorTest {
 
     @Test
     fun focusedTabIsProtectedBeforeSelectionStateCatchesUp() {
-        var requestedTagId: Int? = null
+        var requestedTagId: ChannelTagId? = null
         val tags = longTags()
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ChannelTagSelector(
                     tags = tags,
-                    activeTagId = 5,
+                    activeTagId = tagId(5),
                     onSelectTag = { requestedTagId = it },
                     modifier = Modifier.width(260.dp),
                 )
             }
         }
 
-        composeRule.onNodeWithText(tags.last().name).requestFocus().performKeyInput {
+        composeRule.onNodeWithText(tags.last().name.orEmpty()).requestFocus().performKeyInput {
             pressKey(Key.DirectionLeft)
         }
 
-        composeRule.onNodeWithText(tags[tags.lastIndex - 1].name).assertIsFocused()
+        composeRule.onNodeWithText(tags[tags.lastIndex - 1].name.orEmpty()).assertIsFocused()
         composeRule.runOnIdle {
-            assertEquals(4, requestedTagId)
+            assertEquals(tagId(4), requestedTagId)
         }
     }
 
     private fun longTags(): List<ChannelTag> = (1..5).map { id ->
-        ChannelTag(
-            id = id,
-            name = "Long channel scope $id",
-            index = id,
-        )
+        tag(id, "Long channel scope $id")
     }
+
+    private fun tag(id: Int, name: String) = ChannelTag.create(
+        id = ChannelTagId(id.toLong()),
+        name = name,
+        index = id.toLong(),
+    )
+
+    private fun tagId(id: Int) = ChannelTagId(id.toLong())
 }

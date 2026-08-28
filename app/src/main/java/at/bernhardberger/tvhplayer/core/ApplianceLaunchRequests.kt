@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -8,11 +9,11 @@ data class ApplianceLaunchRequest(val id: Long)
 
 data class ApplianceLaunchTarget(
     val request: ApplianceLaunchRequest,
-    val channelId: Int,
+    val channelId: ChannelId,
     val channelName: String,
 ) {
     fun matchesPlayer(
-        channelId: Int,
+        channelId: ChannelId,
         channelName: String,
     ): Boolean =
         this.channelId == channelId &&
@@ -62,18 +63,18 @@ class ApplianceLaunchRequests(
     fun resolve(
         request: ApplianceLaunchRequest,
         readiness: CurrentChannelReadiness,
-        persistedId: Int?,
+        persistedId: ChannelId?,
     ): ApplianceLaunchTarget? {
         val ready = readiness as? CurrentChannelReadiness.Ready ?: return null
         val channelId = LastPlayedChannelPolicy.resolve(
-            orderedIds = ready.channels.map { it.channelId },
+            orderedIds = ready.channels.map { it.id },
             persistedId = persistedId,
         ) ?: return null
-        val channel = ready.channels.firstOrNull { it.channelId == channelId } ?: return null
+        val channel = ready.channels.firstOrNull { it.id == channelId } ?: return null
         val target = ApplianceLaunchTarget(
             request = request,
-            channelId = channel.channelId,
-            channelName = channel.name,
+            channelId = channel.id,
+            channelName = channel.name.orEmpty(),
         )
         val pending = ApplianceLaunchState.Pending(request)
 
@@ -96,7 +97,7 @@ class ApplianceLaunchRequests(
     @Synchronized
     fun completePlayerVisibility(
         target: ApplianceLaunchTarget,
-        channelId: Int,
+        channelId: ChannelId,
         channelName: String,
     ): Boolean {
         if (!target.matchesPlayer(channelId, channelName)) return false

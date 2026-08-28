@@ -17,7 +17,9 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.runtime.mutableStateOf
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
@@ -27,6 +29,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlin.time.Instant
 
 class PlayerOverlayCompositionTest {
     @get:Rule
@@ -80,20 +83,8 @@ class PlayerOverlayCompositionTest {
                     channelNumber = 1,
                     channelName = "ORF 1 HD",
                     piconPath = null,
-                    nowEvent = EpgEventEntry(
-                        eventId = 1,
-                        channelId = 1,
-                        start = 3_600,
-                        stop = 7_200,
-                        title = "Zeit im Bild",
-                    ),
-                    nextEvent = EpgEventEntry(
-                        eventId = 2,
-                        channelId = 1,
-                        start = 7_200,
-                        stop = 9_000,
-                        title = "Wetter",
-                    ),
+                    nowEvent = event(1, 3_600, 7_200, "Zeit im Bild"),
+                    nextEvent = event(2, 7_200, 9_000, "Wetter"),
                     nowSec = 5_400,
                     controlsVisible = true,
                     optionsOpen = false,
@@ -181,13 +172,7 @@ class PlayerOverlayCompositionTest {
                     channelNumber = 1,
                     channelName = "ORF 1 HD",
                     piconPath = null,
-                    nowEvent = EpgEventEntry(
-                        eventId = 1,
-                        channelId = 1,
-                        start = 3_600,
-                        stop = 7_200,
-                        title = "Zeit im Bild",
-                    ),
+                    nowEvent = event(1, 3_600, 7_200, "Zeit im Bild"),
                     nextEvent = null,
                     nowSec = 5_400,
                     controlsVisible = true,
@@ -313,13 +298,7 @@ class PlayerOverlayCompositionTest {
                     channelNumber = 1,
                     channelName = "Channel",
                     piconPath = null,
-                    nowEvent = EpgEventEntry(
-                        eventId = 1,
-                        channelId = 1,
-                        start = 3_600,
-                        stop = 7_200,
-                        title = eventTitle.value,
-                    ),
+                    nowEvent = event(1, 3_600, 7_200, eventTitle.value),
                     nextEvent = null,
                     nowSec = 5_400,
                     controlsVisible = true,
@@ -358,4 +337,12 @@ class PlayerOverlayCompositionTest {
         assertEquals(shortPicon.top, longPicon.top, 1f)
         assertEquals(longEyebrow.top, clock.top, 1f)
     }
+
+    private fun event(id: Int, start: Long, stop: Long, title: String) = EpgEvent.create(
+        id = EventId(id.toLong()),
+        channelId = ChannelId(1),
+        start = Instant.fromEpochSeconds(start),
+        stop = Instant.fromEpochSeconds(stop),
+        title = title,
+    )
 }

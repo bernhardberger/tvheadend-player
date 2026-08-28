@@ -1,19 +1,25 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.data.EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgCoverage
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.time.Instant
 
 data class EpgFocusColumn(
-    val channelId: Int,
+    val channelId: ChannelId,
     val events: List<EpgEventEntry>,
 )
 
 data class EpgFocusTarget(
     val channelIndex: Int,
-    val eventId: Int,
+    val eventId: EventId,
 )
 
 enum class EpgFocusDirection {
@@ -39,7 +45,7 @@ fun initialTimelineEpgFocus(
     rows: List<EpgFocusColumn>,
     preferredChannelIndex: Int,
     targetSec: Long,
-    preferredEventId: Int? = null,
+    preferredEventId: EventId? = null,
 ): EpgFocusTarget? {
     if (rows.isEmpty()) return null
     val preferredIndex = preferredChannelIndex.coerceIn(rows.indices)
@@ -53,10 +59,10 @@ fun initialTimelineEpgFocus(
     candidateIndices.forEach { channelIndex ->
         val events = rows[channelIndex].events.sortedBy { it.start }
         if (events.isEmpty()) return@forEach
-        val event = preferredEventId?.let { id -> events.firstOrNull { it.eventId == id } }
-            ?: events.firstOrNull { it.start <= targetSec && targetSec < it.stop }
-            ?: events.minByOrNull { abs(it.start - targetSec) }
-        if (event != null) return EpgFocusTarget(channelIndex, event.eventId)
+        val event = preferredEventId?.let { id -> events.firstOrNull { it.id == id } }
+            ?: events.firstOrNull { it.start.epochSeconds <= targetSec && targetSec < it.stop.epochSeconds }
+            ?: events.minByOrNull { abs(it.start.epochSeconds - targetSec) }
+        if (event != null) return EpgFocusTarget(channelIndex, event.id)
     }
     return null
 }
@@ -69,7 +75,7 @@ fun reconcileTimelineEpgFocus(
 ): EpgFocusTarget? {
     current?.let { target ->
         rows.forEachIndexed { channelIndex, row ->
-            if (row.events.any { it.eventId == target.eventId }) {
+            if (row.events.any { it.id == target.eventId }) {
                 return EpgFocusTarget(channelIndex, target.eventId)
             }
         }
@@ -90,7 +96,7 @@ fun moveTimelineEpgFocus(
     val row = rows.getOrNull(current.channelIndex)
         ?: return TimelineEpgFocusMove(current)
     val events = row.events.sortedBy { it.start }
-    val currentIndex = events.indexOfFirst { it.eventId == current.eventId }
+    val currentIndex = events.indexOfFirst { it.id == current.eventId }
     val currentEvent = events.getOrNull(currentIndex)
         ?: return TimelineEpgFocusMove(current)
 
@@ -100,7 +106,7 @@ fun moveTimelineEpgFocus(
             target = current,
             extendTimeFrontier = direction == EpgFocusDirection.RIGHT,
         )
-        return TimelineEpgFocusMove(current.copy(eventId = event.eventId))
+        return TimelineEpgFocusMove(current.copy(eventId = event.id))
     }
 
     val step = if (direction == EpgFocusDirection.UP) -1 else 1
@@ -120,7 +126,7 @@ fun moveTimelineEpgFocus(
     ) ?: return TimelineEpgFocusMove(current)
 
     return TimelineEpgFocusMove(
-        target = EpgFocusTarget(channelIndex, best.eventId),
+        target = EpgFocusTarget(channelIndex, best.id),
         pageChannels = channelIndex !in visibleChannelRange,
     )
 }
@@ -133,7 +139,7 @@ fun timelinePageFocusTarget(
 ): EpgFocusTarget? {
     val currentEvent = rows.getOrNull(current.channelIndex)
         ?.events
-        ?.firstOrNull { it.eventId == current.eventId }
+        ?.firstOrNull { it.id == current.eventId }
         ?: return null
     val step = if (direction < 0) -1 else 1
     val startIndex = preferredChannelIndex.coerceIn(rows.indices)
@@ -147,7 +153,7 @@ fun timelinePageFocusTarget(
             { -abs(midpoint(currentEvent) - midpoint(it)) },
         ),
     ) ?: return null
-    return EpgFocusTarget(targetIndex, targetEvent.eventId)
+    return EpgFocusTarget(targetIndex, targetEvent.id)
 }
 
 fun timelineEventSpan(
@@ -169,9 +175,20 @@ fun timelineEventSpan(
 }
 
 private fun overlapSeconds(left: EpgEventEntry, right: EpgEventEntry): Long =
-    max(0L, min(left.stop, right.stop) - max(left.start, right.start))
+    max(
+        0L,
+        min(left.stop.epochSeconds, right.stop.epochSeconds) -
+            max(left.start.epochSeconds, right.start.epochSeconds),
+    )
 
-private fun midpoint(event: EpgEventEntry): Long = event.start + (event.stop - event.start) / 2
+private fun midpoint(event: EpgEventEntry): Long =
+    event.start.epochSeconds + (event.stop.epochSeconds - event.start.epochSeconds) / 2
+
+fun epgFrontierSettled(coverage: EpgCoverage?, requestedThrough: Instant): Boolean =
+    coverage?.knownTo?.let { it >= requestedThrough } == true
+
+fun EpgRepositoryState.currentEpgSnapshot(): EpgSnapshot? =
+    (this as? EpgRepositoryState.Current)?.snapshot
 
 enum class EpgColumnDataState {
     READY,
@@ -211,8 +228,8 @@ fun epgColumnDataState(
         EpgColumnDataState.FILTER_EMPTY
     visibleEvents.isEmpty() && cachedEvents.isEmpty() -> EpgColumnDataState.NO_DATA
     visibleEvents.isEmpty() -> EpgColumnDataState.EMPTY_DAY
-    visibleEvents.minOf { it.start } > windowStartSec ||
-        visibleEvents.maxOf { it.stop } < windowEndSec ->
+    visibleEvents.minOf { it.start.epochSeconds } > windowStartSec ||
+        visibleEvents.maxOf { it.stop.epochSeconds } < windowEndSec ->
         EpgColumnDataState.PARTIAL
     else -> EpgColumnDataState.READY
 }

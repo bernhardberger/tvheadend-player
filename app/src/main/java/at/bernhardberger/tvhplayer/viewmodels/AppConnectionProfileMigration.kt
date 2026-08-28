@@ -1,21 +1,25 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
-import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvhplayer.core.StreamProfileSelectionOption
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 
 internal suspend fun collectReadyStreamProfileMigrations(
-    states: Flow<SessionState>,
-    currentState: () -> SessionState,
-    discover: suspend () -> StreamProfilesResult,
+    observations: Flow<SessionObservation>,
+    currentObservation: () -> SessionObservation,
+    discover: suspend (CurrentSessionObservation) -> StreamProfilesResult,
     migrate: suspend (List<StreamProfileSelectionOption>) -> Unit,
 ) {
-    states.collectLatest { ready ->
-        if (ready !is SessionState.Ready) return@collectLatest
-        val profiles = discover()
-        if (currentState() !== ready || profiles !is StreamProfilesResult.Available) {
+    observations.collectLatest { observation ->
+        val currentSession = observation.currentSession ?: return@collectLatest
+        val profiles = discover(currentSession)
+        if (
+            currentObservation().currentSession !== currentSession ||
+            profiles !is StreamProfilesResult.Available
+        ) {
             return@collectLatest
         }
         migrate(

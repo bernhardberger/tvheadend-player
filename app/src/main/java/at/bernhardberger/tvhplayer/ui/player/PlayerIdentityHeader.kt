@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderColumnGap
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderFirstBaseline
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderMinHeight
@@ -44,6 +45,7 @@ data class PlayerHeaderTags(
 @Composable
 fun PlayerIdentityHeader(
     imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation? = null,
     piconPath: String?,
     eyebrow: String?,
     title: String,
@@ -60,6 +62,7 @@ fun PlayerIdentityHeader(
     ) {
         PiconBox(
             imageLoader = imageLoader,
+            currentSession = currentSession,
             piconPath = piconPath,
             modifier = Modifier
                 .width(TvOverlayHeaderPiconWidth)
