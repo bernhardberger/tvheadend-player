@@ -11,15 +11,6 @@ import org.junit.Test
 
 class AppPlaybackRuntimeTest {
     @Test
-    fun selectedProfileUsesTheReleasedSdkIdentifierDirectly() {
-        assertEquals(
-            "11111111111111111111111111111111",
-            selectedStreamProfileId("11111111111111111111111111111111")?.value,
-        )
-        assertNull(selectedStreamProfileId(""))
-    }
-
-    @Test
     fun unavailableSdkTimeshiftStateHasUnavailablePresentation() {
         assertEquals(
             AppTimeshiftState(),

@@ -110,7 +110,7 @@ fun RecordingPlayerScreen(
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
+        initialValue = PlayerSettings(audioLanguage = null, subtitleLanguage = null)
     )
     val retainedSelection = recordingSelection?.takeIf { it.recordingId == recordingId }
     var targetObservation by remember(recordingId, retainedSelection?.currentSession) {

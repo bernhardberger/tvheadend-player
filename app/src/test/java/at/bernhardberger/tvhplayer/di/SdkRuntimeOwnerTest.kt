@@ -16,6 +16,8 @@ class SdkRuntimeOwnerTest {
             listOf(
                 "coordinator.shutdown",
                 "coordinator.join",
+                "profileOwner.cancel",
+                "profileOwner.join",
                 "session.shutdown",
                 "listeners.detach",
                 "player.release",
@@ -40,6 +42,8 @@ class SdkRuntimeOwnerTest {
                 "coordinator.shutdown",
                 "coordinator.cancel",
                 "coordinator.join",
+                "profileOwner.cancel",
+                "profileOwner.join",
                 "session.shutdown",
                 "listeners.detach",
                 "player.release",
@@ -63,6 +67,8 @@ class SdkRuntimeOwnerTest {
                 "coordinator.shutdown",
                 "coordinator.cancel",
                 "coordinator.join",
+                "profileOwner.cancel",
+                "profileOwner.join",
                 "session.shutdown",
                 "listeners.detach",
                 "player.release",
@@ -83,6 +89,8 @@ private class FakeShutdownActions(
     }
     override fun cancelCoordinatorRun() { calls += "coordinator.cancel" }
     override suspend fun joinCoordinatorRun() { calls += "coordinator.join" }
+    override fun cancelProfileOwnerRun() { calls += "profileOwner.cancel" }
+    override suspend fun joinProfileOwnerRun() { calls += "profileOwner.join" }
     override suspend fun shutdownSession() { calls += "session.shutdown" }
     override fun detachApplicationListeners() { calls += "listeners.detach" }
     override fun releasePlayer() { calls += "player.release" }

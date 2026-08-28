@@ -30,7 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.replacementCredentialsComplete
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
@@ -43,7 +43,7 @@ import org.koin.compose.koinInject
 @Composable
 fun SettingsConnection(
     initialFocusRequester: FocusRequester,
-    settingsStore: ServerSettingsStore = koinInject(),
+    settingsStore: AppProfileOwner = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current
@@ -64,7 +64,6 @@ fun SettingsConnection(
     var passwordChanged by remember { mutableStateOf(false) }
     var passwordConfigured by remember { mutableStateOf(false) }
     var credentialError by remember { mutableStateOf(false) }
-    var auto by rememberSaveable { mutableStateOf(true) }
     val parsedPort = htspPort.toIntOrNull()?.takeIf { it in 1..65535 }
     val credentialsComplete = replacementCredentialsComplete(
         passwordConfigured = passwordConfigured,
@@ -159,11 +158,11 @@ fun SettingsConnection(
                 scope.launch {
                     try {
                         if (user.isBlank()) {
-                            settingsStore.saveServer(host.trim(), pHtsp, "", auto)
+                            settingsStore.saveServer(host.trim(), pHtsp)
                             passwordConfigured = false
                         } else {
                             settingsStore.savePasswordServer(
-                                host.trim(), pHtsp, user, pass, auto,
+                                host.trim(), pHtsp, user, pass,
                             )
                             passwordConfigured = true
                         }
@@ -185,7 +184,7 @@ fun SettingsConnection(
                     try {
                         val current = settingsStore.serverSettings.first()
                         if (current.host.isNotBlank()) {
-                            settingsStore.saveServer(current.host, current.htspPort, "", auto)
+                            settingsStore.saveServer(current.host, current.htspPort)
                         } else {
                             settingsStore.clearProfile()
                         }

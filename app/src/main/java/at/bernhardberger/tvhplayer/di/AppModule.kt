@@ -7,14 +7,12 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
-import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
-import at.bernhardberger.tvhplayer.settings.ServerProfileMigration
 import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -39,10 +37,6 @@ import org.koin.dsl.onClose
 
 val appModule = module {
     single<CoroutineDispatcher>(qualifier = named("io")) { Dispatchers.IO }
-    single { TvheadendServerProfileStore(androidContext()) }
-    single { ServerSettingsStore(androidContext(), get()) }
-    single { LegacyCredentialSource(androidContext()) }
-    single { ServerProfileMigration(get(), get(), get()) }
     single { PlayerSettingsStore(androidContext()) }
     single { ChannelTagSettingsStore(androidContext()) }
     single { UiSettingsStore(androidContext()) }
@@ -51,8 +45,13 @@ val appModule = module {
     single {
         val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val session = createTvheadendSession()
-        val streamProfileDiscovery = StreamProfileDiscovery(
+        val playerSettings = get<PlayerSettingsStore>()
+        val profileOwner = AppProfileOwner(
+            context = androidContext(),
             session = session,
+            profileStore = TvheadendServerProfileStore(androidContext()),
+            legacyCredentials = LegacyCredentialSource(androidContext()),
+            playerSettings = playerSettings,
             ioDispatcher = get(qualifier = named("io")),
         )
         val player = ExoPlayer.Builder(androidContext())
@@ -67,13 +66,14 @@ val appModule = module {
             player = player,
             session = session,
             coordinator = coordinator,
-            settings = get(),
+            settings = playerSettings,
+            profileOwner = profileOwner,
             scope = applicationScope,
         )
         SdkRuntimeOwner.create(
             session = session,
             playbackRuntime = playbackRuntime,
-            streamProfileDiscovery = streamProfileDiscovery,
+            appProfileOwner = profileOwner,
             coordinator = coordinator,
             player = player,
             applicationScope = applicationScope,
@@ -81,7 +81,7 @@ val appModule = module {
     } onClose { owner -> owner?.requestClose() }
 
     single { get<SdkRuntimeOwner>().session }
-    single { get<SdkRuntimeOwner>().streamProfileDiscovery }
+    single { get<SdkRuntimeOwner>().appProfileOwner }
     single { get<SdkRuntimeOwner>().session.epgRepository }
     single { get<SdkRuntimeOwner>().playbackRuntime }
 
@@ -95,17 +95,12 @@ val appModule = module {
     viewModel {
         AppConnectionViewModel(
             session = get(),
-            profileStore = get(),
-            profileMigration = get(),
-            serverSettings = get(),
-            playerSettings = get(),
-            streamProfileDiscovery = get(),
+            profileOwner = get(),
         )
     }
     viewModel {
         MainStartupViewModel(
-            serverSettingsStore = get(),
-            serverProfileMigration = get(),
+            profileOwner = get(),
             uiSettingsStore = get(),
             simpleTvSettingsStore = get(),
             simpleTvSession = get(),
@@ -119,7 +114,7 @@ val appModule = module {
             settingsStore = get(),
             playbackRuntime = get(),
             session = get(),
-            streamProfileDiscovery = get(),
+            profileOwner = get(),
         )
     }
 }

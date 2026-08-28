@@ -1,28 +1,11 @@
 package at.bernhardberger.tvhplayer.settings
 
-import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.preferencesOf
-import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 class SettingsPersistenceTest {
-    private val profileUuidKey = stringPreferencesKey("profileUuid")
-    private val legacyProfileNameKey = stringPreferencesKey("profile")
-    @Test
-    fun legacyOnlyEvidenceLoadsWithoutClaimingUuidMigration() {
-        val settings = playerSettingsFromPreferences(preferencesOf(legacyProfileNameKey to "pass"))
-        assertEquals("", settings.profile)
-        assertEquals("pass", settings.legacyProfileName)
-    }
-    @Test
-    fun profileSelectionWritesUuidAndExactLegacyName() {
-        val preferences = mutablePreferencesOf()
-        preferences.writeProfileSelection(profileUuid = "uuid-pass", legacyProfileName = " Pass Profile ")
-        assertEquals("uuid-pass", preferences[profileUuidKey])
-        assertEquals(" Pass Profile ", preferences[legacyProfileNameKey])
-    }
     @Test
     fun legacyAndPersistedIdsRoundTripAsUnsignedU32() = runBlocking {
         val migrated = activeTagIdMigration().migrate(preferencesOf(legacyActiveTagKey to -1))

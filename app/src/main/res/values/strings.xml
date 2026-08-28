@@ -78,6 +78,7 @@
     <string name="language_german">German</string>
     <string name="language_english">English</string>
     <string name="profile">Stream profile</string>
+    <string name="profile_server_default">Server default</string>
     <string name="profile_direct_streaming">Direct streaming</string>
     <string name="stream_profiles_unavailable">Stream profiles are unavailable.</string>
     <string name="audio_language">Audio Language</string>

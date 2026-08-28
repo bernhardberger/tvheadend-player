@@ -16,12 +16,12 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
 import at.bernhardberger.tvhplayer.ui.components.SettingsSectionTitle
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
-import at.bernhardberger.tvhplayer.viewmodels.ProfilesUiState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import org.koin.androidx.compose.koinViewModel
 
@@ -60,28 +60,33 @@ fun SettingsPlayer(
         SettingsSectionTitle(stringResource(R.string.profile))
 
         when (val profiles = ui.profiles) {
-            ProfilesUiState.Idle -> Text(
+            StreamProfilesResult.NotReady -> Text(
                 if (ui.connected) stringResource(R.string.loading_wait)
                 else stringResource(R.string.not_connected)
             )
-            ProfilesUiState.Loading -> Text(stringResource(R.string.loading))
-            ProfilesUiState.Error -> Text(
-                text = stringResource(R.string.stream_profiles_unavailable),
-                color = MaterialTheme.colorScheme.error,
-            )
-            is ProfilesUiState.Ready -> {
+            is StreamProfilesResult.Available -> {
                 Column(
                     modifier = Modifier.width(480.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    profiles.items.forEach { profile ->
+                    ListItem(
+                        selected = ui.selectedProfileId == null,
+                        onClick = { vm.onProfileSelected(null) },
+                        headlineContent = { Text(stringResource(R.string.profile_server_default)) },
+                        scale = ListItemDefaults.scale(
+                            focusedScale = 1f,
+                            focusedSelectedScale = 1f,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    profiles.profiles.forEach { profile ->
                         val presentation = streamProfilePresentation(
                             profileName = profile.name,
                             directStreamingLabel = directStreamingLabel,
                         )
                         ListItem(
-                            selected = profile.id == ui.selectedProfileUuid,
-                            onClick = { vm.onProfileSelected(profile) },
+                            selected = profile.id == ui.selectedProfileId,
+                            onClick = { vm.onProfileSelected(profile.id) },
                             headlineContent = { Text(presentation.primaryLabel) },
                             supportingContent = presentation.secondaryLabel?.let { secondary ->
                                 { Text(secondary) }
@@ -95,6 +100,16 @@ fun SettingsPlayer(
                     }
                 }
             }
+            StreamProfilesResult.ObservationExpired,
+            StreamProfilesResult.ServerRejected,
+            StreamProfilesResult.AccessDenied,
+            StreamProfilesResult.ConnectionLimit,
+            StreamProfilesResult.Timeout,
+            StreamProfilesResult.TransportUnavailable,
+            StreamProfilesResult.NotSupported -> Text(
+                text = stringResource(R.string.stream_profiles_unavailable),
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

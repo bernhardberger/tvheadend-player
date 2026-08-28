@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.debug
 
 import android.content.Context
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileOperationResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
-import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
 import org.json.JSONObject
 import java.io.File
 
@@ -52,12 +52,13 @@ internal class TestCredentialProvisioner(private val context: Context) {
         try {
             val payload = readPayload(stagingFile) ?: return
             val profileStore = TvheadendServerProfileStore(context)
-            ServerSettingsStore(context, profileStore).savePasswordServer(
-                host = payload.host,
-                htspPort = payload.htspPort,
-                username = payload.username,
-                password = payload.password,
-                autoConnect = payload.autoConnect,
+            check(
+                profileStore.storePassword(
+                    host = payload.host,
+                    port = payload.htspPort,
+                    username = payload.username,
+                    password = payload.password,
+                ) == ServerProfileOperationResult.SUCCESS,
             )
             result = "ok"
         } finally {

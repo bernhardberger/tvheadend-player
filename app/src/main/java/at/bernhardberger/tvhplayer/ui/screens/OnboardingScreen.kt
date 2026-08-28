@@ -32,7 +32,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.ServerSettingsStore
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
@@ -48,7 +48,7 @@ enum class OnboardingStep {
 
 @Composable
 fun OnboardingScreen(
-    settingsStore: ServerSettingsStore = koinInject(),
+    settingsStore: AppProfileOwner = koinInject(),
 ) {
     val activity = LocalActivity.current
     DisposableEffect(activity) {
@@ -111,7 +111,7 @@ fun OnboardingIntroduction(onContinue: () -> Unit) {
 
 @Composable
 private fun OnboardingConnection(
-    settingsStore: ServerSettingsStore,
+    settingsStore: AppProfileOwner,
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -208,8 +208,6 @@ private fun OnboardingConnection(
                                 settingsStore.saveServer(
                                     host = host.trim(),
                                     htspPort = endpointPort,
-                                    username = "",
-                                    autoConnect = true,
                                 )
                             } else {
                                 settingsStore.savePasswordServer(
@@ -217,7 +215,6 @@ private fun OnboardingConnection(
                                     htspPort = endpointPort,
                                     username = username,
                                     password = password,
-                                    autoConnect = true,
                                 )
                             }
                             password = ""

@@ -228,7 +228,7 @@ fun VideoPlayerScreen(
     val scope = rememberCoroutineScope()
 
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings(profile = "", audioLanguage = null, subtitleLanguage = null)
+        initialValue = PlayerSettings(audioLanguage = null, subtitleLanguage = null)
     )
 
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()

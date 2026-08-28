@@ -5,8 +5,8 @@ package at.bernhardberger.tvhplayer.di
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
-import at.bernhardberger.tvhplayer.core.StreamProfileDiscovery
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -22,9 +22,10 @@ import kotlinx.coroutines.launch
 internal class SdkRuntimeOwner(
     val session: TvheadendSession,
     val playbackRuntime: AppPlaybackRuntime,
-    val streamProfileDiscovery: StreamProfileDiscovery,
+    val appProfileOwner: AppProfileOwner,
     private val coordinator: TvheadendPlaybackCoordinator,
     private val coordinatorRunJob: Job,
+    private val profileOwnerRunJob: Job,
     private val player: ExoPlayer,
     private val applicationJob: Job,
     shutdownDispatcher: CoroutineDispatcher = Dispatchers.Main,
@@ -48,6 +49,8 @@ internal class SdkRuntimeOwner(
             override suspend fun shutdownCoordinator() { coordinator.shutdown(5.seconds) }
             override fun cancelCoordinatorRun() { coordinatorRunJob.cancel() }
             override suspend fun joinCoordinatorRun() { coordinatorRunJob.join() }
+            override fun cancelProfileOwnerRun() { profileOwnerRunJob.cancel() }
+            override suspend fun joinProfileOwnerRun() { profileOwnerRunJob.join() }
             override suspend fun shutdownSession() { session.shutdown() }
             override fun detachApplicationListeners() { playbackRuntime.detach() }
             override fun releasePlayer() { player.release() }
@@ -59,19 +62,21 @@ internal class SdkRuntimeOwner(
         fun create(
             session: TvheadendSession,
             playbackRuntime: AppPlaybackRuntime,
-            streamProfileDiscovery: StreamProfileDiscovery,
+            appProfileOwner: AppProfileOwner,
             coordinator: TvheadendPlaybackCoordinator,
             player: ExoPlayer,
             applicationScope: CoroutineScope,
             shutdownDispatcher: CoroutineDispatcher = Dispatchers.Main,
         ): SdkRuntimeOwner {
             val runJob = applicationScope.launch { coordinator.run() }
+            val profileOwnerRunJob = applicationScope.launch { appProfileOwner.run() }
             return SdkRuntimeOwner(
                 session,
                 playbackRuntime,
-                streamProfileDiscovery,
+                appProfileOwner,
                 coordinator,
                 runJob,
+                profileOwnerRunJob,
                 player,
                 checkNotNull(applicationScope.coroutineContext[Job]) {
                     "Application scope must own a lifecycle job"
@@ -86,6 +91,8 @@ internal interface SdkShutdownActions {
     suspend fun shutdownCoordinator()
     fun cancelCoordinatorRun()
     suspend fun joinCoordinatorRun()
+    fun cancelProfileOwnerRun()
+    suspend fun joinProfileOwnerRun()
     suspend fun shutdownSession()
     fun detachApplicationListeners()
     fun releasePlayer()
@@ -110,6 +117,16 @@ internal suspend fun closeSdkRuntime(actions: SdkShutdownActions) {
     }
     try {
         actions.joinCoordinatorRun()
+    } catch (error: Throwable) {
+        record(error)
+    }
+    try {
+        actions.cancelProfileOwnerRun()
+    } catch (error: Throwable) {
+        record(error)
+    }
+    try {
+        actions.joinProfileOwnerRun()
     } catch (error: Throwable) {
         record(error)
     }

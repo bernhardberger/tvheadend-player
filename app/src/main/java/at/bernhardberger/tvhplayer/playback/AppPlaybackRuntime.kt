@@ -11,7 +11,6 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
-import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
@@ -22,6 +21,7 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Duration.Companion.milliseconds
@@ -95,6 +95,7 @@ class AppPlaybackRuntime(
     private val session: TvheadendSession,
     private val coordinator: TvheadendPlaybackCoordinator,
     private val settings: PlayerSettingsStore,
+    private val profileOwner: AppProfileOwner,
     private val scope: CoroutineScope,
 ) {
     private val presentationEpoch = PlaybackPresentationEpoch()
@@ -158,6 +159,8 @@ class AppPlaybackRuntime(
         lastLiveSelection = selection
         val playerSettings = settings.playerSettings.first()
         if (!presentationEpoch.isCurrent(epoch)) return null
+        val streamProfileId = profileOwner.selectedStreamProfileIdFor(selection.currentSession)
+        if (!presentationEpoch.isCurrent(epoch)) return null
         val result = when (
             val binding = session.bindLivePlayback(
                 selection.currentSession,
@@ -167,7 +170,7 @@ class AppPlaybackRuntime(
             is PlaybackBindingResult.Bound -> coordinator.setLiveTarget(
                 binding.binding,
                 LivePlaybackOptions(
-                    streamProfileId = selectedStreamProfileId(playerSettings.profile),
+                    streamProfileId = streamProfileId,
                     timeshiftPeriod = if (playerSettings.timeshiftEnabled) 2.hours else kotlin.time.Duration.ZERO,
                 ),
             )
@@ -373,11 +376,6 @@ internal class PlaybackPresentationEpoch {
         true
     }
 }
-
-internal fun selectedStreamProfileId(value: String): StreamProfileId? =
-    value.takeIf { it.isNotBlank() }?.let { selected ->
-        runCatching { StreamProfileId(selected) }.getOrNull()
-    }
 
 fun LiveTimeshiftState.toAppPresentation(): AppTimeshiftState = when (this) {
     LiveTimeshiftState.Unavailable -> AppTimeshiftState()

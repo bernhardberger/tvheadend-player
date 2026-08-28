@@ -1,22 +1,19 @@
 package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
-import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
-import at.bernhardberger.tvhplayer.core.StreamProfileSelectionOption
-import at.bernhardberger.tvhplayer.core.exactLegacyProfileUuid
+import at.bernhardberger.tvheadend.sdk.core.StreamProfile
+import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
 
 data class PlayerSettings(
-    val profile: String = "",
-    val legacyProfileName: String? = null,
     val audioLanguage: String?,
     val subtitleLanguage: String?,
     val aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
@@ -24,7 +21,8 @@ data class PlayerSettings(
     val refreshRateMatchingEnabled: Boolean = true,
 )
 
-class PlayerSettingsStore(private val context: Context) {
+class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
+    constructor(context: Context) : this(context.dataStore)
 
     private object Keys {
         val PROFILE_UUID = stringPreferencesKey("profileUuid")
@@ -37,63 +35,68 @@ class PlayerSettingsStore(private val context: Context) {
     }
 
     val playerSettings: Flow<PlayerSettings> =
-        context.dataStore.data.map(::playerSettingsFromPreferences)
+        dataStore.data.map(::playerSettingsFromPreferences)
 
-    suspend fun savePlayer(
-        profileUuid: String,
-        legacyProfileName: String?,
-        audioLanguage: String?,
-        subtitleLanguage: String?,
-        aspectRatio: AspectRatioMode,
-        timeshiftEnabled: Boolean,
-        refreshRateMatchingEnabled: Boolean,
-    ) {
-        context.dataStore.edit { p ->
-            p.writeProfileSelection(profileUuid, legacyProfileName)
-            p[Keys.AUDIO_LANGUAGE] = audioLanguage.orEmpty()
-            p[Keys.SUBTITLE_LANGUAGE] = subtitleLanguage.orEmpty()
-            p[Keys.ASPECT_RATIO] = aspectRatio.name
-            p[Keys.TIMESHIFT_ENABLED] = timeshiftEnabled
-            p[Keys.REFRESH_RATE_MATCHING_ENABLED] = refreshRateMatchingEnabled
-        }
-    }
+    internal suspend fun resolveStreamProfileSelection(
+        discoveredProfiles: List<StreamProfile>,
+        observationIsCurrent: () -> Boolean,
+    ): StreamProfileId? {
+        var selected: StreamProfileId? = null
+        dataStore.edit { preferences ->
+            if (!observationIsCurrent()) return@edit
+            val persisted = preferences[Keys.PROFILE_UUID]?.takeIf(String::isNotBlank)
+            val resolved = persisted
+                ?.let { value -> runCatching { StreamProfileId(value) }.getOrNull() }
+                ?.takeIf { id -> discoveredProfiles.any { it.id == id } }
 
-    suspend fun setProfile(profileUuid: String, legacyProfileName: String) {
-        context.dataStore.edit { p ->
-            p.writeProfileSelection(profileUuid, legacyProfileName)
-        }
-    }
-
-    suspend fun migrateLegacyProfileSelection(
-        discoveredProfiles: List<StreamProfileSelectionOption>,
-    ): String? {
-        var migratedUuid: String? = null
-        context.dataStore.edit { preferences ->
-            if (preferences[Keys.PROFILE_UUID].isNullOrEmpty()) {
-                migratedUuid = exactLegacyProfileUuid(
-                    preferences[Keys.LEGACY_PROFILE_NAME],
-                    discoveredProfiles,
-                )
-                migratedUuid?.let { preferences[Keys.PROFILE_UUID] = it }
+            var migrated: StreamProfileId? = null
+            if (persisted == null) {
+                val legacyName = preferences[Keys.LEGACY_PROFILE_NAME]
+                migrated = legacyName
+                    ?.takeIf(String::isNotEmpty)
+                    ?.let { evidence ->
+                        discoveredProfiles.singleOrNull { it.name == evidence }?.id
+                    }
             }
+            if (!observationIsCurrent()) return@edit
+
+            selected = resolved ?: migrated
+            if (persisted == null) {
+                migrated?.let { preferences[Keys.PROFILE_UUID] = it.value }
+                if (preferences[Keys.PROFILE_UUID].isNullOrBlank()) {
+                    preferences.remove(Keys.PROFILE_UUID)
+                }
+            }
+            preferences.remove(Keys.LEGACY_PROFILE_NAME)
         }
-        return migratedUuid
+        return selected.takeIf { observationIsCurrent() }
+    }
+
+    internal suspend fun setStreamProfile(profileId: StreamProfileId?) {
+        dataStore.edit { preferences ->
+            if (profileId == null) {
+                preferences.remove(Keys.PROFILE_UUID)
+            } else {
+                preferences[Keys.PROFILE_UUID] = profileId.value
+            }
+            preferences.remove(Keys.LEGACY_PROFILE_NAME)
+        }
     }
 
     suspend fun setAspectRatio(aspectRatio: AspectRatioMode) {
-        context.dataStore.edit { p ->
+        dataStore.edit { p ->
             p[Keys.ASPECT_RATIO] = aspectRatio.name
         }
     }
 
     suspend fun setTimeshiftEnabled(enabled: Boolean) {
-        context.dataStore.edit { p ->
+        dataStore.edit { p ->
             p[Keys.TIMESHIFT_ENABLED] = enabled
         }
     }
 
     suspend fun setRefreshRateMatchingEnabled(enabled: Boolean) {
-        context.dataStore.edit { p ->
+        dataStore.edit { p ->
             p[Keys.REFRESH_RATE_MATCHING_ENABLED] = enabled
         }
     }
@@ -105,8 +108,6 @@ class PlayerSettingsStore(private val context: Context) {
                 .getOrNull() ?: AspectRatioMode.FIT
 
             return PlayerSettings(
-                profile = p[Keys.PROFILE_UUID] ?: "",
-                legacyProfileName = p[Keys.LEGACY_PROFILE_NAME]?.takeIf { it.isNotBlank() },
                 audioLanguage = p[Keys.AUDIO_LANGUAGE]?.takeIf { it.isNotBlank() },
                 subtitleLanguage = p[Keys.SUBTITLE_LANGUAGE]?.takeIf { it.isNotBlank() },
                 aspectRatio = aspect,
@@ -115,23 +116,8 @@ class PlayerSettingsStore(private val context: Context) {
             )
         }
 
-        fun writeProfileSelection(
-            preferences: MutablePreferences,
-            profileUuid: String,
-            legacyProfileName: String?,
-        ) {
-            preferences[Keys.PROFILE_UUID] = profileUuid
-            preferences[Keys.LEGACY_PROFILE_NAME] = legacyProfileName.orEmpty()
-        }
     }
 }
 
 internal fun playerSettingsFromPreferences(preferences: Preferences): PlayerSettings =
     PlayerSettingsStore.decodePlayerSettings(preferences)
-
-internal fun MutablePreferences.writeProfileSelection(
-    profileUuid: String,
-    legacyProfileName: String?,
-) {
-    PlayerSettingsStore.writeProfileSelection(this, profileUuid, legacyProfileName)
-}
