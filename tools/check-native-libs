@@ -202,7 +202,11 @@ def validate_source_members(members: list[tarfile.TarInfo], errors: list[str]) -
     for member in members:
         if not (member.issym() or member.islnk()):
             continue
-        target = PurePosixPath(member.name).parent.joinpath(member.linkname)
+        target = (
+            PurePosixPath(member.name).parent.joinpath(member.linkname)
+            if member.issym()
+            else PurePosixPath(member.linkname)
+        )
         depth = 0
         escaped = False
         for part in target.parts:

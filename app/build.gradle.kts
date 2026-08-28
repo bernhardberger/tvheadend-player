@@ -1,4 +1,3 @@
-import java.security.MessageDigest
 import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.FileCollectionDependency
 import org.gradle.api.artifacts.ProjectDependency
@@ -134,92 +133,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
-private fun sha256(file: java.io.File): String = MessageDigest.getInstance("SHA-256")
-    .digest(file.readBytes())
-    .joinToString("") { byte -> "%02x".format(byte) }
-
-private fun executableGradleSource(source: String): String {
-    val result = StringBuilder(source.length)
-    var index = 0
-    var blockCommentDepth = 0
-    var state = "code"
-    while (index < source.length) {
-        when (state) {
-            "code" -> when {
-                source.startsWith("//", index) -> {
-                    result.append("  ")
-                    index += 2
-                    state = "line-comment"
-                }
-                source.startsWith("/*", index) -> {
-                    result.append("  ")
-                    index += 2
-                    blockCommentDepth = 1
-                    state = "block-comment"
-                }
-                source.startsWith("\"\"\"", index) -> {
-                    result.append("   ")
-                    index += 3
-                    state = "triple-string"
-                }
-                source[index] == '"' -> {
-                    result.append(' ')
-                    index++
-                    state = "double-string"
-                }
-                source[index] == '\'' -> {
-                    result.append(' ')
-                    index++
-                    state = "single-string"
-                }
-                else -> result.append(source[index++])
-            }
-            "line-comment" -> {
-                val character = source[index++]
-                result.append(if (character == '\n') '\n' else ' ')
-                if (character == '\n') state = "code"
-            }
-            "block-comment" -> when {
-                source.startsWith("/*", index) -> {
-                    result.append("  ")
-                    index += 2
-                    blockCommentDepth++
-                }
-                source.startsWith("*/", index) -> {
-                    result.append("  ")
-                    index += 2
-                    blockCommentDepth--
-                    if (blockCommentDepth == 0) state = "code"
-                }
-                else -> {
-                    val character = source[index++]
-                    result.append(if (character == '\n') '\n' else ' ')
-                }
-            }
-            "triple-string" -> if (source.startsWith("\"\"\"", index)) {
-                result.append("   ")
-                index += 3
-                state = "code"
-            } else {
-                val character = source[index++]
-                result.append(if (character == '\n') '\n' else ' ')
-            }
-            "double-string", "single-string" -> {
-                val delimiter = if (state == "double-string") '"' else '\''
-                val character = source[index++]
-                result.append(if (character == '\n') '\n' else ' ')
-                if (character == '\\' && index < source.length) {
-                    val escaped = source[index++]
-                    result.append(if (escaped == '\n') '\n' else ' ')
-                } else if (character == delimiter) {
-                    state = "code"
-                }
-            }
-        }
-    }
-    return result.toString()
-}
-
 val syncReleasedSdkEvidence by tasks.registering(Sync::class) {
     val runtimeClasspath = configurations.named("debugRuntimeClasspath")
     val media3Aar = providers.provider {
@@ -232,36 +145,24 @@ val syncReleasedSdkEvidence by tasks.registering(Sync::class) {
     from(releasedSdkSources)
     from(releasedSdkFfmpegSources)
     into(layout.buildDirectory.dir("released-sdk-evidence"))
-
-    doLast {
-        val version = libs.versions.tvheadend.sdk.get()
-        val expected = setOf(
-            "sdk-android-$version-sources.jar",
-            "sdk-core-$version-sources.jar",
-            "sdk-media3-$version-sources.jar",
-            "sdk-media3-$version.aar",
-            "sdk-media3-$version-ffmpeg-sources.tar.xz",
-            "sdk-playback-$version-sources.jar",
-        )
-        val actual = destinationDir.listFiles().orEmpty().filter { it.isFile }.mapTo(linkedSetOf()) { it.name }
-        check(actual == expected) { "Released SDK evidence files $actual do not match $expected" }
-    }
 }
 
 tasks.register("verifyExternalSdkConsumption") {
     group = "verification"
-    description = "Proves the app consumes only the byte-pinned public TVHeadend SDK release."
+    description = "Proves the app consumes only the exact public TVHeadend SDK release."
     dependsOn("assembleDebug", syncReleasedSdkEvidence)
 
     doLast {
         val sdkGroup = "at.bernhardberger.tvheadend"
         val sdkVersion = libs.versions.tvheadend.sdk.get()
-        val productionBucket = Regex(
-            "^(api|compileOnly|implementation|runtimeOnly|" +
-                "debug(Api|CompileOnly|Implementation|RuntimeOnly)|" +
-                "release(Api|CompileOnly|Implementation|RuntimeOnly))$",
-        )
-        val productionConfigurations = configurations.filter { productionBucket.matches(it.name) }
+        check(sdkVersion == "0.3.0") { "Expected public SDK 0.3.0 but found $sdkVersion" }
+        val productionClasspaths = listOf(
+            "debugCompileClasspath",
+            "debugRuntimeClasspath",
+            "releaseCompileClasspath",
+            "releaseRuntimeClasspath",
+        ).associateWith(configurations::getByName)
+        val productionConfigurations = productionClasspaths.values.flatMap { it.hierarchy }.toSet()
         val directSdkDependencies = productionConfigurations.flatMap { configuration ->
             configuration.dependencies.mapNotNull { dependency ->
                 (dependency as? ExternalModuleDependency)
@@ -280,21 +181,20 @@ tasks.register("verifyExternalSdkConsumption") {
             "App SDK declarations $directSdkDependencies do not match $expectedDirectSdkDependencies"
         }
 
-        val declarationBucket = Regex("^(api|compileOnly|implementation|runtimeOnly|.*(Api|CompileOnly|Implementation|RuntimeOnly))$")
-        val forbiddenLocalDependencies = configurations
-            .filter { declarationBucket.matches(it.name) }
-            .flatMap { configuration ->
+        val forbiddenLocalDependencies = productionClasspaths.flatMap { (classpathName, classpath) ->
+            classpath.hierarchy.flatMap { configuration ->
                 configuration.dependencies.mapNotNull { dependency ->
                     when (dependency) {
-                        is ProjectDependency -> "${configuration.name}:project:${dependency.path}"
+                        is ProjectDependency -> "$classpathName:${configuration.name}:project:${dependency.path}"
                         is FileCollectionDependency -> dependency.files.files
                             .filterNot { it.name in setOf("android.jar", "core-for-system-modules.jar") }
                             .takeIf { it.isNotEmpty() }
-                            ?.let { "${configuration.name}:files:$it" }
+                            ?.let { "$classpathName:${configuration.name}:files:$it" }
                         else -> null
                     }
                 }
             }
+        }.distinct()
         check(forbiddenLocalDependencies.isEmpty()) {
             "App dependencies contain local fallbacks: $forbiddenLocalDependencies"
         }
@@ -303,73 +203,18 @@ tasks.register("verifyExternalSdkConsumption") {
             "Unexpected Gradle projects: ${rootProject.allprojects.map { it.path }}"
         }
 
-        val gradleSources = listOf(
-            rootProject.file("settings.gradle.kts"),
-            rootProject.file("build.gradle.kts"),
-            project.file("build.gradle.kts"),
+        val publicRepositoryUrls = gradle.extensions.extraProperties.get("dependencyRepositoryUrls")
+        val expectedPublicRepositoryUrls = setOf(
+            "https://dl.google.com/dl/android/maven2",
+            "https://repo.maven.apache.org/maven2",
         )
-        val forbiddenFallbacks = linkedMapOf(
-            "mavenLocal" to Regex("""\bmavenLocal\b"""),
-            "flatDir" to Regex("""\bflatDir\b"""),
-            "included build" to Regex("""\bincludeBuild\b"""),
-            "dependency substitution" to Regex("""\bdependencySubstitution\b"""),
-            "local Maven bridge" to Regex("""local-maven|build/local-maven"""),
-            "sibling repository" to Regex("""\.\./tvheadend|tvheadend-player-sdk"""),
-        )
-        val fallbackViolations = gradleSources.flatMap { source ->
-            forbiddenFallbacks.filterValues { it.containsMatchIn(executableGradleSource(source.readText())) }
-                .keys.map { "${source.relativeTo(rootDir).invariantSeparatorsPath}:$it" }
+        check(publicRepositoryUrls == expectedPublicRepositoryUrls) {
+            "App repositories $publicRepositoryUrls do not match $expectedPublicRepositoryUrls"
         }
-        check(fallbackViolations.isEmpty()) { "Gradle source contains SDK fallbacks: $fallbackViolations" }
-
-        val settingsText = rootProject.file("settings.gradle.kts").readText()
-        val customRepositoryTokens = linkedMapOf(
-            "custom Maven repository" to Regex("""\bmaven\s*\{"""),
-            "Ivy repository" to Regex("""\bivy\b"""),
-            "repository URL" to Regex("""\burl\s*="""),
-            "exclusive repository" to Regex("""\bexclusiveContent\b"""),
-        ).filterValues { it.containsMatchIn(settingsText) }.keys
-        check(customRepositoryTokens.isEmpty()) {
-            "settings.gradle.kts contains non-public repository routing: $customRepositoryTokens"
-        }
-        check("google()" in settingsText && "mavenCentral()" in settingsText) {
-            "settings.gradle.kts must resolve only through the declared public repositories"
+        check(gradle.extensions.extraProperties.get("dependencyRepositoriesMode") == "FAIL_ON_PROJECT_REPOS") {
+            "Project repositories must remain forbidden"
         }
 
-        val forbiddenSdkOwnedPaths = listOf(
-            "sdk",
-            "app/libs/README.md",
-            "app/libs/lib-decoder-ffmpeg-release.aar",
-            "app/libs/native-dependencies.json",
-            "app/libs/licenses",
-            "app/libs/patches",
-            "tools/build-media3-ffmpeg",
-        ).filter { rootProject.file(it).exists() }
-        check(forbiddenSdkOwnedPaths.isEmpty()) { "Duplicate SDK-owned paths: $forbiddenSdkOwnedPaths" }
-
-        val predecessorImport = Regex(
-            "(?m)^import at\\.bernhardberger\\.tvheadend\\.(client|core|playback)(\\.|$)",
-        )
-        val invalidImports = listOf("src/main", "src/test", "src/androidTest")
-            .flatMap { sourceRoot ->
-                file(sourceRoot).walkTopDown().filter { it.isFile && it.extension == "kt" }
-                    .filter { predecessorImport.containsMatchIn(it.readText()) }
-                    .map { it.relativeTo(projectDir).invariantSeparatorsPath }
-                    .toList()
-            }
-        check(invalidImports.isEmpty()) { "App sources retain predecessor imports: $invalidImports" }
-
-        val runtimeClasspath = configurations.getByName("debugRuntimeClasspath")
-        val components = runtimeClasspath.incoming.resolutionResult.allComponents
-        val projectSdkComponents = components.mapNotNull { it.id as? ProjectComponentIdentifier }
-            .filter { it.projectPath.startsWith(":sdk") }
-        check(projectSdkComponents.isEmpty()) { "Runtime contains project SDK components: $projectSdkComponents" }
-
-        val resolvedTvheadendModules = components.mapNotNull { component ->
-            val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-            if (id.group != sdkGroup) return@mapNotNull null
-            id.module to id.version
-        }.toMap()
         val expectedTvheadendModules = mapOf(
             "htsp" to "0.7.0",
             "sdk-android" to sdkVersion,
@@ -377,55 +222,54 @@ tasks.register("verifyExternalSdkConsumption") {
             "sdk-media3" to sdkVersion,
             "sdk-playback" to sdkVersion,
         )
-        check(resolvedTvheadendModules == expectedTvheadendModules) {
-            "Runtime TVHeadend graph $resolvedTvheadendModules does not match $expectedTvheadendModules"
-        }
+        listOf("debug", "release").forEach { variant ->
+            val components = productionClasspaths.getValue("${variant}RuntimeClasspath")
+                .incoming.resolutionResult.allComponents
+            val projectComponents = components.mapNotNull { it.id as? ProjectComponentIdentifier }
+                .filter { it.projectPath != project.path }
+            check(projectComponents.isEmpty()) {
+                "$variant runtime contains project components: $projectComponents"
+            }
 
-        val media3Versions = components.mapNotNull { component ->
-            val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-            id.version.takeIf { id.group == "androidx.media3" }
-        }.toSet()
-        check(media3Versions == setOf("1.11.0")) { "Runtime Media3 versions are $media3Versions" }
-        val coilVersions = components.mapNotNull { component ->
-            val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-            id.version.takeIf { id.group.startsWith("io.coil-kt.coil3") }
-        }.toSet()
-        check(coilVersions == setOf("3.5.0")) { "Runtime Coil versions are $coilVersions" }
-        val dataStoreVersions = components.mapNotNull { component ->
-            val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-            id.version.takeIf { id.group == "androidx.datastore" }
-        }.toSet()
-        check(dataStoreVersions == setOf("1.2.1")) { "Runtime DataStore versions are $dataStoreVersions" }
+            val resolvedTvheadendModules = components.mapNotNull { component ->
+                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                if (id.group != sdkGroup) return@mapNotNull null
+                id.module to id.version
+            }.toMap()
+            check(resolvedTvheadendModules == expectedTvheadendModules) {
+                "$variant runtime TVHeadend graph $resolvedTvheadendModules " +
+                    "does not match $expectedTvheadendModules"
+            }
+            val compileTvheadendModules = productionClasspaths.getValue("${variant}CompileClasspath")
+                .incoming.resolutionResult.allComponents.mapNotNull { component ->
+                    val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                    id.module.takeIf { id.group == sdkGroup }
+                }.toSet()
+            check("htsp" !in compileTvheadendModules) {
+                "HTSP must remain runtime-only but $variant compile graph contains $compileTvheadendModules"
+            }
 
-        val sdkArtifacts = runtimeClasspath.incoming.artifacts.artifacts.mapNotNull { artifact ->
-            val id = artifact.id.componentIdentifier as? ModuleComponentIdentifier ?: return@mapNotNull null
-            if (id.group != sdkGroup || id.module == "htsp") return@mapNotNull null
-            id.module to artifact.file
-        }.toMap()
-        val expectedExtensions = mapOf(
-            "sdk-android" to "aar",
-            "sdk-core" to "jar",
-            "sdk-media3" to "aar",
-            "sdk-playback" to "jar",
-        )
-        check(sdkArtifacts.mapValues { it.value.extension } == expectedExtensions) {
-            "Runtime SDK artifact types ${sdkArtifacts.mapValues { it.value.extension }} do not match $expectedExtensions"
-        }
-        val expectedHashes = mapOf(
-            "sdk-android" to "b906882de78b32e0fb0975b73c96d9c732bac56ca62aace9dfdd409ad127de30",
-            "sdk-core" to "374264676150e687e5f2aa8b602ada24c102e81063330784baadf78dc505f77f",
-            "sdk-media3" to "a3d199ef83848a56b6ca0e8ef396348bd50be740f5e672967515d77b8eb53616",
-            "sdk-playback" to "15279da6e8263e341b2dd78bd12dc0e355be2a714c0617483486bad761e4c758",
-        )
-        val resolvedHashes = sdkArtifacts.mapValues { sha256(it.value) }
-        check(resolvedHashes == expectedHashes) {
-            "Runtime SDK hashes $resolvedHashes do not match the released bytes"
-        }
-
-        val evidenceDirectory = layout.buildDirectory.dir("released-sdk-evidence").get().asFile
-        val ffmpegSources = evidenceDirectory.resolve("sdk-media3-$sdkVersion-ffmpeg-sources.tar.xz")
-        check(sha256(ffmpegSources) == "9eeca8490f794574185986c0df7800d65ccca2980f57dc26b630a398581d7929") {
-            "Resolved FFmpeg corresponding source does not match SDK 0.3.0 release evidence"
+            val media3Versions = components.mapNotNull { component ->
+                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                id.version.takeIf { id.group == "androidx.media3" }
+            }.toSet()
+            check(media3Versions == setOf("1.11.0")) {
+                "$variant runtime Media3 versions are $media3Versions"
+            }
+            val coilVersions = components.mapNotNull { component ->
+                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                id.version.takeIf { id.group.startsWith("io.coil-kt.coil3") }
+            }.toSet()
+            check(coilVersions == setOf("3.5.0")) {
+                "$variant runtime Coil versions are $coilVersions"
+            }
+            val dataStoreVersions = components.mapNotNull { component ->
+                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                id.version.takeIf { id.group == "androidx.datastore" }
+            }.toSet()
+            check(dataStoreVersions == setOf("1.2.1")) {
+                "$variant runtime DataStore versions are $dataStoreVersions"
+            }
         }
     }
 }

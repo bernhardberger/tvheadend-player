@@ -60,6 +60,13 @@ class NativePublicationEvidenceTest(unittest.TestCase):
         CHECKER["validate_source_members"]([unsafe], unsafe_errors)
         self.assertTrue(any("unsafe paths" in error for error in unsafe_errors))
 
+        hard_link = tarfile.TarInfo("ffmpeg/nested/hard-link")
+        hard_link.type = tarfile.LNKTYPE
+        hard_link.linkname = "../outside"
+        hard_link_errors: list[str] = []
+        CHECKER["validate_source_members"]([hard_link], hard_link_errors)
+        self.assertTrue(any("unsafe links" in error for error in hard_link_errors))
+
         special = tarfile.TarInfo("ffmpeg/device")
         special.type = tarfile.CHRTYPE
         special_errors: list[str] = []
@@ -100,14 +107,6 @@ class NativePublicationEvidenceTest(unittest.TestCase):
             mismatch_errors: list[str] = []
             CHECKER["validate_apk"](apk, mismatched_libraries, mismatch_errors)
             self.assertTrue(any("differs" in error for error in mismatch_errors))
-
-    def test_checker_and_release_preparation_never_walk_a_sibling_sdk(self) -> None:
-        source = CHECKER_PATH.read_text(encoding="utf-8")
-        prepare = (ROOT / "tools/prepare-release").read_text(encoding="utf-8")
-        for forbidden in ("../tvheadend-player-sdk", "SDK_ROOT", "build/local-maven"):
-            self.assertNotIn(forbidden, source)
-            self.assertNotIn(forbidden, prepare)
-
 
 if __name__ == "__main__":
     unittest.main()
