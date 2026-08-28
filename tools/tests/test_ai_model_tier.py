@@ -25,7 +25,9 @@ class AiModelTierTest(unittest.TestCase):
                     "model": f"{model}{suffix}",
                     "variant": "medium",
                     "steps": 48,
-                    "permission": {"task": "deny"},
+                    "permission": {
+                        "task": {"*": "deny", "app-locator": "allow"}
+                    },
                 }
                 for name, model in AGENT_MODELS.items()
             },
@@ -52,7 +54,10 @@ class AiModelTierTest(unittest.TestCase):
                 self.assertEqual(agent["model"], f"{model}-fast")
                 self.assertEqual(agent["variant"], "medium")
                 self.assertEqual(agent["steps"], 48)
-                self.assertEqual(agent["permission"], {"task": "deny"})
+                self.assertEqual(
+                    agent["permission"],
+                    {"task": {"*": "deny", "app-locator": "allow"}},
+                )
 
     def test_switches_fast_models_back_to_standard(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -93,6 +98,7 @@ class AiModelTierTest(unittest.TestCase):
             set(AGENT_MODELS),
             {
                 "app-locator",
+                "app-explore",
                 "app-planner",
                 "app-analyze",
                 "app-research",
@@ -102,7 +108,11 @@ class AiModelTierTest(unittest.TestCase):
         )
         self.assertEqual(
             set(AGENT_MODELS.values()),
-            {"openai/gpt-5.6-luna", "openai/gpt-5.6-sol"},
+            {
+                "openai/gpt-5.6-luna",
+                "openai/gpt-5.6-terra",
+                "openai/gpt-5.6-sol",
+            },
         )
 
     def test_reports_mixed_tier(self) -> None:

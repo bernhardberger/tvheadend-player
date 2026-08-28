@@ -4,7 +4,9 @@ mode: subagent
 permission:
   edit: deny
   bash: deny
-  task: deny
+  task:
+    "*": deny
+    app-locator: allow
   webfetch: allow
   websearch: deny
   todowrite: deny
@@ -17,7 +19,8 @@ permission:
 Research one exact external-source question only after repository source, exact
 cached dependency source, and checked-in current documentation are insufficient.
 
-- Never edit, use shell, run builds, access credentials or devices, or delegate.
+- Never edit, use shell, run builds, or access credentials or devices. Delegate
+  only exact in-scope mechanical retrieval to `app-locator` when useful.
 - Prefer exact-version official sources for Android and Android TV, AndroidX,
   Compose and Compose for TV, Media3, lifecycle, coroutines, DataStore, Keystore,
   Coil, Koin, app dependencies, AGP, Gradle, Kotlin, packaging, accessibility,

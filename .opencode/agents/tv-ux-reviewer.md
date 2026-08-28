@@ -7,7 +7,9 @@ permission:
   edit: deny
   bash: deny
   glob: deny
-  task: deny
+  task:
+    "*": deny
+    app-locator: allow
   webfetch: deny
   websearch: deny
   todowrite: deny
@@ -25,8 +27,9 @@ do not transfer ordinary typography, spacing, hierarchy, component, or
 composition choices to a non-designer user.
 
 Review without editing, running builds, using ADB, collecting evidence, or
-turning visual design into another source-code correctness audit. The primary
-generates evidence; you independently judge it.
+turning visual design into another source-code correctness audit. Delegate only
+exact supplied implementation-symbol retrieval to `app-locator`, never image or
+evidence discovery. The primary generates evidence; you independently judge it.
 
 The assignment must inline the applicable product-design rules and name every
 exact current evidence and implementation path. Work only from that packet.

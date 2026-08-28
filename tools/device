@@ -51,12 +51,16 @@ KEY_EVENTS = {
     "back": "KEYCODE_BACK",
     "power": "KEYCODE_POWER",
 }
+DEFAULT_KEY_DELAY_MS = 300
+MAX_KEY_DELAY_MS = 5_000
+MAX_KEY_EVENTS = 100
 TEST_DEVICE_ACTIONS = {
     "install-debug",
     "launch",
     "force-stop",
     "smoke",
     "key",
+    "keys",
     "screenshot",
     "provision-test-credentials",
     "allow-appliance-autostart",
@@ -70,6 +74,30 @@ TARGET_NAME_PATTERN = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 def fail(message: str) -> NoReturn:
     print(f"error: {message}", file=sys.stderr)
     raise SystemExit(2)
+
+
+def bounded_key_repeat(value: str) -> int:
+    try:
+        repeat = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("repeat must be an integer") from exc
+    if not 1 <= repeat <= MAX_KEY_EVENTS:
+        raise argparse.ArgumentTypeError(
+            f"repeat must be between 1 and {MAX_KEY_EVENTS}"
+        )
+    return repeat
+
+
+def bounded_key_delay(value: str) -> int:
+    try:
+        delay_ms = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("delay must be an integer") from exc
+    if not 0 <= delay_ms <= MAX_KEY_DELAY_MS:
+        raise argparse.ArgumentTypeError(
+            f"delay must be between 0 and {MAX_KEY_DELAY_MS} milliseconds"
+        )
+    return delay_ms
 
 
 def normalize_device_config(value: object, *, label: str) -> dict[str, str]:
@@ -306,14 +334,24 @@ def identity_errors(
     return errors
 
 
-def require_device_ready(adb: str, serial: str) -> None:
-    state = run(adb_command(adb, serial, "get-state"), capture=True, check=False)
+def require_device_ready(adb: str, serial: str, *, announce: bool = True) -> None:
+    state = run(
+        adb_command(adb, serial, "get-state"),
+        capture=True,
+        check=False,
+        announce=announce,
+    )
     if state.returncode != 0 or state.stdout.strip() != "device":
         detail = (state.stderr or state.stdout).strip()
         fail(f"device {serial} is not ready: {detail or 'unknown adb state'}")
 
 
-def read_device_properties(adb: str, serial: str) -> dict[str, str]:
+def read_device_properties(
+    adb: str,
+    serial: str,
+    *,
+    announce: bool = True,
+) -> dict[str, str]:
     names = {
         "manufacturer": "ro.product.manufacturer",
         "model": "ro.product.model",
@@ -332,11 +370,36 @@ def read_device_properties(adb: str, serial: str) -> dict[str, str]:
             + '; do getprop "$property"; done',
         ),
         capture=True,
+        announce=announce,
     )
     values = result.stdout.splitlines()
     if len(values) != len(names):
         fail("device returned an unexpected property response")
     return dict(zip(names, values, strict=True))
+
+
+def send_key_events(
+    adb: str,
+    serial: str,
+    names: list[str],
+    *,
+    delay_ms: int,
+    long_press: bool,
+) -> None:
+    if not 1 <= len(names) <= MAX_KEY_EVENTS:
+        fail(f"key sequence must contain between 1 and {MAX_KEY_EVENTS} events")
+    if not 0 <= delay_ms <= MAX_KEY_DELAY_MS:
+        fail(f"key delay must be between 0 and {MAX_KEY_DELAY_MS} milliseconds")
+
+    for index, name in enumerate(names):
+        key_arguments = ["shell", "input", "keyevent"]
+        if long_press:
+            key_arguments.append("--longpress")
+        key_arguments.append(KEY_EVENTS[name])
+        run(adb_command(adb, serial, *key_arguments), announce=False)
+        if index < len(names) - 1 and delay_ms:
+            time.sleep(delay_ms / 1_000)
+    print(f"sentKeyEvents={len(names)}")
 
 
 def verify_configured_identity(
@@ -760,14 +823,56 @@ def build_parser() -> argparse.ArgumentParser:
         help="Provision credentials from the configured local secret file into a debug app",
     )
 
-    key_parser = subparsers.add_parser("key", help="Send one approved named key event")
+    key_parser = subparsers.add_parser("key", help="Send an approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
+    key_parser.add_argument(
+        "--repeat",
+        type=bounded_key_repeat,
+        default=1,
+        help=f"Number of events to send (default: 1; maximum: {MAX_KEY_EVENTS})",
+    )
+    key_parser.add_argument(
+        "--delay-ms",
+        type=bounded_key_delay,
+        default=DEFAULT_KEY_DELAY_MS,
+        help=f"Delay between events (default: {DEFAULT_KEY_DELAY_MS} ms)",
+    )
+    key_parser.add_argument(
+        "--long-press",
+        action="store_true",
+        help="Send each event with Android's long-press flag",
+    )
+
+    keys_parser = subparsers.add_parser(
+        "keys",
+        help="Send an ordered sequence of approved named key events",
+    )
+    keys_parser.add_argument("names", nargs="+", choices=sorted(KEY_EVENTS))
+    keys_parser.add_argument(
+        "--delay-ms",
+        type=bounded_key_delay,
+        default=DEFAULT_KEY_DELAY_MS,
+        help=f"Delay between events (default: {DEFAULT_KEY_DELAY_MS} ms)",
+    )
+    keys_parser.add_argument(
+        "--long-press",
+        action="store_true",
+        help="Send each event with Android's long-press flag",
+    )
     return parser
 
 
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    key_names: list[str] | None = None
+    if args.action == "key":
+        key_names = [args.name] * args.repeat
+    elif args.action == "keys":
+        key_names = args.names
+    if key_names is not None and len(key_names) > MAX_KEY_EVENTS:
+        parser.error(f"at most {MAX_KEY_EVENTS} key events may be sent per invocation")
+
     target_name, config = load_local_config(
         args.target or os.environ.get("TVHPLAYER_DEVICE_TARGET")
     )
@@ -831,8 +936,9 @@ def main() -> int:
         return 0
 
     if args.action in TEST_DEVICE_ACTIONS | RELEASE_DEVICE_ACTIONS | PRODUCTION_DEVICE_ACTIONS:
-        require_device_ready(adb, serial)
-        properties = read_device_properties(adb, serial)
+        compact_key_output = args.action in {"key", "keys"}
+        require_device_ready(adb, serial, announce=not compact_key_output)
+        properties = read_device_properties(adb, serial, announce=not compact_key_output)
         verify_configured_identity(properties, config, require_expected=True)
 
     if args.action == "install-debug":
@@ -877,72 +983,74 @@ def main() -> int:
         payload = load_credential_payload(credential_path)
 
         run(adb_command(adb, serial, "shell", "am", "force-stop", package_name))
-        run(
-            adb_command(
+        status = "pending"
+        try:
+            run(
+                adb_command(
+                    adb,
+                    serial,
+                    "exec-in",
+                    "run-as",
+                    package_name,
+                    "sh",
+                    "-c",
+                    "umask 077; mkdir -p files; "
+                    "rm -f files/tvhplayer_test_provisioning.result; "
+                    "cat > files/tvhplayer_test_provisioning.json",
+                ),
+                capture=True,
+                input_data=payload,
+                sensitive=True,
+            )
+            run(
+                adb_command(
+                    adb,
+                    serial,
+                    "shell",
+                    "monkey",
+                    "-p",
+                    package_name,
+                    "-c",
+                    "android.intent.category.LEANBACK_LAUNCHER",
+                    "1",
+                )
+            )
+
+            status_command = adb_command(
                 adb,
                 serial,
-                "exec-in",
+                "exec-out",
                 "run-as",
                 package_name,
                 "sh",
                 "-c",
-                "umask 077; mkdir -p files; "
-                "rm -f files/tvhplayer_test_provisioning.result; "
-                "cat > files/tvhplayer_test_provisioning.json",
-            ),
-            capture=True,
-            input_data=payload,
-            sensitive=True,
-        )
-        run(
-            adb_command(
-                adb,
-                serial,
-                "shell",
-                "monkey",
-                "-p",
-                package_name,
-                "-c",
-                "android.intent.category.LEANBACK_LAUNCHER",
-                "1",
+                "if test -f files/tvhplayer_test_provisioning.result; then "
+                "cat files/tvhplayer_test_provisioning.result; "
+                "elif test -f files/tvhplayer_test_provisioning.json; then printf pending; "
+                "else printf missing; fi",
             )
-        )
-
-        status_command = adb_command(
-            adb,
-            serial,
-            "exec-out",
-            "run-as",
-            package_name,
-            "sh",
-            "-c",
-            "if test -f files/tvhplayer_test_provisioning.result; then "
-            "cat files/tvhplayer_test_provisioning.result; "
-            "elif test -f files/tvhplayer_test_provisioning.json; then printf pending; "
-            "else printf missing; fi",
-        )
-        deadline = time.monotonic() + 10
-        status = "pending"
-        while time.monotonic() < deadline and status == "pending":
-            time.sleep(0.2)
-            result = run(status_command, capture=True, check=False, announce=False)
-            status = result.stdout.strip()
-        run(
-            adb_command(
-                adb,
-                serial,
-                "shell",
-                "run-as",
-                package_name,
-                "rm",
-                "-f",
-                "files/tvhplayer_test_provisioning.json",
-                "files/tvhplayer_test_provisioning.result",
-            ),
-            capture=True,
-            check=False,
-            sensitive=True,
-        )
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and status == "pending":
+                time.sleep(0.2)
+                result = run(status_command, capture=True, check=False, announce=False)
+                status = result.stdout.strip()
+        finally:
+            run(
+                adb_command(
+                    adb,
+                    serial,
+                    "shell",
+                    "run-as",
+                    package_name,
+                    "rm",
+                    "-f",
+                    "files/tvhplayer_test_provisioning.json",
+                    "files/tvhplayer_test_provisioning.result",
+                ),
+                capture=True,
+                check=False,
+                sensitive=True,
+            )
         if status != "ok":
             fail("debug app did not accept the credential payload; no sensitive output shown")
         print("test-device credentials provisioned into app-private storage")
@@ -1022,16 +1130,14 @@ def main() -> int:
             capture_screenshot(adb, serial, screenshot_output)
         return 0
 
-    if args.action == "key":
-        run(
-            adb_command(
-                adb,
-                serial,
-                "shell",
-                "input",
-                "keyevent",
-                KEY_EVENTS[args.name],
-            )
+    if args.action in {"key", "keys"}:
+        assert key_names is not None
+        send_key_events(
+            adb,
+            serial,
+            key_names,
+            delay_ms=args.delay_ms,
+            long_press=args.long_press,
         )
         return 0
 

@@ -4,7 +4,9 @@ mode: subagent
 permission:
   edit: deny
   bash: deny
-  task: deny
+  task:
+    "*": deny
+    app-locator: allow
   webfetch: deny
   websearch: deny
   todowrite: deny
@@ -18,8 +20,9 @@ Independently review one frozen, tested TVHeadend Player package packet.
 
 - Review only the supplied acceptance criteria, changed files or diff, relevant
   source/tests, invariants, exclusions, and verification evidence.
-- Never edit, use shell, run builds, use a device, access the network, or
-  delegate. Do not reconstruct a missing packet through repository archaeology.
+- Never edit, use shell, run builds, use a device, or access the network.
+  Delegate only exact in-packet mechanical retrieval to `app-locator`; do not
+  reconstruct a missing packet through repository archaeology.
 - Check Android lifecycle and ownership, concurrency and cancellation, SDK and
   Media3 integration, playback behavior, security and redaction, native/release
   boundaries, TV focus/keys/Back/accessibility, and test truthfulness only when

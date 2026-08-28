@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / ".opencode/opencode.json"
 AGENT_MODELS = {
     "app-locator": "openai/gpt-5.6-luna",
+    "app-explore": "openai/gpt-5.6-terra",
     "app-planner": "openai/gpt-5.6-sol",
     "app-analyze": "openai/gpt-5.6-sol",
     "app-research": "openai/gpt-5.6-sol",

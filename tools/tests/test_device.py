@@ -7,11 +7,12 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
 DEVICE = runpy.run_path(str(ROOT / "tools/device"), run_name="device_tool")
+DEVICE_GLOBALS = DEVICE["main"].__globals__
 action_policy_error = DEVICE["action_policy_error"]
 identity_errors = DEVICE["identity_errors"]
 select_device_config = DEVICE["select_device_config"]
@@ -119,6 +120,218 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertEqual(key_events["right"], "KEYCODE_DPAD_RIGHT")
         self.assertEqual(key_events["center"], "KEYCODE_DPAD_CENTER")
 
+    def test_parser_accepts_ordered_keys_repeat_delay_and_long_press(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        sequence = parser.parse_args(
+            ["keys", "down", "down", "right", "center", "--delay-ms", "250"]
+        )
+        repeated = parser.parse_args(
+            ["key", "down", "--repeat", "3", "--delay-ms", "400", "--long-press"]
+        )
+
+        self.assertEqual(sequence.names, ["down", "down", "right", "center"])
+        self.assertEqual(sequence.delay_ms, 250)
+        self.assertFalse(sequence.long_press)
+        self.assertEqual(repeated.repeat, 3)
+        self.assertEqual(repeated.delay_ms, 400)
+        self.assertTrue(repeated.long_press)
+
+    def test_legacy_key_defaults_and_inclusive_bounds_are_preserved(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        legacy = parser.parse_args(["key", "down"])
+        lower_bounds = parser.parse_args(
+            ["key", "down", "--repeat", "1", "--delay-ms", "0"]
+        )
+        upper_bounds = parser.parse_args(
+            ["key", "down", "--repeat", "100", "--delay-ms", "5000"]
+        )
+
+        self.assertEqual(legacy.repeat, 1)
+        self.assertEqual(legacy.delay_ms, 300)
+        self.assertFalse(legacy.long_press)
+        self.assertEqual(lower_bounds.repeat, 1)
+        self.assertEqual(lower_bounds.delay_ms, 0)
+        self.assertEqual(upper_bounds.repeat, 100)
+        self.assertEqual(upper_bounds.delay_ms, 5000)
+
+    def test_parser_rejects_unbounded_repeat_and_delay(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        for arguments in (
+            ["key", "down", "--repeat", "0"],
+            ["key", "down", "--repeat", "101"],
+            ["keys", "down", "right", "--delay-ms", "-1"],
+            ["keys", "down", "right", "--delay-ms", "5001"],
+        ):
+            with self.subTest(arguments=arguments):
+                with patch.object(DEVICE["sys"], "stderr"):
+                    with self.assertRaises(SystemExit):
+                        parser.parse_args(arguments)
+
+    def test_key_sequence_limit_is_rejected_before_device_configuration(self) -> None:
+        load_config_mock = Mock()
+
+        with (
+            patch.dict(DEVICE_GLOBALS, {"load_local_config": load_config_mock}),
+            patch.object(
+                DEVICE["sys"],
+                "argv",
+                ["device", "keys", *(["down"] * 101)],
+            ),
+            patch.object(DEVICE["sys"], "stderr"),
+        ):
+            with self.assertRaises(SystemExit):
+                DEVICE["main"]()
+
+        load_config_mock.assert_not_called()
+
+    def test_key_events_are_sent_in_order_with_compact_output(self) -> None:
+        run_mock = Mock()
+
+        with (
+            patch.dict(DEVICE_GLOBALS, {"run": run_mock}),
+            patch.object(DEVICE["time"], "sleep") as sleep_mock,
+            patch("builtins.print") as print_mock,
+        ):
+            DEVICE["send_key_events"](
+                "adb",
+                "private-device",
+                ["down", "down", "right", "center"],
+                delay_ms=250,
+                long_press=False,
+            )
+
+        self.assertEqual(
+            run_mock.call_args_list,
+            [
+                call(
+                    [
+                        "adb",
+                        "-s",
+                        "private-device",
+                        "shell",
+                        "input",
+                        "keyevent",
+                        key_events[name],
+                    ],
+                    announce=False,
+                )
+                for name in ("down", "down", "right", "center")
+            ],
+        )
+        self.assertEqual(
+            sleep_mock.call_args_list,
+            [call(0.25), call(0.25), call(0.25)],
+        )
+        print_mock.assert_called_once_with("sentKeyEvents=4")
+
+    def test_long_press_uses_android_keyevent_longpress_flag(self) -> None:
+        run_mock = Mock()
+
+        with patch.dict(DEVICE_GLOBALS, {"run": run_mock}), patch("builtins.print"):
+            DEVICE["send_key_events"](
+                "adb",
+                "private-device",
+                ["center"],
+                delay_ms=300,
+                long_press=True,
+            )
+
+        run_mock.assert_called_once_with(
+            [
+                "adb",
+                "-s",
+                "private-device",
+                "shell",
+                "input",
+                "keyevent",
+                "--longpress",
+                "KEYCODE_DPAD_CENTER",
+            ],
+            announce=False,
+        )
+
+    def test_key_sequence_stops_without_success_output_after_a_failed_event(self) -> None:
+        run_mock = Mock(side_effect=[None, SystemExit(2)])
+
+        with (
+            patch.dict(DEVICE_GLOBALS, {"run": run_mock}),
+            patch.object(DEVICE["time"], "sleep") as sleep_mock,
+            patch("builtins.print") as print_mock,
+        ):
+            with self.assertRaises(SystemExit):
+                DEVICE["send_key_events"](
+                    "adb",
+                    "private-device",
+                    ["down", "right", "center"],
+                    delay_ms=250,
+                    long_press=False,
+                )
+
+        self.assertEqual(run_mock.call_count, 2)
+        sleep_mock.assert_called_once_with(0.25)
+        print_mock.assert_not_called()
+
+    def test_batched_key_main_checks_device_identity_once(self) -> None:
+        properties = {
+            "manufacturer": "TCL",
+            "model": "Smart TV Pro",
+            "device": "G10",
+            "product": "G10_4K_GB",
+            "android": "12",
+            "abis": "armeabi-v7a",
+        }
+        ready_mock = Mock()
+        properties_mock = Mock(return_value=properties)
+        identity_mock = Mock()
+        send_mock = Mock()
+
+        with (
+            patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "load_local_config": Mock(
+                        return_value=(
+                            "g10",
+                            {
+                                "serial": "private-device",
+                                "role": "test",
+                                "expected_manufacturer": "TCL",
+                                "expected_model": "Smart TV Pro",
+                                "expected_device": "G10",
+                                "expected_product": "G10_4K_GB",
+                            },
+                        )
+                    ),
+                    "require_device_ready": ready_mock,
+                    "read_device_properties": properties_mock,
+                    "verify_configured_identity": identity_mock,
+                    "send_key_events": send_mock,
+                },
+            ),
+            patch.object(DEVICE["shutil"], "which", return_value="adb"),
+            patch.object(
+                DEVICE["sys"],
+                "argv",
+                ["device", "keys", "down", "down", "right", "center"],
+            ),
+        ):
+            result = DEVICE["main"]()
+
+        self.assertEqual(result, 0)
+        ready_mock.assert_called_once_with("adb", "private-device", announce=False)
+        properties_mock.assert_called_once_with("adb", "private-device", announce=False)
+        identity_mock.assert_called_once()
+        send_mock.assert_called_once_with(
+            "adb",
+            "private-device",
+            ["down", "down", "right", "center"],
+            delay_ms=300,
+            long_press=False,
+        )
+
     def test_screenshot_requires_explicit_safe_screen_confirmation(self) -> None:
         parser = DEVICE["build_parser"]()
         args = parser.parse_args(["screenshot"])
@@ -209,6 +422,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "force-stop",
                 "smoke",
                 "key",
+                "keys",
                 "screenshot",
                 "provision-test-credentials",
                 "allow-appliance-autostart",
@@ -223,6 +437,7 @@ class DevicePolicyTest(unittest.TestCase):
             "force-stop",
             "smoke",
             "key",
+            "keys",
             "screenshot",
             "provision-test-credentials",
             "allow-appliance-autostart",
@@ -470,6 +685,60 @@ class DevicePolicyTest(unittest.TestCase):
         )
         self.assertNotIn("super-secret", output)
         self.assertIn("redacted", output)
+
+    def test_credential_staging_is_cleaned_after_launch_failure(self) -> None:
+        properties = {
+            "manufacturer": "TCL",
+            "model": "Smart TV Pro",
+            "device": "G10",
+            "product": "G10_4K_GB",
+            "android": "12",
+            "abis": "armeabi-v7a",
+        }
+        run_mock = Mock(side_effect=[None, None, SystemExit(2), None])
+
+        with (
+            patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "load_local_config": Mock(
+                        return_value=(
+                            "g10",
+                            {
+                                "serial": "private-device",
+                                "role": "test",
+                                "expected_device": "G10",
+                            },
+                        )
+                    ),
+                    "require_device_ready": Mock(),
+                    "read_device_properties": Mock(return_value=properties),
+                    "verify_configured_identity": Mock(),
+                    "load_credential_payload": Mock(
+                        return_value='{"password":"super-secret"}'
+                    ),
+                    "run": run_mock,
+                },
+            ),
+            patch.object(DEVICE["shutil"], "which", return_value="adb"),
+            patch.object(
+                DEVICE["sys"],
+                "argv",
+                ["device", "provision-test-credentials"],
+            ),
+        ):
+            with self.assertRaisesRegex(SystemExit, "2"):
+                DEVICE["main"]()
+
+        self.assertEqual(run_mock.call_count, 4)
+        cleanup = run_mock.call_args_list[-1]
+        self.assertIn("files/tvhplayer_test_provisioning.json", cleanup.args[0])
+        self.assertIn("files/tvhplayer_test_provisioning.result", cleanup.args[0])
+        self.assertEqual(
+            cleanup.kwargs,
+            {"capture": True, "check": False, "sensitive": True},
+        )
+        self.assertNotIn("super-secret", str(cleanup))
 
     def test_screenshot_output_allows_only_the_ignored_capture_tree_in_repository(self) -> None:
         with self.assertRaisesRegex(SystemExit, "2"):

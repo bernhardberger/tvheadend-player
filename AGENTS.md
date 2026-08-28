@@ -134,18 +134,24 @@ it does not replace integrated or physical-TV gates.
 
 ## Delegation and evidence
 
-Delegation is limited to one child level and all children are read-only. The
-`build` primary performs routine work itself and uses zero children by default.
-Use `app-locator` only for mechanical retrieval, `app-planner` for one optional
-bounded design second opinion, `app-analyze` for one concrete post-plan
-contradiction, and `app-research` only when exact local and cached dependency
-sources cannot answer one authoritative external-source question. Use
-`android-reviewer` once on a frozen tested packet when risk requires source
-review, and `tv-ux-reviewer` only for screenshot-first design review against
-exact supplied evidence. Children cannot edit, use shell, run builds or devices,
-delegate, mutate Git, or read project instructions, ledgers, handoffs, archives,
-or broad plans. Their configured model variants and step limits do not inherit
-the writable primary's `medium`, `high`, `xhigh`, or `max` effort.
+All children are read-only. The primary owns decomposition and delegation: use
+children whenever they are likely to materially improve correctness, evidence
+coverage, context isolation, turnaround time, or final quality. A roughly 20%
+resource overhead is an acceptable soft target for a meaningful quality gain,
+not a hard accounting threshold. There is no fixed child-count limit; avoid only
+duplicated assignments and unnecessarily verbose returned evidence.
+
+Use Luna/low `app-locator` for mechanical retrieval, Terra/medium `app-explore`
+for bounded multi-file source maps and call traces, `app-planner` for an optional
+design second opinion, `app-analyze` for one concrete post-plan contradiction,
+and `app-research` for one authoritative external-source question after local
+sources are insufficient. Use `android-reviewer` for a risk-based frozen-packet
+review and `tv-ux-reviewer` for screenshot-first design review. Only
+`app-locator` children may be delegated by read-only children, and depth 2 is
+terminal. Children cannot edit, use shell, run builds or devices, mutate Git, or
+read project instructions, ledgers, handoffs, archives, or broad plans. Their
+configured model variants and step limits do not inherit the writable primary's
+`medium`, `high`, `xhigh`, or `max` effort.
 
 Start each child as a fresh session by omitting `task_id`; never resume old child
 history. Supply one self-contained question with accepted invariants, included

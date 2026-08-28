@@ -4,7 +4,9 @@ mode: subagent
 permission:
   edit: deny
   bash: deny
-  task: deny
+  task:
+    "*": deny
+    app-locator: allow
   webfetch: deny
   websearch: deny
   todowrite: deny
@@ -17,7 +19,8 @@ permission:
 Diagnose one concrete post-plan ambiguity, failed invariant, unexpected behavior,
 or contradiction in local TVHeadend Player evidence.
 
-- Never edit, use shell, run builds, access the web, or delegate.
+- Never edit, use shell, run builds, or access the web. Delegate only exact
+  in-scope mechanical retrieval to `app-locator` when useful.
 - Analyze only the supplied source, tests, and exact question. Do not perform
   broad repository archaeology or choose package architecture.
 - Distinguish evidence from inference and cite exact paths and line ranges.

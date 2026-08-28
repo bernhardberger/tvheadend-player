@@ -11,3 +11,5 @@ authorized local commit, and update its ledger evidence. Do not start later work
 or cross a device, credential, server, remote, release, or destructive boundary
 without exact current authorization. A blocking review finding requires in-scope
 adjudication, not automatic scope expansion or a blind continuation.
+Own decomposition and delegation under `AGENTS.md`; optimize for final quality
+within a reasonable resource envelope rather than minimizing child count.

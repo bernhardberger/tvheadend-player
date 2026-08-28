@@ -1,11 +1,7 @@
 # AI engineering harness
 
-OpenCode and OpenChamber use the same repository-local harness from the project
-root:
-
-```text
-/root/projects/tvhstream
-```
+OpenCode and OpenChamber use the same repository-local harness from the
+repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 
 ## Tracked architecture
 
@@ -14,9 +10,10 @@ root:
 | `AGENTS.md` | Sole automatic project instruction; concise safety, routing, and workflow floor |
 | `docs/README.md` | Documentation authority and lifecycle index used for task-specific reads |
 | `docs/archive/README.md` | Historical-document containment and successor map |
-| `.opencode/opencode.json` | Built-in Build default, read-only child assignments, sharing policy, permissions, and one-level child allowlist |
+| `.opencode/opencode.json` | Built-in Build default, read-only child assignments, sharing policy, permissions, and depth-2 child allowlist |
 | `.opencode/commands/continue-app.md` | Concise package execution contract for the built-in Build primary |
 | `.opencode/agents/app-locator.md` | Mechanical Luna/low repository locator |
+| `.opencode/agents/app-explore.md` | Terra/medium bounded multi-file source and behavior mapper |
 | `.opencode/agents/app-planner.md` | Optional Sol/high bounded planning second opinion |
 | `.opencode/agents/app-analyze.md` | Sol/medium concrete implementation diagnostician |
 | `.opencode/agents/app-research.md` | Sol/low authoritative external-source researcher |
@@ -28,7 +25,7 @@ root:
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
 | `tools/check-ai-harness` | Config, agent, skill, command, permission, safety, and live OpenCode validation |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
-| `tools/ai-model-tier` | Checked switch of the six managed read-only roles between standard and fast service tiers |
+| `tools/ai-model-tier` | Checked switch of the seven managed read-only roles between standard and fast service tiers |
 | `tools/verify` | AI-harness, native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
@@ -48,12 +45,13 @@ do; there is no per-command approval relay or duplicated command deny list.
 Read-only children retain their own explicit restrictions and the exact Task
 allowlist remains deny-by-default.
 
-The six managed read-only roles have explicit non-inheriting assignments:
-`app-locator` uses Luna/low/20, `app-planner` Sol/high/45, `app-analyze`
-Sol/medium/30, `app-research` Sol/low/35, `android-reviewer` Sol/high/45, and
-`tv-ux-reviewer` Sol/medium/40. They use standard service by default and may be
-switched together to matching `-fast` IDs. Fast IDs select service priority, not
-a different model. Changing the writable primary effort never changes a child.
+The seven managed read-only roles have explicit non-inheriting assignments:
+`app-locator` uses Luna/low/20, `app-explore` Terra/medium/30, `app-planner`
+Sol/high/45, `app-analyze` Sol/medium/30, `app-research` Sol/low/35,
+`android-reviewer` Sol/high/45, and `tv-ux-reviewer` Sol/medium/40. They use
+standard service by default and may be switched together to matching `-fast`
+IDs. Fast IDs select service priority, not a different model. Changing the
+writable primary effort never changes a child.
 
 OpenCode cannot hot-reload model assignments for later Task calls. Use the
 checked repository tool or matching slash command, then restart OpenCode:
@@ -66,18 +64,25 @@ checked repository tool or matching slash command, then restart OpenCode:
 
 ## Delegation and context containment
 
-Delegation is one level deep and read-only. The project Task policy denies every
-child first, then permits only the six named roles above. Zero children is the
-default. `app-locator` does mechanical retrieval; `app-planner` is an optional
-single planning second opinion; `app-analyze` diagnoses one concrete post-plan
-contradiction; `app-research` answers one external-source question only after
-exact local and cached sources are insufficient; `android-reviewer` reviews one
-frozen tested packet; and `tv-ux-reviewer` judges exact supplied images.
+Delegation is read-only and may nest through one additional Luna locator level.
+The primary owns decomposition and delegation and may use as many children as it
+judges useful for correctness, evidence coverage, context isolation, turnaround,
+or final quality. A roughly 20% resource overhead is an acceptable soft target
+for a meaningful quality gain, not a hard budget. Avoid duplicated work and
+verbose returns because cheap child output can still enlarge the primary's
+expensive context.
 
-Children cannot edit, use shell, run builds or devices, mutate Git, spawn another
-child, or read project instructions, ledgers, handoffs, archives, or broad plans.
-Start each as a fresh session without `task_id` and supply one self-contained
-question with exact evidence and a stop condition. The writable primary has no
+The project Task policy denies every child first, then permits the seven named
+roles above. `app-locator` performs mechanical retrieval; `app-explore` maps
+bounded multi-file flows without diagnosis or design; the remaining roles retain
+their specialized contracts. Only `app-locator` children may be delegated by
+read-only children, and depth 2 is terminal. Reviewers may use that capability
+only for exact in-packet retrieval, never to reconstruct missing evidence.
+
+Children cannot edit, use shell, run builds or devices, mutate Git, or read
+project instructions, ledgers, handoffs, archives, or broad plans. Start each as
+a fresh session without `task_id` and supply one self-contained question with
+exact evidence and a stop condition. The writable primary has no
 repository-configured step ceiling; deterministic wall-clock and stalled-session
 watchdogs bound orchestration. Child step limits are terminal evidence budgets,
 not a reason for generic continuation.

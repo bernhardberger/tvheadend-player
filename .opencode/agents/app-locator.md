@@ -4,7 +4,9 @@ mode: subagent
 permission:
   edit: deny
   bash: deny
-  task: deny
+  task:
+    "*": deny
+    app-locator: allow
   webfetch: deny
   websearch: deny
   todowrite: deny
@@ -19,6 +21,8 @@ declared, which files use it, where its tests live, or which exact paths match a
 named concern.
 
 - Use only read, glob, grep, and directory listing tools.
+- You may delegate genuinely independent exact-retrieval slices only to
+  `app-locator`; synthesize their results without repeating the searches.
 - Do not analyze architecture or behavior, debug failures, compare designs, or
   propose implementation.
 - Prefer one precise search and the smallest confirming reads.

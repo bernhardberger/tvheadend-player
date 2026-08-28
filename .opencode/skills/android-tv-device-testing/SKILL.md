@@ -41,6 +41,11 @@ The following restricted sequence is available only for a configured test device
 Use named key commands rather than numeric key codes:
 
 ```bash
+./tools/device key up
+./tools/device key down
+./tools/device key left
+./tools/device key right
+./tools/device key center
 ./tools/device key channel-up
 ./tools/device key channel-down
 ./tools/device key guide
@@ -48,6 +53,23 @@ Use named key commands rather than numeric key codes:
 ./tools/device key back
 ./tools/device key power
 ```
+
+For ordered navigation, send a short screen-agnostic sequence in one invocation
+instead of consuming one agent turn per key:
+
+```bash
+./tools/device keys down down right center --delay-ms 250
+./tools/device key down --repeat 3 --delay-ms 250
+./tools/device key center --long-press
+```
+
+Both commands validate device readiness and exact identity once per invocation.
+They accept at most 100 events and a delay from 0 through 5000 milliseconds; the
+default delay is 300 milliseconds. `--long-press` uses Android's key-event
+long-press flag rather than holding a key for a configurable duration. During
+active UI iteration, prefer short explicit sequences that can change with the UI
+over permanent screen-specific scenarios. Keep atomic `key` calls for exploratory
+steps where the next direction depends on the resulting screen.
 
 For production and unclassified devices, use only bounded diagnostics such as
 `doctor`, `current`, and `package-info`. Do not bypass the role policy with raw
