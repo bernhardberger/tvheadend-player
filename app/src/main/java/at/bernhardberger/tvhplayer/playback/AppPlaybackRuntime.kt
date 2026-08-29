@@ -24,6 +24,7 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
@@ -382,12 +383,21 @@ internal class PlaybackPresentationEpoch {
 
 fun LiveTimeshiftState.toAppPresentation(): AppTimeshiftState = when (this) {
     LiveTimeshiftState.Unavailable -> AppTimeshiftState()
-    is LiveTimeshiftState.Available -> {
-        val behind = positionBehindLive?.inWholeMilliseconds?.coerceAtLeast(0L) ?: 0L
-        val buffered = bufferedDuration?.inWholeMilliseconds?.coerceAtLeast(behind)
-            ?: grantedPeriod.inWholeMilliseconds
-        AppTimeshiftState(true, serverPaused == true, -buffered, -behind, 0L)
-    }
+    is LiveTimeshiftState.Available -> measuredTimeshiftPresentation(
+        bufferedDuration = bufferedDuration,
+        positionBehindLive = positionBehindLive,
+        serverPaused = serverPaused,
+    )
+}
+
+internal fun measuredTimeshiftPresentation(
+    bufferedDuration: Duration?,
+    positionBehindLive: Duration?,
+    serverPaused: Boolean?,
+): AppTimeshiftState {
+    val behind = positionBehindLive?.inWholeMilliseconds?.coerceAtLeast(0L) ?: 0L
+    val buffered = bufferedDuration?.inWholeMilliseconds?.coerceAtLeast(behind) ?: behind
+    return AppTimeshiftState(true, serverPaused == true, -buffered, -behind, 0L)
 }
 
 private val Int.hours get() = this.seconds * 3_600

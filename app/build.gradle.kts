@@ -155,7 +155,7 @@ tasks.register("verifyExternalSdkConsumption") {
     doLast {
         val sdkGroup = "at.bernhardberger.tvheadend"
         val sdkVersion = libs.versions.tvheadend.sdk.get()
-        check(sdkVersion == "0.3.1") { "Expected public SDK 0.3.1 but found $sdkVersion" }
+        check(sdkVersion == "0.3.2") { "Expected public SDK 0.3.2 but found $sdkVersion" }
         val productionClasspaths = listOf(
             "debugCompileClasspath",
             "debugRuntimeClasspath",

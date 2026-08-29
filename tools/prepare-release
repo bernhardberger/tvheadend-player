@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 APPLICATION_ID="at.bernhardberger.tvhplayer"
-SDK_VERSION="0.3.1"
+SDK_VERSION="0.3.2"
 SDK_SOURCE_COMMIT="fa39e5e24d1103339210969125905ef1bc6f11a1"
 EVIDENCE_DIR="$ROOT_DIR/app/build/released-sdk-evidence"
 NATIVE_SOURCE_NAME="sdk-media3-${SDK_VERSION}-ffmpeg-sources.tar.xz"

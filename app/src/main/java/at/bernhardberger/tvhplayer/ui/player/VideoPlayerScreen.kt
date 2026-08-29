@@ -165,8 +165,33 @@ private fun SubscriptionIssue.messageResource(): Int = when (this) {
     SubscriptionIssue.WEAK_STREAM -> R.string.tvh_bad_signal
 }
 
+internal data class TimeshiftCommandCompletion(
+    val feedback: String?,
+    val applyFeedback: Boolean,
+    val restorePlayIntent: Boolean,
+)
+
+internal fun timeshiftCommandCompletion(
+    commandToken: Long,
+    currentToken: Long,
+    feedbackToken: Long = commandToken,
+    currentFeedbackToken: Long = currentToken,
+    result: TimeshiftCommandResult,
+    unavailableText: String,
+    restorePlayIntentOnFailure: Boolean,
+): TimeshiftCommandCompletion? {
+    if (commandToken != currentToken) return null
+    val accepted = result == TimeshiftCommandResult.ACCEPTED
+    return TimeshiftCommandCompletion(
+        feedback = unavailableText.takeUnless { accepted },
+        applyFeedback = feedbackToken == currentFeedbackToken,
+        restorePlayIntent = restorePlayIntentOnFailure && !accepted,
+    )
+}
+
 private data class LiveTimeshiftSeekPreview(
     val token: Int,
+    val feedbackToken: Long,
     val decision: TimeshiftSeekDecision,
     val dispatched: Boolean,
 )
@@ -271,6 +296,8 @@ fun VideoPlayerScreen(
     var timeshiftSeekPreview by remember { mutableStateOf<LiveTimeshiftSeekPreview?>(null) }
     var timeshiftSeekToken by remember { mutableIntStateOf(0) }
     var timeshiftSeekQueuedAtMs by remember { mutableLongStateOf(0L) }
+    var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
+    var timeshiftFeedbackToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
@@ -297,6 +324,30 @@ fun VideoPlayerScreen(
     val player = remember { videoPlayerViewModel.getPlayerInstance() }
     val playerPlaybackProgressing = rememberPlayerPlaybackProgressing(player)
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
+
+    fun dispatchTimeshiftCommand(
+        restorePlayIntentOnFailure: Boolean = false,
+        command: suspend () -> TimeshiftCommandResult,
+    ) {
+        timeshiftCommandToken += 1L
+        val commandToken = timeshiftCommandToken
+        timeshiftFeedbackToken += 1L
+        val feedbackToken = timeshiftFeedbackToken
+        scope.launch {
+            val result = command()
+            val completion = timeshiftCommandCompletion(
+                commandToken = commandToken,
+                currentToken = timeshiftCommandToken,
+                feedbackToken = feedbackToken,
+                currentFeedbackToken = timeshiftFeedbackToken,
+                result = result,
+                unavailableText = timeshiftUnavailableText,
+                restorePlayIntentOnFailure = restorePlayIntentOnFailure,
+            ) ?: return@launch
+            if (completion.applyFeedback) timeshiftFeedback = completion.feedback
+            if (completion.restorePlayIntent) videoPlayerViewModel.play()
+        }
+    }
 
     LaunchedEffect(settings.aspectRatio) {
         aspectRatio = settings.aspectRatio
@@ -351,11 +402,9 @@ fun VideoPlayerScreen(
             ?.takeIf { it.channelId == currentChannelId }
             ?: currentSession?.let { LivePlaybackSelection(it, currentChannelId) }
             ?: return@LaunchedEffect
+        val result = videoPlayerViewModel.playChannel(playbackSelection)
         initialPlaybackResolved = true
-        if (
-            videoPlayerViewModel.playChannel(playbackSelection) ==
-            PlaybackTargetResult.STARTED
-        ) {
+        if (result == PlaybackTargetResult.STARTED) {
             lastPlayedChannelId = currentChannelId
             requestedLiveSelection = null
         }
@@ -414,6 +463,8 @@ fun VideoPlayerScreen(
     }
 
     fun queueTimeshiftSeek(deltaMs: Long) {
+        timeshiftFeedbackToken += 1L
+        val feedbackToken = timeshiftFeedbackToken
         timeshiftSeekQueue = enqueueTimeshiftSeek(
             queue = timeshiftSeekQueue,
             state = effectiveTimeshiftState,
@@ -424,6 +475,7 @@ fun VideoPlayerScreen(
         timeshiftSeekQueuedAtMs = SystemClock.uptimeMillis()
         timeshiftSeekPreview = LiveTimeshiftSeekPreview(
             token = token,
+            feedbackToken = feedbackToken,
             decision = queuedTimeshiftSeekDecision(timeshiftSeekQueue),
             dispatched = false,
         )
@@ -449,6 +501,8 @@ fun VideoPlayerScreen(
                     }
                     timeshiftSeekQueue = dispatch.queue
                     val dispatchToken = timeshiftSeekPreview?.token ?: timeshiftSeekToken
+                    val dispatchFeedbackToken = timeshiftSeekPreview?.feedbackToken
+                        ?: timeshiftFeedbackToken
                     timeshiftSeekPreview = timeshiftSeekPreview
                         ?.takeIf { it.token == dispatchToken }
                         ?.copy(dispatched = true)
@@ -460,7 +514,10 @@ fun VideoPlayerScreen(
                         accepted,
                     )
                     val previewIsCurrent = timeshiftSeekPreview?.token == dispatchToken
-                    if (previewIsCurrent) {
+                    if (
+                        previewIsCurrent &&
+                        dispatchFeedbackToken == timeshiftFeedbackToken
+                    ) {
                         timeshiftFeedback = if (accepted) {
                             if (timeshiftSeekPreview?.decision?.clamped == true) {
                                 timeshiftSeekClampedText
@@ -494,6 +551,8 @@ fun VideoPlayerScreen(
 
     fun tuneChannel(channel: Channel): Boolean {
         val channelId = channel.id
+        timeshiftCommandToken += 1L
+        timeshiftFeedbackToken += 1L
         timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
         timeshiftSeekToken++
         timeshiftSeekFeedbackJob?.cancel()
@@ -872,53 +931,29 @@ fun VideoPlayerScreen(
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> {
                             videoPlayerViewModel.play()
-                            scope.launch {
-                                if (
-                                    videoPlayerViewModel.resumeTimeshift() !=
-                                    TimeshiftCommandResult.ACCEPTED
-                                ) {
-                                    timeshiftFeedback =
-                                        timeshiftUnavailableText
-                                }
-                            }
+                            dispatchTimeshiftCommand(
+                                command = videoPlayerViewModel::resumeTimeshift,
+                            )
                         }
                         MediaPlaybackAction.PAUSE -> {
                             videoPlayerViewModel.pause()
-                            scope.launch {
-                                if (
-                                    videoPlayerViewModel.pauseTimeshift() !=
-                                    TimeshiftCommandResult.ACCEPTED
-                                ) {
-                                    videoPlayerViewModel.play()
-                                    timeshiftFeedback =
-                                        timeshiftUnavailableText
-                                }
-                            }
+                            dispatchTimeshiftCommand(
+                                restorePlayIntentOnFailure = true,
+                                command = videoPlayerViewModel::pauseTimeshift,
+                            )
                         }
                         MediaPlaybackAction.TOGGLE -> {
                             if (effectiveTimeshiftState.paused || !player.playWhenReady) {
                                 videoPlayerViewModel.play()
-                                scope.launch {
-                                    if (
-                                        videoPlayerViewModel.resumeTimeshift() !=
-                                        TimeshiftCommandResult.ACCEPTED
-                                    ) {
-                                        timeshiftFeedback =
-                                            timeshiftUnavailableText
-                                    }
-                                }
+                                dispatchTimeshiftCommand(
+                                    command = videoPlayerViewModel::resumeTimeshift,
+                                )
                             } else {
                                 videoPlayerViewModel.pause()
-                                scope.launch {
-                                    if (
-                                        videoPlayerViewModel.pauseTimeshift() !=
-                                        TimeshiftCommandResult.ACCEPTED
-                                    ) {
-                                        videoPlayerViewModel.play()
-                                        timeshiftFeedback =
-                                            timeshiftUnavailableText
-                                    }
-                                }
+                                dispatchTimeshiftCommand(
+                                    restorePlayIntentOnFailure = true,
+                                    command = videoPlayerViewModel::pauseTimeshift,
+                                )
                             }
                         }
                         MediaPlaybackAction.NONE -> Unit
@@ -1003,17 +1038,15 @@ fun VideoPlayerScreen(
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
                         if (effectiveTimeshiftState.paused || !player.playWhenReady) {
                             videoPlayerViewModel.play()
-                            scope.launch { videoPlayerViewModel.resumeTimeshift() }
+                            dispatchTimeshiftCommand(
+                                command = videoPlayerViewModel::resumeTimeshift,
+                            )
                         } else {
                             videoPlayerViewModel.pause()
-                            scope.launch {
-                                if (
-                                    videoPlayerViewModel.pauseTimeshift() !=
-                                    TimeshiftCommandResult.ACCEPTED
-                                ) {
-                                    videoPlayerViewModel.play()
-                                }
-                            }
+                            dispatchTimeshiftCommand(
+                                restorePlayIntentOnFailure = true,
+                                command = videoPlayerViewModel::pauseTimeshift,
+                            )
                         }
                         showControls()
                         return@onPreviewKeyEvent true
@@ -1116,44 +1149,47 @@ fun VideoPlayerScreen(
                 onToggleTimeshiftPause = {
                     if (effectiveTimeshiftState.paused) {
                         videoPlayerViewModel.play()
-                        scope.launch {
-                            if (
-                                videoPlayerViewModel.resumeTimeshift() !=
-                                TimeshiftCommandResult.ACCEPTED
-                            ) {
-                                timeshiftFeedback =
-                                    timeshiftUnavailableText
-                            }
-                        }
+                        dispatchTimeshiftCommand(
+                            command = videoPlayerViewModel::resumeTimeshift,
+                        )
                     } else {
                         videoPlayerViewModel.pause()
-                        scope.launch {
-                            if (
-                                videoPlayerViewModel.pauseTimeshift() !=
-                                TimeshiftCommandResult.ACCEPTED
-                            ) {
-                                videoPlayerViewModel.play()
-                                timeshiftFeedback =
-                                    timeshiftUnavailableText
-                            }
-                        }
+                        dispatchTimeshiftCommand(
+                            restorePlayIntentOnFailure = true,
+                            command = videoPlayerViewModel::pauseTimeshift,
+                        )
                     }
                 },
                 onSeekTimeshift = { deltaMs ->
                     queueTimeshiftSeek(deltaMs)
                 },
                 onGoLive = {
+                    timeshiftCommandToken += 1L
+                    val commandToken = timeshiftCommandToken
+                    timeshiftFeedbackToken += 1L
+                    val feedbackToken = timeshiftFeedbackToken
                     scope.launch {
                         val result = videoPlayerViewModel.goLive()
-                        if (
-                            result != TimeshiftCommandResult.ACCEPTED ||
-                            videoPlayerViewModel.resumeTimeshift() !=
-                            TimeshiftCommandResult.ACCEPTED
-                        ) {
-                            timeshiftFeedback = timeshiftUnavailableText
+                        if (commandToken != timeshiftCommandToken) return@launch
+                        val resumeResult = if (result == TimeshiftCommandResult.ACCEPTED) {
+                            videoPlayerViewModel.resumeTimeshift()
                         } else {
+                            result
+                        }
+                        val completion = timeshiftCommandCompletion(
+                            commandToken = commandToken,
+                            currentToken = timeshiftCommandToken,
+                            feedbackToken = feedbackToken,
+                            currentFeedbackToken = timeshiftFeedbackToken,
+                            result = resumeResult,
+                            unavailableText = timeshiftUnavailableText,
+                            restorePlayIntentOnFailure = false,
+                        ) ?: return@launch
+                        if (completion.applyFeedback) {
+                            timeshiftFeedback = completion.feedback
+                        }
+                        if (resumeResult == TimeshiftCommandResult.ACCEPTED) {
                             videoPlayerViewModel.play()
-                            timeshiftFeedback = null
                         }
                     }
                 },

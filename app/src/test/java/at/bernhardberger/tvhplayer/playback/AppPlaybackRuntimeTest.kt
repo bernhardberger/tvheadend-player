@@ -4,6 +4,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import java.io.File
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -33,6 +35,35 @@ class AppPlaybackRuntimeTest {
         assertEquals(
             AppTimeshiftState(),
             LiveTimeshiftState.Unavailable.toAppPresentation(),
+        )
+    }
+
+    @Test
+    fun nullMeasuredTimeshiftDoesNotInventSeekableHistory() {
+        assertEquals(
+            AppTimeshiftState(available = true),
+            measuredTimeshiftPresentation(
+                bufferedDuration = null,
+                positionBehindLive = null,
+                serverPaused = false,
+            ),
+        )
+    }
+
+    @Test
+    fun measuredTimeshiftPreservesObservedBufferPositionAndPause() {
+        assertEquals(
+            AppTimeshiftState(
+                available = true,
+                paused = true,
+                bufferStartMs = -120_000L,
+                positionMs = -30_000L,
+            ),
+            measuredTimeshiftPresentation(
+                bufferedDuration = 2.minutes,
+                positionBehindLive = 30.seconds,
+                serverPaused = true,
+            ),
         )
     }
 

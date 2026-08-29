@@ -17,10 +17,10 @@ CHECKER = runpy.run_path(str(CHECKER_PATH), run_name="native_checker_test")
 
 class NativePublicationEvidenceTest(unittest.TestCase):
     def test_public_release_bytes_and_corresponding_sources_are_pinned(self) -> None:
-        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.3.1")
+        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.3.2")
         self.assertEqual(
             CHECKER["EXPECTED_AAR_SHA256"],
-            "0d93841250ce84f1982f4dd5155f27e16f7805f4c182a041c86787751c279ed8",
+            "c162c6e6a08078af9823e3db4c43e229cb7ef861cfcb4bab050398d8742bd826",
         )
         self.assertEqual(
             CHECKER["EXPECTED_FFMPEG_SOURCES_SHA256"],
