@@ -36,6 +36,9 @@ CHANNEL_GUIDE_TEST = (
 TIMESHIFT_COMMAND_TEST = (
     "at.bernhardberger.tvhplayer.playback.TimeshiftCommandDeviceAcceptanceTest"
 )
+FOREGROUND_PLAYBACK_LIFECYCLE_TEST = (
+    "at.bernhardberger.tvhplayer.playback.ForegroundPlaybackLifecycleDeviceAcceptanceTest"
+)
 RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 CAPTURE_ROOT = ROOT / "captures/device"
@@ -72,6 +75,7 @@ TEST_DEVICE_ACTIONS = {
     "provision-test-credentials",
     "channel-guide-check",
     "timeshift-command-check",
+    "foreground-playback-lifecycle-check",
     "allow-appliance-autostart",
 }
 RELEASE_DEVICE_ACTIONS = {"install-release"}
@@ -630,12 +634,50 @@ def run_instrumentation_check(
             or "FAILURES!!!" in runner_output
             or re.search(r"(?m)^INSTRUMENTATION_FAILED:", runner_output)
         ):
-            fail(f"{action} reported a failed test")
+            failed_tests = re.findall(
+                r"(?m)^INSTRUMENTATION_STATUS: test=([A-Za-z0-9_.$]+)\s*$",
+                runner_output,
+            )
+            failure_messages = re.findall(
+                r"(?m)^INSTRUMENTATION_STATUS: stack=([^\r\n]{1,500})$",
+                runner_output,
+            )
+            detail = ""
+            if failed_tests:
+                detail = f" {failed_tests[-1]}"
+            if failure_messages:
+                detail += f": {failure_messages[-1]}"
+            if not detail:
+                error_start = runner_output.rfind("\nError in ")
+                error_block = (
+                    runner_output[error_start + 1 :]
+                    if error_start >= 0
+                    else runner_output
+                )
+                bounded_lines = [
+                    line.strip()
+                    for line in error_block.splitlines()
+                    if line.strip()
+                ][:12]
+                detail = ": " + " | ".join(bounded_lines)[:1_000]
+            evidence = re.findall(
+                r"(?m)^INSTRUMENTATION_STATUS: (fixture|stage)=([^\r\n]{1,100})$",
+                runner_output,
+            )
+            if evidence:
+                detail += " | lastEvidence=" + ",".join(
+                    f"{key}={value}" for key, value in evidence[-2:]
+                )
+            fail(f"{action} reported a failed test{detail}")
         success_summary = re.search(r"(?m)^\s*OK \((\d+) tests?\)\s*$", runner_output)
         if success_summary is None:
             fail(f"{action} did not report a successful test run")
-        if test_class == TIMESHIFT_COMMAND_TEST and int(success_summary.group(1)) != 2:
-            fail(f"{action} did not run both acceptance tests")
+        expected_test_count = {
+            TIMESHIFT_COMMAND_TEST: 2,
+            FOREGROUND_PLAYBACK_LIFECYCLE_TEST: 5,
+        }.get(test_class)
+        if expected_test_count is not None and int(success_summary.group(1)) != expected_test_count:
+            fail(f"{action} did not run all {expected_test_count} acceptance tests")
     finally:
         run(
             adb_command(adb, serial, "uninstall", test_package),
@@ -669,6 +711,20 @@ def run_timeshift_command_check(adb: str, serial: str, package_name: str) -> Non
         package_name,
         action="timeshift-command-check",
         test_class=TIMESHIFT_COMMAND_TEST,
+    )
+
+
+def run_foreground_playback_lifecycle_check(
+    adb: str,
+    serial: str,
+    package_name: str,
+) -> None:
+    run_instrumentation_check(
+        adb,
+        serial,
+        package_name,
+        action="foreground-playback-lifecycle-check",
+        test_class=FOREGROUND_PLAYBACK_LIFECYCLE_TEST,
     )
 
 
@@ -961,6 +1017,10 @@ def build_parser() -> argparse.ArgumentParser:
         "timeshift-command-check",
         help="Run the bounded live timeshift command instrumentation check",
     )
+    subparsers.add_parser(
+        "foreground-playback-lifecycle-check",
+        help="Run bounded HOME, return, replacement, and root-exit playback checks",
+    )
 
     key_parser = subparsers.add_parser("key", help="Send an approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
@@ -1201,6 +1261,10 @@ def main() -> int:
 
     if args.action == "timeshift-command-check":
         run_timeshift_command_check(adb, serial, package_name)
+        return 0
+
+    if args.action == "foreground-playback-lifecycle-check":
+        run_foreground_playback_lifecycle_check(adb, serial, package_name)
         return 0
 
     if args.action == "launch":

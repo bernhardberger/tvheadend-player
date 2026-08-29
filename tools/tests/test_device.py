@@ -27,6 +27,9 @@ sanitize_screenshot_name = DEVICE["sanitize_screenshot_name"]
 package_installation_status = DEVICE["package_installation_status"]
 run_channel_guide_check = DEVICE["run_channel_guide_check"]
 run_timeshift_command_check = DEVICE["run_timeshift_command_check"]
+run_foreground_playback_lifecycle_check = DEVICE[
+    "run_foreground_playback_lifecycle_check"
+]
 run = DEVICE["run"]
 read_device_properties = DEVICE["read_device_properties"]
 key_events = DEVICE["KEY_EVENTS"]
@@ -441,6 +444,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "provision-test-credentials",
                 "channel-guide-check",
                 "timeshift-command-check",
+                "foreground-playback-lifecycle-check",
                 "allow-appliance-autostart",
             ):
                 with self.subTest(role=role, action=action):
@@ -458,6 +462,7 @@ class DevicePolicyTest(unittest.TestCase):
             "provision-test-credentials",
             "channel-guide-check",
             "timeshift-command-check",
+            "foreground-playback-lifecycle-check",
             "allow-appliance-autostart",
         ):
             with self.subTest(action=action):
@@ -648,6 +653,122 @@ class DevicePolicyTest(unittest.TestCase):
                 commands = [call.args[0] for call in run_mock.call_args_list]
                 self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
                 self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+
+    def test_foreground_playback_lifecycle_check_uses_fixed_instrumentation_and_cleans_up(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        runner_success = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout="INSTRUMENTATION_RESULT: stream=\nOK (5 tests)\n",
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                runner_success,
+                completed,
+                completed,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                run_foreground_playback_lifecycle_check(
+                    "adb",
+                    "test-device",
+                    "at.bernhardberger.tvhplayer",
+                )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertIn(
+            [
+                "adb",
+                "-s",
+                "test-device",
+                "shell",
+                "am",
+                "instrument",
+                "-w",
+                "-e",
+                "class",
+                DEVICE["FOREGROUND_PLAYBACK_LIFECYCLE_TEST"],
+                "at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner",
+            ],
+            commands,
+        )
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+
+    def test_foreground_playback_lifecycle_check_requires_all_acceptance_tests(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        runner_success = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout="INSTRUMENTATION_RESULT: stream=\nOK (4 tests)\n",
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                runner_success,
+                completed,
+                completed,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    run_foreground_playback_lifecycle_check(
+                        "adb",
+                        "test-device",
+                        "at.bernhardberger.tvhplayer",
+                    )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
 
     def test_timeshift_command_check_cleans_up_for_invalid_test_apk(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")

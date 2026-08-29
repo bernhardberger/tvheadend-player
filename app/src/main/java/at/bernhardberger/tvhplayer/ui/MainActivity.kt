@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.KeyEvent
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
@@ -15,8 +16,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
@@ -100,6 +101,7 @@ class MainActivity : AppCompatActivity() {
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
     private var isPlayerVisible = false
+    private var rootExitInProgress = false
     private var debugVideoBackdropVisible by mutableStateOf(false)
     private var debugVideoBackdropReceiverRegistered = false
     private val mainStartupKeyCycleOwner = MainStartupKeyCycleOwner()
@@ -135,6 +137,14 @@ class MainActivity : AppCompatActivity() {
         if (startupViewModel.shouldHandleInitialActivityIntent(savedInstanceState != null)) {
             requestApplianceEntry(intent)
         }
+        onBackPressedDispatcher.addCallback(this) {
+            if (rootExitInProgress) return@addCallback
+            rootExitInProgress = true
+            lifecycleScope.launch {
+                playbackRuntime.stop()
+                finish()
+            }
+        }
         setContent {
             val startupState by startupViewModel.state.collectAsStateWithLifecycle()
             val runtimeServerSettings by
@@ -154,6 +164,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        playbackRuntime.onAppForegrounded()
         if (BuildConfig.DEBUG && !debugVideoBackdropReceiverRegistered) {
             ContextCompat.registerReceiver(
                 this,
@@ -184,8 +195,8 @@ class MainActivity : AppCompatActivity() {
             debugVideoBackdropReceiverRegistered = false
         }
         debugVideoBackdropVisible = false
+        playbackRuntime.onAppBackgrounded()
         super.onStop()
-        lifecycleScope.launch { playbackRuntime.stop() }
     }
 
     private fun requestApplianceEntry(intent: Intent?) {

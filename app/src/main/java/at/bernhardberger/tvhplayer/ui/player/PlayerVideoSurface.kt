@@ -20,6 +20,7 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 fun PlayerVideoSurface(
     player: Player,
     aspectRatio: AspectRatioMode,
+    videoVisible: Boolean,
     debugVideoBackdropVisible: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -39,6 +40,7 @@ fun PlayerVideoSurface(
                 }
             },
             update = { view ->
+                view.alpha = if (videoVisible) 1f else 0f
                 view.resizeMode = when (aspectRatio) {
                     AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                     AspectRatioMode.FORCE_16_9,

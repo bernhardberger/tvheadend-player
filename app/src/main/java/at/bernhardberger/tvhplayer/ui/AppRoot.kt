@@ -85,6 +85,7 @@ import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
+import at.bernhardberger.tvhplayer.ui.player.stopPlaybackAndClose
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
@@ -486,6 +487,7 @@ fun AppRoot(
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
     val activeTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
+    val videoPresentation by playbackRuntime.videoPresentation.collectAsStateWithLifecycle()
     val activeChannelId = (activeTarget as? AppPlaybackTarget.Live)?.channelId
     val activeRecordingId = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
@@ -672,6 +674,14 @@ fun AppRoot(
             )
         }
     }
+    val finishActivity: () -> Unit = {
+        playbackSelectionScope.launch {
+            stopPlaybackAndClose(
+                stopPlayback = playbackRuntime::stop,
+                closePlayer = { activity?.finish() },
+            )
+        }
+    }
     val handleRootBack: () -> Unit = rootBack@{
         val currentLaunchState = applianceLaunchRequests.state.value
         if (currentLaunchState != ApplianceLaunchState.Idle && applianceLaunchActive) {
@@ -687,12 +697,12 @@ fun AppRoot(
         ) {
             BackAction.FINISH_ACTIVITY -> {
                 if (capabilityProfile.allows(SimpleTvCapability.APP_EXIT)) {
-                    activity?.finish()
+                    finishActivity()
                 }
                 // Simple TV never exits through Back; ignore when exit is gated.
             }
             BackAction.POP_NAVIGATION -> {
-                if (!nav.popBackStack()) activity?.finish()
+                if (!nav.popBackStack()) finishActivity()
             }
             BackAction.RETURN_TO_PARENT -> Unit
             BackAction.RETURN_TO_PLAYER -> {
@@ -1074,6 +1084,7 @@ fun AppRoot(
                 PlayerVideoSurface(
                     player = playbackRuntime.player,
                     aspectRatio = playerSettings.aspectRatio,
+                    videoVisible = videoPresentation.visible,
                     debugVideoBackdropVisible = debugVideoBackdropVisible,
                     modifier = Modifier.fillMaxSize(),
                 )

@@ -14,6 +14,7 @@ import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -66,6 +67,7 @@ class PlayerVideoSurfaceLifecycleTest {
                 PlayerVideoSurface(
                     player = player,
                     aspectRatio = AspectRatioMode.FIT,
+                    videoVisible = true,
                 )
             }
         }
@@ -113,6 +115,7 @@ class PlayerVideoSurfaceLifecycleTest {
                 PlayerVideoSurface(
                     player = player,
                     aspectRatio = AspectRatioMode.FIT,
+                    videoVisible = true,
                 )
             }
         }
@@ -147,6 +150,44 @@ class PlayerVideoSurfaceLifecycleTest {
             assertNull(mountedView.player)
             assertFalse(mountedView.keepScreenOn)
             assertFalse(playerReleased)
+        }
+    }
+
+    @Test
+    fun targetReplacementConcealsOneNativeViewUntilItsFirstFrame() {
+        val videoVisible = mutableStateOf(true)
+        lateinit var rootView: View
+
+        composeRule.setContent {
+            rootView = LocalView.current.rootView
+            PlayerVideoSurface(
+                player = player,
+                aspectRatio = AspectRatioMode.FIT,
+                videoVisible = videoVisible.value,
+            )
+        }
+
+        val mountedView = composeRule.runOnIdle {
+            rootView.playerViews().single()
+        }
+        assertEquals(1f, mountedView.alpha)
+
+        composeRule.runOnIdle { videoVisible.value = false }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertSame(mountedView, rootView.playerViews().single())
+            assertSame(player, mountedView.player)
+            assertEquals(0f, mountedView.alpha)
+            assertEquals(View.VISIBLE, mountedView.visibility)
+            assertFalse(mountedView.isFocusable)
+        }
+
+        composeRule.runOnIdle { videoVisible.value = true }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertSame(mountedView, rootView.playerViews().single())
+            assertSame(player, mountedView.player)
+            assertEquals(1f, mountedView.alpha)
         }
     }
 }
