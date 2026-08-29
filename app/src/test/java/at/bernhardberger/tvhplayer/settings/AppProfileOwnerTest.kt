@@ -58,6 +58,111 @@ import org.junit.Test
 class AppProfileOwnerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun selectedProfileReadWaitsForCurrentDiscoveryToSettle() = runTest {
+        val selectedId = StreamProfileId("11111111111111111111111111111111")
+        val discoveryStarted = CompletableDeferred<Unit>()
+        val releaseDiscovery = CompletableDeferred<Unit>()
+        val observations = FakeSessionObservation(currentObservation("server"))
+        val session = ProfileSession(observations.observation) {
+            discoveryStarted.complete(Unit)
+            releaseDiscovery.await()
+            available(selectedId)
+        }
+        val dataStore = InMemoryPreferencesDataStore(
+            initial = preferencesOf(stringPreferencesKey("profileUuid") to selectedId.value),
+        )
+        val owner = profileOwner(
+            session,
+            PlayerSettingsStore(dataStore),
+            StandardTestDispatcher(testScheduler),
+        )
+
+        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
+        runCurrent()
+        discoveryStarted.await()
+        val selected = async {
+            owner.selectedStreamProfileIdFor(
+                checkNotNull(observations.observation.value.currentSession),
+            )
+        }
+        runCurrent()
+
+        assertFalse(selected.isCompleted)
+        releaseDiscovery.complete(Unit)
+        runCurrent()
+        assertEquals(selectedId, selected.await())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun selectedProfileReadSettlesWhenPersistedSelectionUpdateFails() = runTest {
+        val selectionUpdateStarted = CompletableDeferred<Unit>()
+        val releaseSelectionUpdate = CompletableDeferred<Unit>()
+        val observations = FakeSessionObservation(currentObservation("server"))
+        val currentSession = checkNotNull(observations.observation.value.currentSession)
+        val session = ProfileSession(observations.observation) {
+            available(StreamProfileId("11111111111111111111111111111111"))
+        }
+        val dataStore = InMemoryPreferencesDataStore(beforeUpdate = {
+            selectionUpdateStarted.complete(Unit)
+            releaseSelectionUpdate.await()
+            error("selection update failed")
+        })
+        val owner = profileOwner(
+            session,
+            PlayerSettingsStore(dataStore),
+            StandardTestDispatcher(testScheduler),
+        )
+
+        backgroundScope.async(start = CoroutineStart.UNDISPATCHED) {
+            runCatching { owner.run() }
+        }
+        runCurrent()
+        selectionUpdateStarted.await()
+        val selected = async { owner.selectedStreamProfileIdFor(currentSession) }
+        runCurrent()
+        assertFalse(selected.isCompleted)
+
+        releaseSelectionUpdate.complete(Unit)
+        runCurrent()
+
+        assertTrue(selected.isCompleted)
+        assertNull(selected.await())
+        assertTrue(owner.streamProfiles.value is StreamProfilesResult.Available)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun selectedProfileReadReturnsWhenObservationExpiresDuringDiscovery() = runTest {
+        val discoveryStarted = CompletableDeferred<Unit>()
+        val releaseDiscovery = CompletableDeferred<Unit>()
+        val observations = FakeSessionObservation(currentObservation("server"))
+        val currentSession = checkNotNull(observations.observation.value.currentSession)
+        val session = ProfileSession(observations.observation) {
+            discoveryStarted.complete(Unit)
+            releaseDiscovery.await()
+            available(StreamProfileId("11111111111111111111111111111111"))
+        }
+        val owner = profileOwner(
+            session,
+            PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler),
+        )
+
+        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
+        runCurrent()
+        discoveryStarted.await()
+        val selected = async { owner.selectedStreamProfileIdFor(currentSession) }
+        runCurrent()
+
+        assertFalse(selected.isCompleted)
+        observations.retire(SessionObservation.create(sessionState = SessionState.Disconnected))
+        runCurrent()
+        assertNull(selected.await())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun staleGenerationIsDiscardedAndReconnectDiscoversOnceOnOwnedIoDispatcher() = runTest {
         val observations = FakeSessionObservation(currentObservation("first"))
         val firstStarted = CompletableDeferred<Unit>()

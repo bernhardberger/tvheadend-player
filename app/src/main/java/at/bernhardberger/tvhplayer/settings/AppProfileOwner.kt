@@ -21,8 +21,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -45,6 +47,8 @@ class AppProfileOwner internal constructor(
     private val mutableStreamProfiles =
         MutableStateFlow<StreamProfilesResult>(StreamProfilesResult.NotReady)
     private val mutableSelectedStreamProfileId = MutableStateFlow<StreamProfileId?>(null)
+    private val mutableSettledStreamProfilesFor =
+        MutableStateFlow<CurrentSessionObservation?>(null)
     private var availableForObservation: CurrentSessionObservation? = null
 
     val serverProfile: StateFlow<ServerProfileReadResult?> = mutableServerProfile.asStateFlow()
@@ -92,10 +96,15 @@ class AppProfileOwner internal constructor(
 
     suspend fun selectedStreamProfileIdFor(
         observation: CurrentSessionObservation,
-    ): StreamProfileId? = streamMutex.withLock {
-        mutableSelectedStreamProfileId.value.takeIf {
-            availableForObservation === observation &&
-                session.observation.value.currentSession === observation
+    ): StreamProfileId? {
+        combine(mutableSettledStreamProfilesFor, session.observation) { settledFor, current ->
+            settledFor === observation || current.currentSession !== observation
+        }.first { it }
+        return streamMutex.withLock {
+            mutableSelectedStreamProfileId.value.takeIf {
+                availableForObservation === observation &&
+                    session.observation.value.currentSession === observation
+            }
         }
     }
 
@@ -194,6 +203,7 @@ class AppProfileOwner internal constructor(
             .collectLatest { observation ->
                 streamMutex.withLock {
                     availableForObservation = null
+                    mutableSettledStreamProfilesFor.value = null
                     mutableSelectedStreamProfileId.value = null
                     mutableStreamProfiles.value = StreamProfilesResult.NotReady
                 }
@@ -215,8 +225,14 @@ class AppProfileOwner internal constructor(
                         return@withLock
                     }
                     val selected = if (result is StreamProfilesResult.Available) {
-                        playerSettings.resolveStreamProfileSelection(result.profiles) {
-                            session.observation.value.currentSession === observation
+                        try {
+                            playerSettings.resolveStreamProfileSelection(result.profiles) {
+                                session.observation.value.currentSession === observation
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            null
                         }
                     } else {
                         null
@@ -229,6 +245,7 @@ class AppProfileOwner internal constructor(
                     }
                     mutableSelectedStreamProfileId.value = selected
                     mutableStreamProfiles.value = result
+                    mutableSettledStreamProfilesFor.value = observation
                 }
             }
     }
