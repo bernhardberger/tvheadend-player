@@ -33,6 +33,9 @@ DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/debug/app-debug-and
 CHANNEL_GUIDE_TEST = (
     "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest"
 )
+TIMESHIFT_COMMAND_TEST = (
+    "at.bernhardberger.tvhplayer.playback.TimeshiftCommandDeviceAcceptanceTest"
+)
 RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 CAPTURE_ROOT = ROOT / "captures/device"
@@ -68,6 +71,7 @@ TEST_DEVICE_ACTIONS = {
     "screenshot",
     "provision-test-credentials",
     "channel-guide-check",
+    "timeshift-command-check",
     "allow-appliance-autostart",
 }
 RELEASE_DEVICE_ACTIONS = {"install-release"}
@@ -559,12 +563,16 @@ def package_is_installed(adb: str, serial: str, package_name: str) -> bool:
     return status
 
 
-def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
+def run_instrumentation_check(
+    adb: str,
+    serial: str,
+    package_name: str,
+    *,
+    action: str,
+    test_class: str,
+) -> None:
     if package_name != DEFAULT_PACKAGE:
-        fail(f"channel-guide-check is available only for package {DEFAULT_PACKAGE}")
-    if DEFAULT_TEST_APK.is_symlink() or not DEFAULT_TEST_APK.is_file():
-        fail(f"instrumentation APK does not exist: {DEFAULT_TEST_APK}")
-
+        fail(f"{action} is available only for package {DEFAULT_PACKAGE}")
     test_package = f"{package_name}.test"
     runner = "androidx.test.runner.AndroidJUnitRunner"
     expected_instrumentation = (
@@ -572,6 +580,8 @@ def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
     )
 
     try:
+        if DEFAULT_TEST_APK.is_symlink() or not DEFAULT_TEST_APK.is_file():
+            fail(f"instrumentation APK does not exist: {DEFAULT_TEST_APK}")
         run(
             adb_command(adb, serial, "uninstall", test_package),
             capture=True,
@@ -597,7 +607,7 @@ def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
             line.strip() for line in installed_instrumentation.stdout.splitlines()
         }:
             fail("installed instrumentation identity does not match the bounded check")
-        run(
+        instrumentation_result = run(
             adb_command(
                 adb,
                 serial,
@@ -607,10 +617,25 @@ def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
                 "-w",
                 "-e",
                 "class",
-                CHANNEL_GUIDE_TEST,
+                test_class,
                 f"{test_package}/{runner}",
-            )
+            ),
+            capture=True,
         )
+        runner_output = "\n".join(
+            part for part in (instrumentation_result.stdout, instrumentation_result.stderr) if part
+        )
+        if (
+            re.search(r"(?m)^INSTRUMENTATION_STATUS_CODE:\s*-2\s*$", runner_output)
+            or "FAILURES!!!" in runner_output
+            or re.search(r"(?m)^INSTRUMENTATION_FAILED:", runner_output)
+        ):
+            fail(f"{action} reported a failed test")
+        success_summary = re.search(r"(?m)^\s*OK \((\d+) tests?\)\s*$", runner_output)
+        if success_summary is None:
+            fail(f"{action} did not report a successful test run")
+        if test_class == TIMESHIFT_COMMAND_TEST and int(success_summary.group(1)) != 2:
+            fail(f"{action} did not run both acceptance tests")
     finally:
         run(
             adb_command(adb, serial, "uninstall", test_package),
@@ -624,7 +649,27 @@ def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
             check=False,
         )
         if instrumentation_status is not False or force_stop.returncode != 0:
-            fail("channel-guide-check cleanup did not complete")
+            fail(f"{action} cleanup did not complete")
+
+
+def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
+    run_instrumentation_check(
+        adb,
+        serial,
+        package_name,
+        action="channel-guide-check",
+        test_class=CHANNEL_GUIDE_TEST,
+    )
+
+
+def run_timeshift_command_check(adb: str, serial: str, package_name: str) -> None:
+    run_instrumentation_check(
+        adb,
+        serial,
+        package_name,
+        action="timeshift-command-check",
+        test_class=TIMESHIFT_COMMAND_TEST,
+    )
 
 
 def resolve_verified_release_apk(bundle: Path) -> Path:
@@ -912,6 +957,10 @@ def build_parser() -> argparse.ArgumentParser:
         "channel-guide-check",
         help="Run the bounded real-catalog channel and Guide instrumentation check",
     )
+    subparsers.add_parser(
+        "timeshift-command-check",
+        help="Run the bounded live timeshift command instrumentation check",
+    )
 
     key_parser = subparsers.add_parser("key", help="Send an approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
@@ -1148,6 +1197,10 @@ def main() -> int:
 
     if args.action == "channel-guide-check":
         run_channel_guide_check(adb, serial, package_name)
+        return 0
+
+    if args.action == "timeshift-command-check":
+        run_timeshift_command_check(adb, serial, package_name)
         return 0
 
     if args.action == "launch":
