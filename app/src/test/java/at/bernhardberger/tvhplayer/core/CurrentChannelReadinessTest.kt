@@ -2,7 +2,10 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CurrentChannelReadinessTest {
@@ -69,6 +72,60 @@ class CurrentChannelReadinessTest {
         source.clear()
 
         assertEquals(listOf(expected), readiness.channels)
+    }
+
+    @Test
+    fun noncurrentEmptyCatalogCannotPresentAuthoritativeEmpty() {
+        assertEquals(
+            ConnectionUiState.SyncingChannels,
+            ConnectionUiState.Ready.forEmptyChannelPresentation(channelCatalogCurrent = false),
+        )
+    }
+
+    @Test
+    fun currentEmptyCatalogPreservesAuthoritativeReadyState() {
+        assertEquals(
+            ConnectionUiState.Ready,
+            ConnectionUiState.Ready.forEmptyChannelPresentation(channelCatalogCurrent = true),
+        )
+    }
+
+    @Test
+    fun connectionFailureRemainsActionableBeforeCatalogIsCurrent() {
+        val failure = ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION)
+
+        assertEquals(
+            failure,
+            failure.forEmptyChannelPresentation(channelCatalogCurrent = false),
+        )
+    }
+
+    @Test
+    fun filteredEmptyRequiresCurrentReadyAuthority() {
+        assertFalse(
+            shouldPresentEmptyTag(
+                channelCatalogCurrent = false,
+                connectionState = ConnectionUiState.Ready,
+                hasChannelsOutsideActiveTag = true,
+                activeTagSelected = true,
+            ),
+        )
+        assertFalse(
+            shouldPresentEmptyTag(
+                channelCatalogCurrent = true,
+                connectionState = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE),
+                hasChannelsOutsideActiveTag = true,
+                activeTagSelected = true,
+            ),
+        )
+        assertTrue(
+            shouldPresentEmptyTag(
+                channelCatalogCurrent = true,
+                connectionState = ConnectionUiState.Ready,
+                hasChannelsOutsideActiveTag = true,
+                activeTagSelected = true,
+            ),
+        )
     }
 
 }

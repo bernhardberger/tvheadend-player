@@ -42,6 +42,7 @@ fun TvOutlinedTextField(
     onValueChange: (String) -> Unit,
     label: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    presentationValue: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     singleLine: Boolean = true,
@@ -51,6 +52,7 @@ fun TvOutlinedTextField(
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     var consumeBackKeyUp by remember { mutableStateOf(false) }
+    val displayedValue = presentationValue.takeIf { !isEditing && value.isEmpty() } ?: value
 
     LaunchedEffect(isEditing) {
         if (isEditing) {
@@ -62,7 +64,7 @@ fun TvOutlinedTextField(
     }
 
     OutlinedTextField(
-        value = value,
+        value = displayedValue,
         onValueChange = onValueChange,
         label = label,
         readOnly = !isEditing,

@@ -68,6 +68,8 @@ import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
+import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -302,7 +304,14 @@ fun ChannelsScreen(
         Spacer(Modifier.height(TvSpacing16))
 
         if (channels.isEmpty()) {
-            if (channelScope.allChannels.isNotEmpty() && channelScope.activeTagId != null) {
+            if (
+                shouldPresentEmptyTag(
+                    channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
+                    connectionState = connectionUiState,
+                    hasChannelsOutsideActiveTag = channelScope.allChannels.isNotEmpty(),
+                    activeTagSelected = channelScope.activeTagId != null,
+                )
+            ) {
                 EmptyTagState(
                     Modifier
                         .padding(browseViewportPadding)
@@ -310,7 +319,9 @@ fun ChannelsScreen(
                 )
             } else {
                 EmptyChannelsState(
-                    state = connectionUiState,
+                    state = connectionUiState.forEmptyChannelPresentation(
+                        channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
+                    ),
                     initialFocusEnabled = initialFocusEnabled,
                     onRetry = onRetryConnection,
                     onOpenSettings = onOpenConnectionSettings,

@@ -16,6 +16,24 @@ sealed interface ConnectionUiState {
     data class SubscriptionError(val kind: SubscriptionFailureKind) : ConnectionUiState
 }
 
+internal fun ConnectionUiState.forEmptyChannelPresentation(
+    channelCatalogCurrent: Boolean,
+): ConnectionUiState = if (this == ConnectionUiState.Ready && !channelCatalogCurrent) {
+    ConnectionUiState.SyncingChannels
+} else {
+    this
+}
+
+internal fun shouldPresentEmptyTag(
+    channelCatalogCurrent: Boolean,
+    connectionState: ConnectionUiState,
+    hasChannelsOutsideActiveTag: Boolean,
+    activeTagSelected: Boolean,
+): Boolean = channelCatalogCurrent &&
+    connectionState == ConnectionUiState.Ready &&
+    hasChannelsOutsideActiveTag &&
+    activeTagSelected
+
 fun SessionState.toConnectionUiState(): ConnectionUiState = when (this) {
     SessionState.Disconnected -> ConnectionUiState.NeedsConfiguration
     SessionState.Connecting -> ConnectionUiState.Connecting

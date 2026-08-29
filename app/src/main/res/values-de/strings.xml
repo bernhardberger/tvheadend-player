@@ -54,6 +54,7 @@
     <string name="username">Benutzername</string>
     <string name="password">Passwort</string>
     <string name="password_replacement_hint">Das gespeicherte Passwort wird nie angezeigt. Geben Sie nur zum Ersetzen einen neuen Wert ein.</string>
+    <string name="configured_credential_placeholder">Konfiguriert</string>
     <string name="clear_saved_password">Gespeichertes Passwort löschen</string>
     <string name="credential_save_failed">Die Zugangsdaten konnten nicht gespeichert werden. Löschen Sie sie und geben Sie sie erneut ein.</string>
     <string name="credential_unavailable">Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein.</string>

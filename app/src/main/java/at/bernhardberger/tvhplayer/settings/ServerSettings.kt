@@ -106,6 +106,12 @@ internal fun serverSettingsForEditing(
     passwordConfigured = passwordConfigured,
 )
 
+internal fun configuredCredentialPresentation(
+    value: String,
+    passwordConfigured: Boolean,
+    marker: String,
+): String? = marker.takeIf { passwordConfigured && value.isEmpty() }
+
 internal fun replacementCredentialsComplete(
     passwordConfigured: Boolean,
     username: String,

@@ -13,7 +13,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -90,5 +93,61 @@ class TvOutlinedTextFieldTest {
         }
         composeTestRule.onNodeWithTag("state").assertTextEquals("editing=none")
         composeTestRule.onNodeWithTag("parent-back-state").assertTextEquals("parentBack=0")
+    }
+
+    @Test
+    fun configuredCredentialMarkersDisappearForEditingWithoutChangingValues() {
+        composeTestRule.setContent {
+            var editingId by remember { mutableStateOf<String?>(null) }
+            var username by remember { mutableStateOf("") }
+            var password by remember { mutableStateOf("") }
+            TVHeadendPlayerTheme {
+                Column {
+                    TvOutlinedTextField(
+                        id = "username",
+                        editingId = editingId,
+                        setEditingId = { editingId = it },
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("Username") },
+                        modifier = Modifier.testTag("username"),
+                        presentationValue = "Configured",
+                    )
+                    TvPasswordField(
+                        id = "password",
+                        editingId = editingId,
+                        setEditingId = { editingId = it },
+                        value = password,
+                        onValueChange = { password = it },
+                        modifier = Modifier.testTag("password"),
+                        presentationValue = "Configured",
+                    )
+                    Text(
+                        text = "values=${username.length}:${password.length}",
+                        modifier = Modifier.testTag("credential-state"),
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag("username").assertTextEquals("Configured")
+        composeTestRule.onNodeWithTag("password")
+            .assertTextEquals("Configured")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Password))
+
+        composeTestRule.onNodeWithTag("username").requestFocus().performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeTestRule.onNodeWithTag("username").assertTextEquals("")
+        composeTestRule.onNodeWithTag("credential-state").assertTextEquals("values=0:0")
+
+        composeTestRule.onNodeWithTag("username").performKeyInput { pressKey(Key.Back) }
+        composeTestRule.onNodeWithTag("password").requestFocus().performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeTestRule.onNodeWithTag("password").assertTextEquals("")
+        composeTestRule.onNodeWithTag("password")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
+        composeTestRule.onNodeWithTag("credential-state").assertTextEquals("values=0:0")
     }
 }

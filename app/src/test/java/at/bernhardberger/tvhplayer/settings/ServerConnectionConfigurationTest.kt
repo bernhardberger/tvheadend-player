@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -77,6 +78,23 @@ class ServerConnectionConfigurationTest {
                 username = "viewer",
                 password = "replacement",
                 passwordChanged = true,
+            ),
+        )
+    }
+
+    @Test
+    fun configuredProfilePresentsRedactedMarkersWithoutMakingThemEditableValues() {
+        val marker = "Configured"
+
+        assertEquals(marker, configuredCredentialPresentation("", true, marker))
+        assertNull(configuredCredentialPresentation("viewer", true, marker))
+        assertNull(configuredCredentialPresentation("", false, marker))
+        assertFalse(
+            replacementCredentialsComplete(
+                passwordConfigured = true,
+                username = "",
+                password = "",
+                passwordChanged = false,
             ),
         )
     }

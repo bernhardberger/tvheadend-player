@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -96,6 +97,41 @@ class ChannelGuideDeviceAcceptanceTest {
             catalog.channels.map { it.id },
             (retainedState as ChannelRepositoryState.Current).catalog.channels.map { it.id },
         )
+        assertTrue(!composeRule.activity.isFinishing)
+    }
+
+    @Test
+    fun configuredConnectionUsesRedactedFieldPresenceSemantics() {
+        val connectionLabel = composeRule.activity.getString(R.string.settings_connection_nav)
+
+        enterBrowseShell()
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty()
+        }
+        focusCurrentBrowseDestination()
+        composeRule.onNodeWithTag("nav-settings").requestFocus()
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasTestTag("nav-settings"))
+                .fetchSemanticsNodes().any { node ->
+                    node.config[SemanticsProperties.Focused]
+                }
+        }
+        composeRule.onNodeWithTag("nav-settings").performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasText(connectionLabel))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithText(connectionLabel).requestFocus()
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasTestTag("connection-username-configured"))
+                .fetchSemanticsNodes().size == 1 &&
+                composeRule.onAllNodes(hasTestTag("connection-password-configured"))
+                    .fetchSemanticsNodes().size == 1
+        }
+
         assertTrue(!composeRule.activity.isFinishing)
     }
 

@@ -43,6 +43,7 @@ fun TvPasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    presentationValue: String? = null,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -54,6 +55,8 @@ fun TvPasswordField(
     var consumeBackKeyUp by remember { mutableStateOf(false) }
 
     val isEditing = editingId == id
+    val displayedPresentation = presentationValue.takeIf { !isEditing && value.isEmpty() }
+    val displayedValue = displayedPresentation ?: value
 
     LaunchedEffect(isEditing) {
         if (isEditing) {
@@ -69,7 +72,7 @@ fun TvPasswordField(
         stringResource(if (passwordVisible) R.string.hide_password else R.string.show_password)
 
     OutlinedTextField(
-        value = value,
+        value = displayedValue,
         onValueChange = onValueChange,
         label = { Text(stringResource(R.string.password)) },
         singleLine = true,
@@ -77,7 +80,7 @@ fun TvPasswordField(
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { setEditingId(null) }),
 
-        visualTransformation = if (passwordVisible) {
+        visualTransformation = if (displayedPresentation != null || passwordVisible) {
             VisualTransformation.None
         } else {
             PasswordVisualTransformation()

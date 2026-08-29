@@ -26,11 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.configuredCredentialPresentation
 import at.bernhardberger.tvhplayer.settings.replacementCredentialsComplete
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
@@ -49,9 +51,12 @@ fun SettingsConnection(
     val activity = LocalActivity.current
 
     DisposableEffect(activity) {
-        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val window = activity?.window
+        val addedSecureFlag = window != null &&
+            window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE == 0
+        if (addedSecureFlag) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         onDispose {
-            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            if (addedSecureFlag) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
 
@@ -59,11 +64,22 @@ fun SettingsConnection(
 
     var host by rememberSaveable { mutableStateOf("") }
     var htspPort by rememberSaveable { mutableStateOf("9982") }
-    var user by rememberSaveable { mutableStateOf("") }
+    var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
     var passwordChanged by remember { mutableStateOf(false) }
     var passwordConfigured by remember { mutableStateOf(false) }
     var credentialError by remember { mutableStateOf(false) }
+    val configuredMarker = stringResource(R.string.configured_credential_placeholder)
+    val usernamePresentation = configuredCredentialPresentation(
+        value = user,
+        passwordConfigured = passwordConfigured,
+        marker = configuredMarker,
+    ).takeIf { editingId != "user" }
+    val passwordPresentation = configuredCredentialPresentation(
+        value = pass,
+        passwordConfigured = passwordConfigured,
+        marker = configuredMarker,
+    ).takeIf { editingId != "pass" }
     val parsedPort = htspPort.toIntOrNull()?.takeIf { it in 1..65535 }
     val credentialsComplete = replacementCredentialsComplete(
         passwordConfigured = passwordConfigured,
@@ -118,7 +134,15 @@ fun SettingsConnection(
                 setEditingId = { editingId = it },
                 value = user,
                 onValueChange = { user = it },
-                label = { Text(stringResource(R.string.username)) }
+                label = { Text(stringResource(R.string.username)) },
+                modifier = Modifier.testTag(
+                    if (usernamePresentation != null) {
+                        "connection-username-configured"
+                    } else {
+                        "connection-username"
+                    },
+                ),
+                presentationValue = usernamePresentation,
             )
 
             Spacer(Modifier.height(12.dp))
@@ -132,7 +156,15 @@ fun SettingsConnection(
                     pass = it
                     passwordChanged = true
                     credentialError = false
-                }
+                },
+                modifier = Modifier.testTag(
+                    if (passwordPresentation != null) {
+                        "connection-password-configured"
+                    } else {
+                        "connection-password"
+                    },
+                ),
+                presentationValue = passwordPresentation,
             )
 
             Text(
@@ -166,6 +198,7 @@ fun SettingsConnection(
                             )
                             passwordConfigured = true
                         }
+                        user = ""
                         pass = ""
                         passwordChanged = false
                         credentialError = false
@@ -188,6 +221,7 @@ fun SettingsConnection(
                         } else {
                             settingsStore.clearProfile()
                         }
+                        user = ""
                         pass = ""
                         passwordConfigured = false
                         passwordChanged = false
