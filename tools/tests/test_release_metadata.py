@@ -187,9 +187,9 @@ class ReleaseMetadataTest(unittest.TestCase):
         metadata = (ROOT / "tools/release_metadata.py").read_text(encoding="utf-8")
 
         self.assertNotIn('git -C "$SDK_ROOT" archive', prepare)
-        self.assertIn('SDK_VERSION="0.3.2"', prepare)
+        self.assertIn('SDK_VERSION="0.3.4"', prepare)
         self.assertIn(
-            'SDK_SOURCE_COMMIT="fa39e5e24d1103339210969125905ef1bc6f11a1"',
+            'SDK_SOURCE_COMMIT="90f3f82ea5bf7cd11bfb35c08ba8cb860b92661a"',
             prepare,
         )
         self.assertIn(":app:syncReleasedSdkEvidence", prepare)

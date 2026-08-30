@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileAuthenticationMode
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileOperationResult
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
@@ -32,6 +33,30 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Process owner for the one persisted server profile and current-generation stream selection. */
+fun interface CredentialEditLease {
+    fun release()
+}
+
+internal interface ConnectionProfileEditor {
+    val serverSettings: Flow<ServerSettings>
+
+    suspend fun loadServerForEditing(
+        applyAvailable: (host: String, port: Int, username: String, password: String) -> Unit,
+    )
+
+    suspend fun saveServer(host: String, htspPort: Int)
+
+    suspend fun savePasswordServer(
+        host: String,
+        htspPort: Int,
+        username: String,
+        password: String,
+        credentialLease: CredentialEditLease,
+    )
+
+    suspend fun clearProfile()
+}
+
 class AppProfileOwner internal constructor(
     private val context: Context,
     private val session: TvheadendSession,
@@ -39,10 +64,12 @@ class AppProfileOwner internal constructor(
     private val legacyCredentials: LegacyCredentialSource,
     private val playerSettings: PlayerSettingsStore,
     private val ioDispatcher: CoroutineDispatcher,
-) {
+) : ConnectionProfileEditor {
     private val serverMutex = Mutex()
     private val streamMutex = Mutex()
-    private val commands = Channel<ProfileCommand>()
+    private val commands = Channel<ProfileCommand>(
+        onUndeliveredElement = ProfileCommand::releaseSensitiveMaterial,
+    )
     private val mutableServerProfile = MutableStateFlow<ServerProfileReadResult?>(null)
     private val mutableStreamProfiles =
         MutableStateFlow<StreamProfilesResult>(StreamProfilesResult.NotReady)
@@ -52,7 +79,7 @@ class AppProfileOwner internal constructor(
     private var availableForObservation: CurrentSessionObservation? = null
 
     val serverProfile: StateFlow<ServerProfileReadResult?> = mutableServerProfile.asStateFlow()
-    val serverSettings: Flow<ServerSettings> = serverProfile
+    override val serverSettings: Flow<ServerSettings> = serverProfile
         .filterNotNull()
         .map(ServerProfileReadResult::toServerSettings)
         .distinctUntilChanged()
@@ -73,7 +100,29 @@ class AppProfileOwner internal constructor(
         }
     }
 
-    suspend fun saveServer(host: String, htspPort: Int) {
+    override suspend fun loadServerForEditing(
+        applyAvailable: (host: String, port: Int, username: String, password: String) -> Unit,
+    ) = serverMutex.withLock {
+        when (val result = profileStore.loadProfileForEditing()) {
+            is ServerProfileEditReadResult.Anonymous -> applyAvailable(
+                result.host,
+                result.port,
+                "",
+                "",
+            )
+            is ServerProfileEditReadResult.Password -> applyAvailable(
+                result.host,
+                result.port,
+                result.username,
+                result.password,
+            )
+            ServerProfileEditReadResult.Missing,
+            ServerProfileEditReadResult.Unavailable,
+            -> Unit
+        }
+    }
+
+    override suspend fun saveServer(host: String, htspPort: Int) {
         submit(SaveServerCommand(host, htspPort))
     }
 
@@ -83,10 +132,28 @@ class AppProfileOwner internal constructor(
         username: String,
         password: String,
     ) {
-        submit(SavePasswordServerCommand(host, htspPort, username, password))
+        submit(
+            SavePasswordServerCommand(
+                host,
+                htspPort,
+                username,
+                password,
+                CredentialEditLease {},
+            ),
+        )
     }
 
-    suspend fun clearProfile() {
+    override suspend fun savePasswordServer(
+        host: String,
+        htspPort: Int,
+        username: String,
+        password: String,
+        credentialLease: CredentialEditLease,
+    ) {
+        submit(SavePasswordServerCommand(host, htspPort, username, password, credentialLease))
+    }
+
+    override suspend fun clearProfile() {
         submit(ClearServerProfileCommand())
     }
 
@@ -114,6 +181,7 @@ class AppProfileOwner internal constructor(
     }
 
     private suspend fun handleCommand(command: ProfileCommand) {
+        var failure: Exception? = null
         try {
             when (command) {
                 is SaveServerCommand -> commitServer(command.host, command.port)
@@ -126,13 +194,25 @@ class AppProfileOwner internal constructor(
                 is ClearServerProfileCommand -> clearServerProfile()
                 is SelectStreamProfileCommand -> commitStreamProfileSelection(command.profileId)
             }
-            command.completion.complete(Unit)
         } catch (error: Exception) {
-            if (command is ServerProfileCommand) recoverServerProfile()
-            command.completion.completeExceptionally(error)
+            try {
+                if (command is ServerProfileCommand) recoverServerProfile()
+            } catch (recoveryError: Throwable) {
+                command.releaseSensitiveMaterial()
+                command.completion.completeExceptionally(recoveryError)
+                throw recoveryError
+            }
+            failure = error
         } catch (error: Throwable) {
+            command.releaseSensitiveMaterial()
             command.completion.completeExceptionally(error)
             throw error
+        }
+        command.releaseSensitiveMaterial()
+        if (failure == null) {
+            command.completion.complete(Unit)
+        } else {
+            command.completion.completeExceptionally(failure)
         }
     }
 
@@ -338,6 +418,8 @@ class AppProfileOwner internal constructor(
 private sealed class ProfileCommand {
     val completion = CompletableDeferred<Unit>()
 
+    open fun releaseSensitiveMaterial() = Unit
+
     final override fun toString(): String = "ProfileCommand(<redacted>)"
 }
 
@@ -351,9 +433,24 @@ private class SaveServerCommand(
 private class SavePasswordServerCommand(
     val host: String,
     val port: Int,
-    val username: String,
-    val password: String,
-) : ServerProfileCommand()
+    username: String,
+    password: String,
+    private val credentialLease: CredentialEditLease,
+) : ServerProfileCommand() {
+    var username = username
+        private set
+    var password = password
+        private set
+    private var released = false
+
+    override fun releaseSensitiveMaterial() = synchronized(this) {
+        if (released) return@synchronized
+        released = true
+        username = ""
+        password = ""
+        credentialLease.release()
+    }
+}
 
 private class ClearServerProfileCommand : ServerProfileCommand()
 

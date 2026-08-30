@@ -96,58 +96,28 @@ class TvOutlinedTextFieldTest {
     }
 
     @Test
-    fun configuredCredentialMarkersDisappearForEditingWithoutChangingValues() {
+    fun passwordValueIsMaskedByDefault() {
         composeTestRule.setContent {
             var editingId by remember { mutableStateOf<String?>(null) }
-            var username by remember { mutableStateOf("") }
-            var password by remember { mutableStateOf("") }
+            var password by remember { mutableStateOf(FAKE_PASSWORD) }
             TVHeadendPlayerTheme {
-                Column {
-                    TvOutlinedTextField(
-                        id = "username",
-                        editingId = editingId,
-                        setEditingId = { editingId = it },
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("Username") },
-                        modifier = Modifier.testTag("username"),
-                        presentationValue = "Configured",
-                    )
-                    TvPasswordField(
-                        id = "password",
-                        editingId = editingId,
-                        setEditingId = { editingId = it },
-                        value = password,
-                        onValueChange = { password = it },
-                        modifier = Modifier.testTag("password"),
-                        presentationValue = "Configured",
-                    )
-                    Text(
-                        text = "values=${username.length}:${password.length}",
-                        modifier = Modifier.testTag("credential-state"),
-                    )
-                }
+                TvPasswordField(
+                    id = "password",
+                    editingId = editingId,
+                    setEditingId = { editingId = it },
+                    value = password,
+                    onValueChange = { password = it },
+                    modifier = Modifier.testTag("password"),
+                )
             }
         }
 
-        composeTestRule.onNodeWithTag("username").assertTextEquals("Configured")
         composeTestRule.onNodeWithTag("password")
-            .assertTextEquals("Configured")
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Password))
-
-        composeTestRule.onNodeWithTag("username").requestFocus().performKeyInput {
-            pressKey(Key.DirectionCenter)
-        }
-        composeTestRule.onNodeWithTag("username").assertTextEquals("")
-        composeTestRule.onNodeWithTag("credential-state").assertTextEquals("values=0:0")
-
-        composeTestRule.onNodeWithTag("username").performKeyInput { pressKey(Key.Back) }
-        composeTestRule.onNodeWithTag("password").requestFocus().performKeyInput {
-            pressKey(Key.DirectionCenter)
-        }
-        composeTestRule.onNodeWithTag("password").assertTextEquals("")
-        composeTestRule.onNodeWithTag("password")
+            .assertTextEquals(FAKE_PASSWORD)
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
-        composeTestRule.onNodeWithTag("credential-state").assertTextEquals("values=0:0")
+    }
+
+    private companion object {
+        const val FAKE_PASSWORD = "fake password"
     }
 }

@@ -39,6 +39,9 @@ TIMESHIFT_COMMAND_TEST = (
 FOREGROUND_PLAYBACK_LIFECYCLE_TEST = (
     "at.bernhardberger.tvhplayer.playback.ForegroundPlaybackLifecycleDeviceAcceptanceTest"
 )
+CONNECTION_CREDENTIAL_TEST = (
+    "at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnectionSecureSurfaceTest"
+)
 RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 CAPTURE_ROOT = ROOT / "captures/device"
@@ -76,6 +79,7 @@ TEST_DEVICE_ACTIONS = {
     "channel-guide-check",
     "timeshift-command-check",
     "foreground-playback-lifecycle-check",
+    "connection-credential-check",
     "allow-appliance-autostart",
 }
 RELEASE_DEVICE_ACTIONS = {"install-release"}
@@ -673,6 +677,7 @@ def run_instrumentation_check(
         if success_summary is None:
             fail(f"{action} did not report a successful test run")
         expected_test_count = {
+            CONNECTION_CREDENTIAL_TEST: 3,
             TIMESHIFT_COMMAND_TEST: 2,
             FOREGROUND_PLAYBACK_LIFECYCLE_TEST: 5,
         }.get(test_class)
@@ -725,6 +730,16 @@ def run_foreground_playback_lifecycle_check(
         package_name,
         action="foreground-playback-lifecycle-check",
         test_class=FOREGROUND_PLAYBACK_LIFECYCLE_TEST,
+    )
+
+
+def run_connection_credential_check(adb: str, serial: str, package_name: str) -> None:
+    run_instrumentation_check(
+        adb,
+        serial,
+        package_name,
+        action="connection-credential-check",
+        test_class=CONNECTION_CREDENTIAL_TEST,
     )
 
 
@@ -1021,6 +1036,10 @@ def build_parser() -> argparse.ArgumentParser:
         "foreground-playback-lifecycle-check",
         help="Run bounded HOME, return, replacement, and root-exit playback checks",
     )
+    subparsers.add_parser(
+        "connection-credential-check",
+        help="Run the secure Connection surface lifetime checks",
+    )
 
     key_parser = subparsers.add_parser("key", help="Send an approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
@@ -1265,6 +1284,10 @@ def main() -> int:
 
     if args.action == "foreground-playback-lifecycle-check":
         run_foreground_playback_lifecycle_check(adb, serial, package_name)
+        return 0
+
+    if args.action == "connection-credential-check":
+        run_connection_credential_check(adb, serial, package_name)
         return 0
 
     if args.action == "launch":

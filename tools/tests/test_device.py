@@ -30,6 +30,7 @@ run_timeshift_command_check = DEVICE["run_timeshift_command_check"]
 run_foreground_playback_lifecycle_check = DEVICE[
     "run_foreground_playback_lifecycle_check"
 ]
+run_connection_credential_check = DEVICE["run_connection_credential_check"]
 run = DEVICE["run"]
 read_device_properties = DEVICE["read_device_properties"]
 key_events = DEVICE["KEY_EVENTS"]
@@ -54,6 +55,56 @@ class DevicePolicyTest(unittest.TestCase):
             DEVICE["DEFAULT_CREDENTIAL_FILE"].name,
             ".tvhplayer-credentials.json",
         )
+
+    def test_connection_credential_check_is_bounded_and_cleans_up(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        connection_runner_success = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout="INSTRUMENTATION_STATUS_CODE: 0\nOK (3 tests)\n",
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                connection_runner_success,
+                completed,
+                completed,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                run_connection_credential_check(
+                    "adb",
+                    "test-device",
+                    "at.bernhardberger.tvhplayer",
+                )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertIn(DEVICE["CONNECTION_CREDENTIAL_TEST"], commands[3])
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
 
     def test_active_named_target_is_selected_without_exposing_other_profiles(self) -> None:
         target_name, config = select_device_config(

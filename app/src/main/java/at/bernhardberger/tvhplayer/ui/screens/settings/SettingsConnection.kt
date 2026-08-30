@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
+import android.view.Window
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.focusGroup
@@ -18,8 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -32,8 +33,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
-import at.bernhardberger.tvhplayer.settings.configuredCredentialPresentation
-import at.bernhardberger.tvhplayer.settings.replacementCredentialsComplete
+import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
+import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
@@ -41,60 +42,144 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import java.util.WeakHashMap
+
+internal class ConnectionEditCredentials {
+    var username by mutableStateOf("")
+        private set
+    var password by mutableStateOf("")
+        private set
+
+    fun replace(username: String, password: String) {
+        this.username = username
+        this.password = password
+    }
+
+    fun updateUsername(username: String) {
+        this.username = username
+    }
+
+    fun updatePassword(password: String) {
+        this.password = password
+    }
+
+    fun clear() {
+        username = ""
+        password = ""
+    }
+}
+
+internal suspend fun ConnectionEditCredentials.loadFrom(
+    settingsStore: ConnectionProfileEditor,
+    applyEndpoint: (host: String, port: Int) -> Unit,
+) {
+    settingsStore.loadServerForEditing { host, port, username, password ->
+        applyEndpoint(host, port)
+        replace(username, password)
+    }
+}
+
+internal suspend fun ConnectionEditCredentials.saveTo(
+    settingsStore: ConnectionProfileEditor,
+    host: String,
+    port: Int,
+    acquireCredentialLease: () -> CredentialEditLease,
+) {
+    if (username.isBlank()) {
+        settingsStore.saveServer(host, port)
+    } else {
+        settingsStore.savePasswordServer(
+            host,
+            port,
+            username,
+            password,
+            acquireCredentialLease(),
+        )
+    }
+}
+
+internal object ConnectionSecureWindow {
+    private data class State(
+        var leaseCount: Int,
+        val clearOnFinalRelease: Boolean,
+    )
+
+    private val states = WeakHashMap<Window, State>()
+
+    fun acquire(window: Window?): CredentialEditLease {
+        if (window == null) return CredentialEditLease {}
+
+        synchronized(states) {
+            val existing = states[window]
+            if (existing == null) {
+                val wasSecure = window.hasSecureFlag()
+                if (!wasSecure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                states[window] = State(leaseCount = 1, clearOnFinalRelease = !wasSecure)
+            } else {
+                existing.leaseCount += 1
+                if (!window.hasSecureFlag()) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
+        }
+
+        return object : CredentialEditLease {
+            private var active = true
+
+            override fun release() = synchronized(states) {
+                if (!active) return@synchronized
+                active = false
+                val state = states[window] ?: return@synchronized
+                state.leaseCount -= 1
+                if (state.leaseCount == 0) {
+                    states.remove(window)
+                    if (state.clearOnFinalRelease) {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun Window.hasSecureFlag(): Boolean =
+        attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
+}
 
 @Composable
-fun SettingsConnection(
+internal fun SettingsConnection(
     initialFocusRequester: FocusRequester,
-    settingsStore: AppProfileOwner = koinInject(),
+    settingsStore: ConnectionProfileEditor = koinInject<AppProfileOwner>(),
 ) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current
+    val window = activity?.window
 
-    DisposableEffect(activity) {
-        val window = activity?.window
-        val addedSecureFlag = window != null &&
-            window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE == 0
-        if (addedSecureFlag) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose {
-            if (addedSecureFlag) window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        }
+    DisposableEffect(window) {
+        val lease = ConnectionSecureWindow.acquire(window)
+        onDispose(lease::release)
     }
 
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
 
     var host by rememberSaveable { mutableStateOf("") }
     var htspPort by rememberSaveable { mutableStateOf("9982") }
-    var user by remember { mutableStateOf("") }
-    var pass by remember { mutableStateOf("") }
-    var passwordChanged by remember { mutableStateOf(false) }
-    var passwordConfigured by remember { mutableStateOf(false) }
+    val credentials = remember { ConnectionEditCredentials() }
     var credentialError by remember { mutableStateOf(false) }
-    val configuredMarker = stringResource(R.string.configured_credential_placeholder)
-    val usernamePresentation = configuredCredentialPresentation(
-        value = user,
-        passwordConfigured = passwordConfigured,
-        marker = configuredMarker,
-    ).takeIf { editingId != "user" }
-    val passwordPresentation = configuredCredentialPresentation(
-        value = pass,
-        passwordConfigured = passwordConfigured,
-        marker = configuredMarker,
-    ).takeIf { editingId != "pass" }
     val parsedPort = htspPort.toIntOrNull()?.takeIf { it in 1..65535 }
-    val credentialsComplete = replacementCredentialsComplete(
-        passwordConfigured = passwordConfigured,
-        username = user,
-        password = pass,
-        passwordChanged = passwordChanged,
-    )
+    val credentialsComplete =
+        (credentials.username.isBlank() && credentials.password.isBlank()) ||
+            (credentials.username.isNotBlank() && credentials.password.isNotBlank())
     val validEndpoint = host.isNotBlank() && parsedPort != null && credentialsComplete
 
     LaunchedEffect(Unit) {
-        val s = settingsStore.serverSettings.first()
-        host = s.host
-        htspPort = s.htspPort.toString()
-        user = s.username
-        passwordConfigured = s.passwordConfigured
+        credentials.loadFrom(settingsStore) { configuredHost, configuredPort ->
+            host = configuredHost
+            htspPort = configuredPort.toString()
+        }
+    }
+
+    DisposableEffect(credentials) {
+        onDispose { credentials.clear() }
     }
 
     SettingsPane(title = stringResource(R.string.settings_server)) {
@@ -132,17 +217,10 @@ fun SettingsConnection(
                 id = "user",
                 editingId = editingId,
                 setEditingId = { editingId = it },
-                value = user,
-                onValueChange = { user = it },
+                value = credentials.username,
+                onValueChange = credentials::updateUsername,
                 label = { Text(stringResource(R.string.username)) },
-                modifier = Modifier.testTag(
-                    if (usernamePresentation != null) {
-                        "connection-username-configured"
-                    } else {
-                        "connection-username"
-                    },
-                ),
-                presentationValue = usernamePresentation,
+                modifier = Modifier.testTag("connection-username"),
             )
 
             Spacer(Modifier.height(12.dp))
@@ -151,26 +229,12 @@ fun SettingsConnection(
                 id = "pass",
                 editingId = editingId,
                 setEditingId = { editingId = it },
-                value = pass,
+                value = credentials.password,
                 onValueChange = {
-                    pass = it
-                    passwordChanged = true
+                    credentials.updatePassword(it)
                     credentialError = false
                 },
-                modifier = Modifier.testTag(
-                    if (passwordPresentation != null) {
-                        "connection-password-configured"
-                    } else {
-                        "connection-password"
-                    },
-                ),
-                presentationValue = passwordPresentation,
-            )
-
-            Text(
-                text = stringResource(R.string.password_replacement_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("connection-password"),
             )
 
             Spacer(Modifier.height(12.dp))
@@ -189,18 +253,9 @@ fun SettingsConnection(
                 val pHtsp = parsedPort ?: return@Button
                 scope.launch {
                     try {
-                        if (user.isBlank()) {
-                            settingsStore.saveServer(host.trim(), pHtsp)
-                            passwordConfigured = false
-                        } else {
-                            settingsStore.savePasswordServer(
-                                host.trim(), pHtsp, user, pass,
-                            )
-                            passwordConfigured = true
+                        credentials.saveTo(settingsStore, host.trim(), pHtsp) {
+                            ConnectionSecureWindow.acquire(window)
                         }
-                        user = ""
-                        pass = ""
-                        passwordChanged = false
                         credentialError = false
                     } catch (cancelled: CancellationException) {
                         throw cancelled
@@ -221,10 +276,7 @@ fun SettingsConnection(
                         } else {
                             settingsStore.clearProfile()
                         }
-                        user = ""
-                        pass = ""
-                        passwordConfigured = false
-                        passwordChanged = false
+                        credentials.clear()
                         credentialError = false
                     } catch (cancelled: CancellationException) {
                         throw cancelled

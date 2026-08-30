@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.settings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,52 +48,6 @@ class ServerConnectionConfigurationTest {
                 host = "2001:db8::10",
                 htspPort = 9982,
                 passwordConfigured = true,
-            ),
-        )
-    }
-
-    @Test
-    fun passwordProfileRequiresRealCredentialReentryInsteadOfSubmittingARedactionMarker() {
-        val editable = serverSettingsForEditing(
-            host = "tvheadend.example.invalid",
-            htspPort = 9982,
-            passwordConfigured = true,
-        )
-
-        assertEquals("", editable.username)
-        assertTrue(editable.passwordConfigured)
-        assertFalse(editable.username.contains("•"))
-        assertFalse(
-            replacementCredentialsComplete(
-                passwordConfigured = true,
-                username = "",
-                password = "",
-                passwordChanged = false,
-            ),
-        )
-        assertTrue(
-            replacementCredentialsComplete(
-                passwordConfigured = true,
-                username = "viewer",
-                password = "replacement",
-                passwordChanged = true,
-            ),
-        )
-    }
-
-    @Test
-    fun configuredProfilePresentsRedactedMarkersWithoutMakingThemEditableValues() {
-        val marker = "Configured"
-
-        assertEquals(marker, configuredCredentialPresentation("", true, marker))
-        assertNull(configuredCredentialPresentation("viewer", true, marker))
-        assertNull(configuredCredentialPresentation("", false, marker))
-        assertFalse(
-            replacementCredentialsComplete(
-                passwordConfigured = true,
-                username = "",
-                password = "",
-                passwordChanged = false,
             ),
         )
     }

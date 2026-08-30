@@ -57,8 +57,6 @@
     <string name="port_http">Http Port</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
-    <string name="password_replacement_hint">The saved password is never displayed. Enter a new value only to replace it.</string>
-    <string name="configured_credential_placeholder">Configured</string>
     <string name="clear_saved_password">Clear saved password</string>
     <string name="credential_save_failed">The credential could not be stored. Try clearing it and entering it again.</string>
     <string name="credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
