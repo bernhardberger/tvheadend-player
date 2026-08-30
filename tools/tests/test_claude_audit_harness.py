@@ -122,67 +122,38 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
                 self.assertIn("session or process", text)
                 self.assertIn("Never read project instructions", text)
 
-    def test_every_role_locks_runtime_quota_and_provenance(self) -> None:
-        expected_runtime = {
-            "claude-audit-lead": (
-                "anthropic/claude-opus-5",
-                "claude-opus-5",
-                "high",
-                "45",
-            ),
-            "claude-local-analysis": (
-                "anthropic/claude-sonnet-5",
-                "claude-sonnet-5",
-                "high",
-                "35",
-            ),
-            "claude-external-research": (
-                "anthropic/claude-sonnet-5",
-                "claude-sonnet-5",
-                "medium",
-                "30",
-            ),
-        }
-        for name, (route, model, variant, steps) in expected_runtime.items():
+    def test_roles_do_not_require_admission_ceremony(self) -> None:
+        forbidden = (
+            "quota_checked_at",
+            "quota_max_age_minutes",
+            "quota_eligible",
+            "RFC 3339 UTC",
+            "observed_route",
+            "observed_provider",
+            "observed_model",
+            "observed_variant",
+            "observed_mode",
+            "observed_steps",
+            "SEALED_",
+            "Require provenance for every supplied fact",
+            "Reject every Sol-",
+            "exact revision",
+        )
+        for name in CLAUDE_AGENTS:
             with self.subTest(name=name):
                 text = normalized(AGENT_DIR / f"{name}.md")
-                runtime_fields = (
-                    f"observed_route={route}",
-                    "observed_provider=anthropic",
-                    f"observed_model={model}",
-                    f"observed_variant={variant}",
-                    "observed_mode=subagent",
-                    f"observed_steps={steps}",
-                )
-                self.assertRegex(
-                    text,
-                    ".*".join(re.escape(field) for field in runtime_fields),
-                )
-                for expected in (
-                    "quota_checked_at",
-                    "RFC 3339 UTC",
-                    "quota_max_age_minutes=30",
-                    "quota_eligible=true",
-                    "Reject a future, malformed, or more-than-30-minute-old check",
-                    "Require provenance for every supplied fact and evidence item",
-                    "Reject every Sol-, Grok-, or other-track-generated input regardless of its label",
-                ):
-                    self.assertIn(expected, text)
+                for ceremony in forbidden:
+                    self.assertNotIn(ceremony, text)
 
         lead_text = normalized(AGENT_DIR / "claude-audit-lead.md")
-        self.assertIn(
-            "local `observed_route=anthropic/claude-sonnet-5`, "
-            "`observed_model=claude-sonnet-5`, `observed_variant=high`, "
-            "`observed_steps=35`;",
-            lead_text,
-        )
-        self.assertIn(
-            "research `observed_route=anthropic/claude-sonnet-5`, "
-            "`observed_model=claude-sonnet-5`, `observed_variant=medium`, "
-            "`observed_steps=30`. Both children must also attest "
-            "`observed_provider=anthropic` and `observed_mode=subagent`.",
-            lead_text,
-        )
+        self.assertIn("Do not require quota telemetry", lead_text)
+        self.assertIn("Never retry a child automatically", lead_text)
+        for name in ("claude-local-analysis", "claude-external-research"):
+            child_text = normalized(AGENT_DIR / f"{name}.md")
+            self.assertIn(
+                "Do not reject a usable task because optional packet metadata is absent",
+                child_text,
+            )
 
     def test_sonnet_roles_cannot_delegate(self) -> None:
         for name in ("claude-local-analysis", "claude-external-research"):
@@ -190,58 +161,36 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
                 role_permissions = permissions(AGENT_DIR / f"{name}.md")
                 self.assertEqual(role_permissions["task"], {"*": "deny"})
 
-    def test_command_requires_quota_isolation_and_sealed_reports(self) -> None:
+    def test_command_uses_configured_routes_and_simple_packets(self) -> None:
         text = normalized(COMMAND_PATH)
-        for label, (route, model, variant, steps) in {
-            "lead": (
-                "anthropic/claude-opus-5",
-                "claude-opus-5",
-                "high",
-                45,
-            ),
-            "local": (
-                "anthropic/claude-sonnet-5",
-                "claude-sonnet-5",
-                "high",
-                35,
-            ),
-            "research": (
-                "anthropic/claude-sonnet-5",
-                "claude-sonnet-5",
-                "medium",
-                30,
-            ),
-        }.items():
-            with self.subTest(label=label):
-                self.assertIn(
-                    f"{label}: `observed_route={route}`, "
-                    "`observed_provider=anthropic`, "
-                    f"`observed_model={model}`, `observed_variant={variant}`, "
-                    f"`observed_mode=subagent`, `observed_steps={steps}`",
-                    text,
-                )
-        required_contract = (
-            "anthropic/claude-opus-5",
-            "anthropic/claude-sonnet-5",
+        forbidden = (
             "quota_checked_at",
             "quota_eligible",
-            "quota_max_age_minutes=30",
+            "quota_max_age_minutes",
             "RFC 3339 UTC",
-            "Reject a future, malformed, or more-than-30-minute-old check",
+            "observed_route",
             "observed_provider",
             "observed_model",
             "observed_variant",
             "observed_mode",
             "observed_steps",
-            "stop without substitution",
-            "separate task packets",
-            "Do not pass one child's output to another child",
-            "SEALED_LOCAL_ANALYSIS",
-            "SEALED_EXTERNAL_RESEARCH",
-            "SEALED_CLAUDE_AUDIT",
-            "Do not accept a Sol-track map, report, candidate list, or conclusion",
-            "Reject every Sol-, Grok-, or other-track-generated input regardless of its label",
-            "Require provenance for every supplied fact and evidence item",
+            "SEALED_",
+            "Require provenance for every supplied fact",
+            "Reject every Sol-",
+        )
+        for ceremony in forbidden:
+            self.assertNotIn(ceremony, text)
+
+        required_contract = (
+            "Use the configured Claude routes",
+            "Do not ask any task to repeat route, model, variant, step, revision, quota, or provenance attestations",
+            "Never retry a child automatically",
+            "bounded question",
+            "allowed paths or sources",
+            "exclusions",
+            "required output",
+            "stop condition",
+            "Do not pass another track's analysis or conclusions",
         )
         for expected in required_contract:
             with self.subTest(expected=expected):
