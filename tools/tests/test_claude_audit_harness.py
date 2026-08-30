@@ -12,9 +12,9 @@ AGENT_DIR = ROOT / ".opencode/agents"
 COMMAND_PATH = ROOT / ".opencode/commands/claude-audit-track.md"
 
 CLAUDE_AGENTS = {
-    "claude-audit-lead": ("anthropic/claude-opus-5", "max", 60),
-    "claude-local-analysis": ("anthropic/claude-sonnet-5", "xhigh", 45),
-    "claude-external-research": ("anthropic/claude-sonnet-5", "high", 35),
+    "claude-audit-lead": ("anthropic/claude-opus-5", "high", 45),
+    "claude-local-analysis": ("anthropic/claude-sonnet-5", "high", 35),
+    "claude-external-research": ("anthropic/claude-sonnet-5", "medium", 30),
 }
 OPENAI_ANALYTICAL_ROLES = {
     "app-analyze",
@@ -127,32 +127,38 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
             "claude-audit-lead": (
                 "anthropic/claude-opus-5",
                 "claude-opus-5",
-                "max",
-                "60",
-            ),
-            "claude-local-analysis": (
-                "anthropic/claude-sonnet-5",
-                "claude-sonnet-5",
-                "xhigh",
+                "high",
                 "45",
             ),
-            "claude-external-research": (
+            "claude-local-analysis": (
                 "anthropic/claude-sonnet-5",
                 "claude-sonnet-5",
                 "high",
                 "35",
             ),
+            "claude-external-research": (
+                "anthropic/claude-sonnet-5",
+                "claude-sonnet-5",
+                "medium",
+                "30",
+            ),
         }
         for name, (route, model, variant, steps) in expected_runtime.items():
             with self.subTest(name=name):
                 text = normalized(AGENT_DIR / f"{name}.md")
-                for expected in (
+                runtime_fields = (
                     f"observed_route={route}",
                     "observed_provider=anthropic",
                     f"observed_model={model}",
                     f"observed_variant={variant}",
                     "observed_mode=subagent",
                     f"observed_steps={steps}",
+                )
+                self.assertRegex(
+                    text,
+                    ".*".join(re.escape(field) for field in runtime_fields),
+                )
+                for expected in (
                     "quota_checked_at",
                     "RFC 3339 UTC",
                     "quota_max_age_minutes=30",
@@ -163,6 +169,21 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
                 ):
                     self.assertIn(expected, text)
 
+        lead_text = normalized(AGENT_DIR / "claude-audit-lead.md")
+        self.assertIn(
+            "local `observed_route=anthropic/claude-sonnet-5`, "
+            "`observed_model=claude-sonnet-5`, `observed_variant=high`, "
+            "`observed_steps=35`;",
+            lead_text,
+        )
+        self.assertIn(
+            "research `observed_route=anthropic/claude-sonnet-5`, "
+            "`observed_model=claude-sonnet-5`, `observed_variant=medium`, "
+            "`observed_steps=30`. Both children must also attest "
+            "`observed_provider=anthropic` and `observed_mode=subagent`.",
+            lead_text,
+        )
+
     def test_sonnet_roles_cannot_delegate(self) -> None:
         for name in ("claude-local-analysis", "claude-external-research"):
             with self.subTest(name=name):
@@ -171,6 +192,34 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
 
     def test_command_requires_quota_isolation_and_sealed_reports(self) -> None:
         text = normalized(COMMAND_PATH)
+        for label, (route, model, variant, steps) in {
+            "lead": (
+                "anthropic/claude-opus-5",
+                "claude-opus-5",
+                "high",
+                45,
+            ),
+            "local": (
+                "anthropic/claude-sonnet-5",
+                "claude-sonnet-5",
+                "high",
+                35,
+            ),
+            "research": (
+                "anthropic/claude-sonnet-5",
+                "claude-sonnet-5",
+                "medium",
+                30,
+            ),
+        }.items():
+            with self.subTest(label=label):
+                self.assertIn(
+                    f"{label}: `observed_route={route}`, "
+                    "`observed_provider=anthropic`, "
+                    f"`observed_model={model}`, `observed_variant={variant}`, "
+                    f"`observed_mode=subagent`, `observed_steps={steps}`",
+                    text,
+                )
         required_contract = (
             "anthropic/claude-opus-5",
             "anthropic/claude-sonnet-5",

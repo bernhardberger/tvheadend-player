@@ -47,18 +47,18 @@
     },
     "claude-audit-lead": {
       "model": "anthropic/claude-opus-5",
-      "variant": "max",
-      "steps": 60
+      "variant": "high",
+      "steps": 45
     },
     "claude-local-analysis": {
       "model": "anthropic/claude-sonnet-5",
-      "variant": "xhigh",
-      "steps": 45
+      "variant": "high",
+      "steps": 35
     },
     "claude-external-research": {
       "model": "anthropic/claude-sonnet-5",
-      "variant": "high",
-      "steps": 35
+      "variant": "medium",
+      "steps": 30
     }
   },
   "permission": {

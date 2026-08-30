@@ -22,8 +22,8 @@ complete neutral packet supplied by the Claude audit lead.
 - Require exact revision, included paths, exclusions, question, evidence limit,
   stop condition, and observed runtime fields:
   `observed_route=anthropic/claude-sonnet-5`, `observed_provider=anthropic`,
-  `observed_model=claude-sonnet-5`, `observed_variant=xhigh`,
-  `observed_mode=subagent`, and `observed_steps=45`.
+  `observed_model=claude-sonnet-5`, `observed_variant=high`,
+  `observed_mode=subagent`, and `observed_steps=35`.
 - Require `quota_checked_at` in RFC 3339 UTC, `quota_max_age_minutes=30`,
   applicable remaining percentages, and `quota_eligible=true`. Reject a future,
   malformed, or more-than-30-minute-old check. Stop without substitution if
@@ -41,5 +41,5 @@ complete neutral packet supplied by the Claude audit lead.
 - Return concise `Scope inspected`, `Findings`, `Direct evidence`, `Inference`,
   `Alternatives`, and `Evidence gaps`. End a complete result with
   `SEALED_LOCAL_ANALYSIS`; do not seal a partial result.
-- The 45-step budget is terminal. Report the exact remaining evidence gap rather
+- The 35-step budget is terminal. Report the exact remaining evidence gap rather
   than broadening the packet.

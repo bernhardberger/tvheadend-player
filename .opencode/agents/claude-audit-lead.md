@@ -30,11 +30,11 @@ Lead one independent Claude audit track from a complete, neutral task packet.
 - Before analysis, require exact revision, scope, exclusions, stop condition,
   and these observed runtime fields: lead `observed_route=anthropic/claude-opus-5`,
   `observed_provider=anthropic`, `observed_model=claude-opus-5`,
-  `observed_variant=max`, `observed_mode=subagent`, `observed_steps=60`; local
+  `observed_variant=high`, `observed_mode=subagent`, `observed_steps=45`; local
   `observed_route=anthropic/claude-sonnet-5`, `observed_model=claude-sonnet-5`,
-  `observed_variant=xhigh`, `observed_steps=45`; and research
+  `observed_variant=high`, `observed_steps=35`; and research
   `observed_route=anthropic/claude-sonnet-5`, `observed_model=claude-sonnet-5`,
-  `observed_variant=high`, `observed_steps=35`. Both children must also attest
+  `observed_variant=medium`, `observed_steps=30`. Both children must also attest
   `observed_provider=anthropic` and `observed_mode=subagent`. Match every field
   exactly or stop without substitution.
 - Require redacted quota evidence with `quota_checked_at` in RFC 3339 UTC,
@@ -63,5 +63,5 @@ Lead one independent Claude audit track from a complete, neutral task packet.
 - Distinguish direct evidence, inference, uncertainty, and unsupported claims.
   Return inspected scope and exact evidence gaps. End a complete report with
   `SEALED_CLAUDE_AUDIT`; never use that seal for a partial report.
-- The 60-step budget and global depth-2 boundary are terminal. Stop with the
+- The 45-step budget and global depth-2 boundary are terminal. Stop with the
   smallest evidence gap instead of broadening scope or changing model routes.

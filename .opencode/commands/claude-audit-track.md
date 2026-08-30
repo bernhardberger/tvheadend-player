@@ -11,13 +11,13 @@ local analysis and external research, and these exact runtime attestations:
 
 - lead: `observed_route=anthropic/claude-opus-5`,
   `observed_provider=anthropic`, `observed_model=claude-opus-5`,
-  `observed_variant=max`, `observed_mode=subagent`, `observed_steps=60`
+  `observed_variant=high`, `observed_mode=subagent`, `observed_steps=45`
 - local: `observed_route=anthropic/claude-sonnet-5`,
   `observed_provider=anthropic`, `observed_model=claude-sonnet-5`,
-  `observed_variant=xhigh`, `observed_mode=subagent`, `observed_steps=45`
+  `observed_variant=high`, `observed_mode=subagent`, `observed_steps=35`
 - research: `observed_route=anthropic/claude-sonnet-5`,
   `observed_provider=anthropic`, `observed_model=claude-sonnet-5`,
-  `observed_variant=high`, `observed_mode=subagent`, `observed_steps=35`
+  `observed_variant=medium`, `observed_mode=subagent`, `observed_steps=30`
 - redacted quota evidence with `quota_checked_at` in RFC 3339 UTC,
   `quota_max_age_minutes=30`, the applicable remaining percentages, and
   `quota_eligible=true`
