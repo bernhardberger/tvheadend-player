@@ -1,26 +1,39 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import java.io.File
-import org.junit.Assert.assertTrue
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LivePlaybackStartPolicyTest {
-    private val repositoryRoot = generateSequence(
-        File(requireNotNull(System.getProperty("user.dir"))),
-    ) { it.parentFile }.first { File(it, ".git").exists() }
-
     @Test
-    fun initialPlaybackIsResolvedOnlyAfterTargetRequestCompletes() {
-        val source = File(
-            repositoryRoot,
-            "app/src/main/java/at/bernhardberger/tvhplayer/ui/player/VideoPlayerScreen.kt",
-        ).readText()
-        val requestBlock = source.substringAfter("val playbackSelection =")
-            .substringBefore("LaunchedEffect(playingLiveChannelId")
-        val requestIndex = requestBlock.indexOf("videoPlayerViewModel.playChannel(playbackSelection)")
-        val resolvedIndex = requestBlock.indexOf("initialPlaybackResolved = true")
+    fun initialPlaybackIsResolvedOnlyAfterTargetRequestCompletes() = runTest {
+        val requestStarted = CompletableDeferred<Unit>()
+        val requestResult = CompletableDeferred<PlaybackTargetResult>()
+        var resolvedResult: PlaybackTargetResult? = null
 
-        assertTrue(requestIndex >= 0)
-        assertTrue(resolvedIndex > requestIndex)
+        val start = launch {
+            startInitialLivePlayback(
+                startPlayback = {
+                    requestStarted.complete(Unit)
+                    requestResult.await()
+                },
+                onResolved = { resolvedResult = it },
+            )
+        }
+        requestStarted.await()
+        runCurrent()
+
+        assertFalse(start.isCompleted)
+        assertEquals(null, resolvedResult)
+        requestResult.complete(PlaybackTargetResult.STARTED)
+        start.join()
+        assertEquals(PlaybackTargetResult.STARTED, resolvedResult)
     }
 }

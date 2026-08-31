@@ -204,6 +204,13 @@ internal suspend fun stopPlaybackAndClose(
     closePlayer()
 }
 
+internal suspend fun startInitialLivePlayback(
+    startPlayback: suspend () -> PlaybackTargetResult?,
+    onResolved: (PlaybackTargetResult?) -> Unit,
+) {
+    onResolved(startPlayback())
+}
+
 val bottomGradient = Brush.verticalGradient(
     0f to Color.Transparent,
     0.35f to Color.Black.copy(alpha = 0.35f),
@@ -402,12 +409,16 @@ fun VideoPlayerScreen(
             ?.takeIf { it.channelId == currentChannelId }
             ?: currentSession?.let { LivePlaybackSelection(it, currentChannelId) }
             ?: return@LaunchedEffect
-        val result = videoPlayerViewModel.playChannel(playbackSelection)
-        initialPlaybackResolved = true
-        if (result == PlaybackTargetResult.STARTED) {
-            lastPlayedChannelId = currentChannelId
-            requestedLiveSelection = null
-        }
+        startInitialLivePlayback(
+            startPlayback = { videoPlayerViewModel.playChannel(playbackSelection) },
+            onResolved = { result ->
+                initialPlaybackResolved = true
+                if (result == PlaybackTargetResult.STARTED) {
+                    lastPlayedChannelId = currentChannelId
+                    requestedLiveSelection = null
+                }
+            },
+        )
     }
 
     LaunchedEffect(playingLiveChannelId, currentChannelId) {

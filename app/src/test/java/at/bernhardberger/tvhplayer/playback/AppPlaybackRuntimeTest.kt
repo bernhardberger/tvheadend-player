@@ -3,31 +3,43 @@ package at.bernhardberger.tvhplayer.playback
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
-import java.io.File
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AppPlaybackRuntimeTest {
-    private val repositoryRoot = generateSequence(
-        File(requireNotNull(System.getProperty("user.dir"))),
-    ) { it.parentFile }.first { File(it, ".git").exists() }
-
     @Test
-    fun liveTargetSetsAppOwnedPlayIntentBeforeCoordinatorInstall() {
-        val source = File(
-            repositoryRoot,
-            "app/src/main/java/at/bernhardberger/tvhplayer/playback/AppPlaybackRuntime.kt",
-        ).readText()
-        val playIndex = source.indexOf("player.play()")
-        val installIndex = source.indexOf("coordinator.setLiveTarget(")
+    fun liveTargetSetsAppOwnedPlayIntentBeforeCoordinatorInstall() = runTest {
+        val events = mutableListOf<String>()
+        val targetInstalled = CompletableDeferred<PlaybackTargetResult>()
 
-        assertTrue(playIndex >= 0)
-        assertTrue(playIndex < installIndex)
+        val result = async {
+            requestBoundLiveTarget(
+                requestPlayIntent = { events += "play" },
+                installTarget = {
+                    events += "install"
+                    targetInstalled.await()
+                },
+            )
+        }
+        runCurrent()
+
+        assertEquals(listOf("play", "install"), events)
+        assertFalse(result.isCompleted)
+        targetInstalled.complete(PlaybackTargetResult.STARTED)
+        assertEquals(PlaybackTargetResult.STARTED, result.await())
     }
 
     @Test
@@ -371,36 +383,81 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
-    fun recordingRetryReadsItsRequestInsideTargetCommandSerialization() {
-        val source = File(
-            repositoryRoot,
-            "app/src/main/java/at/bernhardberger/tvhplayer/playback/AppPlaybackRuntime.kt",
-        ).readText()
-        val retryRecording = source.substring(
-            startIndex = source.indexOf("suspend fun retryRecording()"),
-            endIndex = source.indexOf("suspend fun pauseTimeshift()"),
-        )
+    fun recordingRetryReadsItsRequestInsideTargetCommandSerialization() = runTest {
+        val commands = PlaybackTargetCommandSerialization()
+        val blockerStarted = CompletableDeferred<Unit>()
+        val releaseBlocker = CompletableDeferred<Unit>()
+        var request = "old"
+        val blocker = launch {
+            commands.serialize {
+                blockerStarted.complete(Unit)
+                releaseBlocker.await()
+                request = "new"
+            }
+        }
+        blockerStarted.await()
 
-        assertTrue(
-            retryRecording.indexOf("targetCommandMutex.withLock") in
-                0 until retryRecording.indexOf("lastRecordingRequest"),
-        )
+        val retried = async {
+            commands.retryRecording(
+                currentRequest = { request },
+                retry = { it },
+            )
+        }
+        runCurrent()
+
+        assertFalse(retried.isCompleted)
+        releaseBlocker.complete(Unit)
+        blocker.join()
+        assertEquals("new", retried.await())
     }
 
     @Test
-    fun recordingForegroundResumeUsesOnlyTheExistingPlayerTarget() {
-        val source = File(
-            repositoryRoot,
-            "app/src/main/java/at/bernhardberger/tvhplayer/playback/AppPlaybackRuntime.kt",
-        ).readText()
-        val foregroundAction = source.substring(
-            startIndex = source.indexOf("private suspend fun applyForegroundPlaybackAction"),
-            endIndex = source.indexOf("private fun beginTargetPresentation"),
+    fun recordingRetryWithoutARequestDoesNothing() = runTest {
+        val commands = PlaybackTargetCommandSerialization()
+
+        val result = commands.retryRecording<String, String>(
+            currentRequest = { null },
+            retry = { error("retry must not run") },
         )
 
-        assertTrue("ResumeRecording -> player.play()" in foregroundAction)
-        assertFalse("setRecordingTarget" in foregroundAction)
-        assertFalse("playRecording" in foregroundAction)
-        assertFalse("seekTo" in foregroundAction)
+        assertNull(result)
+    }
+
+    @Test
+    fun nonRecordingForegroundActionsInvokeOnlyTheirOwnedEffect() = runTest {
+        val cases = listOf(
+            ForegroundPlaybackAction.None to emptyList(),
+            ForegroundPlaybackAction.StopLive to listOf("stop-live"),
+            ForegroundPlaybackAction.PauseRecording to listOf("pause-recording"),
+            ForegroundPlaybackAction.ResumeLive(ChannelId(7)) to listOf("resume-live:7"),
+        )
+
+        cases.forEach { (action, expected) ->
+            val events = mutableListOf<String>()
+            executeForegroundPlaybackAction(
+                action = action,
+                stopLive = { events += "stop-live" },
+                pauseRecording = { events += "pause-recording" },
+                resumeLive = { events += "resume-live:${it.value}" },
+                resumeRecording = { events += "resume-recording" },
+            )
+
+            assertEquals(action.toString(), expected, events)
+        }
+    }
+
+    @Test
+    fun recordingForegroundResumeUsesOnlyTheExistingPlayerTarget() = runTest {
+        val events = mutableListOf<String>()
+
+        executeForegroundPlaybackAction(
+            action = ForegroundPlaybackAction.ResumeRecording,
+            stopLive = { events += "stop-live" },
+            pauseRecording = { events += "pause-recording" },
+            resumeLive = { events += "resume-live:$it" },
+            resumeRecording = { events += "resume-recording" },
+        )
+
+        assertEquals(listOf("resume-recording"), events)
     }
 }

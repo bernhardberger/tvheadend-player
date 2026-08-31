@@ -29,6 +29,8 @@ import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
@@ -96,8 +98,13 @@ private fun Int.isStartupActivationKey(): Boolean = when (this) {
 class MainActivity : AppCompatActivity() {
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
+    private val playbackLifecycle = MainActivityPlaybackLifecycle(
+        onAppForegrounded = { playbackRuntime.onAppForegrounded() },
+        onAppBackgrounded = { playbackRuntime.onAppBackgrounded() },
+        stopPlayback = { playbackRuntime.stop() },
+        finishActivity = ::finish,
+    )
     private var isPlayerVisible = false
-    private val rootExitGate = MainRootExitGate()
     private var debugVideoBackdropVisible by mutableStateOf(false)
     private var debugVideoBackdropReceiverRegistered = false
     private val mainStartupKeyCycleOwner = MainStartupKeyCycleOwner()
@@ -154,7 +161,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        playbackRuntime.onAppForegrounded()
+        playbackLifecycle.onActivityStarted()
         if (BuildConfig.DEBUG && !debugVideoBackdropReceiverRegistered) {
             ContextCompat.registerReceiver(
                 this,
@@ -185,17 +192,13 @@ class MainActivity : AppCompatActivity() {
             debugVideoBackdropReceiverRegistered = false
         }
         debugVideoBackdropVisible = false
-        playbackRuntime.onAppBackgrounded()
+        playbackLifecycle.onActivityStopped()
         super.onStop()
     }
 
     private fun requestRootExit() {
-        if (!rootExitGate.tryBegin()) return
         lifecycleScope.launch {
-            stopPlaybackAndClose(
-                stopPlayback = playbackRuntime::stop,
-                closePlayer = ::finish,
-            )
+            playbackLifecycle.onRootExitRequested()
         }
     }
 
@@ -227,12 +230,27 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-internal class MainRootExitGate {
-    private var inProgress = false
+internal class MainActivityPlaybackLifecycle(
+    private val onAppForegrounded: () -> Unit,
+    private val onAppBackgrounded: () -> Unit,
+    private val stopPlayback: suspend () -> Unit,
+    private val finishActivity: () -> Unit,
+) {
+    private val rootExitMutex = Mutex()
+    private var rootExitStarted = false
 
-    fun tryBegin(): Boolean {
-        if (inProgress) return false
-        inProgress = true
-        return true
+    fun onActivityStarted() = onAppForegrounded()
+
+    fun onActivityStopped() = onAppBackgrounded()
+
+    suspend fun onRootExitRequested() {
+        rootExitMutex.withLock {
+            if (rootExitStarted) return@withLock
+            rootExitStarted = true
+            stopPlaybackAndClose(
+                stopPlayback = stopPlayback,
+                closePlayer = finishActivity,
+            )
+        }
     }
 }
