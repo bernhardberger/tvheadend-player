@@ -36,11 +36,6 @@
     <string name="settings_channel_tags_last_enabled">Erforderlich – mindestens eine Gruppe muss aktiv bleiben.</string>
     <string name="show_epg_menu">Programmführer-Menü anzeigen</string>
     <string name="show_epg_menu_description">Programmführer in der Hauptnavigation anzeigen.</string>
-    <string name="channels_layout_section">Senderdarstellung</string>
-    <string name="channels_layout_list">Liste mit Details</string>
-    <string name="channels_layout_list_description">Senderliste mit dauerhaftem Programmdetailbereich.</string>
-    <string name="channels_layout_cards">Große Karten</string>
-    <string name="channels_layout_cards_description">Ein 3-spaltiges Kartenraster mit größeren Logos und Titeln.</string>
     <string name="player_info">Info</string>
     <string name="player_info_close">Info schließen</string>
     <string name="player_info_pane_title">Programminformationen</string>

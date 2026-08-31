@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -45,8 +43,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.components.ChannelCardGrid
-import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.TvPlaybackPadding
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -67,10 +63,8 @@ fun ChannelDrawer(
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: () -> Unit,
-    largeCards: Boolean = false,
 ) {
     val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
@@ -88,11 +82,7 @@ fun ChannelDrawer(
 
     fun pageChannels(direction: Int): Boolean {
         val currentIndex = channels.indexOfFirst { it.id == selectedId }
-        val visibleCount = if (largeCards) {
-            gridState.layoutInfo.visibleItemsInfo.size
-        } else {
-            listState.layoutInfo.visibleItemsInfo.size
-        }
+        val visibleCount = listState.layoutInfo.visibleItemsInfo.size
         val targetIndex = ChannelNavigation.pageTargetIndex(
             itemCount = channels.size,
             currentIndex = currentIndex,
@@ -109,17 +99,10 @@ fun ChannelDrawer(
         onFocusChannel(targetId)
         coroutineScope.launch {
             try {
-                if (largeCards) {
-                    gridState.scrollToItem(targetIndex)
-                    snapshotFlow {
-                        gridState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
-                    }.filter { it }.first()
-                } else {
-                    listState.scrollToItem(targetIndex)
-                    snapshotFlow {
-                        listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
-                    }.filter { it }.first()
-                }
+                listState.scrollToItem(targetIndex)
+                snapshotFlow {
+                    listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
+                }.filter { it }.first()
                 withFrameNanos { }
                 targetFocus.requestFocus()
                 withFrameNanos { }
@@ -130,7 +113,7 @@ fun ChannelDrawer(
         return true
     }
 
-    LaunchedEffect(channels, selectedId, largeCards) {
+    LaunchedEffect(channels, selectedId) {
         if (didInitialRestore) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
 
@@ -140,17 +123,10 @@ fun ChannelDrawer(
 
         isRestoring = true
 
-        if (largeCards) {
-            gridState.scrollToItem(idx)
-            snapshotFlow {
-                gridState.layoutInfo.visibleItemsInfo.any { it.key == id }
-            }.filter { it }.first()
-        } else {
-            listState.scrollToItem(idx)
-            snapshotFlow {
-                listState.layoutInfo.visibleItemsInfo.any { it.key == id }
-            }.filter { it }.first()
-        }
+        listState.scrollToItem(idx)
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo.any { it.key == id }
+        }.filter { it }.first()
 
         withFrameNanos { }
         rowFocusRequesters[id]?.requestFocus()
@@ -160,17 +136,15 @@ fun ChannelDrawer(
         isRestoring = false
     }
 
-    val drawerWidth = if (largeCards) 720.dp else 480.dp
     Box(
         modifier = Modifier
             // Keep the focusable list inside the opaque region; fade only over video.
-            .width(drawerWidth)
+            .width(480.dp)
             .fillMaxHeight()
             .background(
                 Brush.horizontalGradient(
                     0f to Color.Black.copy(alpha = 0.96f),
-                    (if (largeCards) 0.88f else 0.82f) to
-                        Color.Black.copy(alpha = 0.92f),
+                    0.82f to Color.Black.copy(alpha = 0.92f),
                     1f to Color.Transparent,
                 )
             )
@@ -180,15 +154,9 @@ fun ChannelDrawer(
                     ev.nativeKeyEvent.keyCode
                 )?.let(::pageChannels)?.let { return@onPreviewKeyEvent it }
                 when (ev.key) {
-                    // Right closes the narrow list drawer only. The large-card
-                    // grid needs Left/Right to move between tiles.
                     Key.DirectionRight -> {
-                        if (largeCards) {
-                            false
-                        } else {
-                            onCloseDrawer()
-                            true
-                        }
+                        onCloseDrawer()
+                        true
                     }
                     else -> false
                 }
@@ -204,49 +172,6 @@ fun ChannelDrawer(
             ) {
                 androidx.tv.material3.Text(stringResource(R.string.empty_channel_tag))
             }
-        } else if (largeCards) {
-            val cardItems = remember(
-                channels,
-                nowSec,
-                playingChannelId,
-                recordingChannelIds,
-                noEpg,
-            ) {
-                channels.map { ch ->
-                    val channelId = ch.id
-                    val now = channelsVm.nowEvent(channelId, nowSec)
-                    val status = channelNowStatus(
-                        channelId = channelId,
-                        playingChannelId = playingChannelId,
-                        recordingChannelIds = recordingChannelIds,
-                    )
-                    ChannelCardModel(
-                        channel = ch,
-                        number = ChannelNavigation.numberForId(
-                            orderedChannelIds,
-                            channelNumbers,
-                            channelId,
-                        ),
-                        programmeTitle = now?.title ?: noEpg,
-                        playingNow = status.playingNow,
-                        recordingNow = status.recordingNow,
-                        progress = now?.progress(nowSec),
-                    )
-                }
-            }
-            ChannelCardGrid(
-                items = cardItems,
-                imageLoader = imageLoader,
-                currentSession = currentSession,
-                focusRequesters = rowFocusRequesters,
-                gridState = gridState,
-                contentPadding = TvPlaybackPadding,
-                onFocusChannel = { if (!isRestoring) onFocusChannel(it) },
-                onConfirmChannel = onPickChannel,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(),
-            )
         } else {
             LazyColumn(
                 state = listState,

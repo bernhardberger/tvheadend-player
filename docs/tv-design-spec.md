@@ -313,9 +313,9 @@ regardless of actual progress.
 
 ### 6.3 Cards
 
-Use the TV Material card containers. `StandardCardContainer`, `WideCardContainer`,
-`ClassicCard` and `CompactCard` are at zero usages while two card types are
-hand-built.
+The app has no alternate card-based channel layout. If a future product surface
+requires browse cards, use TV Material card containers rather than hand-built
+focusable replicas.
 
 - Widths come from the guidance grid at 20dp peek spacing:
   `844 / 412 / 268 / 196 / 124`.

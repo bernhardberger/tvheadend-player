@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
@@ -61,7 +60,6 @@ import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.ChannelBrowseLayout
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
@@ -71,16 +69,12 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
 import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
-import at.bernhardberger.tvhplayer.settings.UiSettings
-import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.core.programmeSummaryText
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
-import at.bernhardberger.tvhplayer.ui.components.ChannelCardGrid
-import at.bernhardberger.tvhplayer.ui.components.ChannelCardModel
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -121,7 +115,6 @@ fun ChannelsScreen(
     channelViewModel: ChannelsViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
-    uiSettingsStore: UiSettingsStore = koinInject(),
     playingChannelId: ChannelId?,
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
@@ -145,7 +138,6 @@ fun ChannelsScreen(
     val currentSession = observation.currentSession
     val dvrEntries = observation.dvrEntries()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
-    val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
@@ -158,12 +150,10 @@ fun ChannelsScreen(
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
     var didInitialRestore by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
-    val useCards = uiSettings.channelBrowseLayout == ChannelBrowseLayout.LARGE_CARDS
 
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
 
     val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -177,11 +167,7 @@ fun ChannelsScreen(
 
     fun pageChannels(direction: Int): Boolean {
         val currentIndex = channels.indexOfFirst { it.id == selectedId }
-        val visibleCount = if (useCards) {
-            gridState.layoutInfo.visibleItemsInfo.size
-        } else {
-            listState.layoutInfo.visibleItemsInfo.size
-        }
+        val visibleCount = listState.layoutInfo.visibleItemsInfo.size
         val targetIndex = ChannelNavigation.pageTargetIndex(
             itemCount = channels.size,
             currentIndex = currentIndex,
@@ -198,17 +184,10 @@ fun ChannelsScreen(
         selection.setSelected(targetId)
         coroutineScope.launch {
             try {
-                if (useCards) {
-                    gridState.scrollToItem(targetIndex)
-                    snapshotFlow {
-                        gridState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
-                    }.filter { it }.first()
-                } else {
-                    listState.scrollToItem(targetIndex)
-                    snapshotFlow {
-                        listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
-                    }.filter { it }.first()
-                }
+                listState.scrollToItem(targetIndex)
+                snapshotFlow {
+                    listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
+                }.filter { it }.first()
                 withFrameNanos { }
                 targetFocus.requestFocus()
                 withFrameNanos { }
@@ -243,7 +222,7 @@ fun ChannelsScreen(
         if (focusId != selectedId) selection.setSelected(focusId)
     }
 
-    LaunchedEffect(channels, selectedId, useCards, initialFocusEnabled) {
+    LaunchedEffect(channels, selectedId, initialFocusEnabled) {
         if (!initialFocusEnabled) return@LaunchedEffect
         if (didInitialRestore) return@LaunchedEffect
         if (channels.isEmpty()) return@LaunchedEffect
@@ -255,17 +234,10 @@ fun ChannelsScreen(
 
         isRestoring = true
 
-        if (useCards) {
-            gridState.scrollToItem(idx)
-            snapshotFlow {
-                gridState.layoutInfo.visibleItemsInfo.any { it.key == id }
-            }.filter { it }.first()
-        } else {
-            listState.scrollToItem(idx)
-            snapshotFlow {
-                listState.layoutInfo.visibleItemsInfo.any { it.key == id }
-            }.filter { it }.first()
-        }
+        listState.scrollToItem(idx)
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo.any { it.key == id }
+        }.filter { it }.first()
 
         withFrameNanos { }
         rowFocusRequesters[id]?.requestFocus()
@@ -343,88 +315,7 @@ fun ChannelsScreen(
             Spacer(Modifier.height(12.dp))
         }
 
-        if (useCards) {
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                colors = SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(
-                        alpha = TvPanelBrowseAlpha
-                    ),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-                modifier = Modifier
-                    .padding(browseViewportPadding)
-                    .fillMaxSize(),
-            ) {
-                Column(Modifier.fillMaxSize().padding(8.dp)) {
-                    UnavailableTagNotice(
-                        visible = tagNotice,
-                        onDismiss = channelViewModel::dismissUnavailableTagNotice,
-                    )
-                    if (tagNotice) Spacer(Modifier.height(8.dp))
-                    val noEpg = stringResource(R.string.no_epg)
-                    val cardItems = remember(
-                        channels,
-                        observation,
-                        nowSec,
-                        playingChannelId,
-                        recordingChannelIds,
-                        noEpg,
-                    ) {
-                        channels.map { ch ->
-                            val channelId = ch.id
-                            val now = observation.eventAt(
-                                channelId,
-                                kotlin.time.Instant.fromEpochSeconds(nowSec),
-                            )
-                            val status = channelNowStatus(
-                                channelId = channelId,
-                                playingChannelId = playingChannelId,
-                                recordingChannelIds = recordingChannelIds,
-                            )
-                            ChannelCardModel(
-                                channel = ch,
-                                number = ChannelNavigation.numberForId(
-                                    orderedChannelIds,
-                                    channelNumbers,
-                                    channelId,
-                                ),
-                                programmeTitle = now?.title ?: noEpg,
-                                playingNow = status.playingNow,
-                                recordingNow = status.recordingNow,
-                                progress = now?.progress(nowSec),
-                            )
-                        }
-                    }
-                    ChannelCardGrid(
-                        items = cardItems,
-                        imageLoader = imageLoader,
-                        currentSession = currentSession,
-                        focusRequesters = rowFocusRequesters,
-                        gridState = gridState,
-                        onFocusChannel = {
-                            if (!isRestoring) selection.setSelected(it)
-                        },
-                        onConfirmChannel = { ch ->
-                            currentSession?.let {
-                                onPlay(LivePlaybackSelection(it, ch.id), ch.name.orEmpty())
-                            }
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .onPreviewKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) {
-                                    return@onPreviewKeyEvent false
-                                }
-                                ChannelNavigation.pageDirectionForKeyCode(
-                                    event.nativeKeyEvent.keyCode
-                                )?.let(::pageChannels) ?: false
-                            },
-                    )
-                }
-            }
-        } else {
-            Row(
+        Row(
                 Modifier
                     .padding(browseViewportPadding)
                     .fillMaxSize(),
@@ -540,7 +431,6 @@ fun ChannelsScreen(
                     )
                 }
             }
-        }
     }
 }
 

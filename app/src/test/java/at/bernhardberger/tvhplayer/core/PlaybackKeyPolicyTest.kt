@@ -240,7 +240,7 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun simpleTvDoesNotOpenChannelsOnLeftButDoesOnListRemoteKey() {
+    fun simpleTvOpensTheChannelListOnLeftAndListRemoteKeys() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
             controlsVisible = false,
@@ -249,7 +249,7 @@ class PlaybackKeyPolicyTest {
             simpleTvActive = true,
         )
         assertEquals(
-            PlayerKeyAction.PASS_THROUGH,
+            PlayerKeyAction.OPEN_CHANNELS,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
         )
         assertEquals(

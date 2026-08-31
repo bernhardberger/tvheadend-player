@@ -177,10 +177,7 @@ fun playerKeyAction(
         KeyEvent.KEYCODE_DPAD_LEFT -> when {
             context.surface == PlayerSurface.RECORDING || context.timeshiftAvailable ->
                 PlayerKeyAction.SEEK_BACK
-            // Simple TV must not steal Left for the channel grid — Left/Right are
-            // needed for in-grid focus. Use the remote list key or the on-screen
-            // channels control instead (Material for TV / remote-first).
-            context.surface == PlayerSurface.LIVE && !context.simpleTvActive ->
+            context.surface == PlayerSurface.LIVE ->
                 PlayerKeyAction.OPEN_CHANNELS
             else -> PlayerKeyAction.PASS_THROUGH
         }

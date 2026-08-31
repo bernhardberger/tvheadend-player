@@ -63,14 +63,8 @@ val TvPlaybackPadding = PaddingValues(
     bottom = 32.dp,
 )
 
-/** Three-across channel card width on the 960dp guidance canvas. */
-val ChannelCardWidth = 268.dp
-
-/** Four-across/fallback card width used by narrower playback surfaces. */
-val CompactChannelCardWidth = 196.dp
-
-/** Material for TV card-lane peek spacing. */
-val TvCardSpacing = 20.dp
+/** Keeps a long channel-scope label from consuming the browse header. */
+val ChannelScopeItemMaxWidth = 196.dp
 
 /** Softens the collapsed navigation plane into the browse content gutter. */
 val TvNavigationRailGradientRunout = TvSpacing32

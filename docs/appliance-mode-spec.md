@@ -123,9 +123,10 @@ fun adjacentChannelId(
   destination content descriptions.
 - Normal non-autoplay launches open Channels. Autoplay and Simple TV launches
   continue to resume the last successfully played channel, falling back to the
-  first available channel. Channels may use List with details (default) or Large
-  cards. Simple TV quick select uses the large-card grid. Player Info reuses the
-  shared Content Details composition.
+  first available channel. Channels uses one channel list with a persistent
+  programme-details pane. The playback channel sheet uses the same list-row
+  presentation for Standard and Simple TV quick selection. Player Info reuses
+  the shared Content Details composition.
 - With controls hidden, Center/Enter/Numpad Enter toggles Play/Pause and reveals
   controls for timeshift Live TV and recordings; non-timeshift Live TV reveals
   without a playback change because pause is unavailable. Up/Down is the neutral

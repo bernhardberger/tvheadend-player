@@ -40,7 +40,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.CompactChannelCardWidth
+import at.bernhardberger.tvhplayer.ui.ChannelScopeItemMaxWidth
 import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -143,7 +143,7 @@ fun ChannelTagSelector(
                             horizontal = TvSpacing16,
                             vertical = TvSpacing8,
                         )
-                        .widthIn(max = CompactChannelCardWidth),
+                        .widthIn(max = ChannelScopeItemMaxWidth),
                 )
             }
         }
