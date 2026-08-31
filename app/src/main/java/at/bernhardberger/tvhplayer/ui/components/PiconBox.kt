@@ -2,8 +2,6 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LiveTv
 import androidx.tv.material3.Icon
@@ -13,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
@@ -21,13 +18,11 @@ import coil3.compose.SubcomposeAsyncImage
 @Composable
 fun PiconBox(
     imageLoader: ImageLoader,
+    piconPath: String?,
+    modifier: Modifier = Modifier,
     currentSession: CurrentSessionObservation? = null,
     serverTag: String = "default",
-    piconPath: String?,
     contentScale: ContentScale = ContentScale.Fit,
-    modifier: Modifier = Modifier
-        .width(92.dp)
-        .height(64.dp),
 ) {
     val piconUrl = remember(currentSession, serverTag, piconPath) {
         currentSession?.let {
@@ -40,7 +35,7 @@ fun PiconBox(
         contentAlignment = Alignment.Center
     ) {
         if (piconUrl == null) {
-            PiconPlaceholder()
+            PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f))
         } else {
             SubcomposeAsyncImage(
                 model = piconUrl,
@@ -48,8 +43,8 @@ fun PiconBox(
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
-                loading = { PiconPlaceholder() },
-                error = { PiconPlaceholder() },
+                loading = { PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f)) },
+                error = { PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f)) },
             )
         }
     }
@@ -57,8 +52,8 @@ fun PiconBox(
 
 @Composable
 fun PiconPlaceholder(
+    modifier: Modifier = Modifier,
     initials: String? = null,
-    modifier: Modifier = Modifier.fillMaxSize(0.5f),
 ) {
     if (!initials.isNullOrBlank()) {
         androidx.tv.material3.Text(

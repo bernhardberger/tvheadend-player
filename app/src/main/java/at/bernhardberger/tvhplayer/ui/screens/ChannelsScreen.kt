@@ -490,7 +490,10 @@ private fun EmptyChannelsState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            DelayedConnectionProgress(visible = state.isConnectionProgress())
+            DelayedConnectionProgress(
+                visible = state.isConnectionProgress(),
+                modifier = Modifier.size(40.dp),
+            )
             Text(
                 text = connectionMessage(state),
                 style = MaterialTheme.typography.titleLarge,
@@ -597,7 +600,7 @@ private fun InlineConnectionState(
 @Composable
 private fun DelayedConnectionProgress(
     visible: Boolean,
-    modifier: Modifier = Modifier.size(40.dp),
+    modifier: Modifier,
 ) {
     var show by remember { mutableStateOf(false) }
     LaunchedEffect(visible) {
@@ -695,6 +698,7 @@ private fun EpgDetailPane(
                     imageLoader = imageLoader,
                     currentSession = currentSession,
                     piconPath = piconPath,
+                    modifier = Modifier.width(92.dp).height(64.dp),
                 )
             }
         }

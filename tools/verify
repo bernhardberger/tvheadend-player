@@ -30,6 +30,9 @@ fi
 printf '==> Tool policy tests\n'
 python3 -m unittest discover -s tools/tests
 
+printf '==> Static rule checks\n'
+python3 tools/static_rules.py
+
 printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
 ./gradlew \
     testDebugUnitTest \

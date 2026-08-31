@@ -12,7 +12,7 @@ import androidx.tv.material3.darkColorScheme
 // Bright enough for small recording labels on the product's dark badge surface.
 val TvRecordingColor = Color(0xFFFF5449)
 
-private val DarkColors = darkColorScheme(
+internal val TvDarkColors = darkColorScheme(
     primary = Color(0xFF00BCFA),
     onPrimary = Color(0xFF00344B),
     primaryContainer = Color(0xFF003E55),
@@ -47,36 +47,36 @@ private val DarkColors = darkColorScheme(
 // TV Material 1.1.0 does not provide text fields, progress indicators, dividers,
 // or dialogs. Keep the official mobile Material implementations color-aligned
 // rather than recreating their input, semantics, and accessibility behavior.
-private val MobileDarkColors = mobileDarkColorScheme(
-    primary = DarkColors.primary,
-    onPrimary = DarkColors.onPrimary,
-    primaryContainer = DarkColors.primaryContainer,
-    onPrimaryContainer = DarkColors.onPrimaryContainer,
-    inversePrimary = DarkColors.inversePrimary,
-    secondary = DarkColors.secondary,
-    onSecondary = DarkColors.onSecondary,
-    secondaryContainer = DarkColors.secondaryContainer,
-    onSecondaryContainer = DarkColors.onSecondaryContainer,
-    tertiary = DarkColors.tertiary,
-    onTertiary = DarkColors.onTertiary,
-    tertiaryContainer = DarkColors.tertiaryContainer,
-    onTertiaryContainer = DarkColors.onTertiaryContainer,
-    background = DarkColors.background,
-    onBackground = DarkColors.onBackground,
-    surface = DarkColors.surface,
-    onSurface = DarkColors.onSurface,
-    surfaceVariant = DarkColors.surfaceVariant,
-    onSurfaceVariant = DarkColors.onSurfaceVariant,
-    surfaceTint = DarkColors.surfaceTint,
-    inverseSurface = DarkColors.inverseSurface,
-    inverseOnSurface = DarkColors.inverseOnSurface,
-    error = DarkColors.error,
-    onError = DarkColors.onError,
-    errorContainer = DarkColors.errorContainer,
-    onErrorContainer = DarkColors.onErrorContainer,
-    outline = DarkColors.border,
-    outlineVariant = DarkColors.borderVariant,
-    scrim = DarkColors.scrim,
+internal val MobileDarkColors = mobileDarkColorScheme(
+    primary = TvDarkColors.primary,
+    onPrimary = TvDarkColors.onPrimary,
+    primaryContainer = TvDarkColors.primaryContainer,
+    onPrimaryContainer = TvDarkColors.onPrimaryContainer,
+    inversePrimary = TvDarkColors.inversePrimary,
+    secondary = TvDarkColors.secondary,
+    onSecondary = TvDarkColors.onSecondary,
+    secondaryContainer = TvDarkColors.secondaryContainer,
+    onSecondaryContainer = TvDarkColors.onSecondaryContainer,
+    tertiary = TvDarkColors.tertiary,
+    onTertiary = TvDarkColors.onTertiary,
+    tertiaryContainer = TvDarkColors.tertiaryContainer,
+    onTertiaryContainer = TvDarkColors.onTertiaryContainer,
+    background = TvDarkColors.background,
+    onBackground = TvDarkColors.onBackground,
+    surface = TvDarkColors.surface,
+    onSurface = TvDarkColors.onSurface,
+    surfaceVariant = TvDarkColors.surfaceVariant,
+    onSurfaceVariant = TvDarkColors.onSurfaceVariant,
+    surfaceTint = TvDarkColors.surfaceTint,
+    inverseSurface = TvDarkColors.inverseSurface,
+    inverseOnSurface = TvDarkColors.inverseOnSurface,
+    error = TvDarkColors.error,
+    onError = TvDarkColors.onError,
+    errorContainer = TvDarkColors.errorContainer,
+    onErrorContainer = TvDarkColors.onErrorContainer,
+    outline = TvDarkColors.border,
+    outlineVariant = TvDarkColors.borderVariant,
+    scrim = TvDarkColors.scrim,
 )
 
 @Composable
@@ -85,7 +85,7 @@ fun TVHeadendPlayerTheme(
 ) {
     MobileMaterialTheme(colorScheme = MobileDarkColors) {
         MaterialTheme(
-            colorScheme = DarkColors,
+            colorScheme = TvDarkColors,
             typography = Typography(),
             shapes = Shapes(),
             content = content,

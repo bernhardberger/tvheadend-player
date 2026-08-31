@@ -50,9 +50,9 @@ internal fun SettingsSubRail(
     categoryFocusRequesters: Map<SettingsSection, FocusRequester>,
     contentFocusRequesters: Map<SettingsSection, FocusRequester>,
     onNavigate: (SettingsSection) -> Unit,
+    modifier: Modifier = Modifier,
     initialFocusEnabled: Boolean = true,
     showSimpleTv: Boolean = true,
-    modifier: Modifier = Modifier,
 ) {
     val items = rememberSettingsItems(
         showSimpleTv = showSimpleTv,

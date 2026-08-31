@@ -45,7 +45,6 @@ data class PlayerHeaderTags(
 @Composable
 fun PlayerIdentityHeader(
     imageLoader: ImageLoader,
-    currentSession: CurrentSessionObservation? = null,
     piconPath: String?,
     eyebrow: String?,
     title: String,
@@ -53,6 +52,7 @@ fun PlayerIdentityHeader(
     clock: String,
     clockSupport: String?,
     modifier: Modifier = Modifier,
+    currentSession: CurrentSessionObservation? = null,
     tags: PlayerHeaderTags = PlayerHeaderTags(),
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface

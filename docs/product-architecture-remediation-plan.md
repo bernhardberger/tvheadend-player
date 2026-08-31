@@ -88,7 +88,7 @@ that belongs to a later screen/state package, not a premature common component.
 Stop if a reachable deep link, appliance entry, or persisted navigation state
 still depends on the route. Record that consumer before changing navigation.
 
-### 3. Verification-tooling repair (B4-P8/P8S, B4-H3C, and RM-PLAYER-1D complete; B4-P9 held)
+### 3. Verification-tooling repair (B4-P8/P8S, B4-H3C, RM-PLAYER-1D, and B4-P9R complete)
 
 - Inventory JVM tests that inspect production source text or exact whitespace.
 - Replace behavioral intent with behavioral tests and rule intent with purpose-

@@ -74,8 +74,11 @@ private val ClosedDrawerWidth =
 @Composable
 internal fun SideRail(
     currentRoute: AppDestination?,
-    rootRoute: AppDestination = AppDestination.CHANNELS,
     showEpgMenu: Boolean,
+    onRootBack: () -> Unit,
+    onNavigate: (AppDestination) -> Unit,
+    modifier: Modifier = Modifier,
+    rootRoute: AppDestination = AppDestination.CHANNELS,
     availableDestinations: Set<AppDestination> = setOf(
         AppDestination.CHANNELS,
         AppDestination.GUIDE,
@@ -83,10 +86,7 @@ internal fun SideRail(
         AppDestination.SETTINGS,
     ),
     rootBackPriority: Boolean = false,
-    onRootBack: () -> Unit,
-    onNavigate: (AppDestination) -> Unit,
     onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
-    modifier: Modifier = Modifier,
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
     val channelsLabel = stringResource(R.string.nav_channels)

@@ -4,52 +4,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.tv.material3.darkColorScheme
-import java.io.File
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ThemeColorContractTest {
-    private val repositoryRoot = generateSequence(
-        File(requireNotNull(System.getProperty("user.dir"))),
-    ) { it.parentFile }.first { File(it, ".git").exists() }
-    private val themeSource = File(
-        repositoryRoot,
-        "app/src/main/java/at/bernhardberger/tvhplayer/ui/Theme.kt",
-    ).readText()
-    private val xmlThemeSource = File(
-        repositoryRoot,
-        "app/src/main/res/values/themes.xml",
-    ).readText()
-
-    @Test
-    fun productThemeHasNoReachableLightScheme() {
-        assertFalse(themeSource.contains("lightColorScheme"))
-        assertFalse(themeSource.contains("LightColors"))
-        assertFalse(themeSource.contains("darkTheme"))
-        assertTrue(xmlThemeSource.contains("Theme.Material3.Dark.NoActionBar"))
-        assertFalse(xmlThemeSource.contains("Theme.Material3.DayNight.NoActionBar"))
-    }
-
-    @Test
-    fun tvSchemeExplicitlyOwnsAllMaterialForTvRoles() {
-        val scheme = sourceBlock("private val DarkColors = darkColorScheme(")
-
-        tvRoles.forEach { role ->
-            assertTrue("Missing explicit TV role: $role", Regex("\\b$role\\s*=").containsMatchIn(scheme))
-        }
-        assertEquals(tvRoles.size, Regex("(?m)^\\s{4}\\w+\\s*=").findAll(scheme).count())
-    }
-
     @Test
     fun pinnedRolesAndImportantContrastPairsMatchTheProductContract() {
-        val scheme = sourceBlock("private val DarkColors = darkColorScheme(")
-        val actual = tvRoles.associateWith { role ->
-            val match = Regex("\\b$role\\s*=\\s*Color\\(0x([0-9A-Fa-f]{8})\\)").find(scheme)
-            requireNotNull(match) { "Role $role must be pinned to an explicit ARGB value" }
-            match.groupValues[1].uppercase()
-        }
+        val actual = tvRoleColors().mapValues { (_, color) -> color.argb() }
 
         assertEquals(expectedTvRoles, actual)
         assertContrast(actual.getValue("primary"), actual.getValue("onPrimary"))
@@ -83,25 +45,16 @@ class ThemeColorContractTest {
 
     @Test
     fun mobileSchemeMirrorsEveryOverlappingTvRole() {
-        val scheme = sourceBlock("private val MobileDarkColors = mobileDarkColorScheme(")
-        val directRoles = tvRoles - setOf("border", "borderVariant")
+        val mobileRoles = mobileRoleColors().mapValues { (_, color) -> color.argb() }
+        val expected = tvRoleColors().mapKeys { (role, _) ->
+            when (role) {
+                "border" -> "outline"
+                "borderVariant" -> "outlineVariant"
+                else -> role
+            }
+        }.mapValues { (_, color) -> color.argb() }
 
-        directRoles.forEach { role ->
-            assertTrue(
-                "Mobile role $role must mirror TV",
-                Regex("\\b$role\\s*=\\s*DarkColors\\.$role\\b").containsMatchIn(scheme),
-            )
-        }
-        assertTrue(Regex("\\boutline\\s*=\\s*DarkColors\\.border\\b").containsMatchIn(scheme))
-        assertTrue(Regex("\\boutlineVariant\\s*=\\s*DarkColors\\.borderVariant\\b").containsMatchIn(scheme))
-    }
-
-    private fun sourceBlock(prefix: String): String {
-        val start = themeSource.indexOf(prefix)
-        require(start >= 0) { "Missing source block: $prefix" }
-        val end = themeSource.indexOf("\n)", start)
-        require(end >= 0) { "Unterminated source block: $prefix" }
-        return themeSource.substring(start, end)
+        assertEquals(expected, mobileRoles)
     }
 
     private fun assertContrast(foreground: String, background: String) {
@@ -112,17 +65,73 @@ class ThemeColorContractTest {
         assertTrue("$foreground on $background", (lighter + 0.05f) / (darker + 0.05f) >= 4.5f)
     }
 
-    private companion object {
-        val tvRoles = listOf(
-            "primary", "onPrimary", "primaryContainer", "onPrimaryContainer", "inversePrimary",
-            "secondary", "onSecondary", "secondaryContainer", "onSecondaryContainer",
-            "tertiary", "onTertiary", "tertiaryContainer", "onTertiaryContainer",
-            "background", "onBackground", "surface", "onSurface", "surfaceVariant",
-            "onSurfaceVariant", "surfaceTint", "inverseSurface", "inverseOnSurface",
-            "error", "onError", "errorContainer", "onErrorContainer", "border", "borderVariant",
-            "scrim",
-        )
+    private fun Color.argb(): String = toArgb().toUInt().toString(16).padStart(8, '0').uppercase()
 
+    private fun tvRoleColors() = mapOf(
+        "primary" to TvDarkColors.primary,
+        "onPrimary" to TvDarkColors.onPrimary,
+        "primaryContainer" to TvDarkColors.primaryContainer,
+        "onPrimaryContainer" to TvDarkColors.onPrimaryContainer,
+        "inversePrimary" to TvDarkColors.inversePrimary,
+        "secondary" to TvDarkColors.secondary,
+        "onSecondary" to TvDarkColors.onSecondary,
+        "secondaryContainer" to TvDarkColors.secondaryContainer,
+        "onSecondaryContainer" to TvDarkColors.onSecondaryContainer,
+        "tertiary" to TvDarkColors.tertiary,
+        "onTertiary" to TvDarkColors.onTertiary,
+        "tertiaryContainer" to TvDarkColors.tertiaryContainer,
+        "onTertiaryContainer" to TvDarkColors.onTertiaryContainer,
+        "background" to TvDarkColors.background,
+        "onBackground" to TvDarkColors.onBackground,
+        "surface" to TvDarkColors.surface,
+        "onSurface" to TvDarkColors.onSurface,
+        "surfaceVariant" to TvDarkColors.surfaceVariant,
+        "onSurfaceVariant" to TvDarkColors.onSurfaceVariant,
+        "surfaceTint" to TvDarkColors.surfaceTint,
+        "inverseSurface" to TvDarkColors.inverseSurface,
+        "inverseOnSurface" to TvDarkColors.inverseOnSurface,
+        "error" to TvDarkColors.error,
+        "onError" to TvDarkColors.onError,
+        "errorContainer" to TvDarkColors.errorContainer,
+        "onErrorContainer" to TvDarkColors.onErrorContainer,
+        "border" to TvDarkColors.border,
+        "borderVariant" to TvDarkColors.borderVariant,
+        "scrim" to TvDarkColors.scrim,
+    )
+
+    private fun mobileRoleColors() = mapOf(
+        "primary" to MobileDarkColors.primary,
+        "onPrimary" to MobileDarkColors.onPrimary,
+        "primaryContainer" to MobileDarkColors.primaryContainer,
+        "onPrimaryContainer" to MobileDarkColors.onPrimaryContainer,
+        "inversePrimary" to MobileDarkColors.inversePrimary,
+        "secondary" to MobileDarkColors.secondary,
+        "onSecondary" to MobileDarkColors.onSecondary,
+        "secondaryContainer" to MobileDarkColors.secondaryContainer,
+        "onSecondaryContainer" to MobileDarkColors.onSecondaryContainer,
+        "tertiary" to MobileDarkColors.tertiary,
+        "onTertiary" to MobileDarkColors.onTertiary,
+        "tertiaryContainer" to MobileDarkColors.tertiaryContainer,
+        "onTertiaryContainer" to MobileDarkColors.onTertiaryContainer,
+        "background" to MobileDarkColors.background,
+        "onBackground" to MobileDarkColors.onBackground,
+        "surface" to MobileDarkColors.surface,
+        "onSurface" to MobileDarkColors.onSurface,
+        "surfaceVariant" to MobileDarkColors.surfaceVariant,
+        "onSurfaceVariant" to MobileDarkColors.onSurfaceVariant,
+        "surfaceTint" to MobileDarkColors.surfaceTint,
+        "inverseSurface" to MobileDarkColors.inverseSurface,
+        "inverseOnSurface" to MobileDarkColors.inverseOnSurface,
+        "error" to MobileDarkColors.error,
+        "onError" to MobileDarkColors.onError,
+        "errorContainer" to MobileDarkColors.errorContainer,
+        "onErrorContainer" to MobileDarkColors.onErrorContainer,
+        "outline" to MobileDarkColors.outline,
+        "outlineVariant" to MobileDarkColors.outlineVariant,
+        "scrim" to MobileDarkColors.scrim,
+    )
+
+    private companion object {
         val expectedTvRoles = mapOf(
             "primary" to "FF00BCFA", "onPrimary" to "FF00344B",
             "primaryContainer" to "FF003E55", "onPrimaryContainer" to "FFC3E8FF",

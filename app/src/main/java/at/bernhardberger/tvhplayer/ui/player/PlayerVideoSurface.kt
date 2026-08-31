@@ -21,8 +21,8 @@ fun PlayerVideoSurface(
     player: Player,
     aspectRatio: AspectRatioMode,
     videoVisible: Boolean,
-    debugVideoBackdropVisible: Boolean = false,
     modifier: Modifier = Modifier,
+    debugVideoBackdropVisible: Boolean = false,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
