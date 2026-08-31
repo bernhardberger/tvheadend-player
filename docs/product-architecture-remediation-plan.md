@@ -204,7 +204,7 @@ retained.
 Stop if state extraction changes commands sent to the SDK. First reproduce and
 classify the behavioral difference.
 
-### 8. Shared DVR actions
+### 8. Shared DVR actions (B4-P18, complete)
 
 - Extract recording create/cancel/delete orchestration and typed result handling
   used by Guide and Recordings.

@@ -88,6 +88,13 @@ class RecordingsScreenTest {
                 recordingProgressCapability = recordingProgressCapability,
             )
         }
+        val dvrMutationActions = remember(onCancelRecording, onDeleteRecording) {
+            DvrMutationActions(
+                scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
+                cancelEntry = onCancelRecording,
+                deleteEntry = onDeleteRecording,
+            )
+        }
         RecordingsScreenContent(
             observation = sessionObservation ?: generatedObservation,
             contentPadding = contentPadding,
@@ -96,8 +103,7 @@ class RecordingsScreenTest {
             imageLoader = imageLoader,
             onPlayRecording = onPlayRecording,
             state = state,
-            onCancelRecording = onCancelRecording,
-            onDeleteRecording = onDeleteRecording,
+            dvrMutationActions = dvrMutationActions,
         )
     }
 

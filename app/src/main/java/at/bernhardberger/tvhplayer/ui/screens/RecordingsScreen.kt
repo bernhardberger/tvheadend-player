@@ -90,7 +90,6 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -191,6 +190,9 @@ fun RecordingsScreen(
     state: RecordingsScreenState? = null,
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
+    val dvrMutationActions = remember(session.dvrRepository) {
+        DvrMutationActions(session.dvrRepository)
+    }
     RecordingsScreenContent(
         observation = observation,
         contentPadding = contentPadding,
@@ -201,8 +203,7 @@ fun RecordingsScreen(
         onRetry = onRetry,
         onPlayRecording = onPlayRecording,
         state = state,
-        onCancelRecording = session.dvrRepository::cancelEntry,
-        onDeleteRecording = session.dvrRepository::deleteEntry,
+        dvrMutationActions = dvrMutationActions,
     )
 }
 
@@ -217,14 +218,7 @@ internal fun RecordingsScreenContent(
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
-    onCancelRecording: suspend (
-        CurrentSessionObservation,
-        DvrEntryId,
-    ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
-    onDeleteRecording: suspend (
-        CurrentSessionObservation,
-        DvrEntryId,
-    ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+    dvrMutationActions: DvrMutationActions,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -256,9 +250,8 @@ internal fun RecordingsScreenContent(
         mutableStateOf<RecordingDetailsAction?>(null)
     }
     var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
-    var pendingCurrentSession by remember { mutableStateOf<CurrentSessionObservation?>(null) }
-    var pendingRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
-    var actionResult by remember { mutableStateOf<DvrMutationResult<*>?>(null) }
+    var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
+    var actionResult by remember { mutableStateOf<DvrMutationFeedback?>(null) }
     var pendingDetailsReturn by remember {
         mutableStateOf<RecordingDetailsReturnTarget?>(null)
     }
@@ -656,14 +649,16 @@ internal fun RecordingsScreenContent(
             },
             onCancel = {
                 detailsInitialAction = RecordingDetailsAction.CANCEL
-                pendingCurrentSession = selectedCapability
-                pendingRecordingId = authoritative.id
+                pendingMutation = selectedCapability?.let { capability ->
+                    DvrMutationAction.Cancel(capability, authoritative.id)
+                }
                 pendingAction = PendingRecordingAction.CANCEL
             },
             onDelete = {
                 detailsInitialAction = RecordingDetailsAction.DELETE
-                pendingCurrentSession = selectedCapability
-                pendingRecordingId = authoritative.id
+                pendingMutation = selectedCapability?.let { capability ->
+                    DvrMutationAction.Delete(capability, authoritative.id)
+                }
                 pendingAction = PendingRecordingAction.DELETE
             },
             onClose = {
@@ -697,22 +692,16 @@ internal fun RecordingsScreenContent(
             action = action,
             title = target.title.orEmpty(),
             backEnabled = backEnabled,
-            onDismiss = { pendingAction = null },
+            onDismiss = {
+                pendingAction = null
+                pendingMutation = null
+            },
             onConfirm = {
                 pendingAction = null
+                val mutation = pendingMutation
+                pendingMutation = null
                 scope.launch {
-                    val capability = pendingCurrentSession
-                    val recordingId = pendingRecordingId
-                    actionResult = if (capability == null || recordingId == null) {
-                        DvrMutationResult.NotReady
-                    } else when (action) {
-                        PendingRecordingAction.CANCEL ->
-                            onCancelRecording(capability, recordingId)
-                        PendingRecordingAction.DELETE ->
-                            onDeleteRecording(capability, recordingId)
-                    }
-                    pendingCurrentSession = null
-                    pendingRecordingId = null
+                    actionResult = dvrMutationActions.execute(mutation)
                 }
             },
         )
@@ -1559,7 +1548,7 @@ private fun ScheduleTime(entry: DvrEntry) {
 private fun RecordingDetailsPanel(
     contentPadding: PaddingValues,
     entry: DvrEntry,
-    actionResult: DvrMutationResult<*>?,
+    actionResult: DvrMutationFeedback?,
     canModifyRecordings: Boolean,
     playbackEligible: Boolean,
     initialAction: RecordingDetailsAction?,
@@ -1676,8 +1665,8 @@ private fun RecordingDetailsPanel(
                     overflow = TextOverflow.Ellipsis,
                 )
                 actionResult != null -> Text(
-                    dvrActionResultLabel(actionResult),
-                    color = if (actionResult.isDvrMutationFailure()) {
+                    actionResult.label(),
+                    color = if (actionResult.isFailure) {
                         MaterialTheme.colorScheme.error
                     } else {
                         MaterialTheme.colorScheme.onSurface
@@ -2101,25 +2090,6 @@ private fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         null -> R.string.recording_state_unknown
     }
 )
-
-@Composable
-private fun dvrActionResultLabel(result: DvrMutationResult<*>): String = stringResource(
-    when (result) {
-        is DvrMutationResult.Confirmed,
-        is DvrMutationResult.AcceptedButUnconfirmed -> R.string.recording_action_accepted
-        DvrMutationResult.AccessDenied -> R.string.recording_action_permission
-        DvrMutationResult.ConnectionLimit -> R.string.recording_action_conn_limit
-        DvrMutationResult.ServerRejected,
-        DvrMutationResult.NotSupported -> R.string.recording_action_rejected
-        DvrMutationResult.NotReady,
-        DvrMutationResult.ObservationExpired,
-        DvrMutationResult.Timeout,
-        DvrMutationResult.TransportUnavailable -> R.string.recording_action_connection
-    }
-)
-
-private fun DvrMutationResult<*>.isDvrMutationFailure(): Boolean =
-    this !is DvrMutationResult.Confirmed && this !is DvrMutationResult.AcceptedButUnconfirmed
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
     is DvrRepositoryState.Current -> state.snapshot.entries

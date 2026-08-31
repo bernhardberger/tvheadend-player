@@ -76,16 +76,12 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
-import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
-import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -211,6 +207,9 @@ fun EpgGridScreen(
         layoutDirection = layoutDirection,
     )
     val coroutineScope = rememberCoroutineScope()
+    val dvrMutationActions = remember(session.dvrRepository) {
+        DvrMutationActions(session.dvrRepository)
+    }
     val channelScopeState by channelViewModel.scope.collectAsStateWithLifecycle()
     val channelScope = channelScopeState.scope
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
@@ -258,11 +257,9 @@ fun EpgGridScreen(
     var restoreDetailsFocus by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
     var configChoices by remember { mutableStateOf<List<DvrConfiguration>?>(null) }
-    var selectedRecordConfigId by remember { mutableStateOf<DvrConfigId?>(null) }
-    var pendingCurrentSession by remember { mutableStateOf<CurrentSessionObservation?>(null) }
     var pendingRecordingTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
-    var pendingRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
-    var actionResult by remember { mutableStateOf<DvrMutationResult<*>?>(null) }
+    var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
+    var actionResult by remember { mutableStateOf<DvrMutationFeedback?>(null) }
     var showJumpDialog by remember { mutableStateOf(false) }
     var frontierRequest by remember { mutableStateOf<FrontierRequest?>(null) }
     var lastPlayedId by remember { mutableStateOf<ChannelId?>(null) }
@@ -911,30 +908,34 @@ fun EpgGridScreen(
                                 )
                             }
                         }
-                        ProgrammeAction.RECORD -> if (selectedCapability != null) when (
-                            val choice = chooseDvrConfig(
-                                selectedObservation.currentDvrConfigurations()
-                            )
-                        ) {
-                            is DvrConfigChoice.Automatic -> {
-                                selectedRecordConfigId = choice.configId
-                                pendingRecordingTarget = event.programmeRecordingTarget(
-                                    selectedCapability
+                        ProgrammeAction.RECORD -> if (selectedCapability != null) {
+                            when (
+                                val choice = chooseDvrConfig(
+                                    selectedObservation.currentDvrConfigurations()
                                 )
-                                pendingAction = action
-                            }
-                            is DvrConfigChoice.RequiresSelection -> {
-                                pendingRecordingTarget = event.programmeRecordingTarget(
-                                    selectedCapability
-                                )
-                                configChoices = choice.configs
+                            ) {
+                                is DvrConfigChoice.Automatic -> {
+                                    pendingMutation = DvrMutationAction.CreateProgramme(
+                                        target = event.programmeRecordingTarget(selectedCapability),
+                                        configId = choice.configId,
+                                    )
+                                    pendingAction = action
+                                }
+                                is DvrConfigChoice.RequiresSelection -> {
+                                    pendingRecordingTarget = event.programmeRecordingTarget(
+                                        selectedCapability
+                                    )
+                                    configChoices = choice.configs
+                                }
                             }
                         }
                         ProgrammeAction.CANCEL_RECORDING -> if (
                             selectedCapability != null && recording != null
                         ) {
-                            pendingCurrentSession = selectedCapability
-                            pendingRecordingId = recording.id
+                            pendingMutation = DvrMutationAction.Cancel(
+                                selectedCapability,
+                                recording.id,
+                            )
                             pendingAction = action
                         }
                     }
@@ -949,35 +950,17 @@ fun EpgGridScreen(
             ConfirmProgrammeActionDialog(
                 action = confirmationAction,
                 programmeTitle = confirmationEvent.title.orEmpty(),
-                onDismiss = { pendingAction = null },
+                onDismiss = {
+                    pendingAction = null
+                    pendingMutation = null
+                },
                 onConfirm = {
                     pendingAction = null
+                    val mutation = pendingMutation
+                    pendingMutation = null
+                    pendingRecordingTarget = null
                     coroutineScope.launch {
-                        actionResult = when (confirmationAction) {
-                            ProgrammeAction.RECORD -> pendingRecordingTarget?.let { target ->
-                                session.dvrRepository.scheduleEntry(
-                                    target.currentSession,
-                                    DvrScheduleRequest(
-                                        schedule = DvrSchedule.Programme(target.eventId),
-                                        configId = selectedRecordConfigId,
-                                        title = target.title,
-                                    ),
-                                )
-                            } ?: DvrMutationResult.NotReady
-                            ProgrammeAction.CANCEL_RECORDING -> {
-                                val capability = pendingCurrentSession
-                                val recordingId = pendingRecordingId
-                                if (capability != null && recordingId != null) {
-                                    session.dvrRepository.cancelEntry(capability, recordingId)
-                                } else {
-                                    DvrMutationResult.NotReady
-                                }
-                            }
-                            else -> null
-                        }
-                        pendingCurrentSession = null
-                        pendingRecordingTarget = null
-                        pendingRecordingId = null
+                        actionResult = dvrMutationActions.execute(mutation)
                     }
                 },
             )
@@ -989,7 +972,9 @@ fun EpgGridScreen(
                 onDismiss = { configChoices = null },
                 onSelect = { config ->
                     configChoices = null
-                    selectedRecordConfigId = config.id
+                    pendingMutation = pendingRecordingTarget?.let { target ->
+                        DvrMutationAction.CreateProgramme(target, config.id)
+                    }
                     pendingAction = ProgrammeAction.RECORD
                 },
             )
@@ -1460,7 +1445,7 @@ private fun ProgrammeDetailsPanel(
     timeshiftAllowed: Boolean,
     recordingsAllowed: Boolean,
     canModifyRecordings: Boolean,
-    actionResult: DvrMutationResult<*>?,
+    actionResult: DvrMutationFeedback?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -1538,8 +1523,8 @@ private fun ProgrammeDetailsPanel(
                 }
                 actionResult?.let {
                     Text(
-                        text = dvrActionResultLabel(it),
-                        color = if (it.isDvrMutationFailure()) {
+                        text = it.label(),
+                        color = if (it.isFailure) {
                             MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.onSurface
@@ -1705,25 +1690,6 @@ private fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         null -> R.string.recording_state_unknown
     }
 )
-
-@Composable
-private fun dvrActionResultLabel(result: DvrMutationResult<*>): String = stringResource(
-    when (result) {
-        is DvrMutationResult.Confirmed,
-        is DvrMutationResult.AcceptedButUnconfirmed -> R.string.recording_action_accepted
-        DvrMutationResult.AccessDenied -> R.string.recording_action_permission
-        DvrMutationResult.ConnectionLimit -> R.string.recording_action_conn_limit
-        DvrMutationResult.ServerRejected,
-        DvrMutationResult.NotSupported -> R.string.recording_action_rejected
-        DvrMutationResult.NotReady,
-        DvrMutationResult.ObservationExpired,
-        DvrMutationResult.Timeout,
-        DvrMutationResult.TransportUnavailable -> R.string.recording_action_connection
-    }
-)
-
-private fun DvrMutationResult<*>.isDvrMutationFailure(): Boolean =
-    this !is DvrMutationResult.Confirmed && this !is DvrMutationResult.AcceptedButUnconfirmed
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
     is DvrRepositoryState.Current -> state.snapshot.entries
