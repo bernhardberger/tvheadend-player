@@ -132,6 +132,12 @@ This is a medium-confidence simplification, not a pre-decided deletion.
 
 ### 5. Root orchestration decomposition
 
+**B4-P11 completed:** `AppRootPlaybackOrchestrator` now owns live and recording
+route publication, one shared stale-selection generation, current-channel
+no-retune, warm-return state, and guarded-route stop-before-redirect ordering.
+`AppRoot` retains typed Navigation 3 entries, destination rendering, and the
+persistent player surface; route-content extraction remains a later package.
+
 - Extract duplicate live-play request and guarded-route decisions from
   `AppRoot` into named state/policy owners.
 - Keep Navigation 3 entries declarative and move destination rendering into

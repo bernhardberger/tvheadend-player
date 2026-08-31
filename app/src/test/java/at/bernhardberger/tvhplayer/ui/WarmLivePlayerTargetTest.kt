@@ -10,8 +10,8 @@ class WarmLivePlayerTargetTest {
     @Test
     fun readySnapshotRestoresTheActiveChannelsExactIdentity() {
         assertEquals(
-            WarmLivePlayerTarget(channelId = ChannelId(22), channelName = "News HD"),
-            warmLivePlayerTarget(
+            PlayerRouteTarget.Live(channelId = ChannelId(22), channelName = "News HD"),
+            livePlayerTarget(
                 activeChannelId = ChannelId(22),
                 readiness = CurrentChannelReadiness.Ready(
                     listOf(Channel.create(ChannelId(11), name = "Other"), Channel.create(ChannelId(22), name = "News HD")),
@@ -23,12 +23,12 @@ class WarmLivePlayerTargetTest {
     @Test
     fun waitingOrMissingSnapshotFallsBackToTheActiveServiceWithoutStaleIdentity() {
         assertEquals(
-            WarmLivePlayerTarget(channelId = ChannelId(22), channelName = ""),
-            warmLivePlayerTarget(activeChannelId = ChannelId(22), readiness = CurrentChannelReadiness.Waiting),
+            PlayerRouteTarget.Live(channelId = ChannelId(22), channelName = ""),
+            livePlayerTarget(activeChannelId = ChannelId(22), readiness = CurrentChannelReadiness.Waiting),
         )
         assertEquals(
-            WarmLivePlayerTarget(channelId = ChannelId(22), channelName = ""),
-            warmLivePlayerTarget(
+            PlayerRouteTarget.Live(channelId = ChannelId(22), channelName = ""),
+            livePlayerTarget(
                 activeChannelId = ChannelId(22),
                 readiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(11), name = "Other"))),
             ),

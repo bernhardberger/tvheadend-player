@@ -39,30 +39,21 @@ import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.core.PlaybackRecoverySecondaryAction
 import at.bernhardberger.tvhplayer.core.mainStartupPresentation
-import at.bernhardberger.tvhplayer.core.WarmPlaybackTarget
-import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
 import at.bernhardberger.tvhplayer.core.applianceProductProfile
-import at.bernhardberger.tvhplayer.core.armWarmReturn
 import at.bernhardberger.tvhplayer.core.ProductProfile
-import at.bernhardberger.tvhplayer.core.clearWarmReturn
-import at.bernhardberger.tvhplayer.core.consumeWarmReturn
-import at.bernhardberger.tvhplayer.core.rearmWarmReturn
-import at.bernhardberger.tvhplayer.core.rearmWarmReturnForPlaybackSelection
 import at.bernhardberger.tvhplayer.core.rootBackAction
 import at.bernhardberger.tvhplayer.core.serverSettingsForRuntime
 import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
 import at.bernhardberger.tvhplayer.core.SimpleTvCapability
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
-import at.bernhardberger.tvhplayer.core.SimpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.allows
 import at.bernhardberger.tvhplayer.core.allowsRoute
-import at.bernhardberger.tvhplayer.core.simpleTvRouteGuardAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
-import at.bernhardberger.tvhplayer.core.warmPlaybackTarget
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
@@ -98,24 +89,6 @@ internal data class MainStartupCompositionState(
     val navigationAllowed: Boolean,
     val contentAllowed: Boolean = presentation == MainStartupPresentation.Inactive,
 )
-
-internal data class WarmLivePlayerTarget(
-    val channelId: ChannelId,
-    val channelName: String,
-)
-
-internal fun warmLivePlayerTarget(
-    activeChannelId: ChannelId,
-    readiness: CurrentChannelReadiness,
-): WarmLivePlayerTarget {
-    val channel = (readiness as? CurrentChannelReadiness.Ready)
-        ?.channels
-        ?.firstOrNull { it.id == activeChannelId }
-    return WarmLivePlayerTarget(
-        channelId = channel?.id ?: activeChannelId,
-        channelName = channel?.name.orEmpty(),
-    )
-}
 
 internal fun enteringNavigationAllowed(
     hasBackStackEntry: Boolean,
@@ -427,6 +400,7 @@ fun AppRoot(
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
     val playbackRuntime: AppPlaybackRuntime = koinInject()
     val playbackSelectionScope = rememberCoroutineScope()
+    val playbackOrchestrator = remember { AppRootPlaybackOrchestrator() }
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
     val activeTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
@@ -516,14 +490,9 @@ fun AppRoot(
     // or the user navigates deliberately while playback remains warm; consumed
     // before returning to the player so root Back cannot loop. Player Back alone
     // does not re-arm.
-    var warmReturn by remember { mutableStateOf(WarmReturnOpportunity()) }
-    val currentWarmTarget = warmPlaybackTarget(activeChannelId, activeRecordingId)
+    val warmReturn = playbackOrchestrator.warmReturn
     LaunchedEffect(activeChannelId, activeRecordingId) {
-        warmReturn = when {
-            activeChannelId != null -> armWarmReturn(WarmPlaybackTarget.LIVE)
-            activeRecordingId != null -> armWarmReturn(WarmPlaybackTarget.RECORDING)
-            else -> clearWarmReturn()
-        }
+        playbackOrchestrator.activePlaybackChanged(activeChannelId, activeRecordingId)
     }
 
     LaunchedEffect(playbackState, activeRecordingId, currentDestination) {
@@ -544,9 +513,10 @@ fun AppRoot(
     }
 
     SimpleTvRouteGuardEffect(
-        destination = currentDestination,
+        route = currentDestination?.toSimpleTvRoute(),
         profile = productProfile,
         recordingActive = activeRecordingId != null,
+        orchestrator = playbackOrchestrator,
         stopRecording = playbackRuntime::stop,
         redirectToLive = {
             applianceLaunchRequests.requestStartup(autoStartPlayback = true)
@@ -637,16 +607,14 @@ fun AppRoot(
             }
             BackAction.RETURN_TO_PARENT -> Unit
             BackAction.RETURN_TO_PLAYER -> {
-                // Consume before navigation so player→browse→Back cannot loop.
-                val target = warmReturn.target
-                warmReturn = consumeWarmReturn(warmReturn)
-                when (target) {
-                    WarmPlaybackTarget.LIVE -> {
-                        val channelId = activeChannelId ?: return@rootBack
-                        val playerTarget = warmLivePlayerTarget(
-                            activeChannelId = channelId,
-                            readiness = currentChannelReadiness,
-                        )
+                when (
+                    val playerTarget = playbackOrchestrator.consumeWarmPlayerTarget(
+                        activeChannelId = activeChannelId,
+                        activeRecordingId = activeRecordingId,
+                        currentChannelReadiness = currentChannelReadiness,
+                    )
+                ) {
+                    is PlayerRouteTarget.Live -> {
                         backStack.pushTransient(
                             LivePlayerKey(
                                 channelId = playerTarget.channelId.value,
@@ -654,13 +622,12 @@ fun AppRoot(
                             ),
                         )
                     }
-                    WarmPlaybackTarget.RECORDING -> {
-                        val recordingId = activeRecordingId ?: return@rootBack
+                    is PlayerRouteTarget.Recording -> {
                         backStack.pushTransient(
-                            RecordingPlayerKey(recordingId = recordingId.value),
+                            RecordingPlayerKey(recordingId = playerTarget.recordingId.value),
                         )
                     }
-                    WarmPlaybackTarget.NONE -> Unit
+                    null -> Unit
                 }
             }
         }
@@ -670,6 +637,20 @@ fun AppRoot(
         onBack = handleRootBack,
     )
     val browseBackHandler = remember { mutableStateOf(handleRootBack) }
+    val requestLivePlayer: (LivePlaybackSelection, String) -> Unit = { selection, name ->
+        playbackSelectionScope.launch {
+            val target = playbackOrchestrator.requestLivePlayer(
+                activeChannelId = activeChannelId,
+                activeRecordingId = activeRecordingId,
+                requestedChannelId = selection.channelId,
+                requestedChannelName = name,
+                startPlayback = { playbackRuntime.playLive(selection) },
+            ) ?: return@launch
+            backStack.pushTransient(
+                LivePlayerKey(target.channelId.value, target.channelName),
+            )
+        }
+    }
     val content: @Composable (PaddingValues, Boolean, Boolean) -> Unit = {
             contentPadding, drawerActive, contentAllowed ->
             Box(Modifier.fillMaxSize()) {
@@ -702,22 +683,7 @@ fun AppRoot(
                                     onOpenConnectionSettings = {
                                         navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                                     },
-                                    onPlay = { playbackSelection, name ->
-                                        val channelId = playbackSelection.channelId
-                                        warmReturn = rearmWarmReturnForPlaybackSelection(
-                                            current = warmReturn,
-                                            currentWarmTarget = currentWarmTarget,
-                                            requestedTarget = WarmPlaybackTarget.LIVE,
-                                            currentIdentity = activeChannelId,
-                                            requestedIdentity = channelId,
-                                        )
-                                        playbackSelectionScope.launch {
-                                            playbackRuntime.playLive(playbackSelection)
-                                            backStack.pushTransient(
-                                                LivePlayerKey(channelId.value, name),
-                                            )
-                                        }
-                                    }
+                                    onPlay = requestLivePlayer,
                                 )
                             }
                         }
@@ -741,39 +707,24 @@ fun AppRoot(
                                             productProfile.allows(SimpleTvCapability.RECORDINGS),
                                         onPlayRecording = { playbackSelection ->
                                             val recordingId = playbackSelection.recordingId
-                                            warmReturn = rearmWarmReturnForPlaybackSelection(
-                                                current = warmReturn,
-                                                currentWarmTarget = currentWarmTarget,
-                                                requestedTarget = WarmPlaybackTarget.RECORDING,
-                                                currentIdentity = activeRecordingId,
-                                                requestedIdentity = recordingId,
-                                            )
                                             playbackSelectionScope.launch {
-                                                playbackRuntime.playRecording(
-                                                    playbackSelection,
-                                                    RecordingPlaybackStart.START_OVER,
-                                                )
+                                                val target = playbackOrchestrator.requestRecordingPlayer(
+                                                    activeChannelId = activeChannelId,
+                                                    activeRecordingId = activeRecordingId,
+                                                    requestedRecordingId = recordingId,
+                                                    startPlayback = {
+                                                        playbackRuntime.playRecording(
+                                                            playbackSelection,
+                                                            RecordingPlaybackStart.START_OVER,
+                                                        )
+                                                    },
+                                                ) ?: return@launch
                                                 backStack.pushTransient(
-                                                    RecordingPlayerKey(recordingId.value),
+                                                    RecordingPlayerKey(target.recordingId.value),
                                                 )
                                             }
                                         },
-                                        onPlay = { playbackSelection, name ->
-                                            val channelId = playbackSelection.channelId
-                                            warmReturn = rearmWarmReturnForPlaybackSelection(
-                                                current = warmReturn,
-                                                currentWarmTarget = currentWarmTarget,
-                                                requestedTarget = WarmPlaybackTarget.LIVE,
-                                                currentIdentity = activeChannelId,
-                                                requestedIdentity = channelId,
-                                            )
-                                            playbackSelectionScope.launch {
-                                                playbackRuntime.playLive(playbackSelection)
-                                                backStack.pushTransient(
-                                                    LivePlayerKey(channelId.value, name),
-                                                )
-                                            }
-                                        }
+                                        onPlay = requestLivePlayer,
                                     )
                             }
                         }
@@ -790,21 +741,21 @@ fun AppRoot(
                                         onRetry = appVm::reconnectNow,
                                         onPlayRecording = { playbackSelection, intent ->
                                             val recordingId = playbackSelection.recordingId
-                                            warmReturn = rearmWarmReturnForPlaybackSelection(
-                                                current = warmReturn,
-                                                currentWarmTarget = currentWarmTarget,
-                                                requestedTarget = WarmPlaybackTarget.RECORDING,
-                                                currentIdentity = activeRecordingId,
-                                                requestedIdentity = recordingId,
-                                            )
                                             playbackSelectionScope.launch {
-                                                playbackRuntime.playRecording(
-                                                    playbackSelection,
-                                                    intent,
-                                                )
+                                                val target = playbackOrchestrator.requestRecordingPlayer(
+                                                    activeChannelId = activeChannelId,
+                                                    activeRecordingId = activeRecordingId,
+                                                    requestedRecordingId = recordingId,
+                                                    startPlayback = {
+                                                        playbackRuntime.playRecording(
+                                                            playbackSelection,
+                                                            intent,
+                                                        )
+                                                    },
+                                                ) ?: return@launch
                                                 backStack.pushTransient(
                                                     RecordingPlayerKey(
-                                                        recordingId = recordingId.value,
+                                                        recordingId = target.recordingId.value,
                                                         start = intent.toRecordingStartMode(),
                                                     ),
                                                 )
@@ -1002,9 +953,10 @@ fun AppRoot(
                                 // Deliberate rail navigation re-arms one warm return while
                                 // playback remains active. Returning from the player via
                                 // Back does not go through this path and must not re-arm.
-                                if (currentWarmTarget != WarmPlaybackTarget.NONE) {
-                                    warmReturn = rearmWarmReturn(currentWarmTarget)
-                                }
+                                playbackOrchestrator.browseNavigationSelected(
+                                    activeChannelId = activeChannelId,
+                                    activeRecordingId = activeRecordingId,
+                                )
                                 if (destination == AppDestination.UNLOCK) {
                                     backStack.pushTransient(UnlockKey)
                                 } else {
@@ -1067,25 +1019,4 @@ private fun AppNavKey.toSimpleTvRoute(): SimpleTvRoute = when (this) {
     is LivePlayerKey -> SimpleTvRoute.PLAYER
     is RecordingPlayerKey -> SimpleTvRoute.RECORDING_PLAYER
     UnlockKey -> SimpleTvRoute.UNLOCK
-}
-
-@Composable
-internal fun SimpleTvRouteGuardEffect(
-    destination: AppNavKey?,
-    profile: ProductProfile,
-    recordingActive: Boolean,
-    stopRecording: suspend () -> Unit,
-    redirectToLive: () -> Unit,
-) {
-    LaunchedEffect(destination, profile) {
-        val route = destination?.toSimpleTvRoute() ?: return@LaunchedEffect
-        when (simpleTvRouteGuardAction(profile, route, recordingActive)) {
-            SimpleTvRouteGuardAction.ALLOW -> Unit
-            SimpleTvRouteGuardAction.REDIRECT_TO_LIVE -> redirectToLive()
-            SimpleTvRouteGuardAction.STOP_RECORDING_AND_REDIRECT_TO_LIVE -> {
-                stopRecording()
-                redirectToLive()
-            }
-        }
-    }
 }

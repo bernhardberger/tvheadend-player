@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -36,10 +37,12 @@ class SimpleTvRouteGuardEffectTest {
 
         composeRule.setContent {
             val backStack = rememberAppNavBackStack(RecordingPlayerKey(recordingId = 1))
+            val orchestrator = remember { AppRootPlaybackOrchestrator() }
             SimpleTvRouteGuardEffect(
-                destination = backStack.lastOrNull(),
+                route = SimpleTvRoute.RECORDING_PLAYER,
                 profile = profile,
                 recordingActive = recordingActive,
+                orchestrator = orchestrator,
                 stopRecording = {
                     events += "stop-started"
                     recordingActive = false
