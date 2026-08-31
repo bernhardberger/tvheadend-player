@@ -102,6 +102,6 @@ No signed binary may be published until all of these gates pass:
 - The clean application ID installs beside the previous package and receives
   credentials only through normal entry or the bounded debug test-device flow.
 - Unit tests, lint, Android-test compilation, APK identity/ABI, 16 KB alignment,
-  native integrity, and AI harness checks pass.
+  and native integrity checks pass.
 - Launcher icon/banner readability and remote focus are validated on the physical
   TV; automated screenshots do not substitute for human motion-quality review.

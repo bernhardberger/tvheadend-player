@@ -73,7 +73,7 @@ repository-local domain overlays, then the focused skill, then local style.
 - For behavior changes, write the failing test first. Keep pure policy outside
   Android UI where practical so JVM tests can cover it.
 - Run focused checks while iterating and `./tools/verify` before considering a
-  slice complete. Run `./tools/check-ai-harness` after any harness/config change.
+  slice complete.
 - External review is risk-based, not an automatic approval loop. Use one scoped
   audit and one closure limited to its findings and fix delta, then remediate
   new in-scope blockers autonomously. Never ask the user merely whether to

@@ -23,10 +23,9 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
 | `.opencode/commands/` | Model-tier, verification, device, reviewer, UX, and upstream shortcuts |
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
-| `tools/check-ai-harness` | Config, agent, skill, command, permission, safety, and live OpenCode validation |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
 | `tools/ai-model-tier` | Checked switch of the seven managed read-only roles between standard and fast service tiers |
-| `tools/verify` | AI-harness, native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
+| `tools/verify` | Native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
 
@@ -150,8 +149,8 @@ reviewer denies Glob and Bash and may not replace them with directory reads or
 searches. Without current images it returns `EVIDENCE_REQUIRED`; it never turns
 that gap into a source-only code review. Read remains available only for an exact
 supplied implementation path after the image-first critique, so the evidence
-prohibition is an explicit reviewer/command policy whose required wording—not
-dynamic path behavior—the harness checks.
+prohibition is an explicit reviewer/command policy rather than a dynamic path
+control.
 
 Prefer deterministic offline captures of production composables with fake
 channels, EPG, tracks, timelines, recovery states, local images, and a
@@ -198,9 +197,8 @@ any exact dated or archived document hard-coded into an agent, command, or skill
 this prohibition includes conditional static examples. Assignment arguments,
 which are not hard-coded harness context, remain the only way to introduce an
 exact historical path.
-`tools/check-ai-harness` invokes that gate and validates the effective OpenCode
-permissions and evidence-review boundary without requiring shared prose to be
-copied across prompts.
+Use `tools/check-doc-authority` only when changing documentation classification
+or archive-containment rules. Routine product verification does not invoke it.
 
 ## Device, native, and release boundaries
 
@@ -219,18 +217,14 @@ for that named upgrade decision and remaining physical playback matrix.
 
 ## Validation
 
-For a prompt-only harness change, use `./tools/check-ai-harness` as the focused
-iteration gate. For a config-time change, also validate the effective config in
-a fresh isolated OpenCode process. Tool changes use the relevant tests under
-`tools/tests`; changes to the verification entry point run the complete tool
-test suite. The final maintenance gate remains:
+OpenCode loads and validates its own project configuration when a session
+starts. Tool changes use the relevant tests under `tools/tests`; changes to the
+verification entry point run the complete tool test suite. The final product
+maintenance gate remains:
 
 ```bash
 ./tools/verify
 ```
-
-`tools/verify` runs the documentation authority gate through
-`tools/check-ai-harness` and invokes that harness checker exactly once.
 
 OpenCode loads config-time files only at startup. After changing config, an
 agent, skill, command, or plugin, quit and restart before evaluating the result.
