@@ -158,11 +158,27 @@ fun SideRail(
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     var requestedRoute by remember { mutableStateOf(currentRoute) }
+    var pendingRoute by remember { mutableStateOf<String?>(null) }
+    val requestRoute: (String) -> Unit = { route ->
+        if (requestedRoute != route) {
+            requestedRoute = route
+            pendingRoute = route
+            onNavigate(route)
+        }
+    }
+    LaunchedEffect(currentRoute, pendingRoute) {
+        if (currentRoute == pendingRoute) pendingRoute = null
+    }
+    val pendingDrawerRoute = pendingRoute?.takeIf(itemFocus::containsKey)
     val drawerRoute = requestedRoute?.takeIf(itemFocus::containsKey)
         ?: currentRoute?.takeIf(itemFocus::containsKey)
         ?: items.firstOrNull()?.route
     val activeItemFocus = itemFocus[
-        if (drawerState.currentValue == DrawerValue.Open) drawerRoute else currentRoute
+        if (drawerState.currentValue == DrawerValue.Open) {
+            drawerRoute
+        } else {
+            pendingDrawerRoute ?: currentRoute
+        }
     ] ?: itemFocus[items.firstOrNull()?.route]
     val backAction = browseShellBackAction(
         drawerOpen = drawerState.currentValue == DrawerValue.Open,
@@ -174,17 +190,16 @@ fun SideRail(
     val handleBrowseBack: () -> Unit = {
         when (backAction) {
             BrowseShellBackAction.FOCUS_CURRENT_DESTINATION -> {
-                (itemFocus[currentRoute] ?: itemFocus[items.firstOrNull()?.route])
+                (itemFocus[pendingDrawerRoute ?: currentRoute]
+                    ?: itemFocus[items.firstOrNull()?.route])
                     ?.requestFocus()
             }
             BrowseShellBackAction.FOCUS_ROOT_DESTINATION -> {
-                requestedRoute = rootRoute
-                onNavigate(rootRoute)
+                requestRoute(rootRoute)
                 itemFocus[rootRoute]?.requestFocus()
             }
             BrowseShellBackAction.AWAIT_ROOT_DESTINATION -> {
-                requestedRoute = rootRoute
-                onNavigate(rootRoute)
+                requestRoute(rootRoute)
                 itemFocus[rootRoute]?.requestFocus()
             }
             BrowseShellBackAction.DELEGATE_TO_ROOT -> onRootBack()
@@ -235,14 +250,18 @@ fun SideRail(
                 } else {
                     currentRoute
                 }
-                // Drawer entry restores the route that is actually current.
+                // Preserve an unacknowledged focus intent across drawer re-entry.
                 LaunchedEffect(drawerValue) {
                     if (drawerValue == DrawerValue.Open) {
-                        val targetRoute = currentRoute?.takeIf(itemFocus::containsKey)
+                        val targetRoute = pendingDrawerRoute
+                            ?: currentRoute?.takeIf(itemFocus::containsKey)
                             ?: items.firstOrNull()?.route
-                        requestedRoute = targetRoute
-                        if (targetRoute != null && targetRoute != currentRoute) {
-                            onNavigate(targetRoute)
+                        if (pendingDrawerRoute != null) {
+                            requestedRoute = pendingDrawerRoute
+                        } else if (targetRoute != null && targetRoute != currentRoute) {
+                            requestRoute(targetRoute)
+                        } else {
+                            requestedRoute = targetRoute
                         }
                         itemFocus[targetRoute]?.requestFocus()
                     }
@@ -250,15 +269,19 @@ fun SideRail(
                 // An item-set change preserves a still-valid D-pad intent. Only
                 // removal of that target falls back to reported route or root.
                 LaunchedEffect(itemFocus) {
-                    if (drawerValue == DrawerValue.Open) {
-                        val targetRoute = requestedRoute?.takeIf(itemFocus::containsKey)
-                            ?: currentRoute?.takeIf(itemFocus::containsKey)
-                            ?: items.firstOrNull()?.route
-                        val targetChanged = targetRoute != requestedRoute
+                    val targetRoute = requestedRoute?.takeIf(itemFocus::containsKey)
+                        ?: currentRoute?.takeIf(itemFocus::containsKey)
+                        ?: items.firstOrNull()?.route
+                    val targetChanged = targetRoute != requestedRoute
+                    val pendingTargetRemoved = pendingRoute
+                        ?.let { !itemFocus.containsKey(it) } == true
+                    if (pendingTargetRemoved) pendingRoute = null
+                    if (targetChanged && targetRoute != null && targetRoute != currentRoute) {
+                        requestRoute(targetRoute)
+                    } else {
                         requestedRoute = targetRoute
-                        if (targetChanged && targetRoute != null && targetRoute != currentRoute) {
-                            onNavigate(targetRoute)
-                        }
+                    }
+                    if (drawerValue == DrawerValue.Open) {
                         itemFocus[targetRoute]?.requestFocus()
                     }
                 }
@@ -291,10 +314,7 @@ fun SideRail(
                         key(item.route) {
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
-                                onClick = {
-                                    requestedRoute = item.route
-                                    onNavigate(item.route)
-                                },
+                                onClick = { requestRoute(item.route) },
                                 leadingContent = item.icon,
                                 modifier = Modifier
                                     .focusRequester(itemFocus.getValue(item.route))
@@ -303,11 +323,9 @@ fun SideRail(
                                     .onFocusChanged { focusState ->
                                         if (
                                             drawerValue == DrawerValue.Open &&
-                                            focusState.isFocused &&
-                                            requestedRoute != item.route
+                                            focusState.isFocused
                                         ) {
-                                            requestedRoute = item.route
-                                            onNavigate(item.route)
+                                            requestRoute(item.route)
                                         }
                                     },
                             ) {
@@ -322,10 +340,7 @@ fun SideRail(
                         key(item.route) {
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
-                                onClick = {
-                                    requestedRoute = item.route
-                                    onNavigate(item.route)
-                                },
+                                onClick = { requestRoute(item.route) },
                                 leadingContent = item.icon,
                                 modifier = Modifier
                                     .focusRequester(itemFocus.getValue(item.route))
@@ -334,11 +349,9 @@ fun SideRail(
                                     .onFocusChanged { focusState ->
                                         if (
                                             drawerValue == DrawerValue.Open &&
-                                            focusState.isFocused &&
-                                            requestedRoute != item.route
+                                            focusState.isFocused
                                         ) {
-                                            requestedRoute = item.route
-                                            onNavigate(item.route)
+                                            requestRoute(item.route)
                                         }
                                     },
                             ) {

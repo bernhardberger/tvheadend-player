@@ -737,7 +737,6 @@ private fun EvidenceChannelDrawer() {
                     imageLoader = imageLoader,
                     currentSession = null,
                     piconPath = null,
-                    focused = index == 1,
                     playingNow = index == 0,
                     recordingNow = index == 2,
                     onFocus = {},

@@ -466,7 +466,6 @@ fun ChannelsScreen(
                         ) {
                             items(channels, key = { ch -> ch.id.value }) { ch ->
                                 val channelId = ch.id
-                                val isSelected = channelId == selectedId
                                 val now =
                                     remember(channelId, observation, nowSec) {
                                         observation.eventAt(
@@ -496,7 +495,6 @@ fun ChannelsScreen(
                                     imageLoader = imageLoader,
                                     currentSession = currentSession,
                                     piconPath = ch.icon,
-                                    focused = isSelected,
                                     recordingNow = status.recordingNow,
                                     playingNow = status.playingNow,
                                     onFocus = {

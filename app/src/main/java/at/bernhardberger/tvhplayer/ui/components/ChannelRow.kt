@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -34,12 +38,12 @@ fun ChannelRow(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
     piconPath: String?,
-    focused: Boolean,
     recordingNow: Boolean = false,
     playingNow: Boolean = false,
     onFocus: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    var focused by remember { mutableStateOf(false) }
     ListItem(
         selected = playingNow,
         onClick = onConfirm,
@@ -102,6 +106,9 @@ fun ChannelRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 3.dp)
-            .onFocusChanged { if (it.isFocused) onFocus() },
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocus()
+            },
     )
 }

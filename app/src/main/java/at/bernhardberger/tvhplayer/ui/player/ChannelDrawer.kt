@@ -259,7 +259,6 @@ fun ChannelDrawer(
             ) {
                 items(channels, key = { ch -> ch.id.value }) { ch ->
                     val channelId = ch.id
-                    val isSelected = channelId == selectedId
 
                     val now = remember(channelId, nowSec) {
                         channelsVm.nowEvent(channelId, nowSec)
@@ -286,7 +285,6 @@ fun ChannelDrawer(
                         imageLoader = imageLoader,
                         currentSession = currentSession,
                         piconPath = ch.icon,
-                        focused = isSelected,
                         recordingNow = status.recordingNow,
                         playingNow = status.playingNow,
                         onFocus = { if (!isRestoring) onFocusChannel(channelId) },

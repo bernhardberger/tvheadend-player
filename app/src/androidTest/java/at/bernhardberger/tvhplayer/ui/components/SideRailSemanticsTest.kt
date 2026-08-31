@@ -375,6 +375,11 @@ class SideRailSemanticsTest {
             guideFocusLatencyMillis <= GUIDE_RAIL_FOCUS_BUDGET_MILLIS,
         )
         composeRule.onNodeWithTag("nav-epg")
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.runOnIdle {
+            assertEquals(listOf(Routes.EPG), requestedRoutes)
+        }
+        composeRule.onNodeWithTag("nav-epg")
             .performKeyInput { pressKey(Key.DirectionDown) }
 
         composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
@@ -399,19 +404,31 @@ class SideRailSemanticsTest {
             )
         }
 
-        dispatchBack()
+        composeRule.runOnIdle {
+            // A late intermediate completion cannot replace the latest focus intent.
+            reportedRoute.value = Routes.RECORDINGS
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+
+        composeRule.onNodeWithTag("nav-channels")
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("rapid-browse-focus")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
         composeRule.runOnIdle {
             assertEquals(
-                listOf(
-                    Routes.EPG,
-                    Routes.RECORDINGS,
-                    Routes.EPG,
-                    Routes.CHANNELS,
-                    Routes.CHANNELS,
-                ),
+                listOf(Routes.EPG, Routes.RECORDINGS, Routes.EPG, Routes.CHANNELS),
                 requestedRoutes,
             )
+        }
+
+        val requestsBeforeSilentBack = requestedRoutes.toList()
+        dispatchBack()
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(requestsBeforeSilentBack, requestedRoutes)
             assertEquals(0, rootBackCount)
         }
         InstrumentationRegistry.getInstrumentation().sendStatus(
@@ -422,6 +439,57 @@ class SideRailSemanticsTest {
                 putString("awaitRootDestinationRootBackCount", rootBackCount.toString())
             },
         )
+    }
+
+    @Test
+    fun removingAPendingClosedDrawerItemDiscardsItBeforeReentry() {
+        val reportedRoute = mutableStateOf(Routes.CHANNELS)
+        val showEpgMenu = mutableStateOf(true)
+        val requestedRoutes = mutableListOf<String>()
+        val contentFocus = FocusRequester()
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                SideRail(
+                    currentRoute = reportedRoute.value,
+                    rootRoute = Routes.CHANNELS,
+                    showEpgMenu = showEpgMenu.value,
+                    onRootBack = {},
+                    onNavigate = { requestedRoutes += it },
+                    content = { _, drawerActive ->
+                        Button(
+                            onClick = {},
+                            modifier = Modifier
+                                .focusRequester(contentFocus)
+                                .testTag("closed-item-change-browse-focus"),
+                        ) {
+                            Text("Browse")
+                        }
+                        LaunchedEffect(drawerActive) {
+                            if (!drawerActive) contentFocus.requestFocus()
+                        }
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("closed-item-change-browse-focus")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("nav-channels")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("nav-epg")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("closed-item-change-browse-focus").assertIsFocused()
+
+        composeRule.runOnIdle { showEpgMenu.value = false }
+        composeRule.runOnIdle { showEpgMenu.value = true }
+        composeRule.onNodeWithTag("closed-item-change-browse-focus")
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+        composeRule.runOnIdle { assertEquals(listOf(Routes.EPG), requestedRoutes) }
     }
 
     @Test

@@ -57,7 +57,6 @@ class ChannelRowTest {
                     progress = 0.5f,
                     imageLoader = imageLoader,
                     piconPath = null,
-                    focused = false,
                     onFocus = {},
                     onConfirm = { confirmed = true }
                 )
@@ -95,7 +94,6 @@ class ChannelRowTest {
                             progress = 0.5f,
                             imageLoader = imageLoader,
                             piconPath = null,
-                            focused = false,
                             recordingNow = index != 1,
                             playingNow = index != 1,
                             onFocus = {},
@@ -151,7 +149,6 @@ class ChannelRowTest {
                             progress = 0.5f,
                             imageLoader = imageLoader,
                             piconPath = null,
-                            focused = focusedNumber == number,
                             onFocus = { focusedNumber = number },
                             onConfirm = {},
                         )
@@ -193,7 +190,6 @@ class ChannelRowTest {
                             progress = 0.5f,
                             imageLoader = imageLoader,
                             piconPath = null,
-                            focused = selectedNumber.intValue == number,
                             onFocus = { selectedNumber.intValue = number },
                             onConfirm = {},
                         )
@@ -218,8 +214,9 @@ class ChannelRowTest {
             recomposedRows = compositionCounts.count { it > 0 }
             maxRowRecompositions = compositionCounts.max()
             assertTrue(
-                "Unexpected recomposition breadth: ${compositionCounts.contentToString()}",
-                recomposedRows in 2..CHANNEL_RECOMPOSITION_VISIBLE_ROWS,
+                "At most the old and new focused rows should recompose: " +
+                    compositionCounts.contentToString(),
+                recomposedRows <= CHANNEL_RECOMPOSITION_MAX_CHANGED_ROWS,
             )
             assertTrue(
                 "A channel row recomposed $maxRowRecompositions times for one focus move",
@@ -249,7 +246,6 @@ class ChannelRowTest {
                     progress = 0.25f,
                     imageLoader = imageLoader,
                     piconPath = null,
-                    focused = false,
                     onFocus = {},
                     onConfirm = {},
                 )
@@ -272,4 +268,5 @@ class ChannelRowTest {
 
 private const val CHANNEL_EVIDENCE_STATUS_CODE = 2
 private const val CHANNEL_RECOMPOSITION_VISIBLE_ROWS = 6
-private const val CHANNEL_RECOMPOSITION_PER_ROW_BUDGET = 3
+private const val CHANNEL_RECOMPOSITION_MAX_CHANGED_ROWS = 2
+private const val CHANNEL_RECOMPOSITION_PER_ROW_BUDGET = 1
