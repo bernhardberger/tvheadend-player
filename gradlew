@@ -114,6 +114,19 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
+# All player worktrees share one Gradle owner on the integration host. Holding
+# this descriptor serializes direct wrapper calls, tools/verify, and gradle-run.
+if command -v flock >/dev/null 2>&1; then
+    gradle_lock_uid=$(id -u) || die "Unable to resolve the Gradle lock owner"
+    gradle_lock_dir=/tmp/tvheadend-player-gradle-$gradle_lock_uid
+    mkdir -p "$gradle_lock_dir" || die "Unable to create the Gradle lock directory"
+    chmod 700 "$gradle_lock_dir" || die "Unable to secure the Gradle lock directory"
+    exec 9>"$gradle_lock_dir/gradle.lock" || die "Unable to open the Gradle lock"
+    flock -x 9 || die "Unable to acquire the Gradle lock"
+elif [ "$( uname -s )" = Linux ]; then
+    die "flock is required to serialize TVHeadend Player Gradle builds"
+fi
+
 CLASSPATH="\\\"\\\""
 
 
