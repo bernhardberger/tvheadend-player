@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
-import at.bernhardberger.tvhplayer.ui.Routes
+import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -55,7 +55,7 @@ class SideRailSemanticsTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
-                    currentRoute = Routes.CHANNELS,
+                    currentRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
                     simpleTvProfile = simpleTvProfile(
                         SimpleTvSettings(),
@@ -82,7 +82,7 @@ class SideRailSemanticsTest {
             Box(Modifier.fillMaxSize().background(Color.Red)) {
                 TVHeadendPlayerTheme {
                     SideRail(
-                        currentRoute = Routes.CHANNELS,
+                        currentRoute = AppDestination.CHANNELS,
                         showEpgMenu = true,
                         onRootBack = {},
                         onNavigate = {},
@@ -204,7 +204,7 @@ class SideRailSemanticsTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
-                    currentRoute = Routes.CHANNELS,
+                    currentRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
@@ -238,7 +238,7 @@ class SideRailSemanticsTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
-                    currentRoute = Routes.CHANNELS,
+                    currentRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = {},
                     onNavigate = {},
@@ -262,17 +262,20 @@ class SideRailSemanticsTest {
 
     @Test
     fun openDrawerPreservesBrowseWidthAndFocusedDestinationNavigates() {
-        val route = mutableStateOf(Routes.CHANNELS)
+        val route = mutableStateOf(AppDestination.CHANNELS)
         val contentFocus = FocusRequester()
         var rootBackCount = 0
+        var browseBackHandler: () -> Unit = {}
         composeRule.setContent {
             TVHeadendPlayerTheme {
+                BackHandler { browseBackHandler() }
                 SideRail(
                     currentRoute = route.value,
-                    rootRoute = Routes.CHANNELS,
+                    rootRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = { route.value = it },
+                    onBackHandlerChanged = { browseBackHandler = it },
                     content = { _, drawerActive ->
                         Box(Modifier.fillMaxSize().testTag("browse-viewport")) {
                             Button(
@@ -309,7 +312,7 @@ class SideRailSemanticsTest {
 
         composeRule.onNodeWithTag("nav-channels")
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.runOnIdle { assertEquals(Routes.EPG, route.value) }
+        composeRule.runOnIdle { assertEquals(AppDestination.GUIDE, route.value) }
         composeRule.onNodeWithTag("nav-epg").assertIsFocused()
 
         composeRule.onNodeWithTag("nav-epg")
@@ -330,18 +333,21 @@ class SideRailSemanticsTest {
 
     @Test
     fun delayedRouteFeedbackDoesNotPullFocusBackDuringRapidNavigation() {
-        val reportedRoute = mutableStateOf(Routes.CHANNELS)
-        val requestedRoutes = mutableListOf<String>()
+        val reportedRoute = mutableStateOf(AppDestination.CHANNELS)
+        val requestedRoutes = mutableListOf<AppDestination>()
         val contentFocus = FocusRequester()
         var rootBackCount = 0
+        var browseBackHandler: () -> Unit = {}
         composeRule.setContent {
             TVHeadendPlayerTheme {
+                BackHandler { browseBackHandler() }
                 SideRail(
                     currentRoute = reportedRoute.value,
-                    rootRoute = Routes.CHANNELS,
+                    rootRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = { requestedRoutes += it },
+                    onBackHandlerChanged = { browseBackHandler = it },
                     content = { _, drawerActive ->
                         Button(
                             onClick = {},
@@ -377,17 +383,20 @@ class SideRailSemanticsTest {
         composeRule.onNodeWithTag("nav-epg")
             .performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.runOnIdle {
-            assertEquals(listOf(Routes.EPG), requestedRoutes)
+            assertEquals(listOf(AppDestination.GUIDE), requestedRoutes)
         }
         composeRule.onNodeWithTag("nav-epg")
             .performKeyInput { pressKey(Key.DirectionDown) }
 
         composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
         composeRule.runOnIdle {
-            assertEquals(listOf(Routes.EPG, Routes.RECORDINGS), requestedRoutes)
+            assertEquals(
+                listOf(AppDestination.GUIDE, AppDestination.RECORDINGS),
+                requestedRoutes,
+            )
             // Navigation can report an intermediate route after focus has already
             // advanced again during an in-flight destination crossfade.
-            reportedRoute.value = Routes.EPG
+            reportedRoute.value = AppDestination.GUIDE
         }
         composeRule.waitForIdle()
 
@@ -399,14 +408,19 @@ class SideRailSemanticsTest {
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
         composeRule.runOnIdle {
             assertEquals(
-                listOf(Routes.EPG, Routes.RECORDINGS, Routes.EPG, Routes.CHANNELS),
+                listOf(
+                    AppDestination.GUIDE,
+                    AppDestination.RECORDINGS,
+                    AppDestination.GUIDE,
+                    AppDestination.CHANNELS,
+                ),
                 requestedRoutes,
             )
         }
 
         composeRule.runOnIdle {
             // A late intermediate completion cannot replace the latest focus intent.
-            reportedRoute.value = Routes.RECORDINGS
+            reportedRoute.value = AppDestination.RECORDINGS
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
@@ -419,7 +433,12 @@ class SideRailSemanticsTest {
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
         composeRule.runOnIdle {
             assertEquals(
-                listOf(Routes.EPG, Routes.RECORDINGS, Routes.EPG, Routes.CHANNELS),
+                listOf(
+                    AppDestination.GUIDE,
+                    AppDestination.RECORDINGS,
+                    AppDestination.GUIDE,
+                    AppDestination.CHANNELS,
+                ),
                 requestedRoutes,
             )
         }
@@ -443,15 +462,15 @@ class SideRailSemanticsTest {
 
     @Test
     fun removingAPendingClosedDrawerItemDiscardsItBeforeReentry() {
-        val reportedRoute = mutableStateOf(Routes.CHANNELS)
+        val reportedRoute = mutableStateOf(AppDestination.CHANNELS)
         val showEpgMenu = mutableStateOf(true)
-        val requestedRoutes = mutableListOf<String>()
+        val requestedRoutes = mutableListOf<AppDestination>()
         val contentFocus = FocusRequester()
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = reportedRoute.value,
-                    rootRoute = Routes.CHANNELS,
+                    rootRoute = AppDestination.CHANNELS,
                     showEpgMenu = showEpgMenu.value,
                     onRootBack = {},
                     onNavigate = { requestedRoutes += it },
@@ -489,20 +508,20 @@ class SideRailSemanticsTest {
             .performKeyInput { pressKey(Key.DirectionLeft) }
 
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
-        composeRule.runOnIdle { assertEquals(listOf(Routes.EPG), requestedRoutes) }
+        composeRule.runOnIdle { assertEquals(listOf(AppDestination.GUIDE), requestedRoutes) }
     }
 
     @Test
     fun removingTheFocusedOpenDrawerItemUsesADeterministicFallback() {
-        val reportedRoute = mutableStateOf(Routes.EPG)
+        val reportedRoute = mutableStateOf(AppDestination.GUIDE)
         val showEpgMenu = mutableStateOf(true)
-        val requestedRoutes = mutableListOf<String>()
+        val requestedRoutes = mutableListOf<AppDestination>()
         val contentFocus = FocusRequester()
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = reportedRoute.value,
-                    rootRoute = Routes.CHANNELS,
+                    rootRoute = AppDestination.CHANNELS,
                     showEpgMenu = showEpgMenu.value,
                     onRootBack = {},
                     onNavigate = {
@@ -536,21 +555,21 @@ class SideRailSemanticsTest {
 
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
         composeRule.runOnIdle {
-            assertEquals(listOf(Routes.CHANNELS), requestedRoutes)
+            assertEquals(listOf(AppDestination.CHANNELS), requestedRoutes)
         }
     }
 
     @Test
     fun removingAnotherItemPreservesAStillValidRapidNavigationIntent() {
-        val reportedRoute = mutableStateOf(Routes.EPG)
+        val reportedRoute = mutableStateOf(AppDestination.GUIDE)
         val showEpgMenu = mutableStateOf(true)
-        val requestedRoutes = mutableListOf<String>()
+        val requestedRoutes = mutableListOf<AppDestination>()
         val contentFocus = FocusRequester()
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
                     currentRoute = reportedRoute.value,
-                    rootRoute = Routes.CHANNELS,
+                    rootRoute = AppDestination.CHANNELS,
                     showEpgMenu = showEpgMenu.value,
                     onRootBack = {},
                     onNavigate = { requestedRoutes += it },
@@ -579,7 +598,7 @@ class SideRailSemanticsTest {
             .performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
         composeRule.runOnIdle {
-            assertEquals(listOf(Routes.RECORDINGS), requestedRoutes)
+            assertEquals(listOf(AppDestination.RECORDINGS), requestedRoutes)
             // EPG feedback is still reported when that unrelated item disappears.
             showEpgMenu.value = false
         }
@@ -587,7 +606,7 @@ class SideRailSemanticsTest {
 
         composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
         composeRule.runOnIdle {
-            assertEquals(listOf(Routes.RECORDINGS), requestedRoutes)
+            assertEquals(listOf(AppDestination.RECORDINGS), requestedRoutes)
         }
     }
 
@@ -596,13 +615,16 @@ class SideRailSemanticsTest {
         val contentFocus = FocusRequester()
         var contentBackCount = 0
         var rootBackCount = 0
+        var browseBackHandler: () -> Unit = {}
         composeRule.setContent {
             TVHeadendPlayerTheme {
+                BackHandler { browseBackHandler() }
                 SideRail(
-                    currentRoute = Routes.CHANNELS,
+                    currentRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = {},
+                    onBackHandlerChanged = { browseBackHandler = it },
                     content = { _, _ ->
                         BackHandler { contentBackCount += 1 }
                         Button(

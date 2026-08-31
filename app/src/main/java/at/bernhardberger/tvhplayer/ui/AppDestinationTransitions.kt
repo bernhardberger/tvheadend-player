@@ -1,9 +1,11 @@
 package at.bernhardberger.tvhplayer.ui
 
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 
@@ -27,3 +29,6 @@ internal fun appDestinationExitTransition(): ExitTransition = fadeOut(
         easing = LinearEasing,
     ),
 )
+
+internal fun appDestinationContentTransform(): ContentTransform =
+    appDestinationEnterTransition() togetherWith appDestinationExitTransition()

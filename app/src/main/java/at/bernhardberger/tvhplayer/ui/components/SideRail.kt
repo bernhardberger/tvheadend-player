@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +21,7 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +57,7 @@ import at.bernhardberger.tvhplayer.core.SimpleTvProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
 import at.bernhardberger.tvhplayer.models.RailItem
-import at.bernhardberger.tvhplayer.ui.Routes
+import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientEarlyAlpha
 import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientLateAlpha
 import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientMiddleAlpha
@@ -75,14 +75,15 @@ private val ClosedDrawerWidth =
     DrawerStartPadding + NavigationDrawerItemDefaults.CollapsedDrawerItemWidth + DrawerEndPadding
 
 @Composable
-fun SideRail(
-    currentRoute: String?,
-    rootRoute: String = Routes.CHANNELS,
+internal fun SideRail(
+    currentRoute: AppDestination?,
+    rootRoute: AppDestination = AppDestination.CHANNELS,
     showEpgMenu: Boolean,
     simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
     rootBackPriority: Boolean = false,
     onRootBack: () -> Unit,
-    onNavigate: (String) -> Unit,
+    onNavigate: (AppDestination) -> Unit,
+    onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
@@ -100,7 +101,7 @@ fun SideRail(
     ) {
         buildList {
             if (simpleTvProfile.allows(SimpleTvCapability.CHANNEL_LIST)) {
-                add(RailItem(Routes.CHANNELS, channelsLabel) {
+                add(RailItem(AppDestination.CHANNELS, channelsLabel) {
                     Icon(
                         Icons.AutoMirrored.Filled.List,
                         contentDescription = null,
@@ -109,7 +110,7 @@ fun SideRail(
                 })
             }
             if (showEpgMenu && simpleTvProfile.allows(SimpleTvCapability.EPG)) {
-                add(RailItem(Routes.EPG, epgLabel) {
+                add(RailItem(AppDestination.GUIDE, epgLabel) {
                     Icon(
                         Icons.Filled.Event,
                         contentDescription = null,
@@ -118,7 +119,7 @@ fun SideRail(
                 })
             }
             if (simpleTvProfile.allows(SimpleTvCapability.RECORDINGS)) {
-                add(RailItem(Routes.RECORDINGS, recordingsLabel) {
+                add(RailItem(AppDestination.RECORDINGS, recordingsLabel) {
                     Icon(
                         Icons.Filled.VideoLibrary,
                         contentDescription = null,
@@ -135,7 +136,7 @@ fun SideRail(
     ) {
         buildList {
             if (simpleTvProfile.active) {
-                add(RailItem(Routes.UNLOCK, unlockLabel) {
+                add(RailItem(AppDestination.UNLOCK, unlockLabel) {
                     Icon(
                         Icons.Filled.LockOpen,
                         contentDescription = null,
@@ -144,7 +145,7 @@ fun SideRail(
                 })
             }
             if (simpleTvProfile.allows(SimpleTvCapability.SETTINGS)) {
-                add(RailItem(Routes.SETTINGS, settingsLabel) {
+                add(RailItem(AppDestination.SETTINGS, settingsLabel) {
                     Icon(
                         Icons.Filled.Settings,
                         contentDescription = null,
@@ -158,8 +159,8 @@ fun SideRail(
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     var requestedRoute by remember { mutableStateOf(currentRoute) }
-    var pendingRoute by remember { mutableStateOf<String?>(null) }
-    val requestRoute: (String) -> Unit = { route ->
+    var pendingRoute by remember { mutableStateOf<AppDestination?>(null) }
+    val requestRoute: (AppDestination) -> Unit = { route ->
         if (requestedRoute != route) {
             requestedRoute = route
             pendingRoute = route
@@ -205,7 +206,7 @@ fun SideRail(
             BrowseShellBackAction.DELEGATE_TO_ROOT -> onRootBack()
         }
     }
-    BackHandler(onBack = handleBrowseBack)
+    SideEffect { onBackHandlerChanged(handleBrowseBack) }
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
@@ -319,7 +320,7 @@ fun SideRail(
                                 modifier = Modifier
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
-                                    .testTag("nav-${item.route}")
+                                    .testTag(item.route.testTag)
                                     .onFocusChanged { focusState ->
                                         if (
                                             drawerValue == DrawerValue.Open &&
@@ -345,7 +346,7 @@ fun SideRail(
                                 modifier = Modifier
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
-                                    .testTag("nav-${item.route}")
+                                    .testTag(item.route.testTag)
                                     .onFocusChanged { focusState ->
                                         if (
                                             drawerValue == DrawerValue.Open &&
@@ -372,6 +373,18 @@ fun SideRail(
         )
     }
 }
+
+private val AppDestination.testTag: String
+    get() = when (this) {
+        AppDestination.CHANNELS -> "nav-channels"
+        AppDestination.GUIDE,
+        AppDestination.FILTERED_GUIDE -> "nav-epg"
+        AppDestination.RECORDINGS -> "nav-recordings"
+        AppDestination.SETTINGS -> "nav-settings"
+        AppDestination.UNLOCK -> "nav-unlock"
+        AppDestination.LIVE_PLAYER -> "nav-player"
+        AppDestination.RECORDING_PLAYER -> "nav-recording-player"
+    }
 
 @Composable
 private fun BrowseViewport(

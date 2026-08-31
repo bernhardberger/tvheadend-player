@@ -2,8 +2,10 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
@@ -17,12 +19,22 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.ui.MainStartupComposition
 import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
+import at.bernhardberger.tvhplayer.ui.AppNavKey
+import at.bernhardberger.tvhplayer.ui.ChannelsKey
+import at.bernhardberger.tvhplayer.ui.SettingsKey
+import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.navigateTopLevel
+import at.bernhardberger.tvhplayer.ui.popNavigation
+import at.bernhardberger.tvhplayer.ui.rememberAppNavBackStack
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -37,9 +49,10 @@ class SettingsStartupEntryTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SettingsScreenNavigation(
-                    startRoute = SettingsRoutes.GENERAL,
+                    currentSection = SettingsSection.GENERAL,
                     initialFocusEnabled = true,
                     showSimpleTvSettings = true,
+                    onNavigate = {},
                 ) { route, focusRequester ->
                     Button(
                         onClick = {},
@@ -52,8 +65,8 @@ class SettingsStartupEntryTest {
         }
 
         composeRule.onNodeWithText("Language").assertIsSelected().assertIsFocused()
-        composeRule.onNodeWithText("Content ${SettingsRoutes.GENERAL}").assertExists()
-        composeRule.onNodeWithText("Content ${SettingsRoutes.CONNECTION}").assertDoesNotExist()
+        composeRule.onNodeWithText("Content ${SettingsSection.GENERAL}").assertExists()
+        composeRule.onNodeWithText("Content ${SettingsSection.CONNECTION}").assertDoesNotExist()
     }
 
     @Test
@@ -65,13 +78,14 @@ class SettingsStartupEntryTest {
             TVHeadendPlayerTheme {
                 if (settingsVisible) {
                     SettingsScreenNavigation(
-                        startRoute = SettingsRoutes.CONNECTION,
+                        currentSection = SettingsSection.CONNECTION,
                         initialFocusEnabled = true,
                         showSimpleTvSettings = true,
+                        onNavigate = {},
                     ) { route, focusRequester ->
                         Button(
                             onClick = {
-                                if (route == SettingsRoutes.CONNECTION) {
+                                if (route == SettingsSection.CONNECTION) {
                                     firstConnectionControlInvocations++
                                 }
                             },
@@ -108,8 +122,8 @@ class SettingsStartupEntryTest {
         }
 
         composeRule.onNodeWithText("Connection").assertIsSelected().assertIsFocused()
-        composeRule.onNodeWithText("First control ${SettingsRoutes.CONNECTION}").assertExists()
-        composeRule.onNodeWithText("First control ${SettingsRoutes.GENERAL}").assertDoesNotExist()
+        composeRule.onNodeWithText("First control ${SettingsSection.CONNECTION}").assertExists()
+        composeRule.onNodeWithText("First control ${SettingsSection.GENERAL}").assertDoesNotExist()
         composeRule.runOnIdle {
             assertEquals(1, startupActions)
             assertEquals(0, firstConnectionControlInvocations)
@@ -123,8 +137,9 @@ class SettingsStartupEntryTest {
             TVHeadendPlayerTheme {
                 BackHandler { shellBackCount++ }
                 SettingsScreenNavigation(
-                    startRoute = SettingsRoutes.GENERAL,
+                    currentSection = SettingsSection.GENERAL,
                     showSimpleTvSettings = true,
+                    onNavigate = {},
                 ) { route, focusRequester ->
                     Button(
                         onClick = {},
@@ -139,7 +154,7 @@ class SettingsStartupEntryTest {
         composeRule.onNodeWithText("Language").assertIsFocused().performKeyInput {
             pressKey(Key.DirectionCenter)
         }
-        composeRule.onNodeWithText("Content ${SettingsRoutes.GENERAL}").assertIsFocused()
+        composeRule.onNodeWithText("Content ${SettingsSection.GENERAL}").assertIsFocused()
 
         dispatchBack()
         composeRule.onNodeWithText("Language").assertIsFocused()
@@ -147,6 +162,58 @@ class SettingsStartupEntryTest {
 
         dispatchBack()
         composeRule.runOnIdle { assertEquals(1, shellBackCount) }
+    }
+
+    @Test
+    fun playerSettingsContentFocusRestoresAfterVisitingAnotherDestination() {
+        lateinit var backStack: MutableList<AppNavKey>
+        composeRule.setContent {
+            backStack = rememberAppNavBackStack(SettingsKey(SettingsSection.PLAYER))
+            NavDisplay(
+                backStack = backStack,
+                onBack = { backStack.popNavigation() },
+                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                entryProvider = entryProvider {
+                    entry<SettingsKey> { key ->
+                        SettingsScreenNavigation(
+                            currentSection = key.section,
+                            showSimpleTvSettings = true,
+                            onNavigate = { backStack.navigateTopLevel(SettingsKey(it)) },
+                        ) { section, focusRequester ->
+                            Button(
+                                onClick = {},
+                                modifier = Modifier.focusRequester(focusRequester),
+                            ) {
+                                Text("Content $section")
+                            }
+                        }
+                    }
+                    entry<ChannelsKey> {
+                        val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+                        LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
+                        Button(
+                            onClick = {},
+                            modifier = Modifier.focusRequester(focusRequester),
+                        ) {
+                            Text("Channels destination")
+                        }
+                    }
+                },
+            )
+        }
+
+        composeRule.onNodeWithText("Player").assertIsFocused().performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeRule.onNodeWithText("Content ${SettingsSection.PLAYER}").assertIsFocused()
+
+        composeRule.runOnIdle { backStack.navigateTopLevel(ChannelsKey) }
+        composeRule.onNodeWithText("Channels destination").assertIsFocused()
+        composeRule.runOnIdle {
+            backStack.navigateTopLevel(SettingsKey(SettingsSection.PLAYER))
+        }
+
+        composeRule.onNodeWithText("Content ${SettingsSection.PLAYER}").assertIsFocused()
     }
 
     private fun dispatchBack() {

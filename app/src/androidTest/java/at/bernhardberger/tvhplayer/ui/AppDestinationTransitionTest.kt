@@ -14,10 +14,8 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -28,15 +26,17 @@ class AppDestinationTransitionTest {
 
     @Test
     fun forwardPlayerShellEdgesRemoveTheOutgoingFocusTreeAfterCrossfade() {
-        lateinit var navController: NavHostController
+        lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            navController = rememberNavController()
-            TransitionHarness(navController)
+            backStack = rememberAppNavBackStack(ChannelsKey)
+            TransitionHarness(backStack)
         }
         assertOnlyFocused(SHELL_A_TAG)
 
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle { navController.navigate("player/1") }
+        composeRule.runOnIdle {
+            backStack.pushTransient(LivePlayerKey(channelId = 1, channelName = "Player"))
+        }
         composeRule.finishDestinationCrossfade()
 
         composeRule.onNodeWithTag(SHELL_A_TAG).assertDoesNotExist()
@@ -45,16 +45,18 @@ class AppDestinationTransitionTest {
 
     @Test
     fun popPlayerShellEdgesRemoveTheOutgoingFocusTreeAfterCrossfade() {
-        lateinit var navController: NavHostController
+        lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            navController = rememberNavController()
-            TransitionHarness(navController)
+            backStack = rememberAppNavBackStack(ChannelsKey)
+            TransitionHarness(backStack)
         }
-        composeRule.runOnIdle { navController.navigate("player/1") }
+        composeRule.runOnIdle {
+            backStack.pushTransient(LivePlayerKey(channelId = 1, channelName = "Player"))
+        }
         assertOnlyFocused(PLAYER_TAG)
 
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle { navController.popBackStack() }
+        composeRule.runOnIdle { backStack.popNavigation() }
         composeRule.finishDestinationCrossfade()
 
         composeRule.onNodeWithTag(PLAYER_TAG).assertDoesNotExist()
@@ -63,14 +65,14 @@ class AppDestinationTransitionTest {
 
     @Test
     fun sameFamilyEdgesCrossfadeWithoutDelayingContentOwnedFocus() {
-        lateinit var navController: NavHostController
+        lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            navController = rememberNavController()
-            TransitionHarness(navController)
+            backStack = rememberAppNavBackStack(ChannelsKey)
+            TransitionHarness(backStack)
         }
 
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle { navController.navigate(SHELL_B_ROUTE) }
+        composeRule.runOnIdle { backStack.navigateTopLevel(GuideKey) }
         composeRule.waitForIdle()
 
         composeRule.mainClock.advanceTimeByFrame()
@@ -91,11 +93,15 @@ class AppDestinationTransitionTest {
 
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
-        composeRule.runOnIdle { navController.navigate("player/1") }
+        composeRule.runOnIdle {
+            backStack.pushTransient(LivePlayerKey(channelId = 1, channelName = "Player"))
+        }
         assertOnlyFocused(PLAYER_TAG)
 
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle { navController.navigate("recording-player/2") }
+        composeRule.runOnIdle {
+            backStack.pushTransient(RecordingPlayerKey(recordingId = 2))
+        }
         composeRule.finishDestinationCrossfade()
 
         composeRule.onNodeWithTag(PLAYER_TAG).assertDoesNotExist()
@@ -104,15 +110,15 @@ class AppDestinationTransitionTest {
 
     @Test
     fun frameSeparatedSameFamilyNavigationKeepsOnlyTheLatestDestination() {
-        lateinit var navController: NavHostController
+        lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            navController = rememberNavController()
-            TransitionHarness(navController)
+            backStack = rememberAppNavBackStack(ChannelsKey)
+            TransitionHarness(backStack)
         }
         assertOnlyFocused(SHELL_A_TAG)
 
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle { navController.navigate(SHELL_B_ROUTE) }
+        composeRule.runOnIdle { backStack.navigateTopLevel(GuideKey) }
         composeRule.waitForIdle()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
@@ -120,7 +126,7 @@ class AppDestinationTransitionTest {
         composeRule.waitForIdle()
         assertOnlyFocused(SHELL_B_TAG)
 
-        composeRule.runOnIdle { navController.navigate(SHELL_C_ROUTE) }
+        composeRule.runOnIdle { backStack.navigateTopLevel(RecordingsKey) }
         composeRule.finishDestinationCrossfade()
 
         composeRule.onNodeWithTag(SHELL_A_TAG).assertDoesNotExist()
@@ -130,16 +136,16 @@ class AppDestinationTransitionTest {
 
     @Test
     fun sameFrameRapidNavigationAlwaysComposesTheLatestDestination() {
-        lateinit var navController: NavHostController
+        lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            navController = rememberNavController()
-            TransitionHarness(navController)
+            backStack = rememberAppNavBackStack(ChannelsKey)
+            TransitionHarness(backStack)
         }
 
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle {
-            navController.navigate(SHELL_B_ROUTE)
-            navController.navigate(SHELL_C_ROUTE)
+            backStack.navigateTopLevel(GuideKey)
+            backStack.navigateTopLevel(RecordingsKey)
         }
         composeRule.waitForIdle()
         composeRule.mainClock.advanceTimeByFrame()
@@ -159,16 +165,16 @@ class AppDestinationTransitionTest {
 
     @Test
     fun crossfadePreservesAnExternalNavigationFocusOwner() {
-        lateinit var navController: NavHostController
+        lateinit var backStack: MutableList<AppNavKey>
         composeRule.setContent {
-            navController = rememberNavController()
+            backStack = rememberAppNavBackStack(ChannelsKey)
             val navigationFocusRequester = remember { FocusRequester() }
             LaunchedEffect(navigationFocusRequester) {
                 navigationFocusRequester.requestFocus()
             }
             Box {
                 TransitionHarness(
-                    navController = navController,
+                    backStack = backStack,
                     destinationFocusEnabled = false,
                 )
                 Box(
@@ -181,7 +187,7 @@ class AppDestinationTransitionTest {
         }
 
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnIdle { navController.navigate(SHELL_B_ROUTE) }
+        composeRule.runOnIdle { backStack.navigateTopLevel(GuideKey) }
         composeRule.waitForIdle()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
@@ -204,41 +210,33 @@ class AppDestinationTransitionTest {
 
 @Composable
 private fun TransitionHarness(
-    navController: NavHostController,
+    backStack: MutableList<AppNavKey>,
     destinationFocusEnabled: Boolean = true,
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = SHELL_A_ROUTE,
-        enterTransition = {
-            appDestinationEnterTransition()
+    NavDisplay(
+        backStack = backStack,
+        onBack = { backStack.popNavigation() },
+        transitionSpec = { appDestinationContentTransform() },
+        popTransitionSpec = { appDestinationContentTransform() },
+        predictivePopTransitionSpec = { appDestinationContentTransform() },
+        entryProvider = entryProvider {
+            entry<ChannelsKey> {
+                FocusedDestination(SHELL_A_TAG, destinationFocusEnabled)
+            }
+            entry<GuideKey> {
+                FocusedDestination(SHELL_B_TAG, destinationFocusEnabled)
+            }
+            entry<RecordingsKey> {
+                FocusedDestination(SHELL_C_TAG, destinationFocusEnabled)
+            }
+            entry<LivePlayerKey> {
+                FocusedDestination(PLAYER_TAG, destinationFocusEnabled)
+            }
+            entry<RecordingPlayerKey> {
+                FocusedDestination(RECORDING_PLAYER_TAG, destinationFocusEnabled)
+            }
         },
-        exitTransition = {
-            appDestinationExitTransition()
-        },
-        popEnterTransition = {
-            appDestinationEnterTransition()
-        },
-        popExitTransition = {
-            appDestinationExitTransition()
-        },
-    ) {
-        composable(SHELL_A_ROUTE) {
-            FocusedDestination(SHELL_A_TAG, destinationFocusEnabled)
-        }
-        composable(SHELL_B_ROUTE) {
-            FocusedDestination(SHELL_B_TAG, destinationFocusEnabled)
-        }
-        composable(SHELL_C_ROUTE) {
-            FocusedDestination(SHELL_C_TAG, destinationFocusEnabled)
-        }
-        composable("player/{id}") {
-            FocusedDestination(PLAYER_TAG, destinationFocusEnabled)
-        }
-        composable("recording-player/{id}") {
-            FocusedDestination(RECORDING_PLAYER_TAG, destinationFocusEnabled)
-        }
-    }
+    )
 }
 
 @Composable
@@ -271,9 +269,6 @@ private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.finishDestina
     waitForIdle()
 }
 
-private const val SHELL_A_ROUTE = "shell-a"
-private const val SHELL_B_ROUTE = "shell-b"
-private const val SHELL_C_ROUTE = "shell-c"
 private const val SHELL_A_TAG = "shell-a-focus"
 private const val SHELL_B_TAG = "shell-b-focus"
 private const val SHELL_C_TAG = "shell-c-focus"

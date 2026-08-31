@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.screens.SettingsRoutes
+import at.bernhardberger.tvhplayer.ui.SettingsSection
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.assertEquals
@@ -43,15 +43,15 @@ class SettingsPaneFocusTest {
             val contentFocus = remember { FocusRequester() }
             val contentFocusRequesters = remember {
                 listOf(
-                    SettingsRoutes.GENERAL,
-                    SettingsRoutes.OPTIONS,
-                    SettingsRoutes.CHANNEL_TAGS,
-                    SettingsRoutes.CONNECTION,
-                    SettingsRoutes.PLAYER,
-                    SettingsRoutes.APPLIANCE,
-                    SettingsRoutes.SIMPLE_TV,
+                    SettingsSection.GENERAL,
+                    SettingsSection.OPTIONS,
+                    SettingsSection.CHANNEL_TAGS,
+                    SettingsSection.CONNECTION,
+                    SettingsSection.PLAYER,
+                    SettingsSection.APPLIANCE,
+                    SettingsSection.SIMPLE_TV,
                 ).associateWith { route ->
-                    if (route == SettingsRoutes.PLAYER) contentFocus else FocusRequester()
+                    if (route == SettingsSection.PLAYER) contentFocus else FocusRequester()
                 }
             }
             val categoryFocusRequesters = remember {
@@ -60,7 +60,7 @@ class SettingsPaneFocusTest {
             TVHeadendPlayerTheme {
                 Row(Modifier.fillMaxSize()) {
                     SettingsSubRail(
-                        currentRoute = SettingsRoutes.PLAYER,
+                        currentRoute = SettingsSection.PLAYER,
                         categoryFocusRequesters = categoryFocusRequesters,
                         contentFocusRequesters = contentFocusRequesters,
                         onNavigate = {},
@@ -142,13 +142,13 @@ class SettingsPaneFocusTest {
             val contentFocus = remember { FocusRequester() }
             val routes = remember {
                 listOf(
-                    SettingsRoutes.GENERAL,
-                    SettingsRoutes.OPTIONS,
-                    SettingsRoutes.CHANNEL_TAGS,
-                    SettingsRoutes.CONNECTION,
-                    SettingsRoutes.PLAYER,
-                    SettingsRoutes.APPLIANCE,
-                    SettingsRoutes.SIMPLE_TV,
+                    SettingsSection.GENERAL,
+                    SettingsSection.OPTIONS,
+                    SettingsSection.CHANNEL_TAGS,
+                    SettingsSection.CONNECTION,
+                    SettingsSection.PLAYER,
+                    SettingsSection.APPLIANCE,
+                    SettingsSection.SIMPLE_TV,
                 )
             }
             val categoryFocusRequesters = remember {
@@ -156,13 +156,13 @@ class SettingsPaneFocusTest {
             }
             val contentFocusRequesters = remember {
                 routes.associateWith { route ->
-                    if (route == SettingsRoutes.PLAYER) contentFocus else FocusRequester()
+                    if (route == SettingsSection.PLAYER) contentFocus else FocusRequester()
                 }
             }
             TVHeadendPlayerTheme {
                 Row(Modifier.fillMaxSize()) {
                     SettingsSubRail(
-                        currentRoute = SettingsRoutes.PLAYER,
+                        currentRoute = SettingsSection.PLAYER,
                         categoryFocusRequesters = categoryFocusRequesters,
                         contentFocusRequesters = contentFocusRequesters,
                         onNavigate = {},

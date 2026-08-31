@@ -5,17 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
@@ -86,7 +82,7 @@ class MainStartupCompositionTest {
                 presentation = MainStartupPresentation.Passive(
                     MainStartupMessageKind.PREPARING,
                 ),
-                navigationStartDestination = Routes.CHANNELS,
+                navigationStartDestination = ChannelsKey,
                 navigationAllowed = false,
             ),
         )
@@ -120,7 +116,7 @@ class MainStartupCompositionTest {
                         MainStartupActionId.CONNECTION_SETTINGS,
                     ),
                 ),
-                navigationStartDestination = Routes.CHANNELS,
+                navigationStartDestination = ChannelsKey,
                 navigationAllowed = false,
             )
         }
@@ -136,11 +132,11 @@ class MainStartupCompositionTest {
     @Test
     fun enterDirectiveStaysStartingAndFreshEnteringStartsAtExactPlayerWithoutChannels() {
         val target = target(requestId = 7, channelId = 42, name = "News / HD")
-        val exactRoute = Routes.player(target.channelId, target.channelName)
+        val exactRoute = LivePlayerKey(target.channelId.value, target.channelName)
         var playerCompositions = 0
         var channelCompositions = 0
         var railCompositions = 0
-        var observedStartDestination: String? = null
+        var observedStartDestination: AppNavKey? = null
         var state by mutableStateOf(
             MainStartupCompositionState(
                 presentation = MainStartupPresentation.Enter(target.request),
@@ -161,7 +157,7 @@ class MainStartupCompositionTest {
                         MainNavigationShell(
                             showRail = shouldShowMainNavigationRail(
                                 simpleTvActive = false,
-                                currentTopRoute = null,
+                                currentDestination = null,
                                 navigationStartDestination = startDestination,
                             ),
                             rail = { railCompositions++ },
@@ -213,13 +209,13 @@ class MainStartupCompositionTest {
     fun inactiveNormalStartupStartsChannels() {
         var channels = 0
         var railCompositions = 0
-        var observedStart: String? = null
+        var observedStart: AppNavKey? = null
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 MainStartupComposition(
                     state = MainStartupCompositionState(
                         presentation = MainStartupPresentation.Inactive,
-                        navigationStartDestination = Routes.CHANNELS,
+                        navigationStartDestination = ChannelsKey,
                         navigationAllowed = true,
                     ),
                     onBack = {},
@@ -230,7 +226,7 @@ class MainStartupCompositionTest {
                         MainNavigationShell(
                             showRail = shouldShowMainNavigationRail(
                                 simpleTvActive = false,
-                                currentTopRoute = null,
+                                currentDestination = null,
                                 navigationStartDestination = start,
                             ),
                             rail = {
@@ -251,14 +247,14 @@ class MainStartupCompositionTest {
 
         composeRule.waitForIdle()
         composeRule.runOnIdle {
-            assertEquals(Routes.CHANNELS, observedStart)
+            assertEquals(ChannelsKey, observedStart)
             assertTrue(channels > 0)
             assertTrue(railCompositions > 0)
             assertTrue(
                 shouldShowMainNavigationRail(
                     simpleTvActive = false,
-                    currentTopRoute = null,
-                    navigationStartDestination = Routes.SETTINGS,
+                    currentDestination = null,
+                    navigationStartDestination = SettingsKey(),
                 ),
             )
         }
@@ -268,35 +264,35 @@ class MainStartupCompositionTest {
     fun exactNormalCancelSelectsChannelsWithoutRearmingAndDirectCloseFallsBack() {
         val requests = ApplianceLaunchRequests().apply { request() }
         val expected = requests.state.value
-        var selectedRoot: String? = null
+        var selectedRoot: AppNavKey? = null
 
         assertTrue(
             cancelStartupAndSelectRoot(
                 requests = requests,
                 expectedState = expected,
-                destination = Routes.CHANNELS,
+                destination = ChannelsKey,
                 selectRoot = { selectedRoot = it },
             ),
         )
         assertEquals(ApplianceLaunchState.Idle, requests.state.value)
-        assertEquals(Routes.CHANNELS, selectedRoot)
+        assertEquals(ChannelsKey, selectedRoot)
         assertFalse(requests.cancel(expected))
 
-        var retainedRoot = Routes.player(ChannelId(1), "One")
+        var retainedRoot: AppNavKey = LivePlayerKey(channelId = 1, channelName = "One")
         closeNormalLivePlayer(
             simpleTvActive = false,
             popBackStack = { false },
             selectRoot = { retainedRoot = it },
         )
-        assertEquals(Routes.CHANNELS, retainedRoot)
+        assertEquals(ChannelsKey, retainedRoot)
 
-        retainedRoot = Routes.player(ChannelId(2), "Two")
+        retainedRoot = LivePlayerKey(channelId = 2, channelName = "Two")
         closeNormalLivePlayer(
             simpleTvActive = false,
             popBackStack = { true },
             selectRoot = { retainedRoot = it },
         )
-        assertEquals(Routes.player(ChannelId(2), "Two"), retainedRoot)
+        assertEquals(LivePlayerKey(channelId = 2, channelName = "Two"), retainedRoot)
     }
 
     @Test
@@ -320,9 +316,9 @@ class MainStartupCompositionTest {
                         } else {
                             passive
                         },
-                        navigationStartDestination = Routes.player(
-                            entering.target.channelId,
-                            entering.target.channelName,
+                        navigationStartDestination = LivePlayerKey(
+                            channelId = entering.target.channelId.value,
+                            channelName = entering.target.channelName,
                         ),
                         navigationAllowed = true,
                     ),
@@ -397,7 +393,7 @@ class MainStartupCompositionTest {
                         presentation = MainStartupPresentation.Passive(
                             MainStartupMessageKind.STARTING_TELEVISION,
                         ),
-                        navigationStartDestination = Routes.player(ChannelId(91), "Wrong target"),
+                        navigationStartDestination = LivePlayerKey(91, "Wrong target"),
                         navigationAllowed = false,
                     ),
                     onBack = {},
@@ -427,15 +423,15 @@ class MainStartupCompositionTest {
             enteringNavigationAllowed(
                 hasBackStackEntry = true,
                 navigationStartDestination = null,
-                exactStartDestination = Routes.player(ChannelId(1), "Exact"),
+                exactStartDestination = LivePlayerKey(1, "Exact"),
                 matchingVisiblePlayer = false,
             ),
         )
         assertTrue(
             enteringNavigationAllowed(
                 hasBackStackEntry = false,
-                navigationStartDestination = Routes.player(ChannelId(1), "Exact"),
-                exactStartDestination = Routes.player(ChannelId(1), "Exact"),
+                navigationStartDestination = LivePlayerKey(1, "Exact"),
+                exactStartDestination = LivePlayerKey(1, "Exact"),
                 matchingVisiblePlayer = false,
             ),
         )
@@ -475,7 +471,7 @@ class MainStartupCompositionTest {
     fun deferredResolvingBackIsContainedForSimpleTvAndCancelsNormalStartupExactly() {
         val simpleRequests = ApplianceLaunchRequests().apply { request() }
         val simplePending = simpleRequests.state.value
-        var simpleRoot: String? = null
+        var simpleRoot: AppNavKey? = null
         val simpleAction = deferredResolvingBackAction(
             cancellationRequested = true,
             readyState = readyStartup(startSimpleTv = true),
@@ -495,7 +491,7 @@ class MainStartupCompositionTest {
 
         val normalRequests = ApplianceLaunchRequests().apply { request() }
         val normalPending = normalRequests.state.value
-        var normalRoot: String? = null
+        var normalRoot: AppNavKey? = null
         val normalAction = deferredResolvingBackAction(
             cancellationRequested = true,
             readyState = readyStartup(startSimpleTv = false),
@@ -511,7 +507,7 @@ class MainStartupCompositionTest {
             ),
         )
         assertEquals(ApplianceLaunchState.Idle, normalRequests.state.value)
-        assertEquals(Routes.CHANNELS, normalRoot)
+        assertEquals(ChannelsKey, normalRoot)
         assertFalse(normalRequests.cancel(normalPending))
     }
 
@@ -571,7 +567,7 @@ class MainStartupCompositionTest {
         val requests = ApplianceLaunchRequests().apply { request() }
         val expectedState = requests.state.value
         var contract: MainStartupActivityKeyContract? = null
-        var selectedRoot: String? = null
+        var selectedRoot: AppNavKey? = null
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 MainStartupComposition(
@@ -615,26 +611,24 @@ class MainStartupCompositionTest {
 
     @Composable
     private fun StartupNavigationCounterHost(
-        startDestination: String,
+        startDestination: AppNavKey,
         contentAllowed: Boolean,
         onChannelsComposed: () -> Unit,
         onPlayerComposed: () -> Unit,
     ) {
-        val nav = rememberNavController()
-        NavHost(navController = nav, startDestination = startDestination) {
-            composable(Routes.CHANNELS) {
-                if (contentAllowed) onChannelsComposed()
-            }
-            composable(
-                route = "${Routes.PLAYER}/{channelId}/{channelName}",
-                arguments = listOf(
-                    navArgument("channelId") { type = NavType.LongType },
-                    navArgument("channelName") { type = NavType.StringType },
-                ),
-            ) {
-                if (contentAllowed) onPlayerComposed()
-            }
-        }
+        val backStack = rememberAppNavBackStack(startDestination)
+        NavDisplay(
+            backStack = backStack,
+            onBack = { backStack.popNavigation() },
+            entryProvider = entryProvider {
+                entry<ChannelsKey> {
+                    if (contentAllowed) onChannelsComposed()
+                }
+                entry<LivePlayerKey> {
+                    if (contentAllowed) onPlayerComposed()
+                }
+            },
+        )
     }
 
     private fun target(requestId: Long, channelId: Int, name: String) = ApplianceLaunchTarget(

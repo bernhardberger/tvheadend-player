@@ -12,11 +12,11 @@ enum class SettingsBackAction {
     DELEGATE_TO_GLOBAL_NAVIGATION,
 }
 
-fun browseShellBackAction(
+fun <T> browseShellBackAction(
     drawerOpen: Boolean,
-    currentRoute: String?,
-    drawerRoute: String? = currentRoute,
-    rootRoute: String,
+    currentRoute: T?,
+    drawerRoute: T? = currentRoute,
+    rootRoute: T,
     rootBackPriority: Boolean = false,
 ): BrowseShellBackAction = when {
     rootBackPriority -> BrowseShellBackAction.DELEGATE_TO_ROOT
@@ -42,13 +42,5 @@ fun settingsBackAction(
  */
 fun showGlobalNavigationRail(
     simpleTvActive: Boolean,
-    topRoute: String?,
-    playerRoute: String,
-    recordingPlayerRoute: String,
-): Boolean {
-    if (simpleTvActive) return false
-    return when (topRoute) {
-        playerRoute, recordingPlayerRoute -> false
-        else -> true
-    }
-}
+    playerVisible: Boolean,
+): Boolean = !simpleTvActive && !playerVisible

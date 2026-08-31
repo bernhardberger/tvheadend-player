@@ -1,7 +1,9 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class ProgrammeCategory {
     ALL,
     FILM_DRAMA,

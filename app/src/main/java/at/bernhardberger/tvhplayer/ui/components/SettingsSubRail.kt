@@ -41,15 +41,15 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.models.RailItem
 import at.bernhardberger.tvhplayer.ui.SettingsCategoryPaneWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.screens.SettingsRoutes
+import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 
 @Composable
-fun SettingsSubRail(
-    currentRoute: String?,
-    categoryFocusRequesters: Map<String, FocusRequester>,
-    contentFocusRequesters: Map<String, FocusRequester>,
-    onNavigate: (String) -> Unit,
+internal fun SettingsSubRail(
+    currentRoute: SettingsSection?,
+    categoryFocusRequesters: Map<SettingsSection, FocusRequester>,
+    contentFocusRequesters: Map<SettingsSection, FocusRequester>,
+    onNavigate: (SettingsSection) -> Unit,
     initialFocusEnabled: Boolean = true,
     showSimpleTv: Boolean = true,
     modifier: Modifier = Modifier,
@@ -115,7 +115,7 @@ fun SettingsSubRail(
 }
 
 @Composable
-private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
+private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem<SettingsSection>> {
     val languageLabel = stringResource(R.string.settings_language_nav)
     val optionsLabel = stringResource(R.string.settings_options_nav)
     val channelTagsLabel = stringResource(R.string.settings_channel_tags_nav)
@@ -135,7 +135,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
     ) {
         buildList {
             add(
-                RailItem(SettingsRoutes.GENERAL, languageLabel) {
+                RailItem(SettingsSection.GENERAL, languageLabel) {
                     Icon(
                         Icons.Filled.Language,
                         contentDescription = languageLabel,
@@ -144,7 +144,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
                 },
             )
             add(
-                RailItem(SettingsRoutes.OPTIONS, optionsLabel) {
+                RailItem(SettingsSection.OPTIONS, optionsLabel) {
                     Icon(
                         Icons.Filled.Tune,
                         contentDescription = optionsLabel,
@@ -153,7 +153,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
                 },
             )
             add(
-                RailItem(SettingsRoutes.CHANNEL_TAGS, channelTagsLabel) {
+                RailItem(SettingsSection.CHANNEL_TAGS, channelTagsLabel) {
                     Icon(
                         Icons.Filled.FilterList,
                         contentDescription = channelTagsLabel,
@@ -162,7 +162,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
                 },
             )
             add(
-                RailItem(SettingsRoutes.CONNECTION, connectionLabel) {
+                RailItem(SettingsSection.CONNECTION, connectionLabel) {
                     Icon(
                         Icons.Filled.Cloud,
                         contentDescription = connectionLabel,
@@ -171,7 +171,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
                 },
             )
             add(
-                RailItem(SettingsRoutes.PLAYER, playerLabel) {
+                RailItem(SettingsSection.PLAYER, playerLabel) {
                     Icon(
                         Icons.Filled.PlayArrow,
                         contentDescription = playerLabel,
@@ -180,7 +180,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
                 },
             )
             add(
-                RailItem(SettingsRoutes.APPLIANCE, applianceLabel) {
+                RailItem(SettingsSection.APPLIANCE, applianceLabel) {
                     Icon(
                         Icons.Filled.Home,
                         contentDescription = applianceLabel,
@@ -190,7 +190,7 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem> {
             )
             if (showSimpleTv) {
                 add(
-                    RailItem(SettingsRoutes.SIMPLE_TV, simpleTvLabel) {
+                    RailItem(SettingsSection.SIMPLE_TV, simpleTvLabel) {
                         Icon(
                             Icons.Filled.AccessibilityNew,
                             contentDescription = simpleTvLabel,

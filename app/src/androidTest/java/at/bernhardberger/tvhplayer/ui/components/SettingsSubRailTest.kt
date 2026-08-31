@@ -13,7 +13,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.screens.SettingsRoutes
+import at.bernhardberger.tvhplayer.ui.SettingsSection
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -25,18 +25,18 @@ class SettingsSubRailTest {
 
     @Test
     fun categoryFocusChangesRouteAndKeepsDpadNavigationOnTheRail() {
-        var selectedRoute = SettingsRoutes.GENERAL
+        var selectedRoute = SettingsSection.GENERAL
         composeTestRule.setContent {
-            var route by remember { mutableStateOf(SettingsRoutes.GENERAL) }
+            var route by remember { mutableStateOf(SettingsSection.GENERAL) }
             val contentFocus = remember {
                 listOf(
-                    SettingsRoutes.GENERAL,
-                    SettingsRoutes.OPTIONS,
-                    SettingsRoutes.CHANNEL_TAGS,
-                    SettingsRoutes.CONNECTION,
-                    SettingsRoutes.PLAYER,
-                    SettingsRoutes.APPLIANCE,
-                    SettingsRoutes.SIMPLE_TV,
+                    SettingsSection.GENERAL,
+                    SettingsSection.OPTIONS,
+                    SettingsSection.CHANNEL_TAGS,
+                    SettingsSection.CONNECTION,
+                    SettingsSection.PLAYER,
+                    SettingsSection.APPLIANCE,
+                    SettingsSection.SIMPLE_TV,
                 ).associateWith { FocusRequester() }
             }
             val categoryFocus = remember {
@@ -61,7 +61,7 @@ class SettingsSubRailTest {
         }
         composeTestRule.onNodeWithText("Options").assertIsFocused()
         composeTestRule.runOnIdle {
-            assertEquals(SettingsRoutes.OPTIONS, selectedRoute)
+            assertEquals(SettingsSection.OPTIONS, selectedRoute)
         }
         composeTestRule.onNodeWithText("Options").performKeyInput {
             pressKey(Key.DirectionDown)
@@ -70,7 +70,7 @@ class SettingsSubRailTest {
         // the next rail item (Channel groups) without jumping into content.
         composeTestRule.onNodeWithText("Channel groups").assertIsFocused()
         composeTestRule.runOnIdle {
-            assertEquals(SettingsRoutes.CHANNEL_TAGS, selectedRoute)
+            assertEquals(SettingsSection.CHANNEL_TAGS, selectedRoute)
         }
     }
 }

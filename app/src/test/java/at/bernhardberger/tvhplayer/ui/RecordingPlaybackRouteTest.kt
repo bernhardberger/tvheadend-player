@@ -1,20 +1,18 @@
 package at.bernhardberger.tvhplayer.ui
 
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class RecordingPlaybackRouteTest {
     @Test
-    fun routeCarriesOnlyTheSdkStartPolicyWithoutACallerResumePosition() {
+    fun keyCarriesOnlyTheStartPolicyWithoutACallerResumePosition() {
         assertEquals(
-            "recording-player/42/resume",
-            Routes.recordingPlayer(DvrEntryId(42), RecordingPlaybackStart.RESUME),
+            RecordingStartMode.RESUME,
+            RecordingPlayerKey(recordingId = 42).start,
         )
         assertEquals(
-            "recording-player/42/beginning",
-            Routes.recordingPlayer(DvrEntryId(42), RecordingPlaybackStart.START_OVER),
+            RecordingStartMode.START_OVER,
+            RecordingPlayerKey(recordingId = 42, start = RecordingStartMode.START_OVER).start,
         )
     }
 }

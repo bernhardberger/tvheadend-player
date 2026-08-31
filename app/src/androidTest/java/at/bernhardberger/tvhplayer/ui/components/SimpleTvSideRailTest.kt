@@ -4,7 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
-import at.bernhardberger.tvhplayer.ui.Routes
+import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Rule
 import org.junit.Test
@@ -19,7 +19,7 @@ class SimpleTvSideRailTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SideRail(
-                    currentRoute = Routes.CHANNELS,
+                    currentRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
                     simpleTvProfile = simpleTvProfile(
                         SimpleTvSettings(enabled = true),

@@ -106,25 +106,19 @@ class NavigationShellPolicyTest {
         assertTrue(
             showGlobalNavigationRail(
                 simpleTvActive = false,
-                topRoute = "channels",
-                playerRoute = "player",
-                recordingPlayerRoute = "recording-player",
+                playerVisible = false,
             ),
         )
         assertTrue(
             showGlobalNavigationRail(
                 simpleTvActive = false,
-                topRoute = "epg",
-                playerRoute = "player",
-                recordingPlayerRoute = "recording-player",
+                playerVisible = false,
             ),
         )
         assertTrue(
             showGlobalNavigationRail(
                 simpleTvActive = false,
-                topRoute = "recordings",
-                playerRoute = "player",
-                recordingPlayerRoute = "recording-player",
+                playerVisible = false,
             ),
         )
     }
@@ -134,9 +128,7 @@ class NavigationShellPolicyTest {
         assertTrue(
             showGlobalNavigationRail(
                 simpleTvActive = false,
-                topRoute = "settings",
-                playerRoute = "player",
-                recordingPlayerRoute = "recording-player",
+                playerVisible = false,
             ),
         )
     }
@@ -146,26 +138,15 @@ class NavigationShellPolicyTest {
         assertFalse(
             showGlobalNavigationRail(
                 simpleTvActive = false,
-                topRoute = "player",
-                playerRoute = "player",
-                recordingPlayerRoute = "recording-player",
+                playerVisible = true,
             ),
         )
         assertFalse(
             showGlobalNavigationRail(
                 simpleTvActive = false,
-                topRoute = "recording-player",
-                playerRoute = "player",
-                recordingPlayerRoute = "recording-player",
+                playerVisible = true,
             ),
         )
-        assertFalse(
-            showGlobalNavigationRail(
-                simpleTvActive = true,
-                topRoute = "channels",
-                playerRoute = "player",
-                recordingPlayerRoute = "recording-player",
-            ),
-        )
+        assertFalse(showGlobalNavigationRail(simpleTvActive = true, playerVisible = false))
     }
 }

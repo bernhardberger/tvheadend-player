@@ -23,14 +23,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
 import at.bernhardberger.tvhplayer.ui.components.SettingsSubRail
-import at.bernhardberger.tvhplayer.ui.appDestinationEnterTransition
-import at.bernhardberger.tvhplayer.ui.appDestinationExitTransition
+import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.core.SettingsBackAction
@@ -45,42 +41,33 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsSimpleTv
 import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import org.koin.compose.koinInject
 
-object SettingsRoutes {
-    const val GENERAL = "settings/general"
-    const val PLAYER = "settings/player"
-    const val OPTIONS = "settings/options"
-    const val CHANNEL_TAGS = "settings/channel-tags"
-    const val CONNECTION = "settings/connection"
-    const val APPLIANCE = "settings/appliance"
-    const val SIMPLE_TV = "settings/simple-tv"
-    const val ABOUT = "settings/about"
-}
-
 @Composable
-fun SettingsScreen(
-    startRoute: String = SettingsRoutes.GENERAL,
+internal fun SettingsScreen(
+    section: SettingsSection = SettingsSection.GENERAL,
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
+    onNavigate: (SettingsSection) -> Unit,
     onStartSimpleTv: () -> Unit,
 ) {
     val simpleTvSession: SimpleTvSession = koinInject()
     val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
     SettingsScreenNavigation(
-        startRoute = startRoute,
+        currentSection = section,
         initialFocusEnabled = initialFocusEnabled,
         contentPadding = contentPadding,
         backEnabled = backEnabled,
         showSimpleTvSettings = !simpleTvActive,
-    ) { route, initialFocusRequester ->
-        when (route) {
-            SettingsRoutes.GENERAL -> SettingsLanguage(initialFocusRequester)
-            SettingsRoutes.CONNECTION -> SettingsConnection(initialFocusRequester)
-            SettingsRoutes.OPTIONS -> SettingsOptions(initialFocusRequester)
-            SettingsRoutes.CHANNEL_TAGS -> SettingsChannelTags(initialFocusRequester)
-            SettingsRoutes.PLAYER -> SettingsPlayer(initialFocusRequester)
-            SettingsRoutes.APPLIANCE -> SettingsAppliance(initialFocusRequester)
-            SettingsRoutes.SIMPLE_TV -> SettingsSimpleTv(
+        onNavigate = onNavigate,
+    ) { destination, initialFocusRequester ->
+        when (destination) {
+            SettingsSection.GENERAL -> SettingsLanguage(initialFocusRequester)
+            SettingsSection.CONNECTION -> SettingsConnection(initialFocusRequester)
+            SettingsSection.OPTIONS -> SettingsOptions(initialFocusRequester)
+            SettingsSection.CHANNEL_TAGS -> SettingsChannelTags(initialFocusRequester)
+            SettingsSection.PLAYER -> SettingsPlayer(initialFocusRequester)
+            SettingsSection.APPLIANCE -> SettingsAppliance(initialFocusRequester)
+            SettingsSection.SIMPLE_TV -> SettingsSimpleTv(
                 initialFocusRequester = initialFocusRequester,
                 onStartSimpleTv = onStartSimpleTv,
             )
@@ -90,80 +77,59 @@ fun SettingsScreen(
 
 @Composable
 internal fun SettingsScreenNavigation(
-    startRoute: String,
+    currentSection: SettingsSection,
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
     showSimpleTvSettings: Boolean,
-    destinationContent: @Composable (String, FocusRequester) -> Unit,
+    onNavigate: (SettingsSection) -> Unit,
+    destinationContent: @Composable (SettingsSection, FocusRequester) -> Unit,
 ) {
-    val nav = rememberNavController()
-    val settingsRoutes = remember {
-        listOf(
-            SettingsRoutes.GENERAL,
-            SettingsRoutes.OPTIONS,
-            SettingsRoutes.CHANNEL_TAGS,
-            SettingsRoutes.CONNECTION,
-            SettingsRoutes.PLAYER,
-            SettingsRoutes.APPLIANCE,
-            SettingsRoutes.SIMPLE_TV,
-        )
+    val settingsSections = remember { SettingsSection.entries }
+    val resolvedSection = currentSection.takeUnless {
+        it == SettingsSection.SIMPLE_TV && !showSimpleTvSettings
+    } ?: SettingsSection.GENERAL
+    val categoryFocus = remember(settingsSections) {
+        settingsSections.associateWith { FocusRequester() }
     }
-    val resolvedStartRoute = startRoute.takeIf { route ->
-        route in settingsRoutes &&
-            (route != SettingsRoutes.SIMPLE_TV || showSimpleTvSettings)
-    } ?: SettingsRoutes.GENERAL
-    val categoryFocus = remember(settingsRoutes) {
-        settingsRoutes.associateWith { FocusRequester() }
-    }
-    val contentFocus = remember(settingsRoutes) {
-        settingsRoutes.associateWith { FocusRequester() }
+    val contentFocus = remember(settingsSections) {
+        settingsSections.associateWith { FocusRequester() }
     }
     var contentPaneFocused by remember { mutableStateOf(false) }
     var initialCategoryFocusHandled by remember { mutableStateOf(false) }
 
-    val backStackEntry by nav.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
     val backAction = settingsBackAction(
         contentPaneFocused = contentPaneFocused,
     )
     val focusCurrentCategory: () -> Unit = {
-        (categoryFocus[currentRoute]
-            ?: categoryFocus[SettingsRoutes.GENERAL])?.requestFocus()
+        categoryFocus.getValue(resolvedSection).requestFocus()
     }
     BackHandler(
         enabled = backEnabled && backAction == SettingsBackAction.FOCUS_CURRENT_CATEGORY,
     ) {
         focusCurrentCategory()
     }
-    LaunchedEffect(initialFocusEnabled, currentRoute) {
+    LaunchedEffect(initialFocusEnabled, resolvedSection) {
         if (!initialFocusEnabled) {
             initialCategoryFocusHandled = false
             return@LaunchedEffect
         }
-        if (!initialCategoryFocusHandled && currentRoute != null) {
-            categoryFocus.getValue(currentRoute).requestFocus()
+        if (!initialCategoryFocusHandled) {
+            categoryFocus.getValue(resolvedSection).requestFocus()
             initialCategoryFocusHandled = true
         }
     }
-    LaunchedEffect(currentRoute, showSimpleTvSettings) {
-        if (currentRoute == SettingsRoutes.SIMPLE_TV && !showSimpleTvSettings) {
+    LaunchedEffect(currentSection, showSimpleTvSettings) {
+        if (resolvedSection != currentSection) {
             val restoreContentFocus = contentPaneFocused
-            nav.navigate(SettingsRoutes.GENERAL) {
-                popUpTo(nav.graph.id) {
-                    inclusive = false
-                    saveState = true
-                }
-                launchSingleTop = true
-                restoreState = true
-            }
+            onNavigate(resolvedSection)
             withFrameNanos { }
             val requester = if (restoreContentFocus) {
-                contentFocus.getValue(SettingsRoutes.GENERAL)
+                contentFocus.getValue(resolvedSection)
             } else {
-                categoryFocus.getValue(SettingsRoutes.GENERAL)
+                categoryFocus.getValue(resolvedSection)
             }
-            runCatching { requester.requestFocus() }
+            runCatching(requester::requestFocus)
         }
     }
     Surface(
@@ -176,27 +142,19 @@ internal fun SettingsScreenNavigation(
         Row(
             Modifier
                 .fillMaxSize()
+                .focusRestorer(categoryFocus.getValue(resolvedSection))
                 // The shell owns the global rail; Settings owns its inner panel spacing.
                 .padding(contentPadding)
         ) {
             SettingsSubRail(
-                currentRoute = currentRoute,
+                currentRoute = resolvedSection,
                 categoryFocusRequesters = categoryFocus,
                 contentFocusRequesters = contentFocus,
                 // Settings owns route-aware entry so a direct Connection start
-                // never briefly focuses General while NavHost initializes.
+                // never briefly focuses General while the typed destination initializes.
                 initialFocusEnabled = false,
                 showSimpleTv = showSimpleTvSettings,
-                onNavigate = { route ->
-                    nav.navigate(route) {
-                        popUpTo(nav.graph.id) {
-                            inclusive = false
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
+                onNavigate = onNavigate,
             )
 
             Spacer(Modifier.width(TvSpacing32))
@@ -208,63 +166,10 @@ internal fun SettingsScreenNavigation(
                     .onFocusChanged { contentPaneFocused = it.hasFocus }
                     .focusGroup()
             ) {
-                NavHost(
-                    navController = nav,
-                    startDestination = resolvedStartRoute,
-                    enterTransition = { appDestinationEnterTransition() },
-                    exitTransition = { appDestinationExitTransition() },
-                    popEnterTransition = { appDestinationEnterTransition() },
-                    popExitTransition = { appDestinationExitTransition() },
-                ) {
-                    composable(SettingsRoutes.GENERAL) {
-                        destinationContent(
-                            SettingsRoutes.GENERAL,
-                            contentFocus.getValue(SettingsRoutes.GENERAL),
-                        )
-                    }
-
-                    composable(SettingsRoutes.CONNECTION) {
-                        destinationContent(
-                            SettingsRoutes.CONNECTION,
-                            contentFocus.getValue(SettingsRoutes.CONNECTION),
-                        )
-                    }
-
-                    composable(SettingsRoutes.OPTIONS) {
-                        destinationContent(
-                            SettingsRoutes.OPTIONS,
-                            contentFocus.getValue(SettingsRoutes.OPTIONS),
-                        )
-                    }
-
-                    composable(SettingsRoutes.CHANNEL_TAGS) {
-                        destinationContent(
-                            SettingsRoutes.CHANNEL_TAGS,
-                            contentFocus.getValue(SettingsRoutes.CHANNEL_TAGS),
-                        )
-                    }
-
-                    composable(SettingsRoutes.PLAYER) {
-                        destinationContent(
-                            SettingsRoutes.PLAYER,
-                            contentFocus.getValue(SettingsRoutes.PLAYER),
-                        )
-                    }
-
-                    composable(SettingsRoutes.APPLIANCE) {
-                        destinationContent(
-                            SettingsRoutes.APPLIANCE,
-                            contentFocus.getValue(SettingsRoutes.APPLIANCE),
-                        )
-                    }
-
-                    composable(SettingsRoutes.SIMPLE_TV) {
-                        destinationContent(
-                            SettingsRoutes.SIMPLE_TV,
-                            contentFocus.getValue(SettingsRoutes.SIMPLE_TV),
-                        )
-                    }
-                }
+                destinationContent(
+                    resolvedSection,
+                    contentFocus.getValue(resolvedSection),
+                )
             }
         }
     }

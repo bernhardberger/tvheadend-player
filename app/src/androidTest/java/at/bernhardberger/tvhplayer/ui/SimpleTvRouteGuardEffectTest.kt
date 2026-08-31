@@ -11,10 +11,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.simpleTvProfile
@@ -37,10 +35,9 @@ class SimpleTvRouteGuardEffectTest {
         var recordingActive by mutableStateOf(true)
 
         composeRule.setContent {
-            val nav = rememberNavController()
-            val entry by nav.currentBackStackEntryAsState()
+            val backStack = rememberAppNavBackStack(RecordingPlayerKey(recordingId = 1))
             SimpleTvRouteGuardEffect(
-                topRoute = entry?.destination?.route,
+                destination = backStack.lastOrNull(),
                 profile = profile,
                 recordingActive = recordingActive,
                 stopRecording = {
@@ -51,22 +48,23 @@ class SimpleTvRouteGuardEffectTest {
                 },
                 redirectToLive = {
                     events += "redirect-live"
-                    nav.navigate(Routes.PLAYER) {
-                        popUpTo(Routes.RECORDING_PLAYER) { inclusive = true }
-                        launchSingleTop = true
-                    }
+                    backStack.replaceRoot(LivePlayerKey(channelId = 1, channelName = "Live"))
                 },
             )
-            NavHost(navController = nav, startDestination = Routes.RECORDING_PLAYER) {
-                composable(Routes.RECORDING_PLAYER) {
+            NavDisplay(
+                backStack = backStack,
+                onBack = { backStack.popNavigation() },
+                entryProvider = entryProvider {
+                    entry<RecordingPlayerKey> {
                     if (profile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER)) {
                         Box(Modifier.fillMaxSize().testTag(RECORDING_ROUTE))
                     }
                 }
-                composable(Routes.PLAYER) {
+                    entry<LivePlayerKey> {
                     Box(Modifier.fillMaxSize().testTag(LIVE_ROUTE))
                 }
-            }
+                },
+            )
         }
 
         composeRule.waitUntil { events.contains("stop-started") }
