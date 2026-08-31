@@ -71,7 +71,10 @@ class AppDestinationTransitionTest {
 
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle { navController.navigate(SHELL_B_ROUTE) }
+        composeRule.waitForIdle()
 
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeBy(
             APP_DESTINATION_CROSSFADE_DURATION_MILLIS.toLong() / 2,
@@ -110,6 +113,9 @@ class AppDestinationTransitionTest {
 
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle { navController.navigate(SHELL_B_ROUTE) }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
         assertOnlyFocused(SHELL_B_TAG)
@@ -135,9 +141,19 @@ class AppDestinationTransitionTest {
             navController.navigate(SHELL_B_ROUTE)
             navController.navigate(SHELL_C_ROUTE)
         }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
 
+        composeRule.onNodeWithTag(SHELL_B_TAG).assertDoesNotExist()
+        assertOnlyFocused(SHELL_C_TAG)
+
+        composeRule.finishDestinationCrossfade()
+
+        composeRule.onNodeWithTag(SHELL_A_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(SHELL_B_TAG).assertDoesNotExist()
         assertOnlyFocused(SHELL_C_TAG)
     }
 
@@ -166,11 +182,17 @@ class AppDestinationTransitionTest {
 
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle { navController.navigate(SHELL_B_ROUTE) }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeBy(
             APP_DESTINATION_CROSSFADE_DURATION_MILLIS.toLong() / 2,
         )
         composeRule.waitForIdle()
 
+        composeRule.onNodeWithTag(SHELL_A_TAG).assertExists()
+        composeRule.onNodeWithTag(SHELL_B_TAG).assertExists()
         assertOnlyFocused(NAVIGATION_FOCUS_TAG)
     }
 
@@ -240,6 +262,9 @@ private fun FocusedDestination(
 }
 
 private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.finishDestinationCrossfade() {
+    waitForIdle()
+    mainClock.advanceTimeByFrame()
+    waitForIdle()
     mainClock.advanceTimeBy(
         APP_DESTINATION_CROSSFADE_DURATION_MILLIS.toLong() + 32L,
     )

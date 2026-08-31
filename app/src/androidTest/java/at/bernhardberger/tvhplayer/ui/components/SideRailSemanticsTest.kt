@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import android.os.Bundle
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -38,6 +40,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.tv.material3.Button
 import org.junit.Rule
 import org.junit.Test
@@ -358,12 +361,20 @@ class SideRailSemanticsTest {
         composeRule.onNodeWithTag("rapid-browse-focus")
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
+        val guideFocusStartedAt = SystemClock.elapsedRealtimeNanos()
         composeRule.onNodeWithTag("nav-channels")
             .assertIsFocused()
-            .performKeyInput {
-                pressKey(Key.DirectionDown)
-                pressKey(Key.DirectionDown)
-            }
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("nav-epg").assertIsFocused()
+        val guideFocusLatencyMillis = (
+            SystemClock.elapsedRealtimeNanos() - guideFocusStartedAt + 999_999L
+            ) / 1_000_000L
+        assertTrue(
+            "Guide rail focus took ${guideFocusLatencyMillis}ms",
+            guideFocusLatencyMillis <= GUIDE_RAIL_FOCUS_BUDGET_MILLIS,
+        )
+        composeRule.onNodeWithTag("nav-epg")
+            .performKeyInput { pressKey(Key.DirectionDown) }
 
         composeRule.onNodeWithTag("nav-recordings").assertIsFocused()
         composeRule.runOnIdle {
@@ -387,9 +398,22 @@ class SideRailSemanticsTest {
             )
         }
 
+        val requestsBeforeSilentBack = requestedRoutes.toList()
         composeRule.onNodeWithTag("nav-channels")
             .performKeyInput { pressKey(Key.Back) }
-        composeRule.runOnIdle { assertEquals(0, rootBackCount) }
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(requestsBeforeSilentBack, requestedRoutes)
+            assertEquals(0, rootBackCount)
+        }
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            EVIDENCE_STATUS_CODE,
+            Bundle().apply {
+                putString("guideRailFocusLatencyMs", guideFocusLatencyMillis.toString())
+                putString("sideRailRequestTrace", requestedRoutes.joinToString(">"))
+                putString("awaitRootDestinationRootBackCount", rootBackCount.toString())
+            },
+        )
     }
 
     @Test
@@ -540,3 +564,6 @@ class SideRailSemanticsTest {
         composeRule.onNodeWithTag("nested-back-owner").assertIsFocused()
     }
 }
+
+private const val EVIDENCE_STATUS_CODE = 2
+private const val GUIDE_RAIL_FOCUS_BUDGET_MILLIS = 1_000L

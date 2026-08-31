@@ -42,6 +42,23 @@ FOREGROUND_PLAYBACK_LIFECYCLE_TEST = (
 CONNECTION_CREDENTIAL_TEST = (
     "at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnectionSecureSurfaceTest"
 )
+NAVIGATION_BACK_TESTS = ",".join(
+    (
+        "at.bernhardberger.tvhplayer.ui.components.SideRailSemanticsTest",
+        "at.bernhardberger.tvhplayer.ui.player.PlayerBackDispatcherTest",
+        "at.bernhardberger.tvhplayer.ui.AppDestinationTransitionTest",
+        "at.bernhardberger.tvhplayer.ui.components.ChannelRowTest",
+        "at.bernhardberger.tvhplayer.ui.components.SettingsPaneFocusTest",
+    )
+)
+NAVIGATION_BACK_EVIDENCE_KEYS = (
+    "guideRailFocusLatencyMs",
+    "sideRailRequestTrace",
+    "awaitRootDestinationRootBackCount",
+    "channelsVisibleRows",
+    "channelsRecomposedRows",
+    "channelsMaxRowRecompositions",
+)
 RELEASE_TOOL = ROOT / "tools/release"
 DEFAULT_CREDENTIAL_FILE = ROOT / ".tvhplayer-credentials.json"
 CAPTURE_ROOT = ROOT / "captures/device"
@@ -50,6 +67,7 @@ DEBUG_VIDEO_BACKDROP_ACTION = "at.bernhardberger.tvhplayer.action.DEBUG_VIDEO_BA
 DEBUG_VIDEO_BACKDROP_EXTRA = "visible"
 DEBUG_VIDEO_BACKDROP_RESULT = -1
 MAX_CREDENTIAL_FILE_BYTES = 64 * 1024
+INSTRUMENTATION_TIMEOUT_SECONDS = 10 * 60
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 KEY_EVENTS = {
     "up": "KEYCODE_DPAD_UP",
@@ -80,6 +98,7 @@ TEST_DEVICE_ACTIONS = {
     "timeshift-command-check",
     "foreground-playback-lifecycle-check",
     "connection-credential-check",
+    "navigation-back-check",
     "allow-appliance-autostart",
 }
 RELEASE_DEVICE_ACTIONS = {"install-release"}
@@ -186,18 +205,25 @@ def run(
     input_data: str | None = None,
     sensitive: bool = False,
     announce: bool = True,
+    timeout_seconds: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if announce:
         suffix = " <redacted stdin>" if sensitive and input_data is not None else ""
         print(f"$ {shlex.join(command)}{suffix}", flush=True)
-    result = subprocess.run(
-        command,
-        check=False,
-        text=True,
-        input=input_data,
-        stdout=subprocess.PIPE if capture or sensitive else None,
-        stderr=subprocess.PIPE if capture or sensitive else None,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            text=True,
+            input=input_data,
+            stdout=subprocess.PIPE if capture or sensitive else None,
+            stderr=subprocess.PIPE if capture or sensitive else None,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        if sensitive:
+            fail("sensitive device operation timed out; device output redacted")
+        fail(f"command timed out after {timeout_seconds:g} seconds")
     if check and result.returncode != 0:
         if sensitive:
             fail("sensitive device operation failed; device output redacted")
@@ -578,6 +604,7 @@ def run_instrumentation_check(
     *,
     action: str,
     test_class: str,
+    evidence_keys: tuple[str, ...] = (),
 ) -> None:
     if package_name != DEFAULT_PACKAGE:
         fail(f"{action} is available only for package {DEFAULT_PACKAGE}")
@@ -629,6 +656,7 @@ def run_instrumentation_check(
                 f"{test_package}/{runner}",
             ),
             capture=True,
+            timeout_seconds=INSTRUMENTATION_TIMEOUT_SECONDS,
         )
         runner_output = "\n".join(
             part for part in (instrumentation_result.stdout, instrumentation_result.stderr) if part
@@ -673,6 +701,11 @@ def run_instrumentation_check(
                     f"{key}={value}" for key, value in evidence[-2:]
                 )
             fail(f"{action} reported a failed test{detail}")
+        nonempty_output_lines = [
+            line.strip() for line in runner_output.splitlines() if line.strip()
+        ]
+        if not nonempty_output_lines or nonempty_output_lines[-1] != "INSTRUMENTATION_CODE: -1":
+            fail(f"{action} did not report successful instrumentation completion")
         success_summary = re.search(r"(?m)^\s*OK \((\d+) tests?\)\s*$", runner_output)
         if success_summary is None:
             fail(f"{action} did not report a successful test run")
@@ -680,9 +713,20 @@ def run_instrumentation_check(
             CONNECTION_CREDENTIAL_TEST: 3,
             TIMESHIFT_COMMAND_TEST: 2,
             FOREGROUND_PLAYBACK_LIFECYCLE_TEST: 5,
+            NAVIGATION_BACK_TESTS: 27,
         }.get(test_class)
         if expected_test_count is not None and int(success_summary.group(1)) != expected_test_count:
             fail(f"{action} did not run all {expected_test_count} acceptance tests")
+        for key in evidence_keys:
+            values = re.findall(
+                "(?m)^INSTRUMENTATION_STATUS: "
+                + re.escape(key)
+                + r"=([^\r\n]{1,200})$",
+                runner_output,
+            )
+            if not values:
+                fail(f"{action} did not report required evidence: {key}")
+            print(f"{key}={values[-1]}")
     finally:
         run(
             adb_command(adb, serial, "uninstall", test_package),
@@ -740,6 +784,17 @@ def run_connection_credential_check(adb: str, serial: str, package_name: str) ->
         package_name,
         action="connection-credential-check",
         test_class=CONNECTION_CREDENTIAL_TEST,
+    )
+
+
+def run_navigation_back_check(adb: str, serial: str, package_name: str) -> None:
+    run_instrumentation_check(
+        adb,
+        serial,
+        package_name,
+        action="navigation-back-check",
+        test_class=NAVIGATION_BACK_TESTS,
+        evidence_keys=NAVIGATION_BACK_EVIDENCE_KEYS,
     )
 
 
@@ -1040,6 +1095,10 @@ def build_parser() -> argparse.ArgumentParser:
         "connection-credential-check",
         help="Run the secure Connection surface lifetime checks",
     )
+    subparsers.add_parser(
+        "navigation-back-check",
+        help="Run bounded navigation, focus, recomposition, and Back evidence checks",
+    )
 
     key_parser = subparsers.add_parser("key", help="Send an approved named key event")
     key_parser.add_argument("name", choices=sorted(KEY_EVENTS))
@@ -1288,6 +1347,10 @@ def main() -> int:
 
     if args.action == "connection-credential-check":
         run_connection_credential_check(adb, serial, package_name)
+        return 0
+
+    if args.action == "navigation-back-check":
+        run_navigation_back_check(adb, serial, package_name)
         return 0
 
     if args.action == "launch":

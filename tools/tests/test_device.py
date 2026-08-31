@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import io
 import runpy
 import stat
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -42,6 +44,7 @@ RUNNER_SUCCESS = subprocess.CompletedProcess(
         "INSTRUMENTATION_STATUS_CODE: 0\n"
         "INSTRUMENTATION_RESULT: stream=\n"
         "OK (2 tests)\n"
+        "INSTRUMENTATION_CODE: -1\n"
     ),
     stderr="",
 )
@@ -55,6 +58,14 @@ class DevicePolicyTest(unittest.TestCase):
             DEVICE["DEFAULT_CREDENTIAL_FILE"].name,
             ".tvhplayer-credentials.json",
         )
+
+    def test_run_timeout_is_a_controlled_failure(self) -> None:
+        with patch(
+            "subprocess.run",
+            side_effect=subprocess.TimeoutExpired(["adb"], 1),
+        ):
+            with self.assertRaisesRegex(SystemExit, "2"):
+                run(["adb"], timeout_seconds=1, announce=False)
 
     def test_connection_credential_check_is_bounded_and_cleans_up(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -71,7 +82,11 @@ class DevicePolicyTest(unittest.TestCase):
         connection_runner_success = subprocess.CompletedProcess(
             ["adb"],
             0,
-            stdout="INSTRUMENTATION_STATUS_CODE: 0\nOK (3 tests)\n",
+            stdout=(
+                "INSTRUMENTATION_STATUS_CODE: 0\n"
+                "OK (3 tests)\n"
+                "INSTRUMENTATION_CODE: -1\n"
+            ),
             stderr="",
         )
         run_mock = Mock(
@@ -496,6 +511,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "channel-guide-check",
                 "timeshift-command-check",
                 "foreground-playback-lifecycle-check",
+                "navigation-back-check",
                 "allow-appliance-autostart",
             ):
                 with self.subTest(role=role, action=action):
@@ -514,6 +530,7 @@ class DevicePolicyTest(unittest.TestCase):
             "channel-guide-check",
             "timeshift-command-check",
             "foreground-playback-lifecycle-check",
+            "navigation-back-check",
             "allow-appliance-autostart",
         ):
             with self.subTest(action=action):
@@ -526,6 +543,149 @@ class DevicePolicyTest(unittest.TestCase):
 
         self.assertEqual(args.action, "channel-guide-check")
         self.assertFalse(hasattr(args, "test_apk"))
+
+    def test_navigation_back_check_is_bounded_and_reports_fixed_evidence(self) -> None:
+        parser = DEVICE["build_parser"]()
+        args = parser.parse_args(["navigation-back-check"])
+        self.assertEqual(args.action, "navigation-back-check")
+        self.assertFalse(hasattr(args, "test_apk"))
+
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        runner_success = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "INSTRUMENTATION_STATUS: guideRailFocusLatencyMs=37\n"
+                "INSTRUMENTATION_STATUS: sideRailRequestTrace=epg>recordings>epg>channels\n"
+                "INSTRUMENTATION_STATUS: awaitRootDestinationRootBackCount=0\n"
+                "INSTRUMENTATION_STATUS: channelsVisibleRows=6\n"
+                "INSTRUMENTATION_STATUS: channelsRecomposedRows=6\n"
+                "INSTRUMENTATION_STATUS: channelsMaxRowRecompositions=1\n"
+                "INSTRUMENTATION_RESULT: stream=\n"
+                "OK (27 tests)\n"
+                "INSTRUMENTATION_CODE: -1\n"
+            ),
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                runner_success,
+                completed,
+                completed,
+            ]
+        )
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ), redirect_stdout(output):
+                DEVICE["run_navigation_back_check"](
+                    "adb",
+                    "test-device",
+                    "at.bernhardberger.tvhplayer",
+                )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        self.assertIn(
+            [
+                "adb",
+                "-s",
+                "test-device",
+                "shell",
+                "am",
+                "instrument",
+                "-w",
+                "-e",
+                "class",
+                DEVICE["NAVIGATION_BACK_TESTS"],
+                "at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner",
+            ],
+            commands,
+        )
+        self.assertIn("guideRailFocusLatencyMs=37", output.getvalue())
+        self.assertIn("channelsRecomposedRows=6", output.getvalue())
+        runner_call = next(
+            invocation
+            for invocation in run_mock.call_args_list
+            if "instrument" in invocation.args[0]
+        )
+        self.assertEqual(
+            runner_call.kwargs["timeout_seconds"],
+            DEVICE["INSTRUMENTATION_TIMEOUT_SECONDS"],
+        )
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+
+    def test_navigation_back_check_rejects_incomplete_runner_and_cleans_up(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        incomplete_runner = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout="INSTRUMENTATION_RESULT: stream=\nOK (27 tests)\n",
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                incomplete_runner,
+                completed,
+                completed,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                with self.assertRaisesRegex(SystemExit, "2"):
+                    DEVICE["run_navigation_back_check"](
+                        "adb",
+                        "test-device",
+                        "at.bernhardberger.tvhplayer",
+                    )
+
+        commands = [invocation.args[0] for invocation in run_mock.call_args_list]
+        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
 
     def test_timeshift_command_check_is_a_bounded_test_device_action(self) -> None:
         parser = DEVICE["build_parser"]()
@@ -720,7 +880,11 @@ class DevicePolicyTest(unittest.TestCase):
         runner_success = subprocess.CompletedProcess(
             ["adb"],
             0,
-            stdout="INSTRUMENTATION_RESULT: stream=\nOK (5 tests)\n",
+            stdout=(
+                "INSTRUMENTATION_RESULT: stream=\n"
+                "OK (5 tests)\n"
+                "INSTRUMENTATION_CODE: -1\n"
+            ),
             stderr="",
         )
         run_mock = Mock(
@@ -786,7 +950,11 @@ class DevicePolicyTest(unittest.TestCase):
         runner_success = subprocess.CompletedProcess(
             ["adb"],
             0,
-            stdout="INSTRUMENTATION_RESULT: stream=\nOK (4 tests)\n",
+            stdout=(
+                "INSTRUMENTATION_RESULT: stream=\n"
+                "OK (4 tests)\n"
+                "INSTRUMENTATION_CODE: -1\n"
+            ),
             stderr="",
         )
         run_mock = Mock(

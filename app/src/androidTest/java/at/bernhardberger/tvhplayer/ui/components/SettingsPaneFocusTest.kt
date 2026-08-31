@@ -18,6 +18,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
@@ -95,7 +96,7 @@ class SettingsPaneFocusTest {
         }
 
         val playerCategory = composeTestRule.onNode(
-            hasText("Player") and hasClickAction(),
+            hasText("Player") and hasClickAction() and isSelected(),
         )
         playerCategory.assertIsFocused()
         val contentLeftWithCategoryFocus = composeTestRule.onNodeWithText("Timeshift")
@@ -178,7 +179,7 @@ class SettingsPaneFocusTest {
         }
 
         composeTestRule.onNode(
-            hasText("Player") and hasClickAction(),
+            hasText("Player") and hasClickAction() and isSelected(),
         ).performKeyInput {
             pressKey(Key.DirectionCenter)
         }
