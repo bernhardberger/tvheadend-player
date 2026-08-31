@@ -190,15 +190,16 @@ retained.
 ### 7. Player UI state owner
 
 - B4-P16: live layer visibility, auto-hide ownership, transition timing, and
-  opening-key tokens now live in `LivePlayerLayerState`. Timeline polling and
-  queued-seek presentation remain in `VideoPlayerScreen` for later packages.
-- Move overlay visibility, auto-hide jobs, transition tokens, timeline polling,
-  queued-seek presentation, and sheet/channel-drawer layer state out of
-  `VideoPlayerScreen` into an explicit lifecycle-aware state holder.
+  opening-key tokens now live in `LivePlayerLayerState`.
+- B4-P17/P17S: `PlayerTimelinePresentationState` now owns lifecycle-aware
+  timeline polling and queued-seek presentation for both player surfaces. Its
+  live owner fences queue, projection, feedback, and dispatch jobs by source
+  generation, while the recording owner retains absolute targets rather than
+  sharing a generic progress model.
 - Keep key dispatch and focus targets at the UI boundary where they are visible
   and testable.
-- Preserve live and recording timeline truth; do not force both through one
-  generic progress model.
+- Timeline rendering, programme-relative axes, recording admission truth, and
+  source-specific SDK command ownership remain at their existing boundaries.
 
 Stop if state extraction changes commands sent to the SDK. First reproduce and
 classify the behavioral difference.

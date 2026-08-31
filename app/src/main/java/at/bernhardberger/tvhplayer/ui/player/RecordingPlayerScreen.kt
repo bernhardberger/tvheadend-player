@@ -10,7 +10,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -27,7 +26,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
@@ -50,7 +48,6 @@ import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
-import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.seekStepMs
@@ -63,8 +60,6 @@ import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.recordingKeyActionStartsOpeningCycle
 import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
-import at.bernhardberger.tvhplayer.core.recordingSeekFeedbackSettled
-import at.bernhardberger.tvhplayer.core.recordingStackedSeekTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -81,10 +76,6 @@ import org.koin.compose.koinInject
 private const val RECORDING_SHORT_SEEK_MS = 30_000L
 private const val RECORDING_LONG_SEEK_MS = 10 * 60_000L
 private const val RECORDING_CONTROLS_AUTO_HIDE_MS = 5_000L
-private const val RECORDING_SEEK_DEBOUNCE_MS = 400L
-private const val RECORDING_SEEK_FEEDBACK_MIN_MS = 600L
-private const val RECORDING_SEEK_FEEDBACK_POLL_MS = 100L
-private const val RECORDING_SEEK_FEEDBACK_SETTLED_GRACE_MS = 350L
 
 @Composable
 fun RecordingPlayerScreen(
@@ -147,18 +138,19 @@ fun RecordingPlayerScreen(
     val recordingLoading = !recordingResolved && connectionAvailable
     val initialConnectionFailure = !recordingResolved && !connectionAvailable
     val player = remember { session.player }
+    val timelineState = rememberRecordingTimelinePresentationState(
+        player = player,
+        session = session,
+        playbackAvailable = playbackAvailable,
+    )
+    val positionMs = timelineState.positionMs
+    val durationMs = timelineState.durationMs
+    val nowSec = timelineState.nowEpochSec
+    val isPlaying = timelineState.isPlaying
     val rootFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
-    var positionMs by remember { mutableLongStateOf(0L) }
-    var durationMs by remember { mutableLongStateOf(C.TIME_UNSET) }
-    var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1_000L) }
-    var isPlaying by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
     var interactionToken by remember { mutableIntStateOf(0) }
-    var seekFeedbackToken by remember { mutableIntStateOf(0) }
-    var pendingSeekTargetMs by remember { mutableStateOf<Long?>(null) }
-    var pendingSeekOriginMs by remember { mutableStateOf<Long?>(null) }
-    var pendingSeekDispatched by remember { mutableStateOf(false) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
     var statsVisible by remember { mutableStateOf(false) }
@@ -208,18 +200,7 @@ fun RecordingPlayerScreen(
     }
 
     fun seekBy(deltaMs: Long) {
-        val currentPosition = player.currentPosition.coerceAtLeast(0L)
-        if (pendingSeekTargetMs == null) pendingSeekOriginMs = currentPosition
-        pendingSeekDispatched = false
-        val target = recordingStackedSeekTarget(
-            currentMs = currentPosition,
-            pendingTargetMs = pendingSeekTargetMs,
-            durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0L },
-            deltaMs = deltaMs,
-        )
-        pendingSeekTargetMs = target
-        positionMs = target
-        seekFeedbackToken++
+        timelineState.queueSeek(deltaMs)
     }
 
     fun applyKeyAction(
@@ -259,24 +240,13 @@ fun RecordingPlayerScreen(
         }
     }
 
-    LaunchedEffect(player, playbackAvailable) {
-        if (!playbackAvailable) return@LaunchedEffect
-        while (true) {
-            positionMs = pendingSeekTargetMs ?: player.currentPosition.coerceAtLeast(0L)
-            durationMs = player.duration
-            isPlaying = player.isPlaying
-            nowSec = System.currentTimeMillis() / 1_000L
-            delay(250L)
-        }
-    }
-
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
             controlsVisible = controlsVisible,
             playbackProgressing = isPlaying,
             playbackStable = playbackAvailable &&
                 playbackState is AppPlaybackState.Playing,
-            seekPending = pendingSeekTargetMs != null,
+            seekPending = timelineState.seekPending,
             modalVisible = optionsPage != null || infoOpen,
             recoveryVisible = playbackState is AppPlaybackState.Recovering,
             actionableErrorVisible = initialConnectionFailure ||
@@ -304,11 +274,7 @@ fun RecordingPlayerScreen(
                 (recordingResolved &&
                     (!playbackAvailable ||
                         playbackState is AppPlaybackState.Failed)),
-            seekPreviewPhase = when {
-                controlsVisible || pendingSeekTargetMs == null -> PlayerSeekPreviewPhase.NONE
-                pendingSeekDispatched -> PlayerSeekPreviewPhase.DISPATCHED
-                else -> PlayerSeekPreviewPhase.PENDING
-            },
+            seekPreviewPhase = timelineState.seekPreviewPhase(controlsVisible),
             controlsVisible = controlsVisible && playbackAvailable,
             statsEnabled = statsVisible,
         )
@@ -355,13 +321,9 @@ fun RecordingPlayerScreen(
             PlayerBackAction.CLEAR_NUMBER_ENTRY,
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> Unit
             PlayerBackAction.CLOSE_PLAYER -> onClose()
-            PlayerBackAction.CANCEL_PENDING_SEEK,
-            PlayerBackAction.DISMISS_SEEK_FEEDBACK -> {
-                seekFeedbackToken++
-                pendingSeekTargetMs = null
-                pendingSeekOriginMs = null
-                pendingSeekDispatched = false
-            }
+            PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
+            PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
+                timelineState.dismissDispatchedFeedback()
             PlayerBackAction.HIDE_CONTROLS -> hideControls()
             PlayerBackAction.HIDE_STATS -> statsVisible = false
             PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
@@ -380,29 +342,6 @@ fun RecordingPlayerScreen(
 
     LaunchedEffect(infoOpen) {
         if (infoOpen) runCatching { infoFocus.requestFocus() }
-    }
-
-    LaunchedEffect(seekFeedbackToken) {
-        val targetMs = pendingSeekTargetMs ?: return@LaunchedEffect
-        delay(RECORDING_SEEK_DEBOUNCE_MS)
-        pendingSeekDispatched = true
-        session.seekTo(targetMs)
-        delay(RECORDING_SEEK_FEEDBACK_MIN_MS)
-        while (
-            !recordingSeekFeedbackSettled(
-                playerReady = player.playbackState == Player.STATE_READY,
-                playerEnded = player.playbackState == Player.STATE_ENDED,
-                playWhenReady = player.playWhenReady,
-                isPlaying = player.isPlaying,
-                playbackFailed = session.state.value is AppPlaybackState.Failed,
-            )
-        ) {
-            delay(RECORDING_SEEK_FEEDBACK_POLL_MS)
-        }
-        delay(RECORDING_SEEK_FEEDBACK_SETTLED_GRACE_MS)
-        pendingSeekTargetMs = null
-        pendingSeekOriginMs = null
-        pendingSeekDispatched = false
     }
 
     PlayerBackHandler(handlePlaybackBack)
@@ -552,17 +491,21 @@ fun RecordingPlayerScreen(
                 foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
             ) {
                 RecordingSeekPreview(
-                    targetMs = requireNotNull(pendingSeekTargetMs),
-                    originMs = pendingSeekOriginMs,
+                    targetMs = requireNotNull(timelineState.pendingTargetMs),
+                    originMs = timelineState.pendingOriginMs,
                     durationMs = durationMs,
                     growing = growing,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
 
-            if (controlsVisible && pendingSeekTargetMs != null && pendingSeekOriginMs != null) {
-                val seekDeltaMs = requireNotNull(pendingSeekTargetMs) -
-                    requireNotNull(pendingSeekOriginMs)
+            if (
+                controlsVisible &&
+                timelineState.pendingTargetMs != null &&
+                timelineState.pendingOriginMs != null
+            ) {
+                val seekDeltaMs = requireNotNull(timelineState.pendingTargetMs) -
+                    requireNotNull(timelineState.pendingOriginMs)
                 Surface(
                     modifier = Modifier.align(Alignment.Center).padding(24.dp),
                     colors = SurfaceDefaults.colors(

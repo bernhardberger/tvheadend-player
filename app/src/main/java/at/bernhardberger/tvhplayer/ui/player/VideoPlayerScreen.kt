@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -25,7 +24,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,12 +77,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
-import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
-import at.bernhardberger.tvhplayer.core.TimeshiftSeekQueueState
-import at.bernhardberger.tvhplayer.core.beginTimeshiftSeekDispatch
-import at.bernhardberger.tvhplayer.core.cancelPendingTimeshiftSeek
 import at.bernhardberger.tvhplayer.core.channelPickAction
-import at.bernhardberger.tvhplayer.core.completeTimeshiftSeekDispatch
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.compactTuningVisibilityAction
@@ -100,8 +93,6 @@ import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
-import at.bernhardberger.tvhplayer.core.queueTimeshiftSeek as enqueueTimeshiftSeek
-import at.bernhardberger.tvhplayer.core.queuedTimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingCompletion
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingDismissed
@@ -123,7 +114,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
-import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.data.ConnectionState
@@ -136,15 +126,12 @@ import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
-private const val TIMESHIFT_SEEK_DEBOUNCE_MS = 400L
-private const val TIMESHIFT_SEEK_FEEDBACK_MS = 950L
 
 private fun SubscriptionIssue.messageResource(): Int = when (this) {
     SubscriptionIssue.INVALID_TARGET -> R.string.tvh_target_invalid
@@ -184,13 +171,6 @@ internal fun timeshiftCommandCompletion(
         restorePlayIntent = restorePlayIntentOnFailure && !accepted,
     )
 }
-
-private data class LiveTimeshiftSeekPreview(
-    val token: Int,
-    val feedbackToken: Long,
-    val decision: TimeshiftSeekDecision,
-    val dispatched: Boolean,
-)
 
 internal suspend fun stopPlaybackAndClose(
     stopPlayback: suspend () -> Unit,
@@ -297,15 +277,7 @@ fun VideoPlayerScreen(
     var connectionLost by remember { mutableStateOf(false) }
     var screenActive by remember { mutableStateOf(false) }
     var channelNumberInput by remember { mutableStateOf("") }
-    var timeshiftFeedback by remember { mutableStateOf<String?>(null) }
-    var timeshiftSeekQueue by remember { mutableStateOf(TimeshiftSeekQueueState()) }
-    var timeshiftSeekJob by remember { mutableStateOf<Job?>(null) }
-    var timeshiftSeekFeedbackJob by remember { mutableStateOf<Job?>(null) }
-    var timeshiftSeekPreview by remember { mutableStateOf<LiveTimeshiftSeekPreview?>(null) }
-    var timeshiftSeekToken by remember { mutableIntStateOf(0) }
-    var timeshiftSeekQueuedAtMs by remember { mutableLongStateOf(0L) }
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
-    var timeshiftFeedbackToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
     var restoreInfoFocus by remember { mutableStateOf(false) }
@@ -325,7 +297,8 @@ fun VideoPlayerScreen(
     val timeshiftReconnectLiveText = stringResource(R.string.timeshift_reconnect_live)
     val timeshiftSeekClampedText = stringResource(R.string.timeshift_seek_clamped)
     val player = remember { videoPlayerViewModel.getPlayerInstance() }
-    val playerPlaybackProgressing = rememberPlayerPlaybackProgressing(player)
+    val timelineState = rememberLiveTimelinePresentationState(player)
+    val nowSec = timelineState.nowEpochSec
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
     fun dispatchTimeshiftCommand(
@@ -334,20 +307,21 @@ fun VideoPlayerScreen(
     ) {
         timeshiftCommandToken += 1L
         val commandToken = timeshiftCommandToken
-        timeshiftFeedbackToken += 1L
-        val feedbackToken = timeshiftFeedbackToken
+        val feedbackToken = timelineState.beginFeedbackOperation()
         scope.launch {
             val result = command()
             val completion = timeshiftCommandCompletion(
                 commandToken = commandToken,
                 currentToken = timeshiftCommandToken,
                 feedbackToken = feedbackToken,
-                currentFeedbackToken = timeshiftFeedbackToken,
+                currentFeedbackToken = timelineState.feedbackToken,
                 result = result,
                 unavailableText = timeshiftUnavailableText,
                 restorePlayIntentOnFailure = restorePlayIntentOnFailure,
             ) ?: return@launch
-            if (completion.applyFeedback) timeshiftFeedback = completion.feedback
+            if (completion.applyFeedback) {
+                timelineState.applyFeedback(feedbackToken, completion.feedback)
+            }
             if (completion.restorePlayIntent) videoPlayerViewModel.play()
         }
     }
@@ -452,108 +426,23 @@ fun VideoPlayerScreen(
     }
 
     fun queueTimeshiftSeek(deltaMs: Long) {
-        timeshiftFeedbackToken += 1L
-        val feedbackToken = timeshiftFeedbackToken
-        timeshiftSeekQueue = enqueueTimeshiftSeek(
-            queue = timeshiftSeekQueue,
+        timelineState.queueRelativeSeek(
             state = effectiveTimeshiftState,
             requestedDeltaMs = deltaMs,
+            unavailableText = timeshiftUnavailableText,
+            clampedText = timeshiftSeekClampedText,
+            seekRelative = videoPlayerViewModel::seekTimeshift,
         )
-        timeshiftSeekToken++
-        val token = timeshiftSeekToken
-        timeshiftSeekQueuedAtMs = SystemClock.uptimeMillis()
-        timeshiftSeekPreview = LiveTimeshiftSeekPreview(
-            token = token,
-            feedbackToken = feedbackToken,
-            decision = queuedTimeshiftSeekDecision(timeshiftSeekQueue),
-            dispatched = false,
-        )
-        timeshiftSeekFeedbackJob?.cancel()
-        timeshiftSeekFeedbackJob = null
-        if (timeshiftSeekJob?.isActive == true) return
-        timeshiftSeekJob = scope.launch {
-            try {
-                while (true) {
-                    val debounceRemainingMs = (
-                        timeshiftSeekQueuedAtMs + TIMESHIFT_SEEK_DEBOUNCE_MS -
-                            SystemClock.uptimeMillis()
-                        ).coerceAtLeast(0L)
-                    if (debounceRemainingMs > 0L) delay(debounceRemainingMs)
-
-                    val dispatch = beginTimeshiftSeekDispatch(timeshiftSeekQueue)
-                    if (dispatch == null) {
-                        timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
-                        if (timeshiftSeekPreview?.dispatched == false) {
-                            timeshiftSeekPreview = null
-                        }
-                        break
-                    }
-                    timeshiftSeekQueue = dispatch.queue
-                    val dispatchToken = timeshiftSeekPreview?.token ?: timeshiftSeekToken
-                    val dispatchFeedbackToken = timeshiftSeekPreview?.feedbackToken
-                        ?: timeshiftFeedbackToken
-                    timeshiftSeekPreview = timeshiftSeekPreview
-                        ?.takeIf { it.token == dispatchToken }
-                        ?.copy(dispatched = true)
-
-                    val result = videoPlayerViewModel.seekTimeshift(dispatch.deltaMs)
-                    val accepted = result == TimeshiftCommandResult.ACCEPTED
-                    timeshiftSeekQueue = completeTimeshiftSeekDispatch(
-                        timeshiftSeekQueue,
-                        accepted,
-                    )
-                    val previewIsCurrent = timeshiftSeekPreview?.token == dispatchToken
-                    if (
-                        previewIsCurrent &&
-                        dispatchFeedbackToken == timeshiftFeedbackToken
-                    ) {
-                        timeshiftFeedback = if (accepted) {
-                            if (timeshiftSeekPreview?.decision?.clamped == true) {
-                                timeshiftSeekClampedText
-                            } else {
-                                null
-                            }
-                        } else {
-                            timeshiftUnavailableText
-                        }
-                        timeshiftSeekFeedbackJob?.cancel()
-                        timeshiftSeekFeedbackJob = scope.launch {
-                            delay(TIMESHIFT_SEEK_FEEDBACK_MS)
-                            if (timeshiftSeekPreview?.token == dispatchToken) {
-                                timeshiftSeekPreview = null
-                            }
-                            timeshiftSeekFeedbackJob = null
-                        }
-                    }
-                }
-            } finally {
-                if (timeshiftSeekQueue.dispatchInFlight) {
-                    timeshiftSeekQueue = completeTimeshiftSeekDispatch(
-                        timeshiftSeekQueue,
-                        accepted = false,
-                    )
-                }
-                timeshiftSeekJob = null
-            }
-        }
     }
 
     fun tuneChannel(channel: Channel): Boolean {
         val channelId = channel.id
-        timeshiftCommandToken += 1L
-        timeshiftFeedbackToken += 1L
-        timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
-        timeshiftSeekToken++
-        timeshiftSeekFeedbackJob?.cancel()
-        timeshiftSeekFeedbackJob = null
-        timeshiftSeekPreview = null
         channelNumberInput = ""
         selection.setSelected(channelId)
         selectedId = channelId
 
-        if (
-            channelPickAction(currentChannelId, channelId) == ChannelPickAction.CLOSE_DRAWER
-        ) {
+        val pickAction = channelPickAction(currentChannelId, channelId)
+        if (pickAction == ChannelPickAction.CLOSE_DRAWER) {
             layerState.closeChannelDrawer()
             return true
         }
@@ -561,10 +450,12 @@ fun VideoPlayerScreen(
         val playbackSelection = currentSession?.let {
             LivePlaybackSelection(it, channelId)
         } ?: return true
+        timeshiftCommandToken += 1L
+        timelineState.invalidateForSourceChange()
         requestedLiveSelection = playbackSelection
         currentChannelId = channelId
         currentChannelName = channel.name.orEmpty()
-        timeshiftFeedback = null
+        timelineState.clearFeedback()
 
         layerState.closeChannelDrawer()
         layerState.showControls()
@@ -606,14 +497,6 @@ fun VideoPlayerScreen(
             }
         )
         tuneEnteredChannel()
-    }
-
-    var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            nowSec = System.currentTimeMillis() / 1000L
-            delay(1000L)
-        }
     }
 
     val nowEvent = remember(observation, currentChannelId, nowSec) {
@@ -686,13 +569,7 @@ fun VideoPlayerScreen(
             numberEntryVisible = channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
             terminalErrorVisible = false,
-            seekPreviewPhase = when {
-                layerState.controlsVisible || timeshiftSeekPreview == null ->
-                    PlayerSeekPreviewPhase.NONE
-                requireNotNull(timeshiftSeekPreview).dispatched ->
-                    PlayerSeekPreviewPhase.DISPATCHED
-                else -> PlayerSeekPreviewPhase.PENDING
-            },
+            seekPreviewPhase = timelineState.seekPreviewPhase(layerState.controlsVisible),
         )
     val foregroundContext = currentPlayerForegroundContext()
     val confirmationVisible = foregroundContext.confirmationVisible
@@ -703,12 +580,12 @@ fun VideoPlayerScreen(
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
             controlsVisible = layerState.controlsVisible,
-            playbackProgressing = playerPlaybackProgressing &&
+            playbackProgressing = timelineState.playbackProgressing &&
                 !effectiveTimeshiftState.paused,
             playbackStable = connState is ConnectionState.Connected &&
                 playbackState is AppPlaybackState.Playing &&
                 statusPresentation == PlaybackStatusPresentation.NONE,
-            seekPending = timeshiftSeekQueue.pendingDeltaMs != 0L,
+            seekPending = timelineState.seekPending,
             modalVisible = layerState.optionsPage != null ||
                 layerState.infoOpen ||
                 showDrawer ||
@@ -816,7 +693,7 @@ fun VideoPlayerScreen(
 
                     videoPlayerViewModel.retryLiveNow()
                     if (restoreToLiveAfterReconnect) {
-                        timeshiftFeedback = timeshiftReconnectLiveText
+                        timelineState.showFeedback(timeshiftReconnectLiveText)
                         restoreToLiveAfterReconnect = false
                     }
                 }
@@ -859,18 +736,9 @@ fun VideoPlayerScreen(
             PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.closeChannelDrawer()
             PlayerBackAction.CLOSE_PLAYER -> onClose()
-            PlayerBackAction.CANCEL_PENDING_SEEK -> {
-                timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
-                timeshiftSeekToken++
-                timeshiftSeekFeedbackJob?.cancel()
-                timeshiftSeekFeedbackJob = null
-                timeshiftSeekPreview = null
-            }
-            PlayerBackAction.DISMISS_SEEK_FEEDBACK -> {
-                timeshiftSeekFeedbackJob?.cancel()
-                timeshiftSeekFeedbackJob = null
-                timeshiftSeekPreview = null
-            }
+            PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
+            PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
+                timelineState.dismissDispatchedFeedback()
             PlayerBackAction.HIDE_CONTROLS -> layerState.hideControls()
             PlayerBackAction.HIDE_STATS -> layerState.updateStatsVisibility(false)
             PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
@@ -1111,7 +979,7 @@ fun VideoPlayerScreen(
                     layerState.openOptions()
                 },
                 timeshiftState = effectiveTimeshiftState,
-                timeshiftFeedback = timeshiftFeedback,
+                timeshiftFeedback = timelineState.feedback,
                 onToggleTimeshiftPause = {
                     if (effectiveTimeshiftState.paused) {
                         videoPlayerViewModel.play()
@@ -1132,8 +1000,7 @@ fun VideoPlayerScreen(
                 onGoLive = {
                     timeshiftCommandToken += 1L
                     val commandToken = timeshiftCommandToken
-                    timeshiftFeedbackToken += 1L
-                    val feedbackToken = timeshiftFeedbackToken
+                    val feedbackToken = timelineState.beginFeedbackOperation()
                     scope.launch {
                         val result = videoPlayerViewModel.goLive()
                         if (commandToken != timeshiftCommandToken) return@launch
@@ -1146,13 +1013,13 @@ fun VideoPlayerScreen(
                             commandToken = commandToken,
                             currentToken = timeshiftCommandToken,
                             feedbackToken = feedbackToken,
-                            currentFeedbackToken = timeshiftFeedbackToken,
+                            currentFeedbackToken = timelineState.feedbackToken,
                             result = resumeResult,
                             unavailableText = timeshiftUnavailableText,
                             restorePlayIntentOnFailure = false,
                         ) ?: return@launch
                         if (completion.applyFeedback) {
-                            timeshiftFeedback = completion.feedback
+                            timelineState.applyFeedback(feedbackToken, completion.feedback)
                         }
                         if (resumeResult == TimeshiftCommandResult.ACCEPTED) {
                             videoPlayerViewModel.play()
@@ -1173,7 +1040,7 @@ fun VideoPlayerScreen(
         ) {
             TimeshiftSeekPreview(
                 state = effectiveTimeshiftState,
-                decision = requireNotNull(timeshiftSeekPreview).decision,
+                decision = requireNotNull(timelineState.preview).decision,
                 nowEpochSec = nowSec,
                 programmeStartSec = nowEvent?.start?.epochSeconds,
                 programmeStopSec = nowEvent?.stop?.epochSeconds,
