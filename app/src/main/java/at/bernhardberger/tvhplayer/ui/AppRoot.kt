@@ -63,18 +63,10 @@ import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.stores.SimpleTvSession
-import at.bernhardberger.tvhplayer.ui.components.ContentContainer
 import at.bernhardberger.tvhplayer.ui.components.SideRail
-import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
-import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
-import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
-import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
-import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
-import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
-import at.bernhardberger.tvhplayer.ui.screens.SimpleTvUnlockScreen
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
@@ -123,23 +115,6 @@ internal fun MainNavigationShell(
     fullScreen: @Composable () -> Unit,
 ) {
     if (showRail) rail() else fullScreen()
-}
-
-@Composable
-internal fun StartupGatedChannelsContent(
-    contentAllowed: Boolean,
-    routeAllowed: Boolean = true,
-    channelsContent: @Composable () -> Unit,
-) {
-    if (contentAllowed && routeAllowed) channelsContent()
-}
-
-@Composable
-internal fun StartupGatedPlayerContent(
-    contentAllowed: Boolean,
-    playerContent: @Composable () -> Unit,
-) {
-    if (contentAllowed) playerContent()
 }
 
 @Composable
@@ -668,188 +643,171 @@ fun AppRoot(
                     predictivePopTransitionSpec = { appDestinationContentTransform() },
                     entryProvider = entryProvider {
                     entry<ChannelsKey> {
-                        StartupGatedChannelsContent(
+                        ChannelsRouteContent(
                             contentAllowed = contentAllowed,
                             routeAllowed =
                                 productProfile.allowsRoute(SimpleTvRoute.CHANNELS),
-                        ) {
-                            ContentContainer {
-                                ChannelsScreen(
-                                    contentPadding = contentPadding,
-                                    initialFocusEnabled = !drawerActive,
-                                    playingChannelId = activeChannelId,
-                                    connectionUiState = connectionUiState,
-                                    onRetryConnection = appVm::reconnectNow,
-                                    onOpenConnectionSettings = {
-                                        navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
-                                    },
-                                    onPlay = requestLivePlayer,
-                                )
-                            }
-                        }
+                            contentPadding = contentPadding,
+                            initialFocusEnabled = !drawerActive,
+                            playingChannelId = activeChannelId,
+                            connectionUiState = connectionUiState,
+                            onRetryConnection = appVm::reconnectNow,
+                            onOpenConnectionSettings = {
+                                navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                            },
+                            onPlay = requestLivePlayer,
+                        )
                     }
 
                     entry<GuideKey> {
-                        if (contentAllowed && productProfile.allowsRoute(SimpleTvRoute.EPG)) {
-                            ContentContainer {
-                                    EpgGridScreen(
-                                        contentPadding = contentPadding,
-                                        initialFocusEnabled = !drawerActive,
-                                        connectionUiState = connectionUiState,
-                                        onRetry = appVm::reconnectNow,
-                                        onOpenConnectionSettings = {
-                                            navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                        GuideRouteContent(
+                            contentAllowed = contentAllowed,
+                            routeAllowed = productProfile.allowsRoute(SimpleTvRoute.EPG),
+                            contentPadding = contentPadding,
+                            initialFocusEnabled = !drawerActive,
+                            connectionUiState = connectionUiState,
+                            onRetry = appVm::reconnectNow,
+                            onOpenConnectionSettings = {
+                                navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                            },
+                            timeshiftAllowed =
+                                productProfile.allows(SimpleTvCapability.TIMESHIFT),
+                            recordingsAllowed =
+                                productProfile.allows(SimpleTvCapability.RECORDINGS),
+                            onPlayRecording = { playbackSelection ->
+                                val recordingId = playbackSelection.recordingId
+                                playbackSelectionScope.launch {
+                                    val target = playbackOrchestrator.requestRecordingPlayer(
+                                        activeChannelId = activeChannelId,
+                                        activeRecordingId = activeRecordingId,
+                                        requestedRecordingId = recordingId,
+                                        startPlayback = {
+                                            playbackRuntime.playRecording(
+                                                playbackSelection,
+                                                RecordingPlaybackStart.START_OVER,
+                                            )
                                         },
-                                        onClearCategory = {},
-                                        timeshiftAllowed =
-                                            productProfile.allows(SimpleTvCapability.TIMESHIFT),
-                                        recordingsAllowed =
-                                            productProfile.allows(SimpleTvCapability.RECORDINGS),
-                                        onPlayRecording = { playbackSelection ->
-                                            val recordingId = playbackSelection.recordingId
-                                            playbackSelectionScope.launch {
-                                                val target = playbackOrchestrator.requestRecordingPlayer(
-                                                    activeChannelId = activeChannelId,
-                                                    activeRecordingId = activeRecordingId,
-                                                    requestedRecordingId = recordingId,
-                                                    startPlayback = {
-                                                        playbackRuntime.playRecording(
-                                                            playbackSelection,
-                                                            RecordingPlaybackStart.START_OVER,
-                                                        )
-                                                    },
-                                                ) ?: return@launch
-                                                backStack.pushTransient(
-                                                    RecordingPlayerKey(target.recordingId.value),
-                                                )
-                                            }
-                                        },
-                                        onPlay = requestLivePlayer,
+                                    ) ?: return@launch
+                                    backStack.pushTransient(
+                                        RecordingPlayerKey(target.recordingId.value),
                                     )
-                            }
-                        }
+                                }
+                            },
+                            onPlay = requestLivePlayer,
+                        )
                     }
 
                     entry<RecordingsKey> {
-                        if (contentAllowed && productProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
-                            ContentContainer {
-                                    RecordingsScreen(
-                                        contentPadding = contentPadding,
-                                        initialFocusEnabled = !drawerActive,
-                                        backEnabled = !applianceLaunchActive,
-                                        connectionUiState = connectionUiState,
-                                        onRetry = appVm::reconnectNow,
-                                        onPlayRecording = { playbackSelection, intent ->
-                                            val recordingId = playbackSelection.recordingId
-                                            playbackSelectionScope.launch {
-                                                val target = playbackOrchestrator.requestRecordingPlayer(
-                                                    activeChannelId = activeChannelId,
-                                                    activeRecordingId = activeRecordingId,
-                                                    requestedRecordingId = recordingId,
-                                                    startPlayback = {
-                                                        playbackRuntime.playRecording(
-                                                            playbackSelection,
-                                                            intent,
-                                                        )
-                                                    },
-                                                ) ?: return@launch
-                                                backStack.pushTransient(
-                                                    RecordingPlayerKey(
-                                                        recordingId = target.recordingId.value,
-                                                        start = intent.toRecordingStartMode(),
-                                                    ),
-                                                )
-                                            }
+                        RecordingsRouteContent(
+                            contentAllowed = contentAllowed,
+                            routeAllowed =
+                                productProfile.allowsRoute(SimpleTvRoute.RECORDINGS),
+                            contentPadding = contentPadding,
+                            initialFocusEnabled = !drawerActive,
+                            backEnabled = !applianceLaunchActive,
+                            connectionUiState = connectionUiState,
+                            onRetry = appVm::reconnectNow,
+                            onPlayRecording = { playbackSelection, intent ->
+                                val recordingId = playbackSelection.recordingId
+                                playbackSelectionScope.launch {
+                                    val target = playbackOrchestrator.requestRecordingPlayer(
+                                        activeChannelId = activeChannelId,
+                                        activeRecordingId = activeRecordingId,
+                                        requestedRecordingId = recordingId,
+                                        startPlayback = {
+                                            playbackRuntime.playRecording(
+                                                playbackSelection,
+                                                intent,
+                                            )
                                         },
-                                        state = recordingsScreenState,
+                                    ) ?: return@launch
+                                    backStack.pushTransient(
+                                        RecordingPlayerKey(
+                                            recordingId = target.recordingId.value,
+                                            start = intent.toRecordingStartMode(),
+                                        ),
                                     )
-                            }
-                        }
+                                }
+                            },
+                            state = recordingsScreenState,
+                        )
                     }
 
                     entry<SettingsKey> { destination ->
-                        if (contentAllowed && productProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
-                            ContentContainer {
-                                    SettingsScreen(
-                                        section = destination.section,
-                                        initialFocusEnabled = !drawerActive,
-                                        contentPadding = contentPadding,
-                                        backEnabled = !applianceLaunchActive,
-                                        showSimpleTvSettings =
-                                            productProfile is ProductProfile.Standard,
-                                        onNavigate = { section ->
-                                            navigateTopLevel(SettingsKey(section))
-                                        },
-                                        onStartSimpleTv = { settings ->
-                                            simpleTvSession.enter(applianceProductProfile(settings))
-                                        },
-                                    )
-                            }
-                        }
+                        SettingsRouteContent(
+                            contentAllowed = contentAllowed,
+                            routeAllowed = productProfile.allowsRoute(SimpleTvRoute.SETTINGS),
+                            section = destination.section,
+                            initialFocusEnabled = !drawerActive,
+                            contentPadding = contentPadding,
+                            backEnabled = !applianceLaunchActive,
+                            showSimpleTvSettings = productProfile is ProductProfile.Standard,
+                            onNavigate = { section ->
+                                navigateTopLevel(SettingsKey(section))
+                            },
+                            onStartSimpleTv = { settings ->
+                                simpleTvSession.enter(applianceProductProfile(settings))
+                            },
+                        )
                     }
 
                     entry<UnlockKey> {
-                        if (contentAllowed) ContentContainer {
-                                SimpleTvUnlockScreen(
-                                    backEnabled =
-                                        !drawerActive && !applianceLaunchActive,
-                                    onExited = {
-                                        navigateTopLevel(ChannelsKey)
-                                    },
-                                    onBack = {
-                                        backStack.popNavigation()
-                                        if (simpleTvActive && activeChannelId == null) {
-                                            applianceLaunchRequests.request()
-                                        }
-                                    },
-                                )
-                        }
+                        UnlockRouteContent(
+                            contentAllowed = contentAllowed,
+                            backEnabled = !drawerActive && !applianceLaunchActive,
+                            onExited = {
+                                navigateTopLevel(ChannelsKey)
+                            },
+                            onBack = {
+                                backStack.popNavigation()
+                                if (simpleTvActive && activeChannelId == null) {
+                                    applianceLaunchRequests.request()
+                                }
+                            },
+                        )
                     }
 
                     entry<LivePlayerKey> { destination ->
-                        StartupGatedPlayerContent(contentAllowed = contentAllowed) {
-                            VideoPlayerScreen(
-                                channelId = ChannelId(destination.channelId),
-                                channelName = destination.channelName,
-                                timeshiftAllowed =
-                                    productProfile.allows(SimpleTvCapability.TIMESHIFT),
-                                showStop = productProfile.allows(SimpleTvCapability.STOP),
-                                recordingActionsAllowed =
-                                    productProfile.allows(SimpleTvCapability.RECORDINGS),
-                                playerCloseAllowed = playerCloseAllowed,
-                                fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
-                                recoverySecondaryAction = recoverySecondaryAction,
-                                onReconnect = appVm::reconnectNow,
-                                onUnlock = { backStack.pushTransient(UnlockKey) },
-                                onClose = {
-                                    closeNormalLivePlayer(
-                                        playerCloseAllowed = playerCloseAllowed,
-                                        popBackStack = backStack::popNavigation,
-                                        selectRoot = selectRoot,
-                                    )
-                                },
-                            )
-                        }
+                        LivePlayerRouteContent(
+                            contentAllowed = contentAllowed,
+                            channelId = ChannelId(destination.channelId),
+                            channelName = destination.channelName,
+                            timeshiftAllowed =
+                                productProfile.allows(SimpleTvCapability.TIMESHIFT),
+                            showStop = productProfile.allows(SimpleTvCapability.STOP),
+                            recordingActionsAllowed =
+                                productProfile.allows(SimpleTvCapability.RECORDINGS),
+                            playerCloseAllowed = playerCloseAllowed,
+                            fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
+                            recoverySecondaryAction = recoverySecondaryAction,
+                            onReconnect = appVm::reconnectNow,
+                            onUnlock = { backStack.pushTransient(UnlockKey) },
+                            onClose = {
+                                closeNormalLivePlayer(
+                                    playerCloseAllowed = playerCloseAllowed,
+                                    popBackStack = backStack::popNavigation,
+                                    selectRoot = selectRoot,
+                                )
+                            },
+                        )
                     }
 
                     entry<RecordingPlayerKey> { destination ->
-                        if (
-                            contentAllowed &&
-                            productProfile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER)
-                        ) {
-                            RecordingPlayerScreen(
-                                recordingId = DvrEntryId(destination.recordingId),
-                                playbackStart = destination.start.toPlaybackStart(),
-                                showStop = productProfile.allows(SimpleTvCapability.STOP),
-                                showSimpleTvExit = !playerCloseAllowed,
-                                playerCloseAllowed = playerCloseAllowed,
-                                fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
-                                connectionAvailable = connectionState is ConnectionState.Connected,
-                                onReconnect = appVm::reconnectNow,
-                                onUnlock = { backStack.pushTransient(UnlockKey) },
-                                onClose = { backStack.popNavigation() },
-                            )
-                        }
+                        RecordingPlayerRouteContent(
+                            contentAllowed = contentAllowed,
+                            routeAllowed =
+                                productProfile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER),
+                            recordingId = DvrEntryId(destination.recordingId),
+                            playbackStart = destination.start.toPlaybackStart(),
+                            showStop = productProfile.allows(SimpleTvCapability.STOP),
+                            showSimpleTvExit = !playerCloseAllowed,
+                            playerCloseAllowed = playerCloseAllowed,
+                            fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
+                            connectionAvailable = connectionState is ConnectionState.Connected,
+                            onReconnect = appVm::reconnectNow,
+                            onUnlock = { backStack.pushTransient(UnlockKey) },
+                            onClose = { backStack.popNavigation() },
+                        )
                     }
                 },
                 )

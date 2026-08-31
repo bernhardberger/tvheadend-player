@@ -138,6 +138,12 @@ no-retune, warm-return state, and guarded-route stop-before-redirect ordering.
 `AppRoot` retains typed Navigation 3 entries, destination rendering, and the
 persistent player surface; route-content extraction remains a later package.
 
+**B4-P12 completed:** one cohesive route-content file now renders Channels,
+Guide, Recordings, Settings, unlock, and both player destinations through
+explicit functions. `AppRoot` retains typed Navigation 3 entry ownership,
+saved-state and ViewModel decorators, transitions, playback orchestration, Back
+and focus wiring, and the persistent player surface below destination content.
+
 - Extract duplicate live-play request and guarded-route decisions from
   `AppRoot` into named state/policy owners.
 - Keep Navigation 3 entries declarative and move destination rendering into
