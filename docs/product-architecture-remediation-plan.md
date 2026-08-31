@@ -189,6 +189,9 @@ retained.
 
 ### 7. Player UI state owner
 
+- B4-P16: live layer visibility, auto-hide ownership, transition timing, and
+  opening-key tokens now live in `LivePlayerLayerState`. Timeline polling and
+  queued-seek presentation remain in `VideoPlayerScreen` for later packages.
 - Move overlay visibility, auto-hide jobs, transition tokens, timeline polling,
   queued-seek presentation, and sheet/channel-drawer layer state out of
   `VideoPlayerScreen` into an explicit lifecycle-aware state holder.

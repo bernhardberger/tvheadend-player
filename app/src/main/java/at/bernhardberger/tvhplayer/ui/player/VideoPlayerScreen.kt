@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -77,7 +78,6 @@ import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
-import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.TimeshiftSeekQueueState
@@ -260,6 +260,7 @@ fun VideoPlayerScreen(
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val layerState = rememberLivePlayerLayerState()
 
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(audioLanguage = null, subtitleLanguage = null)
@@ -295,8 +296,6 @@ fun VideoPlayerScreen(
 
     var connectionLost by remember { mutableStateOf(false) }
     var screenActive by remember { mutableStateOf(false) }
-    var drawerOpen by remember { mutableStateOf(false) }
-    var controlsVisible by remember { mutableStateOf(true) }
     var channelNumberInput by remember { mutableStateOf("") }
     var timeshiftFeedback by remember { mutableStateOf<String?>(null) }
     var timeshiftSeekQueue by remember { mutableStateOf(TimeshiftSeekQueueState()) }
@@ -308,17 +307,12 @@ fun VideoPlayerScreen(
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
     var timeshiftFeedbackToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
-    var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
-    var statsVisible by remember { mutableStateOf(false) }
-    var infoOpen by remember { mutableStateOf(false) }
     var restoreInfoFocus by remember { mutableStateOf(false) }
     var restoreRecordFocus by remember { mutableStateOf(false) }
-    var recordingDialogVisible by remember { mutableStateOf(false) }
     var infoRecordingState by remember {
         mutableStateOf<LiveInfoRecordingState>(LiveInfoRecordingState.Idle)
     }
-    var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
     val rootFocus = remember { FocusRequester() }
 
     var currentChannelId by remember { mutableStateOf(channelId) }
@@ -362,10 +356,10 @@ fun VideoPlayerScreen(
         aspectRatio = settings.aspectRatio
     }
 
-    DisposableEffect(statsVisible) {
-        videoPlayerViewModel.setDiagnosticsEnabled(statsVisible)
+    DisposableEffect(layerState.statsVisible) {
+        videoPlayerViewModel.setDiagnosticsEnabled(layerState.statsVisible)
         onDispose {
-            if (statsVisible) videoPlayerViewModel.setDiagnosticsEnabled(false)
+            if (layerState.statsVisible) videoPlayerViewModel.setDiagnosticsEnabled(false)
         }
     }
 
@@ -429,38 +423,23 @@ fun VideoPlayerScreen(
         }
     }
 
-    var interactionToken by remember { mutableIntStateOf(0) }
-    val autoHideMs = 5000L
-
-    fun showControls() {
-        controlsVisible = true
-        interactionToken++
-    }
-
-    fun hideControls() {
-        controlsVisible = false
-    }
-
     fun openInfo() {
-        recordingDialogVisible = false
         restoreInfoFocus = false
         restoreRecordFocus = false
-        infoOpen = true
-        hideControls()
+        layerState.openInfo()
     }
 
     fun dismissRecordingDialog() {
         infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
-        recordingDialogVisible = false
+        layerState.dismissRecordingConfirmation()
         restoreRecordFocus = true
     }
 
     fun closeInfo() {
         infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
-        recordingDialogVisible = false
+        layerState.dismissRecordingConfirmation()
         restoreRecordFocus = false
-        infoOpen = false
-        showControls()
+        layerState.closeInfo()
         restoreInfoFocus = true
     }
 
@@ -469,8 +448,7 @@ fun VideoPlayerScreen(
             visibleChannels = channels,
             currentFocusId = currentChannelId,
         )
-        hideControls()
-        drawerOpen = true
+        layerState.openChannelDrawer()
     }
 
     fun queueTimeshiftSeek(deltaMs: Long) {
@@ -576,7 +554,7 @@ fun VideoPlayerScreen(
         if (
             channelPickAction(currentChannelId, channelId) == ChannelPickAction.CLOSE_DRAWER
         ) {
-            drawerOpen = false
+            layerState.closeChannelDrawer()
             return true
         }
 
@@ -588,8 +566,8 @@ fun VideoPlayerScreen(
         currentChannelName = channel.name.orEmpty()
         timeshiftFeedback = null
 
-        drawerOpen = false
-        showControls()
+        layerState.closeChannelDrawer()
+        layerState.showControls()
         return true
     }
 
@@ -704,27 +682,17 @@ fun VideoPlayerScreen(
     val recoverySafeActionIsExit =
         recoveryUiModel.secondaryAction == PlaybackRecoverySecondaryAction.EXIT_SIMPLE_TV
     fun currentPlayerForegroundContext() =
-        PlayerForegroundContext(
-            confirmationVisible = infoOpen &&
-                recordingDialogVisible &&
-                infoRecordingState !is LiveInfoRecordingState.Idle,
-            infoVisible = infoOpen && !(
-                recordingDialogVisible &&
-                    infoRecordingState !is LiveInfoRecordingState.Idle
-                ),
-            optionsPage = optionsPage,
+        layerState.foregroundContext(
             numberEntryVisible = channelNumberInput.isNotEmpty(),
-            channelDrawerVisible = drawerOpen && !controlsVisible && !infoOpen,
             recoveryVisible = recoveryVisible,
             terminalErrorVisible = false,
             seekPreviewPhase = when {
-                controlsVisible || timeshiftSeekPreview == null -> PlayerSeekPreviewPhase.NONE
+                layerState.controlsVisible || timeshiftSeekPreview == null ->
+                    PlayerSeekPreviewPhase.NONE
                 requireNotNull(timeshiftSeekPreview).dispatched ->
                     PlayerSeekPreviewPhase.DISPATCHED
                 else -> PlayerSeekPreviewPhase.PENDING
             },
-            controlsVisible = controlsVisible,
-            statsEnabled = statsVisible,
         )
     val foregroundContext = currentPlayerForegroundContext()
     val confirmationVisible = foregroundContext.confirmationVisible
@@ -734,15 +702,15 @@ fun VideoPlayerScreen(
     val foregroundLayer = playerForegroundLayer(foregroundContext)
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
-            controlsVisible = controlsVisible,
+            controlsVisible = layerState.controlsVisible,
             playbackProgressing = playerPlaybackProgressing &&
                 !effectiveTimeshiftState.paused,
             playbackStable = connState is ConnectionState.Connected &&
                 playbackState is AppPlaybackState.Playing &&
                 statusPresentation == PlaybackStatusPresentation.NONE,
             seekPending = timeshiftSeekQueue.pendingDeltaMs != 0L,
-            modalVisible = optionsPage != null ||
-                infoOpen ||
+            modalVisible = layerState.optionsPage != null ||
+                layerState.infoOpen ||
                 showDrawer ||
                 channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
@@ -750,12 +718,9 @@ fun VideoPlayerScreen(
                 playbackState is AppPlaybackState.Failed,
         )
     )
-    PlayerControlsAutoHideEffect(
-        eligible = autoHideEligible,
-        interactionToken = interactionToken,
-        timeoutMillis = autoHideMs,
-        onHide = ::hideControls,
-    )
+    SideEffect {
+        layerState.updateAutoHideEligibility(autoHideEligible)
+    }
     PlayerRootFocusEffect(foregroundLayer, rootFocus)
     var compactTuningVisible by remember { mutableStateOf(false) }
 
@@ -787,10 +752,10 @@ fun VideoPlayerScreen(
         state = infoRecordingState,
         currentEvent = nowEvent,
         actionEligible = recordActionEligible,
-        confirmationVisible = recordingDialogVisible,
+        confirmationVisible = layerState.recordingConfirmationVisible,
         onInvalidated = {
             infoRecordingState = LiveInfoRecordingState.Idle
-            recordingDialogVisible = false
+            layerState.dismissRecordingConfirmation()
             restoreRecordFocus = true
         },
     )
@@ -816,15 +781,15 @@ fun VideoPlayerScreen(
                     val completion = liveInfoRecordingCompletion(
                         state = infoRecordingState,
                         result = result,
-                        infoOpen = infoOpen,
+                        infoOpen = layerState.infoOpen,
                     )
                     infoRecordingState = completion.state
-                    if (completion.showResult) recordingDialogVisible = true
+                    if (completion.showResult) layerState.showRecordingConfirmation()
                 }
             }
             LiveInfoRecordingDecision.Invalidate -> {
                 infoRecordingState = LiveInfoRecordingState.Idle
-                recordingDialogVisible = false
+                layerState.dismissRecordingConfirmation()
                 restoreRecordFocus = true
             }
             LiveInfoRecordingDecision.Ignore -> Unit
@@ -840,10 +805,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    LaunchedEffect(controlsVisible) {
-        if (controlsVisible) drawerOpen = false
-    }
-
     LaunchedEffect(connState, screenActive) {
         if (!screenActive) return@LaunchedEffect
 
@@ -851,7 +812,7 @@ fun VideoPlayerScreen(
             is ConnectionState.Connected -> {
                 if (connectionLost) {
                     connectionLost = false
-                    showControls()
+                    layerState.showControls()
 
                     videoPlayerViewModel.retryLiveNow()
                     if (restoreToLiveAfterReconnect) {
@@ -871,7 +832,7 @@ fun VideoPlayerScreen(
                             !timeshiftPositionPresentation(
                                 effectiveTimeshiftState
                             ).atLiveEdge
-                    showControls()
+                    layerState.showControls()
                     videoPlayerViewModel.stop()
                     lastPlayedChannelId = null
                 }
@@ -889,14 +850,14 @@ fun VideoPlayerScreen(
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
             PlayerBackAction.CLOSE_INFO -> closeInfo()
-            PlayerBackAction.RETURN_TO_OPTIONS_ROOT -> optionsPage = PlaybackOptionsPage.ROOT
+            PlayerBackAction.RETURN_TO_OPTIONS_ROOT ->
+                layerState.showOptionsPage(PlaybackOptionsPage.ROOT)
             PlayerBackAction.CLOSE_OPTIONS -> {
-                optionsPage = null
+                layerState.closeOptions()
                 restoreOptionsFocus = true
-                interactionToken++
             }
             PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
-            PlayerBackAction.CLOSE_CHANNEL_DRAWER -> drawerOpen = false
+            PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.closeChannelDrawer()
             PlayerBackAction.CLOSE_PLAYER -> onClose()
             PlayerBackAction.CANCEL_PENDING_SEEK -> {
                 timeshiftSeekQueue = cancelPendingTimeshiftSeek(timeshiftSeekQueue)
@@ -910,8 +871,8 @@ fun VideoPlayerScreen(
                 timeshiftSeekFeedbackJob = null
                 timeshiftSeekPreview = null
             }
-            PlayerBackAction.HIDE_CONTROLS -> hideControls()
-            PlayerBackAction.HIDE_STATS -> statsVisible = false
+            PlayerBackAction.HIDE_CONTROLS -> layerState.hideControls()
+            PlayerBackAction.HIDE_STATS -> layerState.updateStatsVisibility(false)
             PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
         }
     }
@@ -922,16 +883,18 @@ fun VideoPlayerScreen(
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
-                if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
-                    if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
+                if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
+                    if (event.type == KeyEventType.KeyUp) {
+                        layerState.endOpeningKeyCycle(keyCode)
+                    }
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (recoveryVisible) {
                     return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
                 }
-                if (infoOpen) return@onPreviewKeyEvent false
-                if (optionsPage != null) return@onPreviewKeyEvent false
+                if (layerState.infoOpen) return@onPreviewKeyEvent false
+                if (layerState.optionsPage != null) return@onPreviewKeyEvent false
 
                 val mediaAction = mediaPlaybackAction(
                     keyCode = event.nativeKeyEvent.keyCode,
@@ -973,7 +936,7 @@ fun VideoPlayerScreen(
                         }
                         MediaPlaybackAction.NONE -> Unit
                     }
-                    showControls()
+                    layerState.showControls()
                     return@onPreviewKeyEvent true
                 }
 
@@ -1003,7 +966,7 @@ fun VideoPlayerScreen(
                 if (showDrawer) {
                     return@onPreviewKeyEvent when (event.key) {
                         Key.DirectionRight -> {
-                            drawerOpen = false
+                            layerState.closeChannelDrawer()
                             true
                         }
                         else -> false
@@ -1013,24 +976,24 @@ fun VideoPlayerScreen(
                 val keyAction = playerKeyAction(
                     PlayerKeyContext(
                         surface = PlayerSurface.LIVE,
-                        controlsVisible = controlsVisible,
+                        controlsVisible = layerState.controlsVisible,
                         seekbarFocused = false,
                         timeshiftAvailable = effectiveTimeshiftState.available,
                         playerCloseAllowed = playerCloseAllowed,
-                        optionsOpen = optionsPage != null,
-                        statsOpen = statsVisible,
-                        infoOpen = infoOpen,
+                        optionsOpen = layerState.optionsPage != null,
+                        statsOpen = layerState.statsVisible,
+                        infoOpen = layerState.infoOpen,
                         drawerOpen = showDrawer,
                     ),
                     keyCode = keyCode,
                 )
                 if (playerKeyActionStartsOpeningCycle(keyAction)) {
-                    revealingKeyCode = keyCode
+                    layerState.beginOpeningKeyCycle(keyCode)
                 }
                 when (keyAction) {
                     PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
                         when {
-                            infoOpen -> {
+                            layerState.infoOpen -> {
                                 closeInfo()
                                 return@onPreviewKeyEvent true
                             }
@@ -1038,8 +1001,7 @@ fun VideoPlayerScreen(
                         }
                     }
                     PlayerKeyAction.REVEAL_CONTROLS -> {
-                        infoOpen = false
-                        showControls()
+                        layerState.showControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
@@ -1055,7 +1017,7 @@ fun VideoPlayerScreen(
                                 command = videoPlayerViewModel::pauseTimeshift,
                             )
                         }
-                        showControls()
+                        layerState.showControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_CHANNELS -> {
@@ -1075,7 +1037,7 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.HIDE_CONTROLS -> {
-                        hideControls()
+                        layerState.hideControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.CLOSE_PLAYER -> {
@@ -1092,8 +1054,8 @@ fun VideoPlayerScreen(
     ) {
         AnimatedVisibility(
             visible = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-            enter = slideInHorizontally(tween(180)) { -it },
-            exit = slideOutHorizontally(tween(180)) { -it },
+            enter = slideInHorizontally(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { -it },
+            exit = slideOutHorizontally(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { -it },
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .fillMaxHeight()
@@ -1109,13 +1071,13 @@ fun VideoPlayerScreen(
                 currentSession = currentSession,
                 onFocusChannel = { selectedId = it },
                 onPickChannel = { tuneChannel(it) },
-                onCloseDrawer = { drawerOpen = false },
+                onCloseDrawer = layerState::closeChannelDrawer,
             )
         }
 
         PlayerControlsLayer(
             visible = foregroundLayer == PlayerForegroundLayer.CONTROLS,
-            modalVisible = optionsPage != null || infoOpen,
+            modalVisible = layerState.optionsPage != null || layerState.infoOpen,
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             OverlayControlsTv(
@@ -1127,8 +1089,8 @@ fun VideoPlayerScreen(
                 nowEvent = nowEvent,
                 nextEvent = nextEvent,
                 nowSec = nowSec,
-                controlsVisible = controlsVisible,
-                optionsOpen = optionsPage != null,
+                controlsVisible = layerState.controlsVisible,
+                optionsOpen = layerState.optionsPage != null,
                 onOpenChannels = {
                     openChannelDrawer()
                 },
@@ -1143,11 +1105,10 @@ fun VideoPlayerScreen(
                         )
                     }
                 },
-                onUserInteraction = { interactionToken++ },
+                onUserInteraction = layerState::onUserInteraction,
                 onOpenOptions = {
                     restoreOptionsFocus = false
-                    optionsPage = PlaybackOptionsPage.ROOT
-                    controlsVisible = true
+                    layerState.openOptions()
                 },
                 timeshiftState = effectiveTimeshiftState,
                 timeshiftFeedback = timeshiftFeedback,
@@ -1221,7 +1182,7 @@ fun VideoPlayerScreen(
         }
 
         if (
-            infoOpen &&
+            layerState.infoOpen &&
             (foregroundLayer == PlayerForegroundLayer.INFO ||
                 foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
         ) {
@@ -1243,7 +1204,7 @@ fun VideoPlayerScreen(
                     infoRecordingState = LiveInfoRecordingState.Confirming(
                         event.programmeRecordingTarget(capability)
                     )
-                    recordingDialogVisible = true
+                    layerState.showRecordingConfirmation()
                     restoreRecordFocus = false
                 },
                 onRecordingActivate = ::activateInfoRecording,
@@ -1272,7 +1233,7 @@ fun VideoPlayerScreen(
             )
         }
 
-        optionsPage?.let { page ->
+        layerState.optionsPage?.let { page ->
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
@@ -1280,17 +1241,17 @@ fun VideoPlayerScreen(
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
-                statsVisible = statsVisible,
+                statsVisible = layerState.statsVisible,
                 showSimpleTvExit = recoverySafeActionIsExit,
                 fullOptionsAvailable = fullPlaybackOptionsAvailable,
-                onPageChange = { optionsPage = it },
+                onPageChange = layerState::showOptionsPage,
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
                     scope.launch { settingsStore.setAspectRatio(mode) }
                 },
-                onStatsVisibleChange = { statsVisible = it },
+                onStatsVisibleChange = layerState::updateStatsVisibility,
                 onSimpleTvExit = {
-                    optionsPage = null
+                    layerState.closeOptions()
                     restoreOptionsFocus = true
                     onUnlock()
                 },

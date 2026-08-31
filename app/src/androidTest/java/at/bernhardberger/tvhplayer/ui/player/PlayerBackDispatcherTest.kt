@@ -21,8 +21,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
-import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
-import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
@@ -103,35 +101,29 @@ class PlayerBackDispatcherTest {
 
     @Test
     fun rapidDispatcherBackActionsReadTheCurrentPlayerLayerWithoutRecomposition() {
-        val confirmationVisible = mutableStateOf(true)
-        val infoVisible = mutableStateOf(true)
-        val actions = listOf("confirmation", "info", "player")
+        val actions = listOf("confirmation", "info", "controls", "player")
         val trace = mutableListOf<String>()
         awaitWindowFocus()
         composeRule.setContent {
+            val layerState = rememberLivePlayerLayerState()
+            LaunchedEffect(layerState) {
+                layerState.openInfo()
+                layerState.showRecordingConfirmation()
+            }
             PlayerBackHandler {
-                val layer = playerForegroundLayer(
-                    PlayerForegroundContext(
-                        confirmationVisible = confirmationVisible.value,
-                        infoVisible = infoVisible.value,
-                        optionsPage = null,
-                        numberEntryVisible = false,
-                        channelDrawerVisible = false,
-                        recoveryVisible = false,
-                        terminalErrorVisible = false,
-                        seekPreviewPhase = PlayerSeekPreviewPhase.NONE,
-                        controlsVisible = false,
-                        statsEnabled = false,
-                    )
-                )
+                val layer = playerForegroundLayer(layerState.foregroundContext())
                 when (playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = true, layer)) {
                     PlayerBackAction.DISMISS_CONFIRMATION -> {
                         trace += "confirmation"
-                        confirmationVisible.value = false
+                        layerState.dismissRecordingConfirmation()
                     }
                     PlayerBackAction.CLOSE_INFO -> {
                         trace += "info"
-                        infoVisible.value = false
+                        layerState.closeInfo()
+                    }
+                    PlayerBackAction.HIDE_CONTROLS -> {
+                        trace += "controls"
+                        layerState.hideControls()
                     }
                     PlayerBackAction.CLOSE_PLAYER -> trace += "player"
                     else -> error("Unexpected rapid Back action for $layer")
