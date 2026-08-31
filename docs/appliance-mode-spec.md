@@ -244,8 +244,11 @@ fun adjacentChannelId(
    from the player to browse does not re-arm the opportunity; deliberate browse
    navigation or newly started playback may re-arm one warm return. Selecting the
    same channel does so without retuning. Root Back exits to Google TV when no
-   warm-return opportunity remains; leaving the activity stops the session.
-   Simple TV never exits through Back.
+   warm-return opportunity remains. Explicit root exit stops the session before
+   finishing the activity. Ordinary HOME/background stops live playback and
+   retunes it once on foreground; a playing recording pauses and resumes only
+   while the same target remains current. Explicit Stop or a target replacement
+   cancels that pending foreground action. Simple TV never exits through Back.
 8. The player Stop control completes serialized playback teardown before it
    returns to the operator UI. It clears the warm-return opportunity so root Back
    cannot redirect to a torn-down session.

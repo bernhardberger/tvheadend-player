@@ -161,8 +161,11 @@ take precedence over completed-work narrative.
   Treat selection of the
   current playback channel as a drawer-close action rather than a tune request.
 - Keep the active service warm while Back exposes the foreground Channel List.
-  A same-service player request is idempotent, while `MainActivity.onStop` remains
-  the hard boundary that stops playback for HOME or other background transitions.
+  When ordinary HOME/background temporarily covers the activity, stop live
+  playback and retune it once on foreground; pause a playing recording and resume
+  it only while the same target remains current. A same-service player request is
+  idempotent; explicit player Stop and serialized root exit remain the terminal
+  teardown boundaries and cancel any pending foreground resume.
 - At the browse root, route Back to the warm fullscreen live or recording player
   at most once. Consume the warm-return token before player navigation so
   player→browse→Back cannot loop. Re-arm only on deliberate browse navigation or

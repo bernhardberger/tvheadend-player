@@ -155,6 +155,12 @@ the owning repository or a separately authorized app package.
 
 ### 6. Runtime seam cleanup
 
+**RM-APP-D1 completed:** the Appliance lifecycle documents now distinguish a
+warm foreground browse route from target-aware background handling. Live playback
+stops and retunes once on foreground, while a playing recording pauses and resumes
+only while the same target remains current; explicit Stop and serialized root exit
+remain terminal teardown boundaries.
+
 **B4-P13 completed with retention:** concrete `SdkRuntimeOwner` tests would
 require test-only construction hooks for the final SDK coordinator and
 Android-bound runtime owners. The narrower internal `SdkShutdownActions` seam is
