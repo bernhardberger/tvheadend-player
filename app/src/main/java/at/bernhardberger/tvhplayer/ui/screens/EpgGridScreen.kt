@@ -113,6 +113,7 @@ import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.epgFrontierSettled
 import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
+import at.bernhardberger.tvhplayer.core.indexTimelineEventsByChannel
 import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
@@ -245,7 +246,7 @@ fun EpgGridScreen(
         connectionUiState == ConnectionUiState.Reconnecting
 
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
-    var nowSec by remember { mutableLongStateOf(openedAtSec) }
+    val nowSecProvider = rememberCurrentEpochSeconds()
     val restoredPosition = remember { guidePositionStore.position.value }
     var windowStartSec by remember {
         mutableLongStateOf(restoredPosition?.windowStartSec ?: floorToHour(openedAtSec))
@@ -317,12 +318,8 @@ fun EpgGridScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(lastPlayedStore) {
         lastPlayedId = lastPlayedStore.channelId.first()
-        while (true) {
-            nowSec = System.currentTimeMillis() / 1000L
-            delay(5_000)
-        }
     }
 
     val selectedIndex = selectedTarget?.channelIndex ?: pendingInitialChannelIndex
@@ -334,21 +331,25 @@ fun EpgGridScreen(
         EpgRepositoryState.Empty -> null
     }
     val snapshotEvents = epgSnapshot?.events.orEmpty()
-    val focusRows = remember(channels, category, epgSnapshot) {
+    val currentEventIds = remember(snapshotEvents) {
+        snapshotEvents.mapTo(mutableSetOf()) { it.id }
+    }
+    LaunchedEffect(currentEventIds) {
+        eventFocusRequesters.keys.retainAll(currentEventIds)
+    }
+    val eventsByChannel = remember(snapshotEvents) {
+        indexTimelineEventsByChannel(snapshotEvents)
+    }
+    val focusRows = remember(channels, category, eventsByChannel) {
         channels.map { channel ->
             EpgFocusColumn(
                 channelId = channel.id,
-                events = snapshotEvents.filter {
-                    it.channelId == channel.id && it.matchesProgrammeCategory(category)
-                },
+                events = eventsByChannel[channel.id].orEmpty()
+                    .filter { it.matchesProgrammeCategory(category) },
             )
         }
     }
     val selectedChannel = channels.getOrNull(selectedIndex)
-
-    fun filteredEvents(channelId: ChannelId): List<EpgEventEntry> = snapshotEvents.filter {
-        it.channelId == channelId && it.matchesProgrammeCategory(category)
-    }
 
     fun requestVisibleWindow(anchorSec: Long, channelIndex: Int) {
         val capability = currentSession ?: return
@@ -391,7 +392,7 @@ fun EpgGridScreen(
             rows = focusRows,
             preferredChannelIndex = channelIndex,
             preferredEventId = restored?.eventId,
-            targetSec = restored?.eventStartSec ?: nowSec,
+            targetSec = restored?.eventStartSec ?: nowSecProvider(),
         )
 
         val targetChannelIndex = target?.channelIndex ?: channelIndex
@@ -408,7 +409,7 @@ fun EpgGridScreen(
         initialPositionDone = true
     }
 
-    LaunchedEffect(focusRows, selectedTarget, initialPositionDone, nowSec) {
+    LaunchedEffect(focusRows, selectedTarget, initialPositionDone) {
         if (!initialPositionDone || focusRows.size != channels.size || channels.isEmpty()) {
             return@LaunchedEffect
         }
@@ -420,7 +421,7 @@ fun EpgGridScreen(
             rows = focusRows,
             current = current,
             preferredChannelIndex = preferredIndex,
-            targetSec = nowSec,
+            targetSec = nowSecProvider(),
         )
         if (replacement == current) return@LaunchedEffect
         selectedTarget = replacement
@@ -465,8 +466,8 @@ fun EpgGridScreen(
         }
         val channelId = channels.getOrNull(target.channelIndex)?.id
             ?: return@LaunchedEffect
-        val event = filteredEvents(channelId)
-            .firstOrNull { it.id == target.eventId }
+        val event = focusRows.getOrNull(target.channelIndex)?.events
+            ?.firstOrNull { it.id == target.eventId }
             ?: return@LaunchedEffect
         when {
             event.start.epochSeconds < windowStartSec ->
@@ -490,7 +491,7 @@ fun EpgGridScreen(
             channelListState.animateScrollToItem(target.channelIndex)
         }
         if (initialFocusEnabled && !scopeRowFocused) {
-            delay(80)
+            withFrameNanos { }
             eventFocusRequesters[target.eventId]?.let { requester ->
                 runCatching { requester.requestFocus() }
             }
@@ -502,9 +503,8 @@ fun EpgGridScreen(
         val channelId = selectedChannel?.id ?: return@LaunchedEffect
         val through = KotlinInstant.fromEpochSeconds(request.throughSec)
         val snapshot = epgState.currentEpgSnapshot() ?: return@LaunchedEffect
-        val event = snapshot.events.asSequence()
-            .filter { it.channelId == channelId && it.start.epochSeconds >= request.afterSec }
-            .filter { it.matchesProgrammeCategory(category) }
+        val event = focusRows.getOrNull(selectedIndex)?.events.orEmpty().asSequence()
+            .filter { it.start.epochSeconds >= request.afterSec }
             .minByOrNull { it.start }
         if (event != null) {
             selectedTarget = selectedTarget?.copy(eventId = event.id)
@@ -565,9 +565,8 @@ fun EpgGridScreen(
                 return true
             }
             move.extendTimeFrontier -> {
-                val currentEvent = filteredEvents(
-                    channels[current.channelIndex].id,
-                ).firstOrNull { it.id == current.eventId }
+                val currentEvent = focusRows[current.channelIndex].events
+                    .firstOrNull { it.id == current.eventId }
                 val after = currentEvent?.stop?.epochSeconds ?: windowEndSec
                 windowStartSec += FRONTIER_STEP_SEC
                 frontierRequest = FrontierRequest(after, windowStartSec)
@@ -658,17 +657,16 @@ fun EpgGridScreen(
                     }
                     OutlinedButton(
                         onClick = {
+                            val nowSec = nowSecProvider()
                             windowStartSec = floorToHour(nowSec)
                             requestVisibleWindow(
                                 windowStartSec,
                                 selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
                             )
-                            selectedTarget = nearestTargetAt(
-                                channels,
-                                snapshotEvents,
-                                selectedTarget?.channelIndex ?: 0,
-                                nowSec,
-                                category,
+                            selectedTarget = initialTimelineEpgFocus(
+                                rows = focusRows,
+                                preferredChannelIndex = selectedTarget?.channelIndex ?: 0,
+                                targetSec = nowSec,
                             )
                         },
                         modifier = Modifier
@@ -788,7 +786,7 @@ fun EpgGridScreen(
                 TimelineTimeRuler(
                     windowStartSec = windowStartSec,
                     windowEndSec = windowStartSec + VISIBLE_WINDOW_SEC,
-                    nowSec = nowSec,
+                    nowSecProvider = nowSecProvider,
                     modifier = Modifier.padding(
                         start = timelineContentPadding.calculateStartPadding(layoutDirection),
                         end = timelineContentPadding.calculateEndPadding(layoutDirection),
@@ -815,10 +813,10 @@ fun EpgGridScreen(
                             eventFocusRequesters = eventFocusRequesters,
                             windowStartSec = windowStartSec,
                             windowEndSec = windowEndSec,
-                            nowSec = nowSec,
+                            nowSecProvider = nowSecProvider,
                             imageLoader = imageLoader,
                             currentSession = currentSession,
-                            events = snapshotEvents.filter { it.channelId == channel.id },
+                            events = eventsByChannel[channel.id].orEmpty(),
                             category = category,
                             connectionUiState = connectionUiState,
                             frontierLoading = frontierRequest != null &&
@@ -855,18 +853,20 @@ fun EpgGridScreen(
             val eventChannelId = event.channelId
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForEvent(event.id)
-            val timeshiftCoversEvent = playingChannelId == eventChannelId &&
-                simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT) &&
-                timeshiftState.available &&
-                event.stop.epochSeconds <= nowSec &&
-                event.start.epochSeconds * 1_000L >=
+            val timeshiftCoversEvent = { nowSec: Long ->
+                playingChannelId == eventChannelId &&
+                    simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT) &&
+                    timeshiftState.available &&
+                    event.stop.epochSeconds <= nowSec &&
+                    event.start.epochSeconds * 1_000L >=
                     nowSec * 1_000L + timeshiftState.bufferStartMs
+            }
             ProgrammeDetailsPanel(
                 contentPadding = contentPadding,
                 event = event,
                 channel = channel,
                 recording = recording,
-                nowSec = nowSec,
+                nowSecProvider = nowSecProvider,
                 serverTimeshiftCoversEvent = timeshiftCoversEvent,
                 simpleTvProfile = simpleTvProfile,
                 canModifyRecordings = selectedCapability != null,
@@ -884,6 +884,7 @@ fun EpgGridScreen(
                             }
                         }
                         ProgrammeAction.WATCH_FROM_START -> {
+                            val nowSec = nowSecProvider()
                             if (recording != null && selectedCapability != null) {
                                 onPlayRecording(
                                     RecordingPlaybackSelection(
@@ -892,7 +893,7 @@ fun EpgGridScreen(
                                     )
                                 )
                             } else if (
-                                timeshiftCoversEvent &&
+                                timeshiftCoversEvent(nowSec) &&
                                 channel != null &&
                                 selectedCapability != null
                             ) {
@@ -998,7 +999,7 @@ fun EpgGridScreen(
         if (showJumpDialog) {
             JumpToTimeDialog(
                 initialSec = windowStartSec,
-                nowSec = nowSec,
+                nowSecProvider = nowSecProvider,
                 onDismiss = { showJumpDialog = false },
                 onJump = { target ->
                     showJumpDialog = false
@@ -1007,12 +1008,10 @@ fun EpgGridScreen(
                         target,
                         selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
                     )
-                    selectedTarget = nearestTargetAt(
-                        channels,
-                        snapshotEvents,
-                        selectedTarget?.channelIndex ?: 0,
-                        target,
-                        category,
+                    selectedTarget = initialTimelineEpgFocus(
+                        rows = focusRows,
+                        preferredChannelIndex = selectedTarget?.channelIndex ?: 0,
+                        targetSec = target,
                     )
                 },
             )
@@ -1024,9 +1023,10 @@ fun EpgGridScreen(
 private fun TimelineTimeRuler(
     windowStartSec: Long,
     windowEndSec: Long,
-    nowSec: Long,
+    nowSecProvider: () -> Long,
     modifier: Modifier = Modifier,
 ) {
+    val nowSec = nowSecProvider()
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -1118,7 +1118,7 @@ private fun TimelineChannelRow(
     eventFocusRequesters: MutableMap<EventId, FocusRequester>,
     windowStartSec: Long,
     windowEndSec: Long,
-    nowSec: Long,
+    nowSecProvider: () -> Long,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     events: List<EpgEventEntry>,
@@ -1130,6 +1130,7 @@ private fun TimelineChannelRow(
     onOpenDetails: (EpgEventEntry) -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
 ) {
+    val nowSec = nowSecProvider()
     val filteredEvents = remember(events, category) {
         events.filter { it.matchesProgrammeCategory(category) }
     }
@@ -1400,7 +1401,7 @@ private fun TimelineRowState(
 @Composable
 private fun JumpToTimeDialog(
     initialSec: Long,
-    nowSec: Long,
+    nowSecProvider: () -> Long,
     onDismiss: () -> Unit,
     onJump: (Long) -> Unit,
 ) {
@@ -1434,7 +1435,7 @@ private fun JumpToTimeDialog(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
-                onClick = { onJump(floorToHour(nowSec)) },
+                onClick = { onJump(floorToHour(nowSecProvider())) },
                 modifier = Modifier.focusRequester(initialFocus),
             ) {
                 Text(stringResource(R.string.now))
@@ -1455,20 +1456,21 @@ private fun ProgrammeDetailsPanel(
     event: EpgEventEntry,
     channel: Channel?,
     recording: DvrEntry?,
-    nowSec: Long,
-    serverTimeshiftCoversEvent: Boolean,
+    nowSecProvider: () -> Long,
+    serverTimeshiftCoversEvent: (Long) -> Boolean,
     simpleTvProfile: SimpleTvProfile,
     canModifyRecordings: Boolean,
     actionResult: DvrMutationResult<*>?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
 ) {
+    val nowSec = nowSecProvider()
     val initialFocus = remember { FocusRequester() }
     val actions = programmeActions(
         event,
         nowSec,
         recording,
-        serverTimeshiftCoversEvent = serverTimeshiftCoversEvent,
+        serverTimeshiftCoversEvent = serverTimeshiftCoversEvent(nowSec),
         canModifyRecordings = canModifyRecordings,
     ).filter { action ->
         when (action) {
@@ -1940,25 +1942,16 @@ internal fun guideEmptyMessageRes(
     }
 }
 
-private fun nearestTargetAt(
-    channels: List<Channel>,
-    events: List<EpgEventEntry>,
-    preferredChannelIndex: Int,
-    targetSec: Long,
-    category: ProgrammeCategory,
-): EpgFocusTarget? {
-    return initialTimelineEpgFocus(
-        rows = channels.map { channel ->
-            EpgFocusColumn(
-                channel.id,
-                events.filter {
-                    it.channelId == channel.id && it.matchesProgrammeCategory(category)
-                },
-            )
-        },
-        preferredChannelIndex = preferredChannelIndex,
-        targetSec = targetSec,
-    )
+@Composable
+private fun rememberCurrentEpochSeconds(): () -> Long {
+    val nowSec = remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
+    LaunchedEffect(nowSec) {
+        while (true) {
+            delay(5_000)
+            nowSec.longValue = System.currentTimeMillis() / 1000L
+        }
+    }
+    return remember(nowSec) { { nowSec.longValue } }
 }
 
 private fun floorToHour(epochSec: Long): Long = epochSec - epochSec.mod(3600L)

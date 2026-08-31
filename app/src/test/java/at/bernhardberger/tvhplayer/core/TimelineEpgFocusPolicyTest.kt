@@ -12,6 +12,18 @@ import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
     @Test
+    fun channelEventIndexPreservesPerChannelSnapshotOrder() {
+        val first = event(11, 0, 30)
+        val otherChannel = event(21, 0, 60)
+        val second = event(12, 30, 60)
+
+        val indexed = indexTimelineEventsByChannel(listOf(first, otherChannel, second))
+
+        assertEquals(listOf(first, second), indexed[ChannelId(1)])
+        assertEquals(listOf(otherChannel), indexed[ChannelId(2)])
+    }
+
+    @Test
     fun pageFocusSkipsEmptyFilteredRowsFromPreferredPageTarget() {
         val rows = listOf(
             row(1, event(11, 0, 100)),

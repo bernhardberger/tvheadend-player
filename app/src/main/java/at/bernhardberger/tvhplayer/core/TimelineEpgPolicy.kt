@@ -22,6 +22,18 @@ data class EpgFocusTarget(
     val eventId: EventId,
 )
 
+fun indexTimelineEventsByChannel(
+    events: List<EpgEventEntry>,
+): Map<ChannelId, List<EpgEventEntry>> {
+    val indexed = mutableMapOf<ChannelId, MutableList<EpgEventEntry>>()
+    events.forEach { event ->
+        event.channelId?.let { channelId ->
+            indexed.getOrPut(channelId) { mutableListOf() }.add(event)
+        }
+    }
+    return indexed
+}
+
 enum class EpgFocusDirection {
     UP,
     DOWN,
