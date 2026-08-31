@@ -20,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -30,6 +29,7 @@ import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.core.SettingsBackAction
+import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.settingsBackAction
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnection
@@ -38,8 +38,6 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsLanguage
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsOptions
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsSimpleTv
-import at.bernhardberger.tvhplayer.stores.SimpleTvSession
-import org.koin.compose.koinInject
 
 @Composable
 internal fun SettingsScreen(
@@ -47,17 +45,16 @@ internal fun SettingsScreen(
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
+    showSimpleTvSettings: Boolean = true,
     onNavigate: (SettingsSection) -> Unit,
-    onStartSimpleTv: () -> Unit,
+    onStartSimpleTv: (SimpleTvSettings) -> Unit,
 ) {
-    val simpleTvSession: SimpleTvSession = koinInject()
-    val simpleTvActive by simpleTvSession.active.collectAsStateWithLifecycle()
     SettingsScreenNavigation(
         currentSection = section,
         initialFocusEnabled = initialFocusEnabled,
         contentPadding = contentPadding,
         backEnabled = backEnabled,
-        showSimpleTvSettings = !simpleTvActive,
+        showSimpleTvSettings = showSimpleTvSettings,
         onNavigate = onNavigate,
     ) { destination, initialFocusRequester ->
         when (destination) {

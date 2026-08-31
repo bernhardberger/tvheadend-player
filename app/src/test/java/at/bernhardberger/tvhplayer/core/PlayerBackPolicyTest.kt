@@ -178,7 +178,7 @@ class PlayerBackPolicyTest {
         val actions = PlayerForegroundLayer.entries.associateWith { layer ->
             playerBackAction(
                 surface = PlayerSurface.LIVE,
-                simpleTvActive = false,
+                playerCloseAllowed = true,
                 foregroundLayer = layer,
             )
         }
@@ -196,15 +196,19 @@ class PlayerBackPolicyTest {
     }
 
     @Test
-    fun normalAndSimpleTvLiveBackDifferOnlyAtRecoveryAndLayerlessPlayer() {
-        listOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.NONE).forEach { layer ->
+    fun deniedPlayerCloseContainsRecoveryTerminalErrorAndLayerlessPlayer() {
+        listOf(
+            PlayerForegroundLayer.RECOVERY,
+            PlayerForegroundLayer.TERMINAL_ERROR,
+            PlayerForegroundLayer.NONE,
+        ).forEach { layer ->
             assertEquals(
                 PlayerBackAction.CLOSE_PLAYER,
-                playerBackAction(PlayerSurface.LIVE, simpleTvActive = false, layer),
+                playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = true, layer),
             )
             assertEquals(
                 PlayerBackAction.CONSUME_WITHOUT_CHANGE,
-                playerBackAction(PlayerSurface.LIVE, simpleTvActive = true, layer),
+                playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = false, layer),
             )
         }
     }
@@ -214,7 +218,7 @@ class PlayerBackPolicyTest {
         listOf(PlayerForegroundLayer.TERMINAL_ERROR, PlayerForegroundLayer.NONE).forEach { layer ->
             assertEquals(
                 PlayerBackAction.CLOSE_PLAYER,
-                playerBackAction(PlayerSurface.RECORDING, simpleTvActive = false, layer),
+                playerBackAction(PlayerSurface.RECORDING, playerCloseAllowed = true, layer),
             )
         }
     }

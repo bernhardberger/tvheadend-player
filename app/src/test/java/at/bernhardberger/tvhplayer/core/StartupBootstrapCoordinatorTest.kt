@@ -41,7 +41,7 @@ class StartupBootstrapCoordinatorTest {
             MainStartupState.Ready(
                 server = configuredServer,
                 autoStartPlayback = true,
-                startSimpleTv = false,
+                startupProfile = ProductProfile.Standard,
             ),
             fixture.coordinator.state.value,
         )
@@ -91,7 +91,7 @@ class StartupBootstrapCoordinatorTest {
             MainStartupState.Ready(
                 server = configuredServer,
                 autoStartPlayback = false,
-                startSimpleTv = false,
+                startupProfile = ProductProfile.Standard,
             ),
             fixture.coordinator.state.value,
         )
@@ -115,12 +115,16 @@ class StartupBootstrapCoordinatorTest {
         fixture.coordinator.bootstrap()
 
         assertEquals(1, fixture.simpleTvStarts)
+        assertEquals(
+            ProductProfile.Appliance(timeshiftAllowed = false),
+            fixture.enteredProfile,
+        )
         assertTrue(fixture.requests.state.value is ApplianceLaunchState.Pending)
         assertEquals(
             MainStartupState.Ready(
                 server = configuredServer,
                 autoStartPlayback = false,
-                startSimpleTv = true,
+                startupProfile = ProductProfile.Appliance(timeshiftAllowed = false),
             ),
             fixture.coordinator.state.value,
         )
@@ -165,12 +169,16 @@ class StartupBootstrapCoordinatorTest {
             fixture.coordinator.bootstrap()
 
             assertEquals(1, fixture.simpleTvStarts)
+            assertEquals(
+                ProductProfile.Appliance(timeshiftAllowed = false),
+                fixture.enteredProfile,
+            )
             assertEquals(ApplianceLaunchState.Idle, fixture.requests.state.value)
             assertEquals(
                 MainStartupState.Ready(
                     server = configuredServer,
                     autoStartPlayback = false,
-                    startSimpleTv = true,
+                    startupProfile = ProductProfile.Appliance(timeshiftAllowed = false),
                 ),
                 fixture.coordinator.state.value,
             )
@@ -193,7 +201,7 @@ class StartupBootstrapCoordinatorTest {
             MainStartupState.Ready(
                 server = server,
                 autoStartPlayback = false,
-                startSimpleTv = false,
+                startupProfile = ProductProfile.Standard,
             ),
             fixture.coordinator.state.value,
         )
@@ -215,7 +223,7 @@ class StartupBootstrapCoordinatorTest {
         assertEquals(updatedServer, ready.serverSettingsForRuntime(updatedServer))
         assertEquals(initialServer, ready.server)
         assertEquals(false, ready.autoStartPlayback)
-        assertEquals(false, ready.startSimpleTv)
+        assertEquals(ProductProfile.Standard, ready.startupProfile)
         assertEquals(ApplianceLaunchState.Idle, fixture.requests.state.value)
         assertEquals(1, fixture.serverReads)
         assertEquals(1, fixture.uiReads)
@@ -324,7 +332,7 @@ class StartupBootstrapCoordinatorTest {
                 simpleTvReads += 1
                 SimpleTvSettings(enabled = true)
             },
-            startSimpleTvSession = { simpleTvStarts += 1 },
+            enterProductProfile = { simpleTvStarts += 1 },
         )
 
         val first = launch { coordinator.bootstrap() }
@@ -362,7 +370,7 @@ class StartupBootstrapCoordinatorTest {
             loadServerSettings = { throw cancellation },
             loadUiSettings = { UiSettings() },
             loadSimpleTvSettings = { SimpleTvSettings() },
-            startSimpleTvSession = {},
+            enterProductProfile = {},
             onStartupRequestCreationHandled = { bootstrapHandledCalls += 1 },
         )
 
@@ -386,7 +394,7 @@ class StartupBootstrapCoordinatorTest {
             loadServerSettings = { configuredServer },
             loadUiSettings = { throw failure },
             loadSimpleTvSettings = { SimpleTvSettings() },
-            startSimpleTvSession = {},
+            enterProductProfile = {},
             onStartupRequestCreationHandled = { bootstrapHandledCalls += 1 },
         )
 
@@ -432,6 +440,7 @@ class StartupBootstrapCoordinatorTest {
         var simpleTvReads = 0
         var simpleTvStarts = 0
         var bootstrapHandledCalls = 0
+        var enteredProfile: ProductProfile.Appliance? = null
 
         val coordinator = StartupBootstrapCoordinator(
             applianceLaunchRequests = requests,
@@ -447,7 +456,8 @@ class StartupBootstrapCoordinatorTest {
                 simpleTvReads += 1
                 SimpleTvSettings(enabled = simpleTvEnabled)
             },
-            startSimpleTvSession = {
+            enterProductProfile = { profile ->
+                enteredProfile = profile
                 simpleTvStarts += 1
                 onSimpleTvStart()
             },

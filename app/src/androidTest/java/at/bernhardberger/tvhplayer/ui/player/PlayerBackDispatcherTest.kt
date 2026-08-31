@@ -124,7 +124,7 @@ class PlayerBackDispatcherTest {
                         statsEnabled = false,
                     )
                 )
-                when (playerBackAction(PlayerSurface.LIVE, false, layer)) {
+                when (playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = true, layer)) {
                     PlayerBackAction.DISMISS_CONFIRMATION -> {
                         trace += "confirmation"
                         confirmationVisible.value = false

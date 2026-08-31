@@ -90,7 +90,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            simpleTvActive = false,
+            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.REVEAL_CONTROLS,
@@ -125,7 +125,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            simpleTvActive = false,
+            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
@@ -148,7 +148,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            simpleTvActive = false,
+            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
@@ -179,7 +179,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            simpleTvActive = false,
+            playerCloseAllowed = true,
             infoOpen = true,
         )
         assertEquals(
@@ -195,7 +195,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            simpleTvActive = false,
+            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.OPEN_INFO,
@@ -226,7 +226,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            simpleTvActive = true,
+            playerCloseAllowed = false,
         )
         assertEquals(
             PlayerKeyAction.DISMISS_OVERLAY_ONLY,
@@ -246,7 +246,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            simpleTvActive = true,
+            playerCloseAllowed = false,
         )
         assertEquals(
             PlayerKeyAction.OPEN_CHANNELS,
@@ -273,7 +273,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = true,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            simpleTvActive = false,
+            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.HIDE_CONTROLS,
@@ -292,7 +292,7 @@ class PlaybackKeyPolicyTest {
             controlsVisible = true,
             seekbarFocused = true,
             timeshiftAvailable = false,
-            simpleTvActive = false,
+            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.SEEK_BACK,

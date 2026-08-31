@@ -52,9 +52,6 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseShellBackAction
-import at.bernhardberger.tvhplayer.core.SimpleTvCapability
-import at.bernhardberger.tvhplayer.core.SimpleTvProfile
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
 import at.bernhardberger.tvhplayer.models.RailItem
 import at.bernhardberger.tvhplayer.ui.AppDestination
@@ -79,7 +76,12 @@ internal fun SideRail(
     currentRoute: AppDestination?,
     rootRoute: AppDestination = AppDestination.CHANNELS,
     showEpgMenu: Boolean,
-    simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
+    availableDestinations: Set<AppDestination> = setOf(
+        AppDestination.CHANNELS,
+        AppDestination.GUIDE,
+        AppDestination.RECORDINGS,
+        AppDestination.SETTINGS,
+    ),
     rootBackPriority: Boolean = false,
     onRootBack: () -> Unit,
     onNavigate: (AppDestination) -> Unit,
@@ -97,10 +99,10 @@ internal fun SideRail(
         epgLabel,
         recordingsLabel,
         showEpgMenu,
-        simpleTvProfile,
+        availableDestinations,
     ) {
         buildList {
-            if (simpleTvProfile.allows(SimpleTvCapability.CHANNEL_LIST)) {
+            if (AppDestination.CHANNELS in availableDestinations) {
                 add(RailItem(AppDestination.CHANNELS, channelsLabel) {
                     Icon(
                         Icons.AutoMirrored.Filled.List,
@@ -109,7 +111,7 @@ internal fun SideRail(
                     )
                 })
             }
-            if (showEpgMenu && simpleTvProfile.allows(SimpleTvCapability.EPG)) {
+            if (showEpgMenu && AppDestination.GUIDE in availableDestinations) {
                 add(RailItem(AppDestination.GUIDE, epgLabel) {
                     Icon(
                         Icons.Filled.Event,
@@ -118,7 +120,7 @@ internal fun SideRail(
                     )
                 })
             }
-            if (simpleTvProfile.allows(SimpleTvCapability.RECORDINGS)) {
+            if (AppDestination.RECORDINGS in availableDestinations) {
                 add(RailItem(AppDestination.RECORDINGS, recordingsLabel) {
                     Icon(
                         Icons.Filled.VideoLibrary,
@@ -132,10 +134,10 @@ internal fun SideRail(
     val footerItems = remember(
         unlockLabel,
         settingsLabel,
-        simpleTvProfile,
+        availableDestinations,
     ) {
         buildList {
-            if (simpleTvProfile.active) {
+            if (AppDestination.UNLOCK in availableDestinations) {
                 add(RailItem(AppDestination.UNLOCK, unlockLabel) {
                     Icon(
                         Icons.Filled.LockOpen,
@@ -144,7 +146,7 @@ internal fun SideRail(
                     )
                 })
             }
-            if (simpleTvProfile.allows(SimpleTvCapability.SETTINGS)) {
+            if (AppDestination.SETTINGS in availableDestinations) {
                 add(RailItem(AppDestination.SETTINGS, settingsLabel) {
                     Icon(
                         Icons.Filled.Settings,

@@ -335,7 +335,7 @@ private fun DispatcherHarness(
                                 controlsVisible = controlsVisible,
                                 seekbarFocused = false,
                                 timeshiftAvailable = mode == DispatcherMode.LIVE_TIMESHIFT,
-                                simpleTvActive = false,
+                                playerCloseAllowed = true,
                                 infoOpen = infoOpen,
                                 drawerOpen = drawerOpen,
                             ),

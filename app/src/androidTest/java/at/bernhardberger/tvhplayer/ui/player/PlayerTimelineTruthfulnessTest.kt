@@ -273,7 +273,7 @@ class PlayerTimelineTruthfulnessTest {
             val rootFocus = remember { FocusRequester() }
             val layer = playerForegroundLayer(previewContext(phase))
             PlayerBackHandler {
-                when (playerBackAction(PlayerSurface.LIVE, false, layer)) {
+                when (playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = true, layer)) {
                     PlayerBackAction.CANCEL_PENDING_SEEK -> {
                         cancelled++
                         phase = PlayerSeekPreviewPhase.NONE

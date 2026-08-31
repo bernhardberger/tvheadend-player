@@ -1,20 +1,21 @@
 package at.bernhardberger.tvhplayer.stores
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import at.bernhardberger.tvhplayer.core.ProductProfile
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SimpleTvSessionTest {
     @Test
-    fun startAndExitOnlyChangeCurrentSession() {
+    fun applianceEntryAndExitOnlyChangeCurrentProductProfile() {
         val session = SimpleTvSession()
+        val appliance = ProductProfile.Appliance(timeshiftAllowed = true)
 
-        assertFalse(session.active.value)
+        assertEquals(ProductProfile.Standard, session.profile.value)
 
-        session.start()
-        assertTrue(session.active.value)
+        session.enter(appliance)
+        assertEquals(appliance, session.profile.value)
 
         session.exit()
-        assertFalse(session.active.value)
+        assertEquals(ProductProfile.Standard, session.profile.value)
     }
 }

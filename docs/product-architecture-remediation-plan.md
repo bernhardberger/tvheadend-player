@@ -107,6 +107,13 @@ flux. Do not expand or replace it in this package.
 
 ### 4. Profile boundary
 
+**B4-P10 completed:** `ProductProfile` now owns Standard versus Appliance route,
+startup, Back/Stop, player-close, playback-options, and settings policy. The
+session publishes that profile, while the root passes concrete access and
+recovery decisions to consumers. The transient unlock route remains because its
+Playback Options and recovery entry, constant-time PIN check, Back containment,
+and session-only exit remain coherent.
+
 - Give the root one explicit source of truth for Standard versus Appliance route
   availability, startup destination, global Back/Stop policy, and settings
   access.

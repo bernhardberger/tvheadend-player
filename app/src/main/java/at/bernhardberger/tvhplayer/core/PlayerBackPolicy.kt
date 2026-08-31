@@ -88,7 +88,7 @@ fun playerRootFocusRequired(foregroundLayer: PlayerForegroundLayer): Boolean =
 
 fun playerBackAction(
     surface: PlayerSurface,
-    simpleTvActive: Boolean,
+    playerCloseAllowed: Boolean,
     foregroundLayer: PlayerForegroundLayer,
 ): PlayerBackAction = when (foregroundLayer) {
     PlayerForegroundLayer.CONFIRMATION -> PlayerBackAction.DISMISS_CONFIRMATION
@@ -98,12 +98,12 @@ fun playerBackAction(
     PlayerForegroundLayer.NUMBER_ENTRY -> PlayerBackAction.CLEAR_NUMBER_ENTRY
     PlayerForegroundLayer.CHANNEL_DRAWER -> PlayerBackAction.CLOSE_CHANNEL_DRAWER
     PlayerForegroundLayer.RECOVERY,
-    PlayerForegroundLayer.NONE -> if (surface == PlayerSurface.LIVE && simpleTvActive) {
-        PlayerBackAction.CONSUME_WITHOUT_CHANGE
-    } else {
+    PlayerForegroundLayer.TERMINAL_ERROR,
+    PlayerForegroundLayer.NONE -> if (playerCloseAllowed) {
         PlayerBackAction.CLOSE_PLAYER
+    } else {
+        PlayerBackAction.CONSUME_WITHOUT_CHANGE
     }
-    PlayerForegroundLayer.TERMINAL_ERROR -> PlayerBackAction.CLOSE_PLAYER
     PlayerForegroundLayer.PENDING_SEEK_PREVIEW -> PlayerBackAction.CANCEL_PENDING_SEEK
     PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW -> PlayerBackAction.DISMISS_SEEK_FEEDBACK
     PlayerForegroundLayer.CONTROLS -> PlayerBackAction.HIDE_CONTROLS

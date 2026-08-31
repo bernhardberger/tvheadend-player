@@ -8,14 +8,14 @@ class PlaybackOptionsPolicyTest {
     fun lateralCategoriesWrapAndHideOwnerPagesInSimpleTv() {
         assertEquals(
             listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES),
-            playbackOptionsCategories(simpleTvActive = true),
+            playbackOptionsCategories(fullOptionsAvailable = false),
         )
         assertEquals(
             PlaybackOptionsPage.SUBTITLES,
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.AUDIO,
                 direction = 1,
-                simpleTvActive = true,
+                fullOptionsAvailable = false,
             ),
         )
         assertEquals(
@@ -23,7 +23,7 @@ class PlaybackOptionsPolicyTest {
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.SUBTITLES,
                 direction = 1,
-                simpleTvActive = true,
+                fullOptionsAvailable = false,
             ),
         )
         assertEquals(
@@ -31,7 +31,7 @@ class PlaybackOptionsPolicyTest {
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.DISPLAY,
                 direction = 1,
-                simpleTvActive = false,
+                fullOptionsAvailable = true,
             ),
         )
         assertEquals(
@@ -39,7 +39,7 @@ class PlaybackOptionsPolicyTest {
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.STATS,
                 direction = 1,
-                simpleTvActive = false,
+                fullOptionsAvailable = true,
             ),
         )
     }

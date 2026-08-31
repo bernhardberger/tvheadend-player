@@ -32,7 +32,7 @@ fun playbackRecoveryUiModel(
     surface: PlaybackRecoverySurface,
     connectionAvailable: Boolean,
     retryTargetAvailable: Boolean,
-    simpleTvActive: Boolean,
+    secondaryAction: PlaybackRecoverySecondaryAction,
 ): PlaybackRecoveryUiModel {
     val retryCommand = when (surface) {
         PlaybackRecoverySurface.LIVE -> playbackRetryCommand(
@@ -49,13 +49,6 @@ fun playbackRecoveryUiModel(
         } else {
             PlaybackRetryCommand.NONE
         }
-    }
-    val secondaryAction = if (
-        surface == PlaybackRecoverySurface.LIVE && simpleTvActive
-    ) {
-        PlaybackRecoverySecondaryAction.EXIT_SIMPLE_TV
-    } else {
-        PlaybackRecoverySecondaryAction.CLOSE
     }
     return PlaybackRecoveryUiModel(
         retryCommand = retryCommand,

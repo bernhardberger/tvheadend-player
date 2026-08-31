@@ -25,8 +25,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvhplayer.core.simpleTvProfile
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import androidx.compose.ui.focus.FocusRequester
@@ -57,10 +55,6 @@ class SideRailSemanticsTest {
                 SideRail(
                     currentRoute = AppDestination.CHANNELS,
                     showEpgMenu = true,
-                    simpleTvProfile = simpleTvProfile(
-                        SimpleTvSettings(),
-                        active = false,
-                    ),
                     onRootBack = {},
                     onNavigate = {},
                     content = { _, _ -> },

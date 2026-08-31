@@ -38,7 +38,7 @@ class MainStartupViewModel(
         loadServerSettings = { profileOwner.serverSettings.first() },
         loadUiSettings = { uiSettingsStore.settings.first() },
         loadSimpleTvSettings = { simpleTvSettingsStore.settings.first() },
-        startSimpleTvSession = simpleTvSession::start,
+        enterProductProfile = simpleTvSession::enter,
         createStartupRequest = createStartupRequest,
         onStartupRequestCreationHandled = {
             markStartupRequestCreationHandled(savedStateHandle)

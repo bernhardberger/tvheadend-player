@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlaybackRecoveryInitialAction
+import at.bernhardberger.tvhplayer.core.PlaybackRecoverySecondaryAction
 import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
@@ -53,9 +54,6 @@ import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.seekStepMs
-import at.bernhardberger.tvhplayer.core.SimpleTvCapability
-import at.bernhardberger.tvhplayer.core.SimpleTvProfile
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
@@ -97,7 +95,10 @@ fun RecordingPlayerScreen(
     imageLoader: ImageLoader = koinInject(),
     session: AppPlaybackRuntime = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
-    simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
+    showStop: Boolean = true,
+    showSimpleTvExit: Boolean = false,
+    playerCloseAllowed: Boolean = true,
+    fullPlaybackOptionsAvailable: Boolean = true,
     connectionAvailable: Boolean,
     onReconnect: () -> Unit,
     onUnlock: () -> Unit = {},
@@ -149,8 +150,6 @@ fun RecordingPlayerScreen(
     val player = remember { session.player }
     val rootFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
-    val showStop = simpleTvProfile.allows(SimpleTvCapability.STOP)
-    val showUnlock = simpleTvProfile.active
     var positionMs by remember { mutableLongStateOf(0L) }
     var durationMs by remember { mutableLongStateOf(C.TIME_UNSET) }
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1_000L) }
@@ -326,7 +325,7 @@ fun RecordingPlayerScreen(
         surface = PlaybackRecoverySurface.RECORDING,
         connectionAvailable = connectionAvailable,
         retryTargetAvailable = retryTargetAvailable,
-        simpleTvActive = false,
+        secondaryAction = PlaybackRecoverySecondaryAction.CLOSE,
     )
 
     fun dispatchRecoveryRetry() {
@@ -342,7 +341,7 @@ fun RecordingPlayerScreen(
         when (
             playerBackAction(
                 surface = PlayerSurface.RECORDING,
-                simpleTvActive = simpleTvProfile.active,
+                playerCloseAllowed = playerCloseAllowed,
                 foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
             )
         ) {
@@ -464,7 +463,7 @@ fun RecordingPlayerScreen(
                 val keyAction = recordingPlaybackKeyAction(
                     controlsVisible = controlsVisible,
                     keyCode = keyCode,
-                    simpleTvActive = simpleTvProfile.active,
+                    playerCloseAllowed = playerCloseAllowed,
                 )
                 if (recordingKeyActionStartsOpeningCycle(keyAction)) {
                     revealingKeyCode = keyCode
@@ -662,8 +661,8 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
-                showSimpleTvExit = showUnlock,
-                simpleTvActive = simpleTvProfile.active,
+                showSimpleTvExit = showSimpleTvExit,
+                fullOptionsAvailable = fullPlaybackOptionsAvailable,
                 onPageChange = { optionsPage = it },
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode

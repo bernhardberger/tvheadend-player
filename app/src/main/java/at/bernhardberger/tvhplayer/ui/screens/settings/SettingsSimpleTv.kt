@@ -59,7 +59,7 @@ private enum class PinFeedbackKind { SUCCESS, ERROR }
 fun SettingsSimpleTv(
     initialFocusRequester: FocusRequester,
     store: SimpleTvSettingsStore = koinInject(),
-    onStartSimpleTv: () -> Unit,
+    onStartSimpleTv: (SimpleTvSettings) -> Unit,
 ) {
     val settings by store.settings.collectAsStateWithLifecycle(
         initialValue = SimpleTvSettings()
@@ -198,7 +198,7 @@ fun SettingsSimpleTv(
                 onCancel = { confirmStart = false },
                 onConfirm = {
                     confirmStart = false
-                    onStartSimpleTv()
+                    onStartSimpleTv(settings)
                 },
             )
         }

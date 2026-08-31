@@ -670,7 +670,7 @@ private fun Options(
         aspectRatio = AspectRatioMode.FIT,
         statsVisible = true,
         showSimpleTvExit = false,
-        simpleTvActive = false,
+        fullOptionsAvailable = true,
         onPageChange = {},
         onAudioTrackSelected = {},
         onSubtitleTrackSelected = {},

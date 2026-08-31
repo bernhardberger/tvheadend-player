@@ -39,9 +39,13 @@ class MainStartupCompositionTest {
     @Test
     fun startupGatedChannelsContentInvokesTheProductionDestinationOnlyWhenAllowed() {
         var contentAllowed by mutableStateOf(false)
+        var routeAllowed by mutableStateOf(false)
         var channelsContentInvocations = 0
         composeRule.setContent {
-            StartupGatedChannelsContent(contentAllowed = contentAllowed) {
+            StartupGatedChannelsContent(
+                contentAllowed = contentAllowed,
+                routeAllowed = routeAllowed,
+            ) {
                 channelsContentInvocations++
             }
         }
@@ -49,6 +53,11 @@ class MainStartupCompositionTest {
         composeRule.runOnIdle {
             assertEquals(0, channelsContentInvocations)
             contentAllowed = true
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(0, channelsContentInvocations)
+            routeAllowed = true
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(1, channelsContentInvocations) }
@@ -280,7 +289,7 @@ class MainStartupCompositionTest {
 
         var retainedRoot: AppNavKey = LivePlayerKey(channelId = 1, channelName = "One")
         closeNormalLivePlayer(
-            simpleTvActive = false,
+            playerCloseAllowed = true,
             popBackStack = { false },
             selectRoot = { retainedRoot = it },
         )
@@ -288,7 +297,7 @@ class MainStartupCompositionTest {
 
         retainedRoot = LivePlayerKey(channelId = 2, channelName = "Two")
         closeNormalLivePlayer(
-            simpleTvActive = false,
+            playerCloseAllowed = true,
             popBackStack = { true },
             selectRoot = { retainedRoot = it },
         )
@@ -581,7 +590,10 @@ class MainStartupCompositionTest {
                     ),
                     onBack = {
                         performMainStartupBack(
-                            simpleTvActive = true,
+                            productProfile =
+                                at.bernhardberger.tvhplayer.core.ProductProfile.Appliance(
+                                    timeshiftAllowed = false,
+                                ),
                             requests = requests,
                             expectedState = expectedState,
                             selectRoot = { selectedRoot = it },
@@ -647,6 +659,12 @@ class MainStartupCompositionTest {
         at.bernhardberger.tvhplayer.core.MainStartupState.Ready(
             server = at.bernhardberger.tvhplayer.settings.ServerSettings(host = "tvh.invalid"),
             autoStartPlayback = true,
-            startSimpleTv = startSimpleTv,
+            startupProfile = if (startSimpleTv) {
+                at.bernhardberger.tvhplayer.core.ProductProfile.Appliance(
+                    timeshiftAllowed = false,
+                )
+            } else {
+                at.bernhardberger.tvhplayer.core.ProductProfile.Standard
+            },
         )
 }

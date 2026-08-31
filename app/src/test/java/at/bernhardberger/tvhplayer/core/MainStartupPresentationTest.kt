@@ -252,7 +252,7 @@ class MainStartupPresentationTest {
         val readyBootstrap = MainStartupState.Ready(
             server = at.bernhardberger.tvhplayer.settings.ServerSettings(host = "tvh.invalid"),
             autoStartPlayback = true,
-            startSimpleTv = false,
+            startupProfile = ProductProfile.Standard,
         )
         val normalActions = listOf(
             MainStartupActionId.RETRY,

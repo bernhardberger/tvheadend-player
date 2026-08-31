@@ -68,7 +68,7 @@ class PlayerRootFocusEffectTest {
                                 controlsVisible = false,
                                 seekbarFocused = false,
                                 timeshiftAvailable = false,
-                                simpleTvActive = false,
+                                playerCloseAllowed = true,
                             ),
                             keyCode = event.nativeKeyEvent.keyCode,
                         )

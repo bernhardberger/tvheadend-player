@@ -107,9 +107,6 @@ import at.bernhardberger.tvhplayer.core.liveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.liveInfoRecordingDismissed
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.seekStepMs
-import at.bernhardberger.tvhplayer.core.SimpleTvCapability
-import at.bernhardberger.tvhplayer.core.SimpleTvProfile
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
@@ -252,7 +249,13 @@ fun VideoPlayerScreen(
     session: TvheadendSession = koinInject(),
     channelId: ChannelId,
     channelName: String,
-    simpleTvProfile: SimpleTvProfile = SimpleTvProfile(SimpleTvSettings(), false),
+    timeshiftAllowed: Boolean = true,
+    showStop: Boolean = true,
+    recordingActionsAllowed: Boolean = true,
+    playerCloseAllowed: Boolean = true,
+    fullPlaybackOptionsAvailable: Boolean = true,
+    recoverySecondaryAction: PlaybackRecoverySecondaryAction =
+        PlaybackRecoverySecondaryAction.CLOSE,
     onReconnect: () -> Unit,
     onUnlock: () -> Unit = {},
     onClose: () -> Unit
@@ -272,7 +275,7 @@ fun VideoPlayerScreen(
         videoPlayerViewModel.liveSubscriptionFailure.collectAsStateWithLifecycle()
     val diagnostics by videoPlayerViewModel.diagnostics.collectAsStateWithLifecycle()
     val effectiveTimeshiftState = if (
-        simpleTvProfile.allows(SimpleTvCapability.TIMESHIFT)
+        timeshiftAllowed
     ) {
         sdkTimeshiftState.toAppPresentation()
     } else {
@@ -676,7 +679,7 @@ fun VideoPlayerScreen(
     val optimisticRecordingMatchesCurrent = optimisticRecordingTarget != null &&
         optimisticRecordingTarget == currentRecordingTarget
     val infoRecordingScheduled = currentRecording != null || optimisticRecordingMatchesCurrent
-    val canRecordFromInfo = !simpleTvProfile.active &&
+    val canRecordFromInfo = recordingActionsAllowed &&
         canModifyRecordings &&
         infoRecordingState !is LiveInfoRecordingState.Dispatching &&
         !(infoRecordingState is LiveInfoRecordingState.Succeeded &&
@@ -698,7 +701,7 @@ fun VideoPlayerScreen(
         connectionAvailable = connState is ConnectionState.Connected,
         retryTargetAvailable = playbackState is AppPlaybackState.Recovering ||
             currentSubscriptionFailure != null,
-        simpleTvActive = simpleTvProfile.active,
+        secondaryAction = recoverySecondaryAction,
     )
     val recoveryHasRetry = recoveryUiModel.retryCommand != PlaybackRetryCommand.NONE
     val recoverySafeActionIsExit =
@@ -883,7 +886,7 @@ fun VideoPlayerScreen(
         when (
             playerBackAction(
                 surface = PlayerSurface.LIVE,
-                simpleTvActive = simpleTvProfile.active,
+                playerCloseAllowed = playerCloseAllowed,
                 foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
             )
         ) {
@@ -1016,7 +1019,7 @@ fun VideoPlayerScreen(
                         controlsVisible = controlsVisible,
                         seekbarFocused = false,
                         timeshiftAvailable = effectiveTimeshiftState.available,
-                        simpleTvActive = simpleTvProfile.active,
+                        playerCloseAllowed = playerCloseAllowed,
                         optionsOpen = optionsPage != null,
                         statsOpen = statsVisible,
                         infoOpen = infoOpen,
@@ -1198,7 +1201,7 @@ fun VideoPlayerScreen(
                         }
                     }
                 },
-                showStop = simpleTvProfile.allows(SimpleTvCapability.STOP),
+                showStop = showStop,
                 restoreInfoFocus = restoreInfoFocus,
                 onInfoFocusRestored = { restoreInfoFocus = false },
                 restoreOptionsFocus = restoreOptionsFocus,
@@ -1281,8 +1284,8 @@ fun VideoPlayerScreen(
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
-                showSimpleTvExit = simpleTvProfile.active,
-                simpleTvActive = simpleTvProfile.active,
+                showSimpleTvExit = recoverySafeActionIsExit,
+                fullOptionsAvailable = fullPlaybackOptionsAvailable,
                 onPageChange = { optionsPage = it },
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
@@ -1336,15 +1339,15 @@ fun VideoPlayerScreen(
                 when {
                     currentSubscriptionFailure != null ->
                         currentSubscriptionFailure.messageResource()
-                    simpleTvProfile.active && connState !is ConnectionState.Connected ->
+                    recoverySafeActionIsExit && connState !is ConnectionState.Connected ->
                         R.string.simple_tv_recovery_connection
-                    simpleTvProfile.active -> R.string.simple_tv_recovery_playback
+                    recoverySafeActionIsExit -> R.string.simple_tv_recovery_playback
                     connState !is ConnectionState.Connected -> R.string.player_connection_recovering
                     playbackState is AppPlaybackState.Failed -> R.string.player_playback_failed
                     else -> R.string.player_playback_recovering
                 }
             ),
-            hint = if (simpleTvProfile.active) {
+            hint = if (recoverySafeActionIsExit) {
                 stringResource(
                     if (recoveryHasRetry) {
                         R.string.simple_tv_recovery_hint
@@ -1355,7 +1358,7 @@ fun VideoPlayerScreen(
             } else {
                 null
             },
-            opaque = simpleTvProfile.active,
+            opaque = recoverySafeActionIsExit,
             primaryActionLabel = if (recoveryHasRetry) {
                 stringResource(R.string.retry)
             } else {

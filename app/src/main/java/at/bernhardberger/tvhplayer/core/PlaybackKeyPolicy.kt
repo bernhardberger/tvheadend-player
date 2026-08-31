@@ -49,7 +49,7 @@ data class PlayerKeyContext(
     val controlsVisible: Boolean,
     val seekbarFocused: Boolean,
     val timeshiftAvailable: Boolean,
-    val simpleTvActive: Boolean,
+    val playerCloseAllowed: Boolean,
     val optionsOpen: Boolean = false,
     val infoOpen: Boolean = false,
     val statsOpen: Boolean = false,
@@ -137,8 +137,8 @@ fun playerKeyAction(
                 context.infoOpen || context.optionsOpen || context.statsOpen ||
                     context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
                 context.controlsVisible -> PlayerKeyAction.HIDE_CONTROLS
-                context.simpleTvActive -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
-                else -> PlayerKeyAction.CLOSE_PLAYER
+                context.playerCloseAllowed -> PlayerKeyAction.CLOSE_PLAYER
+                else -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
             }
             KeyEvent.KEYCODE_DPAD_UP,
             KeyEvent.KEYCODE_DPAD_DOWN -> PlayerKeyAction.PASS_THROUGH
@@ -162,8 +162,8 @@ fun playerKeyAction(
         KeyEvent.KEYCODE_BACK -> when {
             context.infoOpen || context.optionsOpen || context.statsOpen ||
                 context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
-            context.simpleTvActive -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
-            else -> PlayerKeyAction.CLOSE_PLAYER
+            context.playerCloseAllowed -> PlayerKeyAction.CLOSE_PLAYER
+            else -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
         }
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,

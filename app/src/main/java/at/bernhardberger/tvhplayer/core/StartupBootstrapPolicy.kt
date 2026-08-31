@@ -15,7 +15,7 @@ sealed interface MainStartupState {
     data class Ready(
         val server: ServerSettings,
         val autoStartPlayback: Boolean,
-        val startSimpleTv: Boolean,
+        val startupProfile: ProductProfile,
     ) : MainStartupState
 }
 
@@ -28,7 +28,7 @@ internal class StartupBootstrapCoordinator(
     private val loadServerSettings: suspend () -> ServerSettings,
     private val loadUiSettings: suspend () -> UiSettings,
     private val loadSimpleTvSettings: suspend () -> SimpleTvSettings,
-    private val startSimpleTvSession: () -> Unit,
+    private val enterProductProfile: (ProductProfile.Appliance) -> Unit,
     private val createStartupRequest: Boolean = true,
     private val onStartupRequestCreationHandled: () -> Unit = {},
     private val startupState: MutableStateFlow<MainStartupState> =
@@ -47,17 +47,23 @@ internal class StartupBootstrapCoordinator(
             currentCoroutineContext().ensureActive()
             val configured = server.host.isNotBlank()
             val autoStartPlayback = configured && uiSettings.autoStartPlayback
-            val startSimpleTv = configured && simpleTvSettings.enabled
+            val startupProfile = startupProductProfile(
+                serverConfigured = configured,
+                settings = simpleTvSettings,
+            )
+            val applianceProfile = startupProfile as? ProductProfile.Appliance
 
-            if (startSimpleTv) startSimpleTvSession()
+            if (applianceProfile != null) enterProductProfile(applianceProfile)
             if (createStartupRequest) {
-                applianceLaunchRequests.requestStartup(autoStartPlayback || startSimpleTv)
+                applianceLaunchRequests.requestStartup(
+                    autoStartPlayback || applianceProfile != null,
+                )
             }
             onStartupRequestCreationHandled()
             startupState.value = MainStartupState.Ready(
                 server = server,
                 autoStartPlayback = autoStartPlayback,
-                startSimpleTv = startSimpleTv,
+                startupProfile = startupProfile,
             )
         }
     }

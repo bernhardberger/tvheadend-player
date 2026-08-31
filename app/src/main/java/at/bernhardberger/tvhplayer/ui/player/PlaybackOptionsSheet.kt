@@ -102,7 +102,7 @@ internal fun PlaybackOptionsSheet(
     aspectRatio: AspectRatioMode,
     statsVisible: Boolean,
     showSimpleTvExit: Boolean,
-    simpleTvActive: Boolean = false,
+    fullOptionsAvailable: Boolean = true,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
     onStatsVisibleChange: (Boolean) -> Unit,
@@ -168,7 +168,7 @@ internal fun PlaybackOptionsSheet(
         aspectRatio = aspectRatio,
         statsVisible = statsVisible,
         showSimpleTvExit = showSimpleTvExit,
-        simpleTvActive = simpleTvActive,
+        fullOptionsAvailable = fullOptionsAvailable,
         onPageChange = onPageChange,
         onAudioTrackSelected = { key ->
             audioChoices.firstOrNull { it.stableKey == key }?.let { selectAudioTrack(player, it) }
@@ -212,7 +212,7 @@ internal fun PlaybackOptionsSheetContent(
     aspectRatio: AspectRatioMode,
     statsVisible: Boolean,
     showSimpleTvExit: Boolean,
-    simpleTvActive: Boolean,
+    fullOptionsAvailable: Boolean,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAudioTrackSelected: (String) -> Unit,
     onSubtitleTrackSelected: (String?) -> Unit,
@@ -221,7 +221,7 @@ internal fun PlaybackOptionsSheetContent(
     onSimpleTvExit: () -> Unit,
 ) {
     var lastRootPage by remember { mutableStateOf(PlaybackOptionsPage.AUDIO) }
-    val availableRootPages = playbackOptionsCategories(simpleTvActive)
+    val availableRootPages = playbackOptionsCategories(fullOptionsAvailable)
     val rootRestorePage = lastRootPage.takeIf(availableRootPages::contains)
         ?: availableRootPages.first()
     val loadingLabel = stringResource(R.string.playback_tracks_loading)
@@ -285,7 +285,7 @@ internal fun PlaybackOptionsSheetContent(
                     displayValue = displayValue,
                     statsVisible = statsVisible,
                     initialPage = rootRestorePage,
-                    simpleTvActive = simpleTvActive,
+                    fullOptionsAvailable = fullOptionsAvailable,
                     showSimpleTvExit = showSimpleTvExit,
                     onPageChange = ::openPage,
                     onStatsVisibleChange = onStatsVisibleChange,
@@ -384,7 +384,7 @@ private fun PlaybackOptionsRoot(
     displayValue: String,
     statsVisible: Boolean,
     initialPage: PlaybackOptionsPage,
-    simpleTvActive: Boolean,
+    fullOptionsAvailable: Boolean,
     showSimpleTvExit: Boolean,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onStatsVisibleChange: (Boolean) -> Unit,
@@ -398,7 +398,7 @@ private fun PlaybackOptionsRoot(
     val requesters = buildList {
         add(PlaybackOptionsPage.AUDIO to audioFocus)
         add(PlaybackOptionsPage.SUBTITLES to subtitlesFocus)
-        if (!simpleTvActive) {
+        if (fullOptionsAvailable) {
             add(PlaybackOptionsPage.DISPLAY to displayFocus)
             add(PlaybackOptionsPage.STATS to statsFocus)
         }
@@ -407,7 +407,7 @@ private fun PlaybackOptionsRoot(
         if (showSimpleTvExit) listOf(exitFocus) else emptyList()
     val initialFocus = requesters.firstOrNull { it.first == initialPage }?.second ?: audioFocus
 
-    LaunchedEffect(initialPage, simpleTvActive, showSimpleTvExit) {
+    LaunchedEffect(initialPage, fullOptionsAvailable, showSimpleTvExit) {
         runCatching { initialFocus.requestFocus() }
     }
 
@@ -438,7 +438,7 @@ private fun PlaybackOptionsRoot(
                 .containedFocus(subtitlesFocus, orderedFocus, index = 1)
                 .testTag("playback-options-subtitles"),
         )
-        if (!simpleTvActive) {
+        if (fullOptionsAvailable) {
             PlaybackOptionRow(
                 label = stringResource(R.string.display_mode),
                 supportingLabel = displayValue,

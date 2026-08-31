@@ -13,9 +13,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
+import at.bernhardberger.tvhplayer.core.ProductProfile
 import at.bernhardberger.tvhplayer.core.SimpleTvRoute
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvhplayer.core.simpleTvProfile
+import at.bernhardberger.tvhplayer.core.allowsRoute
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -29,7 +29,7 @@ class SimpleTvRouteGuardEffectTest {
     fun recordingDeepLinkStopsItsOwnerBeforeRedirectingToLive() {
         val events = mutableListOf<String>()
         var profile by mutableStateOf(
-            simpleTvProfile(SimpleTvSettings(enabled = true), active = true)
+            ProductProfile.Appliance(timeshiftAllowed = false)
         )
         val finishStop = CompletableDeferred<Unit>()
         var recordingActive by mutableStateOf(true)
@@ -69,10 +69,7 @@ class SimpleTvRouteGuardEffectTest {
 
         composeRule.waitUntil { events.contains("stop-started") }
         composeRule.runOnIdle {
-            profile = simpleTvProfile(
-                SimpleTvSettings(enabled = true, timeshift = true),
-                active = true,
-            )
+            profile = ProductProfile.Appliance(timeshiftAllowed = true)
         }
         composeRule.runOnIdle {
             assertEquals(listOf("stop-started"), events)

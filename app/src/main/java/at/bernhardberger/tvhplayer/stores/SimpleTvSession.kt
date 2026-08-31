@@ -1,17 +1,18 @@
 package at.bernhardberger.tvhplayer.stores
 
+import at.bernhardberger.tvhplayer.core.ProductProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class SimpleTvSession {
-    private val _active = MutableStateFlow(false)
-    val active = _active.asStateFlow()
+    private val _profile = MutableStateFlow<ProductProfile>(ProductProfile.Standard)
+    val profile = _profile.asStateFlow()
 
-    fun start() {
-        _active.value = true
+    fun enter(profile: ProductProfile.Appliance) {
+        _profile.value = profile
     }
 
     fun exit() {
-        _active.value = false
+        _profile.value = ProductProfile.Standard
     }
 }

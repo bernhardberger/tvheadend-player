@@ -12,6 +12,8 @@ enum class SimpleTvCapability {
     STOP,
     SETTINGS,
     APP_EXIT,
+    PLAYER_CLOSE,
+    FULL_PLAYBACK_OPTIONS,
     UNLOCK,
 }
 
@@ -43,43 +45,57 @@ data class SimpleTvSettings(
     val pinConfigured: Boolean = false,
 )
 
-data class SimpleTvProfile(
-    val settings: SimpleTvSettings,
-    val active: Boolean,
-) {
-    fun allows(capability: SimpleTvCapability): Boolean {
-        if (!active) return true
-        return when (capability) {
-            SimpleTvCapability.LIVE_TV,
-            SimpleTvCapability.UNLOCK -> true
-            SimpleTvCapability.TIMESHIFT -> settings.timeshift
-            SimpleTvCapability.CHANNEL_LIST,
-            SimpleTvCapability.EPG,
-            SimpleTvCapability.RECORDINGS,
-            SimpleTvCapability.STOP,
-            SimpleTvCapability.SETTINGS,
-            SimpleTvCapability.APP_EXIT -> false
-        }
-    }
+sealed interface ProductProfile {
+    data object Standard : ProductProfile
 
-    fun allowsRoute(route: SimpleTvRoute): Boolean = allows(
-        when (route) {
-            SimpleTvRoute.CHANNELS -> SimpleTvCapability.CHANNEL_LIST
-            SimpleTvRoute.EPG -> SimpleTvCapability.EPG
-            SimpleTvRoute.RECORDINGS,
-            SimpleTvRoute.RECORDING_PLAYER -> SimpleTvCapability.RECORDINGS
-            SimpleTvRoute.SETTINGS -> SimpleTvCapability.SETTINGS
-            SimpleTvRoute.PLAYER -> SimpleTvCapability.LIVE_TV
-            SimpleTvRoute.UNLOCK -> SimpleTvCapability.UNLOCK
-        }
-    )
+    data class Appliance(
+        val timeshiftAllowed: Boolean,
+    ) : ProductProfile
 }
 
-fun simpleTvProfile(settings: SimpleTvSettings, active: Boolean): SimpleTvProfile =
-    SimpleTvProfile(settings, active)
+fun startupProductProfile(
+    serverConfigured: Boolean,
+    settings: SimpleTvSettings,
+): ProductProfile = if (serverConfigured && settings.enabled) {
+    applianceProductProfile(settings)
+} else {
+    ProductProfile.Standard
+}
+
+fun applianceProductProfile(settings: SimpleTvSettings): ProductProfile.Appliance =
+    ProductProfile.Appliance(timeshiftAllowed = settings.timeshift)
+
+fun ProductProfile.allows(capability: SimpleTvCapability): Boolean = when (this) {
+    ProductProfile.Standard -> true
+    is ProductProfile.Appliance -> when (capability) {
+        SimpleTvCapability.LIVE_TV,
+        SimpleTvCapability.UNLOCK -> true
+        SimpleTvCapability.TIMESHIFT -> timeshiftAllowed
+        SimpleTvCapability.CHANNEL_LIST,
+        SimpleTvCapability.EPG,
+        SimpleTvCapability.RECORDINGS,
+        SimpleTvCapability.STOP,
+        SimpleTvCapability.SETTINGS,
+        SimpleTvCapability.APP_EXIT,
+        SimpleTvCapability.PLAYER_CLOSE,
+        SimpleTvCapability.FULL_PLAYBACK_OPTIONS -> false
+    }
+}
+
+fun ProductProfile.allowsRoute(route: SimpleTvRoute): Boolean = allows(
+    when (route) {
+        SimpleTvRoute.CHANNELS -> SimpleTvCapability.CHANNEL_LIST
+        SimpleTvRoute.EPG -> SimpleTvCapability.EPG
+        SimpleTvRoute.RECORDINGS,
+        SimpleTvRoute.RECORDING_PLAYER -> SimpleTvCapability.RECORDINGS
+        SimpleTvRoute.SETTINGS -> SimpleTvCapability.SETTINGS
+        SimpleTvRoute.PLAYER -> SimpleTvCapability.LIVE_TV
+        SimpleTvRoute.UNLOCK -> SimpleTvCapability.UNLOCK
+    }
+)
 
 fun simpleTvRouteGuardAction(
-    profile: SimpleTvProfile,
+    profile: ProductProfile,
     route: SimpleTvRoute,
     recordingActive: Boolean,
 ): SimpleTvRouteGuardAction = when {
