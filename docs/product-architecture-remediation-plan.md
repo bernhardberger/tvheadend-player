@@ -155,6 +155,13 @@ the owning repository or a separately authorized app package.
 
 ### 6. Runtime seam cleanup
 
+**B4-P13 completed with retention:** concrete `SdkRuntimeOwner` tests would
+require test-only construction hooks for the final SDK coordinator and
+Android-bound runtime owners. The narrower internal `SdkShutdownActions` seam is
+retained, with explicit coverage for exact shutdown order, primary failure
+identity, suppressed-failure order, and completion of every later shutdown
+action.
+
 - Remove production interfaces that exist only as test seams, including
   `SdkShutdownActions`, only after tests can exercise the concrete owner without
   weakening ordered shutdown coverage.
