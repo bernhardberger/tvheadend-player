@@ -377,8 +377,7 @@ internal fun SideRail(
 private val AppDestination.testTag: String
     get() = when (this) {
         AppDestination.CHANNELS -> "nav-channels"
-        AppDestination.GUIDE,
-        AppDestination.FILTERED_GUIDE -> "nav-epg"
+        AppDestination.GUIDE -> "nav-epg"
         AppDestination.RECORDINGS -> "nav-recordings"
         AppDestination.SETTINGS -> "nav-settings"
         AppDestination.UNLOCK -> "nav-unlock"

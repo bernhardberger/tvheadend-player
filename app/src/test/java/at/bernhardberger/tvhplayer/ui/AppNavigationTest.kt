@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui
 
-import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -15,7 +14,6 @@ class AppNavigationTest {
         val keys = setOf<AppNavKey>(
             ChannelsKey,
             GuideKey,
-            FilteredGuideKey(ProgrammeCategory.SPORT),
             RecordingsKey,
             SettingsKey(SettingsSection.GENERAL),
             UnlockKey,
@@ -41,11 +39,7 @@ class AppNavigationTest {
     }
 
     @Test
-    fun parameterizedKeysRetainTypedState() {
-        assertEquals(
-            ProgrammeCategory.NEWS,
-            FilteredGuideKey(ProgrammeCategory.NEWS).category,
-        )
+    fun parameterizedPlayerKeysRetainTypedState() {
         assertEquals(
             LivePlayerKey(channelId = 42, channelName = "News / HD"),
             LivePlayerKey(channelId = 42, channelName = "News / HD"),
@@ -61,7 +55,6 @@ class AppNavigationTest {
         val routes = listOf<AppNavKey>(
             ChannelsKey,
             GuideKey,
-            FilteredGuideKey(ProgrammeCategory.FILM_DRAMA),
             RecordingsKey,
             SettingsKey(SettingsSection.PLAYER),
             UnlockKey,

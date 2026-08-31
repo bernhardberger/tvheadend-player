@@ -79,7 +79,7 @@ normative requirement:
 Stop if the two list surfaces require a shared state owner to remain correct;
 that belongs to a later screen/state package, not a premature common component.
 
-### 2. Dormant navigation removal
+### 2. Dormant navigation removal (B4-P7, complete)
 
 - Prove that `FilteredGuideKey` has no reachable production entry.
 - Remove the route, its root branch, and route-only programme-category policy.

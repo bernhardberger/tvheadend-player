@@ -771,62 +771,6 @@ fun AppRoot(
                         }
                     }
 
-                    entry<FilteredGuideKey> { destination ->
-                        if (contentAllowed && capabilityProfile.allowsRoute(SimpleTvRoute.EPG)) {
-                            ContentContainer {
-                                    EpgGridScreen(
-                                        contentPadding = contentPadding,
-                                        initialFocusEnabled = !drawerActive,
-                                        category = destination.category,
-                                        connectionUiState = connectionUiState,
-                                        onRetry = appVm::reconnectNow,
-                                        onOpenConnectionSettings = {
-                                            navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
-                                        },
-                                        onClearCategory = {
-                                            navigateTopLevel(GuideKey)
-                                        },
-                                        simpleTvProfile = capabilityProfile,
-                                        onPlayRecording = { playbackSelection ->
-                                            val recordingId = playbackSelection.recordingId
-                                            warmReturn = rearmWarmReturnForPlaybackSelection(
-                                                current = warmReturn,
-                                                currentWarmTarget = currentWarmTarget,
-                                                requestedTarget = WarmPlaybackTarget.RECORDING,
-                                                currentIdentity = activeRecordingId,
-                                                requestedIdentity = recordingId,
-                                            )
-                                            playbackSelectionScope.launch {
-                                                playbackRuntime.playRecording(
-                                                    playbackSelection,
-                                                    RecordingPlaybackStart.START_OVER,
-                                                )
-                                                backStack.pushTransient(
-                                                    RecordingPlayerKey(recordingId.value),
-                                                )
-                                            }
-                                        },
-                                        onPlay = { playbackSelection, name ->
-                                            val channelId = playbackSelection.channelId
-                                            warmReturn = rearmWarmReturnForPlaybackSelection(
-                                                current = warmReturn,
-                                                currentWarmTarget = currentWarmTarget,
-                                                requestedTarget = WarmPlaybackTarget.LIVE,
-                                                currentIdentity = activeChannelId,
-                                                requestedIdentity = channelId,
-                                            )
-                                            playbackSelectionScope.launch {
-                                                playbackRuntime.playLive(playbackSelection)
-                                                backStack.pushTransient(
-                                                    LivePlayerKey(channelId.value, name),
-                                                )
-                                            }
-                                        },
-                                    )
-                            }
-                        }
-                    }
-
                     entry<RecordingsKey> {
                         if (contentAllowed && capabilityProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
                             ContentContainer {
@@ -1061,8 +1005,7 @@ private fun AppDestination.toTopLevelKey(
     settingsSection: SettingsSection?,
 ): AppNavKey = when (this) {
     AppDestination.CHANNELS -> ChannelsKey
-    AppDestination.GUIDE,
-    AppDestination.FILTERED_GUIDE -> GuideKey
+    AppDestination.GUIDE -> GuideKey
     AppDestination.RECORDINGS -> RecordingsKey
     AppDestination.SETTINGS -> SettingsKey(settingsSection ?: SettingsSection.GENERAL)
     AppDestination.UNLOCK,
@@ -1082,8 +1025,7 @@ private fun RecordingStartMode.toPlaybackStart(): RecordingPlaybackStart = when 
 
 private fun AppNavKey.toSimpleTvRoute(): SimpleTvRoute = when (this) {
     ChannelsKey -> SimpleTvRoute.CHANNELS
-    GuideKey,
-    is FilteredGuideKey -> SimpleTvRoute.EPG
+    GuideKey -> SimpleTvRoute.EPG
     RecordingsKey -> SimpleTvRoute.RECORDINGS
     is SettingsKey -> SimpleTvRoute.SETTINGS
     is LivePlayerKey -> SimpleTvRoute.PLAYER

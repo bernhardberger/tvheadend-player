@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSerializable
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
-import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 
@@ -14,7 +13,6 @@ internal sealed interface AppNavKey : NavKey
 internal enum class AppDestination {
     CHANNELS,
     GUIDE,
-    FILTERED_GUIDE,
     RECORDINGS,
     SETTINGS,
     UNLOCK,
@@ -27,11 +25,6 @@ internal data object ChannelsKey : AppNavKey
 
 @Serializable
 internal data object GuideKey : AppNavKey
-
-@Serializable
-internal data class FilteredGuideKey(
-    val category: ProgrammeCategory,
-) : AppNavKey
 
 @Serializable
 internal data object RecordingsKey : AppNavKey
@@ -85,7 +78,6 @@ internal val AppNavKey.destination: AppDestination
     get() = when (this) {
         ChannelsKey -> AppDestination.CHANNELS
         GuideKey -> AppDestination.GUIDE
-        is FilteredGuideKey -> AppDestination.FILTERED_GUIDE
         RecordingsKey -> AppDestination.RECORDINGS
         is SettingsKey -> AppDestination.SETTINGS
         UnlockKey -> AppDestination.UNLOCK
@@ -134,7 +126,6 @@ internal fun AppNavKey.isTransientDestination(): Boolean = when (this) {
     UnlockKey -> true
     ChannelsKey,
     GuideKey,
-    is FilteredGuideKey,
     RecordingsKey,
     is SettingsKey -> false
 }

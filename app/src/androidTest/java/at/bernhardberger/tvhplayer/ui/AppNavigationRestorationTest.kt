@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.ui
 
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
-import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -19,7 +18,7 @@ class AppNavigationRestorationTest {
             backStack = rememberAppNavBackStack(ChannelsKey)
         }
         composeRule.runOnIdle {
-            backStack.navigateTopLevel(FilteredGuideKey(ProgrammeCategory.NEWS))
+            backStack.navigateTopLevel(GuideKey)
             backStack.navigateTopLevel(SettingsKey(SettingsSection.PLAYER))
             backStack.pushTransient(LivePlayerKey(channelId = 42, channelName = "News / HD"))
         }
