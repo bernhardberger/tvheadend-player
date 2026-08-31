@@ -221,6 +221,14 @@ classify the behavioral difference.
 
 ### 9. Connection and profile-owner simplification
 
+**B4-P19 completed:** one transient `ConnectionFormState` now owns endpoint and
+credential validation, editable-profile loading, submission, password removal,
+and typed feedback for onboarding and Settings. Its saver retains only host and
+port; credentials and feedback never enter saved state. Both screens retain
+their separate navigation, category, focus, secure-window, and post-save
+credential-lifetime behavior, while the SDK-backed profile owner remains the
+only persistence boundary.
+
 - Share endpoint validation, credential field state, submission, and typed
   feedback between onboarding and Settings.
 - Keep onboarding navigation and Settings category/focus shells separate.

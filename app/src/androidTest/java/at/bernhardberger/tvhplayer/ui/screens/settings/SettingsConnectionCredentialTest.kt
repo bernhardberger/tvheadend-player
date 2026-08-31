@@ -8,6 +8,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
+import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
 import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.settings.ServerSettings
@@ -15,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -83,6 +88,30 @@ class SettingsConnectionSecureSurfaceTest {
         assertFalse(composeRule.activity.hasSecureFlag())
     }
 
+    @Test
+    fun saveSubmitsTheSharedFormThroughTheProfileEditor() {
+        val editor = FakeConnectionProfileEditor()
+        val form = ConnectionFormState()
+        composeRule.setContent {
+            SettingsConnection(
+                initialFocusRequester = remember { FocusRequester() },
+                settingsStore = editor,
+                form = form,
+            )
+        }
+        composeRule.waitUntil { form.host == FAKE_HOST && form.password == FAKE_PASSWORD }
+
+        composeRule.onNodeWithText("Save").performClick()
+        composeRule.waitUntil { editor.passwordSaveCount == 1 }
+        composeRule.runOnIdle {
+            assertEquals(FAKE_HOST, editor.savedHost)
+            assertEquals(FAKE_PORT, editor.savedPort)
+            assertEquals(FAKE_USERNAME, editor.savedUsername)
+            assertEquals(ConnectionFormFeedback.SAVED, form.feedback)
+            assertEquals(FAKE_PASSWORD, form.password)
+        }
+    }
+
     private fun ComponentActivity.hasSecureFlag(): Boolean =
         window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
 }
@@ -91,6 +120,10 @@ private class FakeConnectionProfileEditor : ConnectionProfileEditor {
     override val serverSettings: Flow<ServerSettings> = MutableStateFlow(
         ServerSettings(FAKE_HOST, FAKE_PORT, FAKE_USERNAME, passwordConfigured = true),
     )
+    var passwordSaveCount = 0
+    var savedHost: String? = null
+    var savedPort: Int? = null
+    var savedUsername: String? = null
 
     override suspend fun loadServerForEditing(
         applyAvailable: (host: String, port: Int, username: String, password: String) -> Unit,
@@ -107,6 +140,10 @@ private class FakeConnectionProfileEditor : ConnectionProfileEditor {
         password: String,
         credentialLease: CredentialEditLease,
     ) {
+        savedHost = host
+        savedPort = htspPort
+        savedUsername = username
+        if (password == FAKE_PASSWORD) passwordSaveCount += 1
         credentialLease.release()
     }
 

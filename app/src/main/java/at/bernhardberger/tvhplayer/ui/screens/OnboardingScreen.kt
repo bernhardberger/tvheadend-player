@@ -33,12 +33,16 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
+import at.bernhardberger.tvhplayer.settings.ConnectionFormState
+import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
+import at.bernhardberger.tvhplayer.settings.CredentialEditLease
+import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
 import org.koin.compose.koinInject
 
 enum class OnboardingStep {
@@ -110,23 +114,14 @@ fun OnboardingIntroduction(onContinue: () -> Unit) {
 }
 
 @Composable
-private fun OnboardingConnection(
-    settingsStore: AppProfileOwner,
+internal fun OnboardingConnection(
+    settingsStore: ConnectionProfileEditor,
     onBack: () -> Unit,
+    form: ConnectionFormState = rememberConnectionFormState(),
 ) {
     val scope = rememberCoroutineScope()
     val hostFocus = remember { FocusRequester() }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
-    var host by rememberSaveable { mutableStateOf("") }
-    var port by rememberSaveable { mutableStateOf("9982") }
-    var username by rememberSaveable { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var saveFailed by remember { mutableStateOf(false) }
-
-    val parsedPort = port.toIntOrNull()?.takeIf { it in 1..65535 }
-    val credentialsComplete = (username.isBlank() && password.isBlank()) ||
-        (username.isNotBlank() && password.isNotBlank())
-    val valid = host.isNotBlank() && parsedPort != null && credentialsComplete
 
     LaunchedEffect(Unit) { hostFocus.requestFocus() }
 
@@ -152,8 +147,8 @@ private fun OnboardingConnection(
             id = "onboarding-host",
             editingId = editingId,
             setEditingId = { editingId = it },
-            value = host,
-            onValueChange = { host = it },
+            value = form.host,
+            onValueChange = form::updateHost,
             label = { Text(stringResource(R.string.host)) },
             modifier = Modifier
                 .width(560.dp)
@@ -163,8 +158,8 @@ private fun OnboardingConnection(
             id = "onboarding-port",
             editingId = editingId,
             setEditingId = { editingId = it },
-            value = port,
-            onValueChange = { port = it },
+            value = form.port,
+            onValueChange = form::updatePort,
             label = { Text(stringResource(R.string.port_htsp)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.width(560.dp),
@@ -173,8 +168,8 @@ private fun OnboardingConnection(
             id = "onboarding-user",
             editingId = editingId,
             setEditingId = { editingId = it },
-            value = username,
-            onValueChange = { username = it },
+            value = form.username,
+            onValueChange = form::updateUsername,
             label = { Text(stringResource(R.string.username)) },
             modifier = Modifier.width(560.dp),
         )
@@ -182,12 +177,12 @@ private fun OnboardingConnection(
             id = "onboarding-password",
             editingId = editingId,
             setEditingId = { editingId = it },
-            value = password,
-            onValueChange = { password = it },
+            value = form.password,
+            onValueChange = form::updatePassword,
             modifier = Modifier.width(560.dp),
         )
 
-        if (saveFailed) {
+        if (form.feedback == ConnectionFormFeedback.SAVE_FAILED) {
             Text(
                 text = stringResource(R.string.credential_save_failed),
                 color = MaterialTheme.colorScheme.error,
@@ -199,30 +194,14 @@ private fun OnboardingConnection(
                 Text(stringResource(R.string.back))
             }
             Button(
-                enabled = valid,
+                enabled = form.canSubmit,
                 onClick = {
-                    val endpointPort = parsedPort ?: return@Button
                     scope.launch {
-                        try {
-                            if (username.isBlank()) {
-                                settingsStore.saveServer(
-                                    host = host.trim(),
-                                    htspPort = endpointPort,
-                                )
-                            } else {
-                                settingsStore.savePasswordServer(
-                                    host = host.trim(),
-                                    htspPort = endpointPort,
-                                    username = username,
-                                    password = password,
-                                )
-                            }
-                            password = ""
-                            saveFailed = false
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            saveFailed = true
+                        val result = form.submit(settingsStore) {
+                            CredentialEditLease {}
+                        }
+                        if (result == ConnectionFormFeedback.SAVED) {
+                            form.clearPassword()
                         }
                     }
                 },

@@ -33,70 +33,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
+import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
 import at.bernhardberger.tvhplayer.settings.CredentialEditLease
+import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.util.WeakHashMap
-
-internal class ConnectionEditCredentials {
-    var username by mutableStateOf("")
-        private set
-    var password by mutableStateOf("")
-        private set
-
-    fun replace(username: String, password: String) {
-        this.username = username
-        this.password = password
-    }
-
-    fun updateUsername(username: String) {
-        this.username = username
-    }
-
-    fun updatePassword(password: String) {
-        this.password = password
-    }
-
-    fun clear() {
-        username = ""
-        password = ""
-    }
-}
-
-internal suspend fun ConnectionEditCredentials.loadFrom(
-    settingsStore: ConnectionProfileEditor,
-    applyEndpoint: (host: String, port: Int) -> Unit,
-) {
-    settingsStore.loadServerForEditing { host, port, username, password ->
-        applyEndpoint(host, port)
-        replace(username, password)
-    }
-}
-
-internal suspend fun ConnectionEditCredentials.saveTo(
-    settingsStore: ConnectionProfileEditor,
-    host: String,
-    port: Int,
-    acquireCredentialLease: () -> CredentialEditLease,
-) {
-    if (username.isBlank()) {
-        settingsStore.saveServer(host, port)
-    } else {
-        settingsStore.savePasswordServer(
-            host,
-            port,
-            username,
-            password,
-            acquireCredentialLease(),
-        )
-    }
-}
 
 internal object ConnectionSecureWindow {
     private data class State(
@@ -149,6 +96,7 @@ internal object ConnectionSecureWindow {
 internal fun SettingsConnection(
     initialFocusRequester: FocusRequester,
     settingsStore: ConnectionProfileEditor = koinInject<AppProfileOwner>(),
+    form: ConnectionFormState = rememberConnectionFormState(),
 ) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current
@@ -161,25 +109,12 @@ internal fun SettingsConnection(
 
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
 
-    var host by rememberSaveable { mutableStateOf("") }
-    var htspPort by rememberSaveable { mutableStateOf("9982") }
-    val credentials = remember { ConnectionEditCredentials() }
-    var credentialError by remember { mutableStateOf(false) }
-    val parsedPort = htspPort.toIntOrNull()?.takeIf { it in 1..65535 }
-    val credentialsComplete =
-        (credentials.username.isBlank() && credentials.password.isBlank()) ||
-            (credentials.username.isNotBlank() && credentials.password.isNotBlank())
-    val validEndpoint = host.isNotBlank() && parsedPort != null && credentialsComplete
-
-    LaunchedEffect(Unit) {
-        credentials.loadFrom(settingsStore) { configuredHost, configuredPort ->
-            host = configuredHost
-            htspPort = configuredPort.toString()
-        }
+    LaunchedEffect(settingsStore, form) {
+        form.loadFrom(settingsStore)
     }
 
-    DisposableEffect(credentials) {
-        onDispose { credentials.clear() }
+    DisposableEffect(form) {
+        onDispose(form::clearCredentials)
     }
 
     SettingsPane(title = stringResource(R.string.settings_server)) {
@@ -193,8 +128,8 @@ internal fun SettingsConnection(
                 id = "host",
                 editingId = editingId,
                 setEditingId = { editingId = it },
-                value = host,
-                onValueChange = { host = it },
+                value = form.host,
+                onValueChange = form::updateHost,
                 label = { Text(stringResource(R.string.host)) },
                 modifier = Modifier.focusRequester(initialFocusRequester),
             )
@@ -205,8 +140,8 @@ internal fun SettingsConnection(
                 id = "port",
                 editingId = editingId,
                 setEditingId = { editingId = it },
-                value = htspPort,
-                onValueChange = { htspPort = it },
+                value = form.port,
+                onValueChange = form::updatePort,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 label = { Text(stringResource(R.string.port_htsp)) }
             )
@@ -217,8 +152,8 @@ internal fun SettingsConnection(
                 id = "user",
                 editingId = editingId,
                 setEditingId = { editingId = it },
-                value = credentials.username,
-                onValueChange = credentials::updateUsername,
+                value = form.username,
+                onValueChange = form::updateUsername,
                 label = { Text(stringResource(R.string.username)) },
                 modifier = Modifier.testTag("connection-username"),
             )
@@ -229,10 +164,10 @@ internal fun SettingsConnection(
                 id = "pass",
                 editingId = editingId,
                 setEditingId = { editingId = it },
-                value = credentials.password,
+                value = form.password,
                 onValueChange = {
-                    credentials.updatePassword(it)
-                    credentialError = false
+                    form.updatePassword(it)
+                    form.clearFeedback()
                 },
                 modifier = Modifier.testTag("connection-password"),
             )
@@ -240,7 +175,7 @@ internal fun SettingsConnection(
             Spacer(Modifier.height(12.dp))
         }
 
-        if (credentialError) {
+        if (form.feedback == ConnectionFormFeedback.SAVE_FAILED) {
             Text(
                 text = stringResource(R.string.credential_save_failed),
                 color = MaterialTheme.colorScheme.error,
@@ -248,43 +183,25 @@ internal fun SettingsConnection(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                enabled = validEndpoint,
+                enabled = form.canSubmit,
                 onClick = {
-                val pHtsp = parsedPort ?: return@Button
-                scope.launch {
-                    try {
-                        credentials.saveTo(settingsStore, host.trim(), pHtsp) {
+                    scope.launch {
+                        form.submit(settingsStore) {
                             ConnectionSecureWindow.acquire(window)
                         }
-                        credentialError = false
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        credentialError = true
                     }
-                }
-            }) {
+                },
+            ) {
                 Text(stringResource(R.string.save))
             }
 
-            OutlinedButton(onClick = {
-                scope.launch {
-                    try {
-                        val current = settingsStore.serverSettings.first()
-                        if (current.host.isNotBlank()) {
-                            settingsStore.saveServer(current.host, current.htspPort)
-                        } else {
-                            settingsStore.clearProfile()
-                        }
-                        credentials.clear()
-                        credentialError = false
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        credentialError = true
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        form.clearSavedPassword(settingsStore)
                     }
-                }
-            }) {
+                },
+            ) {
                 Text(stringResource(R.string.clear_saved_password))
             }
         }
