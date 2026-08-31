@@ -294,12 +294,7 @@ fun RecordingPlayerScreen(
         onHide = ::hideControls,
     )
 
-    val seekPreviewPhase = when {
-        controlsVisible || pendingSeekTargetMs == null -> PlayerSeekPreviewPhase.NONE
-        pendingSeekDispatched -> PlayerSeekPreviewPhase.DISPATCHED
-        else -> PlayerSeekPreviewPhase.PENDING
-    }
-    val foregroundLayer = playerForegroundLayer(
+    fun currentPlayerForegroundContext() =
         PlayerForegroundContext(
             confirmationVisible = false,
             infoVisible = infoOpen && entry != null && playbackAvailable,
@@ -311,11 +306,17 @@ fun RecordingPlayerScreen(
                 (recordingResolved &&
                     (!playbackAvailable ||
                         playbackState is AppPlaybackState.Failed)),
-            seekPreviewPhase = seekPreviewPhase,
+            seekPreviewPhase = when {
+                controlsVisible || pendingSeekTargetMs == null -> PlayerSeekPreviewPhase.NONE
+                pendingSeekDispatched -> PlayerSeekPreviewPhase.DISPATCHED
+                else -> PlayerSeekPreviewPhase.PENDING
+            },
             controlsVisible = controlsVisible && playbackAvailable,
             statsEnabled = statsVisible,
         )
-    )
+    val foregroundContext = currentPlayerForegroundContext()
+    val seekPreviewPhase = foregroundContext.seekPreviewPhase
+    val foregroundLayer = playerForegroundLayer(foregroundContext)
     val failureReason = (playbackState as? AppPlaybackState.Failed)?.reason
     val retryTargetAvailable =
         initialConnectionFailure ||
@@ -342,7 +343,7 @@ fun RecordingPlayerScreen(
             playerBackAction(
                 surface = PlayerSurface.RECORDING,
                 simpleTvActive = simpleTvProfile.active,
-                foregroundLayer = foregroundLayer,
+                foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
             )
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> Unit
@@ -406,7 +407,7 @@ fun RecordingPlayerScreen(
         pendingSeekDispatched = false
     }
 
-    val dispatchBack = rememberPlayerBackDispatcher(handlePlaybackBack)
+    PlayerBackHandler(handlePlaybackBack)
     KeepScreenOn(
         enabled = playbackAvailable &&
             playbackState !is AppPlaybackState.Failed,
@@ -416,7 +417,6 @@ fun RecordingPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
-                if (dispatchBack(event)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (recordingPlaybackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null

@@ -1,14 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -51,8 +49,9 @@ fun TvOutlinedTextField(
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    var consumeBackKeyUp by remember { mutableStateOf(false) }
     val displayedValue = presentationValue.takeIf { !isEditing && value.isEmpty() } ?: value
+
+    BackHandler(enabled = isEditing) { setEditingId(null) }
 
     LaunchedEffect(isEditing) {
         if (isEditing) {
@@ -79,27 +78,11 @@ fun TvOutlinedTextField(
                 if (!state.isFocused && isEditing) setEditingId(null)
             }
             .onPreviewKeyEvent { ev ->
-                if (
-                    ev.key == Key.Back &&
-                    ev.type == KeyEventType.KeyUp &&
-                    consumeBackKeyUp
-                ) {
-                    consumeBackKeyUp = false
-                    return@onPreviewKeyEvent true
-                }
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (ev.key) {
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                         if (!isEditing) {
                             setEditingId(id)
-                            true
-                        } else false
-                    }
-
-                    Key.Back -> {
-                        if (isEditing) {
-                            consumeBackKeyUp = true
-                            setEditingId(null)
                             true
                         } else false
                     }

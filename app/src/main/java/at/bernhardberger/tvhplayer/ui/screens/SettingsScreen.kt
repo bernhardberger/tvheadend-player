@@ -24,11 +24,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -211,19 +206,6 @@ internal fun SettingsScreenNavigation(
                     .weight(1f)
                     .fillMaxHeight()
                     .onFocusChanged { contentPaneFocused = it.hasFocus }
-                    .onKeyEvent { event ->
-                        if (
-                            event.key != Key.Back ||
-                            !backEnabled ||
-                            backAction != SettingsBackAction.FOCUS_CURRENT_CATEGORY
-                        ) {
-                            return@onKeyEvent false
-                        }
-                        if (event.type == KeyEventType.KeyUp) {
-                            focusCurrentCategory()
-                        }
-                        true
-                    }
                     .focusGroup()
             ) {
                 NavHost(

@@ -26,7 +26,6 @@ import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import org.junit.Assert.assertEquals
@@ -96,7 +95,6 @@ class MainStartupCompositionTest {
             TVHeadendPlayerTheme {
                 MainStartupComposition(
                     state = state,
-                    simpleTvActive = false,
                     onBack = {},
                     onAction = {},
                     registerActivityKeyContract = { {} },
@@ -155,7 +153,6 @@ class MainStartupCompositionTest {
             TVHeadendPlayerTheme {
                 MainStartupComposition(
                     state = state,
-                    simpleTvActive = false,
                     onBack = {},
                     onAction = {},
                     registerActivityKeyContract = { {} },
@@ -225,7 +222,6 @@ class MainStartupCompositionTest {
                         navigationStartDestination = Routes.CHANNELS,
                         navigationAllowed = true,
                     ),
-                    simpleTvActive = false,
                     onBack = {},
                     onAction = {},
                     registerActivityKeyContract = { {} },
@@ -330,7 +326,6 @@ class MainStartupCompositionTest {
                         ),
                         navigationAllowed = true,
                     ),
-                    simpleTvActive = false,
                     onBack = {},
                     onAction = {},
                     registerActivityKeyContract = { contract ->
@@ -347,7 +342,7 @@ class MainStartupCompositionTest {
         composeRule.onNodeWithText("Starting television…").assertExists()
         composeRule.runOnIdle {
             assertEquals(
-                MainStartupKeyMode.Passive(MainStartupBackProfile.NORMAL),
+                MainStartupKeyMode.Passive,
                 registered?.mode,
             )
             assertEquals(0, playerContentCompositions)
@@ -405,7 +400,6 @@ class MainStartupCompositionTest {
                         navigationStartDestination = Routes.player(ChannelId(91), "Wrong target"),
                         navigationAllowed = false,
                     ),
-                    simpleTvActive = false,
                     onBack = {},
                     onAction = {},
                     registerActivityKeyContract = { contract ->
@@ -425,7 +419,7 @@ class MainStartupCompositionTest {
             assertEquals(0, navigationCompositions)
             assertEquals(0, playerContentCompositions)
             assertEquals(
-                MainStartupKeyMode.Passive(MainStartupBackProfile.NORMAL),
+                MainStartupKeyMode.Passive,
                 registered?.mode,
             )
         }
@@ -522,7 +516,7 @@ class MainStartupCompositionTest {
     }
 
     @Test
-    fun activityKeyContractPublishesExactProfileCleansUpAndSystemBackMatchesIt() {
+    fun activityKeyContractPassesBackToTheSystemOwnerAndCleansUp() {
         var registered: MainStartupActivityKeyContract? = null
         var showStartup by mutableStateOf(true)
         var normalCancels = 0
@@ -537,7 +531,6 @@ class MainStartupCompositionTest {
                             navigationStartDestination = null,
                             navigationAllowed = false,
                         ),
-                        simpleTvActive = false,
                         onBack = { normalCancels++ },
                         onAction = {},
                         registerActivityKeyContract = { contract ->
@@ -551,23 +544,23 @@ class MainStartupCompositionTest {
 
         composeRule.runOnIdle {
             assertEquals(
-                MainStartupKeyMode.Passive(MainStartupBackProfile.NORMAL),
+                MainStartupKeyMode.Passive,
                 registered?.mode,
             )
             val contract = requireNotNull(registered)
-            assertTrue(
+            assertFalse(
                 dispatchMainStartupKeyEvent(
                     owner = MainStartupKeyCycleOwner(),
                     contract = contract,
                     event = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK),
                 ),
             )
-            assertEquals(1, normalCancels)
+            assertEquals(0, normalCancels)
         }
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.runOnIdle {
-            assertEquals(2, normalCancels)
+            assertEquals(1, normalCancels)
             showStartup = false
         }
         composeRule.runOnIdle { assertNull(registered) }
@@ -590,7 +583,6 @@ class MainStartupCompositionTest {
                         navigationStartDestination = null,
                         navigationAllowed = false,
                     ),
-                    simpleTvActive = true,
                     onBack = {
                         performMainStartupBack(
                             simpleTvActive = true,
@@ -610,7 +602,7 @@ class MainStartupCompositionTest {
 
         composeRule.runOnIdle {
             assertEquals(
-                MainStartupKeyMode.Actionable(MainStartupBackProfile.SIMPLE_TV),
+                MainStartupKeyMode.Actionable,
                 contract?.mode,
             )
         }

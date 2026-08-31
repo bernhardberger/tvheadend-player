@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui
 
-import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -21,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -85,7 +83,6 @@ import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
-import at.bernhardberger.tvhplayer.ui.player.stopPlaybackAndClose
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
@@ -94,7 +91,6 @@ import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.SettingsRoutes
 import at.bernhardberger.tvhplayer.ui.screens.SimpleTvUnlockScreen
-import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupScreen
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
@@ -205,7 +201,6 @@ internal fun StartupGatedPlayerContent(
 @Composable
 internal fun MainStartupComposition(
     state: MainStartupCompositionState,
-    simpleTvActive: Boolean,
     onBack: () -> Unit,
     onAction: (MainStartupActionId) -> Unit,
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit),
@@ -219,29 +214,14 @@ internal fun MainStartupComposition(
         )
         else -> state.presentation
     }
-    val backProfile = if (simpleTvActive) {
-        MainStartupBackProfile.SIMPLE_TV
-    } else {
-        MainStartupBackProfile.NORMAL
-    }
     val keyMode = when (renderedPresentation) {
         MainStartupPresentation.Inactive -> MainStartupKeyMode.Inactive
-        is MainStartupPresentation.Passive -> MainStartupKeyMode.Passive(backProfile)
-        is MainStartupPresentation.Actionable -> MainStartupKeyMode.Actionable(backProfile)
+        is MainStartupPresentation.Passive -> MainStartupKeyMode.Passive
+        is MainStartupPresentation.Actionable -> MainStartupKeyMode.Actionable
         is MainStartupPresentation.Enter -> error("Enter is rendered as passive startup")
     }
-    val keyContract = remember(keyMode, onBack) {
-        MainStartupActivityKeyContract(
-            mode = keyMode,
-            cancelNormalStartup = if (
-                keyMode != MainStartupKeyMode.Inactive &&
-                backProfile == MainStartupBackProfile.NORMAL
-            ) {
-                onBack
-            } else {
-                null
-            },
-        )
+    val keyContract = remember(keyMode) {
+        MainStartupActivityKeyContract(mode = keyMode)
     }
 
     DisposableEffect(registerActivityKeyContract, keyContract) {
@@ -364,6 +344,7 @@ fun AppRoot(
     applianceLaunchRequests: ApplianceLaunchRequests,
     debugVideoBackdropVisible: Boolean = false,
     onPlayerVisibilityChanged: (Boolean) -> Unit,
+    onRequestExit: () -> Unit,
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit) = { {} },
 ) {
     val applianceLaunchState by applianceLaunchRequests.state.collectAsStateWithLifecycle()
@@ -388,7 +369,6 @@ fun AppRoot(
                     navigationStartDestination = null,
                     navigationAllowed = false,
                 ),
-                simpleTvActive = false,
                 onBack = resolvingBack,
                 onAction = {},
                 registerActivityKeyContract = registerActivityKeyContract,
@@ -411,7 +391,6 @@ fun AppRoot(
                 navigationAllowed = true,
                 contentAllowed = true,
             ),
-            simpleTvActive = false,
             onBack = {},
             onAction = {},
             registerActivityKeyContract = registerActivityKeyContract,
@@ -474,8 +453,6 @@ fun AppRoot(
         }
     }
     val recordingsScreenState = remember { RecordingsScreenState() }
-    val context = LocalContext.current
-    val activity = context as? Activity
     val focusManager = LocalFocusManager.current
 
     val appVm: AppConnectionViewModel = koinViewModel()
@@ -674,14 +651,6 @@ fun AppRoot(
             )
         }
     }
-    val finishActivity: () -> Unit = {
-        playbackSelectionScope.launch {
-            stopPlaybackAndClose(
-                stopPlayback = playbackRuntime::stop,
-                closePlayer = { activity?.finish() },
-            )
-        }
-    }
     val handleRootBack: () -> Unit = rootBack@{
         val currentLaunchState = applianceLaunchRequests.state.value
         if (currentLaunchState != ApplianceLaunchState.Idle && applianceLaunchActive) {
@@ -697,12 +666,12 @@ fun AppRoot(
         ) {
             BackAction.FINISH_ACTIVITY -> {
                 if (capabilityProfile.allows(SimpleTvCapability.APP_EXIT)) {
-                    finishActivity()
+                    onRequestExit()
                 }
                 // Simple TV never exits through Back; ignore when exit is gated.
             }
             BackAction.POP_NAVIGATION -> {
-                if (!nav.popBackStack()) finishActivity()
+                if (!nav.popBackStack()) onRequestExit()
             }
             BackAction.RETURN_TO_PARENT -> Unit
             BackAction.RETURN_TO_PLAYER -> {
@@ -1071,7 +1040,6 @@ fun AppRoot(
                 applianceLaunchState == ApplianceLaunchState.Idle &&
                     effectiveStartupPresentation == MainStartupPresentation.Inactive,
         ),
-        simpleTvActive = simpleTvActive,
         onBack = startupBack,
         onAction = startupAction,
         registerActivityKeyContract = registerActivityKeyContract,

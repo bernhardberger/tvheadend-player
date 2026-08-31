@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,7 +11,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -28,7 +30,7 @@ import org.junit.Test
 @OptIn(ExperimentalTestApi::class)
 class SettingsStartupEntryTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun ordinaryEntryStartsGeneralAndFocusesItsSemanticCategory() {
@@ -88,7 +90,6 @@ class SettingsStartupEntryTest {
                             navigationStartDestination = null,
                             navigationAllowed = false,
                         ),
-                        simpleTvActive = false,
                         onBack = {},
                         onAction = { action ->
                             if (action == MainStartupActionId.CONNECTION_SETTINGS) {
@@ -112,6 +113,45 @@ class SettingsStartupEntryTest {
         composeRule.runOnIdle {
             assertEquals(1, startupActions)
             assertEquals(0, firstConnectionControlInvocations)
+        }
+    }
+
+    @Test
+    fun backReturnsFromSettingsContentBeforeDelegatingToTheShell() {
+        var shellBackCount = 0
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                BackHandler { shellBackCount++ }
+                SettingsScreenNavigation(
+                    startRoute = SettingsRoutes.GENERAL,
+                    showSimpleTvSettings = true,
+                ) { route, focusRequester ->
+                    Button(
+                        onClick = {},
+                        modifier = Modifier.focusRequester(focusRequester),
+                    ) {
+                        Text("Content $route")
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Language").assertIsFocused().performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeRule.onNodeWithText("Content ${SettingsRoutes.GENERAL}").assertIsFocused()
+
+        dispatchBack()
+        composeRule.onNodeWithText("Language").assertIsFocused()
+        composeRule.runOnIdle { assertEquals(0, shellBackCount) }
+
+        dispatchBack()
+        composeRule.runOnIdle { assertEquals(1, shellBackCount) }
+    }
+
+    private fun dispatchBack() {
+        composeRule.runOnIdle {
+            composeRule.activity.onBackPressedDispatcher.onBackPressed()
         }
     }
 }

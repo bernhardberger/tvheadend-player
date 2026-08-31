@@ -24,11 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -91,14 +86,6 @@ fun SimpleTvUnlockScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .onKeyEvent { event ->
-                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
-                    onBack()
-                    true
-                } else {
-                    false
-                }
-            }
             .padding(TvFullScreenPadding),
     ) {
         Text(
@@ -167,14 +154,6 @@ private fun SimpleTvExitConfirmation(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.76f))
-            .onKeyEvent { event ->
-                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
-                    onCancel()
-                    true
-                } else {
-                    false
-                }
-            }
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {

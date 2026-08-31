@@ -21,7 +21,7 @@ class MainStartupKeyCycleOwnerTest {
 
     @Test
     fun passive_consumesEveryStartupOwnedCategoryForItsCompleteCycle() {
-        listOf(passiveNormal, passiveSimpleTv).forEach { mode ->
+        listOf(MainStartupKeyMode.Passive).forEach { mode ->
             startupOwnedAppKeys.forEach { keyCode ->
                 val owner = MainStartupKeyCycleOwner()
 
@@ -51,50 +51,32 @@ class MainStartupKeyCycleOwnerTest {
 
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(passiveNormal, keyCode, KeyEvent.ACTION_DOWN),
+                owner.keyEvent(MainStartupKeyMode.Passive, keyCode, KeyEvent.ACTION_DOWN),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(actionableSimpleTv, keyCode, KeyEvent.ACTION_UP),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_UP),
                 keyCode,
             )
         }
     }
 
     @Test
-    fun normalBack_cancelsExactlyOnceThenConsumesItsCompleteCycle() {
-        val owner = MainStartupKeyCycleOwner()
-
-        assertDecision(
-            MainStartupKeyDecision.CANCEL_NORMAL_STARTUP_AND_CONSUME,
-            owner.keyEvent(passiveNormal, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN),
-        )
-        assertDecision(
-            MainStartupKeyDecision.CONSUME,
-            owner.keyEvent(passiveNormal, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN, repeatCount = 1),
-        )
-        assertDecision(
-            MainStartupKeyDecision.CONSUME,
-            owner.keyEvent(passiveNormal, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP),
-        )
-        assertDecision(
-            MainStartupKeyDecision.CANCEL_NORMAL_STARTUP_AND_CONSUME,
-            owner.keyEvent(actionableNormal, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN),
-        )
-    }
-
-    @Test
-    fun simpleTvBack_isContainedWithoutCancellationInPassiveAndActionableModes() {
-        listOf(passiveSimpleTv, actionableSimpleTv).forEach { mode ->
+    fun backAlwaysPassesThroughToTheAndroidXDispatcher() {
+        listOf(MainStartupKeyMode.Passive, MainStartupKeyMode.Actionable).forEach { mode ->
             val owner = MainStartupKeyCycleOwner()
 
             assertDecision(
-                MainStartupKeyDecision.CONSUME,
+                MainStartupKeyDecision.PASS_THROUGH,
                 owner.keyEvent(mode, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN),
             )
             assertDecision(
-                MainStartupKeyDecision.CONSUME,
+                MainStartupKeyDecision.PASS_THROUGH,
+                owner.keyEvent(mode, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN, repeatCount = 1),
+            )
+            assertDecision(
+                MainStartupKeyDecision.PASS_THROUGH,
                 owner.keyEvent(mode, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP),
             )
         }
@@ -113,12 +95,12 @@ class MainStartupKeyCycleOwnerTest {
 
             assertDecision(
                 MainStartupKeyDecision.CONSUME,
-                owner.keyEvent(passiveNormal, keyCode, KeyEvent.ACTION_DOWN),
+                owner.keyEvent(MainStartupKeyMode.Passive, keyCode, KeyEvent.ACTION_DOWN),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.CONSUME,
-                owner.keyEvent(actionableNormal, keyCode, KeyEvent.ACTION_DOWN, repeatCount = 1),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_DOWN, repeatCount = 1),
                 keyCode,
             )
             assertDecision(
@@ -140,11 +122,11 @@ class MainStartupKeyCycleOwnerTest {
 
         assertDecision(
             MainStartupKeyDecision.CONSUME,
-            owner.keyEvent(passiveNormal, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.ACTION_DOWN),
+            owner.keyEvent(MainStartupKeyMode.Passive, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.ACTION_DOWN),
         )
         assertDecision(
             MainStartupKeyDecision.CONSUME,
-            owner.keyEvent(passiveNormal, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.ACTION_DOWN),
+            owner.keyEvent(MainStartupKeyMode.Passive, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.ACTION_DOWN),
         )
         assertDecision(
             MainStartupKeyDecision.CONSUME,
@@ -168,17 +150,17 @@ class MainStartupKeyCycleOwnerTest {
         ).forEach { keyCode ->
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(actionableNormal, keyCode, KeyEvent.ACTION_DOWN),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_DOWN),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(actionableNormal, keyCode, KeyEvent.ACTION_DOWN, repeatCount = 1),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_DOWN, repeatCount = 1),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(actionableNormal, keyCode, KeyEvent.ACTION_UP),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_UP),
                 keyCode,
             )
         }
@@ -190,10 +172,10 @@ class MainStartupKeyCycleOwnerTest {
         val focusedControl = FakeFocusedControl()
 
         focusedControl.receive(
-            owner.keyEvent(actionableNormal, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN),
+            owner.keyEvent(MainStartupKeyMode.Actionable, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN),
         )
         focusedControl.receive(
-            owner.keyEvent(actionableNormal, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN, repeatCount = 1),
+            owner.keyEvent(MainStartupKeyMode.Actionable, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN, repeatCount = 1),
         )
         focusedControl.receive(
             owner.keyEvent(MainStartupKeyMode.Inactive, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN),
@@ -202,10 +184,10 @@ class MainStartupKeyCycleOwnerTest {
             owner.keyEvent(MainStartupKeyMode.Inactive, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_UP),
         )
         focusedControl.receive(
-            owner.keyEvent(actionableNormal, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN),
+            owner.keyEvent(MainStartupKeyMode.Actionable, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_DOWN),
         )
         focusedControl.receive(
-            owner.keyEvent(actionableNormal, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_UP),
+            owner.keyEvent(MainStartupKeyMode.Actionable, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_UP),
         )
 
         assertEquals(2, focusedControl.activationDownCount)
@@ -223,27 +205,27 @@ class MainStartupKeyCycleOwnerTest {
 
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(actionableSimpleTv, keyCode, KeyEvent.ACTION_DOWN),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_DOWN),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.CONSUME,
-                owner.keyEvent(actionableSimpleTv, keyCode, KeyEvent.ACTION_DOWN),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_DOWN),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.CONSUME,
-                owner.keyEvent(actionableSimpleTv, keyCode, KeyEvent.ACTION_DOWN, repeatCount = 2),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_DOWN, repeatCount = 2),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(actionableSimpleTv, keyCode, KeyEvent.ACTION_UP),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_UP),
                 keyCode,
             )
             assertDecision(
                 MainStartupKeyDecision.PASS_THROUGH,
-                owner.keyEvent(actionableSimpleTv, keyCode, KeyEvent.ACTION_DOWN),
+                owner.keyEvent(MainStartupKeyMode.Actionable, keyCode, KeyEvent.ACTION_DOWN),
                 keyCode,
             )
         }
@@ -251,7 +233,7 @@ class MainStartupKeyCycleOwnerTest {
 
     @Test
     fun actionableModes_consumeNonNavigationAppKeys() {
-        listOf(actionableNormal, actionableSimpleTv).forEach { mode ->
+        listOf(MainStartupKeyMode.Actionable).forEach { mode ->
             actionableNonNavigationKeys.forEach { keyCode ->
                 val owner = MainStartupKeyCycleOwner()
 
@@ -293,11 +275,6 @@ class MainStartupKeyCycleOwnerTest {
     }
 
     private companion object {
-        val passiveNormal = MainStartupKeyMode.Passive(MainStartupBackProfile.NORMAL)
-        val passiveSimpleTv = MainStartupKeyMode.Passive(MainStartupBackProfile.SIMPLE_TV)
-        val actionableNormal = MainStartupKeyMode.Actionable(MainStartupBackProfile.NORMAL)
-        val actionableSimpleTv = MainStartupKeyMode.Actionable(MainStartupBackProfile.SIMPLE_TV)
-
         val systemOwnedKeys = listOf(
             KeyEvent.KEYCODE_HOME,
             KeyEvent.KEYCODE_POWER,

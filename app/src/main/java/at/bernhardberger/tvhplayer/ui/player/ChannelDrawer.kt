@@ -180,10 +180,6 @@ fun ChannelDrawer(
                     ev.nativeKeyEvent.keyCode
                 )?.let(::pageChannels)?.let { return@onPreviewKeyEvent it }
                 when (ev.key) {
-                    Key.Back -> {
-                        onCloseDrawer()
-                        true
-                    }
                     // Right closes the narrow list drawer only. The large-card
                     // grid needs Left/Right to move between tiles.
                     Key.DirectionRight -> {

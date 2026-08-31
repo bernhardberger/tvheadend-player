@@ -23,6 +23,7 @@ import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityServ
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.ui.player.stopPlaybackAndClose
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
@@ -33,7 +34,6 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 
 data class MainStartupActivityKeyContract(
     val mode: MainStartupKeyMode,
-    val cancelNormalStartup: (() -> Unit)? = null,
 )
 
 internal class MainStartupActivityKeyDispatcher(
@@ -62,10 +62,6 @@ internal class MainStartupActivityKeyDispatcher(
         )
         when (decision) {
             MainStartupKeyDecision.CONSUME -> return true
-            MainStartupKeyDecision.CANCEL_NORMAL_STARTUP_AND_CONSUME -> {
-                contract.cancelNormalStartup?.invoke()
-                return true
-            }
             MainStartupKeyDecision.PASS_THROUGH -> Unit
         }
         if (action == KeyEvent.ACTION_UP && keyCode in forwardedActivationKeyCodes) {
@@ -101,7 +97,7 @@ class MainActivity : AppCompatActivity() {
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
     private var isPlayerVisible = false
-    private var rootExitInProgress = false
+    private val rootExitGate = MainRootExitGate()
     private var debugVideoBackdropVisible by mutableStateOf(false)
     private var debugVideoBackdropReceiverRegistered = false
     private val mainStartupKeyCycleOwner = MainStartupKeyCycleOwner()
@@ -137,14 +133,7 @@ class MainActivity : AppCompatActivity() {
         if (startupViewModel.shouldHandleInitialActivityIntent(savedInstanceState != null)) {
             requestApplianceEntry(intent)
         }
-        onBackPressedDispatcher.addCallback(this) {
-            if (rootExitInProgress) return@addCallback
-            rootExitInProgress = true
-            lifecycleScope.launch {
-                playbackRuntime.stop()
-                finish()
-            }
-        }
+        onBackPressedDispatcher.addCallback(this) { requestRootExit() }
         setContent {
             val startupState by startupViewModel.state.collectAsStateWithLifecycle()
             val runtimeServerSettings by
@@ -156,6 +145,7 @@ class MainActivity : AppCompatActivity() {
                     applianceLaunchRequests = startupViewModel.applianceLaunchRequests,
                     debugVideoBackdropVisible = debugVideoBackdropVisible,
                     onPlayerVisibilityChanged = { isPlayerVisible = it },
+                    onRequestExit = ::requestRootExit,
                     registerActivityKeyContract = ::registerMainStartupActivityKeyContract,
                 )
             }
@@ -199,6 +189,16 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    private fun requestRootExit() {
+        if (!rootExitGate.tryBegin()) return
+        lifecycleScope.launch {
+            stopPlaybackAndClose(
+                stopPlayback = playbackRuntime::stop,
+                closePlayer = ::finish,
+            )
+        }
+    }
+
     private fun requestApplianceEntry(intent: Intent?) {
         if (intent?.action != ApplianceEntryAccessibilityService.ACTION_APPLIANCE_ENTRY) return
         if (ApplianceEntryPolicy.shouldCreateLaunchRequest(isPlayerVisible)) {
@@ -224,5 +224,15 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_DEBUG_VIDEO_BACKDROP =
             "at.bernhardberger.tvhplayer.action.DEBUG_VIDEO_BACKDROP"
         const val EXTRA_DEBUG_VIDEO_BACKDROP_VISIBLE = "visible"
+    }
+}
+
+internal class MainRootExitGate {
+    private var inProgress = false
+
+    fun tryBegin(): Boolean {
+        if (inProgress) return false
+        inProgress = true
+        return true
     }
 }

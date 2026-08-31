@@ -5,24 +5,12 @@ import android.view.KeyEvent
 enum class MainStartupKeyDecision {
     PASS_THROUGH,
     CONSUME,
-    CANCEL_NORMAL_STARTUP_AND_CONSUME,
-}
-
-enum class MainStartupBackProfile {
-    NORMAL,
-    SIMPLE_TV,
 }
 
 sealed interface MainStartupKeyMode {
     data object Inactive : MainStartupKeyMode
-
-    data class Passive(
-        val backProfile: MainStartupBackProfile,
-    ) : MainStartupKeyMode
-
-    data class Actionable(
-        val backProfile: MainStartupBackProfile,
-    ) : MainStartupKeyMode
+    data object Passive : MainStartupKeyMode
+    data object Actionable : MainStartupKeyMode
 }
 
 /**
@@ -60,30 +48,23 @@ class MainStartupKeyCycleOwner {
 
         return when (mode) {
             MainStartupKeyMode.Inactive -> MainStartupKeyDecision.PASS_THROUGH
-            is MainStartupKeyMode.Passive -> passiveDecision(mode.backProfile, keyCode)
-            is MainStartupKeyMode.Actionable -> actionableDecision(
-                backProfile = mode.backProfile,
+            MainStartupKeyMode.Passive -> passiveDecision(keyCode)
+            MainStartupKeyMode.Actionable -> actionableDecision(
                 keyCode = keyCode,
                 repeatCount = repeatCount,
             )
         }
     }
 
-    private fun passiveDecision(
-        backProfile: MainStartupBackProfile,
-        keyCode: Int,
-    ): MainStartupKeyDecision = when {
-        keyCode == KeyEvent.KEYCODE_BACK -> backDecision(backProfile, keyCode)
+    private fun passiveDecision(keyCode: Int): MainStartupKeyDecision = when {
         isPassiveOwnedKey(keyCode) -> claimAndConsume(keyCode)
         else -> MainStartupKeyDecision.PASS_THROUGH
     }
 
     private fun actionableDecision(
-        backProfile: MainStartupBackProfile,
         keyCode: Int,
         repeatCount: Int,
     ): MainStartupKeyDecision = when {
-        keyCode == KeyEvent.KEYCODE_BACK -> backDecision(backProfile, keyCode)
         isActionableNonNavigationKey(keyCode) -> claimAndConsume(keyCode)
         isActivationKey(keyCode) && repeatCount == 0 -> {
             forwardedActivationKeyCodes.add(keyCode)
@@ -93,24 +74,13 @@ class MainStartupKeyCycleOwner {
         else -> MainStartupKeyDecision.PASS_THROUGH
     }
 
-    private fun backDecision(
-        backProfile: MainStartupBackProfile,
-        keyCode: Int,
-    ): MainStartupKeyDecision {
-        consumedKeyCodes.add(keyCode)
-        return when (backProfile) {
-            MainStartupBackProfile.NORMAL ->
-                MainStartupKeyDecision.CANCEL_NORMAL_STARTUP_AND_CONSUME
-            MainStartupBackProfile.SIMPLE_TV -> MainStartupKeyDecision.CONSUME
-        }
-    }
-
     private fun claimAndConsume(keyCode: Int): MainStartupKeyDecision {
         consumedKeyCodes.add(keyCode)
         return MainStartupKeyDecision.CONSUME
     }
 
     private fun isAlwaysSystemKey(keyCode: Int): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_BACK,
         KeyEvent.KEYCODE_HOME,
         KeyEvent.KEYCODE_POWER,
         KeyEvent.KEYCODE_TV_POWER,

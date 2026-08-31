@@ -692,30 +692,35 @@ fun VideoPlayerScreen(
     val recoveryHasRetry = recoveryUiModel.retryCommand != PlaybackRetryCommand.NONE
     val recoverySafeActionIsExit =
         recoveryUiModel.secondaryAction == PlaybackRecoverySecondaryAction.EXIT_SIMPLE_TV
-    val confirmationVisible = infoOpen &&
-        recordingDialogVisible &&
-        infoRecordingState !is LiveInfoRecordingState.Idle
-    val infoVisible = infoOpen && !confirmationVisible
-    val showDrawer = drawerOpen && !controlsVisible && !infoOpen
-    val seekPreviewPhase = when {
-        controlsVisible || timeshiftSeekPreview == null -> PlayerSeekPreviewPhase.NONE
-        requireNotNull(timeshiftSeekPreview).dispatched -> PlayerSeekPreviewPhase.DISPATCHED
-        else -> PlayerSeekPreviewPhase.PENDING
-    }
-    val foregroundLayer = playerForegroundLayer(
+    fun currentPlayerForegroundContext() =
         PlayerForegroundContext(
-            confirmationVisible = confirmationVisible,
-            infoVisible = infoVisible,
+            confirmationVisible = infoOpen &&
+                recordingDialogVisible &&
+                infoRecordingState !is LiveInfoRecordingState.Idle,
+            infoVisible = infoOpen && !(
+                recordingDialogVisible &&
+                    infoRecordingState !is LiveInfoRecordingState.Idle
+                ),
             optionsPage = optionsPage,
             numberEntryVisible = channelNumberInput.isNotEmpty(),
-            channelDrawerVisible = showDrawer,
+            channelDrawerVisible = drawerOpen && !controlsVisible && !infoOpen,
             recoveryVisible = recoveryVisible,
             terminalErrorVisible = false,
-            seekPreviewPhase = seekPreviewPhase,
+            seekPreviewPhase = when {
+                controlsVisible || timeshiftSeekPreview == null -> PlayerSeekPreviewPhase.NONE
+                requireNotNull(timeshiftSeekPreview).dispatched ->
+                    PlayerSeekPreviewPhase.DISPATCHED
+                else -> PlayerSeekPreviewPhase.PENDING
+            },
             controlsVisible = controlsVisible,
             statsEnabled = statsVisible,
         )
-    )
+    val foregroundContext = currentPlayerForegroundContext()
+    val confirmationVisible = foregroundContext.confirmationVisible
+    val infoVisible = foregroundContext.infoVisible
+    val showDrawer = foregroundContext.channelDrawerVisible
+    val seekPreviewPhase = foregroundContext.seekPreviewPhase
+    val foregroundLayer = playerForegroundLayer(foregroundContext)
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
             controlsVisible = controlsVisible,
@@ -868,7 +873,7 @@ fun VideoPlayerScreen(
             playerBackAction(
                 surface = PlayerSurface.LIVE,
                 simpleTvActive = simpleTvProfile.active,
-                foregroundLayer = foregroundLayer,
+                foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
             )
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
@@ -899,13 +904,12 @@ fun VideoPlayerScreen(
             PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
         }
     }
-    val dispatchBack = rememberPlayerBackDispatcher(handlePlaybackBack)
+    PlayerBackHandler(handlePlaybackBack)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
-                if (dispatchBack(event)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null

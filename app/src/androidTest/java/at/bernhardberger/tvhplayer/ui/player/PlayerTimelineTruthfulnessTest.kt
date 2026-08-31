@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.content.res.Configuration
-import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -18,8 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.KeyEvent as ComposeKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -37,7 +34,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.performKeyPress
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Density
@@ -276,7 +272,7 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.setContent {
             val rootFocus = remember { FocusRequester() }
             val layer = playerForegroundLayer(previewContext(phase))
-            val dispatchBack = rememberPlayerBackDispatcher {
+            PlayerBackHandler {
                 when (playerBackAction(PlayerSurface.LIVE, false, layer)) {
                     PlayerBackAction.CANCEL_PENDING_SEEK -> {
                         cancelled++
@@ -295,15 +291,12 @@ class PlayerTimelineTruthfulnessTest {
                 Modifier
                     .fillMaxSize()
                     .testTag("timeshift-preview-root")
-                    .onPreviewKeyEvent(dispatchBack)
                     .focusRequester(rootFocus)
                     .focusable()
             )
         }
 
-        dispatchBack(AndroidKeyEvent.ACTION_DOWN)
-        dispatchBack(AndroidKeyEvent.ACTION_DOWN, repeatCount = 1)
-        dispatchBack(AndroidKeyEvent.ACTION_UP)
+        dispatchBack()
         composeRule.runOnIdle {
             assertEquals(1, cancelled)
             assertEquals(0, dismissed)
@@ -311,16 +304,14 @@ class PlayerTimelineTruthfulnessTest {
             phase = PlayerSeekPreviewPhase.DISPATCHED
         }
 
-        dispatchBack(AndroidKeyEvent.ACTION_DOWN)
-        dispatchBack(AndroidKeyEvent.ACTION_UP)
+        dispatchBack()
         composeRule.runOnIdle {
             assertEquals(1, cancelled)
             assertEquals(1, dismissed)
             assertEquals(0, closed)
         }
 
-        dispatchBack(AndroidKeyEvent.ACTION_DOWN)
-        dispatchBack(AndroidKeyEvent.ACTION_UP)
+        dispatchBack()
         composeRule.runOnIdle { assertEquals(1, closed) }
     }
 
@@ -544,19 +535,10 @@ class PlayerTimelineTruthfulnessTest {
         statsEnabled = false,
     )
 
-    private fun dispatchBack(action: Int, repeatCount: Int = 0) {
-        val eventTime = android.os.SystemClock.uptimeMillis()
-        composeRule.onNodeWithTag("timeshift-preview-root").performKeyPress(
-            ComposeKeyEvent(
-                AndroidKeyEvent(
-                    eventTime,
-                    eventTime,
-                    action,
-                    AndroidKeyEvent.KEYCODE_BACK,
-                    repeatCount,
-                )
-            )
-        )
+    private fun dispatchBack() {
+        composeRule.runOnIdle {
+            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        }
     }
 
     private fun awaitWindowFocus() {

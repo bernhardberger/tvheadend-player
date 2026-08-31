@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.content.res.Configuration
-import android.view.KeyEvent as AndroidKeyEvent
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
@@ -11,8 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent as ComposeKeyEvent
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -26,11 +24,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.performKeyPress
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Density
@@ -61,7 +58,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTestApi::class)
 class LiveProgrammeInfoOverlayTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
     private val currentSession = checkNotNull(testSessionObservation().currentSession)
 
     @Test
@@ -255,9 +252,7 @@ class LiveProgrammeInfoOverlayTest {
             .performKeyInput { pressKey(Key.Enter) }
         composeRule.onNodeWithTag("programme-recording-cancel").assertIsFocused()
 
-        dispatchBack("programme-recording-cancel", AndroidKeyEvent.ACTION_DOWN)
-        dispatchBack("programme-recording-cancel", AndroidKeyEvent.ACTION_DOWN, repeatCount = 1)
-        dispatchBack("programme-recording-cancel", AndroidKeyEvent.ACTION_UP)
+        dispatchBack()
 
         composeRule.onNodeWithTag("programme-recording-cancel").assertDoesNotExist()
         composeRule.onNodeWithTag("live-info-record").assertIsFocused()
@@ -559,7 +554,7 @@ class LiveProgrammeInfoOverlayTest {
         onBack: () -> Unit = {},
     ) {
         composeRule.setContent {
-            val dispatchBack = rememberPlayerBackDispatcher(onBack)
+            PlayerBackHandler(onBack)
             LiveInfoRecordingValidityEffect(
                 state = recordingState(),
                 currentEvent = event(),
@@ -572,7 +567,6 @@ class LiveProgrammeInfoOverlayTest {
                     Modifier
                         .size(width = 960.dp, height = 540.dp)
                         .testTag("live-info-test-viewport")
-                        .onPreviewKeyEvent(dispatchBack)
                 ) {
                     LiveProgrammeInfoOverlay(
                         event = event(),
@@ -594,23 +588,10 @@ class LiveProgrammeInfoOverlayTest {
         }
     }
 
-    private fun dispatchBack(
-        nodeTag: String,
-        action: Int,
-        repeatCount: Int = 0,
-    ) {
-        val eventTime = android.os.SystemClock.uptimeMillis()
-        composeRule.onNodeWithTag(nodeTag).performKeyPress(
-            ComposeKeyEvent(
-                AndroidKeyEvent(
-                    eventTime,
-                    eventTime,
-                    action,
-                    AndroidKeyEvent.KEYCODE_BACK,
-                    repeatCount,
-                )
-            )
-        )
+    private fun dispatchBack() {
+        composeRule.runOnIdle {
+            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        }
     }
 
     private fun event(

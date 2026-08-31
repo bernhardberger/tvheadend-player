@@ -36,10 +36,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -186,24 +182,18 @@ fun SideRail(
                 onNavigate(rootRoute)
                 itemFocus[rootRoute]?.requestFocus()
             }
-            BrowseShellBackAction.AWAIT_ROOT_DESTINATION -> Unit
+            BrowseShellBackAction.AWAIT_ROOT_DESTINATION -> {
+                requestedRoute = rootRoute
+                onNavigate(rootRoute)
+                itemFocus[rootRoute]?.requestFocus()
+            }
             BrowseShellBackAction.DELEGATE_TO_ROOT -> onRootBack()
         }
     }
-    // Remote key dispatch supplies focus-layer precedence. Keep the dispatcher
-    // path for accessibility and system Back actions without a focused key target.
     BackHandler(onBack = handleBrowseBack)
 
     BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .onKeyEvent { event ->
-                if (event.key != Key.Back || event.type != KeyEventType.KeyUp) {
-                    return@onKeyEvent false
-                }
-                handleBrowseBack()
-                true
-            },
+        modifier = modifier.fillMaxSize(),
     ) {
         val browseWidth = (maxWidth - ClosedDrawerWidth).coerceAtLeast(0.dp)
         val railGradientWidth = ClosedDrawerWidth + TvNavigationRailGradientRunout

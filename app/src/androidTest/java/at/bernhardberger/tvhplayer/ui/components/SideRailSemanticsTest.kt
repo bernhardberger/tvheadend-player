@@ -2,9 +2,11 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import android.os.Bundle
 import android.os.SystemClock
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.platform.testTag
@@ -30,10 +32,6 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.captureToImage
@@ -50,7 +48,7 @@ import org.junit.Assert.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class SideRailSemanticsTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun collapsedRailExposesAllDestinationItems() {
@@ -317,14 +315,17 @@ class SideRailSemanticsTest {
         composeRule.onNodeWithTag("nav-epg")
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("browse-focus").assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.onNodeWithTag("nav-epg").assertIsFocused()
 
-        composeRule.onNodeWithTag("nav-epg")
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.runOnIdle { assertEquals(1, rootBackCount) }
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            EVIDENCE_STATUS_CODE,
+            Bundle().apply { putString("rootBackOwnerTrace", "shell>root") },
+        )
     }
 
     @Test
@@ -398,12 +399,19 @@ class SideRailSemanticsTest {
             )
         }
 
-        val requestsBeforeSilentBack = requestedRoutes.toList()
-        composeRule.onNodeWithTag("nav-channels")
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
         composeRule.runOnIdle {
-            assertEquals(requestsBeforeSilentBack, requestedRoutes)
+            assertEquals(
+                listOf(
+                    Routes.EPG,
+                    Routes.RECORDINGS,
+                    Routes.EPG,
+                    Routes.CHANNELS,
+                    Routes.CHANNELS,
+                ),
+                requestedRoutes,
+            )
             assertEquals(0, rootBackCount)
         }
         InstrumentationRegistry.getInstrumentation().sendStatus(
@@ -528,21 +536,11 @@ class SideRailSemanticsTest {
                     onRootBack = { rootBackCount += 1 },
                     onNavigate = {},
                     content = { _, _ ->
+                        BackHandler { contentBackCount += 1 }
                         Button(
                             onClick = {},
                             modifier = Modifier
                                 .focusRequester(contentFocus)
-                                .onKeyEvent { event ->
-                                    if (
-                                        event.key == Key.Back &&
-                                        event.type == KeyEventType.KeyUp
-                                    ) {
-                                        contentBackCount += 1
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
                                 .testTag("nested-back-owner"),
                         ) {
                             Text("Nested content")
@@ -555,13 +553,19 @@ class SideRailSemanticsTest {
 
         composeRule.onNodeWithTag("nested-back-owner")
             .assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
 
         composeRule.runOnIdle {
             assertEquals(1, contentBackCount)
             assertEquals(0, rootBackCount)
         }
         composeRule.onNodeWithTag("nested-back-owner").assertIsFocused()
+    }
+
+    private fun dispatchBack() {
+        composeRule.runOnIdle {
+            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        }
     }
 }
 

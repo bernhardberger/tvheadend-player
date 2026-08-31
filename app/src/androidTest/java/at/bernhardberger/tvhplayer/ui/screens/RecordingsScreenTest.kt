@@ -7,10 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -179,7 +175,7 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("recording-confirmation-confirm").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.onNodeWithTag("recording-details-delete").assertIsFocused()
     }
 
@@ -265,18 +261,17 @@ class RecordingsScreenTest {
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("folder-preview-recording-7")
             .assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused().pressCenter()
         waitForFocus("recording-list-entry-7")
         composeRule.onNodeWithTag("recording-list-entry-7").pressCenter()
         composeRule.onNodeWithTag("recording-details-panel").assertIsDisplayed()
         composeRule.onNodeWithTag("recording-details-play")
             .assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
         waitForFocus("recording-list-entry-7")
-        composeRule.onNodeWithTag("recording-list-entry-7")
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
         composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused()
     }
 
@@ -289,16 +284,8 @@ class RecordingsScreenTest {
 
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                Box(
-                    modifier = Modifier.onKeyEvent { event ->
-                        if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
-                            shellBackCount++
-                            true
-                        } else {
-                            false
-                        }
-                    },
-                ) {
+                Box {
+                    BackHandler { shellBackCount++ }
                     TestRecordingsScreen(entries = entries, backEnabled = false)
                 }
             }
@@ -308,7 +295,7 @@ class RecordingsScreenTest {
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("folder-preview-recording-7")
             .assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
 
         composeRule.onNodeWithTag("folder-preview-recording-7").assertIsFocused()
         composeRule.runOnIdle { assertEquals(1, shellBackCount) }
@@ -354,19 +341,25 @@ class RecordingsScreenTest {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 Box {
-                    TestRecordingsScreen(entries = entries)
                     BackHandler { shellBackCount++ }
+                    TestRecordingsScreen(entries = entries)
                 }
             }
         }
 
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().pressCenter()
         composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
-            .performKeyInput { pressKey(Key.Back) }
+        dispatchBack()
 
         composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
         composeRule.runOnIdle { assertEquals(0, shellBackCount) }
+    }
+
+    private fun dispatchBack() {
+        composeRule.runOnIdle {
+            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        }
     }
 
     @Test

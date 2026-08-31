@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.view.KeyEvent
-import at.bernhardberger.tvhplayer.ui.startup.MainStartupBackProfile
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import org.junit.Assert.assertEquals
@@ -11,12 +10,11 @@ import org.junit.Test
 
 class MainStartupActivityKeyDispatcherTest {
     @Test
-    fun settingsActivationCycleCannotReachTheFirstSettingsControlAfterStartupDisappears() {
+    fun settingsActivationCycleDispatchesOnlyOneStartupAction() {
         val dispatcher = MainStartupActivityKeyDispatcher(MainStartupKeyCycleOwner())
         var startupActions = 0
-        var firstSettingsControlInvocations = 0
         var contract = MainStartupActivityKeyContract(
-            mode = MainStartupKeyMode.Actionable(MainStartupBackProfile.NORMAL),
+            mode = MainStartupKeyMode.Actionable,
         )
 
         assertFalse(
@@ -44,7 +42,6 @@ class MainStartupActivityKeyDispatcherTest {
         }
 
         assertEquals(1, startupActions)
-        assertEquals(0, firstSettingsControlInvocations)
     }
 
     @Test
@@ -53,7 +50,7 @@ class MainStartupActivityKeyDispatcherTest {
         var startupActions = 0
         var settingsActions = 0
         var contract = MainStartupActivityKeyContract(
-            mode = MainStartupKeyMode.Actionable(MainStartupBackProfile.NORMAL),
+            mode = MainStartupKeyMode.Actionable,
         )
 
         if (!dispatcher.dispatch(contract, KeyEvent.KEYCODE_ENTER, KeyEvent.ACTION_DOWN)) {
@@ -69,17 +66,12 @@ class MainStartupActivityKeyDispatcherTest {
     }
 
     @Test
-    fun normalBackCycleCancelsOnceAndRemainsConsumedAfterStartupDisappears() {
+    fun rawBackAlwaysPassesThroughToTheAndroidXDispatcher() {
         val dispatcher = MainStartupActivityKeyDispatcher(MainStartupKeyCycleOwner())
-        var cancels = 0
-        var contract = MainStartupActivityKeyContract(
-            mode = MainStartupKeyMode.Passive(MainStartupBackProfile.NORMAL),
-            cancelNormalStartup = { cancels++ },
-        )
+        val contract = MainStartupActivityKeyContract(mode = MainStartupKeyMode.Passive)
 
-        assertTrue(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN))
-        contract = MainStartupActivityKeyContract(mode = MainStartupKeyMode.Inactive)
-        assertTrue(
+        assertFalse(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN))
+        assertFalse(
             dispatcher.dispatch(
                 contract = contract,
                 keyCode = KeyEvent.KEYCODE_BACK,
@@ -87,23 +79,6 @@ class MainStartupActivityKeyDispatcherTest {
                 repeatCount = 1,
             ),
         )
-        assertTrue(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP))
-
-        assertEquals(1, cancels)
-    }
-
-    @Test
-    fun simpleTvBackRemainsContained() {
-        val dispatcher = MainStartupActivityKeyDispatcher(MainStartupKeyCycleOwner())
-        var cancels = 0
-        val contract = MainStartupActivityKeyContract(
-            mode = MainStartupKeyMode.Passive(MainStartupBackProfile.SIMPLE_TV),
-            cancelNormalStartup = { cancels++ },
-        )
-
-        assertTrue(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_DOWN))
-        assertTrue(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP))
-
-        assertEquals(0, cancels)
+        assertFalse(dispatcher.dispatch(contract, KeyEvent.KEYCODE_BACK, KeyEvent.ACTION_UP))
     }
 }

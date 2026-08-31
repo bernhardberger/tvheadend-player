@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -52,11 +53,12 @@ fun TvPasswordField(
     val eyeFocus = remember { FocusRequester() }
 
     var passwordVisible by remember { mutableStateOf(false) }
-    var consumeBackKeyUp by remember { mutableStateOf(false) }
 
     val isEditing = editingId == id
     val displayedPresentation = presentationValue.takeIf { !isEditing && value.isEmpty() }
     val displayedValue = displayedPresentation ?: value
+
+    BackHandler(enabled = isEditing) { setEditingId(null) }
 
     LaunchedEffect(isEditing) {
         if (isEditing) {
@@ -92,28 +94,12 @@ fun TvPasswordField(
                 if (!state.isFocused && isEditing) setEditingId(null)
             }
             .onPreviewKeyEvent { ev ->
-                if (
-                    ev.key == Key.Back &&
-                    ev.type == KeyEventType.KeyUp &&
-                    consumeBackKeyUp
-                ) {
-                    consumeBackKeyUp = false
-                    return@onPreviewKeyEvent true
-                }
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
                 when (ev.key) {
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                         if (!isEditing) {
                             setEditingId(id)
-                            true
-                        } else false
-                    }
-
-                    Key.Back -> {
-                        if (isEditing) {
-                            consumeBackKeyUp = true
-                            setEditingId(null)
                             true
                         } else false
                     }
@@ -161,13 +147,6 @@ fun TvPasswordField(
                             Key.DirectionLeft -> {
                                 textFocus.requestFocus()
                                 true
-                            }
-
-                            Key.Back -> {
-                                if (isEditing) {
-                                    setEditingId(null)
-                                    true
-                                } else false
                             }
 
                             else -> false

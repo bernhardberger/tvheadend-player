@@ -46,15 +46,25 @@ NAVIGATION_BACK_TESTS = ",".join(
     (
         "at.bernhardberger.tvhplayer.ui.components.SideRailSemanticsTest",
         "at.bernhardberger.tvhplayer.ui.player.PlayerBackDispatcherTest",
+        "at.bernhardberger.tvhplayer.ui.player.LiveProgrammeInfoOverlayTest",
+        "at.bernhardberger.tvhplayer.ui.player.PlayerTimelineTruthfulnessTest",
         "at.bernhardberger.tvhplayer.ui.AppDestinationTransitionTest",
+        "at.bernhardberger.tvhplayer.ui.MainStartupCompositionTest",
         "at.bernhardberger.tvhplayer.ui.components.ChannelRowTest",
         "at.bernhardberger.tvhplayer.ui.components.SettingsPaneFocusTest",
+        "at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextFieldTest",
+        "at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenTest",
+        "at.bernhardberger.tvhplayer.ui.screens.SettingsStartupEntryTest",
     )
 )
 NAVIGATION_BACK_EVIDENCE_KEYS = (
     "guideRailFocusLatencyMs",
     "sideRailRequestTrace",
     "awaitRootDestinationRootBackCount",
+    "backDispatchApiLevel",
+    "nestedBackOwnerTrace",
+    "rootBackOwnerTrace",
+    "rapidBackActionTrace",
     "channelsVisibleRows",
     "channelsRecomposedRows",
     "channelsMaxRowRecompositions",
@@ -605,6 +615,7 @@ def run_instrumentation_check(
     action: str,
     test_class: str,
     evidence_keys: tuple[str, ...] = (),
+    expected_evidence: dict[str, str] | None = None,
 ) -> None:
     if package_name != DEFAULT_PACKAGE:
         fail(f"{action} is available only for package {DEFAULT_PACKAGE}")
@@ -713,7 +724,7 @@ def run_instrumentation_check(
             CONNECTION_CREDENTIAL_TEST: 3,
             TIMESHIFT_COMMAND_TEST: 2,
             FOREGROUND_PLAYBACK_LIFECYCLE_TEST: 5,
-            NAVIGATION_BACK_TESTS: 27,
+            NAVIGATION_BACK_TESTS: 84,
         }.get(test_class)
         if expected_test_count is not None and int(success_summary.group(1)) != expected_test_count:
             fail(f"{action} did not run all {expected_test_count} acceptance tests")
@@ -726,6 +737,12 @@ def run_instrumentation_check(
             )
             if not values:
                 fail(f"{action} did not report required evidence: {key}")
+            expected_value = (expected_evidence or {}).get(key)
+            if expected_value is not None and values[-1] != expected_value:
+                fail(
+                    f"{action} reported unexpected evidence: "
+                    f"{key}={values[-1]} (expected {expected_value})"
+                )
             print(f"{key}={values[-1]}")
     finally:
         run(
@@ -795,6 +812,7 @@ def run_navigation_back_check(adb: str, serial: str, package_name: str) -> None:
         action="navigation-back-check",
         test_class=NAVIGATION_BACK_TESTS,
         evidence_keys=NAVIGATION_BACK_EVIDENCE_KEYS,
+        expected_evidence={"backDispatchApiLevel": "36"},
     )
 
 

@@ -566,13 +566,17 @@ class DevicePolicyTest(unittest.TestCase):
             0,
             stdout=(
                 "INSTRUMENTATION_STATUS: guideRailFocusLatencyMs=37\n"
-                "INSTRUMENTATION_STATUS: sideRailRequestTrace=epg>recordings>epg>channels\n"
+                "INSTRUMENTATION_STATUS: sideRailRequestTrace=epg>recordings>epg>channels>channels\n"
                 "INSTRUMENTATION_STATUS: awaitRootDestinationRootBackCount=0\n"
+                "INSTRUMENTATION_STATUS: backDispatchApiLevel=36\n"
+                "INSTRUMENTATION_STATUS: nestedBackOwnerTrace=nested>player(0)\n"
+                "INSTRUMENTATION_STATUS: rootBackOwnerTrace=shell>root\n"
+                "INSTRUMENTATION_STATUS: rapidBackActionTrace=confirmation>info>player\n"
                 "INSTRUMENTATION_STATUS: channelsVisibleRows=6\n"
                 "INSTRUMENTATION_STATUS: channelsRecomposedRows=6\n"
                 "INSTRUMENTATION_STATUS: channelsMaxRowRecompositions=1\n"
                 "INSTRUMENTATION_RESULT: stream=\n"
-                "OK (27 tests)\n"
+                "OK (84 tests)\n"
                 "INSTRUMENTATION_CODE: -1\n"
             ),
             stderr="",
@@ -624,6 +628,16 @@ class DevicePolicyTest(unittest.TestCase):
             commands,
         )
         self.assertIn("guideRailFocusLatencyMs=37", output.getvalue())
+        self.assertIn(
+            "at.bernhardberger.tvhplayer.ui.player.LiveProgrammeInfoOverlayTest",
+            DEVICE["NAVIGATION_BACK_TESTS"],
+        )
+        self.assertIn(
+            "at.bernhardberger.tvhplayer.ui.player.PlayerTimelineTruthfulnessTest",
+            DEVICE["NAVIGATION_BACK_TESTS"],
+        )
+        self.assertIn("backDispatchApiLevel=36", output.getvalue())
+        self.assertIn("rapidBackActionTrace=confirmation>info>player", output.getvalue())
         self.assertIn("channelsRecomposedRows=6", output.getvalue())
         runner_call = next(
             invocation

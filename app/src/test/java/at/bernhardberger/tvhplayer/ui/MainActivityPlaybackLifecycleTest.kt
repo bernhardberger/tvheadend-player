@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,17 +37,29 @@ class MainActivityPlaybackLifecycleTest {
             repositoryRoot,
             "app/src/main/java/at/bernhardberger/tvhplayer/ui/MainActivity.kt",
         ).readText()
-        val finishActivity = source.substringAfter("val finishActivity")
-            .substringBefore("val handleRootBack")
         val rootBack = source.substringAfter("val handleRootBack")
             .substringBefore("BackHandler(")
-        val fallbackBack = activitySource.substringAfter("onBackPressedDispatcher.addCallback")
-            .substringBefore("setContent")
+        val requestRootExit = activitySource.substringAfter("private fun requestRootExit()")
+            .substringBefore("private fun requestApplianceEntry")
 
-        assertTrue(finishActivity.contains("stopPlaybackAndClose("))
-        assertTrue(finishActivity.contains("stopPlayback = playbackRuntime::stop"))
-        assertTrue(rootBack.contains("finishActivity()"))
-        assertTrue(fallbackBack.contains("playbackRuntime.stop()"))
-        assertTrue(fallbackBack.indexOf("playbackRuntime.stop()") < fallbackBack.indexOf("finish()"))
+        assertTrue(rootBack.contains("onRequestExit()"))
+        assertTrue(activitySource.contains("onBackPressedDispatcher.addCallback(this) { requestRootExit() }"))
+        assertTrue(activitySource.contains("onRequestExit = ::requestRootExit"))
+        assertTrue(requestRootExit.contains("if (!rootExitGate.tryBegin()) return"))
+        assertTrue(requestRootExit.contains("stopPlaybackAndClose("))
+        assertTrue(requestRootExit.contains("stopPlayback = playbackRuntime::stop"))
+        assertTrue(requestRootExit.contains("closePlayer = ::finish"))
+    }
+
+    @Test
+    fun twoImmediateRootExitCallbacksStartOneTeardown() {
+        val gate = MainRootExitGate()
+        var teardownCount = 0
+
+        repeat(2) {
+            if (gate.tryBegin()) teardownCount++
+        }
+
+        assertEquals(1, teardownCount)
     }
 }

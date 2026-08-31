@@ -59,7 +59,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
@@ -382,28 +381,6 @@ internal fun RecordingsScreenContent(
                     contentFocusOwned = false
                 }
                 false
-            }
-            .onKeyEvent { event ->
-                if (
-                    !backEnabled ||
-                    event.key != Key.Back ||
-                    event.type != KeyEventType.KeyUp
-                ) {
-                    return@onKeyEvent false
-                }
-                when {
-                    folderPreviewFocused && detailsEntry == null -> {
-                        folderPreviewFocused = false
-                        runCatching { contentFocus.requestFocus() }
-                        true
-                    }
-                    archivePath.isNotEmpty() && detailsEntry == null -> {
-                        archivePath = archivePath.dropLast(1)
-                        requestContentFocus = true
-                        true
-                    }
-                    else -> false
-                }
             }
             .padding(
                 top = contentPadding.calculateTopPadding(),
@@ -1908,18 +1885,11 @@ private fun RecordingDetailsSurface(
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    BackHandler(enabled = backEnabled, onBack = onBack)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.64f))
-            .onPreviewKeyEvent { event ->
-                if (!backEnabled || event.key != Key.Back) {
-                    false
-                } else {
-                    if (event.type == KeyEventType.KeyUp) onBack()
-                    true
-                }
-            }
             .focusGroup()
             .padding(contentPadding)
             .padding(vertical = 24.dp),
@@ -2034,18 +2004,11 @@ private fun RecordingDialogSurface(
     onBack: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    BackHandler(enabled = backEnabled, onBack = onBack)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = TvScrimModalAlpha))
-            .onPreviewKeyEvent { event ->
-                if (!backEnabled || event.key != Key.Back) {
-                    false
-                } else {
-                    if (event.type == KeyEventType.KeyUp) onBack()
-                    true
-                }
-            }
             .focusGroup(),
         contentAlignment = Alignment.Center,
     ) {

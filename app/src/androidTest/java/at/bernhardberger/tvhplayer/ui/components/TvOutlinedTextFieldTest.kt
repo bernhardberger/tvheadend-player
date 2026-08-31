@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -8,17 +10,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -36,7 +35,7 @@ import org.junit.Test
 class TvOutlinedTextFieldTest {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun field_entersEditing_onlyAfterOkPressed() {
@@ -45,16 +44,8 @@ class TvOutlinedTextFieldTest {
             var value by remember { mutableStateOf("") }
             var parentBackCount by remember { mutableStateOf(0) }
             TVHeadendPlayerTheme {
-                Column(
-                    Modifier.onKeyEvent { event ->
-                        if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
-                            parentBackCount += 1
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                ) {
+                BackHandler { parentBackCount += 1 }
+                Column {
                     TvOutlinedTextField(
                         id = "host",
                         editingId = editingId,
@@ -88,11 +79,12 @@ class TvOutlinedTextFieldTest {
         composeTestRule.onNodeWithTag("state").assertTextEquals("editing=host")
 
         // Back leaves editing again.
-        composeTestRule.onNodeWithTag("field").performKeyInput {
-            pressKey(Key.Back)
-        }
+        dispatchBack()
         composeTestRule.onNodeWithTag("state").assertTextEquals("editing=none")
         composeTestRule.onNodeWithTag("parent-back-state").assertTextEquals("parentBack=0")
+
+        dispatchBack()
+        composeTestRule.onNodeWithTag("parent-back-state").assertTextEquals("parentBack=1")
     }
 
     @Test
@@ -113,8 +105,59 @@ class TvOutlinedTextFieldTest {
         }
 
         composeTestRule.onNodeWithTag("password")
-            .assertTextEquals(FAKE_PASSWORD)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.EditableText,
+                    AnnotatedString("\u2022".repeat(FAKE_PASSWORD.length)),
+                )
+            )
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
+    }
+
+    @Test
+    fun passwordEditingConsumesBackBeforeTheParentOwner() {
+        composeTestRule.setContent {
+            var editingId by remember { mutableStateOf<String?>(null) }
+            var parentBackCount by remember { mutableStateOf(0) }
+            TVHeadendPlayerTheme {
+                BackHandler { parentBackCount += 1 }
+                Column {
+                    TvPasswordField(
+                        id = "password",
+                        editingId = editingId,
+                        setEditingId = { editingId = it },
+                        value = FAKE_PASSWORD,
+                        onValueChange = {},
+                        modifier = Modifier.testTag("password"),
+                    )
+                    Text(
+                        text = "editing=${editingId ?: "none"}",
+                        modifier = Modifier.testTag("password-editing-state"),
+                    )
+                    Text(
+                        text = "parentBack=$parentBackCount",
+                        modifier = Modifier.testTag("password-parent-back-state"),
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag("password").requestFocus().performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeTestRule.onNodeWithTag("password-editing-state")
+            .assertTextEquals("editing=password")
+
+        dispatchBack()
+        composeTestRule.onNodeWithTag("password-editing-state").assertTextEquals("editing=none")
+        composeTestRule.onNodeWithTag("password-parent-back-state")
+            .assertTextEquals("parentBack=0")
+    }
+
+    private fun dispatchBack() {
+        composeTestRule.runOnIdle {
+            composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+        }
     }
 
     private companion object {
