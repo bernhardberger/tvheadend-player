@@ -131,7 +131,6 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -429,8 +428,6 @@ fun VideoPlayerScreen(
             lastPlayedChannelStore.setChannelId(currentChannelId)
         }
     }
-
-    KeepScreenOn(enabled = true)
 
     var interactionToken by remember { mutableIntStateOf(0) }
     val autoHideMs = 5000L

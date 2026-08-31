@@ -167,6 +167,11 @@ one named product policy to either the fixed two-hour SDK request or zero. The
 duration remains non-configurable, and SDK timeshift semantics and seek ranges
 are unchanged.
 
+**B4-P15 completed:** the persistent `PlayerView` is the sole keep-screen-on
+owner. Its attached-view lifetime preserves keep-awake across player routes and
+warm playback, becomes ineffective with its background window, and clears on
+surface release. The redundant route-local window flag owner was removed.
+
 - Remove production interfaces that exist only as test seams, including
   `SdkShutdownActions`, only after tests can exercise the concrete owner without
   weakening ordered shutdown coverage.

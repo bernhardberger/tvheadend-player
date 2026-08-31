@@ -71,7 +71,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
-import at.bernhardberger.tvhplayer.ui.components.KeepScreenOn
 import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import coil3.ImageLoader
@@ -407,11 +406,6 @@ fun RecordingPlayerScreen(
     }
 
     PlayerBackHandler(handlePlaybackBack)
-    KeepScreenOn(
-        enabled = playbackAvailable &&
-            playbackState !is AppPlaybackState.Failed,
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
