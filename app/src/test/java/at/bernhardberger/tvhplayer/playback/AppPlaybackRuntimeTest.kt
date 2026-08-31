@@ -4,6 +4,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
@@ -20,6 +22,16 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppPlaybackRuntimeTest {
+    @Test
+    fun enabledTimeshiftRequestsTheFixedProductPeriod() {
+        assertEquals(2.hours, requestedLiveTimeshiftPeriod(timeshiftEnabled = true))
+    }
+
+    @Test
+    fun disabledTimeshiftRequestsNoPeriod() {
+        assertEquals(Duration.ZERO, requestedLiveTimeshiftPeriod(timeshiftEnabled = false))
+    }
+
     @Test
     fun liveTargetSetsAppOwnedPlayIntentBeforeCoordinatorInstall() = runTest {
         val events = mutableListOf<String>()

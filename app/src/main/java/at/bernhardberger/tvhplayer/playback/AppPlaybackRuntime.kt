@@ -25,8 +25,8 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -70,6 +70,12 @@ data class AppTimeshiftState(
     val positionMs: Long = 0L,
     val liveEdgeMs: Long = 0L,
 )
+
+private val FIXED_LIVE_TIMESHIFT_PERIOD = 2.hours
+
+internal fun requestedLiveTimeshiftPeriod(timeshiftEnabled: Boolean): Duration =
+    if (timeshiftEnabled) FIXED_LIVE_TIMESHIFT_PERIOD else Duration.ZERO
+
 data class TimeshiftSeekDecision(
     val targetMs: Long,
     val deltaMs: Long,
@@ -371,7 +377,9 @@ class AppPlaybackRuntime(
                             binding.binding,
                             LivePlaybackOptions(
                                 streamProfileId = streamProfileId,
-                                timeshiftPeriod = if (playerSettings.timeshiftEnabled) 2.hours else kotlin.time.Duration.ZERO,
+                                timeshiftPeriod = requestedLiveTimeshiftPeriod(
+                                    playerSettings.timeshiftEnabled,
+                                ),
                             ),
                         )
                     },
@@ -734,5 +742,3 @@ internal fun measuredTimeshiftPresentation(
     val buffered = bufferedDuration?.inWholeMilliseconds?.coerceAtLeast(behind) ?: behind
     return AppTimeshiftState(true, serverPaused == true, -buffered, -behind, 0L)
 }
-
-private val Int.hours get() = this.seconds * 3_600

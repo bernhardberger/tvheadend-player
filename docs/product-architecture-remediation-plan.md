@@ -162,6 +162,11 @@ retained, with explicit coverage for exact shutdown order, primary failure
 identity, suppressed-failure order, and completion of every later shutdown
 action.
 
+**B4-P14 completed:** the existing timeshift enablement setting now maps through
+one named product policy to either the fixed two-hour SDK request or zero. The
+duration remains non-configurable, and SDK timeshift semantics and seek ranges
+are unchanged.
+
 - Remove production interfaces that exist only as test seams, including
   `SdkShutdownActions`, only after tests can exercise the concrete owner without
   weakening ordered shutdown coverage.
