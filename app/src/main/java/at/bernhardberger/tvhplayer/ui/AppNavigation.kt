@@ -60,12 +60,10 @@ internal data class RecordingPlayerKey(
 @Serializable
 internal enum class SettingsSection {
     GENERAL,
-    OPTIONS,
     CHANNEL_TAGS,
     CONNECTION,
     PLAYER,
     APPLIANCE,
-    SIMPLE_TV,
 }
 
 @Serializable

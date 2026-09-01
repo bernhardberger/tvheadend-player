@@ -20,10 +20,11 @@ import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 @Composable
 fun SettingsPane(
     title: String,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),

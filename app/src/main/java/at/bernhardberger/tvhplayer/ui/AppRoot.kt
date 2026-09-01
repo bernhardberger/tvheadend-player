@@ -741,7 +741,6 @@ fun AppRoot(
                             initialFocusEnabled = !drawerActive,
                             contentPadding = contentPadding,
                             backEnabled = !applianceLaunchActive,
-                            showSimpleTvSettings = productProfile is ProductProfile.Standard,
                             onNavigate = { section ->
                                 navigateTopLevel(SettingsKey(section))
                             },

@@ -134,7 +134,6 @@ internal fun SettingsRouteContent(
     initialFocusEnabled: Boolean,
     contentPadding: PaddingValues,
     backEnabled: Boolean,
-    showSimpleTvSettings: Boolean,
     onNavigate: (SettingsSection) -> Unit,
     onStartSimpleTv: (SimpleTvSettings) -> Unit,
 ) {
@@ -145,7 +144,6 @@ internal fun SettingsRouteContent(
                 initialFocusEnabled = initialFocusEnabled,
                 contentPadding = contentPadding,
                 backEnabled = backEnabled,
-                showSimpleTvSettings = showSimpleTvSettings,
                 onNavigate = onNavigate,
                 onStartSimpleTv = onStartSimpleTv,
             )

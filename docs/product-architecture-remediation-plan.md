@@ -249,7 +249,7 @@ sensitive values, lease release, stale-observation rejection, and shutdown join.
 - Remove one-use abstractions only when tests can use concrete public behavior;
   do not replace them with test-only production hooks.
 
-### 10. Settings consolidation
+### 10. Settings consolidation (B4-P21, complete)
 
 - Merge thin General and Options presentation into one coherent user-facing
   section while retaining internal player and UI setting ownership.

@@ -19,7 +19,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -34,10 +33,8 @@ import at.bernhardberger.tvhplayer.core.settingsBackAction
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnection
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsChannelTags
-import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsLanguage
-import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsOptions
+import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsGeneral
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer
-import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsSimpleTv
 
 @Composable
 internal fun SettingsScreen(
@@ -45,7 +42,6 @@ internal fun SettingsScreen(
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
-    showSimpleTvSettings: Boolean = true,
     onNavigate: (SettingsSection) -> Unit,
     onStartSimpleTv: (SimpleTvSettings) -> Unit,
 ) {
@@ -54,17 +50,14 @@ internal fun SettingsScreen(
         initialFocusEnabled = initialFocusEnabled,
         contentPadding = contentPadding,
         backEnabled = backEnabled,
-        showSimpleTvSettings = showSimpleTvSettings,
         onNavigate = onNavigate,
     ) { destination, initialFocusRequester ->
         when (destination) {
-            SettingsSection.GENERAL -> SettingsLanguage(initialFocusRequester)
+            SettingsSection.GENERAL -> SettingsGeneral(initialFocusRequester)
             SettingsSection.CONNECTION -> SettingsConnection(initialFocusRequester)
-            SettingsSection.OPTIONS -> SettingsOptions(initialFocusRequester)
             SettingsSection.CHANNEL_TAGS -> SettingsChannelTags(initialFocusRequester)
             SettingsSection.PLAYER -> SettingsPlayer(initialFocusRequester)
-            SettingsSection.APPLIANCE -> SettingsAppliance(initialFocusRequester)
-            SettingsSection.SIMPLE_TV -> SettingsSimpleTv(
+            SettingsSection.APPLIANCE -> SettingsAppliance(
                 initialFocusRequester = initialFocusRequester,
                 onStartSimpleTv = onStartSimpleTv,
             )
@@ -78,14 +71,10 @@ internal fun SettingsScreenNavigation(
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
-    showSimpleTvSettings: Boolean,
     onNavigate: (SettingsSection) -> Unit,
     destinationContent: @Composable (SettingsSection, FocusRequester) -> Unit,
 ) {
     val settingsSections = remember { SettingsSection.entries }
-    val resolvedSection = currentSection.takeUnless {
-        it == SettingsSection.SIMPLE_TV && !showSimpleTvSettings
-    } ?: SettingsSection.GENERAL
     val categoryFocus = remember(settingsSections) {
         settingsSections.associateWith { FocusRequester() }
     }
@@ -99,34 +88,21 @@ internal fun SettingsScreenNavigation(
         contentPaneFocused = contentPaneFocused,
     )
     val focusCurrentCategory: () -> Unit = {
-        categoryFocus.getValue(resolvedSection).requestFocus()
+        categoryFocus.getValue(currentSection).requestFocus()
     }
     BackHandler(
         enabled = backEnabled && backAction == SettingsBackAction.FOCUS_CURRENT_CATEGORY,
     ) {
         focusCurrentCategory()
     }
-    LaunchedEffect(initialFocusEnabled, resolvedSection) {
+    LaunchedEffect(initialFocusEnabled, currentSection) {
         if (!initialFocusEnabled) {
             initialCategoryFocusHandled = false
             return@LaunchedEffect
         }
         if (!initialCategoryFocusHandled) {
-            categoryFocus.getValue(resolvedSection).requestFocus()
+            categoryFocus.getValue(currentSection).requestFocus()
             initialCategoryFocusHandled = true
-        }
-    }
-    LaunchedEffect(currentSection, showSimpleTvSettings) {
-        if (resolvedSection != currentSection) {
-            val restoreContentFocus = contentPaneFocused
-            onNavigate(resolvedSection)
-            withFrameNanos { }
-            val requester = if (restoreContentFocus) {
-                contentFocus.getValue(resolvedSection)
-            } else {
-                categoryFocus.getValue(resolvedSection)
-            }
-            runCatching(requester::requestFocus)
         }
     }
     Surface(
@@ -139,18 +115,17 @@ internal fun SettingsScreenNavigation(
         Row(
             Modifier
                 .fillMaxSize()
-                .focusRestorer(categoryFocus.getValue(resolvedSection))
+                .focusRestorer(categoryFocus.getValue(currentSection))
                 // The shell owns the global rail; Settings owns its inner panel spacing.
                 .padding(contentPadding)
         ) {
             SettingsSubRail(
-                currentRoute = resolvedSection,
+                currentRoute = currentSection,
                 categoryFocusRequesters = categoryFocus,
                 contentFocusRequesters = contentFocus,
                 // Settings owns route-aware entry so a direct Connection start
                 // never briefly focuses General while the typed destination initializes.
                 initialFocusEnabled = false,
-                showSimpleTv = showSimpleTvSettings,
                 onNavigate = onNavigate,
             )
 
@@ -164,8 +139,8 @@ internal fun SettingsScreenNavigation(
                     .focusGroup()
             ) {
                 destinationContent(
-                    resolvedSection,
-                    contentFocus.getValue(resolvedSection),
+                    currentSection,
+                    contentFocus.getValue(currentSection),
                 )
             }
         }

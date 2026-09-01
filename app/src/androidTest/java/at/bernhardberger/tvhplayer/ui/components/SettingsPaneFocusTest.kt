@@ -42,15 +42,7 @@ class SettingsPaneFocusTest {
         composeTestRule.setContent {
             val contentFocus = remember { FocusRequester() }
             val contentFocusRequesters = remember {
-                listOf(
-                    SettingsSection.GENERAL,
-                    SettingsSection.OPTIONS,
-                    SettingsSection.CHANNEL_TAGS,
-                    SettingsSection.CONNECTION,
-                    SettingsSection.PLAYER,
-                    SettingsSection.APPLIANCE,
-                    SettingsSection.SIMPLE_TV,
-                ).associateWith { route ->
+                SettingsSection.entries.associateWith { route ->
                     if (route == SettingsSection.PLAYER) contentFocus else FocusRequester()
                 }
             }
@@ -105,7 +97,7 @@ class SettingsPaneFocusTest {
             pressKey(Key.DirectionCenter)
         }
         composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
-        composeTestRule.onNodeWithText("Language").assertIsDisplayed()
+        composeTestRule.onNodeWithText("General").assertIsDisplayed()
         val contentLeftWithContentFocus = composeTestRule.onNodeWithText("Timeshift")
             .fetchSemanticsNode().boundsInRoot.left
         assertEquals(contentLeftWithCategoryFocus, contentLeftWithContentFocus, 0.5f)
@@ -136,21 +128,11 @@ class SettingsPaneFocusTest {
     }
 
     @Test
-    fun changingVisibleCategoriesDoesNotStealDetailFocus() {
-        var showSimpleTv by mutableStateOf(true)
+    fun changingSelectedCategoryDoesNotStealDetailFocus() {
+        var currentRoute by mutableStateOf(SettingsSection.PLAYER)
         composeTestRule.setContent {
             val contentFocus = remember { FocusRequester() }
-            val routes = remember {
-                listOf(
-                    SettingsSection.GENERAL,
-                    SettingsSection.OPTIONS,
-                    SettingsSection.CHANNEL_TAGS,
-                    SettingsSection.CONNECTION,
-                    SettingsSection.PLAYER,
-                    SettingsSection.APPLIANCE,
-                    SettingsSection.SIMPLE_TV,
-                )
-            }
+            val routes = remember { SettingsSection.entries }
             val categoryFocusRequesters = remember {
                 routes.associateWith { FocusRequester() }
             }
@@ -162,11 +144,10 @@ class SettingsPaneFocusTest {
             TVHeadendPlayerTheme {
                 Row(Modifier.fillMaxSize()) {
                     SettingsSubRail(
-                        currentRoute = SettingsSection.PLAYER,
+                        currentRoute = currentRoute,
                         categoryFocusRequesters = categoryFocusRequesters,
                         contentFocusRequesters = contentFocusRequesters,
                         onNavigate = {},
-                        showSimpleTv = showSimpleTv,
                     )
                     SettingsSwitchRow(
                         label = "Timeshift",
@@ -184,7 +165,7 @@ class SettingsPaneFocusTest {
             pressKey(Key.DirectionCenter)
         }
         composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
-        composeTestRule.runOnIdle { showSimpleTv = false }
+        composeTestRule.runOnIdle { currentRoute = SettingsSection.APPLIANCE }
         composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
     }
 }

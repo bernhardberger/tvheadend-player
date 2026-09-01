@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.tv.material3.Button
@@ -25,6 +26,9 @@ import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.MainStartupComposition
 import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
 import at.bernhardberger.tvhplayer.ui.AppNavKey
@@ -35,6 +39,8 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.navigateTopLevel
 import at.bernhardberger.tvhplayer.ui.popNavigation
 import at.bernhardberger.tvhplayer.ui.rememberAppNavBackStack
+import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
+import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsGeneral
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -51,7 +57,6 @@ class SettingsStartupEntryTest {
                 SettingsScreenNavigation(
                     currentSection = SettingsSection.GENERAL,
                     initialFocusEnabled = true,
-                    showSimpleTvSettings = true,
                     onNavigate = {},
                 ) { route, focusRequester ->
                     Button(
@@ -64,9 +69,70 @@ class SettingsStartupEntryTest {
             }
         }
 
-        composeRule.onNodeWithText("Language").assertIsSelected().assertIsFocused()
+        composeRule.onNodeWithText("General").assertIsSelected().assertIsFocused()
         composeRule.onNodeWithText("Content ${SettingsSection.GENERAL}").assertExists()
         composeRule.onNodeWithText("Content ${SettingsSection.CONNECTION}").assertDoesNotExist()
+    }
+
+    @Test
+    fun generalCategoryEntersProductionFirstLanguageControl() {
+        val settingsStore = UiSettingsStore(composeRule.activity.applicationContext)
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(
+                    currentSection = SettingsSection.GENERAL,
+                    onNavigate = {},
+                ) { _, focusRequester ->
+                    SettingsGeneral(
+                        initialFocusRequester = focusRequester,
+                        settingsStore = settingsStore,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("General").performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeRule.onNodeWithText(
+            composeRule.activity.getString(R.string.language_follow_system)
+        ).assertIsFocused()
+    }
+
+    @Test
+    fun applianceCategoryEntersAutoStartAndReachesSimpleTvStart() {
+        val context = composeRule.activity.applicationContext
+        val settingsStore = UiSettingsStore(context)
+        val simpleTvSettingsStore = SimpleTvSettingsStore(context)
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(
+                    currentSection = SettingsSection.APPLIANCE,
+                    onNavigate = {},
+                ) { _, focusRequester ->
+                    SettingsAppliance(
+                        initialFocusRequester = focusRequester,
+                        onStartSimpleTv = {},
+                        settingsStore = settingsStore,
+                        simpleTvSettingsStore = simpleTvSettingsStore,
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Appliance").performKeyInput {
+            pressKey(Key.DirectionCenter)
+        }
+        composeRule.onNodeWithText(
+            composeRule.activity.getString(R.string.auto_start_playback)
+        ).assertIsFocused()
+
+        composeRule.onRoot().performKeyInput {
+            repeat(12) { pressKey(Key.DirectionDown) }
+        }
+        composeRule.onNodeWithText(
+            composeRule.activity.getString(R.string.simple_tv_start_now)
+        ).assertIsFocused()
     }
 
     @Test
@@ -80,7 +146,6 @@ class SettingsStartupEntryTest {
                     SettingsScreenNavigation(
                         currentSection = SettingsSection.CONNECTION,
                         initialFocusEnabled = true,
-                        showSimpleTvSettings = true,
                         onNavigate = {},
                     ) { route, focusRequester ->
                         Button(
@@ -138,7 +203,6 @@ class SettingsStartupEntryTest {
                 BackHandler { shellBackCount++ }
                 SettingsScreenNavigation(
                     currentSection = SettingsSection.GENERAL,
-                    showSimpleTvSettings = true,
                     onNavigate = {},
                 ) { route, focusRequester ->
                     Button(
@@ -151,13 +215,13 @@ class SettingsStartupEntryTest {
             }
         }
 
-        composeRule.onNodeWithText("Language").assertIsFocused().performKeyInput {
+        composeRule.onNodeWithText("General").assertIsFocused().performKeyInput {
             pressKey(Key.DirectionCenter)
         }
         composeRule.onNodeWithText("Content ${SettingsSection.GENERAL}").assertIsFocused()
 
         dispatchBack()
-        composeRule.onNodeWithText("Language").assertIsFocused()
+        composeRule.onNodeWithText("General").assertIsFocused()
         composeRule.runOnIdle { assertEquals(0, shellBackCount) }
 
         dispatchBack()
@@ -177,7 +241,6 @@ class SettingsStartupEntryTest {
                     entry<SettingsKey> { key ->
                         SettingsScreenNavigation(
                             currentSection = key.section,
-                            showSimpleTvSettings = true,
                             onNavigate = { backStack.navigateTopLevel(SettingsKey(it)) },
                         ) { section, focusRequester ->
                             Button(

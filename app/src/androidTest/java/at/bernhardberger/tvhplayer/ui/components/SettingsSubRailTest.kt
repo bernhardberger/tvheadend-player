@@ -29,15 +29,7 @@ class SettingsSubRailTest {
         composeTestRule.setContent {
             var route by remember { mutableStateOf(SettingsSection.GENERAL) }
             val contentFocus = remember {
-                listOf(
-                    SettingsSection.GENERAL,
-                    SettingsSection.OPTIONS,
-                    SettingsSection.CHANNEL_TAGS,
-                    SettingsSection.CONNECTION,
-                    SettingsSection.PLAYER,
-                    SettingsSection.APPLIANCE,
-                    SettingsSection.SIMPLE_TV,
-                ).associateWith { FocusRequester() }
+                SettingsSection.entries.associateWith { FocusRequester() }
             }
             val categoryFocus = remember {
                 contentFocus.keys.associateWith { FocusRequester() }
@@ -55,19 +47,14 @@ class SettingsSubRailTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Language").assertIsFocused()
-        composeTestRule.onNodeWithText("Language").performKeyInput {
-            pressKey(Key.DirectionDown)
-        }
-        composeTestRule.onNodeWithText("Options").assertIsFocused()
-        composeTestRule.runOnIdle {
-            assertEquals(SettingsSection.OPTIONS, selectedRoute)
-        }
-        composeTestRule.onNodeWithText("Options").performKeyInput {
+        composeTestRule.onNodeWithText("General").assertIsFocused()
+        composeTestRule.onNodeWithText("Options").assertDoesNotExist()
+        composeTestRule.onNodeWithText("Simple TV").assertDoesNotExist()
+        composeTestRule.onNodeWithText("General").performKeyInput {
             pressKey(Key.DirectionDown)
         }
         // Focus stays on the category rail after its pane updates; Down moves to
-        // the next rail item (Channel groups) without jumping into content.
+        // Channel groups without jumping into content.
         composeTestRule.onNodeWithText("Channel groups").assertIsFocused()
         composeTestRule.runOnIdle {
             assertEquals(SettingsSection.CHANNEL_TAGS, selectedRoute)

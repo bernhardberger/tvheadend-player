@@ -27,12 +27,10 @@ class AppNavigationTest {
         assertEquals(
             setOf(
                 SettingsSection.GENERAL,
-                SettingsSection.OPTIONS,
                 SettingsSection.CHANNEL_TAGS,
                 SettingsSection.CONNECTION,
                 SettingsSection.PLAYER,
                 SettingsSection.APPLIANCE,
-                SettingsSection.SIMPLE_TV,
             ),
             SettingsSection.entries.toSet(),
         )

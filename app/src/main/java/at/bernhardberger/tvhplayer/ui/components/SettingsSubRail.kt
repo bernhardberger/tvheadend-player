@@ -15,10 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -52,11 +50,8 @@ internal fun SettingsSubRail(
     onNavigate: (SettingsSection) -> Unit,
     modifier: Modifier = Modifier,
     initialFocusEnabled: Boolean = true,
-    showSimpleTv: Boolean = true,
 ) {
-    val items = rememberSettingsItems(
-        showSimpleTv = showSimpleTv,
-    )
+    val items = rememberSettingsItems()
     val visibleRoutes = items.mapTo(mutableSetOf()) { it.route }
     val activeRoute = currentRoute?.takeIf(visibleRoutes::contains) ?: items.first().route
     val activeItemFocus = categoryFocusRequesters.getValue(activeRoute)
@@ -115,39 +110,25 @@ internal fun SettingsSubRail(
 }
 
 @Composable
-private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem<SettingsSection>> {
-    val languageLabel = stringResource(R.string.settings_language_nav)
-    val optionsLabel = stringResource(R.string.settings_options_nav)
+private fun rememberSettingsItems(): List<RailItem<SettingsSection>> {
+    val generalLabel = stringResource(R.string.settings_general_nav)
     val channelTagsLabel = stringResource(R.string.settings_channel_tags_nav)
     val connectionLabel = stringResource(R.string.settings_connection_nav)
     val playerLabel = stringResource(R.string.settings_player_nav)
     val applianceLabel = stringResource(R.string.settings_appliance_nav)
-    val simpleTvLabel = stringResource(R.string.settings_simple_tv_nav)
     return remember(
-        languageLabel,
-        optionsLabel,
+        generalLabel,
         channelTagsLabel,
         connectionLabel,
         playerLabel,
         applianceLabel,
-        simpleTvLabel,
-        showSimpleTv,
     ) {
         buildList {
             add(
-                RailItem(SettingsSection.GENERAL, languageLabel) {
-                    Icon(
-                        Icons.Filled.Language,
-                        contentDescription = languageLabel,
-                        modifier = Modifier.size(24.dp),
-                    )
-                },
-            )
-            add(
-                RailItem(SettingsSection.OPTIONS, optionsLabel) {
+                RailItem(SettingsSection.GENERAL, generalLabel) {
                     Icon(
                         Icons.Filled.Tune,
-                        contentDescription = optionsLabel,
+                        contentDescription = generalLabel,
                         modifier = Modifier.size(24.dp),
                     )
                 },
@@ -188,17 +169,6 @@ private fun rememberSettingsItems(showSimpleTv: Boolean): List<RailItem<Settings
                     )
                 },
             )
-            if (showSimpleTv) {
-                add(
-                    RailItem(SettingsSection.SIMPLE_TV, simpleTvLabel) {
-                        Icon(
-                            Icons.Filled.AccessibilityNew,
-                            contentDescription = simpleTvLabel,
-                            modifier = Modifier.size(24.dp),
-                        )
-                    },
-                )
-            }
         }
     }
 }

@@ -26,9 +26,9 @@
 
     <string name="settings_server">Verbindung</string>
     <string name="settings_language">Sprache</string>
-    <string name="settings_language_nav">Sprache</string>
-    <string name="settings_options">Optionen</string>
-    <string name="settings_options_nav">Optionen</string>
+    <string name="settings_general">Allgemein</string>
+    <string name="settings_general_nav">Allgemein</string>
+    <string name="settings_navigation">Navigation</string>
     <string name="settings_channel_tags_nav">Sendergruppen</string>
     <string name="settings_channel_tags">Sendergruppen</string>
     <string name="settings_channel_tags_description">Wählen Sie, welche Sendergruppen auf diesem Fernseher unter Sender und Programmführer verfügbar sind.</string>
@@ -62,7 +62,6 @@
     <string name="settings_connection_nav">Verbindung</string>
     <string name="settings_player_nav">Wiedergabe</string>
     <string name="settings_appliance_nav">TV-Start</string>
-    <string name="settings_simple_tv_nav">Einfaches TV</string>
     <string name="settings_simple_tv">Einfaches TV</string>
     <string name="language_follow_system">System folgen</string>
     <string name="language_german">Deutsch</string>

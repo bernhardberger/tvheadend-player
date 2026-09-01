@@ -30,9 +30,9 @@
     <!-- Settings screen -->
     <string name="settings_server">Connection</string>
     <string name="settings_language">Language</string>
-    <string name="settings_language_nav">Language</string>
-    <string name="settings_options">Options</string>
-    <string name="settings_options_nav">Options</string>
+    <string name="settings_general">General</string>
+    <string name="settings_general_nav">General</string>
+    <string name="settings_navigation">Navigation</string>
     <string name="settings_channel_tags_nav">Channel groups</string>
     <string name="settings_channel_tags">Channel groups</string>
     <string name="settings_channel_tags_description">Choose which channel groups are available in Channels and Guide on this TV.</string>
@@ -66,7 +66,6 @@
     <string name="settings_connection_nav">Connection</string>
     <string name="settings_player_nav">Player</string>
     <string name="settings_appliance_nav">Appliance</string>
-    <string name="settings_simple_tv_nav">Simple TV</string>
     <string name="settings_simple_tv">Simple TV</string>
     <string name="language_follow_system">Follow system</string>
     <string name="language_german">German</string>
