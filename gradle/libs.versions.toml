@@ -17,7 +17,6 @@ lifecycle = "2.10.0"
 material = "1.13.0"
 media3 = "1.11.0"
 navigation3 = "1.1.7"
-timber = "5.0.1"
 tvMaterial = "1.1.0"
 tvheadend-sdk = "0.3.4"
 junit = "4.13.2"
@@ -57,7 +56,6 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 tvheadend-sdk-android = { module = "at.bernhardberger.tvheadend:sdk-android" }
 tvheadend-sdk-media3 = { module = "at.bernhardberger.tvheadend:sdk-media3" }
 tvheadend-sdk-testing = { module = "at.bernhardberger.tvheadend:sdk-testing" }

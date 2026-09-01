@@ -283,7 +283,7 @@ The independent review identified plausible risks, not proven defects.
 - Keep source-specific lifecycle, timeline, live-edge, track, and error behavior
   explicit.
 
-### 13. Dependency hygiene
+### 13. Dependency hygiene (B4-P25 Timber removal complete; remaining items deferred)
 
 - Remove Timber if it remains a planted tree with no logging calls.
 - Re-parent the app theme and remove Material Components only with a visual

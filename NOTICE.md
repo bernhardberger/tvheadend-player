@@ -15,9 +15,9 @@ endorsed by, or sponsored by the Tvheadend project. Artwork generation is
 documented in `artwork/README.md`.
 
 The application uses AndroidX, Jetpack Compose, Compose for TV, Material
-Components, Media3, Kotlin coroutines, Coil, Koin, and Timber. Their own copyright
-and license terms continue to apply; dependency coordinates and exact versions
-are recorded in `gradle/libs.versions.toml`.
+Components, Media3, Kotlin coroutines, Coil, and Koin. Their own copyright and
+license terms continue to apply; dependency coordinates and exact versions are
+recorded in `gradle/libs.versions.toml`.
 
 The project-local Kotlin and Compose engineering skills under `.agents/skills/`
 are selected unmodified files from Chris Banes' `chrisbanes/skills` release

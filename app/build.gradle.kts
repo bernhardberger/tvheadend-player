@@ -108,7 +108,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
-    implementation(libs.timber)
 
     // Presentation API only; the released SDK owns concrete playback and codecs.
     implementation(libs.androidx.media3.ui)
