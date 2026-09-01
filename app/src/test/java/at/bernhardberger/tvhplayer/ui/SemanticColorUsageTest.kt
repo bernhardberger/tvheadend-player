@@ -33,6 +33,8 @@ class SemanticColorUsageTest {
             "ui/screens/settings/SettingsConnection.kt",
             "ui/screens/settings/SettingsSimpleTv.kt",
             "ui/screens/RecordingsScreen.kt",
+            "ui/screens/recordings/RecordingsContent.kt",
+            "ui/screens/recordings/RecordingsModals.kt",
             "ui/screens/EpgGridScreen.kt",
             "ui/screens/guide/EpgGridContent.kt",
             "ui/screens/guide/EpgGridModals.kt",

@@ -260,11 +260,14 @@ sensitive values, lease release, stale-observation rejection, and shutdown join.
 Stop if a move makes settings reachable from Appliance without its existing
 guard.
 
-### 11. Guide and Recordings decomposition (B4-P22 Guide complete)
+### 11. Guide and Recordings decomposition (B4-P22 Guide and B4-P23 Recordings complete)
 
 - B4-P22 keeps Guide state, focus, coverage, observation and DVR orchestration
   in `EpgGridScreen.kt`, with cohesive timeline/content and modal rendering in
-  `ui/screens/guide`. B4-P23 retains the separate Recordings decomposition.
+  `ui/screens/guide`.
+- B4-P23 keeps Recordings observation, selection/restoration, focus, playback,
+  and DVR mutation orchestration in `RecordingsScreen.kt`, with cohesive browser
+  content and modal rendering in `ui/screens/recordings`.
 - Do not create generic base screens or one-file-per-composable fragmentation.
 - Keep two-dimensional Guide focus, coverage/frontier loading, and Recordings
   selection/restoration behavior unchanged.
