@@ -276,7 +276,7 @@ Before adding `focusRestorer()` to Guide or replacing per-row
 `BoxWithConstraints`, reproduce focus entry and measure row cost on a target TV.
 The independent review identified plausible risks, not proven defects.
 
-### 12. Player shell convergence
+### 12. Player shell convergence (B4-P24/P24R complete)
 
 - Share only proven-identical player chrome, focus containment, and surface
   placement between live and recording playback.

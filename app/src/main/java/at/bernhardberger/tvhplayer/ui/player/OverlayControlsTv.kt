@@ -1,15 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -60,12 +56,7 @@ import at.bernhardberger.tvhplayer.core.programmeAnchoredAxis
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
-import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
-import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBlockGap
-import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
@@ -205,50 +196,37 @@ fun OverlayControlsTv(
     } else {
         null
     }
-    Box(Modifier.fillMaxSize()) {
-        PlayerIdentityHeader(
-            imageLoader = imageLoader,
-            currentSession = currentSession,
-            piconPath = piconPath,
-            eyebrow = channelTitleText(number = channelNumber, name = channelName),
-            title = title.ifEmpty { channelName },
-            support = nextEvent?.let {
-                stringResource(R.string.player_next_event_at, formatClock(it.start.epochSeconds), it.title.orEmpty())
-            },
-            clock = clock,
-            clockSupport = nowEvent?.let {
-                stringResource(R.string.player_ends_in, formatClock(it.stop.epochSeconds))
-            },
-            tags = PlayerHeaderTags(
-                picon = "player-picon",
-                eyebrow = "player-channel-identity",
-                title = "player-programme-title",
-                support = "player-next-programme",
-                clock = "player-clock",
-                clockSupport = "player-programme-end",
-            ),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .background(topGradient)
-                .padding(
-                    start = TvOverlaySidePadding,
-                    end = TvOverlaySidePadding,
-                    top = TvOverlayTopPadding,
-                    bottom = TvOverlayHeaderGradientRunout,
+    PlayerOverlayChrome(
+        headerContent = { headerModifier ->
+            PlayerIdentityHeader(
+                imageLoader = imageLoader,
+                currentSession = currentSession,
+                piconPath = piconPath,
+                eyebrow = channelTitleText(number = channelNumber, name = channelName),
+                title = title.ifEmpty { channelName },
+                support = nextEvent?.let {
+                    stringResource(
+                        R.string.player_next_event_at,
+                        formatClock(it.start.epochSeconds),
+                        it.title.orEmpty(),
+                    )
+                },
+                clock = clock,
+                clockSupport = nowEvent?.let {
+                    stringResource(R.string.player_ends_in, formatClock(it.stop.epochSeconds))
+                },
+                tags = PlayerHeaderTags(
+                    picon = "player-picon",
+                    eyebrow = "player-channel-identity",
+                    title = "player-programme-title",
+                    support = "player-next-programme",
+                    clock = "player-clock",
+                    clockSupport = "player-programme-end",
                 ),
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(bottomGradient)
-                .padding(
-                    start = TvOverlaySidePadding,
-                    end = TvOverlaySidePadding,
-                    top = TvOverlayFooterGradientRunout,
-                    bottom = TvOverlayBottomPadding,
-                ),
-        ) {
+                modifier = headerModifier,
+            )
+        },
+    ) {
             if (timeshiftState.available || nowEvent != null) {
                 Column(Modifier.testTag("player-timeline")) {
                     if (timeshiftState.available) {
@@ -484,6 +462,5 @@ fun OverlayControlsTv(
                     null
                 },
             )
-        }
     }
 }

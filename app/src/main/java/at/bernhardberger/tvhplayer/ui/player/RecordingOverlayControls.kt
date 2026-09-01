@@ -2,11 +2,9 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -60,12 +58,10 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBlockGap
-import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import coil3.ImageLoader
 
@@ -183,45 +179,28 @@ internal fun RecordingOverlayControls(
         null
     }
     val clock = remember(nowSec) { formatClock(nowSec) }
-    Box(Modifier.fillMaxSize()) {
-        PlayerIdentityHeader(
-            imageLoader = imageLoader,
-            currentSession = currentSession,
-            piconPath = piconPath,
-            eyebrow = channelName?.takeIf(String::isNotBlank),
-            title = title,
-            support = subtitle?.takeIf(String::isNotBlank),
-            clock = clock,
-            clockSupport = null,
-            tags = PlayerHeaderTags(
-                picon = "recording-picon",
-                eyebrow = "recording-channel-identity",
-                title = "recording-programme-title",
-                support = "recording-subtitle",
-                clock = "recording-clock",
-            ),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .background(topGradient)
-                .padding(
-                    start = TvOverlaySidePadding,
-                    end = TvOverlaySidePadding,
-                    top = TvOverlayTopPadding,
-                    bottom = TvOverlayHeaderGradientRunout,
+    PlayerOverlayChrome(
+        headerContent = { headerModifier ->
+            PlayerIdentityHeader(
+                imageLoader = imageLoader,
+                currentSession = currentSession,
+                piconPath = piconPath,
+                eyebrow = channelName?.takeIf(String::isNotBlank),
+                title = title,
+                support = subtitle?.takeIf(String::isNotBlank),
+                clock = clock,
+                clockSupport = null,
+                tags = PlayerHeaderTags(
+                    picon = "recording-picon",
+                    eyebrow = "recording-channel-identity",
+                    title = "recording-programme-title",
+                    support = "recording-subtitle",
+                    clock = "recording-clock",
                 ),
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(bottomGradient)
-                .padding(
-                    start = TvOverlaySidePadding,
-                    end = TvOverlaySidePadding,
-                    top = TvOverlayFooterGradientRunout,
-                    bottom = TvOverlayBottomPadding,
-                ),
-        ) {
+                modifier = headerModifier,
+            )
+        },
+    ) {
             when (timelinePresentation) {
                 is RecordingTimelinePresentation.Seekable -> PlaybackSeekbar(
                     range = timelinePresentation.range,
@@ -398,7 +377,6 @@ internal fun RecordingOverlayControls(
                     null
                 },
             )
-        }
     }
 }
 
