@@ -58,6 +58,64 @@ import org.junit.Test
 class AppProfileOwnerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun cancelledPendingPasswordSaveReleasesCredentialLease() = runTest {
+        val session = ProfileSession(
+            FakeSessionObservation(currentObservation("server")).observation,
+        ) { available(StreamProfileId("11111111111111111111111111111111")) }
+        val owner = profileOwner(
+            session,
+            PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler),
+        )
+        var leaseReleases = 0
+
+        val save = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            owner.savePasswordServer(
+                host = "tvheadend.invalid",
+                htspPort = 9982,
+                username = "viewer",
+                password = "fake password",
+                credentialLease = CredentialEditLease { leaseReleases += 1 },
+            )
+        }
+        runCurrent()
+
+        assertFalse(save.isCompleted)
+        save.cancelAndJoin()
+        assertEquals(1, leaseReleases)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun failedAcceptedPasswordSaveReleasesCredentialLease() = runTest {
+        val session = ProfileSession(
+            FakeSessionObservation(currentObservation("server")).observation,
+        ) { available(StreamProfileId("11111111111111111111111111111111")) }
+        val owner = profileOwner(
+            session,
+            PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler),
+        )
+        var leaseReleases = 0
+
+        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
+        runCurrent()
+        val result = runCatching {
+            owner.savePasswordServer(
+                host = "",
+                htspPort = 9982,
+                username = "viewer",
+                password = "fake password",
+                credentialLease = CredentialEditLease { leaseReleases += 1 },
+            )
+        }
+
+        assertTrue(result.isFailure)
+        assertEquals(1, leaseReleases)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun selectedProfileReadWaitsForCurrentDiscoveryToSettle() = runTest {
         val selectedId = StreamProfileId("11111111111111111111111111111111")
         val discoveryStarted = CompletableDeferred<Unit>()

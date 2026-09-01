@@ -37,6 +37,7 @@ fun interface CredentialEditLease {
     fun release()
 }
 
+/** Connection-form operations backed by the process-owned SDK profile store. */
 internal interface ConnectionProfileEditor {
     val serverSettings: Flow<ServerSettings>
 
@@ -124,23 +125,6 @@ class AppProfileOwner internal constructor(
 
     override suspend fun saveServer(host: String, htspPort: Int) {
         submit(SaveServerCommand(host, htspPort))
-    }
-
-    suspend fun savePasswordServer(
-        host: String,
-        htspPort: Int,
-        username: String,
-        password: String,
-    ) {
-        submit(
-            SavePasswordServerCommand(
-                host,
-                htspPort,
-                username,
-                password,
-                CredentialEditLease {},
-            ),
-        )
     }
 
     override suspend fun savePasswordServer(

@@ -229,6 +229,16 @@ their separate navigation, category, focus, secure-window, and post-save
 credential-lifetime behavior, while the SDK-backed profile owner remains the
 only persistence boundary.
 
+**B4-P20 completed with retention:** `AppProfileOwner` no longer exposes the
+unused lease-free password-save overload, so every production password write
+carries its credential lease through the process-owned command path. The narrow
+`ConnectionProfileEditor` capability remains because the shared form and Compose
+tests can exercise concrete connection behavior without constructing Android
+Keystore and the released SDK runtime; replacing it with callbacks or test-only
+hooks would only move the seam. The command owner remains because it preserves
+initialization-before-write, serialized non-cancellable commits, redacted
+sensitive values, lease release, stale-observation rejection, and shutdown join.
+
 - Share endpoint validation, credential field state, submission, and typed
   feedback between onboarding and Settings.
 - Keep onboarding navigation and Settings category/focus shells separate.
