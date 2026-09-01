@@ -1,33 +1,20 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import android.view.KeyEvent as AndroidKeyEvent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,9 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -50,37 +35,17 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.Button
-import androidx.tv.material3.Icon
-import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
@@ -93,7 +58,6 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.DvrConfigChoice
-import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
@@ -105,7 +69,6 @@ import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
-import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.epgFrontierSettled
 import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
@@ -113,10 +76,8 @@ import at.bernhardberger.tvhplayer.core.indexTimelineEventsByChannel
 import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
-import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.reconcileTimelineEpgFocus
-import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -127,20 +88,19 @@ import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
-import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
-import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
-import at.bernhardberger.tvhplayer.core.programmeHasAired
-import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
-import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
-import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
+import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
+import at.bernhardberger.tvhplayer.ui.screens.guide.DvrConfigDialog
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideConnectionRecovery
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEmptyState
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePassiveNotice
+import at.bernhardberger.tvhplayer.ui.screens.guide.JumpToTimeDialog
+import at.bernhardberger.tvhplayer.ui.screens.guide.ProgrammeDetailsPanel
+import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
+import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import coil3.ImageLoader
 import java.time.Instant
@@ -157,8 +117,6 @@ import kotlin.math.max
 private const val VISIBLE_WINDOW_SEC = 3 * 3600L
 private const val FRONTIER_STEP_SEC = 3 * 3600L
 private const val CHANNEL_PAGE_SIZE = 6
-private val CHANNEL_HEADER_WIDTH = 190.dp
-private val TIMELINE_ROW_HEIGHT = 76.dp
 
 private enum class GuideHeaderFocus {
     DATE,
@@ -1003,694 +961,6 @@ fun EpgGridScreen(
     }
 }
 
-@Composable
-private fun TimelineTimeRuler(
-    windowStartSec: Long,
-    windowEndSec: Long,
-    nowSecProvider: () -> Long,
-    modifier: Modifier = Modifier,
-) {
-    val nowSec = nowSecProvider()
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(38.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            modifier = Modifier
-                .width(CHANNEL_HEADER_WIDTH)
-                .fillMaxHeight(),
-            shape = MaterialTheme.shapes.small,
-            colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
-            Box(contentAlignment = Alignment.CenterStart) {
-                Text(
-                    text = stringResource(R.string.epg_channels_heading),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-            }
-        }
-        Spacer(Modifier.width(4.dp))
-        BoxWithConstraints(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
-        ) {
-            repeat(6) { markerIndex ->
-                val markerOffset = maxWidth * (markerIndex / 6f)
-                Column(
-                    modifier = Modifier
-                        .offset(x = markerOffset)
-                        .fillMaxHeight(),
-                ) {
-                    Text(
-                        text = formatHm(windowStartSec + markerIndex * 30 * 60L),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 6.dp, top = 4.dp),
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Box(
-                        Modifier
-                            .width(1.dp)
-                            .weight(1f)
-                            .background(
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)
-                            )
-                    )
-                }
-            }
-            if (nowSec in windowStartSec until windowEndSec) {
-                val nowFraction = (nowSec - windowStartSec).toFloat() /
-                    (windowEndSec - windowStartSec).coerceAtLeast(1L)
-                Box(
-                    modifier = Modifier
-                        .offset(x = maxWidth * nowFraction - 5.dp)
-                        .width(10.dp)
-                        .height(10.dp)
-                        .align(Alignment.TopStart)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = MaterialTheme.shapes.extraSmall,
-                        ),
-                )
-                Box(
-                    modifier = Modifier
-                        .offset(x = maxWidth * nowFraction)
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimelineChannelRow(
-    channel: Channel,
-    channelIndex: Int,
-    allChannels: List<Channel>,
-    selectedTarget: EpgFocusTarget?,
-    eventFocusRequesters: MutableMap<EventId, FocusRequester>,
-    windowStartSec: Long,
-    windowEndSec: Long,
-    nowSecProvider: () -> Long,
-    imageLoader: ImageLoader,
-    currentSession: CurrentSessionObservation?,
-    events: List<EpgEventEntry>,
-    category: ProgrammeCategory,
-    connectionUiState: ConnectionUiState,
-    frontierLoading: Boolean,
-    recordingForEvent: (EventId) -> DvrEntry?,
-    onFocused: (EpgEventEntry) -> Unit,
-    onOpenDetails: (EpgEventEntry) -> Unit,
-    onMoveFocus: (EpgFocusDirection) -> Boolean,
-) {
-    val nowSec = nowSecProvider()
-    val filteredEvents = remember(events, category) {
-        events.filter { it.matchesProgrammeCategory(category) }
-    }
-    val visibleEvents = remember(filteredEvents, windowStartSec, windowEndSec) {
-        filteredEvents.filter {
-            it.stop.epochSeconds > windowStartSec && it.start.epochSeconds < windowEndSec
-        }
-    }
-    val state = epgColumnDataState(
-        cachedEvents = events,
-        visibleEvents = visibleEvents,
-        windowStartSec = windowStartSec,
-        windowEndSec = windowEndSec,
-        connectionState = connectionUiState,
-        filterActive = category != ProgrammeCategory.ALL,
-        matchingCachedEvents = filteredEvents,
-    )
-    val orderedIds = remember(allChannels) { allChannels.map { it.id } }
-    val numbers = remember(allChannels) {
-        allChannels.associate { it.id to it.number?.toInt() }
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(TIMELINE_ROW_HEIGHT),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TimelineChannelHeader(
-            channel = channel,
-            number = ChannelNavigation.numberForId(orderedIds, numbers, channel.id),
-            imageLoader = imageLoader,
-            currentSession = currentSession,
-            selected = selectedTarget?.channelIndex == channelIndex,
-        )
-        Spacer(Modifier.width(4.dp))
-        BoxWithConstraints(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
-        ) {
-            visibleEvents.forEach { event ->
-                val span = timelineEventSpan(
-                    eventStartSec = event.start.epochSeconds,
-                    eventEndSec = event.stop.epochSeconds,
-                    windowStartSec = windowStartSec,
-                    windowEndSec = windowEndSec,
-                ) ?: return@forEach
-                val start = maxWidth * span.startFraction
-                val width = maxWidth * (span.endFraction - span.startFraction)
-                TimelineProgrammeCell(
-                    event = event,
-                    channel = channel,
-                    recording = recordingForEvent(event.id),
-                    nowSec = nowSec,
-                    selected = selectedTarget?.channelIndex == channelIndex &&
-                        selectedTarget.eventId == event.id,
-                    focusRequester = eventFocusRequesters.getOrPut(event.id) {
-                        FocusRequester()
-                    },
-                    onFocused = { onFocused(event) },
-                    onOpenDetails = { onOpenDetails(event) },
-                    onMoveFocus = onMoveFocus,
-                    width = width,
-                    modifier = Modifier
-                        .offset(x = start)
-                        .width(width)
-                        .fillMaxHeight(),
-                )
-            }
-
-            if (visibleEvents.isEmpty()) {
-                TimelineRowState(
-                    state = if (frontierLoading) EpgColumnDataState.LOADING else state,
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
-
-            if (nowSec in windowStartSec until windowEndSec) {
-                val nowFraction = (nowSec - windowStartSec).toFloat() /
-                    (windowEndSec - windowStartSec)
-                Box(
-                    modifier = Modifier
-                        .offset(x = maxWidth * nowFraction)
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun TimelineChannelHeader(
-    channel: Channel,
-    number: Int?,
-    imageLoader: ImageLoader,
-    currentSession: CurrentSessionObservation? = null,
-    selected: Boolean = false,
-) {
-    Surface(
-            modifier = Modifier
-                .width(CHANNEL_HEADER_WIDTH)
-                .fillMaxHeight(),
-            colors = SurfaceDefaults.colors(
-                containerColor = if (selected) {
-                    MaterialTheme.colorScheme.surfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)
-                },
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-            shape = MaterialTheme.shapes.small,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                PiconBox(
-                    imageLoader = imageLoader,
-                    currentSession = currentSession,
-                    piconPath = channel.icon,
-                    modifier = Modifier
-                        .width(44.dp)
-                        .height(30.dp),
-                )
-                Spacer(Modifier.width(TvSpacing8))
-                ChannelTitle(
-                    number = number,
-                    name = channel.name.orEmpty(),
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-}
-
-@Composable
-internal fun TimelineProgrammeCell(
-    event: EpgEventEntry,
-    channel: Channel,
-    recording: DvrEntry?,
-    nowSec: Long,
-    selected: Boolean,
-    focusRequester: FocusRequester,
-    onFocused: () -> Unit,
-    onOpenDetails: () -> Unit,
-    onMoveFocus: (EpgFocusDirection) -> Boolean,
-    width: Dp,
-    modifier: Modifier,
-) {
-    val stateText = when {
-        event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds ->
-            stringResource(R.string.epg_state_now)
-        event.start.epochSeconds > nowSec -> stringResource(R.string.epg_state_future)
-        else -> stringResource(R.string.epg_state_past)
-    }
-    val description = stringResource(
-        R.string.epg_cell_description,
-        channel.name.orEmpty(),
-        event.start.epochSeconds.formatDateTime(),
-        formatHm(event.stop.epochSeconds),
-        event.title.orEmpty(),
-        stateText,
-    )
-
-    Box(modifier = modifier) {
-        ListItem(
-            selected = selected,
-            onClick = onOpenDetails,
-            headlineContent = {
-                Text(
-                    // Always render a label so no focusable cell is visually blank.
-                    text = event.title.orEmpty(),
-                    maxLines = if (width >= 140.dp) 2 else 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            },
-            supportingContent = if (width >= 90.dp) {
-                {
-                    Text(
-                        text = "${formatHm(event.start.epochSeconds)}–${formatHm(event.stop.epochSeconds)}",
-                        maxLines = 1,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            } else {
-                null
-            },
-            scale = ListItemDefaults.scale(
-                focusedScale = 1f,
-                focusedSelectedScale = 1f,
-            ),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 1.dp, vertical = 2.dp)
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvPanelDenseAlpha))
-                .focusRequester(focusRequester)
-                .onFocusChanged { if (it.isFocused) onFocused() }
-                .onPreviewKeyEvent { keyEvent ->
-                    if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (keyEvent.key) {
-                        Key.DirectionUp -> onMoveFocus(EpgFocusDirection.UP)
-                        Key.DirectionDown -> onMoveFocus(EpgFocusDirection.DOWN)
-                        Key.DirectionLeft -> onMoveFocus(EpgFocusDirection.LEFT)
-                        Key.DirectionRight -> onMoveFocus(EpgFocusDirection.RIGHT)
-                        else -> false
-                    }
-                }
-                .semantics { contentDescription = description },
-        )
-        recording?.takeIf {
-            it.state == DvrEntryState.RECORDING || it.state == DvrEntryState.SCHEDULED
-        }?.let {
-            RecordingStatusIndicator(
-                state = checkNotNull(it.state),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .zIndex(2f)
-                    .padding(6.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun TimelineRowState(
-    state: EpgColumnDataState,
-    modifier: Modifier = Modifier,
-) {
-    val text = stringResource(
-        when (state) {
-            EpgColumnDataState.READY -> R.string.epg_state_ready
-            EpgColumnDataState.LOADING -> R.string.epg_loading
-            EpgColumnDataState.NO_DATA -> R.string.epg_no_data
-            EpgColumnDataState.EMPTY_DAY -> R.string.epg_empty_day
-            EpgColumnDataState.PARTIAL -> R.string.epg_partial
-            EpgColumnDataState.STALE -> R.string.epg_stale
-            EpgColumnDataState.PERMISSION_DENIED -> R.string.epg_permission_denied
-            EpgColumnDataState.RECONNECTING -> R.string.epg_reconnecting
-            EpgColumnDataState.SERVER_FAILURE -> R.string.epg_server_failure
-            EpgColumnDataState.FILTER_EMPTY -> R.string.epg_filter_empty
-        }
-    )
-    Row(
-        modifier = modifier.padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun JumpToTimeDialog(
-    initialSec: Long,
-    nowSecProvider: () -> Long,
-    onDismiss: () -> Unit,
-    onJump: (Long) -> Unit,
-) {
-    var targetSec by remember(initialSec) { mutableLongStateOf(initialSec) }
-    val initialFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { initialFocus.requestFocus() }
-    DialogScrim(onDismissRequest = onDismiss) {
-        Text(
-            text = stringResource(R.string.epg_jump_title),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(
-            text = targetSec.formatDateTime(),
-            style = MaterialTheme.typography.titleLarge,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { targetSec -= 24 * 3600L }) {
-                Text(stringResource(R.string.previous_day))
-            }
-            OutlinedButton(onClick = { targetSec += 24 * 3600L }) {
-                Text(stringResource(R.string.next_day))
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { targetSec -= 3600L }) {
-                Text(stringResource(R.string.previous_hour))
-            }
-            OutlinedButton(onClick = { targetSec += 3600L }) {
-                Text(stringResource(R.string.next_hour))
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = { onJump(floorToHour(nowSecProvider())) },
-                modifier = Modifier.focusRequester(initialFocus),
-            ) {
-                Text(stringResource(R.string.now))
-            }
-            OutlinedButton(onClick = onDismiss) {
-                Text(stringResource(R.string.close))
-            }
-            Button(onClick = { onJump(floorToHour(targetSec)) }) {
-                Text(stringResource(R.string.epg_jump_action))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProgrammeDetailsPanel(
-    contentPadding: PaddingValues,
-    event: EpgEventEntry,
-    channel: Channel?,
-    recording: DvrEntry?,
-    nowSecProvider: () -> Long,
-    serverTimeshiftCoversEvent: (Long) -> Boolean,
-    timeshiftAllowed: Boolean,
-    recordingsAllowed: Boolean,
-    canModifyRecordings: Boolean,
-    actionResult: DvrMutationFeedback?,
-    onAction: (ProgrammeAction) -> Unit,
-    onClose: () -> Unit,
-) {
-    val nowSec = nowSecProvider()
-    val initialFocus = remember { FocusRequester() }
-    val actions = programmeActions(
-        event,
-        nowSec,
-        recording,
-        serverTimeshiftCoversEvent = serverTimeshiftCoversEvent(nowSec),
-        canModifyRecordings = canModifyRecordings,
-    ).filter { action ->
-        when (action) {
-            ProgrammeAction.RECORD,
-            ProgrammeAction.CANCEL_RECORDING ->
-                recordingsAllowed
-            ProgrammeAction.WATCH_FROM_START ->
-                if (recording != null) {
-                    recordingsAllowed
-                } else {
-                    timeshiftAllowed
-                }
-            ProgrammeAction.WATCH -> true
-        }
-    }
-    LaunchedEffect(event.id, actions) { initialFocus.requestFocus() }
-    val subtitle = buildString {
-        append(channel?.name.orEmpty())
-        if (isNotEmpty()) append(" • ")
-        append(event.start.epochSeconds.formatDateTime())
-        append("–")
-        append(formatHm(event.stop.epochSeconds))
-        append(" • ")
-        append((event.stop.epochSeconds - event.start.epochSeconds).coerceAtLeast(0L) / 60L)
-        append(" min")
-    }
-    DialogScrim(
-        onDismissRequest = onClose,
-        wide = true,
-        contentPadding = contentPadding,
-    ) {
-        ProgrammeContentDetails(
-            event = event,
-            subtitle = subtitle,
-            footer = {
-                recording?.let {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RecordingStatusIndicator(state = it.state ?: DvrEntryState.UNKNOWN)
-                        Text(
-                            text = stringResource(
-                                R.string.recording_status,
-                                dvrStateLabel(it.state),
-                            ),
-                            color = when (it.state) {
-                                DvrEntryState.SCHEDULED,
-                                DvrEntryState.RECORDING -> TvRecordingColor
-                                DvrEntryState.MISSED,
-                                DvrEntryState.INVALID,
-                                DvrEntryState.RECORDING_ERROR,
-                                DvrEntryState.COMPLETED_ERROR,
-                                DvrEntryState.FILE_MISSING -> MaterialTheme.colorScheme.error
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    }
-                    it.subscriptionError?.name?.let { reason ->
-                        Text(
-                            text = stringResource(R.string.recording_failure_reason, reason),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-                actionResult?.let {
-                    Text(
-                        text = it.label(),
-                        color = if (it.isFailure) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                }
-                if (actions.isEmpty()) {
-                    Text(
-                        text = stringResource(
-                            if (programmeHasAired(event, nowSec)) {
-                                R.string.epg_already_aired
-                            } else {
-                                R.string.epg_no_actions
-                            }
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-            actions = {
-                actions.forEachIndexed { index, action ->
-                    Button(
-                        onClick = { onAction(action) },
-                        modifier = if (index == 0) {
-                            Modifier.focusRequester(initialFocus)
-                        } else {
-                            Modifier
-                        },
-                    ) {
-                        Text(programmeActionLabel(action))
-                    }
-                }
-                OutlinedButton(
-                    onClick = onClose,
-                    modifier = if (actions.isEmpty()) {
-                        Modifier.focusRequester(initialFocus)
-                    } else {
-                        Modifier
-                    },
-                ) {
-                    Text(stringResource(R.string.close))
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun DvrConfigDialog(
-    configs: List<DvrConfiguration>,
-    onDismiss: () -> Unit,
-    onSelect: (DvrConfiguration) -> Unit,
-) {
-    val initialFocus = remember { FocusRequester() }
-    LaunchedEffect(configs) { initialFocus.requestFocus() }
-    DialogScrim(onDismissRequest = onDismiss) {
-        Text(
-            text = stringResource(R.string.recording_config_title),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(
-            text = stringResource(R.string.recording_config_message),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        configs.forEachIndexed { index, config ->
-            OutlinedButton(
-                onClick = { onSelect(config) },
-                modifier = if (index == 0) {
-                    Modifier.focusRequester(initialFocus)
-                } else {
-                    Modifier
-                },
-            ) {
-                Column {
-                    Text(config.name)
-                    config.comment.takeIf(String::isNotBlank)?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
-        OutlinedButton(onClick = onDismiss) {
-            Text(stringResource(R.string.back))
-        }
-    }
-}
-
-@Composable
-internal fun ConfirmProgrammeActionDialog(
-    action: ProgrammeAction,
-    programmeTitle: String,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    val safeFocus = remember { FocusRequester() }
-    LaunchedEffect(action) { safeFocus.requestFocus() }
-    DialogScrim(onDismissRequest = onDismiss) {
-        Text(
-            text = stringResource(
-                if (action == ProgrammeAction.RECORD) {
-                    R.string.record_confirm_title
-                } else {
-                    R.string.cancel_recording_confirm_title
-                },
-                programmeTitle,
-            ),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.focusRequester(safeFocus),
-            ) {
-                Text(stringResource(R.string.back))
-            }
-            Button(onClick = onConfirm) {
-                Icon(
-                    imageVector = if (action == ProgrammeAction.RECORD) {
-                        Icons.Filled.FiberManualRecord
-                    } else {
-                        Icons.Filled.Stop
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    stringResource(
-                        if (action == ProgrammeAction.RECORD) {
-                            R.string.record
-                        } else {
-                            R.string.cancel_recording
-                        }
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun programmeActionLabel(action: ProgrammeAction): String = stringResource(
-    when (action) {
-        ProgrammeAction.WATCH -> R.string.watch
-        ProgrammeAction.RECORD -> R.string.record
-        ProgrammeAction.CANCEL_RECORDING -> R.string.cancel_recording
-        ProgrammeAction.WATCH_FROM_START -> R.string.watch_from_start
-    }
-)
-
-@Composable
-private fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
-    when (state) {
-        DvrEntryState.SCHEDULED -> R.string.recording_state_scheduled
-        DvrEntryState.RECORDING -> R.string.recording_state_recording
-        DvrEntryState.COMPLETED -> R.string.recording_state_completed
-        DvrEntryState.MISSED,
-        DvrEntryState.INVALID -> R.string.recording_state_cancelled
-        DvrEntryState.RECORDING_ERROR,
-        DvrEntryState.COMPLETED_ERROR,
-        DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
-        DvrEntryState.UNKNOWN,
-        null -> R.string.recording_state_unknown
-    }
-)
-
 private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
     is DvrRepositoryState.Current -> state.snapshot.entries
     is DvrRepositoryState.Stale -> state.snapshot.entries
@@ -1706,184 +976,6 @@ internal fun SessionObservation.currentDvrConfigurations(): List<DvrConfiguratio
         DvrConfigurationsState.Denied,
         DvrConfigurationsState.Unknown -> emptyList()
     }
-
-@Composable
-private fun DialogScrim(
-    onDismissRequest: () -> Unit,
-    wide: Boolean = false,
-    contentPadding: PaddingValues = PaddingValues(),
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-            usePlatformDefaultWidth = false,
-        ),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = TvScrimModalAlpha))
-                .focusGroup()
-                .then(if (wide) Modifier.padding(contentPadding) else Modifier),
-            contentAlignment = if (wide) Alignment.CenterEnd else Alignment.Center,
-        ) {
-            Surface(
-                modifier = if (wide) {
-                    Modifier.width(680.dp).fillMaxHeight()
-                } else {
-                    Modifier.width(720.dp)
-                },
-                shape = MaterialTheme.shapes.large,
-                colors = SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            ) {
-                Column(
-                    modifier = Modifier.padding(28.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    content = content,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun GuidePassiveNotice(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-    }
-}
-
-@Composable
-private fun GuideConnectionRecovery(
-    needsSettings: Boolean,
-    permissionDenied: Boolean,
-    focusRequester: FocusRequester,
-    onRetry: () -> Unit,
-    onOpenConnectionSettings: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(
-                    if (permissionDenied) {
-                        R.string.epg_permission_denied
-                    } else if (needsSettings) {
-                        R.string.connection_configuration_required
-                    } else {
-                        R.string.epg_server_failure
-                    },
-                ),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Button(
-                onClick = if (needsSettings) onOpenConnectionSettings else onRetry,
-                modifier = Modifier.focusRequester(focusRequester),
-            ) {
-                Text(
-                    stringResource(
-                        if (needsSettings) {
-                            R.string.connection_settings_short
-                        } else {
-                            R.string.retry
-                        },
-                    ),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun GuideEmptyState(
-    isEmptyTag: Boolean,
-    connectionUiState: ConnectionUiState,
-    channelCatalogCurrent: Boolean,
-    onRetry: () -> Unit,
-    onOpenConnectionSettings: () -> Unit,
-    retryFocusRequester: FocusRequester,
-) {
-    val permissionDenied = connectionUiState is ConnectionUiState.Error &&
-        connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED
-    val message = stringResource(
-        guideEmptyMessageRes(
-            isEmptyTag = isEmptyTag,
-            connectionUiState = connectionUiState,
-            channelCatalogCurrent = channelCatalogCurrent,
-        ),
-    )
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("guide-empty-state"),
-        colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-    ) {
-        Column(
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(message, style = MaterialTheme.typography.titleLarge)
-            val failure = (connectionUiState is ConnectionUiState.Error && !permissionDenied) ||
-                connectionUiState is ConnectionUiState.SubscriptionError
-            val settings = connectionUiState == ConnectionUiState.NeedsConfiguration ||
-                connectionUiState == ConnectionUiState.CredentialUnavailable || permissionDenied
-            if (failure || settings) {
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = if (settings) onOpenConnectionSettings else onRetry,
-                    modifier = Modifier.focusRequester(retryFocusRequester),
-                ) {
-                    Text(
-                        stringResource(
-                            if (settings) {
-                                R.string.connection_settings_short
-                            } else {
-                                R.string.retry
-                            },
-                        ),
-                    )
-                }
-            }
-        }
-    }
-}
 
 internal fun guideEmptyMessageRes(
     isEmptyTag: Boolean,
@@ -1920,8 +1012,8 @@ private fun rememberCurrentEpochSeconds(): () -> Long {
     return remember(nowSec) { { nowSec.longValue } }
 }
 
-private fun floorToHour(epochSec: Long): Long = epochSec - epochSec.mod(3600L)
+internal fun floorToHour(epochSec: Long): Long = epochSec - epochSec.mod(3600L)
 
-private fun Long.formatDateTime(): String = Instant.ofEpochSecond(this)
+internal fun Long.formatDateTime(): String = Instant.ofEpochSecond(this)
     .atZone(ZoneId.systemDefault())
     .format(DateTimeFormatter.ofPattern("EEE d MMM HH:mm"))

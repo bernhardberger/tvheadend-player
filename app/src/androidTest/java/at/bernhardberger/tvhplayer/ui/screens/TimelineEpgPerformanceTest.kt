@@ -25,6 +25,9 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
+import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelHeader
+import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineProgrammeCell
 import coil3.ImageLoader
 import org.junit.Assert.assertTrue
 import org.junit.Rule
