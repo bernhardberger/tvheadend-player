@@ -13,6 +13,8 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -91,7 +93,7 @@ class SettingsStartupEntryTest {
             }
         }
 
-        composeRule.onNodeWithText("General").performKeyInput {
+        composeRule.onNode(hasText("General") and hasClickAction()).performKeyInput {
             pressKey(Key.DirectionCenter)
         }
         composeRule.onNodeWithText(
@@ -120,7 +122,7 @@ class SettingsStartupEntryTest {
             }
         }
 
-        composeRule.onNodeWithText("Appliance").performKeyInput {
+        composeRule.onNode(hasText("Appliance") and hasClickAction()).performKeyInput {
             pressKey(Key.DirectionCenter)
         }
         composeRule.onNodeWithText(

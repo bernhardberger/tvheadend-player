@@ -14,6 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -117,9 +120,15 @@ class TimelineEpgPerformanceTest {
             }
         }
 
-        val firstBounds = composeRule.onNodeWithTag("first-short-programme")
+        val firstBounds = composeRule.onNode(
+            hasClickAction() and hasAnyAncestor(hasTestTag("first-short-programme")),
+            useUnmergedTree = true,
+        )
             .fetchSemanticsNode().boundsInRoot
-        val secondBounds = composeRule.onNodeWithTag("second-short-programme")
+        val secondBounds = composeRule.onNode(
+            hasClickAction() and hasAnyAncestor(hasTestTag("second-short-programme")),
+            useUnmergedTree = true,
+        )
             .fetchSemanticsNode().boundsInRoot
         assertTrue(firstBounds.right <= secondBounds.left)
     }

@@ -16,18 +16,25 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.ExternalTargetAcceptanceRule
 import at.bernhardberger.tvhplayer.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 
 @RunWith(AndroidJUnit4::class)
 class ChannelGuideDeviceAcceptanceTest {
+    private val externalTargetAcceptance = ExternalTargetAcceptanceRule()
+    private val composeRule = createAndroidComposeRule<MainActivity>()
+
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val rules: RuleChain = RuleChain
+        .outerRule(externalTargetAcceptance)
+        .around(composeRule)
 
     @Test
     fun realCatalogRendersInNumericOrderAndGuideDoesNotClaimStaleEmptyState() {

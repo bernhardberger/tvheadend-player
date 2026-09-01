@@ -49,14 +49,29 @@ class MainStartupScreenTest {
 
     @Test
     fun everyMessageKindRendersEnglishAndGermanStatus() {
+        var presentation: MainStartupPresentation by mutableStateOf(
+            MainStartupPresentation.Passive(messageTexts.first().kind),
+        )
+        var locale by mutableStateOf(Locale.ENGLISH)
+        composeRule.setContent {
+            LocaleStartupContent(locale) {
+                TVHeadendPlayerTheme {
+                    MainStartupScreen(
+                        presentation = presentation,
+                        contentPadding = PaddingValues(),
+                    )
+                }
+            }
+        }
+
         messageTexts.forEach { (kind, english, german) ->
-            setStartupContent(MainStartupPresentation.Passive(kind))
+            composeRule.runOnIdle {
+                presentation = MainStartupPresentation.Passive(kind)
+                locale = Locale.ENGLISH
+            }
             composeRule.onNodeWithText(english).assertIsDisplayed()
 
-            setStartupContent(
-                presentation = MainStartupPresentation.Passive(kind),
-                locale = Locale.GERMAN,
-            )
+            composeRule.runOnIdle { locale = Locale.GERMAN }
             composeRule.onNodeWithText(german).assertIsDisplayed()
         }
     }
@@ -122,29 +137,37 @@ class MainStartupScreenTest {
 
     @Test
     fun initialFocusUsesFirstSemanticActionForEverySupportedSet() {
-        setStartupContent(
+        var presentation: MainStartupPresentation by mutableStateOf(
             MainStartupPresentation.Actionable(
                 MainStartupMessageKind.RETRYABLE_FAILURE,
                 retryAndSettings,
             ),
         )
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                MainStartupScreen(
+                    presentation = presentation,
+                    contentPadding = PaddingValues(),
+                )
+            }
+        }
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY)).assertIsFocused()
 
-        setStartupContent(
-            MainStartupPresentation.Actionable(
+        composeRule.runOnIdle {
+            presentation = MainStartupPresentation.Actionable(
                 MainStartupMessageKind.CONFIGURATION_REQUIRED,
                 settingsOnly,
-            ),
-        )
+            )
+        }
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.CONNECTION_SETTINGS))
             .assertIsFocused()
 
-        setStartupContent(
-            MainStartupPresentation.Actionable(
+        composeRule.runOnIdle {
+            presentation = MainStartupPresentation.Actionable(
                 MainStartupMessageKind.SIMPLE_TV_FAILURE,
                 retryAndExit,
-            ),
-        )
+            )
+        }
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY)).assertIsFocused()
     }
 

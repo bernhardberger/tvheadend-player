@@ -7,9 +7,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
@@ -30,7 +34,9 @@ class SettingsConnectionSecureSurfaceTest {
 
     @After
     fun clearSecureFlag() {
-        composeRule.activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        composeRule.runOnUiThread {
+            composeRule.activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
 
     @Test
@@ -55,7 +61,9 @@ class SettingsConnectionSecureSurfaceTest {
 
     @Test
     fun disposalPreservesSecureFlagOwnedByAnotherSurface() {
-        composeRule.activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        composeRule.runOnUiThread {
+            composeRule.activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
         var showConnection by mutableStateOf(true)
         composeRule.setContent {
             if (showConnection) {
@@ -76,16 +84,18 @@ class SettingsConnectionSecureSurfaceTest {
 
     @Test
     fun secureFlagRemainsUntilTheFinalOverlappingLeaseIsReleased() {
-        val first = ConnectionSecureWindow.acquire(composeRule.activity.window)
-        val second = ConnectionSecureWindow.acquire(composeRule.activity.window)
+        composeRule.runOnUiThread {
+            val first = ConnectionSecureWindow.acquire(composeRule.activity.window)
+            val second = ConnectionSecureWindow.acquire(composeRule.activity.window)
 
-        assertTrue(composeRule.activity.hasSecureFlag())
-        first.release()
-        first.release()
-        assertTrue(composeRule.activity.hasSecureFlag())
+            assertTrue(composeRule.activity.hasSecureFlag())
+            first.release()
+            first.release()
+            assertTrue(composeRule.activity.hasSecureFlag())
 
-        second.release()
-        assertFalse(composeRule.activity.hasSecureFlag())
+            second.release()
+            assertFalse(composeRule.activity.hasSecureFlag())
+        }
     }
 
     @Test
@@ -99,11 +109,18 @@ class SettingsConnectionSecureSurfaceTest {
                 form = form,
             )
         }
-        composeRule.waitUntil { form.host == FAKE_HOST && form.password == FAKE_PASSWORD }
-
-        composeRule.onNodeWithText("Save").performClick()
-        composeRule.waitUntil { editor.passwordSaveCount == 1 }
+        composeRule.waitForIdle()
         composeRule.runOnIdle {
+            assertEquals(FAKE_HOST, form.host)
+            assertEquals(FAKE_PASSWORD, form.password)
+        }
+
+        composeRule.onNode(hasText("Save") and hasClickAction())
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(1, editor.passwordSaveCount)
             assertEquals(FAKE_HOST, editor.savedHost)
             assertEquals(FAKE_PORT, editor.savedPort)
             assertEquals(FAKE_USERNAME, editor.savedUsername)

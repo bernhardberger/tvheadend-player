@@ -3,10 +3,15 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
@@ -37,7 +42,10 @@ class OnboardingScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Set up TVHeadend").performClick()
+        composeRule.onNode(hasText("Set up TVHeadend") and hasClickAction())
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.waitForIdle()
         composeRule.onNodeWithText("Connection step").assertIsDisplayed()
     }
 
@@ -61,9 +69,12 @@ class OnboardingScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Save and continue").performClick()
-        composeRule.waitUntil { editor.passwordSaveCount == 1 }
+        composeRule.onNode(hasText("Save and continue") and hasClickAction())
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.waitForIdle()
         composeRule.runOnIdle {
+            assertEquals(1, editor.passwordSaveCount)
             assertEquals(FAKE_HOST, editor.savedHost)
             assertEquals(FAKE_PORT, editor.savedPort)
             assertEquals(FAKE_USERNAME, editor.savedUsername)

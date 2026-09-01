@@ -39,6 +39,8 @@ TIMESHIFT_COMMAND_TEST = (
 FOREGROUND_PLAYBACK_LIFECYCLE_TEST = (
     "at.bernhardberger.tvhplayer.playback.ForegroundPlaybackLifecycleDeviceAcceptanceTest"
 )
+EXTERNAL_TARGET_ACCEPTANCE_ARGUMENT = "tvhplayer.externalTargetAcceptance"
+EXTERNAL_TARGET_ACCEPTANCE_ENABLED = "enabled"
 CONNECTION_CREDENTIAL_TEST = (
     "at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnectionSecureSurfaceTest"
 )
@@ -614,6 +616,7 @@ def run_instrumentation_check(
     *,
     action: str,
     test_class: str,
+    admit_external_target: bool = False,
     evidence_keys: tuple[str, ...] = (),
     expected_evidence: dict[str, str] | None = None,
 ) -> None:
@@ -664,6 +667,15 @@ def run_instrumentation_check(
                 "-e",
                 "class",
                 test_class,
+                *(
+                    (
+                        "-e",
+                        EXTERNAL_TARGET_ACCEPTANCE_ARGUMENT,
+                        EXTERNAL_TARGET_ACCEPTANCE_ENABLED,
+                    )
+                    if admit_external_target
+                    else ()
+                ),
                 f"{test_package}/{runner}",
             ),
             capture=True,
@@ -672,6 +684,11 @@ def run_instrumentation_check(
         runner_output = "\n".join(
             part for part in (instrumentation_result.stdout, instrumentation_result.stderr) if part
         )
+        if admit_external_target and re.search(
+            r"(?m)^INSTRUMENTATION_STATUS_CODE:\s*-(?:3|4)\s*$",
+            runner_output,
+        ):
+            fail(f"{action} skipped an explicitly admitted acceptance test")
         if (
             re.search(r"(?m)^INSTRUMENTATION_STATUS_CODE:\s*-2\s*$", runner_output)
             or "FAILURES!!!" in runner_output
@@ -721,7 +738,8 @@ def run_instrumentation_check(
         if success_summary is None:
             fail(f"{action} did not report a successful test run")
         expected_test_count = {
-            CONNECTION_CREDENTIAL_TEST: 3,
+            CHANNEL_GUIDE_TEST: 2,
+            CONNECTION_CREDENTIAL_TEST: 4,
             TIMESHIFT_COMMAND_TEST: 2,
             FOREGROUND_PLAYBACK_LIFECYCLE_TEST: 5,
             NAVIGATION_BACK_TESTS: 84,
@@ -767,6 +785,7 @@ def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
         package_name,
         action="channel-guide-check",
         test_class=CHANNEL_GUIDE_TEST,
+        admit_external_target=True,
     )
 
 
@@ -777,6 +796,7 @@ def run_timeshift_command_check(adb: str, serial: str, package_name: str) -> Non
         package_name,
         action="timeshift-command-check",
         test_class=TIMESHIFT_COMMAND_TEST,
+        admit_external_target=True,
     )
 
 
@@ -791,6 +811,7 @@ def run_foreground_playback_lifecycle_check(
         package_name,
         action="foreground-playback-lifecycle-check",
         test_class=FOREGROUND_PLAYBACK_LIFECYCLE_TEST,
+        admit_external_target=True,
     )
 
 

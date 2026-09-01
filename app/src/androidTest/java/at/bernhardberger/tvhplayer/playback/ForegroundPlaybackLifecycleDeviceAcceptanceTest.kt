@@ -23,6 +23,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvhplayer.ExternalTargetAcceptanceRule
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.MainActivity
 import java.util.concurrent.atomic.AtomicInteger
@@ -46,12 +47,16 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 
 @RunWith(AndroidJUnit4::class)
 class ForegroundPlaybackLifecycleDeviceAcceptanceTest {
+    @get:Rule
+    val externalTargetAcceptance = ExternalTargetAcceptanceRule()
+
     @Test
     fun liveHomeReleasesAndReturnRetunesExactlyOnce() = runAcceptance {
         val fixture = fixture()

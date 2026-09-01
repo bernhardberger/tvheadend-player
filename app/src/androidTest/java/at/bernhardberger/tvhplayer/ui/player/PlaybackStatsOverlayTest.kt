@@ -61,9 +61,7 @@ class PlaybackStatsOverlayTest {
         composeRule.onNodeWithText("Playback").assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading),
         )
-        composeRule.onNodeWithText("System").assert(
-            SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading),
-        )
+        composeRule.onNodeWithText("Source").assertIsDisplayed()
         composeRule.onNodeWithText("Tuner").assertDoesNotExist()
         composeRule.onNodeWithText("Server queue").assertDoesNotExist()
         composeRule.onNodeWithTag("playback-stats-overlay")
@@ -79,9 +77,9 @@ class PlaybackStatsOverlayTest {
         composeRule.onNodeWithText("Wiederherstellung läuft").assertDoesNotExist()
         composeRule.onNodeWithText("buffer", substring = true, ignoreCase = true)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("12,345").assertIsDisplayed()
+        composeRule.onNodeWithText("192,000 Hz", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("59.9 fps", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Frames").assertIsDisplayed()
+        composeRule.onNodeWithText("audio/eac3-joc", substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("Display mode").assertIsDisplayed()
         composeRule.onNodeWithText("Auto (original aspect)").assertIsDisplayed()
         composeRule.onNodeWithText("Bildformat").assertDoesNotExist()

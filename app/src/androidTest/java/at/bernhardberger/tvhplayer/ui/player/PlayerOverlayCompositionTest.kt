@@ -47,7 +47,7 @@ class PlayerOverlayCompositionTest {
 
         composeRule.onNodeWithTag("debug-video-backdrop").assertDoesNotExist()
 
-        visible.value = true
+        composeRule.runOnIdle { visible.value = true }
 
         composeRule.onNodeWithTag("debug-video-backdrop").assertExists()
     }

@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Rule
@@ -27,13 +27,10 @@ class SimpleTvSideRailTest {
             }
         }
 
-        assertEquals(0, composeRule.onAllNodesWithText("Channels").fetchSemanticsNodes().size)
-        assertEquals(0, composeRule.onAllNodesWithText("Guide").fetchSemanticsNodes().size)
-        assertEquals(0, composeRule.onAllNodesWithText("Recordings").fetchSemanticsNodes().size)
-        assertEquals(0, composeRule.onAllNodesWithText("Settings").fetchSemanticsNodes().size)
-        assertEquals(
-            1,
-            composeRule.onAllNodesWithText("Exit Simple TV").fetchSemanticsNodes().size,
-        )
+        assertEquals(0, composeRule.onAllNodesWithTag("nav-channels").fetchSemanticsNodes().size)
+        assertEquals(0, composeRule.onAllNodesWithTag("nav-epg").fetchSemanticsNodes().size)
+        assertEquals(0, composeRule.onAllNodesWithTag("nav-recordings").fetchSemanticsNodes().size)
+        assertEquals(0, composeRule.onAllNodesWithTag("nav-settings").fetchSemanticsNodes().size)
+        assertEquals(1, composeRule.onAllNodesWithTag("nav-unlock").fetchSemanticsNodes().size)
     }
 }

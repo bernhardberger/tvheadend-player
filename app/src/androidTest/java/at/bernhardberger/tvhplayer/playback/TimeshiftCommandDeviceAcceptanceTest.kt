@@ -13,6 +13,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
+import at.bernhardberger.tvhplayer.ExternalTargetAcceptanceRule
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.minutes
@@ -30,12 +31,16 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.core.context.GlobalContext
 
 @RunWith(AndroidJUnit4::class)
 class TimeshiftCommandDeviceAcceptanceTest {
+    @get:Rule
+    val externalTargetAcceptance = ExternalTargetAcceptanceRule()
+
     @Test
     fun terrestrialTimeshiftCommandsPreserveTargetContinuity() = runAcceptance(TERRESTRIAL)
 
