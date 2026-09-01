@@ -29,8 +29,8 @@ internal fun DebugVideoBackdrop(
 
     Box(
         modifier = modifier
-            .clearAndSetSemantics { }
-            .testTag("debug-video-backdrop"),
+            .testTag("debug-video-backdrop")
+            .clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
