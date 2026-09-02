@@ -1,13 +1,13 @@
 ---
-description: Run a screenshot-first TV design brief, visual review, or visual closure on supplied current evidence.
+description: Run an Opus final TV visual review or focused closure on a curated current evidence manifest.
 agent: tv-ux-reviewer
 subtask: true
 ---
 
 Use `$ARGUMENTS` as the complete visual-evidence contract. It must name
-`mode=brief`, `mode=review`, or `mode=closure`; the exact surface, states, visual
+`mode=review` or `mode=closure`; the exact surface, states, visual
 goal, and acceptance criteria; the canvas or device; and every exact current and
-historical evidence path. Closure must include prior `UX-` finding IDs and
+historical evidence path from the curator manifest. Closure must include prior `UX-` finding IDs and
 matched updated captures.
 
 Treat an image, inventory, or handoff as current only when its exact path is

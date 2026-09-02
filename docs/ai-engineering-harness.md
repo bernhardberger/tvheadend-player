@@ -18,13 +18,15 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `.opencode/agents/app-analyze.md` | Sol/medium concrete implementation diagnostician |
 | `.opencode/agents/app-research.md` | Sol/low authoritative external-source researcher |
 | `.opencode/agents/android-reviewer.md` | Sol/high frozen-packet Android runtime and TV interaction reviewer |
-| `.opencode/agents/tv-ux-reviewer.md` | Screenshot-first, read-only product design and visual-quality reviewer |
+| `.opencode/agents/tv-evidence-curator.md` | Terra/medium mechanical validator for exact screenshot evidence sets |
+| `.opencode/agents/tv-ux-brief.md` | Opus/high pre-implementation TV product design specialist |
+| `.opencode/agents/tv-ux-reviewer.md` | Opus/medium final screenshot-first visual-quality reviewer |
 | `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
 | `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
 | `.opencode/commands/` | Model-tier, verification, device, reviewer, UX, and upstream shortcuts |
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
-| `tools/ai-model-tier` | Checked switch of the seven managed read-only roles between standard and fast service tiers |
+| `tools/ai-model-tier` | Checked switch of the eight managed OpenAI read-only roles between standard and fast service tiers |
 | `tools/verify` | Native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
@@ -44,13 +46,15 @@ do; there is no per-command approval relay or duplicated command deny list.
 Read-only children retain their own explicit restrictions and the exact Task
 allowlist remains deny-by-default.
 
-The seven managed read-only roles have explicit non-inheriting assignments:
+The eight managed OpenAI read-only roles have explicit non-inheriting assignments:
 `app-locator` uses Luna/low/20, `app-explore` Terra/medium/30, `app-planner`
 Sol/high/45, `app-analyze` Sol/medium/30, `app-research` Sol/low/35,
-`android-reviewer` Sol/high/45, and `tv-ux-reviewer` Sol/medium/40. They use
-standard service by default and may be switched together to matching `-fast`
-IDs. Fast IDs select service priority, not a different model. Changing the
-writable primary effort never changes a child.
+`android-reviewer` Sol/high/45, and `tv-evidence-curator` Terra/medium/25. They
+use standard service by default and may be switched together to matching
+`-fast` IDs. Fast IDs select service priority, not a different model. The fixed
+Claude roles are separate: `tv-ux-brief` Opus/high/35, `tv-ux-reviewer`
+Opus/medium/40, and `claude-audit-lead` Opus/high/45. Changing the writable
+primary effort never changes a child.
 
 OpenCode cannot hot-reload model assignments for later Task calls. Use the
 checked repository tool or matching slash command, then restart OpenCode:
@@ -71,7 +75,7 @@ for a meaningful quality gain, not a hard budget. Avoid duplicated work and
 verbose returns because cheap child output can still enlarge the primary's
 expensive context.
 
-The project Task policy denies every child first, then permits the seven named
+The project Task policy denies every child first, then permits the configured
 roles above. `app-locator` performs mechanical retrieval; `app-explore` maps
 bounded multi-file flows without diagnosis or design; the remaining roles retain
 their specialized contracts. Only `app-locator` children may be delegated by
@@ -100,7 +104,9 @@ risk:
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
 | Runtime behavior, production wiring, concurrency, playback, security, native, release, focus, keys, Back, accessibility, safe bounds, or UI-test behavior | `android-reviewer` |
-| Visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` against supplied current images |
+| Pre-implementation visual direction for a substantial new or redesigned TV surface | `tv-ux-brief` against supplied requirements and baseline images |
+| Screenshot-set coverage, metadata, duplication, staleness, or privacy | `tv-evidence-curator` over caller-supplied exact paths |
+| Final visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` against the curated current manifest |
 | HTSP, Media3, concurrency, subscription ownership, or DVR lifecycle | One early architecture/race audit may replace the normal audit, followed by closure review |
 
 Every code-review assignment supplies one frozen tested packet: exact acceptance
@@ -121,16 +127,18 @@ or request merely to continue. Related recurring findings stop micro-patching an
 trigger a bounded root-cause re-scope. Research children answer bounded questions
 and do not act as additional approval reviewers.
 
-Visual design uses a separate evidence lifecycle. `tv-ux-reviewer` accepts
-`brief`, `review`, and `closure` modes. A fresh brief turns named baseline images
-and accepted requirements into one preferred visual direction. For a substantial
-visual or navigation slice, the primary then renders the production composable
-through deterministic fake-state evidence before broad player/state wiring. One
-fresh review judges that stable composition boundary. After `DESIGN_READY`, the
-primary keeps accepted geometry fixed while wiring behavior. At most one fresh
-closure compares named `UX-` findings with matched captures and does not restart
-broad redesign. `DESIGN_REMEDIATE` is fixed autonomously when it violates
-accepted visual criteria; advisory polish does not silently expand scope.
+Visual design uses a separate evidence lifecycle. For a substantial visual or
+navigation slice, fixed Opus/high `tv-ux-brief` turns named baseline images and
+accepted requirements into one preferred direction before implementation. The
+Sol primary renders production composables through deterministic fake-state
+evidence. Terra/medium `tv-evidence-curator` validates exact state coverage and
+emits a compact path manifest without design judgment. Fixed Opus/medium
+`tv-ux-reviewer` then accepts `review` or `closure` mode over that curated set.
+After `DESIGN_READY`, the primary keeps accepted geometry fixed while wiring
+behavior. At most one closure compares named `UX-` findings with matched
+captures and does not restart broad redesign. `DESIGN_REMEDIATE` is fixed
+autonomously when it violates accepted visual criteria; advisory polish does
+not silently expand scope.
 
 Continue automatically through the current slice, internal checkpoints,
 recoverable test failures, reviewer findings, child-agent errors, and one batched

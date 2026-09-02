@@ -13,17 +13,13 @@ COMMAND_PATH = ROOT / ".opencode/commands/claude-audit-track.md"
 
 CLAUDE_AGENTS = {
     "claude-audit-lead": ("anthropic/claude-opus-5", "high", 45),
-    "claude-local-analysis": ("anthropic/claude-sonnet-5", "high", 35),
-    "claude-external-research": ("anthropic/claude-sonnet-5", "medium", 30),
 }
-OPENAI_ANALYTICAL_ROLES = {
-    "app-analyze",
-    "app-explore",
-    "app-research",
-    "app-planner",
-    "android-reviewer",
+
+OPUS_AGENT_NAMES = (
+    "claude-audit-lead",
+    "tv-ux-brief",
     "tv-ux-reviewer",
-}
+)
 
 
 def frontmatter(path: Path) -> str:
@@ -76,25 +72,45 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
                 metadata = frontmatter(AGENT_DIR / f"{name}.md")
                 self.assertIn("mode: subagent", metadata)
 
-    def test_root_can_invoke_only_the_claude_lead(self) -> None:
+    def test_root_can_invoke_the_claude_lead_without_nested_claude_roles(self) -> None:
         task = self.config["permission"]["task"]
         self.assertEqual(task["*"], "deny")
         self.assertEqual(task["claude-audit-lead"], "allow")
         self.assertNotIn("claude-local-analysis", task)
         self.assertNotIn("claude-external-research", task)
+        self.assertNotIn("claude-local-analysis", self.config["agent"])
+        self.assertNotIn("claude-external-research", self.config["agent"])
 
-    def test_lead_allows_only_claude_children_and_independent_luna(self) -> None:
+    def test_opus_roles_omit_sampling_controls_and_calibrate_output(self) -> None:
+        for name in OPUS_AGENT_NAMES:
+            with self.subTest(name=name):
+                metadata = frontmatter(AGENT_DIR / f"{name}.md")
+                text = normalized(AGENT_DIR / f"{name}.md")
+                self.assertNotIn("temperature:", metadata)
+                self.assertNotIn("top_p:", metadata)
+                self.assertNotIn("top_k:", metadata)
+                self.assertIn("<tone_preference>", text)
+                self.assertIn("Keep the response focused and concise", text)
+                self.assertIn("do not add a redundant verification pass", text)
+
+    def test_opus_roles_own_their_output_contracts(self) -> None:
+        brief = normalized(AGENT_DIR / "tv-ux-brief.md")
+        reviewer = normalized(AGENT_DIR / "tv-ux-reviewer.md")
+        audit = normalized(AGENT_DIR / "claude-audit-lead.md")
+        command = normalized(COMMAND_PATH)
+
+        self.assertIn("BRIEF_READY", brief)
+        self.assertIn("The assignment must not redefine these dispositions", brief)
+        self.assertIn("DESIGN_READY", reviewer)
+        self.assertIn("The assignment must not redefine these dispositions", reviewer)
+        self.assertIn("`BLOCKING`, `NON_BLOCKING`, `CLEAN`, or `INSUFFICIENT_EVIDENCE`", audit)
+        self.assertIn("The task packet must not redefine these labels", audit)
+        self.assertIn("Do not redefine the agent's role", command)
+        self.assertNotIn("required output", command)
+
+    def test_lead_allows_only_independent_luna_lookup(self) -> None:
         task = permissions(AGENT_DIR / "claude-audit-lead.md")["task"]
-        self.assertEqual(
-            task,
-            {
-                "*": "deny",
-                **{role: "deny" for role in OPENAI_ANALYTICAL_ROLES},
-                "app-locator": "allow",
-                "claude-local-analysis": "allow",
-                "claude-external-research": "allow",
-            },
-        )
+        self.assertEqual(task, {"*": "deny", "app-locator": "allow"})
 
     def test_every_claude_role_is_read_only_and_fail_closed(self) -> None:
         expected_common = {
@@ -114,10 +130,7 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
                 role_permissions = permissions(AGENT_DIR / f"{name}.md")
                 for tool, action in expected_common.items():
                     self.assertEqual(role_permissions[tool], action)
-                expected_webfetch = (
-                    "allow" if name == "claude-external-research" else "deny"
-                )
-                self.assertEqual(role_permissions["webfetch"], expected_webfetch)
+                self.assertEqual(role_permissions["webfetch"], "deny")
                 self.assertIn("Never read credentials", text)
                 self.assertIn("session or process", text)
                 self.assertIn("Never read project instructions", text)
@@ -147,19 +160,7 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
 
         lead_text = normalized(AGENT_DIR / "claude-audit-lead.md")
         self.assertIn("Do not require quota telemetry", lead_text)
-        self.assertIn("Never retry a child automatically", lead_text)
-        for name in ("claude-local-analysis", "claude-external-research"):
-            child_text = normalized(AGENT_DIR / f"{name}.md")
-            self.assertIn(
-                "Do not reject a usable task because optional packet metadata is absent",
-                child_text,
-            )
-
-    def test_sonnet_roles_cannot_delegate(self) -> None:
-        for name in ("claude-local-analysis", "claude-external-research"):
-            with self.subTest(name=name):
-                role_permissions = permissions(AGENT_DIR / f"{name}.md")
-                self.assertEqual(role_permissions["task"], {"*": "deny"})
+        self.assertIn("Never invoke another analytical", lead_text)
 
     def test_command_uses_configured_routes_and_simple_packets(self) -> None:
         text = normalized(COMMAND_PATH)
@@ -184,12 +185,12 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
         required_contract = (
             "Use the configured Claude routes",
             "Do not ask any task to repeat route, model, variant, step, revision, quota, or provenance attestations",
-            "Never retry a child automatically",
             "bounded question",
             "allowed paths or sources",
             "exclusions",
-            "required output",
+            "variable evidence",
             "stop condition",
+            "Do not redefine the agent's role",
             "Do not pass another track's analysis or conclusions",
         )
         for expected in required_contract:

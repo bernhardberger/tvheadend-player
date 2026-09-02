@@ -103,7 +103,7 @@ class AiModelTierTest(unittest.TestCase):
                 "app-analyze",
                 "app-research",
                 "android-reviewer",
-                "tv-ux-reviewer",
+                "tv-evidence-curator",
             },
         )
         self.assertEqual(

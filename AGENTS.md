@@ -146,16 +146,36 @@ for bounded multi-file source maps and call traces, `app-planner` for an optiona
 design second opinion, `app-analyze` for one concrete post-plan contradiction,
 and `app-research` for one authoritative external-source question after local
 sources are insufficient. Use `android-reviewer` for a risk-based frozen-packet
-review and `tv-ux-reviewer` for screenshot-first design review. Only
-`app-locator` children may be delegated by read-only children, and depth 2 is
-terminal. Children cannot edit, use shell, run builds or devices, mutate Git, or
-read project instructions, ledgers, handoffs, archives, or broad plans. Their
-configured model variants and step limits do not inherit the writable primary's
-`medium`, `high`, `xhigh`, or `max` effort.
+review, `tv-evidence-curator` for mechanical screenshot-set validation,
+`tv-ux-brief` for pre-implementation product direction, and `tv-ux-reviewer` for
+final screenshot-first design review. Only `app-locator` children may be
+delegated by read-only children, and depth 2 is terminal. Children cannot edit,
+use shell, run builds or devices, mutate Git, or read project instructions,
+ledgers, handoffs, archives, or broad plans. Their configured model variants and
+step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
+`max` effort.
+
+For a substantial new or redesigned TV surface, obtain one fresh fixed
+Opus/high `tv-ux-brief` before implementation and one final fixed Opus/medium
+`tv-ux-reviewer` after the Sol primary captures current evidence and the
+Terra/medium curator validates its state matrix. Run a closure review only when
+blocking design findings require matched recaptures. Before each Opus UX call,
+run `./review-provider-route.sh select ux`; launch the role only when it prints
+`opus`. The UX route requires remaining Claude quota above 20% in the 5-hour
+window and above 5% in the 7-day window. Missing, malformed, exhausted, or
+below-threshold telemetry skips that optional call without weakening the
+mandatory Sol Android review. Keep `claude-audit-lead` Opus/high for genuinely
+critical or complex nonvisual architecture and dependency work. Use at most one
+Opus specialization for a concern; routine, documentation, test-only, and
+configuration-only changes are Sol-only.
 
 Start each child as a fresh session by omitting `task_id`; never resume old child
 history. Supply one self-contained question with accepted invariants, included
-paths, exclusions, relevant evidence, and a stop condition. A child that reaches
+paths, exclusions, relevant evidence, and a stop condition. Do not redefine the
+role's permissions, generic policy, output contract or verdict vocabulary in a
+task packet. Supply the actual relevant diff or exact readable changed paths;
+Git identity and gate status are caller-provided evidence for children that
+cannot run commands. A child that reaches
 its terminal budget reports inspected scope and the exact remaining evidence
 gap instead of claiming completion. The writable primary adjudicates and fixes
 in-scope review findings directly; a broad new concern becomes a separately
