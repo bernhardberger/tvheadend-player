@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -11,36 +12,51 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
+import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
+import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.programmeActions
@@ -50,6 +66,7 @@ import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.ui.screens.label
 import at.bernhardberger.tvhplayer.ui.screens.floorToHour
@@ -108,6 +125,199 @@ internal fun JumpToTimeDialog(
             }
         }
     }
+}
+
+@Composable
+internal fun EpgSearchDialog(
+    contentPadding: PaddingValues,
+    query: String,
+    result: EpgSearchResult?,
+    searching: Boolean,
+    searchEnabled: Boolean,
+    channelName: (ChannelId?) -> String?,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onOpenDetails: (EpgEventEntry) -> Unit,
+    onDismiss: () -> Unit,
+    restoreFocusTo: EventId? = null,
+    onFocusRestored: () -> Unit = {},
+) {
+    val queryFocus = remember { FocusRequester() }
+    val searchFocus = remember { FocusRequester() }
+    val closeFocus = remember { FocusRequester() }
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var searchWasLastFocused by remember { mutableStateOf(false) }
+    val events = (result as? EpgSearchResult.Available)?.events.orEmpty()
+    val resultFocusRequesters = remember(events) {
+        events.associate { event -> event.id to FocusRequester() }
+    }
+    val canSearch = searchEnabled && query.isNotBlank() && !searching
+
+    LaunchedEffect(Unit) {
+        if (restoreFocusTo == null) queryFocus.requestFocus()
+    }
+    LaunchedEffect(restoreFocusTo, events) {
+        val requester = restoreFocusTo?.let(resultFocusRequesters::get) ?: return@LaunchedEffect
+        if (requester.requestFocus()) onFocusRestored()
+    }
+    LaunchedEffect(canSearch) {
+        if (!canSearch && searchWasLastFocused) closeFocus.requestFocus()
+    }
+    BackHandler(enabled = editingId == null, onBack = onDismiss)
+    DialogScrim(
+        onDismissRequest = {
+            if (editingId != null) editingId = null else onDismiss()
+        },
+        wide = true,
+        contentPadding = contentPadding,
+    ) {
+        Text(
+            text = stringResource(R.string.epg_search_title),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        TvOutlinedTextField(
+            id = "epg-search-query",
+            editingId = editingId,
+            setEditingId = { editingId = it },
+            value = query,
+            onValueChange = onQueryChange,
+            label = { Text(stringResource(R.string.epg_search_query)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(queryFocus)
+                .focusProperties { down = if (canSearch) searchFocus else closeFocus }
+                .onFocusChanged { if (it.isFocused) searchWasLastFocused = false }
+                .testTag("epg-search-field"),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onSearch,
+                enabled = canSearch,
+                modifier = Modifier
+                    .focusRequester(searchFocus)
+                    .onFocusChanged { if (it.isFocused) searchWasLastFocused = true }
+                    .focusProperties {
+                        up = queryFocus
+                        right = closeFocus
+                        resultFocusRequesters[events.firstOrNull()?.id]?.let { down = it }
+                    }
+                    .testTag("epg-search-submit"),
+            ) {
+                Text(stringResource(R.string.epg_search_action))
+            }
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .focusRequester(closeFocus)
+                    .onFocusChanged { if (it.isFocused) searchWasLastFocused = false }
+                    .focusProperties {
+                        up = queryFocus
+                        left = if (canSearch) searchFocus else queryFocus
+                        resultFocusRequesters[events.firstOrNull()?.id]?.let { down = it }
+                    }
+                    .testTag("epg-search-close"),
+            ) {
+                Text(stringResource(R.string.close))
+            }
+        }
+
+        val messageRes = epgSearchMessageRes(
+            result = result,
+            searching = searching,
+            searchEnabled = searchEnabled,
+        )
+        if (messageRes != null) {
+            Text(
+                text = stringResource(messageRes),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (events.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .focusGroup()
+                    .testTag("epg-search-results"),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(events, key = { event -> event.id.value }) { event ->
+                    val title = event.title?.takeIf(String::isNotBlank)
+                        ?: stringResource(R.string.epg_search_untitled)
+                    val channel = channelName(event.channelId)
+                        ?: stringResource(R.string.epg_search_unknown_channel)
+                    val schedule = stringResource(
+                        R.string.epg_search_result_schedule,
+                        channel,
+                        event.start.epochSeconds.formatDateTime(),
+                        formatHm(event.stop.epochSeconds),
+                    )
+                    val description = stringResource(
+                        R.string.epg_search_result_description,
+                        title,
+                        schedule,
+                    )
+                    ListItem(
+                        selected = false,
+                        onClick = { onOpenDetails(event) },
+                        headlineContent = {
+                            Text(
+                                text = title,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = schedule,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        scale = ListItemDefaults.scale(focusedScale = 1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(resultFocusRequesters.getValue(event.id))
+                            .onFocusChanged {
+                                if (it.isFocused) searchWasLastFocused = false
+                            }
+                            .focusProperties {
+                                if (event.id == events.first().id) {
+                                    up = if (canSearch) searchFocus else closeFocus
+                                }
+                            }
+                            .testTag("epg-search-result-${event.id.value}")
+                            .semantics { contentDescription = description },
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun epgSearchMessageRes(
+    result: EpgSearchResult?,
+    searching: Boolean,
+    searchEnabled: Boolean,
+): Int? = when {
+    searching -> R.string.epg_search_searching
+    !searchEnabled -> R.string.epg_search_connection_unavailable
+    result == null -> R.string.epg_search_hint
+    result is EpgSearchResult.Available -> if (result.events.isEmpty()) {
+        R.string.epg_search_empty
+    } else {
+        null
+    }
+    result === EpgSearchResult.InvalidQuery -> R.string.epg_search_invalid
+    result === EpgSearchResult.AccessDenied -> R.string.epg_search_denied
+    result === EpgSearchResult.ConnectionLimit -> R.string.epg_search_connection_limit
+    result === EpgSearchResult.NotSupported -> R.string.epg_search_not_supported
+    result === EpgSearchResult.ObservationExpired ||
+        result === EpgSearchResult.Timeout ||
+        result === EpgSearchResult.TransportUnavailable ||
+        result === EpgSearchResult.ConnectionChanged -> R.string.epg_search_unavailable
+    else -> R.string.epg_search_unavailable
 }
 
 @Composable
