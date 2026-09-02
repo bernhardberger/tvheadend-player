@@ -22,23 +22,124 @@ class GuideRenderingCostContractTest {
         repositoryRoot,
         "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/guide/EpgGridModals.kt",
     ).readText()
+    private val appModuleSource = File(
+        repositoryRoot,
+        "app/src/main/java/at/bernhardberger/tvhplayer/di/AppModule.kt",
+    ).readText()
 
     @Test
-    fun guideUsesOneCurrentPerChannelEventIndex() {
+    fun appSessionUsesTheExplicitGuideCoveragePolicy() {
+        assertEquals(
+            1,
+            appModuleSource.count("createTvheadendSession(GUIDE_EPG_COVERAGE_POLICY)"),
+        )
+        assertFalse(appModuleSource.contains("val session = createTvheadendSession()"))
+    }
+
+    @Test
+    fun guideUsesOneWindowBoundedPerChannelEventIndex() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",
             "private fun SessionObservation.dvrEntries()",
         )
 
-        assertEquals(1, guide.count("indexTimelineEventsByChannel(snapshotEvents)"))
+        assertEquals(1, guide.count("indexTimelineEventsByChannel("))
         assertTrue(
             guide.contains(
-                """val eventsByChannel = remember(snapshotEvents) {
-        indexTimelineEventsByChannel(snapshotEvents)
+                """val timelineEventIndex = remember(snapshotEvents, category, windowStartSec) {
+        indexTimelineEventsByChannel(
+            events = snapshotEvents,
+            windowStartSec = windowStartSec,
+            windowEndSec = windowEndSec,
+            matches = { it.matchesProgrammeCategory(category) },
+        )
     }"""
             )
         )
+        assertFalse(guide.contains("indexTimelineEventsByChannel(snapshotEvents)"))
         assertFalse(guide.contains("snapshotEvents.filter { it.channelId == channel.id }"))
+        assertTrue(
+            guide.contains(
+                """val through = KotlinInstant.fromEpochSeconds(
+            boundedAnchorSec + GUIDE_VISIBLE_WINDOW_SEC
+        )"""
+            )
+        )
+        assertTrue(guide.contains("channelId = channels[current.channelIndex].id"))
+        assertTrue(guide.contains("channelFocusRequest = ChannelFocusRequest("))
+        assertTrue(guide.contains("val coverageRequest = requestVisibleWindow("))
+        assertTrue(
+            guide.contains(
+                """val unsettledIndex = unsettledPageIndex(current.channelIndex, targetIndex)
+        if (unsettledIndex != null) {
+            requestChannelFocus(current, unsettledIndex, direction)
+            return
+        }"""
+            )
+        )
+        assertTrue(
+            guide.contains(
+                """val unsettledIndex = unsettledPageIndex(
+                    current.channelIndex,
+                    move.target.channelIndex,
+                )
+                if (unsettledIndex != null) {
+                    requestChannelFocus(current, unsettledIndex, step)
+                    return true
+                }"""
+            )
+        )
+        assertEquals(2, guide.count("if (coverageSettled && target != null)"))
+        assertTrue(
+            guide.contains(
+                "searchChannelIds = request.coverageRequest.generations.keys"
+            )
+        )
+        assertTrue(guide.contains("searchChannelIds = targetPageIds"))
+        assertTrue(
+            guide.contains(
+                "channelIds = request.coverageRequest.generations.keys.toList()"
+            )
+        )
+        assertTrue(guide.contains("windowFocusRequest = WindowFocusRequest("))
+        assertTrue(guide.contains("resolveGuideWindowFocus("))
+        assertTrue(
+            guide.contains(
+                """fun clearAllCoverage(restoreFrontier: Boolean = false) {
+        if (restoreFrontier) frontierRequest?.let(::deferFrontierOrigin)
+        else pendingFrontierOrigin = null
+        coverageRequests.cancelAll()"""
+            )
+        )
+        assertTrue(
+            guide.contains(
+                """if (coverageSession !== currentSession) {
+            coverageSession = currentSession
+            clearAllCoverage(restoreFrontier = true)
+        }"""
+            )
+        )
+        assertTrue(
+            guide.contains(
+                "pendingFrontierOrigin != null ||"
+            )
+        )
+        assertTrue(guide.contains("resolveGuideFrontierOrigin("))
+        assertTrue(guide.contains("is GuideDeferredOriginResolution.Restore"))
+        assertTrue(guide.contains("requestVisibleWindow(origin.windowStartSec, channelIndex)"))
+        assertTrue(
+            guide.contains(
+                """windowStartSec = request.originWindowStartSec
+        selection.setSelected(request.channelId)
+        pendingFrontierOrigin = request.toOrigin()"""
+            )
+        )
+        assertTrue(
+            guide.contains(
+                "windowFocusRequest != null"
+            )
+        )
+        assertEquals(4, guide.count("delay(GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS)"))
     }
 
     @Test
@@ -49,7 +150,7 @@ class GuideRenderingCostContractTest {
         )
         val selectedTargetFocus = guide.section(
             "LaunchedEffect(\n        selectedTarget,",
-            "LaunchedEffect(epgState, selectedChannel, category, frontierRequest)",
+            "LaunchedEffect(\n        epgState,\n        focusRows,\n        channels,",
         ).substringAfter("if (initialFocusEnabled && !scopeRowFocused) {")
 
         assertFalse(guide.contains("delay(80)"))

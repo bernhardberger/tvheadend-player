@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -64,6 +65,9 @@ import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
+import at.bernhardberger.tvhplayer.core.GUIDE_VISIBLE_WINDOW_SEC
+import at.bernhardberger.tvhplayer.core.GuideCoverageFocusResolution
+import at.bernhardberger.tvhplayer.core.GuideDeferredOriginResolution
 import at.bernhardberger.tvhplayer.core.GuideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.GuideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
@@ -72,15 +76,22 @@ import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
-import at.bernhardberger.tvhplayer.core.epgFrontierSettled
+import at.bernhardberger.tvhplayer.core.firstUnsettledGuidePageIndex
+import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
+import at.bernhardberger.tvhplayer.core.guideChannelPageCoverageSettled
 import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
+import at.bernhardberger.tvhplayer.core.guideWindowBounds
 import at.bernhardberger.tvhplayer.core.indexTimelineEventsByChannel
 import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.reconcileTimelineEpgFocus
+import at.bernhardberger.tvhplayer.core.resolveGuideFrontierOrigin
+import at.bernhardberger.tvhplayer.core.resolveGuideWindowFocus
+import at.bernhardberger.tvhplayer.core.shouldWaitForGuideCoverage
+import at.bernhardberger.tvhplayer.core.timelineFrontierFocus
 import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -118,9 +129,8 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import kotlin.math.max
 
-private const val VISIBLE_WINDOW_SEC = 3 * 3600L
-private const val FRONTIER_STEP_SEC = 3 * 3600L
 private const val CHANNEL_PAGE_SIZE = 6
+private const val GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS = 10_000L
 
 private enum class GuideHeaderFocus {
     DATE,
@@ -129,7 +139,43 @@ private enum class GuideHeaderFocus {
     CLEAR_FILTER,
 }
 
-private data class FrontierRequest(val afterSec: Long, val throughSec: Long)
+private data class FrontierRequest(
+    val channelId: ChannelId,
+    val originEventId: EventId,
+    val boundarySec: Long,
+    val direction: Int,
+    val originWindowStartSec: Long,
+    val coverageRequest: GuideCoverageRequestToken,
+    val throughSec: Long,
+)
+
+private data class FrontierOrigin(
+    val channelId: ChannelId,
+    val eventId: EventId,
+    val windowStartSec: Long,
+)
+
+private fun FrontierRequest.toOrigin() = FrontierOrigin(
+    channelId = channelId,
+    eventId = originEventId,
+    windowStartSec = originWindowStartSec,
+)
+
+private data class ChannelFocusRequest(
+    val originChannelId: ChannelId,
+    val originEventId: EventId,
+    val preferredChannelId: ChannelId,
+    val direction: Int,
+    val coverageRequest: GuideCoverageRequestToken,
+    val throughSec: Long,
+)
+
+private data class WindowFocusRequest(
+    val preferredChannelId: ChannelId,
+    val windowStartSec: Long,
+    val coverageRequest: GuideCoverageRequestToken,
+    val throughSec: Long,
+)
 
 private data class GuideSearchRequest(
     val observation: SessionObservation,
@@ -217,13 +263,24 @@ fun EpgGridScreen(
         connectionUiState == ConnectionUiState.SyncingChannels ||
         connectionUiState == ConnectionUiState.Reconnecting
 
+    val guideZoneId = remember { ZoneId.systemDefault() }
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
+    val windowBounds = remember(openedAtSec, guideZoneId) {
+        guideWindowBounds(openedAtSec, guideZoneId)
+    }
     val nowSecProvider = rememberCurrentEpochSeconds()
     val restoredPosition = remember { guidePositionStore.position.value }
-    var windowStartSec by remember {
-        mutableLongStateOf(restoredPosition?.windowStartSec ?: floorToHour(openedAtSec))
+    val restoredTimelinePosition = remember(restoredPosition, windowBounds) {
+        restoredPosition?.takeIf { it.windowStartSec in
+            windowBounds.earliestStartSec..windowBounds.latestStartSec
+        }
     }
-    val windowEndSec = windowStartSec + VISIBLE_WINDOW_SEC
+    var windowStartSec by remember {
+        mutableLongStateOf(
+            restoredTimelinePosition?.windowStartSec ?: windowBounds.earliestStartSec
+        )
+    }
+    val windowEndSec = windowStartSec + GUIDE_VISIBLE_WINDOW_SEC
     var selectedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
@@ -245,6 +302,23 @@ fun EpgGridScreen(
     var restoreSearchHeaderFocus by remember { mutableStateOf(false) }
     var restoreSearchResultFocus by remember { mutableStateOf<EventId?>(null) }
     var frontierRequest by remember { mutableStateOf<FrontierRequest?>(null) }
+    var pendingFrontierOrigin by remember { mutableStateOf<FrontierOrigin?>(null) }
+    var channelFocusRequest by remember { mutableStateOf<ChannelFocusRequest?>(null) }
+    var windowFocusRequest by remember { mutableStateOf<WindowFocusRequest?>(null) }
+    var coverageRequestVersion by remember { mutableLongStateOf(0L) }
+    val coverageRequests = remember(coroutineScope) {
+        GuideCoverageRequestOwner(
+            scope = coroutineScope,
+            timeoutMillis = GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS,
+            onPendingChanged = { coverageRequestVersion++ },
+        )
+    }
+    DisposableEffect(coverageRequests) {
+        onDispose { coverageRequests.dispose() }
+    }
+    var coverageSession by remember { mutableStateOf(currentSession) }
+    var coverageTagId by remember { mutableStateOf(channelScope.activeTagId) }
+    var coverageCategory by remember { mutableStateOf(category) }
     var lastPlayedId by remember { mutableStateOf<ChannelId?>(null) }
     var scopeRowFocused by remember { mutableStateOf(false) }
     var lastHeaderFocus by remember { mutableStateOf(GuideHeaderFocus.DATE) }
@@ -326,7 +400,6 @@ fun EpgGridScreen(
         }
     }
 
-    val selectedIndex = selectedTarget?.channelIndex ?: pendingInitialChannelIndex
     val epgState = observation.epgState
     val epgSnapshot = when (val state = epgState) {
         is EpgRepositoryState.Current -> state.snapshot
@@ -335,40 +408,155 @@ fun EpgGridScreen(
         EpgRepositoryState.Empty -> null
     }
     val snapshotEvents = epgSnapshot?.events.orEmpty()
-    val currentEventIds = remember(snapshotEvents) {
-        snapshotEvents.mapTo(mutableSetOf()) { it.id }
+    val timelineEventIndex = remember(snapshotEvents, category, windowStartSec) {
+        indexTimelineEventsByChannel(
+            events = snapshotEvents,
+            windowStartSec = windowStartSec,
+            windowEndSec = windowEndSec,
+            matches = { it.matchesProgrammeCategory(category) },
+        )
+    }
+    val currentEventIds = remember(timelineEventIndex) {
+        timelineEventIndex.visibleEventsByChannel.values
+            .flatMapTo(mutableSetOf()) { events -> events.map { it.id } }
     }
     LaunchedEffect(currentEventIds) {
         eventFocusRequesters.keys.retainAll(currentEventIds)
     }
-    val eventsByChannel = remember(snapshotEvents) {
-        indexTimelineEventsByChannel(snapshotEvents)
-    }
-    val focusRows = remember(channels, category, eventsByChannel) {
+    val eventsByChannel = timelineEventIndex.visibleEventsByChannel
+    val focusRows = remember(channels, timelineEventIndex) {
         channels.map { channel ->
             EpgFocusColumn(
                 channelId = channel.id,
-                events = eventsByChannel[channel.id].orEmpty()
-                    .filter { it.matchesProgrammeCategory(category) },
+                events = eventsByChannel[channel.id].orEmpty(),
             )
         }
     }
-    val selectedChannel = channels.getOrNull(selectedIndex)
+    fun channelPageRange(channelIndex: Int): IntRange {
+        if (channels.isEmpty()) return 0 until 0
+        val boundedIndex = channelIndex.coerceIn(channels.indices)
+        val pageStart = (boundedIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
+        return pageStart until (pageStart + CHANNEL_PAGE_SIZE).coerceAtMost(channels.size)
+    }
 
-    fun requestVisibleWindow(anchorSec: Long, channelIndex: Int) {
-        val capability = currentSession ?: return
-        if (channels.isEmpty()) return
-        val pageStart = (channelIndex.coerceAtLeast(0) / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
-        val ids = channels
-            .subList(pageStart, (pageStart + CHANNEL_PAGE_SIZE).coerceAtMost(channels.size))
-            .map { it.id }
-        val through = KotlinInstant.fromEpochSeconds(anchorSec)
-        ids.forEach { channelId ->
-            coroutineScope.launch {
-                session.epgRepository.acquireCoverage(capability, channelId, through)
-            }
+    fun channelPageIds(channelIndex: Int): List<ChannelId> =
+        channelPageRange(channelIndex).map { channels[it].id }
+
+    fun requestVisibleWindow(
+        anchorSec: Long,
+        channelIndex: Int,
+    ): GuideCoverageRequestToken? {
+        val capability = currentSession ?: return null
+        val ids = channelPageIds(channelIndex)
+        if (ids.isEmpty()) return null
+        val boundedAnchorSec = windowBounds.constrain(anchorSec)
+        val through = KotlinInstant.fromEpochSeconds(
+            boundedAnchorSec + GUIDE_VISIBLE_WINDOW_SEC
+        )
+        return coverageRequests.request(
+            channelIds = ids.toSet(),
+            windowStartSec = boundedAnchorSec,
+        ) { channelId ->
+            session.epgRepository.acquireCoverage(
+                capability,
+                channelId,
+                through,
+            )
         }
     }
+
+    fun deferFrontierOrigin(request: FrontierRequest) {
+        windowStartSec = request.originWindowStartSec
+        selection.setSelected(request.channelId)
+        pendingFrontierOrigin = request.toOrigin()
+        pendingInitialChannelIndex = -1
+        selectedTarget = null
+    }
+
+    fun restoreFrontierOrigin(request: FrontierRequest) {
+        deferFrontierOrigin(request)
+    }
+
+    fun clearAllCoverage(restoreFrontier: Boolean = false) {
+        if (restoreFrontier) frontierRequest?.let(::deferFrontierOrigin)
+        else pendingFrontierOrigin = null
+        coverageRequests.cancelAll()
+        frontierRequest = null
+        channelFocusRequest = null
+        windowFocusRequest = null
+    }
+
+    fun completeFrontierRequest(request: FrontierRequest) {
+        coverageRequests.cancel(request.coverageRequest)
+        if (frontierRequest == request) {
+            frontierRequest = null
+        }
+    }
+
+    fun completeChannelFocusRequest(request: ChannelFocusRequest) {
+        coverageRequests.cancel(request.coverageRequest)
+        if (channelFocusRequest == request) {
+            channelFocusRequest = null
+        }
+    }
+
+    fun completeWindowFocusRequest(request: WindowFocusRequest) {
+        coverageRequests.cancel(request.coverageRequest)
+        if (windowFocusRequest == request) {
+            windowFocusRequest = null
+        }
+    }
+
+    fun coveragePending(token: GuideCoverageRequestToken): Boolean =
+        coverageRequestVersion.let {
+            coverageRequests.isPending(token)
+        }
+
+    fun pageCoverageSettled(channelIndex: Int): Boolean {
+        val snapshot = epgState.currentEpgSnapshot() ?: return false
+        return guideChannelPageCoverageSettled(
+            channelIds = channelPageIds(channelIndex),
+            coverages = snapshot.coverages,
+            requestedThrough = KotlinInstant.fromEpochSeconds(windowEndSec),
+        )
+    }
+
+    fun unsettledPageIndex(channelIndex: Int, targetIndex: Int): Int? =
+        firstUnsettledGuidePageIndex(
+            currentChannelIndex = channelIndex,
+            targetChannelIndex = targetIndex,
+            channelCount = channels.size,
+            pageSize = CHANNEL_PAGE_SIZE,
+            coverageSettled = ::pageCoverageSettled,
+        )
+
+    fun requestChannelFocus(
+        current: EpgFocusTarget,
+        preferredChannelIndex: Int,
+        direction: Int,
+    ) {
+        val preferredChannel = channels.getOrNull(preferredChannelIndex) ?: return
+        val originChannel = channels.getOrNull(current.channelIndex) ?: return
+        val coverageRequest = requestVisibleWindow(windowStartSec, preferredChannelIndex) ?: return
+        channelFocusRequest = ChannelFocusRequest(
+            originChannelId = originChannel.id,
+            originEventId = current.eventId,
+            preferredChannelId = preferredChannel.id,
+            direction = direction,
+            coverageRequest = coverageRequest,
+            throughSec = windowEndSec,
+        )
+    }
+
+    val frontierAcquisitionPending = frontierRequest?.let { request ->
+        coveragePending(request.coverageRequest)
+    } == true
+    val channelAcquisitionPending = channelFocusRequest?.let { request ->
+        coveragePending(request.coverageRequest)
+    } == true
+    val windowAcquisitionPending = windowFocusRequest?.let { request ->
+        coveragePending(request.coverageRequest)
+    } == true
 
     LaunchedEffect(
         channels,
@@ -382,12 +570,15 @@ fun EpgGridScreen(
             return@LaunchedEffect
         }
         val preferredId = playingChannelId ?: lastPlayedId ?: selectedChannelId
-        val restored = restoredPosition?.takeIf { position ->
+        val restoredChannelPosition = restoredPosition?.takeIf { position ->
+            channels.any { it.id == position.channelId }
+        }
+        val restored = restoredTimelinePosition?.takeIf { position ->
             channels.any { it.id == position.channelId }
         }
         val channelId = browsingFocusChannelId(
             channels,
-            restored?.channelId ?: preferredId,
+            restoredChannelPosition?.channelId ?: preferredId,
         )
             ?: return@LaunchedEffect
         val channelIndex = channels.indexOfFirst { it.id == channelId }
@@ -413,8 +604,15 @@ fun EpgGridScreen(
         initialPositionDone = true
     }
 
-    LaunchedEffect(focusRows, selectedTarget, initialPositionDone) {
+    LaunchedEffect(focusRows, selectedTarget, pendingFrontierOrigin, initialPositionDone) {
         if (!initialPositionDone || focusRows.size != channels.size || channels.isEmpty()) {
+            return@LaunchedEffect
+        }
+        if (
+            frontierRequest != null ||
+            pendingFrontierOrigin != null ||
+            windowFocusRequest != null
+        ) {
             return@LaunchedEffect
         }
         val current = selectedTarget
@@ -425,7 +623,7 @@ fun EpgGridScreen(
             rows = focusRows,
             current = current,
             preferredChannelIndex = preferredIndex,
-            targetSec = nowSecProvider(),
+            targetSec = windowStartSec,
         )
         if (replacement == current) return@LaunchedEffect
         selectedTarget = replacement
@@ -436,15 +634,102 @@ fun EpgGridScreen(
     }
 
     LaunchedEffect(channelScope.activeTagId) {
+        if (coverageTagId != channelScope.activeTagId) {
+            coverageTagId = channelScope.activeTagId
+            clearAllCoverage()
+        }
         initialPositionDone = false
         selectedTarget = null
         pendingInitialChannelIndex = -1
+        frontierRequest = null
+        channelFocusRequest = null
+        windowFocusRequest = null
     }
 
     LaunchedEffect(category) {
+        if (coverageCategory != category) {
+            coverageCategory = category
+            clearAllCoverage()
+        }
         initialPositionDone = false
         selectedTarget = null
         pendingInitialChannelIndex = -1
+        frontierRequest = null
+        channelFocusRequest = null
+        windowFocusRequest = null
+    }
+
+    LaunchedEffect(currentSession) {
+        if (coverageSession !== currentSession) {
+            coverageSession = currentSession
+            clearAllCoverage(restoreFrontier = true)
+        }
+    }
+
+    LaunchedEffect(currentSession, pendingFrontierOrigin, channels) {
+        val origin = pendingFrontierOrigin ?: return@LaunchedEffect
+        if (currentSession == null) return@LaunchedEffect
+        val channelIndex = channels.indexOfFirst { it.id == origin.channelId }
+        if (channelIndex >= 0) {
+            requestVisibleWindow(origin.windowStartSec, channelIndex)
+        }
+    }
+
+    LaunchedEffect(
+        currentSession,
+        connectionUiState,
+        epgState,
+        focusRows,
+        channels,
+        pendingFrontierOrigin,
+    ) {
+        val origin = pendingFrontierOrigin ?: return@LaunchedEffect
+        when (
+            val resolution = resolveGuideFrontierOrigin(
+                rows = focusRows,
+                channelId = origin.channelId,
+                eventId = origin.eventId,
+                connectionReady = currentSession != null &&
+                    connectionUiState == ConnectionUiState.Ready,
+                hasCurrentSnapshot = epgState.currentEpgSnapshot() != null,
+                timedOut = false,
+            )
+        ) {
+            GuideDeferredOriginResolution.Wait -> return@LaunchedEffect
+            GuideDeferredOriginResolution.Release -> pendingFrontierOrigin = null
+            is GuideDeferredOriginResolution.Restore -> {
+                windowStartSec = origin.windowStartSec
+                pendingInitialChannelIndex = resolution.target.channelIndex
+                selectedTarget = resolution.target
+                selection.setSelected(origin.channelId)
+                pendingFrontierOrigin = null
+            }
+        }
+    }
+
+    LaunchedEffect(pendingFrontierOrigin) {
+        val origin = pendingFrontierOrigin ?: return@LaunchedEffect
+        delay(GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS)
+        if (
+            pendingFrontierOrigin == origin &&
+            resolveGuideFrontierOrigin(
+                rows = focusRows,
+                channelId = origin.channelId,
+                eventId = origin.eventId,
+                connectionReady = currentSession != null &&
+                    connectionUiState == ConnectionUiState.Ready,
+                hasCurrentSnapshot = epgState.currentEpgSnapshot() != null,
+                timedOut = true,
+            ) == GuideDeferredOriginResolution.Release
+        ) {
+            pendingFrontierOrigin = null
+        }
+    }
+
+    LaunchedEffect(connectionUiState) {
+        if (connectionUiState != ConnectionUiState.Ready) {
+            coverageRequests.cancelAll()
+        }
     }
 
     LaunchedEffect(
@@ -474,11 +759,17 @@ fun EpgGridScreen(
             ?.firstOrNull { it.id == target.eventId }
             ?: return@LaunchedEffect
         when {
-            event.start.epochSeconds < windowStartSec ->
-                windowStartSec = floorToHour(event.start.epochSeconds)
-            event.stop.epochSeconds > windowEndSec -> windowStartSec = floorToHour(
-                max(event.start.epochSeconds - 30 * 60L, 0L)
-            )
+            event.start.epochSeconds < windowStartSec -> windowStartSec =
+                windowBounds.constrain(
+                    floorGuideWindowToHour(event.start.epochSeconds, guideZoneId)
+                )
+            event.stop.epochSeconds > windowEndSec -> windowStartSec =
+                windowBounds.constrain(
+                    floorGuideWindowToHour(
+                        max(event.start.epochSeconds - 30 * 60L, 0L),
+                        guideZoneId,
+                    )
+                )
         }
         selection.setSelected(channelId)
         guidePositionStore.save(
@@ -502,28 +793,178 @@ fun EpgGridScreen(
         }
     }
 
-    LaunchedEffect(epgState, selectedChannel, category, frontierRequest) {
+    LaunchedEffect(
+        epgState,
+        focusRows,
+        channels,
+        category,
+        connectionUiState,
+        frontierRequest,
+        frontierAcquisitionPending,
+    ) {
         val request = frontierRequest ?: return@LaunchedEffect
-        val channelId = selectedChannel?.id ?: return@LaunchedEffect
+        val channelIndex = channels.indexOfFirst { it.id == request.channelId }
+        if (channelIndex < 0) {
+            restoreFrontierOrigin(request)
+            completeFrontierRequest(request)
+            return@LaunchedEffect
+        }
         val through = KotlinInstant.fromEpochSeconds(request.throughSec)
-        val snapshot = epgState.currentEpgSnapshot() ?: return@LaunchedEffect
-        val event = focusRows.getOrNull(selectedIndex)?.events.orEmpty().asSequence()
-            .filter { it.start.epochSeconds >= request.afterSec }
-            .minByOrNull { it.start }
-        if (event != null) {
-            selectedTarget = selectedTarget?.copy(eventId = event.id)
-        } else if (!epgFrontierSettled(
-                snapshot.coverages.firstOrNull { it.channelId == channelId },
-                through,
+        val snapshot = epgState.currentEpgSnapshot()
+            .takeIf { connectionUiState == ConnectionUiState.Ready }
+        val target = snapshot?.let {
+            timelineFrontierFocus(
+                rows = focusRows,
+                channelId = request.channelId,
+                originEventId = request.originEventId,
+                boundarySec = request.boundarySec,
+                direction = request.direction,
+            )
+        }
+        val coverageSettled = snapshot?.let { current ->
+            guideChannelPageCoverageSettled(
+                channelIds = request.coverageRequest.generations.keys.toList(),
+                coverages = current.coverages,
+                requestedThrough = through,
+            )
+        } == true
+        if (coverageSettled && target != null) {
+            pendingInitialChannelIndex = target.channelIndex
+            selectedTarget = target
+            selection.setSelected(request.channelId)
+        } else if (
+            shouldWaitForGuideCoverage(
+                connectionReady = connectionUiState == ConnectionUiState.Ready,
+                hasCurrentSnapshot = snapshot != null,
+                acquisitionPending = frontierAcquisitionPending,
+                coverageSettled = coverageSettled,
+            )
+        ) {
+            return@LaunchedEffect
+        } else {
+            restoreFrontierOrigin(request)
+        }
+        completeFrontierRequest(request)
+    }
+
+    LaunchedEffect(frontierRequest) {
+        val request = frontierRequest ?: return@LaunchedEffect
+        delay(GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS)
+        if (frontierRequest != request) return@LaunchedEffect
+        restoreFrontierOrigin(request)
+        completeFrontierRequest(request)
+    }
+
+    LaunchedEffect(
+        epgState,
+        focusRows,
+        channels,
+        connectionUiState,
+        channelFocusRequest,
+        channelAcquisitionPending,
+    ) {
+        val request = channelFocusRequest ?: return@LaunchedEffect
+        val originChannelIndex = channels.indexOfFirst { it.id == request.originChannelId }
+        val preferredChannelIndex = channels.indexOfFirst { it.id == request.preferredChannelId }
+        if (originChannelIndex < 0 || preferredChannelIndex < 0) {
+            completeChannelFocusRequest(request)
+            return@LaunchedEffect
+        }
+        val snapshot = epgState.currentEpgSnapshot()
+            .takeIf { connectionUiState == ConnectionUiState.Ready }
+        val target = snapshot?.let {
+            timelinePageFocusTarget(
+                rows = focusRows,
+                current = EpgFocusTarget(originChannelIndex, request.originEventId),
+                preferredChannelIndex = preferredChannelIndex,
+                direction = request.direction,
+                searchChannelIds = request.coverageRequest.generations.keys,
+            )
+        }
+        val through = KotlinInstant.fromEpochSeconds(request.throughSec)
+        val coverageSettled = snapshot?.let { current ->
+            guideChannelPageCoverageSettled(
+                channelIds = request.coverageRequest.generations.keys.toList(),
+                coverages = current.coverages,
+                requestedThrough = through,
+            )
+        } == true
+        if (coverageSettled && target != null) {
+            pendingInitialChannelIndex = target.channelIndex
+            selectedTarget = target
+            selection.setSelected(channels[target.channelIndex].id)
+            channelListState.animateScrollToItem(target.channelIndex)
+        } else if (
+            shouldWaitForGuideCoverage(
+                connectionReady = connectionUiState == ConnectionUiState.Ready,
+                hasCurrentSnapshot = snapshot != null,
+                acquisitionPending = channelAcquisitionPending,
+                coverageSettled = coverageSettled,
             )
         ) {
             return@LaunchedEffect
         }
-        frontierRequest = null
+        completeChannelFocusRequest(request)
+    }
+
+    LaunchedEffect(channelFocusRequest) {
+        val request = channelFocusRequest ?: return@LaunchedEffect
+        delay(GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS)
+        if (channelFocusRequest == request) completeChannelFocusRequest(request)
+    }
+
+    LaunchedEffect(
+        epgState,
+        focusRows,
+        connectionUiState,
+        windowFocusRequest,
+        windowAcquisitionPending,
+    ) {
+        val request = windowFocusRequest ?: return@LaunchedEffect
+        val snapshot = epgState.currentEpgSnapshot()
+        when (
+            val resolution = resolveGuideWindowFocus(
+                rows = focusRows,
+                preferredChannelId = request.preferredChannelId,
+                targetSec = request.windowStartSec,
+                requestedChannelIds = request.coverageRequest.generations.keys,
+                coverages = snapshot?.coverages.orEmpty(),
+                requestedThrough = KotlinInstant.fromEpochSeconds(request.throughSec),
+                connectionReady = connectionUiState == ConnectionUiState.Ready,
+                hasCurrentSnapshot = snapshot != null,
+                acquisitionPending = windowAcquisitionPending,
+            )
+        ) {
+            GuideCoverageFocusResolution.Wait -> return@LaunchedEffect
+            GuideCoverageFocusResolution.Release -> Unit
+            is GuideCoverageFocusResolution.Select -> {
+                pendingInitialChannelIndex = resolution.target.channelIndex
+                selectedTarget = resolution.target
+                selection.setSelected(
+                    channels.getOrNull(resolution.target.channelIndex)?.id
+                        ?: request.preferredChannelId
+                )
+                channelListState.animateScrollToItem(resolution.target.channelIndex)
+            }
+        }
+        completeWindowFocusRequest(request)
+    }
+
+    LaunchedEffect(windowFocusRequest) {
+        val request = windowFocusRequest ?: return@LaunchedEffect
+        delay(GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS)
+        if (windowFocusRequest == request) completeWindowFocusRequest(request)
     }
 
     fun pageColumns(direction: Int) {
         if (channels.isEmpty()) return
+        if (
+            frontierRequest != null ||
+            channelFocusRequest != null ||
+            windowFocusRequest != null
+        ) {
+            return
+        }
         val current = selectedTarget ?: return
         val visibleCount = channelListState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(2)
         val targetIndex = ChannelNavigation.pageTargetIndex(
@@ -532,20 +973,53 @@ fun EpgGridScreen(
             visibleItemCount = visibleCount,
             direction = direction,
         ) ?: return
+        val unsettledIndex = unsettledPageIndex(current.channelIndex, targetIndex)
+        if (unsettledIndex != null) {
+            requestChannelFocus(current, unsettledIndex, direction)
+            return
+        }
+        val targetPageIds = channelPageIds(targetIndex).toSet()
         val target = timelinePageFocusTarget(
             rows = focusRows,
             current = current,
             preferredChannelIndex = targetIndex,
             direction = direction,
-        ) ?: return
+            searchChannelIds = targetPageIds,
+        )
+        if (target == null) return
         selectedTarget = target
-        requestVisibleWindow(windowStartSec, target.channelIndex)
         coroutineScope.launch {
             channelListState.animateScrollToItem(target.channelIndex)
         }
     }
 
+    fun jumpToWindow(targetSec: Long) {
+        val channelIndex = selectedTarget?.channelIndex
+            ?: pendingInitialChannelIndex.takeIf { it >= 0 }
+            ?: 0
+        val preferredChannelId = channels.getOrNull(channelIndex)?.id ?: return
+        val boundedTargetSec = windowBounds.constrain(targetSec)
+        clearAllCoverage()
+        pendingInitialChannelIndex = channelIndex
+        selectedTarget = null
+        windowStartSec = boundedTargetSec
+        val coverageRequest = requestVisibleWindow(boundedTargetSec, channelIndex) ?: return
+        windowFocusRequest = WindowFocusRequest(
+            preferredChannelId = preferredChannelId,
+            windowStartSec = boundedTargetSec,
+            coverageRequest = coverageRequest,
+            throughSec = boundedTargetSec + GUIDE_VISIBLE_WINDOW_SEC,
+        )
+    }
+
     fun moveFocus(direction: EpgFocusDirection): Boolean {
+        if (
+            frontierRequest != null ||
+            channelFocusRequest != null ||
+            windowFocusRequest != null
+        ) {
+            return true
+        }
         val current = selectedTarget ?: return false
         val visibleIndices = channelListState.layoutInfo.visibleItemsInfo.map { it.index }
         val visibleRange = if (visibleIndices.isEmpty()) {
@@ -561,6 +1035,15 @@ fun EpgGridScreen(
         )
         when {
             move.focusHeader -> {
+                val previousChannelIndex = if (current.channelIndex > 0) {
+                    unsettledPageIndex(current.channelIndex, 0)
+                } else {
+                    null
+                }
+                if (previousChannelIndex != null) {
+                    requestChannelFocus(current, previousChannelIndex, -1)
+                    return true
+                }
                 if (hasScopeTabs) {
                     scopeFocus.requestFocus()
                 } else {
@@ -568,26 +1051,68 @@ fun EpgGridScreen(
                 }
                 return true
             }
-            move.extendTimeFrontier -> {
+            move.timeFrontierDirection != 0 -> {
                 val currentEvent = focusRows[current.channelIndex].events
                     .firstOrNull { it.id == current.eventId }
-                val after = currentEvent?.stop?.epochSeconds ?: windowEndSec
-                windowStartSec += FRONTIER_STEP_SEC
-                frontierRequest = FrontierRequest(after, windowStartSec)
-                requestVisibleWindow(windowStartSec, current.channelIndex)
+                    ?: return true
+                val targetWindowStartSec = windowBounds.constrain(
+                    windowStartSec + GUIDE_VISIBLE_WINDOW_SEC * move.timeFrontierDirection
+                )
+                if (targetWindowStartSec == windowStartSec) return true
+                val boundarySec = if (move.timeFrontierDirection > 0) {
+                    currentEvent.stop.epochSeconds
+                } else {
+                    currentEvent.start.epochSeconds
+                }
+                val originWindowStartSec = windowStartSec
+                val coverageRequest = requestVisibleWindow(
+                    targetWindowStartSec,
+                    current.channelIndex,
+                ) ?: return true
+                frontierRequest = FrontierRequest(
+                    channelId = channels[current.channelIndex].id,
+                    originEventId = current.eventId,
+                    boundarySec = boundarySec,
+                    direction = move.timeFrontierDirection,
+                    originWindowStartSec = originWindowStartSec,
+                    coverageRequest = coverageRequest,
+                    throughSec = targetWindowStartSec + GUIDE_VISIBLE_WINDOW_SEC,
+                )
+                windowStartSec = targetWindowStartSec
                 return true
             }
             move.target != current -> {
+                val step = if (direction == EpgFocusDirection.UP) -1 else 1
+                val unsettledIndex = unsettledPageIndex(
+                    current.channelIndex,
+                    move.target.channelIndex,
+                )
+                if (unsettledIndex != null) {
+                    requestChannelFocus(current, unsettledIndex, step)
+                    return true
+                }
                 selectedTarget = move.target
                 if (move.pageChannels) {
                     coroutineScope.launch {
                         channelListState.animateScrollToItem(move.target.channelIndex)
-                        requestVisibleWindow(windowStartSec, move.target.channelIndex)
                     }
                 }
                 return true
             }
-            else -> return true
+            else -> {
+                if (direction == EpgFocusDirection.UP || direction == EpgFocusDirection.DOWN) {
+                    val step = if (direction == EpgFocusDirection.UP) -1 else 1
+                    val boundaryIndex = if (step < 0) 0 else channels.lastIndex
+                    val preferredChannelIndex = unsettledPageIndex(
+                        current.channelIndex,
+                        boundaryIndex,
+                    )
+                    if (preferredChannelIndex != null) {
+                        requestChannelFocus(current, preferredChannelIndex, step)
+                    }
+                }
+                return true
+            }
         }
     }
 
@@ -695,16 +1220,7 @@ fun EpgGridScreen(
                     OutlinedButton(
                         onClick = {
                             val nowSec = nowSecProvider()
-                            windowStartSec = floorToHour(nowSec)
-                            requestVisibleWindow(
-                                windowStartSec,
-                                selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
-                            )
-                            selectedTarget = initialTimelineEpgFocus(
-                                rows = focusRows,
-                                preferredChannelIndex = selectedTarget?.channelIndex ?: 0,
-                                targetSec = nowSec,
-                            )
+                            jumpToWindow(floorGuideWindowToHour(nowSec, guideZoneId))
                         },
                         modifier = Modifier
                             .focusRequester(guideNowFocus)
@@ -854,7 +1370,7 @@ fun EpgGridScreen(
             } else {
                 TimelineTimeRuler(
                     windowStartSec = windowStartSec,
-                    windowEndSec = windowStartSec + VISIBLE_WINDOW_SEC,
+                    windowEndSec = windowStartSec + GUIDE_VISIBLE_WINDOW_SEC,
                     nowSecProvider = nowSecProvider,
                     modifier = Modifier.padding(
                         start = timelineContentPadding.calculateStartPadding(layoutDirection),
@@ -886,10 +1402,13 @@ fun EpgGridScreen(
                             imageLoader = imageLoader,
                             currentSession = currentSession,
                             events = eventsByChannel[channel.id].orEmpty(),
-                            category = category,
+                            hasCachedEvents = channel.id in timelineEventIndex.channelsWithEvents,
+                            hasMatchingCachedEvents =
+                                channel.id in timelineEventIndex.channelsWithMatchingEvents,
                             connectionUiState = connectionUiState,
-                            frontierLoading = frontierRequest != null &&
-                                selectedTarget?.channelIndex == channelIndex,
+                            coveragePending = coverageRequestVersion.let {
+                                coverageRequests.isPending(channel.id, windowStartSec)
+                            },
                             onFocused = { event ->
                                 selectedTarget = EpgFocusTarget(
                                     channelIndex,
@@ -1135,20 +1654,13 @@ fun EpgGridScreen(
         if (showJumpDialog) {
             JumpToTimeDialog(
                 initialSec = windowStartSec,
+                bounds = windowBounds,
+                zoneId = guideZoneId,
                 nowSecProvider = nowSecProvider,
                 onDismiss = { showJumpDialog = false },
                 onJump = { target ->
                     showJumpDialog = false
-                    windowStartSec = target
-                    requestVisibleWindow(
-                        target,
-                        selectedTarget?.channelIndex ?: pendingInitialChannelIndex,
-                    )
-                    selectedTarget = initialTimelineEpgFocus(
-                        rows = focusRows,
-                        preferredChannelIndex = selectedTarget?.channelIndex ?: 0,
-                        targetSec = target,
-                    )
+                    jumpToWindow(target)
                 },
             )
         }
@@ -1231,8 +1743,6 @@ private fun rememberCurrentEpochSeconds(): () -> Long {
     }
     return remember(nowSec) { { nowSec.longValue } }
 }
-
-internal fun floorToHour(epochSec: Long): Long = epochSec - epochSec.mod(3600L)
 
 internal fun Long.formatDateTime(): String = Instant.ofEpochSecond(this)
     .atZone(ZoneId.systemDefault())

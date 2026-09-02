@@ -54,9 +54,7 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
-import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
-import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
 import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
@@ -176,31 +174,25 @@ internal fun TimelineChannelRow(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     events: List<EpgEventEntry>,
-    category: ProgrammeCategory,
+    hasCachedEvents: Boolean,
+    hasMatchingCachedEvents: Boolean,
     connectionUiState: ConnectionUiState,
-    frontierLoading: Boolean,
+    coveragePending: Boolean,
     recordingForEvent: (EventId) -> DvrEntry?,
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
 ) {
     val nowSec = nowSecProvider()
-    val filteredEvents = remember(events, category) {
-        events.filter { it.matchesProgrammeCategory(category) }
-    }
-    val visibleEvents = remember(filteredEvents, windowStartSec, windowEndSec) {
-        filteredEvents.filter {
-            it.stop.epochSeconds > windowStartSec && it.start.epochSeconds < windowEndSec
-        }
-    }
     val state = epgColumnDataState(
-        cachedEvents = events,
-        visibleEvents = visibleEvents,
+        visibleEvents = events,
         windowStartSec = windowStartSec,
         windowEndSec = windowEndSec,
         connectionState = connectionUiState,
-        filterActive = category != ProgrammeCategory.ALL,
-        matchingCachedEvents = filteredEvents,
+        filterActive = hasCachedEvents != hasMatchingCachedEvents,
+        coveragePending = coveragePending,
+        hasCachedEvents = hasCachedEvents,
+        hasMatchingCachedEvents = hasMatchingCachedEvents,
     )
     val orderedIds = remember(allChannels) { allChannels.map { it.id } }
     val numbers = remember(allChannels) {
@@ -228,7 +220,7 @@ internal fun TimelineChannelRow(
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
         ) {
-            visibleEvents.forEach { event ->
+            events.forEach { event ->
                 val span = timelineEventSpan(
                     eventStartSec = event.start.epochSeconds,
                     eventEndSec = event.stop.epochSeconds,
@@ -258,9 +250,9 @@ internal fun TimelineChannelRow(
                 )
             }
 
-            if (visibleEvents.isEmpty()) {
+            if (events.isEmpty()) {
                 TimelineRowState(
-                    state = if (frontierLoading) EpgColumnDataState.LOADING else state,
+                    state = state,
                     modifier = Modifier.align(Alignment.Center),
                 )
             }

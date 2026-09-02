@@ -17,7 +17,11 @@ class TimelineEpgFocusPolicyTest {
         val otherChannel = event(21, 0, 60)
         val second = event(12, 30, 60)
 
-        val indexed = indexTimelineEventsByChannel(listOf(first, otherChannel, second))
+        val indexed = indexTimelineEventsByChannel(
+            events = listOf(first, otherChannel, second),
+            windowStartSec = 0,
+            windowEndSec = 60 * 60,
+        ).visibleEventsByChannel
 
         assertEquals(listOf(first, second), indexed[ChannelId(1)])
         assertEquals(listOf(otherChannel), indexed[ChannelId(2)])
@@ -62,6 +66,29 @@ class TimelineEpgFocusPolicyTest {
                 preferredChannelIndex = 3,
                 direction = -1,
             ),
+        )
+    }
+
+    @Test
+    fun pageFocusDoesNotSkipIntoAnUnrequestedLaterPage() {
+        val pagedRows = (1..18).map { channelId ->
+            when (channelId) {
+                1 -> row(channelId, event(11, 0, 100))
+                13 -> row(channelId, event(131, 20, 120))
+                else -> row(channelId)
+            }
+        }
+
+        assertNull(
+            timelinePageFocusTarget(
+                rows = pagedRows,
+                current = EpgFocusTarget(channelIndex = 0, eventId = EventId(11)),
+                preferredChannelIndex = 6,
+                direction = 1,
+                searchChannelIds = pagedRows
+                    .subList(6, 12)
+                    .mapTo(mutableSetOf()) { it.channelId },
+            )
         )
     }
 
@@ -155,6 +182,7 @@ class TimelineEpgFocusPolicyTest {
 
         assertEquals(focus(0, 11), left.target)
         assertEquals(focus(2, 31), down.target)
+        assertEquals(-1, left.timeFrontierDirection)
         assertFalse(left.pageChannels)
         assertFalse(down.pageChannels)
     }
@@ -164,7 +192,35 @@ class TimelineEpgFocusPolicyTest {
         val move = moveTimelineEpgFocus(rows, focus(0, 12), EpgFocusDirection.RIGHT)
 
         assertEquals(focus(0, 12), move.target)
-        assertTrue(move.extendTimeFrontier)
+        assertEquals(1, move.timeFrontierDirection)
+    }
+
+    @Test
+    fun frontierResolutionStaysOnTheOriginatingChannel() {
+        val newlyLoadedRows = listOf(
+            row(2, event(24, 120, 180)),
+            row(1, event(13, 120, 180)),
+        )
+
+        assertEquals(
+            focus(1, 13),
+            timelineFrontierFocus(
+                rows = newlyLoadedRows,
+                channelId = ChannelId(1),
+                originEventId = EventId(12),
+                boundarySec = 120 * 60,
+                direction = 1,
+            ),
+        )
+        assertNull(
+            timelineFrontierFocus(
+                rows = listOf(row(2, event(24, 120, 180)), row(1)),
+                channelId = ChannelId(1),
+                originEventId = EventId(12),
+                boundarySec = 120 * 60,
+                direction = 1,
+            ),
+        )
     }
 
     @Test

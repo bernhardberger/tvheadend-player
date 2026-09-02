@@ -58,7 +58,10 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
+import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
+import at.bernhardberger.tvhplayer.core.moveGuideWindowByDays
 import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.core.programmeHasAired
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
@@ -69,22 +72,30 @@ import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.ui.screens.label
-import at.bernhardberger.tvhplayer.ui.screens.floorToHour
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Stop
+import java.time.ZoneId
 
 @Composable
 internal fun JumpToTimeDialog(
     initialSec: Long,
+    bounds: GuideWindowBounds,
+    zoneId: ZoneId,
     nowSecProvider: () -> Long,
     onDismiss: () -> Unit,
     onJump: (Long) -> Unit,
 ) {
-    var targetSec by remember(initialSec) { mutableLongStateOf(initialSec) }
+    var targetSec by remember(initialSec, bounds) {
+        mutableLongStateOf(bounds.constrain(initialSec))
+    }
     val initialFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { initialFocus.requestFocus() }
+    val previousDaySec = moveGuideWindowByDays(targetSec, -1, bounds, zoneId)
+    val nextDaySec = moveGuideWindowByDays(targetSec, 1, bounds, zoneId)
+    val previousHourSec = bounds.constrain(targetSec - 3600L)
+    val nextHourSec = bounds.constrain(targetSec + 3600L)
     DialogScrim(onDismissRequest = onDismiss) {
         Text(
             text = stringResource(R.string.epg_jump_title),
@@ -95,24 +106,38 @@ internal fun JumpToTimeDialog(
             style = MaterialTheme.typography.titleLarge,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { targetSec -= 24 * 3600L }) {
+            OutlinedButton(
+                onClick = { targetSec = previousDaySec },
+                enabled = previousDaySec != targetSec,
+            ) {
                 Text(stringResource(R.string.previous_day))
             }
-            OutlinedButton(onClick = { targetSec += 24 * 3600L }) {
+            OutlinedButton(
+                onClick = { targetSec = nextDaySec },
+                enabled = nextDaySec != targetSec,
+            ) {
                 Text(stringResource(R.string.next_day))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { targetSec -= 3600L }) {
+            OutlinedButton(
+                onClick = { targetSec = previousHourSec },
+                enabled = previousHourSec != targetSec,
+            ) {
                 Text(stringResource(R.string.previous_hour))
             }
-            OutlinedButton(onClick = { targetSec += 3600L }) {
+            OutlinedButton(
+                onClick = { targetSec = nextHourSec },
+                enabled = nextHourSec != targetSec,
+            ) {
                 Text(stringResource(R.string.next_hour))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
-                onClick = { onJump(floorToHour(nowSecProvider())) },
+                onClick = {
+                    onJump(floorGuideWindowToHour(nowSecProvider(), zoneId))
+                },
                 modifier = Modifier.focusRequester(initialFocus),
             ) {
                 Text(stringResource(R.string.now))
@@ -120,7 +145,7 @@ internal fun JumpToTimeDialog(
             OutlinedButton(onClick = onDismiss) {
                 Text(stringResource(R.string.close))
             }
-            Button(onClick = { onJump(floorToHour(targetSec)) }) {
+            Button(onClick = { onJump(floorGuideWindowToHour(targetSec, zoneId)) }) {
                 Text(stringResource(R.string.epg_jump_action))
             }
         }

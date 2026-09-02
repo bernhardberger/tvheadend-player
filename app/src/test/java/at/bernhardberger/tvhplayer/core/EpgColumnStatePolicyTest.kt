@@ -8,6 +8,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -31,12 +32,11 @@ class EpgColumnStatePolicyTest {
     fun derivesDistinctInlineStates() {
         assertEquals(
             EpgColumnDataState.LOADING,
-            epgColumnDataState(emptyList(), emptyList(), 0, 100, ConnectionUiState.SyncingChannels),
+            epgColumnDataState(emptyList(), 0, 100, ConnectionUiState.SyncingChannels),
         )
         assertEquals(
             EpgColumnDataState.PERMISSION_DENIED,
             epgColumnDataState(
-                emptyList(),
                 emptyList(),
                 0,
                 100,
@@ -47,36 +47,64 @@ class EpgColumnStatePolicyTest {
             EpgColumnDataState.STALE,
             epgColumnDataState(
                 listOf(event(0, 100)),
-                listOf(event(0, 100)),
                 0,
                 100,
                 ConnectionUiState.Reconnecting,
+                hasCachedEvents = true,
             ),
         )
         assertEquals(
             EpgColumnDataState.EMPTY_DAY,
-            epgColumnDataState(listOf(event(200, 300)), emptyList(), 0, 100, ConnectionUiState.Ready),
+            epgColumnDataState(
+                emptyList(),
+                0,
+                100,
+                ConnectionUiState.Ready,
+                hasCachedEvents = true,
+            ),
         )
         assertEquals(
             EpgColumnDataState.NO_DATA,
-            epgColumnDataState(emptyList(), emptyList(), 0, 100, ConnectionUiState.Ready),
+            epgColumnDataState(emptyList(), 0, 100, ConnectionUiState.Ready),
+        )
+        assertEquals(
+            EpgColumnDataState.LOADING,
+            epgColumnDataState(
+                visibleEvents = emptyList(),
+                windowStartSec = 0,
+                windowEndSec = 100,
+                connectionState = ConnectionUiState.Ready,
+                coveragePending = true,
+                hasCachedEvents = true,
+            ),
+        )
+        assertEquals(
+            EpgColumnDataState.SERVER_FAILURE,
+            epgColumnDataState(
+                visibleEvents = emptyList(),
+                windowStartSec = 0,
+                windowEndSec = 100,
+                connectionState = ConnectionUiState.SubscriptionError(
+                    SubscriptionFailureKind.NO_INPUT
+                ),
+                coveragePending = true,
+            ),
         )
         assertEquals(
             EpgColumnDataState.FILTER_EMPTY,
             epgColumnDataState(
-                cachedEvents = listOf(event(0, 100)),
                 visibleEvents = emptyList(),
                 windowStartSec = 0,
                 windowEndSec = 100,
                 connectionState = ConnectionUiState.Ready,
                 filterActive = true,
-                matchingCachedEvents = emptyList(),
+                hasCachedEvents = true,
+                hasMatchingCachedEvents = false,
             ),
         )
         assertEquals(
             EpgColumnDataState.PARTIAL,
             epgColumnDataState(
-                listOf(event(20, 80)),
                 listOf(event(20, 80)),
                 0,
                 100,

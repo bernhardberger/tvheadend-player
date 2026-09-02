@@ -7,6 +7,7 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
+import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
@@ -44,7 +45,7 @@ val appModule = module {
 
     single {
         val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val session = createTvheadendSession()
+        val session = createTvheadendSession(GUIDE_EPG_COVERAGE_POLICY)
         val playerSettings = get<PlayerSettingsStore>()
         val profileOwner = AppProfileOwner(
             context = androidContext(),
