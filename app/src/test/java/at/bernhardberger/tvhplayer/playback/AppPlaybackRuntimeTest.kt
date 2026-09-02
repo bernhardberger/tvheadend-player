@@ -436,6 +436,72 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
+    fun recordingRouteRestorationIsNeededOnlyForAnUnmatchedRuntime() {
+        val recordingId = DvrEntryId(42)
+
+        assertTrue(
+            recordingRouteNeedsRestoration(
+                recordingId = recordingId,
+                activeTarget = null,
+                selectedRecordingId = null,
+            )
+        )
+        assertFalse(
+            recordingRouteNeedsRestoration(
+                recordingId = recordingId,
+                activeTarget = AppPlaybackTarget.Recording(recordingId),
+                selectedRecordingId = null,
+            )
+        )
+        assertFalse(
+            recordingRouteNeedsRestoration(
+                recordingId = recordingId,
+                activeTarget = null,
+                selectedRecordingId = recordingId,
+            )
+        )
+        assertTrue(
+            recordingRouteNeedsRestoration(
+                recordingId = recordingId,
+                activeTarget = AppPlaybackTarget.Live(ChannelId(7)),
+                selectedRecordingId = DvrEntryId(41),
+            )
+        )
+    }
+
+    @Test
+    fun concurrentRecordingRouteRestorationsAdmitPlaybackOnce() = runTest {
+        val commands = PlaybackTargetCommandSerialization()
+        val firstStarted = CompletableDeferred<Unit>()
+        val finishFirst = CompletableDeferred<Unit>()
+        var selectedRecordingId: DvrEntryId? = null
+        var starts = 0
+
+        suspend fun restore(): String? = commands.restoreRecordingIfNeeded(
+            targetMatches = { selectedRecordingId == DvrEntryId(42) },
+            restore = {
+                starts += 1
+                firstStarted.complete(Unit)
+                finishFirst.await()
+                selectedRecordingId = DvrEntryId(42)
+                "started"
+            },
+        )
+
+        val first = async { restore() }
+        firstStarted.await()
+        val duplicate = async { restore() }
+        runCurrent()
+        assertFalse(duplicate.isCompleted)
+
+        finishFirst.complete(Unit)
+
+        assertEquals("started", first.await())
+        assertNull(duplicate.await())
+        assertEquals(1, starts)
+    }
+
+    @Test
     fun nonRecordingForegroundActionsInvokeOnlyTheirOwnedEffect() = runTest {
         val cases = listOf(
             ForegroundPlaybackAction.None to emptyList(),

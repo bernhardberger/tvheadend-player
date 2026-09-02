@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +64,7 @@ import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
@@ -99,6 +101,19 @@ fun RecordingPlayerScreen(
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
+    val currentSession = observation.currentSession
+    if (currentSession != null) {
+        RecordingPlaybackRouteRestorationEffect(
+            recordingId = recordingId,
+            playbackStart = playbackStart,
+            restorePlayback = {
+                session.restoreRecordingRoute(
+                    RecordingPlaybackSelection(currentSession, recordingId),
+                    playbackStart,
+                )
+            },
+        )
+    }
     val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings(audioLanguage = null, subtitleLanguage = null)
@@ -613,6 +628,18 @@ fun RecordingPlayerScreen(
                 },
             )
         }
+    }
+}
+
+@Composable
+internal fun RecordingPlaybackRouteRestorationEffect(
+    recordingId: DvrEntryId,
+    playbackStart: RecordingPlaybackStart,
+    restorePlayback: suspend () -> Unit,
+) {
+    val latestRestorePlayback by rememberUpdatedState(restorePlayback)
+    LaunchedEffect(recordingId, playbackStart) {
+        latestRestorePlayback()
     }
 }
 

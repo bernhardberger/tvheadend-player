@@ -689,7 +689,10 @@ fun AppRoot(
                                         },
                                     ) ?: return@launch
                                     backStack.pushTransient(
-                                        RecordingPlayerKey(target.recordingId.value),
+                                        recordingPlayerKey(
+                                            recordingId = target.recordingId,
+                                            start = RecordingPlaybackStart.START_OVER,
+                                        ),
                                     )
                                 }
                             },
@@ -722,10 +725,7 @@ fun AppRoot(
                                         },
                                     ) ?: return@launch
                                     backStack.pushTransient(
-                                        RecordingPlayerKey(
-                                            recordingId = target.recordingId.value,
-                                            start = intent.toRecordingStartMode(),
-                                        ),
+                                        recordingPlayerKey(target.recordingId, intent),
                                     )
                                 }
                             },
@@ -958,10 +958,16 @@ private fun AppDestination.toTopLevelKey(
     AppDestination.RECORDING_PLAYER -> error("Transient destination is not top-level")
 }
 
-private fun RecordingPlaybackStart.toRecordingStartMode(): RecordingStartMode = when (this) {
-    RecordingPlaybackStart.RESUME -> RecordingStartMode.RESUME
-    RecordingPlaybackStart.START_OVER -> RecordingStartMode.START_OVER
-}
+internal fun recordingPlayerKey(
+    recordingId: DvrEntryId,
+    start: RecordingPlaybackStart,
+): RecordingPlayerKey = RecordingPlayerKey(
+    recordingId = recordingId.value,
+    start = when (start) {
+        RecordingPlaybackStart.RESUME -> RecordingStartMode.RESUME
+        RecordingPlaybackStart.START_OVER -> RecordingStartMode.START_OVER
+    },
+)
 
 private fun RecordingStartMode.toPlaybackStart(): RecordingPlaybackStart = when (this) {
     RecordingStartMode.RESUME -> RecordingPlaybackStart.RESUME

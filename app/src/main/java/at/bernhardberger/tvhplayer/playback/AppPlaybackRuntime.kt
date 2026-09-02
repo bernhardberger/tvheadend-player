@@ -63,6 +63,15 @@ data class RecordingPlaybackSelection(
     val currentSession: CurrentSessionObservation,
     val recordingId: DvrEntryId,
 )
+
+internal fun recordingRouteNeedsRestoration(
+    recordingId: DvrEntryId,
+    activeTarget: AppPlaybackTarget?,
+    selectedRecordingId: DvrEntryId?,
+): Boolean =
+    activeTarget != AppPlaybackTarget.Recording(recordingId) &&
+        selectedRecordingId != recordingId
+
 data class AppTimeshiftState(
     val available: Boolean = false,
     val paused: Boolean = false,
@@ -140,6 +149,13 @@ internal class PlaybackTargetCommandSerialization {
         retry: suspend (Request) -> Result,
     ): Result? = mutex.withLock {
         currentRequest()?.let { retry(it) }
+    }
+
+    suspend fun <Result> restoreRecordingIfNeeded(
+        targetMatches: () -> Boolean,
+        restore: suspend () -> Result,
+    ): Result? = mutex.withLock {
+        if (targetMatches()) null else restore()
     }
 }
 
@@ -407,6 +423,23 @@ class AppPlaybackRuntime(
         foregroundPlaybackLifecycle.onTargetCommand()
         playRecordingLocked(selection, start)
     }
+
+    suspend fun restoreRecordingRoute(
+        selection: RecordingPlaybackSelection,
+        start: RecordingPlaybackStart,
+    ): PlaybackTargetResult? = targetCommands.restoreRecordingIfNeeded(
+        targetMatches = {
+            !recordingRouteNeedsRestoration(
+                recordingId = selection.recordingId,
+                activeTarget = _activeTarget.value,
+                selectedRecordingId = _recordingSelection.value?.recordingId,
+            )
+        },
+        restore = {
+            foregroundPlaybackLifecycle.onTargetCommand()
+            playRecordingLocked(selection, start)
+        },
+    )
 
     private suspend fun playRecordingLocked(
         selection: RecordingPlaybackSelection,
