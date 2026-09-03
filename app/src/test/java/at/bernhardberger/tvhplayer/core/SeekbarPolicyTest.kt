@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -9,7 +10,7 @@ import org.junit.Test
 class SeekbarPolicyTest {
     @Test
     fun axisIsNullWithoutAProgramme() {
-        val state = TimeshiftState(available = true, bufferStartMs = -60_000L)
+        val state = AppTimeshiftState(available = true, bufferStartMs = -60_000L)
 
         assertEquals(null, programmeAnchoredAxis(state, 5_400L, null, 7_200L))
         assertEquals(null, programmeAnchoredAxis(state, 5_400L, 3_600L, 3_600L))
@@ -22,7 +23,7 @@ class SeekbarPolicyTest {
     @Test
     fun playbackFractionTracksPositionWithinProgramme() {
         val axis = programmeAnchoredAxis(
-            state = TimeshiftState(
+            state = AppTimeshiftState(
                 available = true,
                 bufferStartMs = -1_800_000L,
                 positionMs = -600_000L,
@@ -39,7 +40,7 @@ class SeekbarPolicyTest {
     fun liveEdgeSitsAheadOfPlaybackWhenBehindLive() {
         val axis = requireNotNull(
             programmeAnchoredAxis(
-                state = TimeshiftState(
+                state = AppTimeshiftState(
                     available = true,
                     bufferStartMs = -1_800_000L,
                     positionMs = -120_000L,
@@ -58,7 +59,7 @@ class SeekbarPolicyTest {
     fun rewindableRegionClampsToProgrammeStart() {
         val axis = requireNotNull(
             programmeAnchoredAxis(
-                state = TimeshiftState(
+                state = AppTimeshiftState(
                     available = true,
                     bufferStartMs = -3_600_000L,
                 ),
@@ -76,7 +77,7 @@ class SeekbarPolicyTest {
     fun rewindableBoundaryAtProgrammeStartIsNotOffAxis() {
         val axis = requireNotNull(
             programmeAnchoredAxis(
-                state = TimeshiftState(
+                state = AppTimeshiftState(
                     available = true,
                     bufferStartMs = -1_800_000L,
                 ),
@@ -94,7 +95,7 @@ class SeekbarPolicyTest {
     fun axisIsStableAsTheBufferGrows() {
         val shortBuffer = requireNotNull(
             programmeAnchoredAxis(
-                state = TimeshiftState(
+                state = AppTimeshiftState(
                     available = true,
                     bufferStartMs = -60_000L,
                     positionMs = -30_000L,
@@ -106,7 +107,7 @@ class SeekbarPolicyTest {
         )
         val longBuffer = requireNotNull(
             programmeAnchoredAxis(
-                state = TimeshiftState(
+                state = AppTimeshiftState(
                     available = true,
                     bufferStartMs = -1_800_000L,
                     positionMs = -30_000L,
@@ -170,7 +171,7 @@ class SeekbarPolicyTest {
     @Test
     fun timeshiftDomainIsBufferToLiveEdge() {
         val range = timeshiftSeekbarRange(
-            TimeshiftState(
+            AppTimeshiftState(
                 available = true,
                 bufferStartMs = -600_000,
                 positionMs = -120_000,
