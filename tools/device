@@ -656,6 +656,10 @@ def run_instrumentation_check(
             line.strip() for line in installed_instrumentation.stdout.splitlines()
         }:
             fail("installed instrumentation identity does not match the bounded check")
+        run(
+            adb_command(adb, serial, "shell", "am", "force-stop", package_name),
+            capture=True,
+        )
         instrumentation_result = run(
             adb_command(
                 adb,
@@ -729,10 +733,11 @@ def run_instrumentation_check(
                     f"{key}={value}" for key, value in evidence[-2:]
                 )
             fail(f"{action} reported a failed test{detail}")
-        nonempty_output_lines = [
-            line.strip() for line in runner_output.splitlines() if line.strip()
-        ]
-        if not nonempty_output_lines or nonempty_output_lines[-1] != "INSTRUMENTATION_CODE: -1":
+        completion_codes = re.findall(
+            r"(?m)^INSTRUMENTATION_CODE:\s*(-?\d+)\s*$",
+            instrumentation_result.stdout,
+        )
+        if not completion_codes or completion_codes[-1] != "-1":
             fail(f"{action} did not report successful instrumentation completion")
         success_summary = re.search(r"(?m)^\s*OK \((\d+) tests?\)\s*$", runner_output)
         if success_summary is None:

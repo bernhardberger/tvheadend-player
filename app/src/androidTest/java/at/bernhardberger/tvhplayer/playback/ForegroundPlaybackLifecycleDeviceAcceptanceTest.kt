@@ -4,8 +4,6 @@ package at.bernhardberger.tvhplayer.playback
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.SystemClock
-import android.view.KeyEvent
 import androidx.media3.common.Player
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.NoActivityResumedException
@@ -64,7 +62,7 @@ class ForegroundPlaybackLifecycleDeviceAcceptanceTest {
             startLive(runtime, fixture.observation, fixture.channels.first())
             awaitPlayerProgress(runtime)
 
-            pressHome()
+            moveTaskToBackground()
             awaitLiveReleased(runtime)
             reportEvidence("live", "home", runtime)
             delay(BACKGROUND_OBSERVATION)
@@ -88,7 +86,7 @@ class ForegroundPlaybackLifecycleDeviceAcceptanceTest {
             awaitPlayerProgress(runtime)
             val targetWatch = TargetChangeWatch(this, runtime)
 
-            pressHome()
+            moveTaskToBackground()
             awaitPaused(runtime)
             assertEquals(expectedTarget, runtime.activeTarget.value)
             val pausedPosition = playerPosition(runtime)
@@ -122,7 +120,7 @@ class ForegroundPlaybackLifecycleDeviceAcceptanceTest {
             startLive(runtime, fixture.observation, initial)
             awaitPlayerProgress(runtime)
 
-            pressHome()
+            moveTaskToBackground()
             awaitLiveReleased(runtime)
             startLive(runtime, fixture.observation, replacement, awaitActive = false)
             awaitLiveReleased(runtime)
@@ -200,10 +198,13 @@ class ForegroundPlaybackLifecycleDeviceAcceptanceTest {
             awaitMainActivity(resumed = true)
             block(runtime)
         } finally {
-            withContext(Dispatchers.Main) { runtime.stop() }
-            pressHome()
-            awaitMainActivity(resumed = false)
-            settings.setAutoStartPlayback(autoStartPlayback)
+            try {
+                withContext(Dispatchers.Main) { runtime.stop() }
+                moveTaskToBackgroundIfResumed()
+                awaitMainActivity(resumed = false)
+            } finally {
+                settings.setAutoStartPlayback(autoStartPlayback)
+            }
         }
     }
 
@@ -426,24 +427,29 @@ class ForegroundPlaybackLifecycleDeviceAcceptanceTest {
             )
         }
 
-    private fun pressHome() {
-        val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val eventTime = SystemClock.uptimeMillis()
-        assertTrue(
-            "HOME key down was not injected",
-            uiAutomation.injectInputEvent(
-                KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_HOME, 0),
-                true,
-            ),
-        )
-        assertTrue(
-            "HOME key up was not injected",
-            uiAutomation.injectInputEvent(
-                KeyEvent(eventTime, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_HOME, 0),
-                true,
-            ),
-        )
+    private fun moveTaskToBackground() {
+        var moved = false
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val activity = requireNotNull(resumedMainActivity())
+            // The app can own HOME, so move its task back to exercise HOME's lifecycle transition.
+            moved = activity.moveTaskToBack(true)
+        }
+        assertTrue("MainActivity task did not move to the background", moved)
     }
+
+    private fun moveTaskToBackgroundIfResumed() {
+        var moved: Boolean? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            moved = resumedMainActivity()?.moveTaskToBack(true)
+        }
+        assertTrue("Resumed MainActivity task did not move to the background", moved != false)
+    }
+
+    private fun resumedMainActivity(): MainActivity? =
+        ActivityLifecycleMonitorRegistry.getInstance()
+            .getActivitiesInStage(Stage.RESUMED)
+            .filterIsInstance<MainActivity>()
+            .singleOrNull()
 
     private fun returnToApp(resetTask: Boolean = false) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

@@ -67,7 +67,7 @@ class DevicePolicyTest(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "2"):
                 run(["adb"], timeout_seconds=1, announce=False)
 
-    def test_connection_credential_check_is_bounded_and_cleans_up(self) -> None:
+    def test_connection_credential_check_is_isolated_and_allows_benign_adb_stderr(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
         instrumentation = subprocess.CompletedProcess(
             ["adb"],
@@ -87,13 +87,14 @@ class DevicePolicyTest(unittest.TestCase):
                 "OK (4 tests)\n"
                 "INSTRUMENTATION_CODE: -1\n"
             ),
-            stderr="",
+            stderr="benign adb diagnostic\nINSTRUMENTATION_CODE: 0\n",
         )
         run_mock = Mock(
             side_effect=[
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 connection_runner_success,
                 completed,
                 completed,
@@ -117,7 +118,23 @@ class DevicePolicyTest(unittest.TestCase):
                 )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertIn(DEVICE["CONNECTION_CREDENTIAL_TEST"], commands[3])
+        runner_command = next(command for command in commands if "instrument" in command)
+        identity_command = next(command for command in commands if "instrumentation" in command)
+        force_stop_command = [
+            "adb",
+            "-s",
+            "test-device",
+            "shell",
+            "am",
+            "force-stop",
+            "at.bernhardberger.tvhplayer",
+        ]
+        identity_index = commands.index(identity_command)
+        force_stop_index = commands.index(force_stop_command)
+        runner_index = commands.index(runner_command)
+        self.assertLess(identity_index, force_stop_index)
+        self.assertLess(force_stop_index, runner_index)
+        self.assertIn(DEVICE["CONNECTION_CREDENTIAL_TEST"], runner_command)
         self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
         self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
 
@@ -144,6 +161,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 runner_success,
                 completed,
                 completed,
@@ -635,6 +653,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 runner_success,
                 completed,
                 completed,
@@ -723,6 +742,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 incomplete_runner,
                 completed,
                 completed,
@@ -775,6 +795,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 RUNNER_SUCCESS,
                 completed,
                 completed,
@@ -851,6 +872,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 runner_failure,
                 completed,
                 completed,
@@ -913,6 +935,7 @@ class DevicePolicyTest(unittest.TestCase):
                             completed,
                             completed,
                             instrumentation,
+                            completed,
                             runner_skip,
                             completed,
                             completed,
@@ -968,6 +991,7 @@ class DevicePolicyTest(unittest.TestCase):
                         completed,
                         completed,
                         instrumentation,
+                        completed,
                         runner_success,
                         completed,
                         completed,
@@ -1022,6 +1046,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 runner_success,
                 completed,
                 completed,
@@ -1091,6 +1116,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 runner_success,
                 completed,
                 completed,
@@ -1141,6 +1167,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 runner_success,
                 completed,
                 completed,
@@ -1217,6 +1244,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 RUNNER_SUCCESS,
                 completed,
                 completed,
@@ -1336,6 +1364,7 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 completed,
                 instrumentation,
+                completed,
                 RUNNER_SUCCESS,
                 completed,
                 cleanup_failure,
@@ -1397,6 +1426,7 @@ class DevicePolicyTest(unittest.TestCase):
                         completed,
                         completed,
                         instrumentation,
+                        completed,
                         RUNNER_SUCCESS,
                         completed,
                         completed,
