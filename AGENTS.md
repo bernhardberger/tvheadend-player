@@ -157,7 +157,7 @@ step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
 `max` effort.
 
 For every frozen package review during the Muse field test, launch one fixed
-Sol/high `android-reviewer` and one fixed Muse Spark 1.3 Contributor Free/xhigh
+Sol/high `android-reviewer` and one fixed OpenRouter Muse Spark 1.3 Contributor/xhigh
 `app-review-muse` in parallel with substantively identical packets. Sol remains
 the mandatory review gate; Muse provider failure is non-blocking and Muse does
 not replace a Sol verdict. Adjudicate every concrete finding from either

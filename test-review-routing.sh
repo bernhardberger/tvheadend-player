@@ -44,7 +44,7 @@ config_path = Path(sys.argv[1])
 config = json.loads(config_path.read_text(encoding="utf-8"))
 expected = {
     "android-reviewer": ("openai/gpt-5.6-sol", "high", 45),
-    "app-review-muse": ("opencode/muse-spark-1.3-contributor-free", "xhigh", 45),
+    "app-review-muse": ("openrouter/meta/muse-spark-1.3-contributor", "xhigh", 45),
     "tv-evidence-curator": ("openai/gpt-5.6-terra", "medium", 25),
     "tv-ux-brief": ("anthropic/claude-opus-5", "high", 35),
     "tv-ux-reviewer": ("anthropic/claude-opus-5", "medium", 40),
