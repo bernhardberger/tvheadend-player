@@ -3,6 +3,8 @@ import org.gradle.api.artifacts.FileCollectionDependency
 import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedComponentResult
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.tasks.Sync
 
 plugins {
@@ -140,34 +142,105 @@ val syncReleasedSdkEvidence = tasks.register<Sync>("syncReleasedSdkEvidence") {
     from(releasedSdkFfmpegSources)
     into(layout.buildDirectory.dir("released-sdk-evidence"))
 }
-val appProjectPath = project.path
-
 tasks.register("verifyExternalSdkConsumption") {
     group = "verification"
     description = "Proves the app consumes only the exact public TVHeadend SDK release."
     dependsOn("assembleDebug", syncReleasedSdkEvidence)
 
-    doLast {
-        val sdkGroup = "at.bernhardberger.tvheadend"
-        val sdkVersion = libs.versions.tvheadend.sdk.get()
-        check(sdkVersion == "0.4.0") { "Expected public SDK 0.4.0 but found $sdkVersion" }
-        val productionClasspaths = listOf(
-            "debugCompileClasspath",
-            "debugRuntimeClasspath",
-            "releaseCompileClasspath",
-            "releaseRuntimeClasspath",
-        ).associateWith(configurations::getByName)
-        val productionConfigurations = productionClasspaths.values.flatMap { it.hierarchy }.toSet()
-        val directSdkDependencies = productionConfigurations.flatMap { configuration ->
+    val sdkGroup = "at.bernhardberger.tvheadend"
+    val sdkVersion = libs.versions.tvheadend.sdk.get()
+    val productionClasspaths = listOf(
+        "debugCompileClasspath",
+        "debugRuntimeClasspath",
+        "releaseCompileClasspath",
+        "releaseRuntimeClasspath",
+    ).associateWith(configurations::getByName)
+    val productionConfigurations = productionClasspaths.values.flatMap { it.hierarchy }.toSet()
+    val directSdkDependencies = productionConfigurations.flatMap { configuration ->
+        configuration.dependencies.mapNotNull { dependency ->
+            (dependency as? ExternalModuleDependency)
+                ?.takeIf { it.group == sdkGroup }
+                ?.let {
+                    val strictVersion = it.versionConstraint.strictVersion
+                    "${configuration.name}:${it.name}:$strictVersion"
+                }
+        }
+    }.toSet()
+    val forbiddenLocalDependencies = productionClasspaths.flatMap { (classpathName, classpath) ->
+        classpath.hierarchy.flatMap { configuration ->
             configuration.dependencies.mapNotNull { dependency ->
-                (dependency as? ExternalModuleDependency)
-                    ?.takeIf { it.group == sdkGroup }
-                    ?.let {
-                        val strictVersion = it.versionConstraint.strictVersion
-                        "${configuration.name}:${it.name}:$strictVersion"
-                    }
+                when (dependency) {
+                    is ProjectDependency -> "$classpathName:${configuration.name}:project:${dependency.path}"
+                    is FileCollectionDependency -> dependency.files.files
+                        .filterNot { it.name in setOf("android.jar", "core-for-system-modules.jar") }
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { "$classpathName:${configuration.name}:files:$it" }
+                    else -> null
+                }
             }
-        }.toSet()
+        }
+    }.distinct()
+    val includedBuildNames = gradle.includedBuilds.map { it.name }
+    val projectPaths = rootProject.allprojects.map { it.path }.toSet()
+    val publicRepositoryUrls = gradle.extensions.extraProperties.get("dependencyRepositoryUrls")
+    val repositoriesMode = gradle.extensions.extraProperties.get("dependencyRepositoriesMode")
+    val appProjectPath = project.path
+    listOf("debug", "release").forEach { variant ->
+        val runtimeGraph = productionClasspaths.getValue("${variant}RuntimeClasspath")
+            .incoming.resolutionResult.rootComponent.map { root ->
+                val components = mutableSetOf<ResolvedComponentResult>()
+                val pending = ArrayDeque<ResolvedComponentResult>()
+                pending.add(root)
+                while (pending.isNotEmpty()) {
+                    val component = pending.removeFirst()
+                    if (components.add(component)) {
+                        component.dependencies.filterIsInstance<ResolvedDependencyResult>().forEach { dependency ->
+                            pending.add(dependency.selected)
+                        }
+                    }
+                }
+                components.flatMap { component ->
+                    when (val id = component.id) {
+                        is ProjectComponentIdentifier -> listOfNotNull(
+                            "project=${id.displayName}".takeIf { id.projectPath != appProjectPath },
+                        )
+                        is ModuleComponentIdentifier -> buildList {
+                            if (id.group == sdkGroup) add("tvheadend=${id.module}:${id.version}")
+                            if (id.group == "androidx.media3") add("media3=${id.version}")
+                            if (id.group.startsWith("io.coil-kt.coil3")) add("coil=${id.version}")
+                            if (id.group == "androidx.datastore") add("datastore=${id.version}")
+                            if (id.group == "org.jetbrains.kotlinx" && id.module.startsWith("kotlinx-coroutines-")) {
+                                add("coroutines=${id.version}")
+                            }
+                        }
+                        else -> emptyList()
+                    }
+                }.distinct().sorted()
+            }
+        val compileTvheadendModules = productionClasspaths.getValue("${variant}CompileClasspath")
+            .incoming.resolutionResult.rootComponent.map { root ->
+                val components = mutableSetOf<ResolvedComponentResult>()
+                val pending = ArrayDeque<ResolvedComponentResult>()
+                pending.add(root)
+                while (pending.isNotEmpty()) {
+                    val component = pending.removeFirst()
+                    if (components.add(component)) {
+                        component.dependencies.filterIsInstance<ResolvedDependencyResult>().forEach { dependency ->
+                            pending.add(dependency.selected)
+                        }
+                    }
+                }
+                components.mapNotNull { component ->
+                    val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                    id.module.takeIf { id.group == sdkGroup }
+                }.distinct().sorted()
+            }
+        inputs.property("${variant}RuntimeGraph", runtimeGraph)
+        inputs.property("${variant}CompileTvheadendModules", compileTvheadendModules)
+    }
+
+    doLast {
+        check(sdkVersion == "0.4.0") { "Expected public SDK 0.4.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             "implementation:sdk-android:$sdkVersion",
             "implementation:sdk-media3:$sdkVersion",
@@ -175,30 +248,14 @@ tasks.register("verifyExternalSdkConsumption") {
         check(directSdkDependencies == expectedDirectSdkDependencies) {
             "App SDK declarations $directSdkDependencies do not match $expectedDirectSdkDependencies"
         }
-
-        val forbiddenLocalDependencies = productionClasspaths.flatMap { (classpathName, classpath) ->
-            classpath.hierarchy.flatMap { configuration ->
-                configuration.dependencies.mapNotNull { dependency ->
-                    when (dependency) {
-                        is ProjectDependency -> "$classpathName:${configuration.name}:project:${dependency.path}"
-                        is FileCollectionDependency -> dependency.files.files
-                            .filterNot { it.name in setOf("android.jar", "core-for-system-modules.jar") }
-                            .takeIf { it.isNotEmpty() }
-                            ?.let { "$classpathName:${configuration.name}:files:$it" }
-                        else -> null
-                    }
-                }
-            }
-        }.distinct()
         check(forbiddenLocalDependencies.isEmpty()) {
             "App dependencies contain local fallbacks: $forbiddenLocalDependencies"
         }
-        check(gradle.includedBuilds.isEmpty()) { "The app must not use included builds" }
-        check(rootProject.allprojects.map { it.path }.toSet() == setOf(":", ":app")) {
-            "Unexpected Gradle projects: ${rootProject.allprojects.map { it.path }}"
+        check(includedBuildNames.isEmpty()) { "The app must not use included builds: $includedBuildNames" }
+        check(projectPaths == setOf(":", ":app")) {
+            "Unexpected Gradle projects: $projectPaths"
         }
 
-        val publicRepositoryUrls = gradle.extensions.extraProperties.get("dependencyRepositoryUrls")
         val expectedPublicRepositoryUrls = setOf(
             "https://dl.google.com/dl/android/maven2",
             "https://repo.maven.apache.org/maven2",
@@ -206,7 +263,7 @@ tasks.register("verifyExternalSdkConsumption") {
         check(publicRepositoryUrls == expectedPublicRepositoryUrls) {
             "App repositories $publicRepositoryUrls do not match $expectedPublicRepositoryUrls"
         }
-        check(gradle.extensions.extraProperties.get("dependencyRepositoriesMode") == "FAIL_ON_PROJECT_REPOS") {
+        check(repositoriesMode == "FAIL_ON_PROJECT_REPOS") {
             "Project repositories must remain forbidden"
         }
 
@@ -218,57 +275,53 @@ tasks.register("verifyExternalSdkConsumption") {
             "sdk-playback" to sdkVersion,
         )
         listOf("debug", "release").forEach { variant ->
-            val components = productionClasspaths.getValue("${variant}RuntimeClasspath")
-                .incoming.resolutionResult.allComponents
-            val projectComponents = components.mapNotNull { it.id as? ProjectComponentIdentifier }
-                .filter { it.projectPath != appProjectPath }
+            val runtimeGraph = (inputs.properties.getValue("${variant}RuntimeGraph") as Iterable<*>)
+                .map(Any?::toString)
+                .toSet()
+            val projectComponents = runtimeGraph.filter { it.startsWith("project=") }
+                .map { it.removePrefix("project=") }
             check(projectComponents.isEmpty()) {
                 "$variant runtime contains project components: $projectComponents"
             }
 
-            val resolvedTvheadendModules = components.mapNotNull { component ->
-                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-                if (id.group != sdkGroup) return@mapNotNull null
-                id.module to id.version
-            }.toMap()
+            val resolvedTvheadendModules = runtimeGraph.filter { it.startsWith("tvheadend=") }
+                .associate { entry ->
+                    val (module, version) = entry.removePrefix("tvheadend=").split(":", limit = 2)
+                    module to version
+                }
             check(resolvedTvheadendModules == expectedTvheadendModules) {
                 "$variant runtime TVHeadend graph $resolvedTvheadendModules " +
                     "does not match $expectedTvheadendModules"
             }
-            val compileTvheadendModules = productionClasspaths.getValue("${variant}CompileClasspath")
-                .incoming.resolutionResult.allComponents.mapNotNull { component ->
-                    val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-                    id.module.takeIf { id.group == sdkGroup }
-                }.toSet()
+            val compileTvheadendModules =
+                (inputs.properties.getValue("${variant}CompileTvheadendModules") as Iterable<*>)
+                    .map(Any?::toString)
+                    .toSet()
             check("htsp" !in compileTvheadendModules) {
                 "HTSP must remain runtime-only but $variant compile graph contains $compileTvheadendModules"
             }
 
-            val media3Versions = components.mapNotNull { component ->
-                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-                id.version.takeIf { id.group == "androidx.media3" }
-            }.toSet()
+            val media3Versions = runtimeGraph.filter { it.startsWith("media3=") }
+                .map { it.removePrefix("media3=") }
+                .toSet()
             check(media3Versions == setOf("1.11.0")) {
                 "$variant runtime Media3 versions are $media3Versions"
             }
-            val coilVersions = components.mapNotNull { component ->
-                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-                id.version.takeIf { id.group.startsWith("io.coil-kt.coil3") }
-            }.toSet()
+            val coilVersions = runtimeGraph.filter { it.startsWith("coil=") }
+                .map { it.removePrefix("coil=") }
+                .toSet()
             check(coilVersions == setOf("3.5.0")) {
                 "$variant runtime Coil versions are $coilVersions"
             }
-            val dataStoreVersions = components.mapNotNull { component ->
-                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-                id.version.takeIf { id.group == "androidx.datastore" }
-            }.toSet()
+            val dataStoreVersions = runtimeGraph.filter { it.startsWith("datastore=") }
+                .map { it.removePrefix("datastore=") }
+                .toSet()
             check(dataStoreVersions == setOf("1.2.1")) {
                 "$variant runtime DataStore versions are $dataStoreVersions"
             }
-            val coroutinesVersions = components.mapNotNull { component ->
-                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
-                id.version.takeIf { id.group == "org.jetbrains.kotlinx" && id.module.startsWith("kotlinx-coroutines-") }
-            }.toSet()
+            val coroutinesVersions = runtimeGraph.filter { it.startsWith("coroutines=") }
+                .map { it.removePrefix("coroutines=") }
+                .toSet()
             check(coroutinesVersions == setOf("1.10.2")) {
                 "$variant runtime Coroutines versions are $coroutinesVersions"
             }
