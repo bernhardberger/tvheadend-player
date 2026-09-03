@@ -17,7 +17,7 @@ kotlin {
 
 android {
     namespace = "at.bernhardberger.tvhplayer"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "at.bernhardberger.tvhplayer"
