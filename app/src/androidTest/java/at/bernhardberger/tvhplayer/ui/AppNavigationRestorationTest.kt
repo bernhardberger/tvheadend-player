@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.player.RecordingPlaybackRouteRestorationEffect
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -40,6 +41,7 @@ class AppNavigationRestorationTest {
     fun processRecreationRestoresRecordingRouteIntoFreshRuntimeExactlyOnce() {
         val restorationTester = StateRestorationTester(composeRule)
         val starts = mutableListOf<Pair<DvrEntryId, RecordingPlaybackStart>>()
+        val generationAuthority = requireNotNull(testSessionObservation().currentSession)
         var firstRuntime = true
         lateinit var backStack: MutableList<AppNavKey>
         lateinit var recompose: () -> Unit
@@ -65,6 +67,7 @@ class AppNavigationRestorationTest {
                 RecordingPlaybackRouteRestorationEffect(
                     recordingId = recordingId,
                     playbackStart = playbackStart,
+                    generationAuthority = generationAuthority,
                     restorePlayback = { runtime.restore(recordingId, playbackStart) },
                 )
             }

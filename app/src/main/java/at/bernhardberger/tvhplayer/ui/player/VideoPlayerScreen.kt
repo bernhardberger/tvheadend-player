@@ -114,6 +114,8 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
+import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
+import at.bernhardberger.tvhplayer.playback.resolveLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.data.ConnectionState
@@ -290,6 +292,11 @@ fun VideoPlayerScreen(
     var currentChannelId by remember { mutableStateOf(channelId) }
     var currentChannelName by remember { mutableStateOf(channelName) }
     var requestedLiveSelection by remember { mutableStateOf<LivePlaybackSelection?>(null) }
+    val authorizedLiveSelection = resolveLivePlaybackSelection(
+        observation = observation,
+        channelId = currentChannelId,
+        requestedSelection = requestedLiveSelection,
+    )
     var initialPlaybackResolved by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -350,7 +357,12 @@ fun VideoPlayerScreen(
     }
 
     var lastPlayedChannelId by remember { mutableStateOf<ChannelId?>(null) }
-    LaunchedEffect(screenActive, currentChannelId, currentSession, requestedLiveSelection) {
+    LaunchedEffect(
+        screenActive,
+        currentChannelId,
+        authorizedLiveSelection,
+        requestedLiveSelection,
+    ) {
         if (!screenActive) {
             lastPlayedChannelId = null
             return@LaunchedEffect
@@ -368,17 +380,11 @@ fun VideoPlayerScreen(
             return@LaunchedEffect
         }
 
-        if (lastPlayedChannelId != null) {
-            videoPlayerViewModel.stop()
-        }
         if (playbackState is AppPlaybackState.Failed && requestedLiveSelection == null) {
             return@LaunchedEffect
         }
         if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
-        val playbackSelection = requestedLiveSelection
-            ?.takeIf { it.channelId == currentChannelId }
-            ?: currentSession?.let { LivePlaybackSelection(it, currentChannelId) }
-            ?: return@LaunchedEffect
+        val playbackSelection = authorizedLiveSelection ?: return@LaunchedEffect
         startInitialLivePlayback(
             startPlayback = { videoPlayerViewModel.playChannel(playbackSelection) },
             onResolved = { result ->
@@ -447,9 +453,8 @@ fun VideoPlayerScreen(
             return true
         }
 
-        val playbackSelection = currentSession?.let {
-            LivePlaybackSelection(it, channelId)
-        } ?: return true
+        val playbackSelection = currentLivePlaybackSelection(observation, channelId)
+            ?: return true
         timeshiftCommandToken += 1L
         timelineState.invalidateForSourceChange()
         requestedLiveSelection = playbackSelection

@@ -33,6 +33,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -64,7 +65,7 @@ import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
-import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
@@ -102,15 +103,14 @@ fun RecordingPlayerScreen(
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
-    if (currentSession != null) {
+    val routeSelection = currentRecordingPlaybackSelection(observation, recordingId)
+    if (routeSelection != null) {
         RecordingPlaybackRouteRestorationEffect(
             recordingId = recordingId,
             playbackStart = playbackStart,
+            generationAuthority = routeSelection.currentSession,
             restorePlayback = {
-                session.restoreRecordingRoute(
-                    RecordingPlaybackSelection(currentSession, recordingId),
-                    playbackStart,
-                )
+                session.restoreRecordingRoute(routeSelection, playbackStart)
             },
         )
     }
@@ -635,10 +635,11 @@ fun RecordingPlayerScreen(
 internal fun RecordingPlaybackRouteRestorationEffect(
     recordingId: DvrEntryId,
     playbackStart: RecordingPlaybackStart,
+    generationAuthority: CurrentSessionObservation,
     restorePlayback: suspend () -> Unit,
 ) {
     val latestRestorePlayback by rememberUpdatedState(restorePlayback)
-    LaunchedEffect(recordingId, playbackStart) {
+    LaunchedEffect(recordingId, playbackStart, generationAuthority) {
         latestRestorePlayback()
     }
 }
