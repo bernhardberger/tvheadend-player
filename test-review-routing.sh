@@ -44,6 +44,7 @@ config_path = Path(sys.argv[1])
 config = json.loads(config_path.read_text(encoding="utf-8"))
 expected = {
     "android-reviewer": ("openai/gpt-5.6-sol", "high", 45),
+    "app-review-muse": ("opencode/muse-spark-1.3-contributor-free", "xhigh", 45),
     "tv-evidence-curator": ("openai/gpt-5.6-terra", "medium", 25),
     "tv-ux-brief": ("anthropic/claude-opus-5", "high", 35),
     "tv-ux-reviewer": ("anthropic/claude-opus-5", "medium", 40),
@@ -65,6 +66,11 @@ for name in ("tv-ux-brief", "tv-ux-reviewer", "claude-audit-lead"):
             raise SystemExit(f"{name}: unsupported Opus sampling option {unsupported}")
     if "<tone_preference>" not in text:
         raise SystemExit(f"{name}: missing response-length calibration")
+
+muse = (config_path.parent / "agents" / "app-review-muse.md").read_text(encoding="utf-8")
+for verdict in ("BLOCKING", "NON_BLOCKING", "CLEAN", "INSUFFICIENT_EVIDENCE"):
+    if f"`{verdict}`" not in muse:
+        raise SystemExit(f"app-review-muse: missing verdict {verdict}")
 PY
 TESTS=$((TESTS + 1))
 
