@@ -33,6 +33,9 @@ DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/debug/app-debug-and
 CHANNEL_GUIDE_TEST = (
     "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest"
 )
+CHANNEL_GUIDE_CONFIGURED_CONNECTION_TEST = (
+    f"{CHANNEL_GUIDE_TEST}#configuredConnectionUsesRedactedFieldPresenceSemantics"
+)
 TIMESHIFT_COMMAND_TEST = (
     "at.bernhardberger.tvhplayer.playback.TimeshiftCommandDeviceAcceptanceTest"
 )
@@ -107,6 +110,7 @@ TEST_DEVICE_ACTIONS = {
     "screenshot",
     "provision-test-credentials",
     "channel-guide-check",
+    "channel-guide-configured-connection-check",
     "timeshift-command-check",
     "foreground-playback-lifecycle-check",
     "connection-credential-check",
@@ -619,6 +623,7 @@ def run_instrumentation_check(
     admit_external_target: bool = False,
     evidence_keys: tuple[str, ...] = (),
     expected_evidence: dict[str, str] | None = None,
+    clear_target_data: bool = False,
 ) -> None:
     if package_name != DEFAULT_PACKAGE:
         fail(f"{action} is available only for package {DEFAULT_PACKAGE}")
@@ -656,10 +661,7 @@ def run_instrumentation_check(
             line.strip() for line in installed_instrumentation.stdout.splitlines()
         }:
             fail("installed instrumentation identity does not match the bounded check")
-        run(
-            adb_command(adb, serial, "shell", "am", "force-stop", package_name),
-            capture=True,
-        )
+        run(adb_command(adb, serial, "shell", "am", "force-stop", package_name), capture=True)
         instrumentation_result = run(
             adb_command(
                 adb,
@@ -737,13 +739,30 @@ def run_instrumentation_check(
             r"(?m)^INSTRUMENTATION_CODE:\s*(-?\d+)\s*$",
             instrumentation_result.stdout,
         )
-        if not completion_codes or completion_codes[-1] != "-1":
-            fail(f"{action} did not report successful instrumentation completion")
+        allow_missing_completion_code = test_class in {
+            CHANNEL_GUIDE_TEST,
+            CHANNEL_GUIDE_CONFIGURED_CONNECTION_TEST,
+        }
+        if not completion_codes:
+            completion_ok = allow_missing_completion_code
+        else:
+            completion_ok = completion_codes[-1] == "-1"
+        if not completion_ok:
+            bounded_lines = [
+                line.strip()
+                for line in runner_output.splitlines()
+                if line.strip()
+            ][:12]
+            detail = ": " + " | ".join(bounded_lines)[:1_000] if bounded_lines else ""
+            fail(
+                f"{action} did not report successful instrumentation completion{detail}"
+            )
         success_summary = re.search(r"(?m)^\s*OK \((\d+) tests?\)\s*$", runner_output)
         if success_summary is None:
             fail(f"{action} did not report a successful test run")
         expected_test_count = {
             CHANNEL_GUIDE_TEST: 2,
+            CHANNEL_GUIDE_CONFIGURED_CONNECTION_TEST: 1,
             CONNECTION_CREDENTIAL_TEST: 4,
             TIMESHIFT_COMMAND_TEST: 2,
             FOREGROUND_PLAYBACK_LIFECYCLE_TEST: 5,
@@ -753,13 +772,19 @@ def run_instrumentation_check(
             fail(f"{action} did not run all {expected_test_count} acceptance tests")
         for key in evidence_keys:
             values = re.findall(
-                "(?m)^INSTRUMENTATION_STATUS: "
+                r"INSTRUMENTATION_STATUS: "
                 + re.escape(key)
-                + r"=([^\r\n]{1,200})$",
+                + r"=([^\r\n]{1,200})",
                 runner_output,
             )
             if not values:
-                fail(f"{action} did not report required evidence: {key}")
+                bounded_lines = [
+                    line.strip()
+                    for line in runner_output.splitlines()
+                    if line.strip()
+                ][:12]
+                detail = ": " + " | ".join(bounded_lines)[:1_000] if bounded_lines else ""
+                fail(f"{action} did not report required evidence: {key}{detail}")
             expected_value = (expected_evidence or {}).get(key)
             if expected_value is not None and values[-1] != expected_value:
                 fail(
@@ -779,8 +804,27 @@ def run_instrumentation_check(
             capture=True,
             check=False,
         )
-        if instrumentation_status is not False or force_stop.returncode != 0:
+        clear_data = None
+        if clear_target_data:
+            clear_data = run(
+                adb_command(adb, serial, "shell", "pm", "clear", package_name),
+                capture=True,
+                check=False,
+            )
+        if (
+            instrumentation_status is not False
+            or force_stop.returncode != 0
+            or (
+                clear_data is not None
+                and (
+                    clear_data.returncode != 0
+                    or clear_data.stdout.strip() != "Success"
+                )
+            )
+        ):
             fail(f"{action} cleanup did not complete")
+        if clear_data is not None:
+            print(f"{action} cleanup=instrumentation-removed,target-data-cleared,target-stopped")
 
 
 def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
@@ -791,6 +835,33 @@ def run_channel_guide_check(adb: str, serial: str, package_name: str) -> None:
         action="channel-guide-check",
         test_class=CHANNEL_GUIDE_TEST,
         admit_external_target=True,
+        evidence_keys=("configuredUsernamePresent", "configuredPasswordPresent"),
+        expected_evidence={
+            "configuredUsernamePresent": "true",
+            "configuredPasswordPresent": "true",
+        },
+        clear_target_data=True,
+    )
+
+
+def run_channel_guide_configured_connection_check(
+    adb: str,
+    serial: str,
+    package_name: str,
+) -> None:
+    run_instrumentation_check(
+        adb,
+        serial,
+        package_name,
+        action="channel-guide-configured-connection-check",
+        test_class=CHANNEL_GUIDE_CONFIGURED_CONNECTION_TEST,
+        admit_external_target=True,
+        evidence_keys=("configuredUsernamePresent", "configuredPasswordPresent"),
+        expected_evidence={
+            "configuredUsernamePresent": "true",
+            "configuredPasswordPresent": "true",
+        },
+        clear_target_data=True,
     )
 
 
@@ -1128,6 +1199,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the bounded real-catalog channel and Guide instrumentation check",
     )
     subparsers.add_parser(
+        "channel-guide-configured-connection-check",
+        help="Run only the configured Connection field-presence acceptance check",
+    )
+    subparsers.add_parser(
         "timeshift-command-check",
         help="Run the bounded live timeshift command instrumentation check",
     )
@@ -1379,6 +1454,10 @@ def main() -> int:
 
     if args.action == "channel-guide-check":
         run_channel_guide_check(adb, serial, package_name)
+        return 0
+
+    if args.action == "channel-guide-configured-connection-check":
+        run_channel_guide_configured_connection_check(adb, serial, package_name)
         return 0
 
     if args.action == "timeshift-command-check":

@@ -6,7 +6,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -28,6 +28,9 @@ default_screenshot_output = DEVICE["default_screenshot_output"]
 sanitize_screenshot_name = DEVICE["sanitize_screenshot_name"]
 package_installation_status = DEVICE["package_installation_status"]
 run_channel_guide_check = DEVICE["run_channel_guide_check"]
+run_channel_guide_configured_connection_check = DEVICE[
+    "run_channel_guide_configured_connection_check"
+]
 run_timeshift_command_check = DEVICE["run_timeshift_command_check"]
 run_foreground_playback_lifecycle_check = DEVICE[
     "run_foreground_playback_lifecycle_check"
@@ -48,8 +51,39 @@ RUNNER_SUCCESS = subprocess.CompletedProcess(
     ),
     stderr="",
 )
-
-
+CHANNEL_GUIDE_RUNNER_SUCCESS = subprocess.CompletedProcess(
+    ["adb"],
+    0,
+    stdout=(
+        "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest:."
+        "INSTRUMENTATION_STATUS: configuredPasswordPresent=true\n"
+        "INSTRUMENTATION_STATUS: configuredUsernamePresent=true\n"
+        "INSTRUMENTATION_STATUS_CODE: 2\n"
+        "INSTRUMENTATION_RESULT: stream=\n"
+        "OK (2 tests)\n"
+        "INSTRUMENTATION_CODE: -1\n"
+    ),
+    stderr="",
+)
+CONFIGURED_CONNECTION_RUNNER_SUCCESS = subprocess.CompletedProcess(
+    ["adb"],
+    0,
+    stdout=(
+        "INSTRUMENTATION_STATUS: configuredUsernamePresent=true\n"
+        "INSTRUMENTATION_STATUS: configuredPasswordPresent=true\n"
+        "INSTRUMENTATION_STATUS_CODE: 2\n"
+        "INSTRUMENTATION_RESULT: stream=\n"
+        "OK (1 test)\n"
+        "INSTRUMENTATION_CODE: -1\n"
+    ),
+    stderr="",
+)
+CLEAR_SUCCESS = subprocess.CompletedProcess(
+    ["adb"],
+    0,
+    stdout="Success\n",
+    stderr="",
+)
 class DevicePolicyTest(unittest.TestCase):
     def test_product_identity_defaults_are_current(self) -> None:
         self.assertEqual(DEVICE["LOCAL_CONFIG"].name, ".tvhplayer-device.json")
@@ -67,7 +101,7 @@ class DevicePolicyTest(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "2"):
                 run(["adb"], timeout_seconds=1, announce=False)
 
-    def test_connection_credential_check_is_isolated_and_allows_benign_adb_stderr(self) -> None:
+    def test_connection_credential_check_force_stops_before_instrumentation(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
         instrumentation = subprocess.CompletedProcess(
             ["adb"],
@@ -130,10 +164,13 @@ class DevicePolicyTest(unittest.TestCase):
             "at.bernhardberger.tvhplayer",
         ]
         identity_index = commands.index(identity_command)
-        force_stop_index = commands.index(force_stop_command)
         runner_index = commands.index(runner_command)
-        self.assertLess(identity_index, force_stop_index)
-        self.assertLess(force_stop_index, runner_index)
+        force_stop_indexes = [
+            index for index, command in enumerate(commands) if command == force_stop_command
+        ]
+        self.assertEqual(len(force_stop_indexes), 2)
+        self.assertLess(identity_index, force_stop_indexes[0])
+        self.assertLess(force_stop_indexes[0], runner_index)
         self.assertIn(DEVICE["CONNECTION_CREDENTIAL_TEST"], runner_command)
         self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
         self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
@@ -165,6 +202,7 @@ class DevicePolicyTest(unittest.TestCase):
                 runner_success,
                 completed,
                 completed,
+                CLEAR_SUCCESS,
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -611,6 +649,19 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertEqual(args.action, "channel-guide-check")
         self.assertFalse(hasattr(args, "test_apk"))
 
+    def test_configured_connection_check_selects_only_the_named_acceptance_test(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["channel-guide-configured-connection-check"])
+
+        self.assertEqual(args.action, "channel-guide-configured-connection-check")
+        self.assertEqual(
+            DEVICE["CHANNEL_GUIDE_CONFIGURED_CONNECTION_TEST"],
+            "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest"
+            "#configuredConnectionUsesRedactedFieldPresenceSemantics",
+        )
+        self.assertFalse(hasattr(args, "test_apk"))
+
     def test_navigation_back_check_is_bounded_and_reports_fixed_evidence(self) -> None:
         parser = DEVICE["build_parser"]()
         args = parser.parse_args(["navigation-back-check"])
@@ -913,11 +964,11 @@ class DevicePolicyTest(unittest.TestCase):
             stderr="",
         )
         checks = (
-            (run_channel_guide_check, 2),
-            (run_timeshift_command_check, 2),
-            (run_foreground_playback_lifecycle_check, 5),
+            (run_channel_guide_check, 2, True),
+            (run_timeshift_command_check, 2, False),
+            (run_foreground_playback_lifecycle_check, 5, False),
         )
-        for check, test_count in checks:
+        for check, test_count, clears_target_data in checks:
             for status_code in (-3, -4):
                 with self.subTest(check=check.__name__, status_code=status_code):
                     runner_skip = subprocess.CompletedProcess(
@@ -930,17 +981,18 @@ class DevicePolicyTest(unittest.TestCase):
                         ),
                         stderr="",
                     )
-                    run_mock = Mock(
-                        side_effect=[
-                            completed,
-                            completed,
-                            instrumentation,
-                            completed,
-                            runner_skip,
-                            completed,
-                            completed,
-                        ]
-                    )
+                    side_effect = [
+                        completed,
+                        completed,
+                        instrumentation,
+                        completed,
+                        runner_skip,
+                        completed,
+                        completed,
+                    ]
+                    if clears_target_data:
+                        side_effect.append(CLEAR_SUCCESS)
+                    run_mock = Mock(side_effect=side_effect)
                     with tempfile.TemporaryDirectory() as directory:
                         test_apk = Path(directory) / "app-debug-androidTest.apk"
                         test_apk.touch()
@@ -1108,7 +1160,14 @@ class DevicePolicyTest(unittest.TestCase):
         runner_success = subprocess.CompletedProcess(
             ["adb"],
             0,
-            stdout="OK (1 test)\nINSTRUMENTATION_CODE: -1\n",
+            stdout=(
+                "INSTRUMENTATION_STATUS: configuredUsernamePresent=true\n"
+                "INSTRUMENTATION_STATUS: configuredPasswordPresent=true\n"
+                "INSTRUMENTATION_STATUS_CODE: 2\n"
+                "INSTRUMENTATION_RESULT: stream=\n"
+                "OK (1 test)\n"
+                "INSTRUMENTATION_CODE: -1\n"
+            ),
             stderr="",
         )
         run_mock = Mock(
@@ -1120,6 +1179,7 @@ class DevicePolicyTest(unittest.TestCase):
                 runner_success,
                 completed,
                 completed,
+                CLEAR_SUCCESS,
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -1245,9 +1305,10 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 instrumentation,
                 completed,
-                RUNNER_SUCCESS,
+                CHANNEL_GUIDE_RUNNER_SUCCESS,
                 completed,
                 completed,
+                CLEAR_SUCCESS,
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -1288,12 +1349,189 @@ class DevicePolicyTest(unittest.TestCase):
             ],
             commands,
         )
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(
+            commands[-1][-3:],
+            ["pm", "clear", "at.bernhardberger.tvhplayer"],
+        )
+
+    def test_configured_connection_check_runs_one_named_test_and_cleans_up(self) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                completed,
+                CONFIGURED_CONNECTION_RUNNER_SUCCESS,
+                completed,
+                completed,
+                CLEAR_SUCCESS,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                run_channel_guide_configured_connection_check(
+                    "adb",
+                    "test-device",
+                    "at.bernhardberger.tvhplayer",
+                )
+
+        commands = [call.args[0] for call in run_mock.call_args_list]
+        runner_command = next(command for command in commands if "instrument" in command)
+        self.assertIn(DEVICE["CHANNEL_GUIDE_CONFIGURED_CONNECTION_TEST"], runner_command)
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(
+            commands[-1][-3:],
+            ["pm", "clear", "at.bernhardberger.tvhplayer"],
+        )
+
+    def test_configured_connection_check_accepts_g10_runner_summary_without_instrumentation_code(
+        self,
+    ) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        runner_success = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest:."
+                "INSTRUMENTATION_STATUS: configuredPasswordPresent=true\n"
+                "INSTRUMENTATION_STATUS: configuredUsernamePresent=true\n"
+                "INSTRUMENTATION_STATUS_CODE: 2\n"
+                "Time: 14.155\n"
+                "OK (1 test)\n"
+            ),
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                completed,
+                runner_success,
+                completed,
+                completed,
+                CLEAR_SUCCESS,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                run_channel_guide_configured_connection_check(
+                    "adb",
+                    "test-device",
+                    "at.bernhardberger.tvhplayer",
+                )
+
+    def test_unrelated_instrumentation_check_rejects_missing_instrumentation_code(
+        self,
+    ) -> None:
+        completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
+        instrumentation = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "instrumentation:at.bernhardberger.tvhplayer.test/"
+                "androidx.test.runner.AndroidJUnitRunner "
+                "(target=at.bernhardberger.tvhplayer)\n"
+            ),
+            stderr="",
+        )
+        runner_success = subprocess.CompletedProcess(
+            ["adb"],
+            0,
+            stdout=(
+                "INSTRUMENTATION_RESULT: stream=\n"
+                "OK (2 tests)\n"
+            ),
+            stderr="",
+        )
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                instrumentation,
+                completed,
+                runner_success,
+                completed,
+                completed,
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk.touch()
+            with patch.dict(
+                DEVICE_GLOBALS,
+                {
+                    "DEFAULT_TEST_APK": test_apk,
+                    "run": run_mock,
+                    "package_installation_status": Mock(side_effect=[False, False]),
+                },
+            ):
+                stderr = io.StringIO()
+                with redirect_stderr(stderr):
+                    with self.assertRaisesRegex(SystemExit, "2"):
+                        run_timeshift_command_check(
+                            "adb",
+                            "test-device",
+                            "at.bernhardberger.tvhplayer",
+                        )
+        self.assertIn(
+            "did not report successful instrumentation completion",
+            stderr.getvalue(),
+        )
 
     def test_channel_guide_check_cleans_up_after_install_failure(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
-        run_mock = Mock(side_effect=[completed, SystemExit(2), completed, completed])
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                SystemExit(2),
+                completed,
+                completed,
+                CLEAR_SUCCESS,
+            ]
+        )
         with tempfile.TemporaryDirectory() as directory:
             test_apk = Path(directory) / "app-debug-androidTest.apk"
             test_apk.touch()
@@ -1313,12 +1551,20 @@ class DevicePolicyTest(unittest.TestCase):
                     )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-1][-3:], ["pm", "clear", "at.bernhardberger.tvhplayer"])
 
     def test_channel_guide_check_cleans_up_after_stale_state_cannot_be_verified(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
-        run_mock = Mock(side_effect=[completed, completed, completed])
+        run_mock = Mock(
+            side_effect=[
+                completed,
+                completed,
+                completed,
+                CLEAR_SUCCESS,
+            ]
+        )
         with tempfile.TemporaryDirectory() as directory:
             test_apk = Path(directory) / "app-debug-androidTest.apk"
             test_apk.touch()
@@ -1338,8 +1584,9 @@ class DevicePolicyTest(unittest.TestCase):
                     )
 
         commands = [call.args[0] for call in run_mock.call_args_list]
-        self.assertEqual(commands[-2][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
-        self.assertEqual(commands[-1][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-3][-2:], ["uninstall", "at.bernhardberger.tvhplayer.test"])
+        self.assertEqual(commands[-2][-2:], ["force-stop", "at.bernhardberger.tvhplayer"])
+        self.assertEqual(commands[-1][-3:], ["pm", "clear", "at.bernhardberger.tvhplayer"])
 
     def test_channel_guide_check_fails_when_cleanup_does_not_complete(self) -> None:
         completed = subprocess.CompletedProcess(["adb"], 0, stdout="", stderr="")
@@ -1365,9 +1612,10 @@ class DevicePolicyTest(unittest.TestCase):
                 completed,
                 instrumentation,
                 completed,
-                RUNNER_SUCCESS,
+                CHANNEL_GUIDE_RUNNER_SUCCESS,
                 completed,
                 cleanup_failure,
+                CLEAR_SUCCESS,
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
@@ -1427,9 +1675,10 @@ class DevicePolicyTest(unittest.TestCase):
                         completed,
                         instrumentation,
                         completed,
-                        RUNNER_SUCCESS,
+                        CHANNEL_GUIDE_RUNNER_SUCCESS,
                         completed,
                         completed,
+                        CLEAR_SUCCESS,
                     ]
                 )
                 with tempfile.TemporaryDirectory() as directory:
@@ -1453,7 +1702,7 @@ class DevicePolicyTest(unittest.TestCase):
                             )
 
                 self.assertEqual(
-                    run_mock.call_args_list[-1].args[0][-2:],
+                    run_mock.call_args_list[-2].args[0][-2:],
                     ["force-stop", "at.bernhardberger.tvhplayer"],
                 )
 

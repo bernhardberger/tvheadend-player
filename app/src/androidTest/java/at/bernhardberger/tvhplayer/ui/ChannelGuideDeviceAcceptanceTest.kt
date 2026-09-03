@@ -1,17 +1,20 @@
 package at.bernhardberger.tvhplayer.ui
 
+import android.os.Bundle
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
@@ -60,7 +63,7 @@ class ChannelGuideDeviceAcceptanceTest {
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
             composeRule.onAllNodes(hasTestTag("nav-epg")).fetchSemanticsNodes().isNotEmpty()
         }
-        focusCurrentBrowseDestination()
+        focusBrowseDestination("nav-channels")
         composeRule.onNodeWithTag("nav-channels")
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
@@ -109,35 +112,67 @@ class ChannelGuideDeviceAcceptanceTest {
 
     @Test
     fun configuredConnectionUsesRedactedFieldPresenceSemantics() {
+        val generalLabel = composeRule.activity.getString(R.string.settings_general_nav)
         val connectionLabel = composeRule.activity.getString(R.string.settings_connection_nav)
 
         enterBrowseShell()
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
             composeRule.onAllNodes(hasTestTag("nav-settings")).fetchSemanticsNodes().isNotEmpty()
         }
-        focusCurrentBrowseDestination()
-        composeRule.onNodeWithTag("nav-settings").requestFocus()
+        focusBrowseDestination("nav-channels")
+        composeRule.onNodeWithTag("nav-channels").performKeyInput {
+            repeat(SETTINGS_NAVIGATION_STEPS) { pressKey(Key.DirectionDown) }
+        }
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
             composeRule.onAllNodes(hasTestTag("nav-settings"))
-                .fetchSemanticsNodes().any { node ->
-                    node.config[SemanticsProperties.Focused]
-                }
+                .fetchSemanticsNodes()
+                .any { node -> node.config[SemanticsProperties.Focused] }
         }
         composeRule.onNodeWithTag("nav-settings").performKeyInput {
             pressKey(Key.DirectionCenter)
         }
-        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
-            composeRule.onAllNodes(androidx.compose.ui.test.hasText(connectionLabel))
-                .fetchSemanticsNodes().isNotEmpty()
+        composeRule.onNodeWithTag("nav-settings").performKeyInput {
+            pressKey(Key.DirectionRight)
         }
-
-        composeRule.onNodeWithText(connectionLabel).requestFocus()
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
-            composeRule.onAllNodes(hasTestTag("connection-username-configured"))
-                .fetchSemanticsNodes().size == 1 &&
-                composeRule.onAllNodes(hasTestTag("connection-password-configured"))
-                    .fetchSemanticsNodes().size == 1
+            composeRule.onAllNodes(hasText(generalLabel) and hasClickAction())
+                .fetchSemanticsNodes()
+                .any { node -> node.config[SemanticsProperties.Focused] }
         }
+        composeRule.onNode(hasText(generalLabel) and hasClickAction())
+            .assertIsFocused()
+            .performKeyInput {
+                repeat(CONNECTION_NAVIGATION_STEPS) { pressKey(Key.DirectionDown) }
+            }
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasText(connectionLabel) and hasClickAction())
+                .fetchSemanticsNodes()
+                .any { node -> node.config[SemanticsProperties.Focused] }
+        }
+        composeRule.onNode(hasText(connectionLabel) and hasClickAction())
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(
+                hasTestTag("connection-username") and hasConfiguredFieldValue,
+            )
+                .fetchSemanticsNodes().size == 1
+        }
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(
+                hasTestTag("connection-password") and
+                    hasConfiguredFieldValue and
+                    SemanticsMatcher.keyIsDefined(SemanticsProperties.Password),
+            )
+                .fetchSemanticsNodes().size == 1
+        }
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            FIELD_PRESENCE_STATUS_CODE,
+            Bundle().apply {
+                putString("configuredUsernamePresent", "true")
+                putString("configuredPasswordPresent", "true")
+            },
+        )
 
         assertTrue(!composeRule.activity.isFinishing)
     }
@@ -154,16 +189,26 @@ class ChannelGuideDeviceAcceptanceTest {
         }
     }
 
-    private fun focusCurrentBrowseDestination() {
-        composeRule.runOnUiThread {
-            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+    private fun focusBrowseDestination(tag: String) {
+        composeRule.onNodeWithTag(tag).requestFocus()
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasTestTag(tag))
+                .fetchSemanticsNodes()
+                .any { node -> node.config[SemanticsProperties.Focused] }
         }
-        composeRule.waitForIdle()
     }
 
     private companion object {
+        const val FIELD_PRESENCE_STATUS_CODE = 2
         const val DEVICE_TIMEOUT_MILLIS = 30_000L
         const val MAX_BROWSE_BACK_ACTIONS = 2
+        const val SETTINGS_NAVIGATION_STEPS = 3
+        const val CONNECTION_NAVIGATION_STEPS = 2
+
+        val hasConfiguredFieldValue = SemanticsMatcher("has a configured field value") { node ->
+            node.config.contains(SemanticsProperties.EditableText) &&
+                node.config[SemanticsProperties.EditableText].isNotEmpty()
+        }
 
         val channelItemMatcher = SemanticsMatcher("channel row or card") { node ->
             val tag = if (node.config.contains(SemanticsProperties.TestTag)) {
