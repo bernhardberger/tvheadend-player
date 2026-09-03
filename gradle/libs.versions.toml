@@ -1,12 +1,12 @@
 [versions]
 activityCompose = "1.12.4"
-agp = "8.13.2"
+agp = "9.3.1"
 coil = "3.5.0"
 composeBom = "2026.02.00"
 datastorePreferences = "1.2.1"
 koin = "4.1.1"
 palette = "1.0.0"
-kotlin = "2.3.10"
+kotlin = "2.4.10"
 coreKtx = "1.17.0"
 coreSplashscreen = "1.2.0"
 appcompat = "1.7.1"
@@ -54,6 +54,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 tvheadend-sdk-android = { module = "at.bernhardberger.tvheadend:sdk-android" }
 tvheadend-sdk-media3 = { module = "at.bernhardberger.tvheadend:sdk-media3" }
@@ -67,6 +68,5 @@ androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-mani
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

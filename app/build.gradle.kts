@@ -7,7 +7,6 @@ import org.gradle.api.tasks.Sync
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -45,12 +44,12 @@ android {
     }
 }
 
-val releasedSdkSources by configurations.creating {
+val releasedSdkSources = configurations.create("releasedSdkSources") {
     isCanBeConsumed = false
     isCanBeResolved = true
     isTransitive = false
 }
-val releasedSdkFfmpegSources by configurations.creating {
+val releasedSdkFfmpegSources = configurations.create("releasedSdkFfmpegSources") {
     isCanBeConsumed = false
     isCanBeResolved = true
     isTransitive = false
@@ -136,19 +135,20 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
-val syncReleasedSdkEvidence by tasks.registering(Sync::class) {
-    val runtimeClasspath = configurations.named("debugRuntimeClasspath")
-    val media3Aar = providers.provider {
-        runtimeClasspath.get().incoming.artifacts.artifacts.single { artifact ->
-            val id = artifact.id.componentIdentifier as? ModuleComponentIdentifier
-            id?.group == "at.bernhardberger.tvheadend" && id.module == "sdk-media3"
-        }.file
-    }
+val syncReleasedSdkEvidence = tasks.register<Sync>("syncReleasedSdkEvidence") {
+    val media3Aar = configurations.getByName("debugRuntimeClasspath").incoming.artifactView {
+        componentFilter { id ->
+            id is ModuleComponentIdentifier &&
+                id.group == "at.bernhardberger.tvheadend" &&
+                id.module == "sdk-media3"
+        }
+    }.files
     from(media3Aar)
     from(releasedSdkSources)
     from(releasedSdkFfmpegSources)
     into(layout.buildDirectory.dir("released-sdk-evidence"))
 }
+val appProjectPath = project.path
 
 tasks.register("verifyExternalSdkConsumption") {
     group = "verification"
@@ -229,7 +229,7 @@ tasks.register("verifyExternalSdkConsumption") {
             val components = productionClasspaths.getValue("${variant}RuntimeClasspath")
                 .incoming.resolutionResult.allComponents
             val projectComponents = components.mapNotNull { it.id as? ProjectComponentIdentifier }
-                .filter { it.projectPath != project.path }
+                .filter { it.projectPath != appProjectPath }
             check(projectComponents.isEmpty()) {
                 "$variant runtime contains project components: $projectComponents"
             }
@@ -272,6 +272,13 @@ tasks.register("verifyExternalSdkConsumption") {
             }.toSet()
             check(dataStoreVersions == setOf("1.2.1")) {
                 "$variant runtime DataStore versions are $dataStoreVersions"
+            }
+            val coroutinesVersions = components.mapNotNull { component ->
+                val id = component.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                id.version.takeIf { id.group == "org.jetbrains.kotlinx" && id.module.startsWith("kotlinx-coroutines-") }
+            }.toSet()
+            check(coroutinesVersions == setOf("1.10.2")) {
+                "$variant runtime Coroutines versions are $coroutinesVersions"
             }
         }
     }

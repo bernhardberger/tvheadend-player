@@ -229,6 +229,9 @@ internal fun TimelineChannelRow(
                 ) ?: return@forEach
                 val start = maxWidth * span.startFraction
                 val width = maxWidth * (span.endFraction - span.startFraction)
+                val focusRequester = remember(event.id) {
+                    eventFocusRequesters.getOrPut(event.id) { FocusRequester() }
+                }
                 TimelineProgrammeCell(
                     event = event,
                     channel = channel,
@@ -236,9 +239,7 @@ internal fun TimelineChannelRow(
                     nowSec = nowSec,
                     selected = selectedTarget?.channelIndex == channelIndex &&
                         selectedTarget.eventId == event.id,
-                    focusRequester = eventFocusRequesters.getOrPut(event.id) {
-                        FocusRequester()
-                    },
+                    focusRequester = focusRequester,
                     onFocused = { onFocused(event) },
                     onOpenDetails = { onOpenDetails(event) },
                     onMoveFocus = onMoveFocus,

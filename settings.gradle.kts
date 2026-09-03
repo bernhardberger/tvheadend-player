@@ -18,14 +18,12 @@ dependencyResolutionManagement {
 
 gradle.extensions.extraProperties.set(
     "dependencyRepositoryUrls",
-    dependencyResolutionManagement.repositories.flatMap { repository ->
+    dependencyResolutionManagement.repositories.map { repository ->
         if (repository is MavenArtifactRepository) {
-            listOf(repository.url) + repository.artifactUrls
+            repository.url.toString().trimEnd('/')
         } else {
-            listOf("non-maven:${repository.name}")
+            "non-maven:${repository.name}"
         }
-    }.map { url ->
-        url.toString().trimEnd('/')
     }.toSet(),
 )
 gradle.extensions.extraProperties.set(

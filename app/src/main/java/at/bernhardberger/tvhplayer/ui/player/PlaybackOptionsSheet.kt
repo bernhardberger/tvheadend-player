@@ -499,8 +499,10 @@ private fun TrackOptionsPage(
     val headerBackFocus = remember { FocusRequester() }
     val offFocus = remember { FocusRequester() }
     val requesterStore = remember { mutableMapOf<String, FocusRequester>() }
-    val trackRequesters = tracks.associate { track ->
-        track.key to requesterStore.getOrPut(track.key) { FocusRequester() }
+    val trackRequesters = remember(tracks) {
+        tracks.associate { track ->
+            track.key to requesterStore.getOrPut(track.key) { FocusRequester() }
+        }
     }
     val selectedKey = tracks.firstOrNull(PlaybackOptionTrack::selected)?.key
     val focusTarget = playbackTrackFocusTarget(
