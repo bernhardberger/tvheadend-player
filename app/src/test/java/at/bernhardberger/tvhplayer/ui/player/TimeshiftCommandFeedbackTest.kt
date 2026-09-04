@@ -16,7 +16,7 @@ class TimeshiftCommandFeedbackTest {
                 currentToken = 2,
                 result = TimeshiftCommandResult.REJECTED,
                 unavailableText = "unavailable",
-                restorePlayIntentOnFailure = true,
+                rollbackPlayWhenReady = true,
             ),
         )
     }
@@ -29,12 +29,28 @@ class TimeshiftCommandFeedbackTest {
                 currentToken = 2,
                 result = TimeshiftCommandResult.REJECTED,
                 unavailableText = "unavailable",
-                restorePlayIntentOnFailure = true,
+                rollbackPlayWhenReady = true,
             ),
         )
 
         assertEquals("unavailable", completion.feedback)
-        assertTrue(completion.restorePlayIntent)
+        assertEquals(true, completion.rollbackPlayWhenReady)
+    }
+
+    @Test
+    fun currentRejectedResumeReportsUnavailableAndRestoresPauseIntent() {
+        val completion = requireNotNull(
+            timeshiftCommandCompletion(
+                commandToken = 2,
+                currentToken = 2,
+                result = TimeshiftCommandResult.REJECTED,
+                unavailableText = "unavailable",
+                rollbackPlayWhenReady = false,
+            ),
+        )
+
+        assertEquals("unavailable", completion.feedback)
+        assertEquals(false, completion.rollbackPlayWhenReady)
     }
 
     @Test
@@ -47,7 +63,7 @@ class TimeshiftCommandFeedbackTest {
                 currentFeedbackToken = 3,
                 result = TimeshiftCommandResult.ACCEPTED,
                 unavailableText = "unavailable",
-                restorePlayIntentOnFailure = true,
+                rollbackPlayWhenReady = true,
             ),
         )
 
@@ -56,7 +72,7 @@ class TimeshiftCommandFeedbackTest {
             completion.feedback,
         )
         assertTrue(completion.applyFeedback)
-        assertFalse(completion.restorePlayIntent)
+        assertNull(completion.rollbackPlayWhenReady)
     }
 
     @Test
@@ -69,11 +85,11 @@ class TimeshiftCommandFeedbackTest {
                 currentFeedbackToken = 5,
                 result = TimeshiftCommandResult.REJECTED,
                 unavailableText = "unavailable",
-                restorePlayIntentOnFailure = true,
+                rollbackPlayWhenReady = true,
             ),
         )
 
         assertFalse(completion.applyFeedback)
-        assertTrue(completion.restorePlayIntent)
+        assertEquals(true, completion.rollbackPlayWhenReady)
     }
 }

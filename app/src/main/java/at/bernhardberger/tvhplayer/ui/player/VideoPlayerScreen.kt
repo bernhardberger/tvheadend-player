@@ -153,7 +153,7 @@ private fun SubscriptionIssue.messageResource(): Int = when (this) {
 internal data class TimeshiftCommandCompletion(
     val feedback: String?,
     val applyFeedback: Boolean,
-    val restorePlayIntent: Boolean,
+    val rollbackPlayWhenReady: Boolean?,
 )
 
 internal fun timeshiftCommandCompletion(
@@ -163,14 +163,14 @@ internal fun timeshiftCommandCompletion(
     currentFeedbackToken: Long = currentToken,
     result: TimeshiftCommandResult,
     unavailableText: String,
-    restorePlayIntentOnFailure: Boolean,
+    rollbackPlayWhenReady: Boolean?,
 ): TimeshiftCommandCompletion? {
     if (commandToken != currentToken) return null
     val accepted = result == TimeshiftCommandResult.ACCEPTED
     return TimeshiftCommandCompletion(
         feedback = unavailableText.takeUnless { accepted },
         applyFeedback = feedbackToken == currentFeedbackToken,
-        restorePlayIntent = restorePlayIntentOnFailure && !accepted,
+        rollbackPlayWhenReady = if (accepted) null else rollbackPlayWhenReady,
     )
 }
 
@@ -309,7 +309,7 @@ fun VideoPlayerScreen(
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
     fun dispatchTimeshiftCommand(
-        restorePlayIntentOnFailure: Boolean = false,
+        rollbackPlayWhenReady: Boolean? = null,
         command: suspend () -> TimeshiftCommandResult,
     ) {
         timeshiftCommandToken += 1L
@@ -324,12 +324,16 @@ fun VideoPlayerScreen(
                 currentFeedbackToken = timelineState.feedbackToken,
                 result = result,
                 unavailableText = timeshiftUnavailableText,
-                restorePlayIntentOnFailure = restorePlayIntentOnFailure,
+                rollbackPlayWhenReady = rollbackPlayWhenReady,
             ) ?: return@launch
             if (completion.applyFeedback) {
                 timelineState.applyFeedback(feedbackToken, completion.feedback)
             }
-            if (completion.restorePlayIntent) videoPlayerViewModel.play()
+            when (completion.rollbackPlayWhenReady) {
+                true -> videoPlayerViewModel.play()
+                false -> videoPlayerViewModel.pause()
+                null -> Unit
+            }
         }
     }
 
@@ -783,13 +787,14 @@ fun VideoPlayerScreen(
                         MediaPlaybackAction.PLAY -> {
                             videoPlayerViewModel.play()
                             dispatchTimeshiftCommand(
+                                rollbackPlayWhenReady = false,
                                 command = videoPlayerViewModel::resumeTimeshift,
                             )
                         }
                         MediaPlaybackAction.PAUSE -> {
                             videoPlayerViewModel.pause()
                             dispatchTimeshiftCommand(
-                                restorePlayIntentOnFailure = true,
+                                rollbackPlayWhenReady = true,
                                 command = videoPlayerViewModel::pauseTimeshift,
                             )
                         }
@@ -797,12 +802,13 @@ fun VideoPlayerScreen(
                             if (effectiveTimeshiftState.paused || !player.playWhenReady) {
                                 videoPlayerViewModel.play()
                                 dispatchTimeshiftCommand(
+                                    rollbackPlayWhenReady = false,
                                     command = videoPlayerViewModel::resumeTimeshift,
                                 )
                             } else {
                                 videoPlayerViewModel.pause()
                                 dispatchTimeshiftCommand(
-                                    restorePlayIntentOnFailure = true,
+                                    rollbackPlayWhenReady = true,
                                     command = videoPlayerViewModel::pauseTimeshift,
                                 )
                             }
@@ -881,12 +887,13 @@ fun VideoPlayerScreen(
                         if (effectiveTimeshiftState.paused || !player.playWhenReady) {
                             videoPlayerViewModel.play()
                             dispatchTimeshiftCommand(
+                                rollbackPlayWhenReady = false,
                                 command = videoPlayerViewModel::resumeTimeshift,
                             )
                         } else {
                             videoPlayerViewModel.pause()
                             dispatchTimeshiftCommand(
-                                restorePlayIntentOnFailure = true,
+                                rollbackPlayWhenReady = true,
                                 command = videoPlayerViewModel::pauseTimeshift,
                             )
                         }
@@ -989,12 +996,13 @@ fun VideoPlayerScreen(
                     if (effectiveTimeshiftState.paused) {
                         videoPlayerViewModel.play()
                         dispatchTimeshiftCommand(
+                            rollbackPlayWhenReady = false,
                             command = videoPlayerViewModel::resumeTimeshift,
                         )
                     } else {
                         videoPlayerViewModel.pause()
                         dispatchTimeshiftCommand(
-                            restorePlayIntentOnFailure = true,
+                            rollbackPlayWhenReady = true,
                             command = videoPlayerViewModel::pauseTimeshift,
                         )
                     }
@@ -1021,7 +1029,7 @@ fun VideoPlayerScreen(
                             currentFeedbackToken = timelineState.feedbackToken,
                             result = resumeResult,
                             unavailableText = timeshiftUnavailableText,
-                            restorePlayIntentOnFailure = false,
+                            rollbackPlayWhenReady = null,
                         ) ?: return@launch
                         if (completion.applyFeedback) {
                             timelineState.applyFeedback(feedbackToken, completion.feedback)

@@ -217,6 +217,8 @@ internal class LiveTimelinePresentationState(
 
     fun invalidateForSourceChange() {
         val previousGeneration = sourceGeneration
+        previousGeneration.seekJob?.cancel()
+        previousGeneration.seekJob = null
         previousGeneration.seekQueue = cancelPendingTimeshiftSeek(previousGeneration.seekQueue)
         previousGeneration.seekToken++
         clearPreview(previousGeneration)

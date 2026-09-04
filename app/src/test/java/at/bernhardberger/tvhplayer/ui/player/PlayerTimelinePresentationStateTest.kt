@@ -8,8 +8,9 @@ import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -151,8 +152,39 @@ class PlayerTimelinePresentationStateTest {
     }
 
     @Test
+    fun liveTimelineSourceInvalidationDropsPendingOldCommandBeforeNewDispatch() = runTest {
+        val commands = mutableListOf<String>()
+        val state = LiveTimelinePresentationState(
+            scope = this,
+            currentEpochMillis = { 0L },
+            monotonicTimeMillis = { testScheduler.currentTime },
+        )
+        val timeshift = AppTimeshiftState(
+            available = true,
+            bufferStartMs = -120_000L,
+            positionMs = -60_000L,
+            liveEdgeMs = 0L,
+        )
+
+        state.queueRelativeSeek(timeshift, -30_000L, "old unavailable", "old clamped") {
+            commands += "old:$it"
+            TimeshiftCommandResult.ACCEPTED
+        }
+        state.invalidateForSourceChange()
+        state.queueRelativeSeek(timeshift, 30_000L, "new unavailable", "new clamped") {
+            commands += "new:$it"
+            TimeshiftCommandResult.ACCEPTED
+        }
+        advanceTimeBy(400L)
+        runCurrent()
+
+        assertEquals(listOf("new:30000"), commands)
+    }
+
+    @Test
     fun liveTimelineSourceInvalidationDetachesNewCommandFromSuspendedOldCommand() = runTest {
         val oldDispatchResult = CompletableDeferred<TimeshiftCommandResult>()
+        val oldDispatchCancelled = CompletableDeferred<Unit>()
         val commands = mutableListOf<String>()
         val state = LiveTimelinePresentationState(
             scope = this,
@@ -172,7 +204,12 @@ class PlayerTimelinePresentationStateTest {
             clampedText = "clamped",
             seekRelative = { deltaMs ->
                 commands += "old:$deltaMs"
-                oldDispatchResult.await()
+                try {
+                    oldDispatchResult.await()
+                } catch (error: CancellationException) {
+                    oldDispatchCancelled.complete(Unit)
+                    throw error
+                }
             },
         )
         advanceTimeBy(400L)
@@ -180,6 +217,8 @@ class PlayerTimelinePresentationStateTest {
         assertEquals(listOf("old:-30000"), commands)
 
         state.invalidateForSourceChange()
+        runCurrent()
+        assertTrue(oldDispatchCancelled.isCompleted)
         assertNull(state.preview)
         state.queueRelativeSeek(
             state = AppTimeshiftState(
