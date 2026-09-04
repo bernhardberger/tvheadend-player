@@ -14,10 +14,10 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `.opencode/commands/continue-app.md` | Concise package execution contract for the built-in Build primary |
 | `.opencode/agents/app-locator.md` | Mechanical Luna/low repository locator |
 | `.opencode/agents/app-explore.md` | Terra/medium bounded multi-file source and behavior mapper |
-| `.opencode/agents/app-planner.md` | Optional Sol/high bounded planning second opinion |
-| `.opencode/agents/app-analyze.md` | Sol/medium concrete implementation diagnostician |
-| `.opencode/agents/app-research.md` | Sol/low authoritative external-source researcher |
-| `.opencode/agents/android-reviewer.md` | Sol/high frozen-packet Android runtime and TV interaction reviewer |
+| `.opencode/agents/app-planner.md` | Optional Astra/medium bounded planning second opinion |
+| `.opencode/agents/app-analyze.md` | Astra/medium concrete implementation diagnostician |
+| `.opencode/agents/app-research.md` | Astra/low authoritative external-source researcher |
+| `.opencode/agents/android-reviewer.md` | Astra/medium frozen-packet Android runtime and TV interaction reviewer |
 | `.opencode/agents/tv-evidence-curator.md` | Terra/medium mechanical validator for exact screenshot evidence sets |
 | `.opencode/agents/tv-ux-brief.md` | Opus/high pre-implementation TV product design specialist |
 | `.opencode/agents/tv-ux-reviewer.md` | Opus/medium final screenshot-first visual-quality reviewer |
@@ -35,8 +35,9 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 
 The built-in `build` is the sole writable primary for application and repository
 work. `AGENTS.md`, the active package packet, and `/continue-app` supply its
-authority. The orchestrator selects GPT-5.6 Sol at the ledger's exact `medium`,
-`high`, `xhigh`, or `max` effort. No custom writable primary or repository-configured primary step
+authority. New packages default to GPT-6 Astra Medium, Low for exact mechanical
+work and High for justified difficult work. Existing admitted manifests retain
+their exact model and effort. No custom writable primary or repository-configured primary step
 ceiling exists.
 
 Like the SDK workspace, the trusted writable primary receives edit, Bash, web
@@ -46,12 +47,13 @@ do; there is no per-command approval relay or duplicated command deny list.
 Read-only children retain their own explicit restrictions and the exact Task
 allowlist remains deny-by-default.
 
-The eight managed OpenAI read-only roles have explicit non-inheriting assignments:
+The seven managed OpenAI read-only roles have explicit non-inheriting assignments:
 `app-locator` uses Luna/low/20, `app-explore` Terra/medium/30, `app-planner`
-Sol/high/45, `app-analyze` Sol/medium/30, `app-research` Sol/low/35,
-`android-reviewer` Sol/high/45, and `tv-evidence-curator` Terra/medium/25. They
-use standard service by default and may be switched together to matching
-`-fast` IDs. Fast IDs select service priority, not a different model. The fixed
+Astra/medium/45, `app-analyze` Astra/medium/30, `app-research` Astra/low/35,
+`android-reviewer` Astra/medium/45, and `tv-evidence-curator` Terra/medium/25.
+The tier helper switches only Luna/Terra to matching `-fast` IDs; Astra remains
+standard until a supported priority route is verified. Fast IDs select service
+priority, not a different model. The fixed
 Claude roles are separate: `tv-ux-brief` Opus/high/35, `tv-ux-reviewer`
 Opus/medium/40, and `claude-audit-lead` Opus/high/45. Changing the writable
 primary effort never changes a child.
@@ -130,7 +132,7 @@ and do not act as additional approval reviewers.
 Visual design uses a separate evidence lifecycle. For a substantial visual or
 navigation slice, fixed Opus/high `tv-ux-brief` turns named baseline images and
 accepted requirements into one preferred direction before implementation. The
-Sol primary renders production composables through deterministic fake-state
+Astra primary renders production composables through deterministic fake-state
 evidence. Terra/medium `tv-evidence-curator` validates exact state coverage and
 emits a compact path manifest without design judgment. Fixed Opus/medium
 `tv-ux-reviewer` then accepts `review` or `closure` mode over that curated set.

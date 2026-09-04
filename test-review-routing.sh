@@ -43,7 +43,7 @@ from pathlib import Path
 config_path = Path(sys.argv[1])
 config = json.loads(config_path.read_text(encoding="utf-8"))
 expected = {
-    "android-reviewer": ("openai/gpt-5.6-sol", "high", 45),
+    "android-reviewer": ("openai/gpt-6-astra", "medium", 45),
     "app-review-muse": ("openrouter/meta/muse-spark-1.3-contributor", "xhigh", 45),
     "tv-evidence-curator": ("openai/gpt-5.6-terra", "medium", 25),
     "tv-ux-brief": ("anthropic/claude-opus-5", "high", 35),
@@ -75,8 +75,8 @@ for verdict in ("BLOCKING", "NON_BLOCKING", "CLEAN", "INSUFFICIENT_EVIDENCE"):
 policy = (config_path.parents[1] / "AGENTS.md").read_text(encoding="utf-8")
 if "The Muse reviewer field test is complete; do not invoke `app-review-muse`." not in policy:
     raise SystemExit("AGENTS.md: missing retired Muse field-test route")
-if "routine, documentation, test-only, and\nconfiguration-only changes are Sol-only." not in policy:
-    raise SystemExit("AGENTS.md: missing routine Sol-only route")
+if "routine, documentation, test-only, and\nconfiguration-only changes are Astra-only." not in policy:
+    raise SystemExit("AGENTS.md: missing routine Astra-only route")
 PY
 TESTS=$((TESTS + 1))
 

@@ -4,8 +4,9 @@ agent: build
 ---
 
 Apply `AGENTS.md` as the repository execution policy. Use only the active package
-contract supplied in `$ARGUMENTS`; verify the session model is GPT-5.6 Sol at its
-exact `medium`, `high`, `xhigh`, or `max` effort. Implement one package end-to-end, run its focused
+contract supplied in `$ARGUMENTS`; verify the session model and effort match
+that admitted contract exactly. New packages default to Astra Medium under
+`AGENTS.md`; historical packages retain their admitted settings. Implement one package end-to-end, run its focused
 and full gates, review a frozen tested packet when required, create only its
 authorized local commit, and update its ledger evidence. Do not start later work
 or cross a device, credential, server, remote, release, or destructive boundary

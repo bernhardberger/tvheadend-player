@@ -22,7 +22,7 @@ class AiModelTierTest(unittest.TestCase):
             "$schema": "https://opencode.ai/config.json",
             "agent": {
                 name: {
-                    "model": f"{model}{suffix}",
+                    "model": model if model == "openai/gpt-6-astra" else f"{model}{suffix}",
                     "variant": "medium",
                     "steps": 48,
                     "permission": {
@@ -51,7 +51,10 @@ class AiModelTierTest(unittest.TestCase):
             self.assertEqual(updated["share"], "disabled")
             for name, model in AGENT_MODELS.items():
                 agent = updated["agent"][name]
-                self.assertEqual(agent["model"], f"{model}-fast")
+                self.assertEqual(
+                    agent["model"],
+                    model if model == "openai/gpt-6-astra" else f"{model}-fast",
+                )
                 self.assertEqual(agent["variant"], "medium")
                 self.assertEqual(agent["steps"], 48)
                 self.assertEqual(
@@ -111,9 +114,19 @@ class AiModelTierTest(unittest.TestCase):
             {
                 "openai/gpt-5.6-luna",
                 "openai/gpt-5.6-terra",
-                "openai/gpt-5.6-sol",
+                "openai/gpt-6-astra",
             },
         )
+
+    def test_rejects_unregistered_astra_fast_without_modifying_config(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = self.config(fast=False)
+            config["agent"]["app-planner"]["model"] = "openai/gpt-6-astra-fast"
+            path = self.write_config(directory, config)
+            original = path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "app-planner.*unexpected model"):
+                switch_model_tier(path, "standard")
+            self.assertEqual(path.read_bytes(), original)
 
     def test_reports_mixed_tier(self) -> None:
         config = self.config(fast=True)

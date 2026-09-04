@@ -1,5 +1,14 @@
 # TVHeadend Player Engineering Guide
 
+New package primaries default to Astra Medium; use Low for exact mechanical work
+and High only for justified difficult work. Existing admitted manifests retain
+authority. Resolve routine choices within scope, reuse existing patterns, and
+avoid speculative abstractions. Finish after relevant checks and required gates
+pass unless a concrete concern needs investigation. Delegate bounded independent
+questions when worthwhile; preserve existing permissions and depth limits.
+The selector's legacy `sol` output means the mandatory OpenAI reviewer lane,
+now Astra `android-reviewer`, not a request to launch the retired Sol model.
+
 TVHeadend Player for TV is an independently developed, public GPLv3 Android TV
 client for TVHeadend. It descends from
 [`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) and preserves
@@ -159,17 +168,17 @@ The Muse reviewer field test is complete; do not invoke `app-review-muse`.
 
 For a substantial new or redesigned TV surface, obtain one fresh fixed
 Opus/high `tv-ux-brief` before implementation and one final fixed Opus/medium
-`tv-ux-reviewer` after the Sol primary captures current evidence and the
+`tv-ux-reviewer` after the Astra primary captures current evidence and the
 Terra/medium curator validates its state matrix. Run a closure review only when
 blocking design findings require matched recaptures. Before each Opus UX call,
 run `./review-provider-route.sh select ux`; launch the role only when it prints
 `opus`. The UX route requires remaining Claude quota above 20% in the 5-hour
 window and above 5% in the 7-day window. Missing, malformed, exhausted, or
 below-threshold telemetry skips that optional call without weakening the
-mandatory Sol Android review. Keep `claude-audit-lead` Opus/high for genuinely
+mandatory Astra Android review. Keep `claude-audit-lead` Opus/high for genuinely
 critical or complex nonvisual architecture and dependency work. Use at most one
 Opus specialization for a concern; routine, documentation, test-only, and
-configuration-only changes are Sol-only.
+configuration-only changes are Astra-only.
 
 Start each child as a fresh session by omitting `task_id`; never resume old child
 history. Supply one self-contained question with accepted invariants, included

@@ -21,23 +21,23 @@
       "steps": 30
     },
     "app-planner": {
-      "model": "openai/gpt-5.6-sol",
-      "variant": "high",
+      "model": "openai/gpt-6-astra",
+      "variant": "medium",
       "steps": 45
     },
     "app-analyze": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "openai/gpt-6-astra",
       "variant": "medium",
       "steps": 30
     },
     "app-research": {
-      "model": "openai/gpt-5.6-sol",
+      "model": "openai/gpt-6-astra",
       "variant": "low",
       "steps": 35
     },
     "android-reviewer": {
-      "model": "openai/gpt-5.6-sol",
-      "variant": "high",
+      "model": "openai/gpt-6-astra",
+      "variant": "medium",
       "steps": 45
     },
     "app-review-muse": {
