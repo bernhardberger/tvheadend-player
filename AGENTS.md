@@ -1,14 +1,5 @@
 # TVHeadend Player Engineering Guide
 
-New package primaries default to Astra Medium; use Low for exact mechanical work
-and High only for justified difficult work. Existing admitted manifests retain
-authority. Resolve routine choices within scope, reuse existing patterns, and
-avoid speculative abstractions. Finish after relevant checks and required gates
-pass unless a concrete concern needs investigation. Delegate bounded independent
-questions when worthwhile; preserve existing permissions and depth limits.
-The selector's legacy `sol` output means the mandatory OpenAI reviewer lane,
-now Astra `android-reviewer`, not a request to launch the retired Sol model.
-
 TVHeadend Player for TV is an independently developed, public GPLv3 Android TV
 client for TVHeadend. It descends from
 [`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) and preserves
@@ -23,7 +14,7 @@ Before non-trivial work:
 2. Use `docs/README.md` to select only the documents relevant to the task. Do
    not read the whole documentation tree.
 3. Use the built-in writable `build` primary for both application and repository
-   work. The active package and repository rules define its scope; no second
+   work. The operator's task, any admitted package and repository rules define its scope; no second
    writable project agent exists.
 4. State assumptions before ambiguous or architectural work and implement one
    small, independently verifiable slice.
@@ -79,12 +70,14 @@ repository-local domain overlays, then the focused skill, then local style.
 - Do not add compatibility façades, SDK model/result mirrors, protocol-shaped
   test translators, bespoke verification frameworks, or production test seams
   when released APIs and test fakes already own the behavior.
-- For behavior changes, write the failing test first. Keep pure policy outside
+- For behavior changes, add a focused regression test. Keep pure policy outside
   Android UI where practical so JVM tests can cover it.
-- Run focused checks while iterating and `./tools/verify` before considering a
-  slice complete.
+- Run focused checks while iterating and `./tools/verify` once for the final code
+  state. For docs/config-only edits use relevant static checks instead. Reuse
+  unchanged successful evidence; a review or administrative stage is not a reason
+  to run it again. Do not add tests for model names or prompt wording.
 - External review is risk-based, not an automatic approval loop. Use one scoped
-  audit and one closure limited to its findings and fix delta, then remediate
+  audit; request a targeted closure only when a fix remains uncertain. Remediate
   new in-scope blockers autonomously. Never ask the user merely whether to
   continue; interrupt only for a genuine product choice or safety boundary.
   Review economy never waives an unresolved correctness or safety blocker.
@@ -94,9 +87,9 @@ repository-local domain overlays, then the focused skill, then local style.
   user explicitly requests that operation and its safety requirements pass.
 - Do not run parallel writers in one dirty worktree or concurrent Gradle builds,
   device operations, Git mutations, signing, publishing, or releases.
-- Run at most one substantial visual or navigation slice per primary session;
-  return a compact next-slice handoff instead of carrying accumulated context
-  into another implementation.
+- One primary owns a coherent task end-to-end, including authorized release and
+  verification. Split only for a real dependency, ownership boundary or context
+  problem—not because implementation, review and release are different stages.
 - On the shared LXC, keep Gradle state in disk-backed `$HOME/.gradle`, retain
   `--no-daemon`, and stop rather than increasing memory if the host becomes
   sluggish.
@@ -150,7 +143,7 @@ resource overhead is an acceptable soft target for a meaningful quality gain,
 not a hard accounting threshold. There is no fixed child-count limit; avoid only
 duplicated assignments and unnecessarily verbose returned evidence.
 
-Use Luna/low `app-locator` for mechanical retrieval, Terra/medium `app-explore`
+Use `app-locator` for mechanical retrieval, `app-explore`
 for bounded multi-file source maps and call traces, `app-planner` for an optional
 design second opinion, `app-analyze` for one concrete post-plan contradiction,
 and `app-research` for one authoritative external-source question after local
@@ -164,21 +157,21 @@ ledgers, handoffs, archives, or broad plans. Their configured model variants and
 step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
 `max` effort.
 
-The Muse reviewer field test is complete; do not invoke `app-review-muse`.
+Model and effort assignments live in OpenCode configuration, not product policy.
+Retired field-test roles stay retired. Routine changes and ordinary releases
+need no independent reviewer. Require one suitable independent review for
+security-sensitive or substantial runtime/lifecycle/concurrency changes, not
+a mandatory provider pair.
 
-For a substantial new or redesigned TV surface, obtain one fresh fixed
-Opus/high `tv-ux-brief` before implementation and one final fixed Opus/medium
-`tv-ux-reviewer` after the Astra primary captures current evidence and the
-Terra/medium curator validates its state matrix. Run a closure review only when
-blocking design findings require matched recaptures. Before each Opus UX call,
-run `./review-provider-route.sh select ux`; launch the role only when it prints
-`opus`. The UX route requires remaining Claude quota above 20% in the 5-hour
-window and above 5% in the 7-day window. Missing, malformed, exhausted, or
-below-threshold telemetry skips that optional call without weakening the
-mandatory Astra Android review. Keep `claude-audit-lead` Opus/high for genuinely
-critical or complex nonvisual architecture and dependency work. Use at most one
-Opus specialization for a concern; routine, documentation, test-only, and
-configuration-only changes are Astra-only.
+For a substantial new or redesigned TV surface, use `tv-ux-brief` if product
+direction is unresolved and obtain a final screenshot-first `tv-ux-reviewer`
+review. The primary can validate its own capture matrix; an evidence curator is
+optional. Add runtime review only when the distinct runtime risk warrants it.
+Use `claude-audit-lead` for a genuine architecture question, not a second routine
+approval. The quota selector remains an optional availability check, not a
+required workflow stage. Never source it or its credential source.
+Its legacy `sol`/`sol_required` output describes a fallback route, not whether a
+review is required. It does not override this risk-based policy.
 
 Start each child as a fresh session by omitting `task_id`; never resume old child
 history. Supply one self-contained question with accepted invariants, included

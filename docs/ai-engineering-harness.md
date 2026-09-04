@@ -11,65 +11,48 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `docs/README.md` | Documentation authority and lifecycle index used for task-specific reads |
 | `docs/archive/README.md` | Historical-document containment and successor map |
 | `.opencode/opencode.json` | Built-in Build default, read-only child assignments, sharing policy, permissions, and depth-2 child allowlist |
-| `.opencode/commands/continue-app.md` | Concise package execution contract for the built-in Build primary |
-| `.opencode/agents/app-locator.md` | Mechanical Luna/low repository locator |
-| `.opencode/agents/app-explore.md` | Terra/medium bounded multi-file source and behavior mapper |
-| `.opencode/agents/app-planner.md` | Optional Astra/medium bounded planning second opinion |
-| `.opencode/agents/app-analyze.md` | Astra/medium concrete implementation diagnostician |
-| `.opencode/agents/app-research.md` | Astra/low authoritative external-source researcher |
-| `.opencode/agents/android-reviewer.md` | Astra/medium frozen-packet Android runtime and TV interaction reviewer |
-| `.opencode/agents/tv-evidence-curator.md` | Terra/medium mechanical validator for exact screenshot evidence sets |
-| `.opencode/agents/tv-ux-brief.md` | Opus/high pre-implementation TV product design specialist |
-| `.opencode/agents/tv-ux-reviewer.md` | Opus/medium final screenshot-first visual-quality reviewer |
+| `.opencode/commands/continue-app.md` | Concise task execution contract for the built-in Build primary |
+| `.opencode/agents/app-locator.md` | Mechanical repository locator |
+| `.opencode/agents/app-explore.md` | Bounded multi-file source and behavior mapper |
+| `.opencode/agents/app-planner.md` | Optional bounded planning second opinion |
+| `.opencode/agents/app-analyze.md` | Concrete implementation diagnostician |
+| `.opencode/agents/app-research.md` | Authoritative external-source researcher |
+| `.opencode/agents/android-reviewer.md` | Risk-based Android runtime and TV interaction reviewer |
+| `.opencode/agents/tv-evidence-curator.md` | Optional validator for exact screenshot evidence sets |
+| `.opencode/agents/tv-ux-brief.md` | TV product design specialist when direction is unresolved |
+| `.opencode/agents/tv-ux-reviewer.md` | Final screenshot-first visual-quality reviewer |
 | `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
 | `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
-| `.opencode/commands/` | Model-tier, verification, device, reviewer, UX, and upstream shortcuts |
+| `.opencode/commands/` | Verification, device, reviewer, UX, and upstream shortcuts |
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
-| `tools/ai-model-tier` | Checked switch of the eight managed OpenAI read-only roles between standard and fast service tiers |
 | `tools/verify` | Native/tool/JVM/lint/Android-test compilation, APK, identity, ABI, and 16 KB gates |
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
 
-## Primary agents and model tier
+## Primary agents and model assignments
 
 The built-in `build` is the sole writable primary for application and repository
-work. `AGENTS.md`, the active package packet, and `/continue-app` supply its
-authority. New packages default to GPT-6 Astra Medium, Low for exact mechanical
-work and High for justified difficult work. Existing admitted manifests retain
-their exact model and effort. No custom writable primary or repository-configured primary step
-ceiling exists.
+work. `AGENTS.md` and the operator's task supply authority; an already admitted
+package retains its explicit contract. New direct work needs no package. No
+custom writable primary or repository-configured primary step ceiling exists.
 
 Like the SDK workspace, the trusted writable primary receives edit, Bash, web
 fetch, and external-directory capabilities directly from server-side project
-configuration. The ledger, package packet, and `AGENTS.md` define what it may
+configuration. Operator authority, any admitted package, and `AGENTS.md` define what it may
 do; there is no per-command approval relay or duplicated command deny list.
 Read-only children retain their own explicit restrictions and the exact Task
 allowlist remains deny-by-default.
 
-The seven managed OpenAI read-only roles have explicit non-inheriting assignments:
-`app-locator` uses Luna/low/20, `app-explore` Terra/medium/30, `app-planner`
-Astra/medium/45, `app-analyze` Astra/medium/30, `app-research` Astra/low/35,
-`android-reviewer` Astra/medium/45, and `tv-evidence-curator` Terra/medium/25.
-The tier helper switches only Luna/Terra to matching `-fast` IDs; Astra remains
-standard until a supported priority route is verified. Fast IDs select service
-priority, not a different model. The fixed
-Claude roles are separate: `tv-ux-brief` Opus/high/35, `tv-ux-reviewer`
-Opus/medium/40, and `claude-audit-lead` Opus/high/45. Changing the writable
-primary effort never changes a child.
-
-OpenCode cannot hot-reload model assignments for later Task calls. Use the
-checked repository tool or matching slash command, then restart OpenCode:
-
-```bash
-./tools/ai-model-tier status
-./tools/ai-model-tier fast
-./tools/ai-model-tier standard
-```
+Model, effort and step assignments live only in `.opencode/opencode.json` and
+agent frontmatter. Edit the relevant assignment directly and restart OpenCode;
+do not duplicate its value in policy or tests. Child settings do not inherit the
+primary's effort. The model-tier helper and its parallel registry were removed:
+mixed supported models are valid, and changing one is not a product gate.
 
 ## Delegation and context containment
 
-Delegation is read-only and may nest through one additional Luna locator level.
+Delegation is read-only and may nest through one additional locator level.
 The primary owns decomposition and delegation and may use as many children as it
 judges useful for correctness, evidence coverage, context isolation, turnaround,
 or final quality. A roughly 20% resource overhead is an acceptable soft target
@@ -105,11 +88,12 @@ risk:
 | Change | Independent review |
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
-| Runtime behavior, production wiring, concurrency, playback, security, native, release, focus, keys, Back, accessibility, safe bounds, or UI-test behavior | `android-reviewer` |
-| Pre-implementation visual direction for a substantial new or redesigned TV surface | `tv-ux-brief` against supplied requirements and baseline images |
-| Screenshot-set coverage, metadata, duplication, staleness, or privacy | `tv-evidence-curator` over caller-supplied exact paths |
+| Security-sensitive or substantial runtime/lifecycle/concurrency change | One suitable reviewer, normally `android-reviewer` |
+| Ordinary release using the existing release path | No additional model approval; retain release artifact and authorization checks |
+| Unresolved visual direction for a substantial new or redesigned TV surface | Optional `tv-ux-brief` against supplied requirements and baseline images |
+| Screenshot-set coverage, metadata, duplication, staleness, or privacy | Primary checks it; optional `tv-evidence-curator` for useful independent work |
 | Final visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` against the curated current manifest |
-| HTSP, Media3, concurrency, subscription ownership, or DVR lifecycle | One early architecture/race audit may replace the normal audit, followed by closure review |
+| HTSP, Media3, concurrency, subscription ownership, or DVR lifecycle | One architecture/race audit can replace runtime review; closure only for a fix that remains uncertain |
 
 Every code-review assignment supplies one frozen tested packet: exact acceptance
 criteria, changed files or diff, relevant source/tests, invariants, exclusions,
@@ -124,18 +108,15 @@ downgrades or waives a confirmed correctness, security, accessibility,
 resource-ownership, release-safety, or acceptance-criterion violation.
 
 Routine in-scope remediation is autonomous. A broad new concern becomes a
-separately authorized package rather than another broad audit, blind continuation,
+separate task only if the operator chooses it, rather than another broad audit, blind continuation,
 or request merely to continue. Related recurring findings stop micro-patching and
 trigger a bounded root-cause re-scope. Research children answer bounded questions
 and do not act as additional approval reviewers.
 
-Visual design uses a separate evidence lifecycle. For a substantial visual or
-navigation slice, fixed Opus/high `tv-ux-brief` turns named baseline images and
-accepted requirements into one preferred direction before implementation. The
-Astra primary renders production composables through deterministic fake-state
-evidence. Terra/medium `tv-evidence-curator` validates exact state coverage and
-emits a compact path manifest without design judgment. Fixed Opus/medium
-`tv-ux-reviewer` then accepts `review` or `closure` mode over that curated set.
+For substantial visual work, use `tv-ux-brief` only when direction is unresolved.
+The primary captures production composables, checks coverage and supplies exact
+paths to `tv-ux-reviewer`; a separate curator is optional. The reviewer accepts
+`review` or a targeted `closure` over current evidence.
 After `DESIGN_READY`, the primary keeps accepted geometry fixed while wiring
 behavior. At most one closure compares named `UX-` findings with matched
 captures and does not restart broad redesign. `DESIGN_REMEDIATE` is fixed
@@ -144,9 +125,9 @@ not silently expand scope.
 
 Continue automatically through the current slice, internal checkpoints,
 recoverable test failures, reviewer findings, child-agent errors, and one batched
-technical remediation. Run at most one substantial visual or navigation slice
-per primary session. Once it reaches acceptance or a named external gate, return
-a compact next-slice handoff rather than carrying accumulated context onward. Ask
+technical remediation. Complete a coherent task end-to-end rather than creating
+handoffs for administrative stages. Split for a real dependency or context
+problem. Ask
 one substantive question only when progress requires a product choice, conflicts
 with current authority, changes accepted scope or capability, cannot preserve
 unrelated worktree changes, crosses an explicit credential/device/signing/release

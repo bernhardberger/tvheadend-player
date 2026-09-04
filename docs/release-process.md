@@ -1,5 +1,10 @@
 # Release and rollback process
 
+One authorized owner may prepare, verify, sign, publish and check the result in
+one task. Routine use of this release path needs no extra model review or separate
+administrative packages. Retain exact operation approval, native/source and
+signing checks, device identity checks and attended acceptance below.
+
 This process separates reproducible release preparation on the engineering host
 from signing on the isolated owner-controlled signing host. The private key and
 passwords never enter LXC 106, Git, release metadata, or command arguments.
