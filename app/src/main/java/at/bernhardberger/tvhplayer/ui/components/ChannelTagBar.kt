@@ -56,6 +56,7 @@ fun ChannelTagSelector(
     allChannelsVisible: Boolean = true,
     activeFocusRequester: FocusRequester = remember { FocusRequester() },
     onMoveToContent: () -> Boolean = { false },
+    onTagFocus: () -> Unit = {},
 ) {
     val allChannelsLabel = stringResource(R.string.all_channels)
     val scopes = remember(tags, allChannelsVisible, allChannelsLabel) {
@@ -113,6 +114,7 @@ fun ChannelTagSelector(
             Tab(
                 selected = index == activeIndex,
                 onFocus = {
+                    onTagFocus()
                     edgeFadeState.updateFocusedIndex(index)
                     if (tagId != activeTagId) onSelectTag(tagId)
                 },
