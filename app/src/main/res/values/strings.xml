@@ -194,6 +194,10 @@
     <string name="stats_playback" translatable="false">Playback</string>
     <string name="stats_tuner" translatable="false">Tuner</string>
     <string name="stats_tuner_status" translatable="false">Frontend</string>
+    <string name="stats_frontend_locked" translatable="false">Locked</string>
+    <string name="stats_frontend_synchronizing" translatable="false">Synchronizing</string>
+    <string name="stats_frontend_signal" translatable="false">Signal detected</string>
+    <string name="stats_frontend_no_signal" translatable="false">No signal</string>
     <string name="stats_signal" translatable="false">Signal</string>
     <string name="stats_snr" translatable="false">SNR</string>
     <string name="stats_ber" translatable="false">Bit error rate</string>

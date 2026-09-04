@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
@@ -83,28 +84,28 @@ class TimeshiftCommandDeviceAcceptanceTest {
                 "startup",
                 "READY/+$startupProgress ms",
                 runtime,
-                runtime.timeshiftState.value,
+                runtime.currentTimeshiftState,
                 continuityWatch.snapshot(),
             )
 
             withContext(Dispatchers.Main) { runtime.pause() }
             val pauseResult = withContext(Dispatchers.Main) { runtime.pauseTimeshift() }
-            assertTrue("$fixture pause=$pauseResult", pauseResult == TimeshiftCommandResult.ACCEPTED)
+            assertTrue("$fixture pause=$pauseResult", pauseResult.isAccepted)
             awaitServerPaused(runtime, paused = true)
             delay(COMMAND_CONTINUITY_SETTLE)
             assertContinuous(fixture, "pause", runtime, channel, continuityWatch.snapshot())
             reportEvidence(
                 fixture,
                 "pause",
-                pauseResult.name,
+                pauseResult.toString(),
                 runtime,
-                runtime.timeshiftState.value,
+                runtime.currentTimeshiftState,
                 continuityWatch.snapshot(),
             )
 
             withContext(Dispatchers.Main) { runtime.play() }
             val resumeResult = withContext(Dispatchers.Main) { runtime.resumeTimeshift() }
-            assertTrue("$fixture resume=$resumeResult", resumeResult == TimeshiftCommandResult.ACCEPTED)
+            assertTrue("$fixture resume=$resumeResult", resumeResult.isAccepted)
             awaitServerPaused(runtime, paused = false)
             val resumeProgress = awaitPlayerProgress(runtime)
             delay(COMMAND_CONTINUITY_SETTLE)
@@ -114,7 +115,7 @@ class TimeshiftCommandDeviceAcceptanceTest {
                 "resume",
                 "$resumeResult/+$resumeProgress ms",
                 runtime,
-                runtime.timeshiftState.value,
+                runtime.currentTimeshiftState,
                 continuityWatch.snapshot(),
             )
 
@@ -125,13 +126,13 @@ class TimeshiftCommandDeviceAcceptanceTest {
                 "seek-ready",
                 "-${measuredSeek.magnitudeMillis} ms",
                 runtime,
-                runtime.timeshiftState.value,
+                runtime.currentTimeshiftState,
                 continuityWatch.snapshot(),
             )
             val seekResult = withContext(Dispatchers.Main) {
                 runtime.seekTimeshift(-measuredSeek.magnitudeMillis)
             }
-            assertTrue("$fixture signed-seek=$seekResult", seekResult == TimeshiftCommandResult.ACCEPTED)
+            assertTrue("$fixture signed-seek=$seekResult", seekResult.isAccepted)
             awaitPositionBehindLive(
                 runtime,
                 measuredSeek.beforeBehindLiveMillis + MINIMUM_SEEK_MOVEMENT_MILLIS,
@@ -144,12 +145,12 @@ class TimeshiftCommandDeviceAcceptanceTest {
                 "signed-seek",
                 "$seekResult/+$seekProgress ms",
                 runtime,
-                runtime.timeshiftState.value,
+                runtime.currentTimeshiftState,
                 continuityWatch.snapshot(),
             )
 
             val goLiveResult = withContext(Dispatchers.Main) { runtime.goLive() }
-            assertTrue("$fixture go-live=$goLiveResult", goLiveResult == TimeshiftCommandResult.ACCEPTED)
+            assertTrue("$fixture go-live=$goLiveResult", goLiveResult.isAccepted)
             awaitNearLive(runtime)
             val goLiveProgress = awaitPlayerProgress(runtime)
             delay(COMMAND_CONTINUITY_SETTLE)
@@ -160,7 +161,7 @@ class TimeshiftCommandDeviceAcceptanceTest {
                 "go-live",
                 "$goLiveResult/+$goLiveProgress ms",
                 runtime,
-                runtime.timeshiftState.value,
+                runtime.currentTimeshiftState,
                 finalContinuity,
             )
         } finally {
@@ -178,12 +179,12 @@ class TimeshiftCommandDeviceAcceptanceTest {
         reportEvidence(
             fixture,
             "start",
-            startResult?.name ?: "null",
+            startResult?.toString() ?: "null",
             runtime,
             null,
             ContinuityCounts(),
         )
-        assertTrue("$fixture live target did not start: $startResult", startResult == PlaybackTargetResult.STARTED)
+        assertTrue("$fixture live target did not start: $startResult", startResult?.isStarted == true)
         val timeshift = awaitTimeshift(runtime)
         reportEvidence(
             fixture,
@@ -205,8 +206,9 @@ class TimeshiftCommandDeviceAcceptanceTest {
 
     private suspend fun awaitTimeshift(runtime: AppPlaybackRuntime): LiveTimeshiftState.Available =
         withTimeout(STATE_TIMEOUT) {
-            runtime.timeshiftState.first { it is LiveTimeshiftState.Available }
-                as LiveTimeshiftState.Available
+            runtime.livePlaybackObservation
+                .first { it.timeshiftState is LiveTimeshiftState.Available }
+                .timeshiftState as LiveTimeshiftState.Available
         }
 
     private suspend fun awaitCurrentTarget(runtime: AppPlaybackRuntime, channel: Channel) {
@@ -217,7 +219,8 @@ class TimeshiftCommandDeviceAcceptanceTest {
 
     private suspend fun awaitServerPaused(runtime: AppPlaybackRuntime, paused: Boolean) {
         withTimeout(STATE_TIMEOUT) {
-            runtime.timeshiftState.first { state ->
+            runtime.livePlaybackObservation.first { observation ->
+                val state = observation.timeshiftState
                 state is LiveTimeshiftState.Available && state.serverPaused == paused
             }
         }
@@ -225,16 +228,18 @@ class TimeshiftCommandDeviceAcceptanceTest {
 
     private suspend fun awaitPositionBehindLive(runtime: AppPlaybackRuntime, minimumMillis: Long) {
         withTimeout(STATE_TIMEOUT) {
-            runtime.timeshiftState.first { state ->
-                state.positionBehindLiveMillisOrNull()?.let { it >= minimumMillis } == true
+            runtime.livePlaybackObservation.first { observation ->
+                observation.timeshiftState.positionBehindLiveMillisOrNull()
+                    ?.let { it >= minimumMillis } == true
             }
         }
     }
 
     private suspend fun awaitNearLive(runtime: AppPlaybackRuntime) {
         withTimeout(STATE_TIMEOUT) {
-            runtime.timeshiftState.first { state ->
-                state.positionBehindLiveMillisOrNull()?.let { it <= NEAR_LIVE_MILLIS } == true
+            runtime.livePlaybackObservation.first { observation ->
+                observation.timeshiftState.positionBehindLiveMillisOrNull()
+                    ?.let { it <= NEAR_LIVE_MILLIS } == true
             }
         }
     }
@@ -274,8 +279,9 @@ class TimeshiftCommandDeviceAcceptanceTest {
     private suspend fun awaitMeasuredSeek(runtime: AppPlaybackRuntime): MeasuredSeek =
         withTimeout(BUFFER_HISTORY_TIMEOUT) {
             var measuredSeek: MeasuredSeek? = null
-            runtime.timeshiftState.first { state ->
-                val available = state as? LiveTimeshiftState.Available ?: return@first false
+            runtime.livePlaybackObservation.first { observation ->
+                val available = observation.timeshiftState as? LiveTimeshiftState.Available
+                    ?: return@first false
                 val bufferedMillis = available.bufferedDuration
                     ?.inWholeMilliseconds
                     ?: return@first false
@@ -308,6 +314,13 @@ class TimeshiftCommandDeviceAcceptanceTest {
         }
         assertTrue("$fixture continuity failures: ${failures.joinToString()}", failures.isEmpty())
     }
+
+    private val AppPlaybackRuntime.currentTimeshiftState: LiveTimeshiftState
+        get() = livePlaybackObservation.value.timeshiftState
+
+    private val LivePlaybackObservation.timeshiftState: LiveTimeshiftState
+        get() = (this as? LivePlaybackObservation.Active)?.timeshiftState
+            ?: LiveTimeshiftState.Unavailable
 
     private suspend fun reportEvidence(
         fixture: String,

@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.debug
 
 import android.content.Context
-import at.bernhardberger.tvheadend.sdk.android.ServerProfileOperationResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import org.json.JSONObject
 import java.io.File
 
@@ -58,7 +58,7 @@ internal class TestCredentialProvisioner(private val context: Context) {
                     port = payload.htspPort,
                     username = payload.username,
                     password = payload.password,
-                ) == ServerProfileOperationResult.SUCCESS,
+                ) is ServerProfileReadResult.Available,
             )
             result = "ok"
         } finally {

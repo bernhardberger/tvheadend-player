@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.TimeshiftSeekQueueState
@@ -160,7 +161,8 @@ internal class LiveTimelinePresentationState(
                         ?.takeIf { it.token == dispatchToken }
                         ?.copy(dispatched = true)
 
-                    val accepted = seekRelative(dispatch.deltaMs) == TimeshiftCommandResult.ACCEPTED
+                    val result = seekRelative(dispatch.deltaMs)
+                    val accepted = result.disposition == TimeshiftCommandDisposition.ACCEPTED
                     generation.seekQueue = completeTimeshiftSeekDispatch(
                         generation.seekQueue,
                         accepted,
@@ -170,12 +172,12 @@ internal class LiveTimelinePresentationState(
                         generation.preview?.token == dispatchToken &&
                         dispatchFeedbackToken == generation.feedbackToken
                     ) {
-                        generation.feedback = if (accepted) {
-                            clampedText.takeIf {
+                        generation.feedback = when (result.disposition) {
+                            TimeshiftCommandDisposition.ACCEPTED -> clampedText.takeIf {
                                 generation.preview?.decision?.clamped == true
                             }
-                        } else {
-                            unavailableText
+                            TimeshiftCommandDisposition.NOT_ACCEPTED -> unavailableText
+                            TimeshiftCommandDisposition.UNCONFIRMED -> null
                         }
                         generation.seekFeedbackJob?.cancel()
                         generation.seekFeedbackJob = scope.launch {

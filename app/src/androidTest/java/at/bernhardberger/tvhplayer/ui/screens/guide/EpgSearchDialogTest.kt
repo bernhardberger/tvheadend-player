@@ -12,10 +12,16 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.espresso.Espresso.pressBack
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionGenerationTestAuthority
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
@@ -27,6 +33,20 @@ import org.junit.Test
 class EpgSearchDialogTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @OptIn(TvheadendTestingApi::class)
+    private val originatingSession = requireNotNull(
+        SessionGenerationTestAuthority(
+            SessionObservation.create(
+                sessionState = SessionState.Ready(
+                    ServerCapabilities.create(
+                        streaming = CapabilityAccess.DENIED,
+                        dvrWrite = CapabilityAccess.DENIED,
+                    ),
+                ),
+            ),
+        ).observation.value.currentSession,
+    )
 
     @Test
     fun initialFocusAndBackUnwindEditingBeforeDismissingSearch() {
@@ -72,7 +92,10 @@ class EpgSearchDialogTest {
                 EpgSearchDialog(
                     contentPadding = PaddingValues(),
                     query = "News",
-                    result = EpgSearchResult.Available.create(listOf(event)),
+                    result = EpgSearchResult.Available.create(
+                        events = listOf(event),
+                        originatingSession = originatingSession,
+                    ),
                     searching = false,
                     searchEnabled = true,
                     channelName = { "Channel 7" },
@@ -106,7 +129,10 @@ class EpgSearchDialogTest {
                 EpgSearchDialog(
                     contentPadding = PaddingValues(),
                     query = "News",
-                    result = EpgSearchResult.Available.create(listOf(event)),
+                    result = EpgSearchResult.Available.create(
+                        events = listOf(event),
+                        originatingSession = originatingSession,
+                    ),
                     searching = false,
                     searchEnabled = true,
                     channelName = { "Channel 7" },
@@ -177,7 +203,10 @@ class EpgSearchDialogTest {
                 EpgSearchDialog(
                     contentPadding = PaddingValues(),
                     query = "News",
-                    result = EpgSearchResult.Available.create(listOf(event)),
+                    result = EpgSearchResult.Available.create(
+                        events = listOf(event),
+                        originatingSession = originatingSession,
+                    ),
                     searching = false,
                     searchEnabled = false,
                     channelName = { "Channel 7" },

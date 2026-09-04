@@ -56,6 +56,8 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
+import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -239,7 +241,11 @@ fun EpgGridScreen(
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
     val activePlaybackTarget by playerSession.activeTarget.collectAsStateWithLifecycle()
     val playingChannelId = (activePlaybackTarget as? AppPlaybackTarget.Live)?.channelId
-    val sdkTimeshiftState by playerSession.timeshiftState.collectAsStateWithLifecycle()
+    val livePlaybackObservation by
+        playerSession.livePlaybackObservation.collectAsStateWithLifecycle()
+    val sdkTimeshiftState =
+        (livePlaybackObservation as? LivePlaybackObservation.Active)?.timeshiftState
+            ?: LiveTimeshiftState.Unavailable
     val timeshiftState = sdkTimeshiftState.toAppPresentation()
     val dvrEntries = observation.dvrEntries()
     val channelListState = rememberLazyListState()

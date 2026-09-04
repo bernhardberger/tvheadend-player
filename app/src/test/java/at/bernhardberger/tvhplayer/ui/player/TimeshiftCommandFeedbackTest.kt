@@ -76,6 +76,25 @@ class TimeshiftCommandFeedbackTest {
     }
 
     @Test
+    fun currentUnconfirmedCommandWaitsForObservedStateWithoutRollback() {
+        val completion = requireNotNull(
+            timeshiftCommandCompletion(
+                commandToken = 3,
+                currentToken = 3,
+                feedbackToken = 3,
+                currentFeedbackToken = 3,
+                result = TimeshiftCommandResult.TIMEOUT,
+                unavailableText = "unavailable",
+                rollbackPlayWhenReady = true,
+            ),
+        )
+
+        assertNull(completion.feedback)
+        assertTrue(completion.applyFeedback)
+        assertNull(completion.rollbackPlayWhenReady)
+    }
+
+    @Test
     fun newerSeekSuppressesPauseFeedbackButNotRejectedPauseRollback() {
         val completion = requireNotNull(
             timeshiftCommandCompletion(

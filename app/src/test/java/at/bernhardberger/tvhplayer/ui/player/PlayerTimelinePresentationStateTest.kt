@@ -107,6 +107,33 @@ class PlayerTimelinePresentationStateTest {
     }
 
     @Test
+    fun unconfirmedSeekDoesNotProjectAnUnobservedServerPosition() = runTest {
+        val state = LiveTimelinePresentationState(
+            scope = this,
+            currentEpochMillis = { 5_400_000L },
+            monotonicTimeMillis = { testScheduler.currentTime },
+        )
+        val timeshift = AppTimeshiftState(
+            available = true,
+            bufferStartMs = -600_000L,
+            positionMs = -60_000L,
+            liveEdgeMs = 0L,
+        )
+
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped") {
+            TimeshiftCommandResult.TIMEOUT
+        }
+        advanceTimeBy(400L)
+        runCurrent()
+
+        assertNull(state.feedback)
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped") {
+            TimeshiftCommandResult.ACCEPTED
+        }
+        assertEquals(-90_000L, state.preview?.decision?.targetMs)
+    }
+
+    @Test
     fun liveTimelineCancellationAndDisposalDoNotDispatchPendingSeek() = runTest {
         val dispatches = mutableListOf<Long>()
         val state = LiveTimelinePresentationState(

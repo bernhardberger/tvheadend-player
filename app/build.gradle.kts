@@ -240,7 +240,7 @@ tasks.register("verifyExternalSdkConsumption") {
     }
 
     doLast {
-        check(sdkVersion == "0.4.0") { "Expected public SDK 0.4.0 but found $sdkVersion" }
+        check(sdkVersion == "0.5.0") { "Expected public SDK 0.5.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             "implementation:sdk-android:$sdkVersion",
             "implementation:sdk-media3:$sdkVersion",

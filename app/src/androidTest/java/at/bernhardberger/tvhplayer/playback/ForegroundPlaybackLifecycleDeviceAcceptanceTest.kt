@@ -18,6 +18,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
@@ -315,7 +316,10 @@ class ForegroundPlaybackLifecycleDeviceAcceptanceTest {
             runtime.activeTarget.first { it == null }
         }
         withTimeout(STATE_TIMEOUT) {
-            runtime.timeshiftState.first { it == LiveTimeshiftState.Unavailable }
+            runtime.livePlaybackObservation.first { observation ->
+                observation !is LivePlaybackObservation.Active ||
+                    observation.timeshiftState == LiveTimeshiftState.Unavailable
+            }
         }
         val sample = playerSample(runtime)
         assertFalse("live player remained audible after HOME", sample.isPlaying)

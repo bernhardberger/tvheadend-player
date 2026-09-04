@@ -25,7 +25,10 @@ class EpgSearchActionsTest {
     fun dispatchesReleasedTypedFullTextRequestForActiveTag() = runTest {
         val capability = currentSession()
         val tagId = ChannelTagId(12)
-        val expected = EpgSearchResult.Available.create(emptyList())
+        val expected = EpgSearchResult.Available.create(
+            events = emptyList(),
+            originatingSession = capability,
+        )
         var dispatchedCapability: CurrentSessionObservation? = null
         var dispatchedRequest: EpgSearchRequest? = null
         val actions = EpgSearchActions { currentSession, request ->

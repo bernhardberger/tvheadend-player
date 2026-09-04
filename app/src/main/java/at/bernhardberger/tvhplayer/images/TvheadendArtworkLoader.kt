@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.images
 
 import android.content.Context
 import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
-import at.bernhardberger.tvheadend.sdk.android.createTvheadendArtworkFetcherFactory
+import at.bernhardberger.tvheadend.sdk.android.addTvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import coil3.ImageLoader
@@ -22,7 +22,7 @@ fun buildImageLoader(context: Context, session: TvheadendSession): ImageLoader =
     ImageLoader.Builder(context)
         .components {
             add(AppArtworkMapper(session))
-            add(createTvheadendArtworkFetcherFactory())
+            addTvheadendArtwork()
         }
         .diskCache {
             DiskCache.Builder()

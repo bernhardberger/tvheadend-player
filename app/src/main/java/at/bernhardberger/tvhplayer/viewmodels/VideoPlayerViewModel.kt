@@ -30,8 +30,7 @@ class VideoPlayerViewModel(
     val playingLiveChannelId = playbackRuntime.activeTarget
         .map { (it as? AppPlaybackTarget.Live)?.channelId }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
-    val timeshiftState = playbackRuntime.timeshiftState
-    val liveSubscriptionFailure = playbackRuntime.livePlaybackIssue
+    val livePlaybackObservation = playbackRuntime.livePlaybackObservation
     val diagnostics = playbackRuntime.diagnostics
 
     fun getPlayerInstance() = playbackRuntime.player

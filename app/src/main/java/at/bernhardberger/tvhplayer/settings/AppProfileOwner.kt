@@ -1,12 +1,11 @@
 package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
-import at.bernhardberger.tvheadend.sdk.android.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
-import at.bernhardberger.tvheadend.sdk.android.ServerProfileOperationResult
-import at.bernhardberger.tvheadend.sdk.android.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -202,14 +201,10 @@ class AppProfileOwner internal constructor(
 
     private suspend fun commitServer(host: String, htspPort: Int) = serverMutex.withLock {
         mutableServerProfile.value = null
-        val operation = profileStore.storeAnonymous(host, htspPort)
-        val readback = profileStore.loadProfile()
-        val verified =
-            operation == ServerProfileOperationResult.SUCCESS &&
-                readback.matchesEndpoint(host, htspPort, ServerProfileAuthenticationMode.ANONYMOUS)
-        check(verified)
+        val profile = profileStore.storeAnonymous(host, htspPort)
+        check(profile is ServerProfileReadResult.Available)
         clearLegacyProfileMaterial()
-        applyServerProfile(readback)
+        applyServerProfile(profile)
     }
 
     private suspend fun commitPasswordServer(
@@ -219,26 +214,18 @@ class AppProfileOwner internal constructor(
         password: String,
     ) = serverMutex.withLock {
         mutableServerProfile.value = null
-        val operation = profileStore.storePassword(host, htspPort, username, password)
-        val readback = profileStore.loadProfile()
-        val verified =
-            operation == ServerProfileOperationResult.SUCCESS &&
-                readback.matchesEndpoint(host, htspPort, ServerProfileAuthenticationMode.PASSWORD)
-        check(verified)
+        val profile = profileStore.storePassword(host, htspPort, username, password)
+        check(profile is ServerProfileReadResult.Available)
         clearLegacyProfileMaterial()
-        applyServerProfile(readback)
+        applyServerProfile(profile)
     }
 
     private suspend fun clearServerProfile() = serverMutex.withLock {
         mutableServerProfile.value = null
-        val operation = profileStore.clearProfile()
-        val readback = profileStore.loadProfile()
-        val verified =
-            operation == ServerProfileOperationResult.SUCCESS &&
-                readback == ServerProfileReadResult.Missing
-        check(verified)
+        val profile = profileStore.clearProfile()
+        check(profile == ServerProfileReadResult.Missing)
         clearLegacyProfileMaterial()
-        applyServerProfile(readback)
+        applyServerProfile(profile)
     }
 
     private suspend fun commitStreamProfileSelection(
@@ -366,7 +353,7 @@ class AppProfileOwner internal constructor(
         val legacy = context.loadLegacyServerProfile(legacyCredentials::loadPassword)
             ?.normalizedForMigration()
             ?: return current
-        val operation = when (val password = legacy.password) {
+        val migrated = when (val password = legacy.password) {
             LegacyPassword.Empty -> profileStore.storeAnonymous(legacy.host, legacy.port)
             is LegacyPassword.Available -> profileStore.storePassword(
                 legacy.host,
@@ -376,11 +363,10 @@ class AppProfileOwner internal constructor(
             )
             LegacyPassword.Unavailable -> return current
         }
-        val readback = profileStore.loadProfile()
-        if (operation == ServerProfileOperationResult.SUCCESS && readback.matchesLegacyProfile(legacy)) {
+        if (migrated.matchesLegacyProfile(legacy)) {
             clearLegacyProfileMaterial()
         }
-        return readback
+        return migrated
     }
 
     private suspend fun clearLegacyProfileMaterial() {
@@ -461,15 +447,6 @@ internal fun ServerProfileReadResult.matchesLegacyProfile(legacy: LegacyServerPr
         } else {
             ServerProfileAuthenticationMode.ANONYMOUS
         }
-
-private fun ServerProfileReadResult.matchesEndpoint(
-    host: String,
-    port: Int,
-    authenticationMode: ServerProfileAuthenticationMode,
-): Boolean = this is ServerProfileReadResult.Available &&
-    this.host == host.trim() &&
-    this.port == port &&
-    this.authenticationMode == authenticationMode
 
 private fun ServerProfileReadResult.toServerSettings(): ServerSettings = when (this) {
     is ServerProfileReadResult.Available -> serverSettingsForEditing(

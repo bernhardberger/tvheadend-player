@@ -18,6 +18,11 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
+import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionSource
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -47,48 +52,6 @@ class AppPlaybackRuntimeTest {
     @Test
     fun disabledTimeshiftRequestsNoPeriod() {
         assertEquals(Duration.ZERO, requestedLiveTimeshiftPeriod(timeshiftEnabled = false))
-    }
-
-    @Test
-    fun liveTargetSetsAppOwnedPlayIntentBeforeCoordinatorInstall() = runTest {
-        val events = mutableListOf<String>()
-        val targetInstalled = CompletableDeferred<PlaybackTargetResult>()
-
-        val result = async {
-            requestBoundLiveTarget(
-                requestPlayIntent = {
-                    events += "play"
-                    true
-                },
-                installTarget = {
-                    events += "install"
-                    targetInstalled.await()
-                },
-            )
-        }
-        runCurrent()
-
-        assertEquals(listOf("play", "install"), events)
-        assertFalse(result.isCompleted)
-        targetInstalled.complete(PlaybackTargetResult.STARTED)
-        assertEquals(PlaybackTargetResult.STARTED, result.await())
-    }
-
-    @Test
-    fun detachedLiveTargetDoesNotInstallAfterPlayIntentIsFenced() = runTest {
-        var installs = 0
-
-        assertEquals(
-            PlaybackTargetResult.SHUT_DOWN,
-            requestBoundLiveTarget(
-                requestPlayIntent = { false },
-                installTarget = {
-                    installs += 1
-                    PlaybackTargetResult.STARTED
-                },
-            ),
-        )
-        assertEquals(0, installs)
     }
 
     @Test
@@ -511,6 +474,69 @@ class AppPlaybackRuntimeTest {
         assertEquals(healthyTarget, activeTarget)
         assertEquals(AppPlaybackState.Playing, state)
         assertEquals(AppVideoPresentation(epoch = 31L, visible = true), presentation)
+    }
+
+    @Test
+    fun failedTargetStatePreservesTheSdkOutcomeAndItsStableCategories() {
+        val result = PlaybackTargetResult.GROWING_RECORDING_DEFERRED
+        val state = AppPlaybackState.Failed(
+            reason = AppPlaybackFailureReason.OTHER,
+            targetResult = result,
+        )
+
+        assertSame(result, state.targetResult)
+        assertTrue(requireNotNull(state.targetResult).isTransient)
+        assertTrue(requireNotNull(state.targetResult).isUnsupported)
+    }
+
+    @Test
+    fun orderedServerPauseReconcilesOnlyAnActiveLiveTarget() {
+        val liveTarget = AppPlaybackTarget.Live(ChannelId(23))
+
+        assertEquals(false, observedLivePlayIntent(liveTarget, serverPaused = true))
+        assertEquals(true, observedLivePlayIntent(liveTarget, serverPaused = false))
+        assertNull(observedLivePlayIntent(liveTarget, serverPaused = null))
+        assertNull(
+            observedLivePlayIntent(
+                AppPlaybackTarget.Recording(DvrEntryId(29)),
+                serverPaused = true,
+            ),
+        )
+    }
+
+    @OptIn(SubscriptionInfrastructureApi::class)
+    @Test
+    fun liveDiagnosticsAreExcludedFromNonLiveTargets() {
+        val diagnostics = requireNotNull(
+            LiveSubscriptionDiagnostics.update(
+                previous = null,
+                event = SubscriptionEvent.Started(
+                    streams = null,
+                    codecMetadata = null,
+                    condition = SubscriptionCondition.NO_DETAIL,
+                    issue = null,
+                    source = LiveSubscriptionSource.create(
+                        adapterName = "DVB adapter",
+                        muxName = null,
+                        networkName = null,
+                        providerName = null,
+                        serviceName = null,
+                    ),
+                ),
+            ),
+        )
+
+        assertSame(
+            diagnostics,
+            liveDiagnosticsForTarget(AppPlaybackTarget.Live(ChannelId(31)), diagnostics),
+        )
+        assertNull(
+            liveDiagnosticsForTarget(
+                AppPlaybackTarget.Recording(DvrEntryId(37)),
+                diagnostics,
+            ),
+        )
+        assertNull(liveDiagnosticsForTarget(activeTarget = null, diagnostics))
     }
 
     @Test

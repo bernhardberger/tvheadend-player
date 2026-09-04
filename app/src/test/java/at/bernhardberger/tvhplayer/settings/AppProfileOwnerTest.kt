@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
 import android.content.ContextWrapper
-import at.bernhardberger.tvheadend.sdk.android.ServerProfileReadResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.ArtworkLoader
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -61,7 +61,9 @@ class AppProfileOwnerTest {
     fun cancelledPendingPasswordSaveReleasesCredentialLease() = runTest {
         val session = ProfileSession(
             FakeSessionObservation(currentObservation("server")).observation,
-        ) { available(StreamProfileId("11111111111111111111111111111111")) }
+        ) { currentSession ->
+            available(StreamProfileId("11111111111111111111111111111111"), currentSession)
+        }
         val owner = profileOwner(
             session,
             PlayerSettingsStore(InMemoryPreferencesDataStore()),
@@ -90,7 +92,9 @@ class AppProfileOwnerTest {
     fun failedAcceptedPasswordSaveReleasesCredentialLease() = runTest {
         val session = ProfileSession(
             FakeSessionObservation(currentObservation("server")).observation,
-        ) { available(StreamProfileId("11111111111111111111111111111111")) }
+        ) { currentSession ->
+            available(StreamProfileId("11111111111111111111111111111111"), currentSession)
+        }
         val owner = profileOwner(
             session,
             PlayerSettingsStore(InMemoryPreferencesDataStore()),
@@ -121,10 +125,10 @@ class AppProfileOwnerTest {
         val discoveryStarted = CompletableDeferred<Unit>()
         val releaseDiscovery = CompletableDeferred<Unit>()
         val observations = FakeSessionObservation(currentObservation("server"))
-        val session = ProfileSession(observations.observation) {
+        val session = ProfileSession(observations.observation) { currentSession ->
             discoveryStarted.complete(Unit)
             releaseDiscovery.await()
-            available(selectedId)
+            available(selectedId, currentSession)
         }
         val dataStore = InMemoryPreferencesDataStore(
             initial = preferencesOf(stringPreferencesKey("profileUuid") to selectedId.value),
@@ -158,8 +162,8 @@ class AppProfileOwnerTest {
         val releaseSelectionUpdate = CompletableDeferred<Unit>()
         val observations = FakeSessionObservation(currentObservation("server"))
         val currentSession = checkNotNull(observations.observation.value.currentSession)
-        val session = ProfileSession(observations.observation) {
-            available(StreamProfileId("11111111111111111111111111111111"))
+        val session = ProfileSession(observations.observation) { originatingSession ->
+            available(StreamProfileId("11111111111111111111111111111111"), originatingSession)
         }
         val dataStore = InMemoryPreferencesDataStore(beforeUpdate = {
             selectionUpdateStarted.complete(Unit)
@@ -196,10 +200,10 @@ class AppProfileOwnerTest {
         val releaseDiscovery = CompletableDeferred<Unit>()
         val observations = FakeSessionObservation(currentObservation("server"))
         val currentSession = checkNotNull(observations.observation.value.currentSession)
-        val session = ProfileSession(observations.observation) {
+        val session = ProfileSession(observations.observation) { originatingSession ->
             discoveryStarted.complete(Unit)
             releaseDiscovery.await()
-            available(StreamProfileId("11111111111111111111111111111111"))
+            available(StreamProfileId("11111111111111111111111111111111"), originatingSession)
         }
         val owner = profileOwner(
             session,
@@ -231,17 +235,20 @@ class AppProfileOwnerTest {
         val secondId = StreamProfileId("22222222222222222222222222222222")
         var discoveries = 0
         var settingsUpdates = 0
-        val session = ProfileSession(observations.observation) {
+        val session = ProfileSession(observations.observation) { originatingSession ->
             assertSame(ioDispatcher, currentCoroutineContext()[ContinuationInterceptor])
             discoveries += 1
             if (discoveries == 1) {
                 withContext(NonCancellable) {
                     firstStarted.complete(Unit)
                     releaseFirst.await()
-                    available(StreamProfileId("11111111111111111111111111111111"))
+                    available(
+                        StreamProfileId("11111111111111111111111111111111"),
+                        originatingSession,
+                    )
                 }
             } else {
-                available(secondId)
+                available(secondId, originatingSession)
             }
         }
         val dataStore = InMemoryPreferencesDataStore(beforeUpdate = {
@@ -304,8 +311,8 @@ class AppProfileOwnerTest {
             },
         )
         val observations = FakeSessionObservation(currentObservation("old"))
-        val session = ProfileSession(observations.observation) {
-            available(StreamProfileId("11111111111111111111111111111111"))
+        val session = ProfileSession(observations.observation) { currentSession ->
+            available(StreamProfileId("11111111111111111111111111111111"), currentSession)
         }
         val owner = profileOwner(
             session,
@@ -372,8 +379,13 @@ class AppProfileOwnerTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )
 
-    private fun available(id: StreamProfileId): StreamProfilesResult.Available =
-        StreamProfilesResult.Available.create(listOf(StreamProfile(id, "profile", "")))
+    private fun available(
+        id: StreamProfileId,
+        originatingSession: CurrentSessionObservation,
+    ): StreamProfilesResult.Available = StreamProfilesResult.Available.create(
+        profiles = listOf(StreamProfile(id, "profile", "")),
+        originatingSession = originatingSession,
+    )
 }
 
 private class ProfileSession(

@@ -24,6 +24,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvheadend.sdk.playback.LiveFrontendState
+import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
+import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionSource
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
@@ -42,7 +48,10 @@ class PlaybackStatsOverlayTest {
 
     @Test
     fun maximumCanonicalPayloadFitsInside960x540AndKeepsHeadings() {
-        setStats(locale = Locale.GERMAN)
+        setStats(
+            locale = Locale.GERMAN,
+            diagnostics = maximumDiagnostics.copy(live = maximumLiveDiagnostics),
+        )
 
         val surface = bounds("stats-test-surface")
         val overlay = bounds("playback-stats-overlay")
@@ -63,11 +72,23 @@ class PlaybackStatsOverlayTest {
             SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading),
         )
         composeRule.onNodeWithText("Source").assertIsDisplayed()
-        composeRule.onNodeWithText("Tuner").assertDoesNotExist()
-        composeRule.onNodeWithText("Server queue").assertDoesNotExist()
+        composeRule.onNodeWithText("Tuner").assertIsDisplayed()
+        composeRule.onNodeWithText("TVHeadend queue").assertIsDisplayed()
+        composeRule.onNodeWithText("DVB-T Adapter", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("75.0%", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("250.0 ms").assertIsDisplayed()
+        composeRule.onNodeWithText("admin:secret", substring = true).assertDoesNotExist()
         composeRule.onNodeWithTag("playback-stats-overlay")
             .assertHasNoClickAction()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+    }
+
+    @Test
+    fun absentLiveDiagnosticsOmitTunerAndQueueSections() {
+        setStats(locale = Locale.GERMAN)
+
+        composeRule.onNodeWithText("Tuner").assertDoesNotExist()
+        composeRule.onNodeWithText("TVHeadend queue").assertDoesNotExist()
     }
 
     @Test
@@ -177,4 +198,55 @@ class PlaybackStatsOverlayTest {
             sampleRateHz = 192_000,
         ),
     )
+
+    @OptIn(SubscriptionInfrastructureApi::class)
+    private val maximumLiveDiagnostics: LiveSubscriptionDiagnostics = run {
+        val source = LiveSubscriptionSource.create(
+            adapterName = "DVB-T Adapter",
+            muxName = "https://admin:secret@example.test/mux",
+            networkName = null,
+            providerName = null,
+            serviceName = null,
+        )
+        var diagnostics = LiveSubscriptionDiagnostics.update(
+            previous = null,
+            event = SubscriptionEvent.Started(
+                streams = null,
+                codecMetadata = null,
+                condition = SubscriptionCondition.NO_DETAIL,
+                issue = null,
+                source = source,
+            ),
+        )
+        diagnostics = LiveSubscriptionDiagnostics.update(
+            previous = diagnostics,
+            event = SubscriptionEvent.Signal(
+                relativeSnr = 49_152L,
+                absoluteSnr = 31_250L,
+                relativeSignal = 49_152L,
+                absoluteSignal = -63_500L,
+                bitErrorRate = 42L,
+                uncorrectedBlockCount = 7L,
+                frontendStatusReported = true,
+                frontendState = LiveFrontendState.create(
+                    signalDetected = true,
+                    partiallySynchronized = true,
+                    locked = true,
+                ),
+            ),
+        )
+        requireNotNull(
+            LiveSubscriptionDiagnostics.update(
+                previous = diagnostics,
+                event = SubscriptionEvent.Queue(
+                    packetCount = 1_500L,
+                    byteCount = 2_000_000L,
+                    delay = 250_000L,
+                    bFrameDropCount = 4L,
+                    pFrameDropCount = 3L,
+                    iFrameDropCount = 2L,
+                ),
+            ),
+        )
+    }
 }

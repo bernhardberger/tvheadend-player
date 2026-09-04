@@ -17,10 +17,10 @@ CHECKER = runpy.run_path(str(CHECKER_PATH), run_name="native_checker_test")
 
 class NativePublicationEvidenceTest(unittest.TestCase):
     def test_public_release_bytes_and_corresponding_sources_are_pinned(self) -> None:
-        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.4.0")
+        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.5.0")
         self.assertEqual(
             CHECKER["EXPECTED_AAR_SHA256"],
-            "c162c6e6a08078af9823e3db4c43e229cb7ef861cfcb4bab050398d8742bd826",
+            "ed844d4912fc981a17c4b513a09e99477073a944bbd4d2eddac0b064501c3cf5",
         )
         self.assertEqual(
             CHECKER["EXPECTED_FFMPEG_SOURCES_SHA256"],
@@ -30,14 +30,14 @@ class NativePublicationEvidenceTest(unittest.TestCase):
         self.assertEqual(
             CHECKER["EXPECTED_STANDARD_SOURCE_SHA256"],
             {
-                "sdk-android-0.4.0-sources.jar":
-                    "a3b4ec913b611f536f89b66dd16445307bf71c07ec116c7b69ddf358b0c7edb0",
-                "sdk-core-0.4.0-sources.jar":
-                    "2fb0b821aa60aef7974554a581928f5fcb53cec3783b310fbd178cd97d8fb254",
-                "sdk-media3-0.4.0-sources.jar":
-                    "82753388fe681c0b3ee3c59fba08ca8e22cd2ef8455bf1848e1d36e6e078b475",
-                "sdk-playback-0.4.0-sources.jar":
-                    "cab46ff691302d24ea8192631a9b1a131e5009cd9ac3b709013bb24c0eed9a26",
+                "sdk-android-0.5.0-sources.jar":
+                    "3657dc308898f850d735ee662480ec9b1ce177de722b10f7504676e4640a477a",
+                "sdk-core-0.5.0-sources.jar":
+                    "4eafd18aa1bed8b1fd8c428c08f7fb69cecfbae5fa1a8ecca0df02486237f040",
+                "sdk-media3-0.5.0-sources.jar":
+                    "5e91717eca487fb598906c08e7ccf70b3fd877def355dc4f327a8e9982c30fc2",
+                "sdk-playback-0.5.0-sources.jar":
+                    "66488d1dbd40d2e1d8aff19c00499d7b4252795bac1fb5fd6d0f4550f7c6e4c6",
             },
         )
 

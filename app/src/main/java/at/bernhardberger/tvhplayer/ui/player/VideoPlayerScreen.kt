@@ -99,8 +99,12 @@ import at.bernhardberger.tvhplayer.core.liveInfoRecordingDismissed
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
+import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssueCategory
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
@@ -135,7 +139,8 @@ import org.koin.compose.koinInject
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 
-private fun SubscriptionIssue.messageResource(): Int = when (this) {
+internal fun SubscriptionIssue.messageResource(): Int = when (this) {
+    SubscriptionIssue.NO_INPUT -> R.string.tvh_no_input
     SubscriptionIssue.INVALID_TARGET -> R.string.tvh_target_invalid
     SubscriptionIssue.NO_FREE_ADAPTER -> R.string.tvh_no_free_adapter
     SubscriptionIssue.MUX_NOT_ENABLED -> R.string.tvh_mux_not_enabled
@@ -145,9 +150,13 @@ private fun SubscriptionIssue.messageResource(): Int = when (this) {
     SubscriptionIssue.SUBSCRIPTION_OVERRIDDEN -> R.string.tvh_subscription_overridden
     SubscriptionIssue.USER_ACCESS,
     SubscriptionIssue.USER_LIMIT,
-    SubscriptionIssue.NO_DISK_SPACE,
-    SubscriptionIssue.UNKNOWN -> R.string.player_playback_failed
+    SubscriptionIssue.NO_DISK_SPACE -> R.string.player_playback_failed
     SubscriptionIssue.WEAK_STREAM -> R.string.tvh_bad_signal
+    else -> if (category == SubscriptionIssueCategory.INPUT_OR_SIGNAL) {
+        R.string.tvh_bad_signal
+    } else {
+        R.string.player_playback_failed
+    }
 }
 
 internal data class TimeshiftCommandCompletion(
@@ -166,11 +175,11 @@ internal fun timeshiftCommandCompletion(
     rollbackPlayWhenReady: Boolean?,
 ): TimeshiftCommandCompletion? {
     if (commandToken != currentToken) return null
-    val accepted = result == TimeshiftCommandResult.ACCEPTED
+    val rejected = result.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED
     return TimeshiftCommandCompletion(
-        feedback = unavailableText.takeUnless { accepted },
+        feedback = unavailableText.takeIf { rejected },
         applyFeedback = feedbackToken == currentFeedbackToken,
-        rollbackPlayWhenReady = if (accepted) null else rollbackPlayWhenReady,
+        rollbackPlayWhenReady = rollbackPlayWhenReady.takeIf { rejected },
     )
 }
 
@@ -252,9 +261,11 @@ fun VideoPlayerScreen(
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
     val playingLiveChannelId by
         videoPlayerViewModel.playingLiveChannelId.collectAsStateWithLifecycle()
-    val sdkTimeshiftState by videoPlayerViewModel.timeshiftState.collectAsStateWithLifecycle()
-    val subscriptionFailure by
-        videoPlayerViewModel.liveSubscriptionFailure.collectAsStateWithLifecycle()
+    val livePlaybackObservation by
+        videoPlayerViewModel.livePlaybackObservation.collectAsStateWithLifecycle()
+    val activeLivePlayback = livePlaybackObservation as? LivePlaybackObservation.Active
+    val sdkTimeshiftState = activeLivePlayback?.timeshiftState ?: LiveTimeshiftState.Unavailable
+    val subscriptionFailure = activeLivePlayback?.subscriptionIssue
     val diagnostics by videoPlayerViewModel.diagnostics.collectAsStateWithLifecycle()
     val effectiveTimeshiftState = if (
         timeshiftAllowed
@@ -393,7 +404,7 @@ fun VideoPlayerScreen(
             startPlayback = { videoPlayerViewModel.playChannel(playbackSelection) },
             onResolved = { result ->
                 initialPlaybackResolved = true
-                if (result == PlaybackTargetResult.STARTED) {
+                if (result?.isStarted == true) {
                     lastPlayedChannelId = currentChannelId
                     requestedLiveSelection = null
                 }
@@ -1017,7 +1028,7 @@ fun VideoPlayerScreen(
                     scope.launch {
                         val result = videoPlayerViewModel.goLive()
                         if (commandToken != timeshiftCommandToken) return@launch
-                        val resumeResult = if (result == TimeshiftCommandResult.ACCEPTED) {
+                        val resumeResult = if (result.isAccepted) {
                             videoPlayerViewModel.resumeTimeshift()
                         } else {
                             result
@@ -1034,7 +1045,7 @@ fun VideoPlayerScreen(
                         if (completion.applyFeedback) {
                             timelineState.applyFeedback(feedbackToken, completion.feedback)
                         }
-                        if (resumeResult == TimeshiftCommandResult.ACCEPTED) {
+                        if (resumeResult.isAccepted) {
                             videoPlayerViewModel.play()
                         }
                     }
