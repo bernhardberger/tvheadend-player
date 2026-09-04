@@ -16,6 +16,7 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import kotlin.time.Duration
@@ -55,7 +56,10 @@ class AppPlaybackRuntimeTest {
 
         val result = async {
             requestBoundLiveTarget(
-                requestPlayIntent = { events += "play" },
+                requestPlayIntent = {
+                    events += "play"
+                    true
+                },
                 installTarget = {
                     events += "install"
                     targetInstalled.await()
@@ -68,6 +72,23 @@ class AppPlaybackRuntimeTest {
         assertFalse(result.isCompleted)
         targetInstalled.complete(PlaybackTargetResult.STARTED)
         assertEquals(PlaybackTargetResult.STARTED, result.await())
+    }
+
+    @Test
+    fun detachedLiveTargetDoesNotInstallAfterPlayIntentIsFenced() = runTest {
+        var installs = 0
+
+        assertEquals(
+            PlaybackTargetResult.SHUT_DOWN,
+            requestBoundLiveTarget(
+                requestPlayIntent = { false },
+                installTarget = {
+                    installs += 1
+                    PlaybackTargetResult.STARTED
+                },
+            ),
+        )
+        assertEquals(0, installs)
     }
 
     @Test
@@ -179,8 +200,14 @@ class AppPlaybackRuntimeTest {
 
     @Test
     fun liveRecoveryFenceRejectsARecordingReplacement() {
+        val channel = Channel.create(id = ChannelId(7), name = "Seven")
+        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
         val fence = LiveRecoveryFence(
-            target = AppPlaybackTarget.Live(ChannelId(7)),
+            reason = PlaybackRecoveryReason.LIVE_ENDED,
+            selection = LivePlaybackSelection(
+                currentSession = observations.captureCurrentSession(),
+                channelId = channel.id,
+            ),
             targetEpoch = 20L,
         )
 
@@ -188,15 +215,21 @@ class AppPlaybackRuntimeTest {
             fence.matches(
                 activeTarget = AppPlaybackTarget.Recording(DvrEntryId(9)),
                 activeTargetEpoch = 21L,
-                selectionChannelId = ChannelId(7),
+                observation = observations.observation.value,
             ),
         )
     }
 
     @Test
     fun liveRecoveryFenceRejectsANewerLiveTarget() {
+        val channel = Channel.create(id = ChannelId(11), name = "Eleven")
+        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
         val fence = LiveRecoveryFence(
-            target = AppPlaybackTarget.Live(ChannelId(11)),
+            reason = PlaybackRecoveryReason.LIVE_ENDED,
+            selection = LivePlaybackSelection(
+                currentSession = observations.captureCurrentSession(),
+                channelId = channel.id,
+            ),
             targetEpoch = 22L,
         )
 
@@ -204,30 +237,148 @@ class AppPlaybackRuntimeTest {
             fence.matches(
                 activeTarget = AppPlaybackTarget.Live(ChannelId(13)),
                 activeTargetEpoch = 23L,
-                selectionChannelId = ChannelId(13),
+                observation = observations.observation.value,
             ),
         )
     }
 
     @Test
-    fun liveRecoveryFenceAcceptsOnlyTheSameLiveTargetEpochAndSelection() {
-        val target = AppPlaybackTarget.Live(ChannelId(17))
-        val fence = LiveRecoveryFence(target = target, targetEpoch = 24L)
+    fun liveRecoveryFenceAcceptsOnlyTheSameTargetEpochGenerationAndReason() {
+        val channel = Channel.create(id = ChannelId(17), name = "Seventeen")
+        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val target = AppPlaybackTarget.Live(channel.id)
+        val selection = LivePlaybackSelection(
+            currentSession = observations.captureCurrentSession(),
+            channelId = channel.id,
+        )
+        val fence = LiveRecoveryFence(
+            reason = PlaybackRecoveryReason.AUDIO_RECOVERY_EXHAUSTED,
+            selection = selection,
+            targetEpoch = 24L,
+        )
 
         assertTrue(
             fence.matches(
                 activeTarget = target,
                 activeTargetEpoch = 24L,
-                selectionChannelId = ChannelId(17),
+                observation = observations.observation.value,
             ),
         )
+        assertEquals(PlaybackRecoveryReason.AUDIO_RECOVERY_EXHAUSTED, fence.reason)
+
+        observations.publish(currentObservation(channels = listOf(channel)))
         assertFalse(
             fence.matches(
                 activeTarget = target,
                 activeTargetEpoch = 24L,
-                selectionChannelId = ChannelId(19),
+                observation = observations.observation.value,
             ),
         )
+    }
+
+    @Test
+    fun ordinaryPlayerCallbacksPreserveRecoveringUntilItsAttemptResolves() {
+        val recovering = AppPlaybackState.Recovering(
+            reason = PlaybackRecoveryReason.LIVE_ENDED,
+            retryDelayMillis = 0L,
+        )
+
+        assertSame(
+            recovering,
+            playerReportedPlaybackState(
+                currentState = recovering,
+                recoveryAttemptInProgress = true,
+                playbackState = Player.STATE_IDLE,
+                isPlaying = false,
+            ),
+        )
+        assertSame(
+            recovering,
+            playerReportedPlaybackState(
+                currentState = recovering,
+                recoveryAttemptInProgress = true,
+                playbackState = Player.STATE_BUFFERING,
+                isPlaying = false,
+            ),
+        )
+        assertEquals(
+            AppPlaybackState.Starting,
+            playerReportedPlaybackState(
+                currentState = recovering,
+                recoveryAttemptInProgress = false,
+                playbackState = Player.STATE_BUFFERING,
+                isPlaying = false,
+            ),
+        )
+    }
+
+    @Test
+    fun failedRecoveryWithItsHealthyReadyTargetRepublishesAfterOwnershipClears() = runTest {
+        val channel = Channel.create(id = ChannelId(23), name = "Twenty-three")
+        val observations = FakeSessionObservation(currentObservation(channels = listOf(channel)))
+        val target = AppPlaybackTarget.Live(channel.id)
+        val fence = LiveRecoveryFence(
+            reason = PlaybackRecoveryReason.LIVE_ENDED,
+            selection = LivePlaybackSelection(
+                currentSession = observations.captureCurrentSession(),
+                channelId = channel.id,
+            ),
+            targetEpoch = 25L,
+        )
+        val recovering = AppPlaybackState.Recovering(
+            reason = fence.reason,
+            retryDelayMillis = 0L,
+        )
+        var state: AppPlaybackState = recovering
+        lateinit var recoveryAttempts: LiveRecoveryAttemptRunner
+        recoveryAttempts = LiveRecoveryAttemptRunner { resolvedFence, result ->
+            assertFalse(recoveryAttempts.inProgress)
+            if (shouldRepublishPlayerStateAfterRecovery(
+                    result = result,
+                    fence = resolvedFence,
+                    activeTarget = target,
+                    activeTargetEpoch = 25L,
+                    observation = observations.observation.value,
+                    healthyActiveTarget = target,
+                )
+            ) {
+                state = playerStateAfterRecoveryResolution(
+                    currentState = state,
+                    playbackState = Player.STATE_READY,
+                    isPlaying = false,
+                )
+            }
+        }
+
+        recoveryAttempts.run(fence) {
+            state = playerReportedPlaybackState(
+                currentState = state,
+                recoveryAttemptInProgress = recoveryAttempts.inProgress,
+                playbackState = Player.STATE_BUFFERING,
+                isPlaying = false,
+            )
+            assertSame(recovering, state)
+            PlaybackTargetResult.NOT_READY
+        }
+
+        assertEquals(AppPlaybackState.Starting, state)
+    }
+
+    @Test
+    fun recoveryCallbackIsQueuedOntoTheApplicationDispatcherWithItsReason() = runTest {
+        var observedReason: PlaybackRecoveryReason? = null
+
+        val recovery = dispatchPlaybackRecovery(
+            scope = this,
+            reason = PlaybackRecoveryReason.AUDIO_RECOVERY_EXHAUSTED,
+        ) { reason ->
+            observedReason = reason
+        }
+
+        assertNull(observedReason)
+        runCurrent()
+        recovery.join()
+        assertEquals(PlaybackRecoveryReason.AUDIO_RECOVERY_EXHAUSTED, observedReason)
     }
 
     @Test
@@ -589,7 +740,7 @@ class AppPlaybackRuntimeTest {
         val releaseBlocker = CompletableDeferred<Unit>()
         var request = "old"
         val blocker = launch {
-            commands.serialize {
+            commands.serialize(onClosed = {}) {
                 blockerStarted.complete(Unit)
                 releaseBlocker.await()
                 request = "new"
@@ -599,6 +750,7 @@ class AppPlaybackRuntimeTest {
 
         val retried = async {
             commands.retryRecording(
+                onClosed = { "closed" },
                 currentRequest = { request },
                 retry = { it },
             )
@@ -616,11 +768,90 @@ class AppPlaybackRuntimeTest {
         val commands = PlaybackTargetCommandSerialization()
 
         val result = commands.retryRecording<String, String>(
+            onClosed = { "closed" },
             currentRequest = { null },
             retry = { error("retry must not run") },
         )
 
         assertNull(result)
+    }
+
+    @Test
+    fun detachFencesACommandQueuedBehindTargetSerialization() = runTest {
+        val commands = PlaybackTargetCommandSerialization()
+        val blockerStarted = CompletableDeferred<Unit>()
+        val releaseBlocker = CompletableDeferred<Unit>()
+        var queuedCommandRuns = 0
+        val blocker = launch {
+            commands.serialize(onClosed = {}) {
+                blockerStarted.complete(Unit)
+                releaseBlocker.await()
+            }
+        }
+        blockerStarted.await()
+        val queued = async {
+            commands.serialize(onClosed = { "closed" }) {
+                queuedCommandRuns += 1
+                "ran"
+            }
+        }
+        runCurrent()
+
+        assertTrue(commands.close())
+        releaseBlocker.complete(Unit)
+        blocker.join()
+
+        assertEquals("closed", queued.await())
+        assertEquals(0, queuedCommandRuns)
+    }
+
+    @Test
+    fun detachedInFlightCommandCannotResumeIntoPlayerAccess() = runTest {
+        val commands = PlaybackTargetCommandSerialization()
+        val commandStarted = CompletableDeferred<Unit>()
+        val resumeCommand = CompletableDeferred<Unit>()
+        var playerTouches = 0
+        val command = launch {
+            commands.serialize<Unit>(onClosed = {}) {
+                commandStarted.complete(Unit)
+                resumeCommand.await()
+                commands.runIfOpen { playerTouches += 1 }
+            }
+        }
+        commandStarted.await()
+
+        commands.close()
+        resumeCommand.complete(Unit)
+        command.join()
+
+        assertEquals(0, playerTouches)
+    }
+
+    @Test
+    fun detachDrainWaitsForAnInFlightSerializedCommand() = runTest {
+        val commands = PlaybackTargetCommandSerialization()
+        val commandStarted = CompletableDeferred<Unit>()
+        val resumeCommand = CompletableDeferred<Unit>()
+        var detachActionRan = false
+        val command = launch {
+            commands.serialize(onClosed = {}) {
+                commandStarted.complete(Unit)
+                resumeCommand.await()
+            }
+        }
+        commandStarted.await()
+        commands.close()
+
+        val detach = launch {
+            commands.awaitIdle { detachActionRan = true }
+        }
+        runCurrent()
+        assertFalse(detachActionRan)
+
+        resumeCommand.complete(Unit)
+        command.join()
+        detach.join()
+        assertTrue(detachActionRan)
     }
 
     @Test
@@ -715,6 +946,7 @@ class AppPlaybackRuntimeTest {
         var starts = 0
 
         suspend fun restore(): String? = commands.restoreRecordingIfNeeded(
+            onClosed = { "closed" },
             targetMatches = { selectedRecordingId == DvrEntryId(42) },
             restore = {
                 starts += 1

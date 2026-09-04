@@ -28,9 +28,9 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,7 +47,10 @@ sealed interface AppPlaybackState {
     data object Starting : AppPlaybackState
     data object Playing : AppPlaybackState
     data object Finished : AppPlaybackState
-    data class Recovering(val retryDelayMillis: Long) : AppPlaybackState
+    data class Recovering(
+        val reason: PlaybackRecoveryReason,
+        val retryDelayMillis: Long,
+    ) : AppPlaybackState
     data class Failed(val reason: AppPlaybackFailureReason) : AppPlaybackState
 }
 
@@ -173,31 +176,61 @@ internal sealed interface ForegroundPlaybackAction {
 
 internal class PlaybackTargetCommandSerialization {
     private val mutex = Mutex()
+    private val accessLock = Any()
+    @Volatile
+    private var closed = false
 
-    suspend fun <T> serialize(command: suspend () -> T): T = mutex.withLock {
-        command()
+    suspend fun <T> serialize(
+        onClosed: () -> T,
+        command: suspend () -> T,
+    ): T = mutex.withLock {
+        if (closed) onClosed() else command()
     }
 
     suspend fun <Request, Result> retryRecording(
+        onClosed: () -> Result,
         currentRequest: () -> Request?,
         retry: suspend (Request) -> Result,
-    ): Result? = mutex.withLock {
-        currentRequest()?.let { retry(it) }
-    }
+    ): Result? = serialize(onClosed) { currentRequest()?.let { retry(it) } }
 
     suspend fun <Result> restoreRecordingIfNeeded(
+        onClosed: () -> Result,
         targetMatches: () -> Boolean,
         restore: suspend () -> Result,
-    ): Result? = mutex.withLock {
+    ): Result? = serialize(onClosed) {
         if (targetMatches()) null else restore()
+    }
+
+    fun close(): Boolean = synchronized(accessLock) {
+        if (closed) return@synchronized false
+        closed = true
+        true
+    }
+
+    fun isOpen(): Boolean = !closed
+
+    fun runIfOpen(action: () -> Unit): Boolean = synchronized(accessLock) {
+        if (closed) return@synchronized false
+        action()
+        true
+    }
+
+    fun <T> readIfOpen(read: () -> T): T? = synchronized(accessLock) {
+        if (closed) null else read()
+    }
+
+    suspend fun awaitIdle(action: () -> Unit) {
+        mutex.withLock {
+            synchronized(accessLock, action)
+        }
     }
 }
 
 internal suspend fun requestBoundLiveTarget(
-    requestPlayIntent: () -> Unit,
+    requestPlayIntent: () -> Boolean,
     installTarget: suspend () -> PlaybackTargetResult,
 ): PlaybackTargetResult {
-    requestPlayIntent()
+    if (!requestPlayIntent()) return PlaybackTargetResult.SHUT_DOWN
     return installTarget()
 }
 
@@ -226,6 +259,39 @@ internal fun activePlayerTargetIsHealthy(
         playbackState != Player.STATE_IDLE &&
         playbackState != Player.STATE_ENDED
 
+internal fun playerReportedPlaybackState(
+    currentState: AppPlaybackState,
+    recoveryAttemptInProgress: Boolean,
+    playbackState: Int,
+    isPlaying: Boolean,
+): AppPlaybackState = when {
+    recoveryAttemptInProgress -> currentState
+    playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
+    isPlaying -> AppPlaybackState.Playing
+    playbackState == Player.STATE_BUFFERING -> AppPlaybackState.Starting
+    playbackState == Player.STATE_IDLE -> AppPlaybackState.Idle
+    else -> currentState
+}
+
+internal fun playerStateAfterRecoveryResolution(
+    currentState: AppPlaybackState,
+    playbackState: Int,
+    isPlaying: Boolean,
+): AppPlaybackState = if (
+    currentState is AppPlaybackState.Recovering &&
+    playbackState == Player.STATE_READY &&
+    !isPlaying
+) {
+    AppPlaybackState.Starting
+} else {
+    playerReportedPlaybackState(
+        currentState = currentState,
+        recoveryAttemptInProgress = false,
+        playbackState = playbackState,
+        isPlaying = isPlaying,
+    )
+}
+
 internal suspend fun executeForegroundPlaybackAction(
     action: ForegroundPlaybackAction,
     stopLive: suspend () -> Unit,
@@ -252,19 +318,78 @@ private sealed interface BackgroundedPlaybackTarget {
 }
 
 internal data class LiveRecoveryFence(
-    val target: AppPlaybackTarget?,
-    val targetEpoch: Long?,
+    val reason: PlaybackRecoveryReason,
+    val selection: LivePlaybackSelection,
+    val targetEpoch: Long,
 ) {
     fun matches(
         activeTarget: AppPlaybackTarget?,
         activeTargetEpoch: Long?,
-        selectionChannelId: ChannelId?,
+        observation: SessionObservation,
     ): Boolean {
-        val liveTarget = target as? AppPlaybackTarget.Live ?: return false
-        return targetEpoch != null &&
-            activeTarget == liveTarget &&
+        val currentSelection = currentLivePlaybackSelection(
+            observation = observation,
+            channelId = selection.channelId,
+        ) ?: return false
+        return activeTarget == AppPlaybackTarget.Live(selection.channelId) &&
             activeTargetEpoch == targetEpoch &&
-            selectionChannelId == liveTarget.channelId
+            currentSelection.currentSession === selection.currentSession
+    }
+}
+
+internal fun currentLiveRecoveryFence(
+    reason: PlaybackRecoveryReason,
+    observation: SessionObservation,
+    activeTarget: AppPlaybackTarget?,
+    activeTargetEpoch: Long?,
+): LiveRecoveryFence? {
+    val liveTarget = activeTarget as? AppPlaybackTarget.Live ?: return null
+    val epoch = activeTargetEpoch ?: return null
+    val selection = currentLivePlaybackSelection(observation, liveTarget.channelId) ?: return null
+    return LiveRecoveryFence(reason, selection, epoch)
+}
+
+internal fun dispatchPlaybackRecovery(
+    scope: CoroutineScope,
+    reason: PlaybackRecoveryReason,
+    recover: suspend (PlaybackRecoveryReason) -> Unit,
+): Job = scope.launch { recover(reason) }
+
+internal fun shouldRepublishPlayerStateAfterRecovery(
+    result: PlaybackTargetResult?,
+    fence: LiveRecoveryFence,
+    activeTarget: AppPlaybackTarget?,
+    activeTargetEpoch: Long?,
+    observation: SessionObservation,
+    healthyActiveTarget: AppPlaybackTarget?,
+): Boolean =
+    result != PlaybackTargetResult.STARTED &&
+        healthyActiveTarget != null &&
+        healthyActiveTarget == activeTarget &&
+        fence.matches(activeTarget, activeTargetEpoch, observation)
+
+internal class LiveRecoveryAttemptRunner(
+    private val onResolved: (LiveRecoveryFence, PlaybackTargetResult?) -> Unit,
+) {
+    private var current: LiveRecoveryFence? = null
+
+    val inProgress: Boolean
+        get() = current != null
+
+    suspend fun run(
+        fence: LiveRecoveryFence,
+        recover: suspend () -> PlaybackTargetResult?,
+    ) {
+        current = fence
+        var result: PlaybackTargetResult? = null
+        try {
+            result = recover()
+        } finally {
+            if (current === fence) {
+                current = null
+                onResolved(fence, result)
+            }
+        }
     }
 }
 
@@ -378,6 +503,7 @@ class AppPlaybackRuntime(
     private var lastLiveChannelId: ChannelId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
     private var recoveryJob: Job? = null
+    private val recoveryAttempts = LiveRecoveryAttemptRunner(::publishResolvedRecoveryPlayerState)
     private var targetFrameListener: Player.Listener? = null
 
     val state = _state.asStateFlow()
@@ -395,24 +521,24 @@ class AppPlaybackRuntime(
 
     private val listener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (!targetInstallationInProgress) publishPlayerState()
+            if (!targetInstallationInProgress && targetCommands.isOpen()) publishPlayerState()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (!targetInstallationInProgress) publishPlayerState()
+            if (!targetInstallationInProgress && targetCommands.isOpen()) publishPlayerState()
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            if (!targetInstallationInProgress) publishPlayerError()
+            if (!targetInstallationInProgress && targetCommands.isOpen()) publishPlayerError()
         }
     }
 
     init {
-        player.addListener(listener)
+        targetCommands.runIfOpen { player.addListener(listener) }
     }
 
     suspend fun playLive(selection: LivePlaybackSelection): PlaybackTargetResult? =
-        targetCommands.serialize {
+        targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
             lastLiveChannelId = selection.channelId
             val result = playLive(
                 channelId = selection.channelId,
@@ -425,13 +551,16 @@ class AppPlaybackRuntime(
         channelId: ChannelId,
         recovering: Boolean,
         expectedPresentationEpoch: Long = presentationEpoch.snapshot(),
+        recoverySelection: LivePlaybackSelection? = null,
     ): PlaybackTargetResult? {
+        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
             if (!recovering && _activeTarget.value == null) {
                 _state.value = AppPlaybackState.Starting
             }
         }
         val playerSettings = settings.playerSettings.first()
+        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val profileSelection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (profileSelection == null) {
             return completeUnavailableTarget(
@@ -440,7 +569,18 @@ class AppPlaybackRuntime(
                 failureReason = AppPlaybackFailureReason.OTHER,
             )
         }
+        if (
+            recoverySelection != null &&
+            profileSelection.currentSession !== recoverySelection.currentSession
+        ) {
+            return completeUnavailableTarget(
+                expectedPresentationEpoch = expectedPresentationEpoch,
+                result = PlaybackTargetResult.NOT_READY,
+                failureReason = AppPlaybackFailureReason.OTHER,
+            )
+        }
         val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession)
+        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val selection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (selection == null) {
             return completeUnavailableTarget(
@@ -449,7 +589,11 @@ class AppPlaybackRuntime(
                 failureReason = AppPlaybackFailureReason.OTHER,
             )
         }
-        if (selection.currentSession !== profileSelection.currentSession) {
+        if (
+            selection.currentSession !== profileSelection.currentSession ||
+            recoverySelection != null &&
+            selection.currentSession !== recoverySelection.currentSession
+        ) {
             return completeUnavailableTarget(
                 expectedPresentationEpoch = expectedPresentationEpoch,
                 result = PlaybackTargetResult.NOT_READY,
@@ -467,17 +611,21 @@ class AppPlaybackRuntime(
                     )
                 ) {
                     is PlaybackBindingResult.Bound -> requestBoundLiveTarget(
-                        requestPlayIntent = player::play,
+                        requestPlayIntent = { targetCommands.runIfOpen(player::play) },
                         installTarget = {
-                            coordinator.setLiveTarget(
-                                binding.binding,
-                                LivePlaybackOptions(
-                                    streamProfileId = streamProfileId,
-                                    timeshiftPeriod = requestedLiveTimeshiftPeriod(
-                                        playerSettings.timeshiftEnabled,
+                            if (!targetCommands.isOpen()) {
+                                PlaybackTargetResult.SHUT_DOWN
+                            } else {
+                                coordinator.setLiveTarget(
+                                    binding.binding,
+                                    LivePlaybackOptions(
+                                        streamProfileId = streamProfileId,
+                                        timeshiftPeriod = requestedLiveTimeshiftPeriod(
+                                            playerSettings.timeshiftEnabled,
+                                        ),
                                     ),
-                                ),
-                            )
+                                )
+                            }
                         },
                     )
                     PlaybackBindingResult.ObservationExpired -> PlaybackTargetResult.NOT_READY
@@ -514,7 +662,9 @@ class AppPlaybackRuntime(
     suspend fun playRecording(
         selection: RecordingPlaybackSelection,
         start: RecordingPlaybackStart,
-    ): PlaybackTargetResult? = targetCommands.serialize {
+    ): PlaybackTargetResult? = targetCommands.serialize(
+        onClosed = { PlaybackTargetResult.SHUT_DOWN },
+    ) {
         playRecordingLocked(selection.recordingId, start)
     }
 
@@ -522,6 +672,7 @@ class AppPlaybackRuntime(
         selection: RecordingPlaybackSelection,
         start: RecordingPlaybackStart,
     ): PlaybackTargetResult? = targetCommands.restoreRecordingIfNeeded(
+        onClosed = { PlaybackTargetResult.SHUT_DOWN },
         targetMatches = {
             currentRecordingPlaybackSelection(
                 observation = session.observation.value,
@@ -543,6 +694,7 @@ class AppPlaybackRuntime(
         recordingId: DvrEntryId,
         start: RecordingPlaybackStart,
     ): PlaybackTargetResult? {
+        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val expectedPresentationEpoch = presentationEpoch.snapshot()
         lastRecordingRequest = recordingId to start
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
@@ -570,6 +722,7 @@ class AppPlaybackRuntime(
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
             installTarget = {
+                if (!targetCommands.isOpen()) return@installTargetForPresentation PlaybackTargetResult.SHUT_DOWN
                 when (
                     val binding = session.bindRecordingPlayback(
                         selection.currentSession,
@@ -578,7 +731,11 @@ class AppPlaybackRuntime(
                 ) {
                     is PlaybackBindingResult.Bound -> {
                         admission = binding.binding.admission
-                        coordinator.setRecordingTarget(binding.binding, start)
+                        if (!targetCommands.isOpen()) {
+                            PlaybackTargetResult.SHUT_DOWN
+                        } else {
+                            coordinator.setRecordingTarget(binding.binding, start)
+                        }
                     }
                     PlaybackBindingResult.ObservationExpired -> {
                         admission = RecordingPlaybackAdmission.ObservationExpired
@@ -616,19 +773,23 @@ class AppPlaybackRuntime(
         return result
     }
 
-    suspend fun stop(): PlaybackStopResult = targetCommands.serialize {
+    suspend fun stop(): PlaybackStopResult = targetCommands.serialize(
+        onClosed = { PlaybackStopResult.SHUT_DOWN },
+    ) {
         foregroundPlaybackLifecycle.onExplicitStop()
         stopPlayback()
     }
 
     fun onAppBackgrounded() {
-        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            targetCommands.serialize {
+        scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady }
+                    ?: return@serialize
                 applyForegroundPlaybackAction(
                     foregroundPlaybackLifecycle.onBackgrounded(
                         activeTarget = _activeTarget.value,
                         activeTargetEpoch = activeTargetEpoch,
-                        recordingPlayWhenReady = player.playWhenReady,
+                        recordingPlayWhenReady = recordingPlayWhenReady,
                     ),
                 )
             }
@@ -636,8 +797,8 @@ class AppPlaybackRuntime(
     }
 
     fun onAppForegrounded() {
-        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            targetCommands.serialize {
+        scope.launch {
+            targetCommands.serialize(onClosed = {}) {
                 applyForegroundPlaybackAction(
                     foregroundPlaybackLifecycle.onForegrounded(
                         activeTarget = _activeTarget.value,
@@ -649,12 +810,14 @@ class AppPlaybackRuntime(
     }
 
     private suspend fun stopPlayback(): PlaybackStopResult {
+        if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
         val epoch = presentationEpoch.begin()
         endTargetPresentation(epoch)
         val currentJob = currentCoroutineContext().job
         recoveryJob?.takeUnless { it === currentJob }?.cancel()
         recoveryJob = null
         val result = coordinator.stop()
+        if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
         presentationEpoch.publishIfCurrent(epoch) {
             _activeTarget.value = null
             _recordingSelection.value = null
@@ -666,7 +829,9 @@ class AppPlaybackRuntime(
         return result
     }
 
-    suspend fun retryLive(): PlaybackTargetResult? = targetCommands.serialize {
+    suspend fun retryLive(): PlaybackTargetResult? = targetCommands.serialize(
+        onClosed = { PlaybackTargetResult.SHUT_DOWN },
+    ) {
         lastLiveChannelId?.let { channelId ->
             playLive(
                 channelId = channelId,
@@ -675,68 +840,103 @@ class AppPlaybackRuntime(
         }
     }
     suspend fun retryRecording(): PlaybackTargetResult? = targetCommands.retryRecording(
+        onClosed = { PlaybackTargetResult.SHUT_DOWN },
         currentRequest = { lastRecordingRequest },
     ) { (recordingId, start) ->
         playRecordingLocked(recordingId, start)
     }
-    suspend fun pauseTimeshift(): TimeshiftCommandResult = coordinator.pauseTimeshift()
-    suspend fun resumeTimeshift(): TimeshiftCommandResult = coordinator.resumeTimeshift()
-    suspend fun seekTimeshift(deltaMs: Long): TimeshiftCommandResult =
+    suspend fun pauseTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
+        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
+    ) {
+        coordinator.pauseTimeshift()
+    }
+    suspend fun resumeTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
+        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
+    ) {
+        coordinator.resumeTimeshift()
+    }
+    suspend fun seekTimeshift(deltaMs: Long): TimeshiftCommandResult = targetCommands.serialize(
+        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
+    ) {
         coordinator.seekTimeshift(deltaMs.milliseconds)
-    suspend fun goLive(): TimeshiftCommandResult = coordinator.returnToLive()
-    fun play() = player.play()
-    fun pause() = player.pause()
-    fun seekTo(positionMs: Long) = player.seekTo(positionMs)
+    }
+    suspend fun goLive(): TimeshiftCommandResult = targetCommands.serialize(
+        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
+    ) {
+        coordinator.returnToLive()
+    }
+    fun play() { targetCommands.runIfOpen(player::play) }
+    fun pause() { targetCommands.runIfOpen(player::pause) }
+    fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
     fun setDiagnosticsEnabled(enabled: Boolean) {
+        if (!targetCommands.isOpen()) return
         diagnosticsEnabled = enabled
         publishDiagnostics()
     }
     fun setRefreshRateMatchingEnabled(enabled: Boolean) {
-        player.setVideoChangeFrameRateStrategy(
-            if (enabled) C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
-            else C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF,
-        )
+        targetCommands.runIfOpen {
+            player.setVideoChangeFrameRateStrategy(
+                if (enabled) C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
+                else C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF,
+            )
+        }
     }
-    internal fun onRecoveryRequired(@Suppress("UNUSED_PARAMETER") reason: PlaybackRecoveryReason) {
-        val channelId = (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId
-        val fence = LiveRecoveryFence(
-            target = _activeTarget.value,
-            targetEpoch = activeTargetEpoch,
-        )
-        recoveryJob?.cancel()
-        recoveryJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            targetCommands.serialize {
-                if (
-                    !fence.matches(
+    internal fun onRecoveryRequired(reason: PlaybackRecoveryReason) {
+        dispatchPlaybackRecovery(scope, reason) { dispatchedReason ->
+            val currentJob = currentCoroutineContext().job
+            recoveryJob?.takeUnless { it === currentJob }?.cancel()
+            recoveryJob = currentJob
+            try {
+                targetCommands.serialize(onClosed = {}) {
+                    val fence = currentLiveRecoveryFence(
+                        reason = dispatchedReason,
+                        observation = session.observation.value,
                         activeTarget = _activeTarget.value,
                         activeTargetEpoch = activeTargetEpoch,
-                        selectionChannelId =
-                            (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
-                    ) || (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId != channelId
-                ) {
-                    return@serialize
+                    ) ?: return@serialize
+                    if (!fence.matches(
+                            activeTarget = _activeTarget.value,
+                            activeTargetEpoch = activeTargetEpoch,
+                            observation = session.observation.value,
+                        )
+                    ) {
+                        return@serialize
+                    }
+                    recoveryAttempts.run(fence) {
+                        presentationEpoch.publishIfCurrent(fence.targetEpoch) {
+                            _state.value = AppPlaybackState.Recovering(
+                                reason = fence.reason,
+                                retryDelayMillis = 0L,
+                            )
+                            publishDiagnostics()
+                        }
+                        playLive(
+                            channelId = fence.selection.channelId,
+                            recovering = true,
+                            expectedPresentationEpoch = fence.targetEpoch,
+                            recoverySelection = fence.selection,
+                        )
+                    }
                 }
-                val targetEpoch = fence.targetEpoch ?: return@serialize
-                val recoveryChannelId = channelId ?: return@serialize
-                presentationEpoch.publishIfCurrent(targetEpoch) {
-                    _state.value = AppPlaybackState.Recovering(retryDelayMillis = 0L)
-                }
-                playLive(
-                    channelId = recoveryChannelId,
-                    recovering = true,
-                    expectedPresentationEpoch = targetEpoch,
-                )
+            } finally {
+                if (recoveryJob === currentJob) recoveryJob = null
             }
         }
     }
 
-    fun detach() {
-        recoveryJob?.cancel()
+    suspend fun detach() {
+        if (!targetCommands.close()) return
+        val pendingRecovery = recoveryJob
         recoveryJob = null
+        pendingRecovery?.cancel()
         settingsJob.cancel()
-        targetFrameListener?.let(player::removeListener)
-        targetFrameListener = null
-        player.removeListener(listener)
+        pendingRecovery?.join()
+        settingsJob.join()
+        targetCommands.awaitIdle {
+            targetFrameListener?.let(player::removeListener)
+            targetFrameListener = null
+            player.removeListener(listener)
+        }
     }
 
     private suspend fun installTargetForPresentation(
@@ -745,17 +945,20 @@ class AppPlaybackRuntime(
         onStarted: () -> Unit,
         onFailed: (PlaybackTargetResult) -> Unit,
     ): PlaybackTargetResult {
+        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         targetInstallationInProgress = true
         return try {
             val result = completePlaybackTargetInstallation(
                 installTarget = installTarget,
                 presentationStillCurrent = {
-                    presentationEpoch.isCurrent(expectedPresentationEpoch)
+                    targetCommands.isOpen() &&
+                        presentationEpoch.isCurrent(expectedPresentationEpoch)
                 },
                 activeTarget = ::healthyActiveTarget,
                 onStarted = onStarted,
                 onFailed = onFailed,
             )
+            if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
             if (
                 result != PlaybackTargetResult.STARTED &&
                 presentationEpoch.isCurrent(expectedPresentationEpoch) &&
@@ -818,6 +1021,7 @@ class AppPlaybackRuntime(
         reason: AppPlaybackFailureReason,
         recordingAdmission: RecordingPlaybackAdmission? = null,
     ) {
+        if (!targetCommands.isOpen()) return
         if (healthyActiveTarget() != null) return
         val epoch = presentationEpoch.beginIfCurrent(expectedPresentationEpoch) ?: return
         presentationEpoch.publishIfCurrent(epoch) {
@@ -831,23 +1035,25 @@ class AppPlaybackRuntime(
         }
     }
 
-    private fun healthyActiveTarget(): AppPlaybackTarget? =
+    private fun healthyActiveTarget(): AppPlaybackTarget? = targetCommands.readIfOpen {
         _activeTarget.value.takeIf {
             activePlayerTargetIsHealthy(
                 playerErrorPresent = player.playerError != null,
                 playbackState = player.playbackState,
             )
         }
+    }
 
     private suspend fun applyBackgroundPolicyToStartedTarget(result: PlaybackTargetResult?) {
         if (result != PlaybackTargetResult.STARTED) return
         val target = _activeTarget.value ?: return
         val targetEpoch = activeTargetEpoch ?: return
+        val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady } ?: return
         applyForegroundPlaybackAction(
             foregroundPlaybackLifecycle.onTargetStarted(
                 activeTarget = target,
                 activeTargetEpoch = targetEpoch,
-                recordingPlayWhenReady = player.playWhenReady,
+                recordingPlayWhenReady = recordingPlayWhenReady,
             ),
         )
     }
@@ -856,72 +1062,117 @@ class AppPlaybackRuntime(
         executeForegroundPlaybackAction(
             action = action,
             stopLive = { stopPlayback() },
-            pauseRecording = player::pause,
+            pauseRecording = { targetCommands.runIfOpen(player::pause) },
             resumeLive = { channelId ->
                 lastLiveChannelId = channelId
                 playLive(channelId = channelId, recovering = false)
             },
-            resumeRecording = player::play,
+            resumeRecording = { targetCommands.runIfOpen(player::play) },
         )
     }
 
     private fun beginTargetPresentation(epoch: Long) {
-        targetFrameListener?.let(player::removeListener)
-        _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
-        targetFrameListener = object : Player.Listener {
-            override fun onRenderedFirstFrame() {
-                if (targetInstallationInProgress) return
-                _videoPresentation.value = _videoPresentation.value.onFirstFrame(
-                    frameEpoch = epoch,
-                    activeTargetEpoch = activeTargetEpoch,
-                )
-            }
-        }.also(player::addListener)
+        targetCommands.runIfOpen {
+            targetFrameListener?.let(player::removeListener)
+            _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
+            targetFrameListener = object : Player.Listener {
+                override fun onRenderedFirstFrame() {
+                    if (targetInstallationInProgress || !targetCommands.isOpen()) return
+                    _videoPresentation.value = _videoPresentation.value.onFirstFrame(
+                        frameEpoch = epoch,
+                        activeTargetEpoch = activeTargetEpoch,
+                    )
+                }
+            }.also(player::addListener)
+        }
     }
 
     private fun endTargetPresentation(epoch: Long) {
-        targetFrameListener?.let(player::removeListener)
-        targetFrameListener = null
-        _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
+        targetCommands.runIfOpen {
+            targetFrameListener?.let(player::removeListener)
+            targetFrameListener = null
+            _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
+        }
     }
 
     private fun applyPlayerSettings(value: PlayerSettings) {
         val audioLanguages: Array<String> = value.audioLanguage?.let { arrayOf(it) } ?: emptyArray()
         val subtitleLanguages: Array<String> =
             value.subtitleLanguage?.let { arrayOf(it) } ?: emptyArray()
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setPreferredAudioLanguages(*audioLanguages)
-            .setPreferredTextLanguages(*subtitleLanguages)
-            .build()
-        setRefreshRateMatchingEnabled(value.refreshRateMatchingEnabled)
+        targetCommands.runIfOpen {
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setPreferredAudioLanguages(*audioLanguages)
+                .setPreferredTextLanguages(*subtitleLanguages)
+                .build()
+            player.setVideoChangeFrameRateStrategy(
+                if (value.refreshRateMatchingEnabled) {
+                    C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
+                } else {
+                    C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
+                },
+            )
+        }
     }
 
-    private fun publishPlayerState() {
-        _state.value = when {
-            player.playerError != null -> _state.value
-            player.playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
-            player.isPlaying -> AppPlaybackState.Playing
-            player.playbackState == Player.STATE_BUFFERING -> AppPlaybackState.Starting
-            player.playbackState == Player.STATE_IDLE -> AppPlaybackState.Idle
-            else -> _state.value
+    private fun publishPlayerState(recoveryResolved: Boolean = false) {
+        targetCommands.runIfOpen {
+            if (player.playerError == null) {
+                _state.value = if (recoveryResolved) {
+                    playerStateAfterRecoveryResolution(
+                        currentState = _state.value,
+                        playbackState = player.playbackState,
+                        isPlaying = player.isPlaying,
+                    )
+                } else {
+                    playerReportedPlaybackState(
+                        currentState = _state.value,
+                        recoveryAttemptInProgress = recoveryAttempts.inProgress,
+                        playbackState = player.playbackState,
+                        isPlaying = player.isPlaying,
+                    )
+                }
+            }
+            publishDiagnosticsFromPlayer()
         }
-        publishDiagnostics()
+    }
+
+    private fun publishResolvedRecoveryPlayerState(
+        fence: LiveRecoveryFence,
+        result: PlaybackTargetResult?,
+    ) {
+        if (shouldRepublishPlayerStateAfterRecovery(
+                result = result,
+                fence = fence,
+                activeTarget = _activeTarget.value,
+                activeTargetEpoch = activeTargetEpoch,
+                observation = session.observation.value,
+                healthyActiveTarget = healthyActiveTarget(),
+            )
+        ) {
+            publishPlayerState(recoveryResolved = true)
+        }
     }
 
     private fun publishInstalledPlayerState() {
-        if (player.playerError != null) {
-            publishPlayerError()
-            return
+        targetCommands.runIfOpen {
+            if (player.playerError != null) {
+                publishPlayerErrorFromPlayer()
+                return@runIfOpen
+            }
+            _state.value = when {
+                player.playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
+                player.isPlaying -> AppPlaybackState.Playing
+                else -> AppPlaybackState.Starting
+            }
+            publishDiagnosticsFromPlayer()
         }
-        _state.value = when {
-            player.playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
-            player.isPlaying -> AppPlaybackState.Playing
-            else -> AppPlaybackState.Starting
-        }
-        publishDiagnostics()
     }
 
     private fun publishPlayerError() {
+        targetCommands.runIfOpen { publishPlayerErrorFromPlayer() }
+    }
+
+    private fun publishPlayerErrorFromPlayer() {
         _state.value = AppPlaybackState.Failed(
             if (_activeTarget.value is AppPlaybackTarget.Recording) {
                 AppPlaybackFailureReason.RECORDING_READ_FAILED
@@ -929,7 +1180,7 @@ class AppPlaybackRuntime(
                 AppPlaybackFailureReason.OTHER
             },
         )
-        publishDiagnostics()
+        publishDiagnosticsFromPlayer()
     }
 
     private fun publishDiagnostics() {
@@ -937,6 +1188,12 @@ class AppPlaybackRuntime(
             _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
             return
         }
+        if (!targetCommands.runIfOpen { publishDiagnosticsFromPlayer() }) {
+            _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
+        }
+    }
+
+    private fun publishDiagnosticsFromPlayer() {
         val video = player.videoFormat
         val audio = player.audioFormat
         _diagnostics.value = AppPlaybackDiagnostics(

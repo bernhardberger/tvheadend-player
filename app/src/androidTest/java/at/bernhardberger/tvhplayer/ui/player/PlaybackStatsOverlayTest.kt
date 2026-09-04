@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
@@ -157,7 +158,10 @@ class PlaybackStatsOverlayTest {
 
     private val maximumDiagnostics = AppPlaybackDiagnostics(
         source = AppPlaybackSource.LIVE_TV,
-        state = AppPlaybackState.Recovering(retryDelayMillis = 1_500L),
+        state = AppPlaybackState.Recovering(
+            reason = PlaybackRecoveryReason.AUDIO_RECOVERY_EXHAUSTED,
+            retryDelayMillis = 1_500L,
+        ),
         positionMs = 7_200_000L,
         durationMs = 14_400_000L,
         bufferedMs = 75_000L,
