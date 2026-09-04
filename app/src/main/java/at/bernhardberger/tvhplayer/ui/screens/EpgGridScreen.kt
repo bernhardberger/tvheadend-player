@@ -49,9 +49,7 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -62,6 +60,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
@@ -89,6 +88,7 @@ import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
+import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.reconcileTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.resolveGuideFrontierOrigin
 import at.bernhardberger.tvhplayer.core.resolveGuideWindowFocus
@@ -260,11 +260,10 @@ fun EpgGridScreen(
     val hasScopeTabs = scopeCount > 1
     val permissionDenied = connectionUiState is ConnectionUiState.Error &&
         connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED
-    val hasGuideFailure = (connectionUiState is ConnectionUiState.Error && !permissionDenied) ||
-        connectionUiState is ConnectionUiState.SubscriptionError
-    val needsGuideSettings = connectionUiState == ConnectionUiState.NeedsConfiguration ||
-        connectionUiState == ConnectionUiState.CredentialUnavailable || permissionDenied
-    val hasGuideRecoveryAction = hasGuideFailure || needsGuideSettings
+    val guideRecoveryAction = connectionUiState.primaryRecoveryAction()
+    val hasGuideFailure = guideRecoveryAction == ConnectionRecoveryAction.RETRY
+    val needsGuideSettings = guideRecoveryAction == ConnectionRecoveryAction.SETTINGS
+    val hasGuideRecoveryAction = guideRecoveryAction != ConnectionRecoveryAction.NONE
     val guideRecovering = connectionUiState == ConnectionUiState.Connecting ||
         connectionUiState == ConnectionUiState.SyncingChannels ||
         connectionUiState == ConnectionUiState.Reconnecting
@@ -407,12 +406,7 @@ fun EpgGridScreen(
     }
 
     val epgState = observation.epgState
-    val epgSnapshot = when (val state = epgState) {
-        is EpgRepositoryState.Current -> state.snapshot
-        is EpgRepositoryState.Stale -> state.snapshot
-        is EpgRepositoryState.Synchronizing -> state.staleSnapshot
-        EpgRepositoryState.Empty -> null
-    }
+    val epgSnapshot = observation.epgSnapshotForDisplay
     val snapshotEvents = epgSnapshot?.events.orEmpty()
     val timelineEventIndex = remember(snapshotEvents, category, windowStartSec) {
         indexTimelineEventsByChannel(
@@ -460,14 +454,10 @@ fun EpgGridScreen(
             boundedAnchorSec + GUIDE_VISIBLE_WINDOW_SEC
         )
         return coverageRequests.request(
-            channelIds = ids.toSet(),
+            channelIds = ids,
             windowStartSec = boundedAnchorSec,
-        ) { channelId ->
-            session.epgRepository.acquireCoverage(
-                capability,
-                channelId,
-                through,
-            )
+        ) { channelIds ->
+            session.epgRepository.acquireCoverageBatch(capability, channelIds, through)
         }
     }
 
@@ -1674,12 +1664,8 @@ fun EpgGridScreen(
     }
 }
 
-private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
-    is DvrRepositoryState.Current -> state.snapshot.entries
-    is DvrRepositoryState.Stale -> state.snapshot.entries
-    is DvrRepositoryState.Synchronizing -> state.staleSnapshot?.entries.orEmpty()
-    DvrRepositoryState.Empty -> emptyList()
-}
+private fun SessionObservation.dvrEntries(): List<DvrEntry> =
+    dvrSnapshotForDisplay?.entries.orEmpty()
 
 internal fun searchResultObservation(
     searchedObservation: SessionObservation,
@@ -1702,7 +1688,7 @@ internal fun currentDvrMutation(
 }
 
 internal fun SessionObservation.dvrEntryForProgramme(event: EpgEventEntry): DvrEntry? =
-    dvrEntries().singleOrNull { entry ->
+    dvrSnapshotForDisplay?.entries?.singleOrNull { entry ->
         entry.eventId == event.id || event.dvrEntryId == entry.id
     }
 

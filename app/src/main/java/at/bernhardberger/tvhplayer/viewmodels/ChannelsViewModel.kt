@@ -7,9 +7,11 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
-import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.RetainedMetadataAuthority
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.channelCatalogAuthority
+import at.bernhardberger.tvheadend.sdk.core.channelCatalogForDisplay
 import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import at.bernhardberger.tvhplayer.core.TagScopeFallback
@@ -50,7 +52,7 @@ class ChannelsViewModel(
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
-    val allChannels = session.observation.map { it.channelState.channelCatalog().channels }
+    val allChannels = session.observation.map { it.channelCatalogForDisplay?.channels.orEmpty() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val unavailableTagNotice = tagSettings.unavailableTagNotice
 
@@ -76,8 +78,9 @@ class ChannelsViewModel(
         }
         viewModelScope.launch {
             combine(session.observation, tagSettings.scopeVisibility) { observation, visibility ->
-                val tags = observation.channelState.channelCatalog().tags
-                val metadataReady = observation.channelState is ChannelRepositoryState.Current
+                val tags = observation.channelCatalogForDisplay?.tags.orEmpty()
+                val metadataReady = observation.channelCatalogAuthority ==
+                    RetainedMetadataAuthority.CURRENT
                 if (
                     metadataReady &&
                     visibility.configured &&
@@ -114,7 +117,8 @@ class ChannelsViewModel(
         session.observation.value.nextEvent(channelId, kotlin.time.Instant.fromEpochSeconds(nowSec))
 
     fun epgForChannel(channelId: ChannelId) = session.observation.map { observation ->
-        observation.epgEvents().filter { it.channelId == channelId }
+        observation.epgSnapshotForDisplay?.events.orEmpty()
+            .filter { it.channelId == channelId }
     }
 }
 
@@ -123,23 +127,10 @@ internal fun resolveChannelScopeState(
     activeTagId: ChannelTagId?,
     visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
 ): ChannelScopeState {
-    val catalog = channelState.channelCatalog()
+    val catalog = channelState.channelCatalogForDisplay ?: ChannelCatalog.create()
     return ChannelScopeState(
         scope = resolveChannelScope(catalog.channels, catalog.tags, activeTagId, visibility),
-        channelCatalogCurrent = channelState is ChannelRepositoryState.Current,
+        channelCatalogCurrent = channelState.channelCatalogAuthority ==
+            RetainedMetadataAuthority.CURRENT,
     )
-}
-
-private fun ChannelRepositoryState.channelCatalog(): ChannelCatalog = when (this) {
-    is ChannelRepositoryState.Current -> catalog
-    is ChannelRepositoryState.Stale -> catalog
-    is ChannelRepositoryState.Synchronizing -> staleCatalog ?: ChannelCatalog.create()
-    ChannelRepositoryState.Empty -> ChannelCatalog.create()
-}
-
-private fun SessionObservation.epgEvents(): List<EpgEvent> = when (val state = epgState) {
-    is EpgRepositoryState.Current -> state.snapshot.events
-    is EpgRepositoryState.Stale -> state.snapshot.events
-    is EpgRepositoryState.Synchronizing -> state.staleSnapshot?.events.orEmpty()
-    EpgRepositoryState.Empty -> emptyList()
 }

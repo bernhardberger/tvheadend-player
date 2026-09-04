@@ -13,7 +13,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
@@ -30,12 +29,7 @@ fun SettingsChannelTags(
     settingsStore: ChannelTagSettingsStore = koinInject(),
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
-    val tags = when (val state = observation.channelState) {
-        is ChannelRepositoryState.Current -> state.catalog.tags
-        is ChannelRepositoryState.Stale -> state.catalog.tags
-        is ChannelRepositoryState.Synchronizing -> state.staleCatalog?.tags.orEmpty()
-        ChannelRepositoryState.Empty -> emptyList()
-    }
+    val tags = observation.channelCatalogForDisplay?.tags.orEmpty()
     val visibility by settingsStore.scopeVisibility.collectAsStateWithLifecycle(
         initialValue = ChannelScopeVisibility()
     )

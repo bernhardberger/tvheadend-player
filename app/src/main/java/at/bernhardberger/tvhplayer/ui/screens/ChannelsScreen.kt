@@ -56,8 +56,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -66,7 +64,9 @@ import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
+import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -136,7 +136,7 @@ fun ChannelsScreen(
     val channelScope = channelScopeState.scope
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
-    val dvrEntries = observation.dvrEntries()
+    val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val channels = channelScope.visibleChannels
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
@@ -463,10 +463,8 @@ private fun EmptyChannelsState(
     modifier: Modifier = Modifier,
 ) {
     val actionFocus = remember { FocusRequester() }
-    val hasPrimaryAction = state is ConnectionUiState.Error ||
-        state is ConnectionUiState.SubscriptionError ||
-        state == ConnectionUiState.NeedsConfiguration ||
-        state == ConnectionUiState.CredentialUnavailable
+    val recoveryAction = state.primaryRecoveryAction()
+    val hasPrimaryAction = recoveryAction != ConnectionRecoveryAction.NONE
 
     LaunchedEffect(state, initialFocusEnabled, hasPrimaryAction) {
         if (shouldRequestEmptyChannelsAction(initialFocusEnabled, hasPrimaryAction)) {
@@ -507,9 +505,8 @@ private fun EmptyChannelsState(
                     .widthIn(max = 680.dp),
             )
 
-            when (state) {
-                ConnectionUiState.NeedsConfiguration,
-                ConnectionUiState.CredentialUnavailable -> {
+            when (recoveryAction) {
+                ConnectionRecoveryAction.SETTINGS -> {
                     Button(
                         onClick = onOpenSettings,
                         modifier = Modifier
@@ -520,8 +517,7 @@ private fun EmptyChannelsState(
                     }
                 }
 
-                is ConnectionUiState.Error,
-                is ConnectionUiState.SubscriptionError -> {
+                ConnectionRecoveryAction.RETRY -> {
                     Row(
                         modifier = Modifier.padding(top = 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -538,7 +534,7 @@ private fun EmptyChannelsState(
                     }
                 }
 
-                else -> Unit
+                ConnectionRecoveryAction.NONE -> Unit
             }
         }
     }
@@ -551,6 +547,7 @@ private fun InlineConnectionState(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val recoveryAction = state.primaryRecoveryAction()
     Surface(
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
@@ -580,15 +577,12 @@ private fun InlineConnectionState(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (state is ConnectionUiState.Error || state is ConnectionUiState.SubscriptionError) {
+            if (recoveryAction == ConnectionRecoveryAction.RETRY) {
                 Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
                 OutlinedButton(onClick = onOpenSettings) {
                     Text(stringResource(R.string.connection_settings_short))
                 }
-            } else if (
-                state == ConnectionUiState.NeedsConfiguration ||
-                state == ConnectionUiState.CredentialUnavailable
-            ) {
+            } else if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
                 Button(onClick = onOpenSettings) {
                     Text(stringResource(R.string.connection_settings_short))
                 }
@@ -762,11 +756,4 @@ private fun EpgDetailPane(
             )
         }
     }
-}
-
-private fun SessionObservation.dvrEntries() = when (val state = dvrState) {
-    is DvrRepositoryState.Current -> state.snapshot.entries
-    is DvrRepositoryState.Stale -> state.snapshot.entries
-    is DvrRepositoryState.Synchronizing -> state.staleSnapshot?.entries.orEmpty()
-    DvrRepositoryState.Empty -> emptyList()
 }

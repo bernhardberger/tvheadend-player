@@ -60,11 +60,7 @@ class VideoPlayerViewModel(
     fun setDiagnosticsEnabled(enabled: Boolean) = playbackRuntime.setDiagnosticsEnabled(enabled)
 
     fun epgForChannel(channelId: ChannelId) = session.observation.map { observation ->
-        when (val state = observation.epgState) {
-            is at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Current -> state.snapshot
-            is at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Stale -> state.snapshot
-            is at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Synchronizing -> state.staleSnapshot
-            at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Empty -> null
-        }?.events?.filter { it.channelId == channelId }.orEmpty()
+        observation.epgSnapshotForDisplay?.events.orEmpty()
+            .filter { it.channelId == channelId }
     }
 }

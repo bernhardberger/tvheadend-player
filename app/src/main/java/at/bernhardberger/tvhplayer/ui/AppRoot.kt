@@ -802,7 +802,7 @@ fun AppRoot(
                             showSimpleTvExit = !playerCloseAllowed,
                             playerCloseAllowed = playerCloseAllowed,
                             fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
-                            connectionAvailable = connectionState is ConnectionState.Connected,
+                            connectionState = connectionState,
                             onReconnect = appVm::reconnectNow,
                             onUnlock = { backStack.pushTransient(UnlockKey) },
                             onClose = { backStack.popNavigation() },

@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
@@ -40,7 +41,10 @@ class EpgColumnStatePolicyTest {
                 emptyList(),
                 0,
                 100,
-                ConnectionUiState.Error(ConnectionFailureKind.PERMISSION_DENIED),
+                ConnectionUiState.Error(
+                    ConnectionFailureKind.PERMISSION_DENIED,
+                    SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
+                ),
             ),
         )
         assertEquals(

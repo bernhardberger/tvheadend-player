@@ -4,6 +4,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
+import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -157,16 +158,40 @@ class MainStartupPresentationTest {
     }
 
     @Test
-    fun everyConnectionAndSubscriptionFailureIsRetryableInNormalMode() {
-        ConnectionFailureKind.entries.forEach { kind ->
-            assertEquals(
-                MainStartupPresentation.Actionable(
-                    MainStartupMessageKind.RETRYABLE_FAILURE,
-                    normalActions,
+    fun sessionFailureActionsFollowSdkRecoveryGuidanceInNormalMode() {
+        assertEquals(
+            MainStartupPresentation.Actionable(
+                MainStartupMessageKind.RETRYABLE_FAILURE,
+                normalActions,
+            ),
+            presentation(
+                connectionState = ConnectionUiState.Error(
+                    ConnectionFailureKind.ZERO_CHANNELS,
+                    SessionRecoveryDisposition.EXPLICIT_RETRY,
                 ),
-                presentation(connectionState = ConnectionUiState.Error(kind)),
-            )
-        }
+            ),
+        )
+        assertEquals(
+            MainStartupPresentation.Actionable(
+                MainStartupMessageKind.RETRYABLE_FAILURE,
+                listOf(MainStartupActionId.CONNECTION_SETTINGS),
+            ),
+            presentation(
+                connectionState = ConnectionUiState.Error(
+                    ConnectionFailureKind.AUTHENTICATION,
+                    SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
+                ),
+            ),
+        )
+        assertEquals(
+            MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
+            presentation(
+                connectionState = ConnectionUiState.Error(
+                    ConnectionFailureKind.UNREACHABLE,
+                    SessionRecoveryDisposition.AUTOMATIC_BACKOFF,
+                ),
+            ),
+        )
         SubscriptionFailureKind.entries.forEach { kind ->
             assertEquals(
                 MainStartupPresentation.Actionable(
@@ -184,7 +209,12 @@ class MainStartupPresentationTest {
             add(ConnectionUiState.NeedsConfiguration)
             add(ConnectionUiState.CredentialUnavailable)
             add(ConnectionUiState.Ready)
-            ConnectionFailureKind.entries.forEach { add(ConnectionUiState.Error(it)) }
+            add(
+                ConnectionUiState.Error(
+                    ConnectionFailureKind.ZERO_CHANNELS,
+                    SessionRecoveryDisposition.EXPLICIT_RETRY,
+                )
+            )
             SubscriptionFailureKind.entries.forEach { add(ConnectionUiState.SubscriptionError(it)) }
         }
 
@@ -201,6 +231,23 @@ class MainStartupPresentationTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun simpleTvProfileChangeFailureOffersOnlyExit() {
+        assertEquals(
+            MainStartupPresentation.Actionable(
+                MainStartupMessageKind.SIMPLE_TV_FAILURE,
+                listOf(MainStartupActionId.EXIT_SIMPLE_TV),
+            ),
+            presentation(
+                connectionState = ConnectionUiState.Error(
+                    ConnectionFailureKind.PERMISSION_DENIED,
+                    SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
+                ),
+                simpleTvActive = true,
+            ),
+        )
     }
 
     @Test

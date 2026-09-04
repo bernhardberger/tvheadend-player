@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -92,7 +93,10 @@ class CurrentChannelReadinessTest {
 
     @Test
     fun connectionFailureRemainsActionableBeforeCatalogIsCurrent() {
-        val failure = ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION)
+        val failure = ConnectionUiState.Error(
+            ConnectionFailureKind.AUTHENTICATION,
+            SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
+        )
 
         assertEquals(
             failure,
@@ -113,7 +117,10 @@ class CurrentChannelReadinessTest {
         assertFalse(
             shouldPresentEmptyTag(
                 channelCatalogCurrent = true,
-                connectionState = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE),
+                connectionState = ConnectionUiState.Error(
+                    ConnectionFailureKind.UNREACHABLE,
+                    SessionRecoveryDisposition.AUTOMATIC_BACKOFF,
+                ),
                 hasChannelsOutsideActiveTag = true,
                 activeTagSelected = true,
             ),

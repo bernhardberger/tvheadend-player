@@ -45,11 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
@@ -143,8 +140,8 @@ internal fun RecordingsScreenContent(
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val currentSession = observation.currentSession
-    val entries = observation.dvrEntries()
-    val channels = observation.channels()
+    val entries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
+    val channels = observation.channelCatalogForDisplay?.channels.orEmpty()
     val channelsById = remember(channels) { channels.associateBy { it.id } }
     val library = remember(entries) { partitionDvrLibrary(entries) }
     val archive = remember(library.archive) { buildDvrArchive(library.archive) }
@@ -625,18 +622,4 @@ internal fun RecordingsScreenContent(
             },
         )
     }
-}
-
-private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
-    is DvrRepositoryState.Current -> state.snapshot.entries
-    is DvrRepositoryState.Stale -> state.snapshot.entries
-    is DvrRepositoryState.Synchronizing -> state.staleSnapshot?.entries.orEmpty()
-    DvrRepositoryState.Empty -> emptyList()
-}
-
-private fun SessionObservation.channels(): List<Channel> = when (val state = channelState) {
-    is ChannelRepositoryState.Current -> state.catalog.channels
-    is ChannelRepositoryState.Stale -> state.catalog.channels
-    is ChannelRepositoryState.Synchronizing -> state.staleCatalog?.channels.orEmpty()
-    ChannelRepositoryState.Empty -> emptyList()
 }

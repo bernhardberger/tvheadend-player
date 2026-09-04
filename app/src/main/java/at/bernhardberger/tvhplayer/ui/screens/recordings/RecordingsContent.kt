@@ -66,6 +66,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
+import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
@@ -957,7 +959,7 @@ internal fun RecordingsEmptyState(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val error = connectionUiState is ConnectionUiState.Error
+    val retryAvailable = connectionUiState.primaryRecoveryAction() == ConnectionRecoveryAction.RETRY
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -976,7 +978,7 @@ internal fun RecordingsEmptyState(
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        if (error) {
+        if (retryAvailable) {
             Spacer(Modifier.height(12.dp))
             Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
         }

@@ -51,8 +51,10 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
+import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.timelineEventSpan
@@ -532,6 +534,7 @@ internal fun GuideEmptyState(
 ) {
     val permissionDenied = connectionUiState is ConnectionUiState.Error &&
         connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED
+    val recoveryAction = connectionUiState.primaryRecoveryAction()
     val message = stringResource(
         guideEmptyMessageRes(
             isEmptyTag = isEmptyTag,
@@ -553,19 +556,19 @@ internal fun GuideEmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(message, style = MaterialTheme.typography.titleLarge)
-            val failure = (connectionUiState is ConnectionUiState.Error && !permissionDenied) ||
-                connectionUiState is ConnectionUiState.SubscriptionError
-            val settings = connectionUiState == ConnectionUiState.NeedsConfiguration ||
-                connectionUiState == ConnectionUiState.CredentialUnavailable || permissionDenied
-            if (failure || settings) {
+            if (recoveryAction != ConnectionRecoveryAction.NONE) {
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = if (settings) onOpenConnectionSettings else onRetry,
+                    onClick = if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
+                        onOpenConnectionSettings
+                    } else {
+                        onRetry
+                    },
                     modifier = Modifier.focusRequester(retryFocusRequester),
                 ) {
                     Text(
                         stringResource(
-                            if (settings) {
+                            if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
                                 R.string.connection_settings_short
                             } else {
                                 R.string.retry

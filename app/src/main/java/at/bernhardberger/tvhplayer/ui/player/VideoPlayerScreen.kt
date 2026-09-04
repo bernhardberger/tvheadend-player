@@ -109,11 +109,13 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.RetainedMetadataAuthority
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.dvrSnapshotAuthority
+import at.bernhardberger.tvheadend.sdk.core.dvrSnapshotForDisplay
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
@@ -576,7 +578,7 @@ fun VideoPlayerScreen(
         statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
     val recoveryUiModel = playbackRecoveryUiModel(
         surface = PlaybackRecoverySurface.LIVE,
-        connectionAvailable = connState is ConnectionState.Connected,
+        connectionState = connState,
         retryTargetAvailable = playbackState is AppPlaybackState.Recovering ||
             currentSubscriptionFailure != null,
         secondaryAction = recoverySecondaryAction,
@@ -1240,9 +1242,7 @@ fun VideoPlayerScreen(
     }
 }
 
-private fun SessionObservation.dvrEntries(): List<DvrEntry> = when (val state = dvrState) {
-    is DvrRepositoryState.Current -> state.snapshot.entries
-    DvrRepositoryState.Empty,
-    is DvrRepositoryState.Stale,
-    is DvrRepositoryState.Synchronizing -> emptyList()
-}
+private fun SessionObservation.dvrEntries(): List<DvrEntry> =
+    dvrSnapshotForDisplay?.entries.orEmpty().takeIf {
+        dvrSnapshotAuthority == RetainedMetadataAuthority.CURRENT
+    }.orEmpty()

@@ -6,6 +6,9 @@ import at.bernhardberger.tvheadend.sdk.core.EpgCoverage
 import at.bernhardberger.tvheadend.sdk.core.EpgCoveragePolicy
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.RetainedMetadataAuthority
+import at.bernhardberger.tvheadend.sdk.core.epgSnapshotAuthority
+import at.bernhardberger.tvheadend.sdk.core.epgSnapshotForDisplay
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import java.time.Instant as JavaInstant
@@ -417,7 +420,9 @@ internal fun resolveGuideFrontierOrigin(
 }
 
 fun EpgRepositoryState.currentEpgSnapshot(): EpgSnapshot? =
-    (this as? EpgRepositoryState.Current)?.snapshot
+    epgSnapshotForDisplay?.takeIf {
+        epgSnapshotAuthority == RetainedMetadataAuthority.CURRENT
+    }
 
 enum class EpgColumnDataState {
     READY,

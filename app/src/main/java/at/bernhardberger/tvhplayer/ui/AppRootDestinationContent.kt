@@ -8,6 +8,7 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.PlaybackRecoverySecondaryAction
 import at.bernhardberger.tvhplayer.core.SimpleTvSettings
+import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.components.ContentContainer
@@ -211,7 +212,7 @@ internal fun RecordingPlayerRouteContent(
     showSimpleTvExit: Boolean,
     playerCloseAllowed: Boolean,
     fullPlaybackOptionsAvailable: Boolean,
-    connectionAvailable: Boolean,
+    connectionState: ConnectionState,
     onReconnect: () -> Unit,
     onUnlock: () -> Unit,
     onClose: () -> Unit,
@@ -224,7 +225,7 @@ internal fun RecordingPlayerRouteContent(
             showSimpleTvExit = showSimpleTvExit,
             playerCloseAllowed = playerCloseAllowed,
             fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
-            connectionAvailable = connectionAvailable,
+            connectionState = connectionState,
             onReconnect = onReconnect,
             onUnlock = onUnlock,
             onClose = onClose,

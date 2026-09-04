@@ -59,6 +59,26 @@ class EpgSearchObservationPolicyTest {
     }
 
     @Test
+    fun searchEventFindsRecordingInStaleAndSynchronizingDisplaySnapshots() {
+        val event = EpgEvent.create(
+            id = EventId(22),
+            channelId = ChannelId(8),
+            start = Instant.fromEpochSeconds(1_800_000_000),
+            stop = Instant.fromEpochSeconds(1_800_003_600),
+        )
+        val recording = DvrEntry.create(id = DvrEntryId(32), eventId = event.id)
+        val snapshot = DvrSnapshot.create(entries = listOf(recording))
+
+        listOf(
+            SessionObservation.create(dvrState = DvrRepositoryState.Stale(snapshot)),
+            SessionObservation.create(dvrState = DvrRepositoryState.Synchronizing(snapshot)),
+        ).forEach { retainedObservation ->
+            assertNull(retainedObservation.currentSession)
+            assertSame(recording, retainedObservation.dvrEntryForProgramme(event))
+        }
+    }
+
+    @Test
     fun pendingConfirmationDoesNotDispatchAfterGenerationReplacement() = runTest {
         val opened = observation()
         val replacement = observation()

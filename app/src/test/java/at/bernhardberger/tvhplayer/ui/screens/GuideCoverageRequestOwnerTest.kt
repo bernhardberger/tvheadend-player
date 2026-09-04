@@ -22,7 +22,7 @@ class GuideCoverageRequestOwnerTest {
             timeoutMillis = 1_000L,
         )
         val channelId = ChannelId(7)
-        val acquire: suspend (ChannelId) -> Unit = {
+        val acquire: suspend (List<ChannelId>) -> Unit = {
             starts++
             try {
                 awaitCancellation()
@@ -31,9 +31,9 @@ class GuideCoverageRequestOwnerTest {
             }
         }
 
-        val first = owner.request(setOf(channelId), windowStartSec = 100L, acquire)
+        val first = owner.request(listOf(channelId), windowStartSec = 100L, acquire)
         runCurrent()
-        val duplicate = owner.request(setOf(channelId), windowStartSec = 100L, acquire)
+        val duplicate = owner.request(listOf(channelId), windowStartSec = 100L, acquire)
         runCurrent()
 
         assertEquals(first, duplicate)
@@ -46,7 +46,7 @@ class GuideCoverageRequestOwnerTest {
         assertFalse(owner.isPending(first))
         assertEquals(1, cancellations)
 
-        val retry = owner.request(setOf(channelId), windowStartSec = 100L, acquire)
+        val retry = owner.request(listOf(channelId), windowStartSec = 100L, acquire)
         runCurrent()
 
         assertEquals(2, starts)
@@ -65,7 +65,7 @@ class GuideCoverageRequestOwnerTest {
             scope = backgroundScope,
             timeoutMillis = 10_000L,
         )
-        val first = owner.request(setOf(channelId), windowStartSec = 100L) {
+        val first = owner.request(listOf(channelId), windowStartSec = 100L) {
             try {
                 awaitCancellation()
             } finally {
@@ -74,7 +74,7 @@ class GuideCoverageRequestOwnerTest {
         }
         runCurrent()
 
-        val replacement = owner.request(setOf(channelId), windowStartSec = 200L) {
+        val replacement = owner.request(listOf(channelId), windowStartSec = 200L) {
             throw IllegalStateException("expected acquisition failure")
         }
         runCurrent()
@@ -92,7 +92,7 @@ class GuideCoverageRequestOwnerTest {
         )
         var cancellations = 0
         val token = owner.request(
-            channelIds = setOf(ChannelId(1), ChannelId(2)),
+            channelIds = listOf(ChannelId(1), ChannelId(2)),
             windowStartSec = 100L,
         ) {
             try {
@@ -106,7 +106,31 @@ class GuideCoverageRequestOwnerTest {
         owner.cancelAll()
         runCurrent()
 
-        assertEquals(2, cancellations)
+        assertEquals(1, cancellations)
         assertFalse(owner.isPending(token))
+    }
+
+    @Test
+    fun pageIsAcquiredOnceInVisibleChannelOrderAndSettlesTogether() = runTest {
+        val owner = GuideCoverageRequestOwner(
+            scope = backgroundScope,
+            timeoutMillis = 10_000L,
+        )
+        val first = ChannelId(3)
+        val second = ChannelId(1)
+        val acquisitions = mutableListOf<List<ChannelId>>()
+
+        val token = owner.request(
+            channelIds = listOf(first, second, first),
+            windowStartSec = 100L,
+        ) { channelIds ->
+            acquisitions += channelIds
+        }
+        runCurrent()
+
+        assertEquals(listOf(listOf(first, second)), acquisitions)
+        assertFalse(owner.isPending(token))
+        assertFalse(owner.isPending(first, windowStartSec = 100L))
+        assertFalse(owner.isPending(second, windowStartSec = 100L))
     }
 }

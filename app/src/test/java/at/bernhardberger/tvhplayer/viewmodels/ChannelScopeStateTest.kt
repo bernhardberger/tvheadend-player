@@ -39,4 +39,20 @@ class ChannelScopeStateTest {
         assertFalse(state.channelCatalogCurrent)
         assertTrue(state.scope.visibleChannels.isEmpty())
     }
+
+    @Test
+    fun staleAndSynchronizingCatalogsRemainVisibleWithoutCurrentAuthority() {
+        val channel = Channel.create(id = ChannelId(9), name = "Nine")
+        val catalog = ChannelCatalog.create(channels = listOf(channel))
+
+        listOf(
+            ChannelRepositoryState.Stale(catalog),
+            ChannelRepositoryState.Synchronizing(catalog),
+        ).forEach { repositoryState ->
+            val state = resolveChannelScopeState(repositoryState, activeTagId = null)
+
+            assertFalse(state.channelCatalogCurrent)
+            assertEquals(listOf(channel), state.scope.visibleChannels)
+        }
+    }
 }

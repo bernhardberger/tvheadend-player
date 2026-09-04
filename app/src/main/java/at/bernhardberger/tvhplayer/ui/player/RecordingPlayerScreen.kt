@@ -69,6 +69,7 @@ import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
+import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import coil3.ImageLoader
@@ -92,11 +93,12 @@ fun RecordingPlayerScreen(
     showSimpleTvExit: Boolean = false,
     playerCloseAllowed: Boolean = true,
     fullPlaybackOptionsAvailable: Boolean = true,
-    connectionAvailable: Boolean,
+    connectionState: ConnectionState,
     onReconnect: () -> Unit,
     onUnlock: () -> Unit = {},
     onClose: () -> Unit,
 ) {
+    val connectionAvailable = connectionState is ConnectionState.Connected
     val scope = rememberCoroutineScope()
     val playbackState by session.state.collectAsStateWithLifecycle()
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
@@ -303,7 +305,7 @@ fun RecordingPlayerScreen(
                 failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED)
     val recoveryUiModel = playbackRecoveryUiModel(
         surface = PlaybackRecoverySurface.RECORDING,
-        connectionAvailable = connectionAvailable,
+        connectionState = connectionState,
         retryTargetAvailable = retryTargetAvailable,
         secondaryAction = PlaybackRecoverySecondaryAction.CLOSE,
     )

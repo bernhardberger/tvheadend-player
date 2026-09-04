@@ -81,7 +81,20 @@ fun mainStartupPresentation(
             simpleTvActive = simpleTvActive,
             normalActions = connectionSettingsAction,
         )
-        is ConnectionUiState.Error,
+        is ConnectionUiState.Error -> when (connectionState.primaryRecoveryAction()) {
+            ConnectionRecoveryAction.RETRY -> actionableFailure(
+                normalMessageKind = MainStartupMessageKind.RETRYABLE_FAILURE,
+                simpleTvActive = simpleTvActive,
+            )
+            ConnectionRecoveryAction.SETTINGS -> actionableFailure(
+                normalMessageKind = MainStartupMessageKind.RETRYABLE_FAILURE,
+                simpleTvActive = simpleTvActive,
+                normalActions = connectionSettingsAction,
+                simpleTvActions = exitSimpleTvAction,
+            )
+            ConnectionRecoveryAction.NONE ->
+                MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING)
+        }
         is ConnectionUiState.SubscriptionError -> actionableFailure(
             normalMessageKind = MainStartupMessageKind.RETRYABLE_FAILURE,
             simpleTvActive = simpleTvActive,
@@ -93,10 +106,11 @@ private fun actionableFailure(
     normalMessageKind: MainStartupMessageKind,
     simpleTvActive: Boolean,
     normalActions: List<MainStartupActionId> = retryAndConnectionSettingsActions,
+    simpleTvActions: List<MainStartupActionId> = retryAndExitSimpleTvActions,
 ): MainStartupPresentation.Actionable = if (simpleTvActive) {
     MainStartupPresentation.Actionable(
         messageKind = MainStartupMessageKind.SIMPLE_TV_FAILURE,
-        actions = retryAndExitSimpleTvActions,
+        actions = simpleTvActions,
     )
 } else {
     MainStartupPresentation.Actionable(
@@ -110,6 +124,7 @@ private val retryAndConnectionSettingsActions = listOf(
     MainStartupActionId.CONNECTION_SETTINGS,
 )
 private val connectionSettingsAction = listOf(MainStartupActionId.CONNECTION_SETTINGS)
+private val exitSimpleTvAction = listOf(MainStartupActionId.EXIT_SIMPLE_TV)
 private val retryAndExitSimpleTvActions = listOf(
     MainStartupActionId.RETRY,
     MainStartupActionId.EXIT_SIMPLE_TV,
