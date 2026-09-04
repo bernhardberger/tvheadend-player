@@ -146,8 +146,7 @@ for bounded multi-file source maps and call traces, `app-planner` for an optiona
 design second opinion, `app-analyze` for one concrete post-plan contradiction,
 and `app-research` for one authoritative external-source question after local
 sources are insufficient. Use `android-reviewer` for a risk-based frozen-packet
-review and `app-review-muse` as its experimental paired reviewer during the Muse
-field test. Use `tv-evidence-curator` for mechanical screenshot-set validation,
+review. Use `tv-evidence-curator` for mechanical screenshot-set validation,
 `tv-ux-brief` for pre-implementation product direction, and `tv-ux-reviewer` for
 final screenshot-first design review. Only `app-locator` children may be
 delegated by read-only children, and depth 2 is terminal. Children cannot edit,
@@ -156,15 +155,7 @@ ledgers, handoffs, archives, or broad plans. Their configured model variants and
 step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
 `max` effort.
 
-For every frozen package review during the Muse field test, launch one fixed
-Sol/high `android-reviewer` and one fixed OpenRouter Muse Spark 1.3 Contributor/xhigh
-`app-review-muse` in parallel with substantively identical packets. Sol remains
-the mandatory review gate; Muse provider failure is non-blocking and Muse does
-not replace a Sol verdict. Adjudicate every concrete finding from either
-completed reviewer and record the Muse session, verdict, and disposition in the
-package evidence. Run at most one Muse review alongside each admitted Sol broad
-or closure round; never start an independent Muse retry or review loop. Apply the
-same credential-redaction rules used for every external reviewer packet.
+The Muse reviewer field test is complete; do not invoke `app-review-muse`.
 
 For a substantial new or redesigned TV surface, obtain one fresh fixed
 Opus/high `tv-ux-brief` before implementation and one final fixed Opus/medium

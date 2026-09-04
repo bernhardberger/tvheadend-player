@@ -71,6 +71,12 @@ muse = (config_path.parent / "agents" / "app-review-muse.md").read_text(encoding
 for verdict in ("BLOCKING", "NON_BLOCKING", "CLEAN", "INSUFFICIENT_EVIDENCE"):
     if f"`{verdict}`" not in muse:
         raise SystemExit(f"app-review-muse: missing verdict {verdict}")
+
+policy = (config_path.parents[1] / "AGENTS.md").read_text(encoding="utf-8")
+if "The Muse reviewer field test is complete; do not invoke `app-review-muse`." not in policy:
+    raise SystemExit("AGENTS.md: missing retired Muse field-test route")
+if "routine, documentation, test-only, and\nconfiguration-only changes are Sol-only." not in policy:
+    raise SystemExit("AGENTS.md: missing routine Sol-only route")
 PY
 TESTS=$((TESTS + 1))
 
