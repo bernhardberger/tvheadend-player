@@ -683,6 +683,17 @@ class GradleRunProcessTest(GradleRunTestCase):
         self.assertIn("Gradle launcher", result.stderr)
         self.assertFalse(list((self.root / workflow).glob("*.log")))
 
+    def test_repository_verify_is_accepted_without_gradle_arguments(self) -> None:
+        verify = Path(__file__).resolve().parents[4] / "tools/verify"
+        command = [str(verify)]
+        self.assertEqual(command, GRADLE_RUN.effective_command(command))
+        with mock.patch("os.getcwd", return_value=str(verify.parent)):
+            self.assertEqual(command, GRADLE_RUN.effective_command(["verify"]))
+        with self.assertRaisesRegex(ValueError, "does not accept arguments"):
+            GRADLE_RUN.effective_command([*command, "--scan"])
+        with self.assertRaisesRegex(ValueError, "Gradle launcher"):
+            GRADLE_RUN.effective_command([str(self.root / "tools/verify")])
+
     def test_custom_gradle_wrapper_script_is_accepted(self) -> None:
         workflow = self.create_workflow()
         custom_wrapper = self.gradle.with_name("gradlew_custom")

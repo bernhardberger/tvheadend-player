@@ -40,7 +40,7 @@ printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
     compileDebugAndroidTestKotlin \
     assembleDebug \
     :app:verifyExternalSdkConsumption \
-    --no-daemon
+    --no-daemon --console=plain --no-scan
 
 printf '==> External native dependency and packaged APK integrity\n'
 ./tools/check-native-libs

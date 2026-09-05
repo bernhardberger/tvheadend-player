@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.toConnectionState
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
@@ -62,9 +61,4 @@ class VideoPlayerViewModel(
     suspend fun goLive() = playbackRuntime.goLive()
 
     fun setDiagnosticsEnabled(enabled: Boolean) = playbackRuntime.setDiagnosticsEnabled(enabled)
-
-    fun epgForChannel(channelId: ChannelId) = session.observation.map { observation ->
-        observation.epgSnapshotForDisplay?.events.orEmpty()
-            .filter { it.channelId == channelId }
-    }
 }

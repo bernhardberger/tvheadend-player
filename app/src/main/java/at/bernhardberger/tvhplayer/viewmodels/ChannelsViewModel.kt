@@ -52,8 +52,6 @@ class ChannelsViewModel(
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
-    val allChannels = session.observation.map { it.channelCatalogForDisplay?.channels.orEmpty() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val unavailableTagNotice = tagSettings.unavailableTagNotice
 
     init {
@@ -115,11 +113,6 @@ class ChannelsViewModel(
 
     fun nextEvent(channelId: ChannelId, nowSec: Long): EpgEvent? =
         session.observation.value.nextEvent(channelId, kotlin.time.Instant.fromEpochSeconds(nowSec))
-
-    fun epgForChannel(channelId: ChannelId) = session.observation.map { observation ->
-        observation.epgSnapshotForDisplay?.events.orEmpty()
-            .filter { it.channelId == channelId }
-    }
 }
 
 internal fun resolveChannelScopeState(

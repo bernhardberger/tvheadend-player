@@ -14,7 +14,8 @@ metadata:
 This skill is based on `chrisbanes/skills` commit
 `ded78abbe5a170c9ca0497b614f63c1a872d9f8e`. TVHeadend Player locally added
 the live-test credential isolation described below and its focused tests,
-and made diagnostic delegation optional while retaining exclusive run ownership;
+made diagnostic delegation optional while retaining exclusive run ownership,
+and added support for the repository's `tools/verify` gate;
 those changes are not upstream. The bundled `LICENSE` contains the Apache
 License 2.0 terms for the upstream work and local derivative.
 
@@ -53,6 +54,12 @@ wrapper; never stream, `tee`, paste, or reopen a complete build log.
    default so ordinary tests cannot inherit live-server activation. Set
    `GRADLE_RUN_ALLOW_LIVE_TESTS=1` on the wrapper invocation only when the
    requested command intentionally owns those live tests.
+
+   For the final application gate, pass `./tools/verify` as the command with no
+   trailing arguments. The wrapper accepts this repository's exact script path;
+   the script supplies its own Gradle console/no-scan defaults. This retains the
+   same compact diagnostics, credential isolation and process ownership without
+   a second launcher or a nested Gradle lock.
 4. For incidental validation, stay in the current agent and run the smallest
    owning task with a non-empty verification question:
 

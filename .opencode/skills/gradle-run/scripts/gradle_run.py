@@ -438,6 +438,11 @@ def is_gradle_launcher(command: str) -> bool:
 
 def effective_command(command: list[str]) -> list[str]:
     """Add safe Gradle defaults without overriding an explicit scan choice."""
+    verify = Path(__file__).resolve().parents[4] / "tools/verify"
+    if Path(command[0]).resolve() == verify:
+        if len(command) != 1:
+            raise ValueError("tools/verify does not accept arguments")
+        return [str(verify)]
     if not is_gradle_launcher(command[0]):
         raise ValueError("command must start with a Gradle launcher")
     effective = list(command)
