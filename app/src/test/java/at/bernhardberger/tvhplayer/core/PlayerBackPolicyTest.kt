@@ -8,6 +8,17 @@ import org.junit.Test
 
 class PlayerBackPolicyTest {
     @Test
+    fun visibleControlsRetainFocusWhileBackCancelsOnlyUndispatchedPreview() {
+        for (surface in PlayerSurface.entries) {
+            assertEquals(PlayerBackAction.CANCEL_PENDING_SEEK,
+                playerBackAction(surface, PlayerForegroundLayer.CONTROLS, PlayerSeekPreviewPhase.PENDING))
+            assertEquals(PlayerBackAction.DISMISS_SEEK_FEEDBACK,
+                playerBackAction(surface, PlayerForegroundLayer.CONTROLS, PlayerSeekPreviewPhase.DISPATCHED))
+            assertEquals(PlayerBackAction.HIDE_CONTROLS,
+                playerBackAction(surface, PlayerForegroundLayer.CONTROLS, PlayerSeekPreviewPhase.NONE))
+        }
+    }
+    @Test
     fun passiveForegroundLayersReturnFocusToThePlayerRoot() {
         listOf(
             PlayerForegroundLayer.NUMBER_ENTRY,
@@ -56,7 +67,7 @@ class PlayerBackPolicyTest {
             PlayerForegroundLayer.CHANNEL_DRAWER,
             PlayerForegroundLayer.RECOVERY,
             PlayerForegroundLayer.TERMINAL_ERROR,
-            PlayerForegroundLayer.PENDING_SEEK_PREVIEW,
+            PlayerForegroundLayer.CONTROLS,
             PlayerForegroundLayer.CONTROLS,
             PlayerForegroundLayer.STATS,
             PlayerForegroundLayer.NONE,
@@ -178,7 +189,6 @@ class PlayerBackPolicyTest {
         val actions = PlayerForegroundLayer.entries.associateWith { layer ->
             playerBackAction(
                 surface = PlayerSurface.LIVE,
-                playerCloseAllowed = true,
                 foregroundLayer = layer,
             )
         }
@@ -196,7 +206,7 @@ class PlayerBackPolicyTest {
     }
 
     @Test
-    fun deniedPlayerCloseContainsRecoveryTerminalErrorAndLayerlessPlayer() {
+    fun recoveryTerminalErrorAndLayerlessPlayerReturnToBrowse() {
         listOf(
             PlayerForegroundLayer.RECOVERY,
             PlayerForegroundLayer.TERMINAL_ERROR,
@@ -204,11 +214,7 @@ class PlayerBackPolicyTest {
         ).forEach { layer ->
             assertEquals(
                 PlayerBackAction.CLOSE_PLAYER,
-                playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = true, layer),
-            )
-            assertEquals(
-                PlayerBackAction.CONSUME_WITHOUT_CHANGE,
-                playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = false, layer),
+                playerBackAction(PlayerSurface.LIVE, layer),
             )
         }
     }
@@ -218,7 +224,7 @@ class PlayerBackPolicyTest {
         listOf(PlayerForegroundLayer.TERMINAL_ERROR, PlayerForegroundLayer.NONE).forEach { layer ->
             assertEquals(
                 PlayerBackAction.CLOSE_PLAYER,
-                playerBackAction(PlayerSurface.RECORDING, playerCloseAllowed = true, layer),
+                playerBackAction(PlayerSurface.RECORDING, layer),
             )
         }
     }

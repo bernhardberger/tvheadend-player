@@ -102,7 +102,6 @@ class ConnectionUiStateTest {
                 surface = PlaybackRecoverySurface.LIVE,
                 connectionState = connectionState,
                 retryTargetAvailable = false,
-                secondaryAction = PlaybackRecoverySecondaryAction.CLOSE,
             )
 
             assertEquals(expectedCommand, model.retryCommand)

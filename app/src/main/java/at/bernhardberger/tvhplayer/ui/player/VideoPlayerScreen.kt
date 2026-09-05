@@ -57,6 +57,7 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_DELAY_MS
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_FADE_IN_MS
@@ -70,7 +71,6 @@ import at.bernhardberger.tvhplayer.core.LiveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
-import at.bernhardberger.tvhplayer.core.PlaybackRecoverySecondaryAction
 import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
@@ -134,6 +134,7 @@ import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -195,9 +196,16 @@ internal suspend fun stopPlaybackAndClose(
 
 internal suspend fun startInitialLivePlayback(
     startPlayback: suspend () -> PlaybackTargetResult?,
+    isCurrent: () -> Boolean,
+    onRejected: suspend () -> Unit,
     onResolved: (PlaybackTargetResult?) -> Unit,
 ) {
-    onResolved(startPlayback())
+    val result = startPlayback()
+    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+    if (!isCurrent()) return
+    if (result?.isStarted != true) onRejected()
+    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+    if (isCurrent()) onResolved(result)
 }
 
 val bottomGradient = Brush.verticalGradient(
@@ -241,15 +249,7 @@ fun VideoPlayerScreen(
     session: TvheadendSession = koinInject(),
     channelId: ChannelId,
     channelName: String,
-    timeshiftAllowed: Boolean = true,
-    showStop: Boolean = true,
-    recordingActionsAllowed: Boolean = true,
-    playerCloseAllowed: Boolean = true,
-    fullPlaybackOptionsAvailable: Boolean = true,
-    recoverySecondaryAction: PlaybackRecoverySecondaryAction =
-        PlaybackRecoverySecondaryAction.CLOSE,
     onReconnect: () -> Unit,
-    onUnlock: () -> Unit = {},
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -269,13 +269,6 @@ fun VideoPlayerScreen(
     val sdkTimeshiftState = activeLivePlayback?.timeshiftState ?: LiveTimeshiftState.Unavailable
     val subscriptionFailure = activeLivePlayback?.subscriptionIssue
     val diagnostics by videoPlayerViewModel.diagnostics.collectAsStateWithLifecycle()
-    val effectiveTimeshiftState = if (
-        timeshiftAllowed
-    ) {
-        sdkTimeshiftState.toAppPresentation()
-    } else {
-        AppTimeshiftState()
-    }
     val channels by channelsVm.channels.collectAsStateWithLifecycle()
     val observation by videoPlayerViewModel.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
@@ -297,6 +290,8 @@ fun VideoPlayerScreen(
     var restoreOptionsFocus by remember { mutableStateOf(false) }
     var restoreInfoFocus by remember { mutableStateOf(false) }
     var restoreRecordFocus by remember { mutableStateOf(false) }
+    var infoOpenedFromRecord by remember { mutableStateOf(false) }
+    var restoreRecordActionFocus by remember { mutableStateOf(false) }
     var infoRecordingState by remember {
         mutableStateOf<LiveInfoRecordingState>(LiveInfoRecordingState.Idle)
     }
@@ -304,6 +299,22 @@ fun VideoPlayerScreen(
 
     var currentChannelId by remember { mutableStateOf(channelId) }
     var currentChannelName by remember { mutableStateOf(channelName) }
+    val confirmedPlayingChannelId = playingLiveChannelId.takeIf {
+        it == currentChannelId && playbackState is AppPlaybackState.Playing
+    }
+    var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }
+    LaunchedEffect(videoPlayerViewModel, activeLivePlayback) {
+        sampledTimeshiftState = AppTimeshiftState()
+        while (true) {
+            sampledTimeshiftState = videoPlayerViewModel.sampleTimeshiftPresentation()
+            delay(250L)
+        }
+    }
+    val effectiveTimeshiftState = if (confirmedPlayingChannelId != null) {
+        sampledTimeshiftState
+    } else {
+        AppTimeshiftState()
+    }
     var requestedLiveSelection by remember { mutableStateOf<LivePlaybackSelection?>(null) }
     val authorizedLiveSelection = resolveLivePlaybackSelection(
         observation = observation,
@@ -311,11 +322,16 @@ fun VideoPlayerScreen(
         requestedSelection = requestedLiveSelection,
     )
     var initialPlaybackResolved by remember { mutableStateOf(false) }
+    var liveRequestToken by remember { mutableLongStateOf(0L) }
+    var requestedChannelFailed by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val timeshiftUnavailableText = stringResource(R.string.timeshift_unavailable)
     val timeshiftReconnectLiveText = stringResource(R.string.timeshift_reconnect_live)
     val timeshiftSeekClampedText = stringResource(R.string.timeshift_seek_clamped)
+    val timeshiftExpiredText = stringResource(R.string.timeshift_target_expired)
+    val timeshiftReplacedText = stringResource(R.string.timeshift_target_replaced)
+    val timeshiftUncertainText = stringResource(R.string.timeshift_seek_uncertain)
     val player = remember { videoPlayerViewModel.getPlayerInstance() }
     val timelineState = rememberLiveTimelinePresentationState(player)
     val nowSec = timelineState.nowEpochSec
@@ -379,6 +395,7 @@ fun VideoPlayerScreen(
         currentChannelId,
         authorizedLiveSelection,
         requestedLiveSelection,
+        liveRequestToken,
     ) {
         if (!screenActive) {
             lastPlayedChannelId = null
@@ -402,27 +419,37 @@ fun VideoPlayerScreen(
         }
         if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
         val playbackSelection = authorizedLiveSelection ?: return@LaunchedEffect
+        val requestToken = liveRequestToken
         startInitialLivePlayback(
             startPlayback = { videoPlayerViewModel.playChannel(playbackSelection) },
+            isCurrent = { requestToken == liveRequestToken },
+            onRejected = {
+                requestedChannelFailed = true
+                lastPlayedChannelId = null
+                videoPlayerViewModel.stop()
+            },
             onResolved = { result ->
                 initialPlaybackResolved = true
                 if (result?.isStarted == true) {
                     lastPlayedChannelId = currentChannelId
-                    requestedLiveSelection = null
+                    requestedChannelFailed = false
                 }
+                requestedLiveSelection = null
             },
         )
     }
 
-    LaunchedEffect(playingLiveChannelId, currentChannelId) {
-        if (playingLiveChannelId == currentChannelId) {
+    LaunchedEffect(confirmedPlayingChannelId) {
+        if (confirmedPlayingChannelId != null) {
             lastPlayedChannelStore.setChannelId(currentChannelId)
         }
     }
 
-    fun openInfo() {
+    fun openInfo(fromRecord: Boolean = false) {
+        infoOpenedFromRecord = fromRecord
         restoreInfoFocus = false
-        restoreRecordFocus = false
+        restoreRecordActionFocus = false
+        restoreRecordFocus = fromRecord
         layerState.openInfo()
     }
 
@@ -437,7 +464,8 @@ fun VideoPlayerScreen(
         layerState.dismissRecordingConfirmation()
         restoreRecordFocus = false
         layerState.closeInfo()
-        restoreInfoFocus = true
+        restoreInfoFocus = !infoOpenedFromRecord
+        restoreRecordActionFocus = infoOpenedFromRecord
     }
 
     fun openChannelDrawer() {
@@ -454,7 +482,10 @@ fun VideoPlayerScreen(
             requestedDeltaMs = deltaMs,
             unavailableText = timeshiftUnavailableText,
             clampedText = timeshiftSeekClampedText,
-            seekRelative = videoPlayerViewModel::seekTimeshift,
+            expiredText = timeshiftExpiredText,
+            replacedText = timeshiftReplacedText,
+            uncertainText = timeshiftUncertainText,
+            seekContent = videoPlayerViewModel::seekTimeshift,
         )
     }
 
@@ -464,7 +495,7 @@ fun VideoPlayerScreen(
         selection.setSelected(channelId)
         selectedId = channelId
 
-        val pickAction = channelPickAction(currentChannelId, channelId)
+        val pickAction = channelPickAction(confirmedPlayingChannelId, channelId)
         if (pickAction == ChannelPickAction.CLOSE_DRAWER) {
             layerState.closeChannelDrawer()
             return true
@@ -474,6 +505,9 @@ fun VideoPlayerScreen(
             ?: return true
         timeshiftCommandToken += 1L
         timelineState.invalidateForSourceChange()
+        liveRequestToken += 1L
+        requestedChannelFailed = false
+        lastPlayedChannelId = null
         requestedLiveSelection = playbackSelection
         currentChannelId = channelId
         currentChannelName = channel.name.orEmpty()
@@ -559,19 +593,18 @@ fun VideoPlayerScreen(
     val optimisticRecordingMatchesCurrent = optimisticRecordingTarget != null &&
         optimisticRecordingTarget == currentRecordingTarget
     val infoRecordingScheduled = currentRecording != null || optimisticRecordingMatchesCurrent
-    val canRecordFromInfo = recordingActionsAllowed &&
-        canModifyRecordings &&
+    val canRecordFromInfo = canModifyRecordings &&
         infoRecordingState !is LiveInfoRecordingState.Dispatching &&
         !(infoRecordingState is LiveInfoRecordingState.Succeeded &&
             optimisticRecordingMatchesCurrent)
     val recordActionEligible = !infoRecordingScheduled && canRecordFromInfo
-    val currentSubscriptionFailure = subscriptionFailure
+    val currentSubscriptionFailure = subscriptionFailure.takeIf { playingLiveChannelId == currentChannelId }
     val statusPresentation = playbackStatusPresentation(
         connectionAvailable = connState is ConnectionState.Connected,
         playbackStarting = playbackState is AppPlaybackState.Starting,
         playbackRecovering = playbackState is AppPlaybackState.Recovering,
         playbackPlaying = playbackState is AppPlaybackState.Playing,
-        playbackFailed = playbackState is AppPlaybackState.Failed ||
+        playbackFailed = requestedChannelFailed || playbackState is AppPlaybackState.Failed ||
             currentSubscriptionFailure != null,
     )
     val recoveryVisible = screenActive &&
@@ -579,13 +612,17 @@ fun VideoPlayerScreen(
     val recoveryUiModel = playbackRecoveryUiModel(
         surface = PlaybackRecoverySurface.LIVE,
         connectionState = connState,
-        retryTargetAvailable = playbackState is AppPlaybackState.Recovering ||
-            currentSubscriptionFailure != null,
-        secondaryAction = recoverySecondaryAction,
+        retryTargetAvailable = playingLiveChannelId == currentChannelId &&
+            playbackState is AppPlaybackState.Recovering,
     )
     val recoveryHasRetry = recoveryUiModel.retryCommand != PlaybackRetryCommand.NONE
-    val recoverySafeActionIsExit =
-        recoveryUiModel.secondaryAction == PlaybackRecoverySecondaryAction.EXIT_SIMPLE_TV
+    val channelUnavailable = statusPresentation == PlaybackStatusPresentation.CHANNEL_UNAVAILABLE
+    LaunchedEffect(channelUnavailable) {
+        if (channelUnavailable) {
+            timelineState.invalidateForSourceChange()
+            layerState.showControls()
+        }
+    }
     fun currentPlayerForegroundContext() =
         layerState.foregroundContext(
             numberEntryVisible = channelNumberInput.isNotEmpty(),
@@ -727,7 +764,7 @@ fun VideoPlayerScreen(
                 if (!connectionLost) {
                     connectionLost = true
                     restoreToLiveAfterReconnect =
-                        effectiveTimeshiftState.available &&
+                        effectiveTimeshiftState.available && effectiveTimeshiftState.timingKnown &&
                             !timeshiftPositionPresentation(
                                 effectiveTimeshiftState
                             ).atLiveEdge
@@ -742,8 +779,8 @@ fun VideoPlayerScreen(
     val handlePlaybackBack: () -> Unit = {
         when (
             playerBackAction(
+                seekPreviewPhase = timelineState.seekPreviewPhase(layerState.controlsVisible),
                 surface = PlayerSurface.LIVE,
-                playerCloseAllowed = playerCloseAllowed,
                 foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
             )
         ) {
@@ -763,7 +800,6 @@ fun VideoPlayerScreen(
                 timelineState.dismissDispatchedFeedback()
             PlayerBackAction.HIDE_CONTROLS -> layerState.hideControls()
             PlayerBackAction.HIDE_STATS -> layerState.updateStatsVisibility(false)
-            PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
         }
     }
     PlayerBackHandler(handlePlaybackBack)
@@ -780,11 +816,17 @@ fun VideoPlayerScreen(
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                if (recoveryVisible) {
+                if (foregroundLayer == PlayerForegroundLayer.RECOVERY) {
                     return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
                 }
-                if (layerState.infoOpen) return@onPreviewKeyEvent false
-                if (layerState.optionsPage != null) return@onPreviewKeyEvent false
+                if (layerState.infoOpen || layerState.optionsPage != null) {
+                    if (event.key == Key.DirectionLeft && foregroundLayer != PlayerForegroundLayer.CONFIRMATION) {
+                        layerState.beginOpeningKeyCycle(keyCode)
+                        handlePlaybackBack()
+                        return@onPreviewKeyEvent true
+                    }
+                    return@onPreviewKeyEvent false
+                }
 
                 val mediaAction = mediaPlaybackAction(
                     keyCode = event.nativeKeyEvent.keyCode,
@@ -812,7 +854,7 @@ fun VideoPlayerScreen(
                             )
                         }
                         MediaPlaybackAction.TOGGLE -> {
-                            if (effectiveTimeshiftState.paused || !player.playWhenReady) {
+                            if (!player.playWhenReady) {
                                 videoPlayerViewModel.play()
                                 dispatchTimeshiftCommand(
                                     rollbackPlayWhenReady = false,
@@ -833,7 +875,9 @@ fun VideoPlayerScreen(
                 }
 
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
-                    channelNumberInput = ChannelNavigation.appendDigit(channelNumberInput, digit)
+                    if (event.nativeKeyEvent.repeatCount == 0) {
+                        channelNumberInput = ChannelNavigation.appendDigit(channelNumberInput, digit)
+                    }
                     return@onPreviewKeyEvent true
                 }
 
@@ -850,19 +894,16 @@ fun VideoPlayerScreen(
                     return@onPreviewKeyEvent when (event.key) {
                         Key.Enter,
                         Key.NumPadEnter,
-                        Key.DirectionCenter -> tuneEnteredChannel()
+                        Key.DirectionCenter -> {
+                            layerState.beginOpeningKeyCycle(keyCode)
+                            tuneEnteredChannel()
+                        }
                         else -> false
                     }
                 }
 
                 if (showDrawer) {
-                    return@onPreviewKeyEvent when (event.key) {
-                        Key.DirectionRight -> {
-                            layerState.closeChannelDrawer()
-                            true
-                        }
-                        else -> false
-                    }
+                    return@onPreviewKeyEvent false
                 }
 
                 val keyAction = playerKeyAction(
@@ -871,7 +912,6 @@ fun VideoPlayerScreen(
                         controlsVisible = layerState.controlsVisible,
                         seekbarFocused = false,
                         timeshiftAvailable = effectiveTimeshiftState.available,
-                        playerCloseAllowed = playerCloseAllowed,
                         optionsOpen = layerState.optionsPage != null,
                         statsOpen = layerState.statsVisible,
                         infoOpen = layerState.infoOpen,
@@ -893,11 +933,19 @@ fun VideoPlayerScreen(
                         }
                     }
                     PlayerKeyAction.REVEAL_CONTROLS -> {
+                        if (timelineState.seekPending) {
+                            timelineState.commitPendingSeek()
+                            if (event.key == Key.DirectionDown) {
+                                openChannelDrawer()
+                                return@onPreviewKeyEvent true
+                            }
+                            restoreInfoFocus = event.key == Key.DirectionUp
+                        }
                         layerState.showControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
-                        if (effectiveTimeshiftState.paused || !player.playWhenReady) {
+                        if (!player.playWhenReady) {
                             videoPlayerViewModel.play()
                             dispatchTimeshiftCommand(
                                 rollbackPlayWhenReady = false,
@@ -950,22 +998,40 @@ fun VideoPlayerScreen(
             enter = slideInHorizontally(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { -it },
             exit = slideOutHorizontally(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { -it },
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .fillMaxHeight()
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
         ) {
-            ChannelDrawer(
+            PlayerOverlayChrome(
+                footerPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                headerContent = { modifier ->
+                    PlayerIdentityHeader(
+                        imageLoader = imageLoader, currentSession = currentSession,
+                        piconPath = currentChannel?.icon,
+                        eyebrow = currentChannelNumber?.toString(),
+                        title = currentChannelName,
+                        support = if (confirmedPlayingChannelId != null) stringResource(R.string.player_shelf_playing) else null,
+                        clock = formatClock(nowSec), clockSupport = null,
+                        modifier = modifier,
+                    )
+                },
+            ) {
+              ChannelDrawer(
                 channels = channels,
                 selectedId = selectedId,
-                playingChannelId = currentChannelId,
+                playingChannelId = confirmedPlayingChannelId,
                 recordingChannelIds = recordingChannelIds,
-                nowSec = nowSec,
-                channelsVm = channelsVm,
+                nowEvent = { channelsVm.nowEvent(it, nowSec) },
+                nextEvent = { channelsVm.nextEvent(it, nowSec) },
                 imageLoader = imageLoader,
                 currentSession = currentSession,
                 onFocusChannel = { selectedId = it },
                 onPickChannel = { tuneChannel(it) },
-                onCloseDrawer = layerState::closeChannelDrawer,
+                onCloseDrawer = { keyCode ->
+                    if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
+                    layerState.closeChannelDrawer()
+                },
             )
+            }
         }
 
         PlayerControlsLayer(
@@ -979,17 +1045,19 @@ fun VideoPlayerScreen(
                 channelNumber = currentChannelNumber,
                 channelName = currentChannelName,
                 piconPath = currentChannel?.icon,
-                nowEvent = nowEvent,
-                nextEvent = nextEvent,
+                nowEvent = nowEvent.takeUnless { channelUnavailable },
+                nextEvent = nextEvent.takeUnless { channelUnavailable },
                 nowSec = nowSec,
                 controlsVisible = layerState.controlsVisible,
                 optionsOpen = layerState.optionsPage != null,
                 onOpenChannels = {
+                    layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
                     openChannelDrawer()
                 },
                 onOpenInfo = {
                     openInfo()
                 },
+                onOpenRecord = { openInfo(fromRecord = true) },
                 onStopPlayback = {
                     scope.launch {
                         stopPlaybackAndClose(
@@ -999,14 +1067,22 @@ fun VideoPlayerScreen(
                     }
                 },
                 onUserInteraction = layerState::onUserInteraction,
+                onCommitSeek = timelineState::commitPendingSeek,
                 onOpenOptions = {
                     restoreOptionsFocus = false
                     layerState.openOptions()
                 },
-                timeshiftState = effectiveTimeshiftState,
+                timeshiftState = timelineState.preview?.let {
+                    effectiveTimeshiftState.copy(positionMs = it.decision.targetMs)
+                } ?: effectiveTimeshiftState,
+                liveAvailable = !channelUnavailable,
+                channelRecordingNow = currentChannelId in recordingChannelIds,
+                nextScheduled = nextEvent?.let { observation.dvrEntryForEvent(it.id) }?.state ==
+                    at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
                 timeshiftFeedback = timelineState.feedback,
+                paused = !player.playWhenReady,
                 onToggleTimeshiftPause = {
-                    if (effectiveTimeshiftState.paused) {
+                    if (!player.playWhenReady) {
                         videoPlayerViewModel.play()
                         dispatchTimeshiftCommand(
                             rollbackPlayWhenReady = false,
@@ -1052,9 +1128,10 @@ fun VideoPlayerScreen(
                         }
                     }
                 },
-                showStop = showStop,
                 restoreInfoFocus = restoreInfoFocus,
                 onInfoFocusRestored = { restoreInfoFocus = false },
+                restoreRecordActionFocus = restoreRecordActionFocus,
+                onRecordActionFocusRestored = { restoreRecordActionFocus = false },
                 restoreOptionsFocus = restoreOptionsFocus,
                 onOptionsFocusRestored = { restoreOptionsFocus = false },
             )
@@ -1067,9 +1144,6 @@ fun VideoPlayerScreen(
             TimeshiftSeekPreview(
                 state = effectiveTimeshiftState,
                 decision = requireNotNull(timelineState.preview).decision,
-                nowEpochSec = nowSec,
-                programmeStartSec = nowEvent?.start?.epochSeconds,
-                programmeStopSec = nowEvent?.stop?.epochSeconds,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
@@ -1135,19 +1209,12 @@ fun VideoPlayerScreen(
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = layerState.statsVisible,
-                showSimpleTvExit = recoverySafeActionIsExit,
-                fullOptionsAvailable = fullPlaybackOptionsAvailable,
                 onPageChange = layerState::showOptionsPage,
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
                     scope.launch { settingsStore.setAspectRatio(mode) }
                 },
                 onStatsVisibleChange = layerState::updateStatsVisibility,
-                onSimpleTvExit = {
-                    layerState.closeOptions()
-                    restoreOptionsFocus = true
-                    onUnlock()
-                },
             )
         }
 
@@ -1175,6 +1242,16 @@ fun VideoPlayerScreen(
             }
         }
 
+        if (channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE)) {
+            Text(
+                text = stringResource(currentSubscriptionFailure?.messageResource() ?: R.string.player_playback_failed),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.align(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.78f))
+                    .padding(24.dp)
+                    .testTag("player-channel-unavailable"),
+            )
+        }
         CompactTuningStatus(
             visible = compactTuningVisible,
             label = stringResource(R.string.player_tuning_channel, currentChannelName),
@@ -1190,51 +1267,28 @@ fun VideoPlayerScreen(
                 when {
                     currentSubscriptionFailure != null ->
                         currentSubscriptionFailure.messageResource()
-                    recoverySafeActionIsExit && connState !is ConnectionState.Connected ->
-                        R.string.simple_tv_recovery_connection
-                    recoverySafeActionIsExit -> R.string.simple_tv_recovery_playback
                     connState !is ConnectionState.Connected -> R.string.player_connection_recovering
                     playbackState is AppPlaybackState.Failed -> R.string.player_playback_failed
                     else -> R.string.player_playback_recovering
                 }
             ),
-            hint = if (recoverySafeActionIsExit) {
-                stringResource(
-                    if (recoveryHasRetry) {
-                        R.string.simple_tv_recovery_hint
-                    } else {
-                        R.string.simple_tv_recovery_exit_hint
-                    }
-                )
-            } else {
-                null
-            },
-            opaque = recoverySafeActionIsExit,
             primaryActionLabel = if (recoveryHasRetry) {
                 stringResource(R.string.retry)
             } else {
-                stringResource(
-                    if (recoverySafeActionIsExit) R.string.simple_tv_unlock else R.string.close
-                )
+                stringResource(R.string.close)
             },
             onPrimaryAction = if (recoveryHasRetry) {
                 ::dispatchRecoveryRetry
-            } else if (recoverySafeActionIsExit) {
-                onUnlock
             } else {
                 onClose
             },
             secondaryActionLabel = if (recoveryHasRetry) {
-                stringResource(
-                    if (recoverySafeActionIsExit) R.string.simple_tv_unlock else R.string.close
-                )
+                stringResource(R.string.close)
             } else {
                 null
             },
             onSecondaryAction = if (!recoveryHasRetry) {
                 null
-            } else if (recoverySafeActionIsExit) {
-                onUnlock
             } else {
                 onClose
             },

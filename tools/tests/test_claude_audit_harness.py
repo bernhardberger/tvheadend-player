@@ -159,7 +159,6 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
                     self.assertNotIn(ceremony, text)
 
         lead_text = normalized(AGENT_DIR / "claude-audit-lead.md")
-        self.assertIn("Do not require quota telemetry", lead_text)
         self.assertIn("Never invoke another analytical", lead_text)
 
     def test_command_uses_configured_routes_and_simple_packets(self) -> None:
@@ -183,8 +182,6 @@ class ClaudeAuditHarnessTest(unittest.TestCase):
             self.assertNotIn(ceremony, text)
 
         required_contract = (
-            "Use the configured Claude routes",
-            "Do not ask any task to repeat route, model, variant, step, revision, quota, or provenance attestations",
             "bounded question",
             "allowed paths or sources",
             "exclusions",

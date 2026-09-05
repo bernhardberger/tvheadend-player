@@ -142,7 +142,6 @@ private fun MainStartupActionableContent(
 ) {
     val retryFocus = remember { FocusRequester() }
     val connectionSettingsFocus = remember { FocusRequester() }
-    val exitSimpleTvFocus = remember { FocusRequester() }
     var focusedActionId by remember { mutableStateOf<MainStartupActionId?>(null) }
     val title = stringResource(R.string.main_startup_actionable_title)
     val focusedOrFirstAction = focusedActionId
@@ -155,7 +154,6 @@ private fun MainStartupActionableContent(
                 action = action,
                 retryFocus = retryFocus,
                 connectionSettingsFocus = connectionSettingsFocus,
-                exitSimpleTvFocus = exitSimpleTvFocus,
             ).requestFocus()
         }
     }
@@ -200,7 +198,6 @@ private fun MainStartupActionableContent(
                                 action = action,
                                 retryFocus = retryFocus,
                                 connectionSettingsFocus = connectionSettingsFocus,
-                                exitSimpleTvFocus = exitSimpleTvFocus,
                             ),
                         )
                         .focusProperties {
@@ -209,7 +206,6 @@ private fun MainStartupActionableContent(
                                 actions = presentation.actions,
                                 retryFocus = retryFocus,
                                 connectionSettingsFocus = connectionSettingsFocus,
-                                exitSimpleTvFocus = exitSimpleTvFocus,
                             )
                             left = graph.left
                             right = graph.right
@@ -288,18 +284,15 @@ private fun mainStartupFocusGraph(
     actions: List<MainStartupActionId>,
     retryFocus: FocusRequester,
     connectionSettingsFocus: FocusRequester,
-    exitSimpleTvFocus: FocusRequester,
 ): MainStartupFocusGraph = when (action) {
     MainStartupActionId.RETRY -> MainStartupFocusGraph(
         left = FocusRequester.Cancel,
         right = when {
             MainStartupActionId.CONNECTION_SETTINGS in actions -> connectionSettingsFocus
-            MainStartupActionId.EXIT_SIMPLE_TV in actions -> exitSimpleTvFocus
             else -> FocusRequester.Cancel
         },
     )
-    MainStartupActionId.CONNECTION_SETTINGS,
-    MainStartupActionId.EXIT_SIMPLE_TV -> MainStartupFocusGraph(
+    MainStartupActionId.CONNECTION_SETTINGS -> MainStartupFocusGraph(
         left = if (MainStartupActionId.RETRY in actions) retryFocus else FocusRequester.Cancel,
         right = FocusRequester.Cancel,
     )
@@ -309,11 +302,9 @@ private fun mainStartupFocusRequester(
     action: MainStartupActionId,
     retryFocus: FocusRequester,
     connectionSettingsFocus: FocusRequester,
-    exitSimpleTvFocus: FocusRequester,
 ): FocusRequester = when (action) {
     MainStartupActionId.RETRY -> retryFocus
     MainStartupActionId.CONNECTION_SETTINGS -> connectionSettingsFocus
-    MainStartupActionId.EXIT_SIMPLE_TV -> exitSimpleTvFocus
 }
 
 @StringRes
@@ -331,14 +322,12 @@ private fun mainStartupMessageResource(messageKind: MainStartupMessageKind): Int
         R.string.main_startup_message_configuration_required
     MainStartupMessageKind.CREDENTIAL_UNAVAILABLE ->
         R.string.main_startup_message_credential_unavailable
-    MainStartupMessageKind.SIMPLE_TV_FAILURE -> R.string.main_startup_message_simple_tv_failure
 }
 
 @StringRes
 private fun mainStartupActionResource(action: MainStartupActionId): Int = when (action) {
     MainStartupActionId.RETRY -> R.string.main_startup_action_retry
     MainStartupActionId.CONNECTION_SETTINGS -> R.string.main_startup_action_connection_settings
-    MainStartupActionId.EXIT_SIMPLE_TV -> R.string.main_startup_action_exit_simple_tv
 }
 
 private fun mainStartupActionTag(action: MainStartupActionId): String =

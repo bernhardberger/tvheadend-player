@@ -4,6 +4,12 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult
+import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
+import at.bernhardberger.tvhplayer.playback.toAppPresentation
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.channelPickAction
@@ -23,6 +29,171 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerTimelinePresentationStateTest {
+    private fun fixture() = TimeshiftTestFixture(600.seconds).apply {
+        updateHistory(start = 0.seconds, end = 600.seconds)
+    }
+
+    private fun TimeshiftTestFixture.presentation(positionMs: Long = 540_000L) =
+        state.value.toAppPresentation(playbackPosition(positionMs.milliseconds))
+
+    @Test
+    fun contentSelectionStaysAbsoluteWhileTheLiveEdgeAdvances() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val dispatches = mutableListOf<Long>()
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain") { target ->
+            fixture.seek(target) {
+                dispatches += target.position.inWholeMilliseconds
+                fixture.completed(readerReached = null)
+            }
+        }
+        fixture.updateHistory(10.seconds, 610.seconds)
+        advanceTimeBy(400L)
+        runCurrent()
+        assertEquals(listOf(510_000L), dispatches)
+        assertNull(owner.feedback)
+    }
+
+    @Test
+    fun expiredUnavailableAndReplacedSelectionsNeverDispatchOrClamp() = runTest {
+        for (outcome in listOf("expired", "unavailable", "replaced")) {
+            val fixture = fixture()
+            val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+            owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+                "unavailable", "clamped", "expired", "replaced", "uncertain") { target ->
+                fixture.seek(target) { error("Invalid content must not dispatch") }
+            }
+            when (outcome) {
+                "expired" -> fixture.updateHistory(520.seconds, 620.seconds)
+                "unavailable" -> fixture.updateHistory(null, null)
+                "replaced" -> fixture.replaceSubscription()
+            }
+            advanceTimeBy(400L)
+            runCurrent()
+            assertEquals(outcome, owner.feedback)
+            owner.dispose()
+        }
+    }
+
+    @Test
+    fun sampledPlaybackDoesNotFollowHistoryAndDoesNotExtendSeekPermission() = runTest {
+        val fixture = fixture()
+        val pausedSample = fixture.playbackPosition(500.seconds)
+        fixture.updateHistory(520.seconds, 620.seconds)
+        val presentation = fixture.state.value.toAppPresentation(pausedSample)
+        assertEquals(500_000L, presentation.positionMs)
+        assertEquals(520_000L, presentation.bufferStartMs)
+        assertEquals(620_000L, presentation.liveEdgeMs)
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        owner.queueRelativeSeek(presentation, -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain") {
+            error("Expired played content cannot extend seekable history")
+        }
+        advanceTimeBy(400L)
+        runCurrent()
+        assertNull(owner.preview)
+        assertFalse(owner.seekPending)
+    }
+
+    @Test
+    fun liveCommitWakesDebounceWithoutOvertakingAnInFlightSeek() = runTest {
+        val release = CompletableDeferred<Unit>()
+        val dispatches = mutableListOf<Long>()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val fixture = fixture()
+        val timing = fixture.presentation()
+        val seek: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult = { target -> fixture.seek(target) {
+            dispatches += target.position.inWholeMilliseconds
+            if (dispatches.size == 1) release.await()
+            fixture.completed()
+        } }
+        owner.queueRelativeSeek(timing, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        runCurrent()
+        advanceTimeBy(100L)
+        owner.commitPendingSeek()
+        runCurrent()
+        assertEquals(listOf(510_000L), dispatches)
+        owner.queueRelativeSeek(timing, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        assertEquals(PlayerSeekPreviewPhase.PENDING, owner.seekPreviewPhase(controlsVisible = true))
+        owner.commitPendingSeek()
+        runCurrent()
+        assertEquals(1, dispatches.size)
+        release.complete(Unit)
+        runCurrent()
+        assertEquals(listOf(510_000L, 480_000L), dispatches)
+        assertEquals(100L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun recordingCommitIsImmediateAndNotRepeatedByTheIdleTimer() = runTest {
+        val dispatches = mutableListOf<Long>()
+        val owner = RecordingTimelinePresentationState(
+            scope = this, currentPositionMs = { 60_000L }, currentDurationMs = { 600_000L },
+            currentIsPlaying = { false }, currentEpochMillis = { 0L },
+            currentCanSeek = { true },
+            seekAbsolute = { dispatches += it }, feedbackSettled = { true },
+        )
+        owner.queueSeek(30_000L)
+        assertEquals(PlayerSeekPreviewPhase.PENDING, owner.seekPreviewPhase(controlsVisible = true))
+        owner.commitPendingSeek()
+        assertEquals(listOf(90_000L), dispatches)
+        assertEquals(PlayerSeekPreviewPhase.DISPATCHED, owner.seekPreviewPhase(controlsVisible = true))
+        advanceTimeBy(500L)
+        runCurrent()
+        assertEquals(listOf(90_000L), dispatches)
+    }
+
+    @Test
+    fun recordingSeeksRequireCapabilityAtInputAndDispatch() = runTest {
+        var canSeek = false
+        val owner = RecordingTimelinePresentationState(
+            scope = this,
+            currentPositionMs = { 60_000L }, currentDurationMs = { 600_000L },
+            currentIsPlaying = { false }, currentCanSeek = { canSeek },
+            currentEpochMillis = { 0L },
+            seekAbsolute = { error("Unavailable seek capability must not dispatch") },
+            feedbackSettled = { true },
+        )
+        owner.queueSeek(30_000L)
+        assertNull(owner.pendingTargetMs)
+        canSeek = true
+        owner.queueSeek(30_000L)
+        assertEquals(90_000L, owner.pendingTargetMs)
+        canSeek = false
+        owner.commitPendingSeek()
+        assertNull(owner.pendingTargetMs)
+        advanceTimeBy(500L)
+        runCurrent()
+    }
+
+    @Test
+    fun liveSeekWaitsForIdleAfterTheLatestRepeat() = runTest {
+        val dispatches = mutableListOf<Long>()
+        val state = LiveTimelinePresentationState(
+            scope = this,
+            currentEpochMillis = { 0L },
+            monotonicTimeMillis = { testScheduler.currentTime },
+        )
+        val fixture = fixture()
+        val timeshift = fixture.presentation()
+        val seek: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult = { target -> fixture.seek(target) {
+            dispatches += target.position.inWholeMilliseconds
+            fixture.completed()
+        } }
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        runCurrent()
+        advanceTimeBy(300L)
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        assertEquals(480_000L, state.preview?.decision?.targetMs)
+        advanceTimeBy(399L)
+        runCurrent()
+        assertTrue(dispatches.isEmpty())
+        advanceTimeBy(1L)
+        runCurrent()
+        assertEquals(listOf(480_000L), dispatches)
+    }
+
     @Test
     fun liveTimelineSameSourceSelectionKeepsSeekQueuedBehindInFlightDispatch() = runTest {
         val firstDispatch = CompletableDeferred<Unit>()
@@ -32,23 +203,19 @@ class PlayerTimelinePresentationStateTest {
             currentEpochMillis = { 5_400_000L },
             monotonicTimeMillis = { testScheduler.currentTime },
         )
-        val timeshift = AppTimeshiftState(
-            available = true,
-            bufferStartMs = -600_000L,
-            positionMs = -60_000L,
-            liveEdgeMs = 0L,
-        )
-        val seek: suspend (Long) -> TimeshiftCommandResult = { deltaMs ->
-            dispatches += deltaMs
+        val fixture = fixture()
+        val timeshift = fixture.presentation()
+        val seek: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult = { target -> fixture.seek(target) {
+            dispatches += target.position.inWholeMilliseconds
             if (dispatches.size == 1) firstDispatch.await()
-            TimeshiftCommandResult.ACCEPTED
-        }
+            fixture.completed()
+        } }
 
-        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", seek)
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
         assertEquals(PlayerSeekPreviewPhase.PENDING, state.seekPreviewPhase(controlsVisible = false))
         advanceTimeBy(400L)
         runCurrent()
-        assertEquals(listOf(-30_000L), dispatches)
+        assertEquals(listOf(510_000L), dispatches)
         assertEquals(
             PlayerSeekPreviewPhase.DISPATCHED,
             state.seekPreviewPhase(controlsVisible = false),
@@ -57,15 +224,15 @@ class PlayerTimelinePresentationStateTest {
         val pickAction = channelPickAction(ChannelId(7), ChannelId(7))
         assertEquals(ChannelPickAction.CLOSE_DRAWER, pickAction)
         if (pickAction == ChannelPickAction.TUNE) state.invalidateForSourceChange()
-        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", seek)
-        assertEquals(-120_000L, state.preview?.decision?.targetMs)
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        assertEquals(480_000L, state.preview?.decision?.targetMs)
         firstDispatch.complete(Unit)
         runCurrent()
         advanceTimeBy(400L)
         runCurrent()
 
-        assertEquals(listOf(-30_000L, -30_000L), dispatches)
-        assertEquals(-120_000L, state.preview?.decision?.targetMs)
+        assertEquals(listOf(510_000L, 480_000L), dispatches)
+        assertEquals(480_000L, state.preview?.decision?.targetMs)
     }
 
     @Test
@@ -77,27 +244,24 @@ class PlayerTimelinePresentationStateTest {
             monotonicTimeMillis = { testScheduler.currentTime },
         )
         val oldFeedbackToken = state.beginFeedbackOperation()
+        val fixture = fixture()
 
         state.queueRelativeSeek(
-            state = AppTimeshiftState(
-                available = true,
-                bufferStartMs = -600_000L,
-                positionMs = -590_000L,
-                liveEdgeMs = 0L,
-            ),
+            state = fixture.presentation(10_000L),
             requestedDeltaMs = -30_000L,
             unavailableText = "unavailable",
             clampedText = "clamped",
-            seekRelative = { deltaMs ->
-                dispatches += deltaMs
-                TimeshiftCommandResult.ACCEPTED
-            },
+            expiredText = "expired", replacedText = "replaced", uncertainText = "uncertain",
+            seekContent = { target -> fixture.seek(target) {
+                dispatches += target.position.inWholeMilliseconds
+                fixture.completed()
+            } },
         )
         assertFalse(state.applyFeedback(oldFeedbackToken, "stale"))
 
         advanceTimeBy(400L)
         runCurrent()
-        assertEquals(listOf(-10_000L), dispatches)
+        assertEquals(listOf(0L), dispatches)
         assertEquals("clamped", state.feedback)
 
         advanceTimeBy(950L)
@@ -113,24 +277,20 @@ class PlayerTimelinePresentationStateTest {
             currentEpochMillis = { 5_400_000L },
             monotonicTimeMillis = { testScheduler.currentTime },
         )
-        val timeshift = AppTimeshiftState(
-            available = true,
-            bufferStartMs = -600_000L,
-            positionMs = -60_000L,
-            liveEdgeMs = 0L,
-        )
+        val fixture = fixture()
+        val timeshift = fixture.presentation()
 
-        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped") {
-            TimeshiftCommandResult.TIMEOUT
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain") { target ->
+            fixture.seek(target) { fixture.completed(TimeshiftCommandResult.TIMEOUT) }
         }
         advanceTimeBy(400L)
         runCurrent()
 
-        assertNull(state.feedback)
-        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped") {
-            TimeshiftCommandResult.ACCEPTED
+        assertEquals("uncertain", state.feedback)
+        state.queueRelativeSeek(timeshift, -30_000L, "unavailable", "clamped", "expired", "replaced", "uncertain") { target ->
+            fixture.seek(target) { fixture.completed() }
         }
-        assertEquals(-90_000L, state.preview?.decision?.targetMs)
+        assertEquals(510_000L, state.preview?.decision?.targetMs)
     }
 
     @Test
@@ -141,22 +301,19 @@ class PlayerTimelinePresentationStateTest {
             currentEpochMillis = { 0L },
             monotonicTimeMillis = { testScheduler.currentTime },
         )
-        val timeshift = AppTimeshiftState(
-            available = true,
-            bufferStartMs = -120_000L,
-            positionMs = -60_000L,
-            liveEdgeMs = 0L,
-        )
+        val fixture = fixture()
+        val timeshift = fixture.presentation()
 
         state.queueRelativeSeek(
             timeshift,
             -30_000L,
             "unavailable",
             "clamped",
-        ) {
-            dispatches += it
-            TimeshiftCommandResult.ACCEPTED
-        }
+            "expired", "replaced", "uncertain",
+        ) { target -> fixture.seek(target) {
+            dispatches += target.position.inWholeMilliseconds
+            fixture.completed()
+        } }
         state.cancelPendingSeek()
         advanceTimeBy(400L)
         runCurrent()
@@ -168,10 +325,11 @@ class PlayerTimelinePresentationStateTest {
             -30_000L,
             "unavailable",
             "clamped",
-        ) {
-            dispatches += it
-            TimeshiftCommandResult.ACCEPTED
-        }
+            "expired", "replaced", "uncertain",
+        ) { target -> fixture.seek(target) {
+            dispatches += target.position.inWholeMilliseconds
+            fixture.completed()
+        } }
         state.dispose()
         advanceTimeBy(400L)
         runCurrent()
@@ -186,31 +344,58 @@ class PlayerTimelinePresentationStateTest {
             currentEpochMillis = { 0L },
             monotonicTimeMillis = { testScheduler.currentTime },
         )
-        val timeshift = AppTimeshiftState(
-            available = true,
-            bufferStartMs = -120_000L,
-            positionMs = -60_000L,
-            liveEdgeMs = 0L,
-        )
+        val fixture = fixture()
+        val timeshift = fixture.presentation()
 
-        state.queueRelativeSeek(timeshift, -30_000L, "old unavailable", "old clamped") {
-            commands += "old:$it"
-            TimeshiftCommandResult.ACCEPTED
-        }
+        state.queueRelativeSeek(timeshift, -30_000L, "old unavailable", "old clamped", "expired", "replaced", "uncertain") { target -> fixture.seek(target) {
+            commands += "old:${target.position.inWholeMilliseconds}"
+            fixture.completed()
+        } }
         state.invalidateForSourceChange()
-        state.queueRelativeSeek(timeshift, 30_000L, "new unavailable", "new clamped") {
-            commands += "new:$it"
-            TimeshiftCommandResult.ACCEPTED
-        }
+        fixture.replaceSubscription()
+        fixture.updateHistory(0.seconds, 600.seconds)
+        state.queueRelativeSeek(fixture.presentation(), 30_000L, "new unavailable", "new clamped", "expired", "replaced", "uncertain") { target -> fixture.seek(target) {
+            commands += "new:${target.position.inWholeMilliseconds}"
+            fixture.completed()
+        } }
         advanceTimeBy(400L)
         runCurrent()
 
-        assertEquals(listOf("new:30000"), commands)
+        assertEquals(listOf("new:570000"), commands)
+    }
+
+    @Test
+    fun rejectedInFlightSeekExplainsDiscardedStackedInput() = runTest {
+        val fixture = fixture()
+        val result = CompletableDeferred<TimeshiftContentSeekResult>()
+        val state = LiveTimelinePresentationState(
+            scope = this,
+            currentEpochMillis = { 0L },
+            monotonicTimeMillis = { testScheduler.currentTime },
+        )
+        var dispatches = 0
+        val seek: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult = {
+            dispatches++
+            result.await()
+        }
+        state.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        advanceTimeBy(400L)
+        runCurrent()
+        state.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        result.complete(TimeshiftContentSeekResult.Expired)
+        advanceTimeBy(400L)
+        runCurrent()
+        assertEquals(1, dispatches)
+        assertEquals("expired", state.feedback)
+        assertNull(state.preview)
+        state.dispose()
     }
 
     @Test
     fun liveTimelineSourceInvalidationDetachesNewCommandFromSuspendedOldCommand() = runTest {
-        val oldDispatchResult = CompletableDeferred<TimeshiftCommandResult>()
+        val oldDispatchResult = CompletableDeferred<TimeshiftContentSeekResult.Completed>()
         val oldDispatchCancelled = CompletableDeferred<Unit>()
         val commands = mutableListOf<String>()
         val state = LiveTimelinePresentationState(
@@ -219,58 +404,52 @@ class PlayerTimelinePresentationStateTest {
             monotonicTimeMillis = { testScheduler.currentTime },
         )
         state.showFeedback("old feedback")
+        val oldFixture = fixture()
+        val newFixture = fixture()
         state.queueRelativeSeek(
-            state = AppTimeshiftState(
-                available = true,
-                bufferStartMs = -120_000L,
-                positionMs = -60_000L,
-                liveEdgeMs = 0L,
-            ),
+            state = oldFixture.presentation(),
             requestedDeltaMs = -30_000L,
             unavailableText = "unavailable",
             clampedText = "clamped",
-            seekRelative = { deltaMs ->
-                commands += "old:$deltaMs"
+            expiredText = "expired", replacedText = "replaced", uncertainText = "uncertain",
+            seekContent = { target -> oldFixture.seek(target) {
+                commands += "old:${target.position.inWholeMilliseconds}"
                 try {
                     oldDispatchResult.await()
                 } catch (error: CancellationException) {
                     oldDispatchCancelled.complete(Unit)
                     throw error
                 }
-            },
+            } },
         )
         advanceTimeBy(400L)
         runCurrent()
-        assertEquals(listOf("old:-30000"), commands)
+        assertEquals(listOf("old:510000"), commands)
 
         state.invalidateForSourceChange()
         runCurrent()
         assertTrue(oldDispatchCancelled.isCompleted)
         assertNull(state.preview)
         state.queueRelativeSeek(
-            state = AppTimeshiftState(
-                available = true,
-                bufferStartMs = -300_000L,
-                positionMs = -10_000L,
-                liveEdgeMs = 0L,
-            ),
+            state = newFixture.presentation(590_000L),
             requestedDeltaMs = 30_000L,
             unavailableText = "new unavailable",
             clampedText = "new clamped",
-            seekRelative = { deltaMs ->
-                commands += "new:$deltaMs"
-                TimeshiftCommandResult.ACCEPTED
-            },
+            expiredText = "expired", replacedText = "replaced", uncertainText = "uncertain",
+            seekContent = { target -> newFixture.seek(target) {
+                commands += "new:${target.position.inWholeMilliseconds}"
+                newFixture.completed()
+            } },
         )
-        assertEquals(0L, state.preview?.decision?.targetMs)
+        assertEquals(600_000L, state.preview?.decision?.targetMs)
         advanceTimeBy(400L)
         runCurrent()
-        assertEquals(listOf("old:-30000", "new:10000"), commands)
+        assertEquals(listOf("old:510000", "new:600000"), commands)
         assertEquals("new clamped", state.feedback)
 
-        oldDispatchResult.complete(TimeshiftCommandResult.REJECTED)
+        oldDispatchResult.complete(oldFixture.completed(TimeshiftCommandResult.REJECTED))
         runCurrent()
-        assertEquals(listOf("old:-30000", "new:10000"), commands)
+        assertEquals(listOf("old:510000", "new:600000"), commands)
         assertEquals("new clamped", state.feedback)
     }
 
@@ -318,6 +497,7 @@ class PlayerTimelinePresentationStateTest {
             currentPositionMs = { currentPositionMs },
             currentDurationMs = { durationMs },
             currentIsPlaying = { true },
+            currentCanSeek = { true },
             currentEpochMillis = { 5_400_000L },
             seekAbsolute = seeks::add,
             feedbackSettled = { settled },
@@ -367,6 +547,7 @@ class PlayerTimelinePresentationStateTest {
             currentPositionMs = { currentPositionMs },
             currentDurationMs = { durationMs },
             currentIsPlaying = { isPlaying },
+            currentCanSeek = { true },
             currentEpochMillis = { epochMillis },
             seekAbsolute = {},
             feedbackSettled = { true },
@@ -406,6 +587,7 @@ class PlayerTimelinePresentationStateTest {
             currentPositionMs = { 60_000L },
             currentDurationMs = { 120_000L },
             currentIsPlaying = { true },
+            currentCanSeek = { true },
             currentEpochMillis = { 0L },
             seekAbsolute = seeks::add,
             feedbackSettled = { true },

@@ -5,6 +5,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,6 +32,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -79,9 +85,6 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import kotlinx.coroutines.flow.first
 
-private val PlaybackOptionsWidth = 420.dp
-private val PlaybackOptionsMaxHeight = 420.dp
-private val PlaybackOptionsBottomAnchor = 108.dp
 private val PlaybackOptionsTrackListMaxHeight = 236.dp
 
 internal data class PlaybackOptionTrack(
@@ -101,12 +104,9 @@ internal fun PlaybackOptionsSheet(
     tracksResolving: Boolean,
     aspectRatio: AspectRatioMode,
     statsVisible: Boolean,
-    showSimpleTvExit: Boolean,
-    fullOptionsAvailable: Boolean = true,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
     onStatsVisibleChange: (Boolean) -> Unit,
-    onSimpleTvExit: () -> Unit,
 ) {
     val unknownLanguage = stringResource(R.string.track_unknown_language)
     val mono = stringResource(R.string.track_mono)
@@ -167,8 +167,6 @@ internal fun PlaybackOptionsSheet(
         tracksResolving = tracksResolving,
         aspectRatio = aspectRatio,
         statsVisible = statsVisible,
-        showSimpleTvExit = showSimpleTvExit,
-        fullOptionsAvailable = fullOptionsAvailable,
         onPageChange = onPageChange,
         onAudioTrackSelected = { key ->
             audioChoices.firstOrNull { it.stableKey == key }?.let { selectAudioTrack(player, it) }
@@ -183,7 +181,6 @@ internal fun PlaybackOptionsSheet(
         },
         onAspectRatioChange = onAspectRatioChange,
         onStatsVisibleChange = onStatsVisibleChange,
-        onSimpleTvExit = onSimpleTvExit,
     )
 }
 
@@ -211,17 +208,14 @@ internal fun PlaybackOptionsSheetContent(
     tracksResolving: Boolean,
     aspectRatio: AspectRatioMode,
     statsVisible: Boolean,
-    showSimpleTvExit: Boolean,
-    fullOptionsAvailable: Boolean,
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAudioTrackSelected: (String) -> Unit,
     onSubtitleTrackSelected: (String?) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
     onStatsVisibleChange: (Boolean) -> Unit,
-    onSimpleTvExit: () -> Unit,
 ) {
     var lastRootPage by remember { mutableStateOf(PlaybackOptionsPage.AUDIO) }
-    val availableRootPages = playbackOptionsCategories(fullOptionsAvailable)
+    val availableRootPages = playbackOptionsCategories()
     val rootRestorePage = lastRootPage.takeIf(availableRootPages::contains)
         ?: availableRootPages.first()
     val loadingLabel = stringResource(R.string.playback_tracks_loading)
@@ -239,6 +233,8 @@ internal fun PlaybackOptionsSheetContent(
     val subtitlesValue = subtitleTracks.firstOrNull(PlaybackOptionTrack::selected)?.label
         ?: if (subtitleState == PlaybackTrackContentState.LOADING) {
             loadingLabel
+        } else if (subtitleState == PlaybackTrackContentState.EMPTY) {
+            "$subtitlesOffLabel / ${stringResource(R.string.no_subtitles)}"
         } else {
             subtitlesOffLabel
         }
@@ -273,7 +269,13 @@ internal fun PlaybackOptionsSheetContent(
         onPageChange(target)
     }
 
-    PlaybackOptionsOverlayFrame(paneTitle = sheetTitle) {
+    PlaybackOptionsOverlayFrame(
+        paneTitle = sheetTitle,
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            event.key == Key.DirectionRight &&
+                (event.type == KeyEventType.KeyUp || page != PlaybackOptionsPage.ROOT)
+        },
+    ) {
         Column(
             modifier = Modifier.padding(horizontal = TvSpacing24, vertical = TvSpacing16),
             verticalArrangement = Arrangement.spacedBy(TvSpacing12),
@@ -284,12 +286,10 @@ internal fun PlaybackOptionsSheetContent(
                     subtitlesValue = subtitlesValue,
                     displayValue = displayValue,
                     statsVisible = statsVisible,
+                    audioAvailable = audioTracks.isNotEmpty(),
+                    subtitlesAvailable = subtitleTracks.isNotEmpty(),
                     initialPage = rootRestorePage,
-                    fullOptionsAvailable = fullOptionsAvailable,
-                    showSimpleTvExit = showSimpleTvExit,
                     onPageChange = ::openPage,
-                    onStatsVisibleChange = onStatsVisibleChange,
-                    onSimpleTvExit = onSimpleTvExit,
                 )
                 PlaybackOptionsPage.AUDIO -> TrackOptionsPage(
                     title = stringResource(R.string.audio_track),
@@ -335,6 +335,7 @@ internal fun PlaybackOptionsSheetContent(
 internal fun PlaybackOptionsOverlayFrame(
     modifier: Modifier = Modifier,
     paneTitle: String? = null,
+    panelTag: String = "playback-options-overlay",
     content: @Composable () -> Unit,
 ) {
     Box(
@@ -342,28 +343,23 @@ internal fun PlaybackOptionsOverlayFrame(
             .fillMaxSize()
             .background(Color.Black.copy(alpha = TvScrimModalAlpha))
             .focusGroup(),
-        contentAlignment = Alignment.BottomEnd,
+        contentAlignment = Alignment.CenterEnd,
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(
-                    top = TvSpacing32,
-                    end = TvSpacing48,
-                    bottom = PlaybackOptionsBottomAnchor,
-                ),
-            contentAlignment = Alignment.BottomEnd,
+                .fillMaxSize(),
+            contentAlignment = Alignment.CenterEnd,
         ) {
             Surface(
                 modifier = Modifier
-                    .width(PlaybackOptionsWidth)
-                    .heightIn(max = PlaybackOptionsMaxHeight)
-                    .testTag("playback-options-overlay")
+                    .width(420.dp)
+                    .fillMaxHeight()
+                    .testTag(panelTag)
                     .semantics {
                         dialog()
                         paneTitle?.let { this.paneTitle = it }
                     },
-                shape = MaterialTheme.shapes.large,
+                shape = androidx.compose.ui.graphics.RectangleShape,
                 colors = SurfaceDefaults.colors(
                     containerColor = MaterialTheme.colorScheme.surface.copy(
                         alpha = TvPanelDenseAlpha
@@ -371,7 +367,7 @@ internal fun PlaybackOptionsOverlayFrame(
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             ) {
-                content()
+                Box(Modifier.padding(top = TvSpacing32, bottom = TvSpacing32)) { content() }
             }
         }
     }
@@ -383,32 +379,29 @@ private fun PlaybackOptionsRoot(
     subtitlesValue: String,
     displayValue: String,
     statsVisible: Boolean,
+    audioAvailable: Boolean,
+    subtitlesAvailable: Boolean,
     initialPage: PlaybackOptionsPage,
-    fullOptionsAvailable: Boolean,
-    showSimpleTvExit: Boolean,
     onPageChange: (PlaybackOptionsPage) -> Unit,
-    onStatsVisibleChange: (Boolean) -> Unit,
-    onSimpleTvExit: () -> Unit,
 ) {
     val audioFocus = remember { FocusRequester() }
     val subtitlesFocus = remember { FocusRequester() }
     val displayFocus = remember { FocusRequester() }
     val statsFocus = remember { FocusRequester() }
-    val exitFocus = remember { FocusRequester() }
     val requesters = buildList {
-        add(PlaybackOptionsPage.AUDIO to audioFocus)
-        add(PlaybackOptionsPage.SUBTITLES to subtitlesFocus)
-        if (fullOptionsAvailable) {
-            add(PlaybackOptionsPage.DISPLAY to displayFocus)
-            add(PlaybackOptionsPage.STATS to statsFocus)
-        }
+        if (audioAvailable) add(PlaybackOptionsPage.AUDIO to audioFocus)
+        if (subtitlesAvailable) add(PlaybackOptionsPage.SUBTITLES to subtitlesFocus)
+        add(PlaybackOptionsPage.DISPLAY to displayFocus)
+        add(PlaybackOptionsPage.STATS to statsFocus)
     }
-    val orderedFocus = requesters.map(Pair<PlaybackOptionsPage, FocusRequester>::second) +
-        if (showSimpleTvExit) listOf(exitFocus) else emptyList()
-    val initialFocus = requesters.firstOrNull { it.first == initialPage }?.second ?: audioFocus
-
-    LaunchedEffect(initialPage, fullOptionsAvailable, showSimpleTvExit) {
-        runCatching { initialFocus.requestFocus() }
+    val orderedFocus = requesters.map(Pair<PlaybackOptionsPage, FocusRequester>::second)
+    var focusedPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
+    LaunchedEffect(requesters.map { it.first }) {
+        if (focusedPage == null || requesters.none { it.first == focusedPage }) {
+            val target = requesters.firstOrNull { it.first == initialPage } ?: requesters.first()
+            androidx.compose.runtime.withFrameNanos { }
+            target.second.requestFocus()
+        }
     }
 
     OptionsHeader(
@@ -424,62 +417,44 @@ private fun PlaybackOptionsRoot(
             label = stringResource(R.string.audio_track),
             supportingLabel = audioValue,
             onClick = { onPageChange(PlaybackOptionsPage.AUDIO) },
-            showChevron = true,
+            enabled = audioAvailable,
+            showChevron = audioAvailable,
             modifier = Modifier
-                .containedFocus(audioFocus, orderedFocus, index = 0)
+                .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.AUDIO }
+                .containedFocus(audioFocus, orderedFocus, index = orderedFocus.indexOf(audioFocus))
                 .testTag("playback-options-audio"),
         )
         PlaybackOptionRow(
             label = stringResource(R.string.subtitles),
             supportingLabel = subtitlesValue,
             onClick = { onPageChange(PlaybackOptionsPage.SUBTITLES) },
-            showChevron = true,
+            enabled = subtitlesAvailable,
+            showChevron = subtitlesAvailable,
             modifier = Modifier
-                .containedFocus(subtitlesFocus, orderedFocus, index = 1)
+                .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.SUBTITLES }
+                .containedFocus(subtitlesFocus, orderedFocus, index = orderedFocus.indexOf(subtitlesFocus))
                 .testTag("playback-options-subtitles"),
         )
-        if (fullOptionsAvailable) {
             PlaybackOptionRow(
                 label = stringResource(R.string.display_mode),
                 supportingLabel = displayValue,
                 onClick = { onPageChange(PlaybackOptionsPage.DISPLAY) },
                 showChevron = true,
                 modifier = Modifier
-                    .containedFocus(displayFocus, orderedFocus, index = 2)
+                    .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.DISPLAY }
+                    .containedFocus(displayFocus, orderedFocus, index = orderedFocus.indexOf(displayFocus))
                     .testTag("playback-options-display"),
             )
             PlaybackOptionRow(
                 label = stringResource(R.string.stats_for_nerds),
-                selected = statsVisible,
-                onClick = { onStatsVisibleChange(!statsVisible) },
-                showSwitch = true,
+                supportingLabel = stringResource(if (statsVisible) R.string.stats_on else R.string.stats_off),
+                onClick = { onPageChange(PlaybackOptionsPage.STATS) },
+                showChevron = true,
                 modifier = Modifier
-                    .containedFocus(statsFocus, orderedFocus, index = 3)
+                    .onFocusChanged { if (it.isFocused) focusedPage = PlaybackOptionsPage.STATS }
+                    .containedFocus(statsFocus, orderedFocus, index = orderedFocus.indexOf(statsFocus))
                     .testTag("playback-options-stats"),
             )
-        }
-        if (showSimpleTvExit) {
-            Text(
-                text = stringResource(R.string.simple_tv_owner_section),
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White.copy(alpha = TvTextTertiaryAlpha),
-                modifier = Modifier
-                    .padding(top = TvSpacing8)
-                    .semantics { heading() },
-            )
-            PlaybackOptionRow(
-                label = stringResource(R.string.simple_tv_unlock),
-                onClick = onSimpleTvExit,
-                leadingLock = true,
-                modifier = Modifier
-                    .containedFocus(
-                        requester = exitFocus,
-                        orderedFocus = orderedFocus,
-                        index = orderedFocus.lastIndex,
-                    )
-                    .testTag("playback-options-simple-tv-exit"),
-            )
-        }
     }
 }
 
@@ -565,7 +540,7 @@ private fun TrackOptionsPage(
                         tracks.none(PlaybackOptionTrack::selected),
                     onClick = onSelectOff,
                     modifier = Modifier
-                        .containedFocus(offFocus, focusableRequesters, index = 0, headerBackFocus)
+                        .containedFocus(offFocus, focusableRequesters, index = 0, headerBackFocus, lazy = true)
                         .testTag("playback-options-subtitles-off"),
                 )
             }
@@ -587,6 +562,7 @@ private fun TrackOptionsPage(
                         orderedFocus = focusableRequesters,
                         index = focusIndex,
                         headerFocus = headerBackFocus,
+                        lazy = true,
                     )
                     .testTag("playback-options-track-${track.key}"),
             )
@@ -761,9 +737,10 @@ private fun PlaybackOptionRow(
     selected: Boolean = false,
     showChevron: Boolean = false,
     showSwitch: Boolean = false,
-    leadingLock: Boolean = false,
+    enabled: Boolean = true,
 ) {
     ListItem(
+        enabled = enabled,
         selected = if (showSwitch) false else selected,
         onClick = onClick,
         headlineContent = {
@@ -778,17 +755,6 @@ private fun PlaybackOptionRow(
                     modifier = supportingTestTag?.let(Modifier::testTag) ?: Modifier,
                 )
             }
-        },
-        leadingContent = if (leadingLock) {
-            {
-                Icon(
-                    Icons.Filled.Lock,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = TvSpacing4),
-                )
-            }
-        } else {
-            null
         },
         trailingContent = {
             when {
@@ -807,6 +773,16 @@ private fun PlaybackOptionRow(
         scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
         modifier = modifier
             .fillMaxWidth()
+            .onPreviewKeyEvent { event ->
+                if (event.key != Key.DirectionRight || !showChevron) {
+                    false
+                } else {
+                    if (enabled && event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                        onClick()
+                    }
+                    true
+                }
+            }
             .then(
                 if (showSwitch) {
                     Modifier.semantics {
@@ -825,9 +801,12 @@ private fun Modifier.containedFocus(
     orderedFocus: List<FocusRequester>,
     index: Int,
     headerFocus: FocusRequester? = null,
+    lazy: Boolean = false,
 ): Modifier = focusRequester(requester).focusProperties {
-    up = orderedFocus.getOrNull(index - 1) ?: headerFocus ?: FocusRequester.Cancel
-    down = orderedFocus.getOrNull(index + 1) ?: FocusRequester.Cancel
+    up = if (lazy && index > 0) FocusRequester.Default
+        else orderedFocus.getOrNull(index - 1) ?: headerFocus ?: FocusRequester.Cancel
+    down = if (lazy && index < orderedFocus.lastIndex) FocusRequester.Default
+        else orderedFocus.getOrNull(index + 1) ?: FocusRequester.Cancel
     left = FocusRequester.Cancel
     right = FocusRequester.Cancel
 }

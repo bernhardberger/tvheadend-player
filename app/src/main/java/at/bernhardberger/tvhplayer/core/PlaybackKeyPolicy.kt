@@ -49,7 +49,6 @@ data class PlayerKeyContext(
     val controlsVisible: Boolean,
     val seekbarFocused: Boolean,
     val timeshiftAvailable: Boolean,
-    val playerCloseAllowed: Boolean,
     val optionsOpen: Boolean = false,
     val infoOpen: Boolean = false,
     val statsOpen: Boolean = false,
@@ -121,8 +120,7 @@ fun playerKeyAction(
         keyCode == KeyEvent.KEYCODE_TV_NUMBER_ENTRY ||
         keyCode == KeyEvent.KEYCODE_BOOKMARK
     ) {
-        // Dedicated list / guide-style remote keys open the channel picker in
-        // both normal and Simple TV live playback.
+        // Dedicated list keys open the live channel shelf.
         return if (context.surface == PlayerSurface.LIVE) {
             PlayerKeyAction.OPEN_CHANNELS
         } else {
@@ -137,8 +135,7 @@ fun playerKeyAction(
                 context.infoOpen || context.optionsOpen || context.statsOpen ||
                     context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
                 context.controlsVisible -> PlayerKeyAction.HIDE_CONTROLS
-                context.playerCloseAllowed -> PlayerKeyAction.CLOSE_PLAYER
-                else -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
+                else -> PlayerKeyAction.CLOSE_PLAYER
             }
             KeyEvent.KEYCODE_DPAD_UP,
             KeyEvent.KEYCODE_DPAD_DOWN -> PlayerKeyAction.PASS_THROUGH
@@ -162,8 +159,7 @@ fun playerKeyAction(
         KeyEvent.KEYCODE_BACK -> when {
             context.infoOpen || context.optionsOpen || context.statsOpen ||
                 context.drawerOpen -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
-            context.playerCloseAllowed -> PlayerKeyAction.CLOSE_PLAYER
-            else -> PlayerKeyAction.DISMISS_OVERLAY_ONLY
+            else -> PlayerKeyAction.CLOSE_PLAYER
         }
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,
@@ -190,7 +186,7 @@ fun playerKeyAction(
     }
 }
 
-fun channelPickAction(currentChannelId: ChannelId, pickedChannelId: ChannelId): ChannelPickAction =
+fun channelPickAction(currentChannelId: ChannelId?, pickedChannelId: ChannelId): ChannelPickAction =
     if (currentChannelId == pickedChannelId) {
         ChannelPickAction.CLOSE_DRAWER
     } else {
@@ -198,7 +194,7 @@ fun channelPickAction(currentChannelId: ChannelId, pickedChannelId: ChannelId): 
     }
 
 fun playbackChannelKeyAction(browserVisible: Boolean): ChannelKeyAction =
-    if (browserVisible) ChannelKeyAction.PAGE_LIST else ChannelKeyAction.TUNE
+    ChannelKeyAction.TUNE
 
 fun mediaPlaybackAction(
     keyCode: Int,

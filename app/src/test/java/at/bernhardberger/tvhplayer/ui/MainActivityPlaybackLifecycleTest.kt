@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui
 
-import at.bernhardberger.tvhplayer.core.ProductProfile
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import kotlinx.coroutines.CompletableDeferred
@@ -46,13 +45,13 @@ class MainActivityPlaybackLifecycleTest {
             finishActivity = { events += "finish" },
         )
 
-        val ready = readyState(ProductProfile.Standard)
+        val ready = readyState()
         val firstExit = launch {
-            lifecycle.onRootExitRequested(ready, ProductProfile.Standard)
+            lifecycle.onRootExitRequested(ready)
         }
         stopStarted.await()
         val overlappingExit = launch {
-            lifecycle.onRootExitRequested(ready, ProductProfile.Standard)
+            lifecycle.onRootExitRequested(ready)
         }
         runCurrent()
 
@@ -66,21 +65,7 @@ class MainActivityPlaybackLifecycleTest {
         assertEquals(listOf("stop", "finish"), events)
     }
 
-    @Test
-    fun applianceRootBackDoesNotStopPlaybackOrFinishActivity() = runTest {
-        val events = mutableListOf<String>()
-        val lifecycle = MainActivityPlaybackLifecycle(
-            onAppForegrounded = {},
-            onAppBackgrounded = {},
-            stopPlayback = { events += "stop" },
-            finishActivity = { events += "finish" },
-        )
 
-        val appliance = ProductProfile.Appliance(timeshiftAllowed = false)
-        lifecycle.onRootExitRequested(readyState(appliance), appliance)
-
-        assertEquals(emptyList<String>(), events)
-    }
 
     @Test
     fun unresolvedStartupBackDoesNotStopPlaybackOrFinishActivity() = runTest {
@@ -94,15 +79,13 @@ class MainActivityPlaybackLifecycleTest {
 
         lifecycle.onRootExitRequested(
             startupState = MainStartupState.ResolvingLocal,
-            productProfile = ProductProfile.Standard,
         )
 
         assertEquals(emptyList<String>(), events)
     }
 
-    private fun readyState(profile: ProductProfile) = MainStartupState.Ready(
+    private fun readyState() = MainStartupState.Ready(
         server = ServerSettings(host = "tvh.invalid"),
         autoStartPlayback = false,
-        startupProfile = profile,
     )
 }

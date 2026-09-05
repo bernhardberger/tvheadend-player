@@ -7,7 +7,7 @@ OPENCHAMBER_QUOTA_URL="http://127.0.0.1:3000/api/quota/claude"
 OPENCHAMBER_LOGIN_URL="http://127.0.0.1:3000/auth/session"
 
 log_skip() {
-  printf 'Opus UX review skipped: %s\n' "$1" >&2
+  printf 'Opus review skipped: %s\n' "$1" >&2
 }
 
 fetch_claude_quota() {
@@ -176,7 +176,7 @@ select_ux_route() {
     printf 'opus\n'
   else
     log_skip "${reason:-trustworthy Claude quota telemetry is unavailable}"
-    printf 'sol\n'
+    printf 'astra\n'
   fi
 }
 
@@ -190,7 +190,7 @@ evaluate_fixture_route() {
     printf 'opus\n'
   else
     log_skip "${reason:-trustworthy Claude quota telemetry is unavailable}"
-    printf 'sol\n'
+    printf 'astra\n'
   fi
 }
 
@@ -198,38 +198,38 @@ selection="${2:-default}"
 case "${1:-select}" in
   select)
     case "$selection" in
-      ux)
+      eligible|ux)
         select_ux_route
         ;;
       default|routine|lower-stakes)
-        printf 'sol\n'
+        printf 'astra\n'
         ;;
       *)
-        printf 'usage: %s select [ux|routine|lower-stakes]\n' "$0" >&2
+        printf 'usage: %s select [eligible|ux|routine|lower-stakes]\n' "$0" >&2
         exit 2
         ;;
     esac
     ;;
   fallback)
-    printf 'sol\n'
+    printf 'astra\n'
     ;;
   status)
-    route="sol"
-    if [[ "$selection" == "ux" ]]; then
+    route="astra"
+    if [[ "$selection" == "eligible" || "$selection" == "ux" ]]; then
       route="$(select_ux_route)"
     elif [[ "$selection" != "default" && "$selection" != "routine" && "$selection" != "lower-stakes" ]]; then
-      printf 'usage: %s status [ux|routine|lower-stakes]\n' "$0" >&2
+      printf 'usage: %s status [eligible|ux|routine|lower-stakes]\n' "$0" >&2
       exit 2
     fi
     printf 'route=%s\n' "$route"
-    printf 'fallback_route=sol\n'
-    printf 'opus_optional=%s\n' "$([[ "$selection" == "ux" ]] && printf true || printf false)"
+    printf 'fallback_route=astra\n'
+    printf 'quota_checked=%s\n' "$([[ "$selection" == "eligible" || "$selection" == "ux" ]] && printf true || printf false)"
     ;;
   evaluate-fixture)
     evaluate_fixture_route
     ;;
   *)
-    printf 'usage: %s {select|fallback|status|evaluate-fixture} [ux|routine|lower-stakes]\n' "$0" >&2
+    printf 'usage: %s {select|fallback|status|evaluate-fixture} [eligible|ux|routine|lower-stakes]\n' "$0" >&2
     exit 2
     ;;
 esac

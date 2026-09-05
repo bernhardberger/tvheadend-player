@@ -69,6 +69,10 @@ run `./tools/check-native-libs` for dependency/native artifact changes or when
 required by that gate. Do not repeat unchanged checks or add tests mirroring
 prose/config edits. Existing admitted verification requirements remain binding.
 
+Non-trivial engineering changes retain the independent Astra/Opus pair and
+mandatory pre-dispatch quota guard in `AGENTS.md`; a playback architecture audit
+does not replace that coverage. Reuse unchanged evidence for targeted follow-ups.
+
 Select device checks according to affected behavior. Broad Media3/decoder/native
 changes warrant the designated test TV matrix; a narrow internal change does not
 automatically require every unrelated physical check. Relevant cases include:

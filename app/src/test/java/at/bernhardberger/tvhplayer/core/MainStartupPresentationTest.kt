@@ -19,7 +19,6 @@ class MainStartupPresentationTest {
                 launchState = entering(),
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-                simpleTvActive = true,
             ),
         )
     }
@@ -33,7 +32,6 @@ class MainStartupPresentationTest {
                 launchState = ApplianceLaunchState.Idle,
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-                simpleTvActive = true,
             ),
         )
     }
@@ -47,7 +45,6 @@ class MainStartupPresentationTest {
                 launchState = entering(),
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-                simpleTvActive = true,
             ),
         )
     }
@@ -93,17 +90,6 @@ class MainStartupPresentationTest {
                 launchState = pending,
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-                simpleTvActive = false,
-            ),
-        )
-        assertEquals(
-            expected,
-            mainStartupPresentation(
-                startupState = readyBootstrap,
-                launchState = pending,
-                connectionState = ConnectionUiState.Ready,
-                currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1)))),
-                simpleTvActive = true,
             ),
         )
         assertEquals(
@@ -120,7 +106,6 @@ class MainStartupPresentationTest {
                 launchState = pending,
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(99)))),
-                simpleTvActive = false,
             ),
         )
     }
@@ -203,52 +188,9 @@ class MainStartupPresentationTest {
         }
     }
 
-    @Test
-    fun everyActionableFailureUsesRetryAndExitSimpleTvWhenSimpleTvIsActive() {
-        val failures = buildList<ConnectionUiState> {
-            add(ConnectionUiState.NeedsConfiguration)
-            add(ConnectionUiState.CredentialUnavailable)
-            add(ConnectionUiState.Ready)
-            add(
-                ConnectionUiState.Error(
-                    ConnectionFailureKind.ZERO_CHANNELS,
-                    SessionRecoveryDisposition.EXPLICIT_RETRY,
-                )
-            )
-            SubscriptionFailureKind.entries.forEach { add(ConnectionUiState.SubscriptionError(it)) }
-        }
 
-        failures.forEach { connectionState ->
-            assertEquals(
-                MainStartupPresentation.Actionable(
-                    MainStartupMessageKind.SIMPLE_TV_FAILURE,
-                    simpleTvActions,
-                ),
-                presentation(
-                    connectionState = connectionState,
-                    currentChannelReadiness = CurrentChannelReadiness.Ready(emptyList()),
-                    simpleTvActive = true,
-                ),
-            )
-        }
-    }
 
-    @Test
-    fun simpleTvProfileChangeFailureOffersOnlyExit() {
-        assertEquals(
-            MainStartupPresentation.Actionable(
-                MainStartupMessageKind.SIMPLE_TV_FAILURE,
-                listOf(MainStartupActionId.EXIT_SIMPLE_TV),
-            ),
-            presentation(
-                connectionState = ConnectionUiState.Error(
-                    ConnectionFailureKind.PERMISSION_DENIED,
-                    SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
-                ),
-                simpleTvActive = true,
-            ),
-        )
-    }
+
 
     @Test
     fun stableActionIdsHaveTheSpecifiedOrder() {
@@ -256,7 +198,6 @@ class MainStartupPresentationTest {
             listOf(
                 MainStartupActionId.RETRY,
                 MainStartupActionId.CONNECTION_SETTINGS,
-                MainStartupActionId.EXIT_SIMPLE_TV,
             ),
             MainStartupActionId.entries,
         )
@@ -267,22 +208,16 @@ class MainStartupPresentationTest {
             ),
             normalActions,
         )
-        assertEquals(
-            listOf(MainStartupActionId.RETRY, MainStartupActionId.EXIT_SIMPLE_TV),
-            simpleTvActions,
-        )
     }
 
     private fun presentation(
         connectionState: ConnectionUiState,
         currentChannelReadiness: CurrentChannelReadiness = CurrentChannelReadiness.Waiting,
-        simpleTvActive: Boolean = false,
     ): MainStartupPresentation = mainStartupPresentation(
         startupState = readyBootstrap,
         launchState = pending(),
         connectionState = connectionState,
         currentChannelReadiness = currentChannelReadiness,
-        simpleTvActive = simpleTvActive,
     )
 
     private fun pending() = ApplianceLaunchState.Pending(ApplianceLaunchRequest(1))
@@ -299,15 +234,10 @@ class MainStartupPresentationTest {
         val readyBootstrap = MainStartupState.Ready(
             server = at.bernhardberger.tvhplayer.settings.ServerSettings(host = "tvh.invalid"),
             autoStartPlayback = true,
-            startupProfile = ProductProfile.Standard,
         )
         val normalActions = listOf(
             MainStartupActionId.RETRY,
             MainStartupActionId.CONNECTION_SETTINGS,
-        )
-        val simpleTvActions = listOf(
-            MainStartupActionId.RETRY,
-            MainStartupActionId.EXIT_SIMPLE_TV,
         )
     }
 }

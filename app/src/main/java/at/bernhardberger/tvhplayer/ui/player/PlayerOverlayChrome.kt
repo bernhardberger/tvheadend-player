@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,6 +21,10 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 internal fun PlayerOverlayChrome(
     headerContent: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
+    footerPadding: PaddingValues = PaddingValues(
+        start = TvOverlaySidePadding, end = TvOverlaySidePadding,
+        top = TvOverlayFooterGradientRunout, bottom = TvOverlayBottomPadding,
+    ),
     footerContent: @Composable ColumnScope.() -> Unit,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -39,12 +44,7 @@ internal fun PlayerOverlayChrome(
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .background(bottomGradient)
-                .padding(
-                    start = TvOverlaySidePadding,
-                    end = TvOverlaySidePadding,
-                    top = TvOverlayFooterGradientRunout,
-                    bottom = TvOverlayBottomPadding,
-                ),
+                .padding(footerPadding),
             content = footerContent,
         )
     }

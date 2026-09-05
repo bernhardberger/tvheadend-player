@@ -15,7 +15,6 @@ sealed interface MainStartupState {
     data class Ready(
         val server: ServerSettings,
         val autoStartPlayback: Boolean,
-        val startupProfile: ProductProfile,
     ) : MainStartupState
 }
 
@@ -27,8 +26,6 @@ internal class StartupBootstrapCoordinator(
     val applianceLaunchRequests: ApplianceLaunchRequests,
     private val loadServerSettings: suspend () -> ServerSettings,
     private val loadUiSettings: suspend () -> UiSettings,
-    private val loadSimpleTvSettings: suspend () -> SimpleTvSettings,
-    private val enterProductProfile: (ProductProfile.Appliance) -> Unit,
     private val createStartupRequest: Boolean = true,
     private val onStartupRequestCreationHandled: () -> Unit = {},
     private val startupState: MutableStateFlow<MainStartupState> =
@@ -43,27 +40,18 @@ internal class StartupBootstrapCoordinator(
 
             val server = loadServerSettings()
             val uiSettings = loadUiSettings()
-            val simpleTvSettings = loadSimpleTvSettings()
             currentCoroutineContext().ensureActive()
             val configured = server.host.isNotBlank()
             val autoStartPlayback = configured && uiSettings.autoStartPlayback
-            val startupProfile = startupProductProfile(
-                serverConfigured = configured,
-                settings = simpleTvSettings,
-            )
-            val applianceProfile = startupProfile as? ProductProfile.Appliance
-
-            if (applianceProfile != null) enterProductProfile(applianceProfile)
             if (createStartupRequest) {
                 applianceLaunchRequests.requestStartup(
-                    autoStartPlayback || applianceProfile != null,
+                    autoStartPlayback,
                 )
             }
             onStartupRequestCreationHandled()
             startupState.value = MainStartupState.Ready(
                 server = server,
                 autoStartPlayback = autoStartPlayback,
-                startupProfile = startupProfile,
             )
         }
     }

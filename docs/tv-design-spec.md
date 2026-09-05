@@ -311,6 +311,94 @@ be built from the player timeline, and must not use mobile Material's
 `LinearProgressIndicator`, whose default stop indicator draws a mark at 100%
 regardless of actual progress.
 
+The live timeshift seekbar uses capacity, not programme bounds, for its display
+span. The released SDK's finite positive `grantedPeriod` is preferred; when it
+is unavailable the app's requested period defines only the display span. Expand
+that span to include all observed history if history exceeds the grant/request.
+A changed grant changes display scale, never actual seek permission. Live stays
+at the right edge. Unavailable history is subdued, available history is neutral,
+and orange marks playback position without filling unavailable history. Remote
+and accessibility seek bounds remain the observed buffer start and live edge.
+Recordings retain their elapsed/duration geometry.
+
+The supported SDK timeline supplies absolute stream coordinates and opaque,
+subscription-scoped selection targets. Player retains the selected target through
+the input debounce rather than rebuilding a relative seek at dispatch. Expired,
+replaced and unavailable targets produce explicit feedback, never a clamped seek
+on a successor subscription. Playback position comes from the SDK's sampled
+Media3 mapping and is labelled as estimated; server-reader shift is not displayed
+playback position. A sampled position that outlives seekable history does not
+extend seek permission. Its display span may expand to retain the position while
+that expired history remains subdued.
+
+SDK 0.6.0 provides no programme wall-clock mapping. During timeshift, the header
+therefore states that programme timing is unavailable instead of claiming that
+wall-clock Now/Next describes the watched content. Live Info explicitly labels
+its EPG and existing recording entry as **Current broadcast**, not historical
+playback metadata. Current wall time remains
+independent. Programme-time seeks from Guide are unavailable on this contract;
+supported recording-based Watch from start remains available. Neither EPG bounds,
+packet coordinates nor local time minus server-reader shift may substitute for
+the absent wall-clock anchor.
+
+Missing, non-finite or contradictory buffer/position measurements are not a
+measured live position. Keep the capacity display and observed history, but omit
+the position marker, progress semantics and seek focus/actions until timing is
+known. Show **Playback timing unavailable** without disabling an independently
+available pause capability. Explicitly measured zero is distinct from missing
+timing; relative durations alone do not establish a wall-clock timestamp.
+
+### Player composition
+
+Live TV and recordings share one composition: artwork and identity at top left,
+current wall time at top right, and a compact action strip above the bottom
+timeline. Info, Settings, neutral Record and immediate Stop retain fixed slots;
+recordings leave Record empty. Live/Go live owns a separate reserved footprint.
+Only the focused icon gets a short visible label; every icon has an accessible
+name. There is no separate transport row or Actions-up hint.
+
+Live Now/Next describes the committed programme, not the uncommitted seek
+preview. Both programmes show start/end times. Programme progress is a separate
+ambient strip. SDK-supported playback coordinates and explicit timing authority
+determine historical metadata; server reader position and relative durations
+are not proof of a UTC timestamp. Unknown timing must remain explicit.
+
+Center toggles playback directly on the playback surface/timeline, including
+during preview. Left/Right previews repeat-accelerated steps immediately and
+coalesces dispatch after 400ms of idle input. Up/Down commits pending preview
+before navigation; Back cancels only undispatched preview. A neutral Up/Down
+first reveals chrome, and a separate press enters actions or the channel shelf.
+Consume the entire key cycle that reveals or relocates focus. Initial focus is
+the usable timeline, otherwise Info. Restoration uses semantic actions and never
+automatically chooses Stop or steals focus on routine timing/metadata updates.
+
+Settings and Programme/Recording Info use one full-height, edge-attached right
+panel with a deliberate video scrim and no competing chrome/focus. Settings has
+at most a category root and one choices/details level, using TV Material list
+rows with current values, explicit selection and unavailable/loading states.
+Info retains existing recording actions and confirmations, not Settings
+diagnostics. Back returns through panel levels and restores the invoking action.
+
+The channel shelf is horizontal and compact. Entry scrolls to the playing
+channel before requesting focus. Focus-following Now/Next is independent of
+playing and channel-recording-now state. Selecting the playing channel closes
+without retuning; CH+/CH- tunes directly even in the shelf. Digit entry supports
+timeout, explicit confirmation and cancellation. An ordinary connected tune
+failure leaves channel access and navigation available, shows no false playing
+marker or borrowed buffer, and does not offer generic Retry without useful
+runtime evidence. Connection loss and actual runtime recovery remain distinct.
+
+Channel-recording-now belongs to channel identity; scheduling belongs to the
+specific Next event. Do not duplicate badges or imply historical watched
+content is being recorded. Record enters existing supported behavior, and Next
+is informational. No new recording workflow or default-action preference is
+introduced by this composition.
+
+Recordings use actual elapsed/duration/capabilities, without a live shelf or
+Go live. Unknown duration is passive. Back dismisses the foreground/chrome and
+then returns to warm browse; it never means Stop. Explicit Stop awaits serialized
+teardown and clears the warm return opportunity.
+
 ### 6.3 Cards
 
 The app has no alternate card-based channel layout. If a future product surface

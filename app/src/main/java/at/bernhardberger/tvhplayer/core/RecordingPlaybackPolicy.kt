@@ -19,7 +19,6 @@ enum class RecordingPlaybackKeyAction {
 fun recordingPlaybackKeyAction(
     controlsVisible: Boolean,
     keyCode: Int,
-    playerCloseAllowed: Boolean = true,
     seekbarFocused: Boolean = false,
 ): RecordingPlaybackKeyAction {
     val action = playerKeyAction(
@@ -28,7 +27,6 @@ fun recordingPlaybackKeyAction(
             controlsVisible = controlsVisible,
             seekbarFocused = seekbarFocused,
             timeshiftAvailable = false,
-            playerCloseAllowed = playerCloseAllowed,
         ),
         keyCode,
     )

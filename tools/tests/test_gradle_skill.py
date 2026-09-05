@@ -62,23 +62,29 @@ class GradleSkillTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("opencode"), "opencode is required")
     def test_pure_opencode_discovers_gradle_skill_once(self) -> None:
-        result = subprocess.run(
-            ["opencode", "debug", "skill", "--pure"],
-            cwd=ROOT,
-            env={
-                **os.environ,
-                "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
-                "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS": "1",
-            },
-            text=True,
-            capture_output=True,
-            timeout=60,
-            check=False,
-        )
+        # Large CLI output can be cut short on exit when stdout is a pipe.
+        with tempfile.TemporaryFile(mode="w+") as output:
+            result = subprocess.run(
+                ["opencode", "debug", "skill", "--pure"],
+                cwd=ROOT,
+                env={
+                    **os.environ,
+                    "OPENCODE_DISABLE_EXTERNAL_SKILLS": "1",
+                    "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS": "1",
+                },
+                text=True,
+                stdout=output,
+                stderr=subprocess.PIPE,
+                timeout=60,
+                check=False,
+            )
+            output.seek(0)
+            skills = json.load(output)
 
         self.assertEqual(0, result.returncode, result.stderr[-2000:])
-        self.assertEqual(1, result.stdout.count('"name": "gradle-run"'))
-        self.assertIn(f'"location": "{SKILL / "SKILL.md"}"', result.stdout)
+        matches = [skill for skill in skills if skill["name"] == "gradle-run"]
+        self.assertEqual(1, len(matches))
+        self.assertEqual(str(SKILL / "SKILL.md"), matches[0]["location"])
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 ---
-description: Independent single-agent Opus audit for critical Android architecture and dependency assessments
+description: Independent Opus second review for bounded non-trivial engineering changes
 mode: subagent
 permission:
   edit: deny
@@ -19,10 +19,10 @@ permission:
 
 Perform one independent Opus audit from a neutral task packet.
 
-- Trust the configured role routing. Do not require quota telemetry or ask the
-  caller or children to repeat model, route, variant, step, revision, or
-  provenance attestations. OpenCode handles provider quota exhaustion and
-  resumption.
+- The caller must run the quota guard before every dispatch and supply its
+  explicit `opus` eligibility. Do not inspect credentials or probe quota yourself.
+  On actual exhaustion the caller aborts this exact session and verifies stop;
+  there is no quota-reset wait or automatic resumption policy.
 - Keep the Claude track blind to another audit track's analysis, maps, candidate
   list, working notes, or conclusions until both independent reports are done.
   Neutral product constraints and raw operator facts are allowed. Do not impose

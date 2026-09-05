@@ -93,7 +93,6 @@ internal fun SideRail(
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
-    val unlockLabel = stringResource(R.string.simple_tv_unlock)
     val mainItems = remember(
         channelsLabel,
         epgLabel,
@@ -132,20 +131,10 @@ internal fun SideRail(
         }
     }
     val footerItems = remember(
-        unlockLabel,
         settingsLabel,
         availableDestinations,
     ) {
         buildList {
-            if (AppDestination.UNLOCK in availableDestinations) {
-                add(RailItem(AppDestination.UNLOCK, unlockLabel) {
-                    Icon(
-                        Icons.Filled.LockOpen,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                    )
-                })
-            }
             if (AppDestination.SETTINGS in availableDestinations) {
                 add(RailItem(AppDestination.SETTINGS, settingsLabel) {
                     Icon(

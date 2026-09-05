@@ -61,24 +61,19 @@ fun playbackTrackFocusTarget(
     } ?: PlaybackTrackFocusTarget.HeaderBack
 }
 
-fun playbackOptionsCategories(fullOptionsAvailable: Boolean): List<PlaybackOptionsPage> =
-    if (fullOptionsAvailable) {
+fun playbackOptionsCategories(): List<PlaybackOptionsPage> =
         listOf(
             PlaybackOptionsPage.AUDIO,
             PlaybackOptionsPage.SUBTITLES,
             PlaybackOptionsPage.DISPLAY,
             PlaybackOptionsPage.STATS,
         )
-    } else {
-        listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES)
-    }
 
 fun adjacentPlaybackOptionsPage(
     current: PlaybackOptionsPage,
     direction: Int,
-    fullOptionsAvailable: Boolean,
 ): PlaybackOptionsPage {
-    val pages = playbackOptionsCategories(fullOptionsAvailable)
+    val pages = playbackOptionsCategories()
     val index = pages.indexOf(current).takeIf { it >= 0 } ?: 0
     val next = (index + direction).floorMod(pages.size)
     return pages[next]

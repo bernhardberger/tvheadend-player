@@ -36,6 +36,23 @@ class PlayerRootFocusEffectTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
+    fun playbackRecompositionDoesNotTakeFocusFromInfo() {
+        var playbackRevision by mutableStateOf(0)
+        composeRule.setContent {
+            val rootFocus = remember { FocusRequester() }
+            val infoFocus = remember { FocusRequester() }
+            PlayerRootFocusEffect(PlayerForegroundLayer.INFO, rootFocus)
+            LaunchedEffect(Unit) { infoFocus.requestFocus() }
+            Box(Modifier.fillMaxSize().focusRequester(rootFocus).focusable()) {
+                Box(Modifier.testTag("info-$playbackRevision").focusRequester(infoFocus).focusable())
+            }
+        }
+        composeRule.onNodeWithTag("info-0").assertIsFocused()
+        composeRule.runOnIdle { playbackRevision++ }
+        composeRule.onNodeWithTag("info-1").assertIsFocused()
+    }
+
+    @Test
     fun autoHideTransfersFocusToRootAndTheNextUpRevealsControls() {
         var foregroundLayer by mutableStateOf(PlayerForegroundLayer.CONTROLS)
         composeRule.waitUntil(timeoutMillis = 5_000L) {
@@ -68,7 +85,6 @@ class PlayerRootFocusEffectTest {
                                 controlsVisible = false,
                                 seekbarFocused = false,
                                 timeshiftAvailable = false,
-                                playerCloseAllowed = true,
                             ),
                             keyCode = event.nativeKeyEvent.keyCode,
                         )

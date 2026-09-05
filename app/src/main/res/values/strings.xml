@@ -17,7 +17,7 @@
     <string name="player_ends_in">Ends at %1$s</string>
     <string name="player_next_event">Up next: %1$s</string>
     <string name="player_next_event_at">Up next at %1$s: %2$s</string>
-    <string name="player_next_event_with_range">Up next: %1$s • %2$s</string>
+    <string name="player_next_event_with_range">Next %1$s: %2$s</string>
 
     <string name="options">Options</string>
     <string name="no_epg">No EPG</string>
@@ -41,6 +41,8 @@
     <string name="show_epg_menu">Show Guide menu</string>
     <string name="show_epg_menu_description">Show Guide in the main navigation rail.</string>
     <string name="player_info">Info</string>
+    <string name="player_shelf_playing">Playing</string>
+    <string name="player_shelf_recording">Recording now</string>
     <string name="player_info_close">Close info</string>
     <string name="player_info_pane_title">Programme information</string>
     <string name="player_info_unavailable_title">Programme information unavailable</string>
@@ -66,7 +68,6 @@
     <string name="settings_connection_nav">Connection</string>
     <string name="settings_player_nav">Player</string>
     <string name="settings_appliance_nav">Appliance</string>
-    <string name="settings_simple_tv">Simple TV</string>
     <string name="language_follow_system">Follow system</string>
     <string name="language_german">German</string>
     <string name="language_english">English</string>
@@ -105,10 +106,8 @@
     <string name="main_startup_message_retryable_failure">TVHeadend is unavailable. Try again.</string>
     <string name="main_startup_message_configuration_required">Set up the TVHeadend connection to load channels.</string>
     <string name="main_startup_message_credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
-    <string name="main_startup_message_simple_tv_failure">Television is unavailable in Simple TV.</string>
     <string name="main_startup_action_retry">Retry</string>
     <string name="main_startup_action_connection_settings">Connection settings</string>
-    <string name="main_startup_action_exit_simple_tv">Exit Simple TV</string>
 
     <string name="player_tuning_channel">Tuning %1$s…</string>
     <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
@@ -400,7 +399,6 @@
     <string name="player_seekbar_timeshift_live_description">Timeshift position Live. %1$s</string>
     <string name="timeshift_seek_preview_description">Seek target %1$s. Cumulative change %2$s. %3$s. %4$s</string>
     <string name="player_on_now">Currently playing</string>
-    <string name="simple_tv_owner_section">Owner</string>
     <string name="track_unknown_language">Unknown language</string>
     <string name="track_mono">Mono</string>
     <string name="track_stereo">Stereo</string>
@@ -412,48 +410,19 @@
     <string name="timeshift_seek_clamped">Reached the available buffer limit.</string>
     <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
     <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
+    <string name="player_timing_unavailable">Playback timing unavailable</string>
+    <string name="timeshift_target_expired">That position is no longer in the buffer.</string>
+    <string name="timeshift_seek_uncertain">Seek result uncertain. Playback position will update when available.</string>
+    <string name="timeshift_target_replaced">Playback changed. Select a new position.</string>
+    <string name="player_timing_estimated">Estimated playback position</string>
+    <string name="player_paused">Paused</string>
+    <string name="player_buffer_summary">%1$s available / %2$s span</string>
+    <string name="player_current_broadcast">Current broadcast</string>
+    <string name="player_programme_timing_unavailable">Programme timing unavailable</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Allow this client to request a server timeshift buffer for live TV.</string>
     <string name="refresh_rate_matching_setting">Match content frame rate</string>
     <string name="refresh_rate_matching_setting_description">Let Android match the display refresh rate to the video when supported.</string>
-    <string name="simple_tv_enabled">Enable Simple TV mode</string>
-    <string name="simple_tv_startup">Start in Simple TV mode</string>
-    <string name="simple_tv_startup_explanation">On a fresh app launch, play the last channel directly in Simple TV.</string>
-    <string name="simple_tv_start_now">Start Simple TV now</string>
-    <string name="simple_tv_mode_disclosure">Simple TV is a player-only mode. Channels, Guide, Recordings, Settings, Stop, and normal app exit are unavailable until an owner exits through More.</string>
-    <string name="simple_tv_home_disclosure">Android HOME can still leave the app. This mode cannot block the system HOME key.</string>
-    <string name="simple_tv_guide_return_disclosure">When appliance entry is enabled, the TV/GUIDE button can return to the app. It does not read screen content.</string>
-    <string name="simple_tv_start_confirm_title">Start Simple TV now?</string>
-    <string name="simple_tv_start_confirm_message">The full interface will be locked for this session. Exit later from More → Exit Simple TV.</string>
-    <string name="simple_tv_recovery_connection">Television is unavailable right now.</string>
-    <string name="simple_tv_recovery_playback">This channel could not start.</string>
-    <string name="simple_tv_recovery_hint">Try again, or let an owner exit Simple TV.</string>
-    <string name="simple_tv_recovery_exit_hint">An owner can exit Simple TV.</string>
-    <string name="simple_tv_back_for_exit">Back for exit options</string>
-    <string name="simple_tv_timeshift">Allow timeshift controls</string>
-    <string name="simple_tv_timeshift_explanation">When on, pause and seek are available if the server supports timeshift. When off, live TV plays without timeshift controls.</string>
-    <string name="simple_tv_unlock">Exit Simple TV</string>
-    <string name="simple_tv_unlock_title">Exit Simple TV</string>
-    <string name="simple_tv_unlock_session">Enter the owner PIN to continue to the exit confirmation.</string>
-    <string name="simple_tv_unlock_required">Unlock owner controls before changing Simple TV mode.</string>
-    <string name="simple_tv_pin_section">Owner PIN</string>
-    <string name="simple_tv_pin">4-digit owner PIN</string>
-    <string name="simple_tv_pin_explanation">The optional PIN is a convenience barrier for household use, not a security boundary.</string>
-    <string name="simple_tv_pin_security_boundary">The PIN is a convenience barrier, not a security boundary.</string>
-    <string name="simple_tv_pin_recovery">If the PIN is forgotten, reset the app data and configure the connection again.</string>
-    <string name="simple_tv_set_pin">Set owner PIN</string>
-    <string name="simple_tv_clear_pin">Remove owner PIN</string>
-    <string name="simple_tv_pin_saved">Owner PIN saved.</string>
-    <string name="simple_tv_pin_cleared">Owner PIN removed.</string>
-    <string name="simple_tv_pin_invalid">Enter exactly four digits.</string>
-    <string name="simple_tv_pin_enter_four">Enter 4 digits to enable Set owner PIN.</string>
-    <string name="simple_tv_pin_wrong">That PIN is incorrect.</string>
-    <string name="simple_tv_no_pin">No PIN is configured. Unlocking requires only confirmation.</string>
-    <string name="simple_tv_continue_to_exit">Continue</string>
-    <string name="simple_tv_exit_confirm_title">Exit Simple TV?</string>
-    <string name="simple_tv_exit_confirm_message">This restores the full TVHeadend Player interface for the current app session. Startup behavior is not changed.</string>
-    <string name="simple_tv_keep_watching">Keep watching</string>
-    <string name="simple_tv_exit">Exit Simple TV</string>
 
     <string name="play">Play</string>
 

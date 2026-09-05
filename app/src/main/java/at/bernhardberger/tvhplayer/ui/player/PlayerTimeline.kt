@@ -44,7 +44,7 @@ enum class PlayerTimelineTone { AMBIENT, INTERACTIVE, ACTIVE, PREVIEW }
 
 @Composable
 fun PlayerTimelineBar(
-    progress: Float,
+    progress: Float?,
     tone: PlayerTimelineTone,
     modifier: Modifier = Modifier,
     ghostProgress: Float? = null,
@@ -58,7 +58,7 @@ fun PlayerTimelineBar(
     liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
 ) {
-    val currentProgress = progress.coerceIn(0f, 1f)
+    val currentProgress = progress?.coerceIn(0f, 1f)
     val barHeight = if (tone == PlayerTimelineTone.ACTIVE) {
         TvOverlayTimelineBarFocusedHeight
     } else {
@@ -69,7 +69,7 @@ fun PlayerTimelineBar(
             .fillMaxWidth()
             .height(TvOverlayTimelineRowHeight)
             .then(
-                if (progressSemantics) {
+                if (progressSemantics && currentProgress != null) {
                     Modifier.semantics {
                         progressBarRangeInfo = ProgressBarRangeInfo(currentProgress, 0f..1f)
                     }
@@ -113,12 +113,14 @@ fun PlayerTimelineBar(
                         ),
                 )
             }
-            Box(
-                Modifier
-                    .fillMaxWidth(currentProgress)
-                    .height(barHeight)
-                    .background(PlaybackPositionColor),
-            )
+            if (rewindableStartFraction == null && currentProgress != null) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(currentProgress)
+                        .height(barHeight)
+                        .background(PlaybackPositionColor),
+                )
+            }
             rewindableStartFraction?.let { fraction ->
                 val start = fraction.coerceIn(0f, 1f)
                 if (rewindableStartOverflow) {
@@ -198,15 +200,24 @@ fun PlayerTimelineBar(
                         .then(liveEdgeTestTag?.let(Modifier::testTag) ?: Modifier),
                 )
             }
+            if (rewindableStartFraction != null && currentProgress != null) {
+                Box(
+                    Modifier
+                        .offset(x = (maxWidth * currentProgress - 1.dp).coerceAtLeast(0.dp))
+                        .width(2.dp)
+                        .height(barHeight)
+                        .background(PlaybackPositionColor),
+                )
+            }
         }
-        if (tone == PlayerTimelineTone.ACTIVE) {
+        if (tone == PlayerTimelineTone.ACTIVE && currentProgress != null) {
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
                 Box(
                     modifier = Modifier
                         .offset(x = maxWidth * currentProgress - TvOverlayTimelineThumbSize / 2)
                         .size(TvOverlayTimelineThumbSize)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurface)
+                        .background(PlaybackPositionColor)
                         .then(thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier),
                 )
             }
@@ -216,7 +227,7 @@ fun PlayerTimelineBar(
 
 @Composable
 fun PlayerTimelineBlock(
-    progress: Float,
+    progress: Float?,
     tone: PlayerTimelineTone,
     modifier: Modifier = Modifier,
     leadingLabel: String? = null,

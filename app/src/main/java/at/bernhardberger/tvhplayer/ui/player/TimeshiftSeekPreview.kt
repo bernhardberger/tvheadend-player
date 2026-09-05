@@ -22,7 +22,6 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
-import at.bernhardberger.tvhplayer.core.programmeAnchoredAxis
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
@@ -34,31 +33,10 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 internal fun TimeshiftSeekPreview(
     state: AppTimeshiftState,
     decision: TimeshiftSeekDecision,
-    nowEpochSec: Long,
-    programmeStartSec: Long?,
-    programmeStopSec: Long?,
     modifier: Modifier = Modifier,
 ) {
     val targetState = state.copy(positionMs = decision.targetMs)
-    val programmeAxis = programmeAnchoredAxis(
-        state = targetState,
-        nowEpochSec = nowEpochSec,
-        programmeStartSec = programmeStartSec,
-        programmeStopSec = programmeStopSec,
-    )
-    val programmeDurationMs = if (
-        programmeStartSec != null &&
-        programmeStopSec != null &&
-        programmeStopSec > programmeStartSec
-    ) {
-        (programmeStopSec - programmeStartSec) * 1_000L
-    } else {
-        null
-    }
-    val programmeTargetMs = programmeDurationMs?.let { duration ->
-        ((nowEpochSec + decision.targetMs / 1_000L - requireNotNull(programmeStartSec)) * 1_000L)
-            .takeIf { it in 0L..duration }
-    }
+    val range = timeshiftSeekbarRange(targetState)
     val positionPresentation = timeshiftPositionPresentation(targetState)
     val liveLabel = stringResource(R.string.timeshift_live)
     val behindLiveLabel = if (positionPresentation.atLiveEdge) {
@@ -69,7 +47,7 @@ internal fun TimeshiftSeekPreview(
             formatPlaybackDuration(positionPresentation.behindLiveMs),
         )
     }
-    val targetLabel = programmeTargetMs?.let(::formatPlaybackDuration) ?: if (
+    val targetLabel = if (
         positionPresentation.atLiveEdge
     ) {
         liveLabel
@@ -114,15 +92,14 @@ internal fun TimeshiftSeekPreview(
             },
     ) {
         PlayerTimelineBlock(
-            progress = programmeAxis?.playbackFraction
-                ?: timeshiftSeekbarRange(targetState).progress,
+            progress = range.displayProgress,
             tone = PlayerTimelineTone.PREVIEW,
             leadingLabel = targetLabel,
             trailingLabel = liveLabel,
             leadingLabelTestTag = "timeshift-preview-target",
-            rewindableStartFraction = programmeAxis?.rewindableStartFraction ?: 0f,
-            rewindableStartOverflow = programmeAxis?.rewindableStartsBeforeProgramme == true,
-            liveEdgeFraction = programmeAxis?.liveEdgeFraction ?: 1f,
+            rewindableStartFraction = range.availableStartFraction,
+            rewindableStartOverflow = false,
+            liveEdgeFraction = 1f,
             rewindableBoundaryTestTag = "timeshift-preview-rewindable-boundary",
             rewindableOverflowTestTag = "timeshift-preview-rewindable-overflow",
             liveEdgeTestTag = "timeshift-preview-live-edge",

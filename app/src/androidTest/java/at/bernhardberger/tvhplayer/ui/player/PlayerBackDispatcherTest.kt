@@ -112,7 +112,7 @@ class PlayerBackDispatcherTest {
             }
             PlayerBackHandler {
                 val layer = playerForegroundLayer(layerState.foregroundContext())
-                when (playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = true, layer)) {
+                when (playerBackAction(PlayerSurface.LIVE, layer)) {
                     PlayerBackAction.DISMISS_CONFIRMATION -> {
                         trace += "confirmation"
                         layerState.dismissRecordingConfirmation()

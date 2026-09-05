@@ -105,19 +105,16 @@ class NavigationShellPolicyTest {
     fun showsRailOnBrowseDestinations() {
         assertTrue(
             showGlobalNavigationRail(
-                simpleTvActive = false,
                 playerVisible = false,
             ),
         )
         assertTrue(
             showGlobalNavigationRail(
-                simpleTvActive = false,
                 playerVisible = false,
             ),
         )
         assertTrue(
             showGlobalNavigationRail(
-                simpleTvActive = false,
                 playerVisible = false,
             ),
         )
@@ -127,26 +124,22 @@ class NavigationShellPolicyTest {
     fun keepsStandardRailOnSettings() {
         assertTrue(
             showGlobalNavigationRail(
-                simpleTvActive = false,
                 playerVisible = false,
             ),
         )
     }
 
     @Test
-    fun hidesRailOnPlayersAndSimpleTv() {
+    fun hidesRailOnPlayers() {
         assertFalse(
             showGlobalNavigationRail(
-                simpleTvActive = false,
                 playerVisible = true,
             ),
         )
         assertFalse(
             showGlobalNavigationRail(
-                simpleTvActive = false,
                 playerVisible = true,
             ),
         )
-        assertFalse(showGlobalNavigationRail(simpleTvActive = true, playerVisible = false))
     }
 }

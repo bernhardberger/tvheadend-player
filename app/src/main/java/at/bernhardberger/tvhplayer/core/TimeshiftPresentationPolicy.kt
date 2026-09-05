@@ -42,13 +42,15 @@ fun timeshiftPositionPresentation(state: AppTimeshiftState): TimeshiftPositionPr
     timeshiftPositionPresentation(
         positionMs = state.positionMs,
         liveEdgeMs = state.liveEdgeMs,
-    )
+    ).let { position ->
+        if (state.timingKnown) position else position.copy(atLiveEdge = false)
+    }
 
 fun canSeekTimeshiftBackward(state: AppTimeshiftState): Boolean =
-    state.available && state.positionMs - state.bufferStartMs > 1_000L
+    state.available && state.timingKnown && state.positionMs - state.bufferStartMs > 1_000L
 
 fun canSeekTimeshiftForward(state: AppTimeshiftState): Boolean =
-    state.available && !timeshiftPositionPresentation(state).atLiveEdge
+    state.available && state.timingKnown && !timeshiftPositionPresentation(state).atLiveEdge
 
 fun queueTimeshiftSeek(
     queue: TimeshiftSeekQueueState,

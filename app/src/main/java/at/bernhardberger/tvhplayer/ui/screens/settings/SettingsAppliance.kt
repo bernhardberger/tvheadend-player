@@ -28,8 +28,6 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
-import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.SettingsPane
@@ -41,10 +39,8 @@ import org.koin.compose.koinInject
 @Composable
 fun SettingsAppliance(
     initialFocusRequester: FocusRequester,
-    onStartSimpleTv: (SimpleTvSettings) -> Unit,
     modifier: Modifier = Modifier,
     settingsStore: UiSettingsStore = koinInject(),
-    simpleTvSettingsStore: SimpleTvSettingsStore = koinInject(),
 ) {
     val context = LocalContext.current
     var serviceEnabled by remember { mutableStateOf(false) }
@@ -95,12 +91,6 @@ fun SettingsAppliance(
                 Text(stringResource(R.string.open_accessibility_settings))
             }
 
-            SettingsSectionTitle(stringResource(R.string.settings_simple_tv))
-            SettingsSimpleTvContent(
-                onStartSimpleTv = onStartSimpleTv,
-                modifier = Modifier.fillMaxWidth(),
-                store = simpleTvSettingsStore,
-            )
         }
     }
 }

@@ -1,220 +1,150 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.Alignment
-import coil3.ImageLoader
+import androidx.tv.material3.Card
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
-import at.bernhardberger.tvhplayer.core.channelNowStatus
-import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.components.ChannelRow
-import at.bernhardberger.tvhplayer.ui.TvPlaybackPadding
-import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import kotlinx.coroutines.flow.filter
+import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import coil3.ImageLoader
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 @Composable
 fun ChannelDrawer(
     channels: List<Channel>,
     selectedId: ChannelId?,
-    playingChannelId: ChannelId,
+    playingChannelId: ChannelId?,
     recordingChannelIds: Set<ChannelId>,
-    nowSec: Long,
-    channelsVm: ChannelsViewModel,
+    nowEvent: (ChannelId) -> EpgEvent?,
+    nextEvent: (ChannelId) -> EpgEvent?,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
-    onCloseDrawer: () -> Unit,
+    onCloseDrawer: (Int?) -> Unit,
 ) {
+    val ids = remember(channels) { channels.map { it.id } }
+    val numbers = remember(channels) { channels.associate { it.id to it.number?.toInt() } }
+    val requesters = remember(ids) { ids.associateWith { FocusRequester() } }
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val focusManager = LocalFocusManager.current
-    val orderedChannelIds = remember(channels) { channels.map { it.id } }
-    val rowFocusRequesters = remember(orderedChannelIds) {
-        orderedChannelIds.associateWith { FocusRequester() }
+    var focusedId by remember { mutableStateOf(playingChannelId ?: selectedId) }
+    var entered by remember { mutableStateOf(false) }
+    val emptyFocus = remember { FocusRequester() }
+    LaunchedEffect(ids) {
+        if (ids.isEmpty()) {
+            emptyFocus.requestFocus()
+            return@LaunchedEffect
+        }
+        if (entered && focusedId in ids) return@LaunchedEffect
+        val target = (if (!entered) playingChannelId else focusedId)?.takeIf { it in ids }
+            ?: selectedId?.takeIf { it in ids } ?: ids.first()
+        focusedId = target
+        listState.scrollToItem(ids.indexOf(target))
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == target.value } }.first { it }
+        withFrameNanos { }
+        requesters.getValue(target).requestFocus()
+        entered = true
     }
-    val channelNumbers = remember(channels) {
-        channels.associate { it.id to it.number?.toInt() }
-    }
-    val noEpg = stringResource(R.string.no_epg)
-
-    var didInitialRestore by remember { mutableStateOf(false) }
-    var isRestoring by remember { mutableStateOf(false) }
-    var pageGeneration by remember { mutableIntStateOf(0) }
-
-    fun pageChannels(direction: Int): Boolean {
-        val currentIndex = channels.indexOfFirst { it.id == selectedId }
-        val visibleCount = listState.layoutInfo.visibleItemsInfo.size
-        val targetIndex = ChannelNavigation.pageTargetIndex(
-            itemCount = channels.size,
-            currentIndex = currentIndex,
-            visibleItemCount = visibleCount,
-            direction = direction,
-        ) ?: return true
-        if (targetIndex == currentIndex) return true
-
-        val targetId = channels[targetIndex].id
-        val targetFocus = rowFocusRequesters[targetId] ?: return true
-        val generation = ++pageGeneration
-        isRestoring = true
-        focusManager.clearFocus(force = true)
-        onFocusChannel(targetId)
-        coroutineScope.launch {
-            try {
-                listState.scrollToItem(targetIndex)
-                snapshotFlow {
-                    listState.layoutInfo.visibleItemsInfo.any { it.key == targetId }
-                }.filter { it }.first()
-                withFrameNanos { }
-                targetFocus.requestFocus()
-                withFrameNanos { }
-            } finally {
-                if (pageGeneration == generation) isRestoring = false
+    val focused = channels.firstOrNull { it.id == focusedId }
+    val now = focused?.let { nowEvent(it.id) }
+    val next = focused?.let { nextEvent(it.id) }
+    Column(
+        Modifier.fillMaxWidth().background(Brush.verticalGradient(
+            0f to Color.Transparent, 0.18f to Color.Black.copy(alpha = 0.94f), 1f to Color.Black,
+        ))
+            .padding(top = 32.dp, bottom = 32.dp).testTag("player-channel-shelf")
+            .onPreviewKeyEvent { event ->
+                if (event.key == Key.DirectionUp) {
+                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) onCloseDrawer(event.nativeKeyEvent.keyCode)
+                    true
+                } else false
+            },
+    ) {
+        Column(Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 56.dp)) {
+            Text(focused?.name.orEmpty(), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge)
+            Text(now?.let { "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}  ${it.title.orEmpty()}" }
+                ?: stringResource(R.string.no_epg), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            next?.let {
+                Text(stringResource(R.string.player_next_event_with_range,
+                    "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}", it.title.orEmpty()),
+                    color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        return true
-    }
-
-    LaunchedEffect(channels, selectedId) {
-        if (didInitialRestore) return@LaunchedEffect
-        if (channels.isEmpty()) return@LaunchedEffect
-
-        val id = selectedId ?: channels.first().id
-        val idx = channels.indexOfFirst { it.id == id }
-        if (idx < 0) return@LaunchedEffect
-
-        isRestoring = true
-
-        listState.scrollToItem(idx)
-        snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo.any { it.key == id }
-        }.filter { it }.first()
-
-        withFrameNanos { }
-        rowFocusRequesters[id]?.requestFocus()
-        withFrameNanos { }
-
-        didInitialRestore = true
-        isRestoring = false
-    }
-
-    Box(
-        modifier = Modifier
-            // Keep the focusable list inside the opaque region; fade only over video.
-            .width(480.dp)
-            .fillMaxHeight()
-            .background(
-                Brush.horizontalGradient(
-                    0f to Color.Black.copy(alpha = 0.96f),
-                    0.82f to Color.Black.copy(alpha = 0.92f),
-                    1f to Color.Transparent,
-                )
-            )
-            .onPreviewKeyEvent { ev ->
-                if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                ChannelNavigation.pageDirectionForKeyCode(
-                    ev.nativeKeyEvent.keyCode
-                )?.let(::pageChannels)?.let { return@onPreviewKeyEvent it }
-                when (ev.key) {
-                    Key.DirectionRight -> {
-                        onCloseDrawer()
-                        true
-                    }
-                    else -> false
-                }
-            }
-    ) {
         if (channels.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .width(400.dp)
-                    .fillMaxSize()
-                    .padding(TvPlaybackPadding),
-                contentAlignment = Alignment.Center,
-            ) {
-                androidx.tv.material3.Text(stringResource(R.string.empty_channel_tag))
-            }
-        } else {
-            LazyColumn(
-                state = listState,
-                contentPadding = TvPlaybackPadding,
-                modifier = Modifier
-                    .width(400.dp)
-                    .fillMaxHeight()
-                    .focusGroup()
-                    .focusRestorer()
-            ) {
-                items(channels, key = { ch -> ch.id.value }) { ch ->
-                    val channelId = ch.id
-
-                    val now = remember(channelId, nowSec) {
-                        channelsVm.nowEvent(channelId, nowSec)
+            Text(stringResource(R.string.empty_channel_tag), Modifier.padding(horizontal = 48.dp), color = MaterialTheme.colorScheme.onSurface)
+            androidx.tv.material3.Button(
+                onClick = { onCloseDrawer(null) },
+                modifier = Modifier.padding(horizontal = 48.dp).focusRequester(emptyFocus),
+            ) { Text(stringResource(R.string.close)) }
+        }
+        LazyRow(state = listState, contentPadding = PaddingValues(horizontal = 56.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            items(channels, key = { it.id.value }) { channel ->
+                Card(onClick = { onPickChannel(channel) },
+                     border = androidx.tv.material3.CardDefaults.border(
+                         focusedBorder = androidx.tv.material3.Border(
+                             androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface),
+                         ),
+                     ),
+                    modifier = Modifier.width(184.dp).height(112.dp)
+                        .focusRequester(requesters.getValue(channel.id))
+                        .onFocusChanged {
+                            if (it.isFocused) { focusedId = channel.id; onFocusChannel(channel.id) }
+                        }) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        PiconBox(imageLoader = imageLoader, currentSession = currentSession,
+                            piconPath = channel.icon, modifier = Modifier.size(52.dp, 36.dp))
+                        Text(channelTitleText(ChannelNavigation.numberForId(ids, numbers, channel.id), channel.name.orEmpty()),
+                            style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (channel.id == playingChannelId) Text(stringResource(R.string.player_shelf_playing), style = MaterialTheme.typography.labelSmall)
+                            if (channel.id in recordingChannelIds) Text(stringResource(R.string.player_shelf_recording),
+                                color = at.bernhardberger.tvhplayer.ui.TvRecordingColor, style = MaterialTheme.typography.labelSmall)
+                        }
                     }
-                    val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
-                    val status = channelNowStatus(
-                        channelId = channelId,
-                        playingChannelId = playingChannelId,
-                        recordingChannelIds = recordingChannelIds,
-                    )
-
-                    ChannelRow(
-                        modifier = Modifier.focusRequester(
-                            rowFocusRequesters.getValue(channelId)
-                        ),
-                        number = ChannelNavigation.numberForId(
-                            orderedChannelIds,
-                            channelNumbers,
-                            channelId,
-                        ),
-                        name = ch.name.orEmpty(),
-                        programTitle = now?.title ?: noEpg,
-                        progress = if (now != null) prog else null,
-                        imageLoader = imageLoader,
-                        currentSession = currentSession,
-                        piconPath = ch.icon,
-                        recordingNow = status.recordingNow,
-                        playingNow = status.playingNow,
-                        onFocus = { if (!isRestoring) onFocusChannel(channelId) },
-                        onConfirm = { onPickChannel(ch) }
-                    )
                 }
             }
         }

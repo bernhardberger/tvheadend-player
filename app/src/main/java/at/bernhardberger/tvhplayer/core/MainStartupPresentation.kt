@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.core
 enum class MainStartupActionId {
     RETRY,
     CONNECTION_SETTINGS,
-    EXIT_SIMPLE_TV,
 }
 
 enum class MainStartupMessageKind {
@@ -17,7 +16,6 @@ enum class MainStartupMessageKind {
     RETRYABLE_FAILURE,
     CONFIGURATION_REQUIRED,
     CREDENTIAL_UNAVAILABLE,
-    SIMPLE_TV_FAILURE,
 }
 
 sealed interface MainStartupPresentation {
@@ -38,7 +36,6 @@ fun mainStartupPresentation(
     launchState: ApplianceLaunchState,
     connectionState: ConnectionUiState,
     currentChannelReadiness: CurrentChannelReadiness,
-    simpleTvActive: Boolean,
 ): MainStartupPresentation {
     if (startupState is MainStartupState.ResolvingLocal) {
         return MainStartupPresentation.Passive(MainStartupMessageKind.PREPARING)
@@ -65,7 +62,6 @@ fun mainStartupPresentation(
             is CurrentChannelReadiness.Ready -> if (currentChannelReadiness.channels.isEmpty()) {
                 actionableFailure(
                     normalMessageKind = MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
-                    simpleTvActive = simpleTvActive,
                 )
             } else {
                 MainStartupPresentation.Enter(pendingLaunch.request)
@@ -73,59 +69,39 @@ fun mainStartupPresentation(
         }
         ConnectionUiState.NeedsConfiguration -> actionableFailure(
             normalMessageKind = MainStartupMessageKind.CONFIGURATION_REQUIRED,
-            simpleTvActive = simpleTvActive,
             normalActions = connectionSettingsAction,
         )
         ConnectionUiState.CredentialUnavailable -> actionableFailure(
             normalMessageKind = MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
-            simpleTvActive = simpleTvActive,
             normalActions = connectionSettingsAction,
         )
         is ConnectionUiState.Error -> when (connectionState.primaryRecoveryAction()) {
             ConnectionRecoveryAction.RETRY -> actionableFailure(
                 normalMessageKind = MainStartupMessageKind.RETRYABLE_FAILURE,
-                simpleTvActive = simpleTvActive,
             )
             ConnectionRecoveryAction.SETTINGS -> actionableFailure(
                 normalMessageKind = MainStartupMessageKind.RETRYABLE_FAILURE,
-                simpleTvActive = simpleTvActive,
                 normalActions = connectionSettingsAction,
-                simpleTvActions = exitSimpleTvAction,
             )
             ConnectionRecoveryAction.NONE ->
                 MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING)
         }
         is ConnectionUiState.SubscriptionError -> actionableFailure(
             normalMessageKind = MainStartupMessageKind.RETRYABLE_FAILURE,
-            simpleTvActive = simpleTvActive,
         )
     }
 }
 
 private fun actionableFailure(
     normalMessageKind: MainStartupMessageKind,
-    simpleTvActive: Boolean,
     normalActions: List<MainStartupActionId> = retryAndConnectionSettingsActions,
-    simpleTvActions: List<MainStartupActionId> = retryAndExitSimpleTvActions,
-): MainStartupPresentation.Actionable = if (simpleTvActive) {
-    MainStartupPresentation.Actionable(
-        messageKind = MainStartupMessageKind.SIMPLE_TV_FAILURE,
-        actions = simpleTvActions,
-    )
-} else {
+): MainStartupPresentation.Actionable =
     MainStartupPresentation.Actionable(
         messageKind = normalMessageKind,
         actions = normalActions,
     )
-}
-
 private val retryAndConnectionSettingsActions = listOf(
     MainStartupActionId.RETRY,
     MainStartupActionId.CONNECTION_SETTINGS,
 )
 private val connectionSettingsAction = listOf(MainStartupActionId.CONNECTION_SETTINGS)
-private val exitSimpleTvAction = listOf(MainStartupActionId.EXIT_SIMPLE_TV)
-private val retryAndExitSimpleTvActions = listOf(
-    MainStartupActionId.RETRY,
-    MainStartupActionId.EXIT_SIMPLE_TV,
-)

@@ -37,10 +37,9 @@ fun settingsBackAction(
 /**
  * Whether the global navigation rail should be composed around browse content.
  *
- * Hidden during Simple TV and fullscreen players. Browse destinations, including
+ * Hidden during fullscreen players. Browse destinations, including
  * Settings, retain the standard drawer's collapsed icon rail.
  */
 fun showGlobalNavigationRail(
-    simpleTvActive: Boolean,
     playerVisible: Boolean,
-): Boolean = !simpleTvActive && !playerVisible
+): Boolean = !playerVisible

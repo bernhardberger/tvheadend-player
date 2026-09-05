@@ -90,7 +90,6 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.REVEAL_CONTROLS,
@@ -125,7 +124,6 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
@@ -148,7 +146,6 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
@@ -179,7 +176,6 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            playerCloseAllowed = true,
             infoOpen = true,
         )
         assertEquals(
@@ -195,7 +191,6 @@ class PlaybackKeyPolicyTest {
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.OPEN_INFO,
@@ -220,16 +215,15 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun simpleTvBackOnlyDismissesOverlays() {
+    fun ordinaryLiveBackClosesOnlyAfterChromeIsDismissed() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            playerCloseAllowed = false,
         )
         assertEquals(
-            PlayerKeyAction.DISMISS_OVERLAY_ONLY,
+            PlayerKeyAction.CLOSE_PLAYER,
             playerKeyAction(ctx, KeyEvent.KEYCODE_BACK),
         )
         val withControls = ctx.copy(controlsVisible = true)
@@ -240,13 +234,12 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun simpleTvOpensTheChannelListOnLeftAndListRemoteKeys() {
+    fun nonTimeshiftLiveOpensTheShelfOnLeftAndListRemoteKeys() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
             controlsVisible = false,
             seekbarFocused = false,
             timeshiftAvailable = false,
-            playerCloseAllowed = false,
         )
         assertEquals(
             PlayerKeyAction.OPEN_CHANNELS,
@@ -273,7 +266,6 @@ class PlaybackKeyPolicyTest {
             controlsVisible = true,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.HIDE_CONTROLS,
@@ -292,7 +284,6 @@ class PlaybackKeyPolicyTest {
             controlsVisible = true,
             seekbarFocused = true,
             timeshiftAvailable = false,
-            playerCloseAllowed = true,
         )
         assertEquals(
             PlayerKeyAction.SEEK_BACK,
@@ -316,6 +307,7 @@ class PlaybackKeyPolicyTest {
     fun pickingCurrentChannelClosesDrawerWithoutRetuning() {
         assertEquals(ChannelPickAction.CLOSE_DRAWER, channelPickAction(ChannelId(33), ChannelId(33)))
         assertEquals(ChannelPickAction.TUNE, channelPickAction(ChannelId(33), ChannelId(34)))
+        assertEquals(ChannelPickAction.TUNE, channelPickAction(null, ChannelId(33)))
     }
 
     @Test
@@ -330,8 +322,8 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun channelKeysPageAnOpenBrowserAndTuneFromFullscreenPlayback() {
-        assertEquals(ChannelKeyAction.PAGE_LIST, playbackChannelKeyAction(browserVisible = true))
+    fun channelKeysTuneInTheShelfAndFullscreenPlayback() {
+        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = true))
         assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = false))
     }
 

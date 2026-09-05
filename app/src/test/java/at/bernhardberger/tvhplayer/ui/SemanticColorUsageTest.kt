@@ -15,10 +15,6 @@ class SemanticColorUsageTest {
         assertContains("ui/screens/OnboardingScreen.kt", "MaterialTheme.colorScheme.error")
         assertContains("ui/screens/settings/SettingsConnection.kt", "MaterialTheme.colorScheme.error")
         assertContains(
-            "ui/screens/settings/SettingsSimpleTv.kt",
-            "PinFeedbackKind.SUCCESS -> MaterialTheme.colorScheme.onSurface",
-        )
-        assertContains(
             "ui/components/ProgrammeContentDetails.kt",
             "color = MaterialTheme.colorScheme.onSurfaceVariant",
         )
@@ -31,7 +27,6 @@ class SemanticColorUsageTest {
         val scopedSources = listOf(
             "ui/screens/OnboardingScreen.kt",
             "ui/screens/settings/SettingsConnection.kt",
-            "ui/screens/settings/SettingsSimpleTv.kt",
             "ui/screens/RecordingsScreen.kt",
             "ui/screens/recordings/RecordingsContent.kt",
             "ui/screens/recordings/RecordingsModals.kt",
@@ -45,7 +40,6 @@ class SemanticColorUsageTest {
         ).joinToString("\n") { source(it) }
 
         listOf(
-            "PinFeedbackKind.SUCCESS -> MaterialTheme.colorScheme.primary",
             "Text(text = it, color = MaterialTheme.colorScheme.primary)",
             "Text(it, color = MaterialTheme.colorScheme.primary)",
         ).forEach { forbidden ->

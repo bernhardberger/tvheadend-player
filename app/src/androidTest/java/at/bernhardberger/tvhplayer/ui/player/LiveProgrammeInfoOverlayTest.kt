@@ -437,12 +437,12 @@ class LiveProgrammeInfoOverlayTest {
             }
         }
 
-        composeRule.onNodeWithTag("live-info-action").requestFocus()
+        composeRule.onNodeWithTag("player-info").requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
-        composeRule.onNodeWithTag("live-info-action").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-info").assertDoesNotExist()
         composeRule.onNodeWithTag("live-info-close").assertIsFocused()
             .performKeyInput { pressKey(Key.Enter) }
-        composeRule.onNodeWithTag("live-info-action").assertIsFocused()
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.runOnIdle { assertFalse(restoreInfoFocus) }
     }
 
@@ -537,6 +537,13 @@ class LiveProgrammeInfoOverlayTest {
         ).assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
         )
+    }
+
+    @Test
+    fun liveInfoIdentifiesCurrentBroadcastRatherThanHistoricalPlayback() {
+        setInfoOverlay(event = { event(1) })
+        composeRule.onNodeWithText("Current broadcast").assertIsDisplayed()
+        composeRule.onNodeWithText("Programme 1").assertIsDisplayed()
     }
 
     private fun setInfoOverlay(

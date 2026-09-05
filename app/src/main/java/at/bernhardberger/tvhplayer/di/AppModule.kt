@@ -14,12 +14,10 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
@@ -41,7 +39,6 @@ val appModule = module {
     single { PlayerSettingsStore(androidContext()) }
     single { ChannelTagSettingsStore(androidContext()) }
     single { UiSettingsStore(androidContext()) }
-    single { SimpleTvSettingsStore(androidContext()) }
 
     single {
         val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -89,7 +86,6 @@ val appModule = module {
     single { ChannelSelectionStore() }
     single { LastPlayedChannelStore(androidContext()) }
     single { GuidePositionStore() }
-    single { SimpleTvSession() }
 
     single<ImageLoader> { buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session) }
 
@@ -103,8 +99,6 @@ val appModule = module {
         MainStartupViewModel(
             profileOwner = get(),
             uiSettingsStore = get(),
-            simpleTvSettingsStore = get(),
-            simpleTvSession = get(),
             savedStateHandle = get(),
         )
     }

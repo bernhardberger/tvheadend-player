@@ -4,8 +4,6 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvhplayer.core.ProductProfile
-import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -236,69 +234,9 @@ class AppRootPlaybackOrchestratorTest {
         )
     }
 
-    @Test
-    fun recordingGuardStopsBeforeRedirecting() = runTest {
-        val orchestrator = AppRootPlaybackOrchestrator()
-        val finishStop = CompletableDeferred<Unit>()
-        val events = mutableListOf<String>()
 
-        val guard = async {
-            orchestrator.enforceRouteGuard(
-                profile = ProductProfile.Appliance(timeshiftAllowed = false),
-                route = SimpleTvRoute.RECORDING_PLAYER,
-                recordingActive = true,
-                stopRecording = {
-                    events += "stop-started"
-                    finishStop.await()
-                    events += "stop-finished"
-                },
-                redirectToLive = { events += "redirect-live" },
-            )
-        }
-        runCurrent()
-        assertEquals(listOf("stop-started"), events)
 
-        finishStop.complete(Unit)
-        guard.await()
-        assertEquals(
-            listOf("stop-started", "stop-finished", "redirect-live"),
-            events,
-        )
-    }
 
-    @Test
-    fun staleGuardCannotRedirectAfterRouteBecomesAllowed() = runTest {
-        val orchestrator = AppRootPlaybackOrchestrator()
-        val stopStarted = CompletableDeferred<Unit>()
-        val finishStop = CompletableDeferred<Unit>()
-        var redirects = 0
-
-        val staleGuard = async {
-            orchestrator.enforceRouteGuard(
-                profile = ProductProfile.Appliance(timeshiftAllowed = false),
-                route = SimpleTvRoute.RECORDING_PLAYER,
-                recordingActive = true,
-                stopRecording = {
-                    stopStarted.complete(Unit)
-                    withContext(NonCancellable) { finishStop.await() }
-                },
-                redirectToLive = { redirects += 1 },
-            )
-        }
-        stopStarted.await()
-
-        orchestrator.enforceRouteGuard(
-            profile = ProductProfile.Standard,
-            route = SimpleTvRoute.RECORDING_PLAYER,
-            recordingActive = false,
-            stopRecording = {},
-            redirectToLive = { redirects += 1 },
-        )
-        finishStop.complete(Unit)
-        staleGuard.await()
-
-        assertEquals(0, redirects)
-    }
 
     @Test
     fun recordingWarmReturnCanBeRearmedByDeliberateBrowseNavigation() {
@@ -327,5 +265,24 @@ class AppRootPlaybackOrchestratorTest {
                 currentChannelReadiness = CurrentChannelReadiness.Waiting,
             ),
         )
+    }
+
+    @Test
+    fun clearingStoppedTargetRemovesWarmReturnForLiveAndRecording() {
+        listOf(true, false).forEach { live ->
+            val orchestrator = AppRootPlaybackOrchestrator()
+            orchestrator.activePlaybackChanged(
+                activeChannelId = ChannelId(22).takeIf { live },
+                activeRecordingId = DvrEntryId(7).takeUnless { live },
+            )
+            assertTrue(orchestrator.warmReturn.canReturn)
+            orchestrator.activePlaybackChanged(null, null)
+            assertFalse(orchestrator.warmReturn.canReturn)
+            assertNull(orchestrator.consumeWarmPlayerTarget(
+                activeChannelId = null,
+                activeRecordingId = null,
+                currentChannelReadiness = CurrentChannelReadiness.Waiting,
+            ))
+        }
     }
 }

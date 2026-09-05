@@ -24,7 +24,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 |---|---|
 | `ai-engineering-harness.md` | Current AI-harness architecture and operation; harness work only. |
 | `code-ownership.md` | Compact source and tooling ownership map; read before locating application code or delegating broad repository mapping. |
-| `appliance-mode-spec.md` | Appliance-profile behavior; appliance work only. |
+| `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |

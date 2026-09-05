@@ -76,8 +76,10 @@ repository-local domain overlays, then the focused skill, then local style.
   state. For docs/config-only edits use relevant static checks instead. Reuse
   unchanged successful evidence; a review or administrative stage is not a reason
   to run it again. Do not add tests for model names or prompt wording.
-- External review is risk-based, not an automatic approval loop. Use one scoped
-  audit; request a targeted closure only when a fix remains uncertain. Remediate
+- External review is risk-based, not an automatic approval loop. Non-trivial
+  non-UX work needs independent Astra and Opus reviews of the same bounded
+  evidence, subject to the quota fallback below. Follow up only on unresolved
+  findings or materially changed behavior, not an automatic third or broad repeat audit. Remediate
   new in-scope blockers autonomously. Never ask the user merely whether to
   continue; interrupt only for a genuine product choice or safety boundary.
   Review economy never waives an unresolved correctness or safety blocker.
@@ -158,20 +160,34 @@ step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
 `max` effort.
 
 Model and effort assignments live in OpenCode configuration, not product policy.
-Retired field-test roles stay retired. Routine changes and ordinary releases
-need no independent reviewer. Require one suitable independent review for
-security-sensitive or substantial runtime/lifecycle/concurrency changes, not
-a mandatory provider pair.
+Retired field-test roles stay retired. Low-impact work has no mandatory pair;
+release ceremony alone does not trigger one. Non-trivial non-UX work needs an
+independent Astra primary reviewer (`android-reviewer`) and an independent Opus
+second (`claude-audit-lead`), neither the implementing primary. Give both the same
+bounded change and evidence; keep the second initial packet blind to the first
+verdict and findings. The primary adjudicates supported in-scope corrections.
 
 For a substantial new or redesigned TV surface, use `tv-ux-brief` if product
 direction is unresolved and obtain a final screenshot-first `tv-ux-reviewer`
 review. The primary can validate its own capture matrix; an evidence curator is
 optional. Add runtime review only when the distinct runtime risk warrants it.
-Use `claude-audit-lead` for a genuine architecture question, not a second routine
-approval. The quota selector remains an optional availability check, not a
-required workflow stage. Never source it or its credential source.
-Its legacy `sol`/`sol_required` output describes a fallback route, not whether a
-review is required. It does not override this risk-based policy.
+The implementing primary accepts, modifies or rejects UX recommendations with
+concrete product, remote, accessibility, consistency or feasibility reasons.
+Opus preference is not authority; demonstrated usability defects are not taste.
+Use `tv-ux-astra` for quota fallback, including design briefs, or an optional
+bounded challenge of one consequential unresolved recommendation, never an
+automatic third/full audit. Supplied mocks may establish direction, not final
+implemented UI acceptance. Do not ask routine operator taste questions.
+UX roles remain distinct from engineering review. Before EVERY Opus dispatch,
+including UX and follow-ups, run `./review-provider-route.sh select eligible`.
+Only successful stdout `opus` allows dispatch. Never source the guard or its
+credential source, use fixture mode, or reuse cached eligibility for a dispatch.
+Otherwise use an independent Astra fallback (`tv-ux-astra` for UX); record the reason and absent Opus coverage. See
+`docs/ai-engineering-harness.md` for the role mapping. An explicitly
+non-substitutable admitted Opus gate requires central reconciliation, not waiver.
+On actual Opus exhaustion, abort that exact reviewer via the supported session
+API and verify its state. Do not wait for reset, nudge it or repeatedly spawn
+replacements; use the fallback and continue independent authorized work.
 
 Start each child as a fresh session by omitting `task_id`; never resume old child
 history. Supply one self-contained question with accepted invariants, included

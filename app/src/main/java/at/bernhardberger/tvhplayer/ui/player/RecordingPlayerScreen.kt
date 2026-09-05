@@ -43,7 +43,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlaybackRecoveryInitialAction
-import at.bernhardberger.tvhplayer.core.PlaybackRecoverySecondaryAction
 import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
@@ -89,13 +88,8 @@ fun RecordingPlayerScreen(
     imageLoader: ImageLoader = koinInject(),
     session: AppPlaybackRuntime = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
-    showStop: Boolean = true,
-    showSimpleTvExit: Boolean = false,
-    playerCloseAllowed: Boolean = true,
-    fullPlaybackOptionsAvailable: Boolean = true,
     connectionState: ConnectionState,
     onReconnect: () -> Unit,
-    onUnlock: () -> Unit = {},
     onClose: () -> Unit,
 ) {
     val connectionAvailable = connectionState is ConnectionState.Connected
@@ -170,6 +164,7 @@ fun RecordingPlayerScreen(
     var interactionToken by remember { mutableIntStateOf(0) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
+    var restoreInfoActionFocus by remember { mutableStateOf(false) }
     var statsVisible by remember { mutableStateOf(false) }
     var infoOpen by remember { mutableStateOf(false) }
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
@@ -205,7 +200,7 @@ fun RecordingPlayerScreen(
     }
 
     fun togglePlayPause() {
-        if (player.isPlaying) {
+        if (player.playWhenReady) {
             session.pause()
         } else {
             session.play()
@@ -226,6 +221,10 @@ fun RecordingPlayerScreen(
     ): Boolean = when (action) {
         RecordingPlaybackKeyAction.PASS_THROUGH -> false
         RecordingPlaybackKeyAction.REVEAL_CONTROLS -> {
+            if (timelineState.seekPending) {
+                timelineState.commitPendingSeek()
+                restoreInfoActionFocus = true
+            }
             showControls()
             true
         }
@@ -307,7 +306,6 @@ fun RecordingPlayerScreen(
         surface = PlaybackRecoverySurface.RECORDING,
         connectionState = connectionState,
         retryTargetAvailable = retryTargetAvailable,
-        secondaryAction = PlaybackRecoverySecondaryAction.CLOSE,
     )
 
     fun dispatchRecoveryRetry() {
@@ -319,16 +317,22 @@ fun RecordingPlayerScreen(
         }
     }
 
+    fun closeInfo() {
+        infoOpen = false
+        restoreInfoActionFocus = true
+        showControls()
+    }
+
     val handlePlaybackBack: () -> Unit = {
         when (
             playerBackAction(
+                seekPreviewPhase = timelineState.seekPreviewPhase(controlsVisible),
                 surface = PlayerSurface.RECORDING,
-                playerCloseAllowed = playerCloseAllowed,
                 foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
             )
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> Unit
-            PlayerBackAction.CLOSE_INFO -> infoOpen = false
+            PlayerBackAction.CLOSE_INFO -> closeInfo()
             PlayerBackAction.RETURN_TO_OPTIONS_ROOT -> optionsPage = PlaybackOptionsPage.ROOT
             PlayerBackAction.CLOSE_OPTIONS -> {
                 optionsPage = null
@@ -343,19 +347,10 @@ fun RecordingPlayerScreen(
                 timelineState.dismissDispatchedFeedback()
             PlayerBackAction.HIDE_CONTROLS -> hideControls()
             PlayerBackAction.HIDE_STATS -> statsVisible = false
-            PlayerBackAction.CONSUME_WITHOUT_CHANGE -> Unit
         }
     }
 
-    LaunchedEffect(controlsVisible, playbackAvailable, playbackState) {
-        if (
-            !controlsVisible &&
-            playbackAvailable &&
-            playbackState !is AppPlaybackState.Failed
-        ) {
-            rootFocus.requestFocus()
-        }
-    }
+    PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     LaunchedEffect(infoOpen) {
         if (infoOpen) runCatching { infoFocus.requestFocus() }
@@ -379,8 +374,14 @@ fun RecordingPlayerScreen(
                     return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
                 }
 
-                if (infoOpen) return@onPreviewKeyEvent false
-                if (optionsPage != null) return@onPreviewKeyEvent false
+                if (infoOpen || optionsPage != null) {
+                    if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT && foregroundLayer != PlayerForegroundLayer.CONFIRMATION) {
+                        revealingKeyCode = keyCode
+                        handlePlaybackBack()
+                        return@onPreviewKeyEvent true
+                    }
+                    return@onPreviewKeyEvent false
+                }
 
                 val mediaAction = mediaPlaybackAction(
                     keyCode = keyCode,
@@ -413,7 +414,6 @@ fun RecordingPlayerScreen(
                 val keyAction = recordingPlaybackKeyAction(
                     controlsVisible = controlsVisible,
                     keyCode = keyCode,
-                    playerCloseAllowed = playerCloseAllowed,
                 )
                 if (recordingKeyActionStartsOpeningCycle(keyAction)) {
                     revealingKeyCode = keyCode
@@ -445,14 +445,14 @@ fun RecordingPlayerScreen(
                     durationMs = durationMs,
                     growing = growing,
                     nowSec = nowSec,
-                    isPlaying = isPlaying,
+                    canSeek = timelineState.canSeek,
+                    paused = !player.playWhenReady,
                     controlsVisible = controlsVisible,
                     optionsOpen = optionsPage != null,
                     onTogglePlayPause = ::togglePlayPause,
                     onSeek = ::seekBy,
                     onStopPlayback = ::stopAndClose,
                     onUserInteraction = { interactionToken++ },
-                    showStop = showStop,
                     onOpenOptions = {
                         restoreOptionsFocus = false
                         optionsPage = PlaybackOptionsPage.ROOT
@@ -463,27 +463,24 @@ fun RecordingPlayerScreen(
                         infoOpen = true
                     },
                     restoreOptionsFocus = restoreOptionsFocus,
+                    restoreInfoFocus = restoreInfoActionFocus,
+                    onInfoFocusRestored = { restoreInfoActionFocus = false },
+                    onCommitSeek = timelineState::commitPendingSeek,
                     onOptionsFocusRestored = { restoreOptionsFocus = false },
                 )
             }
 
             if (foregroundLayer == PlayerForegroundLayer.INFO) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 48.dp, vertical = 32.dp),
-                    colors = SurfaceDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    shape = MaterialTheme.shapes.large,
+                PlaybackOptionsOverlayFrame(
+                    paneTitle = stringResource(R.string.player_info),
+                    panelTag = "recording-info-panel",
                 ) {
                     RecordingContentDetails(
                         entry = entry,
                         modifier = Modifier.padding(28.dp),
                         actions = {
                             Button(
-                                onClick = { infoOpen = false },
+                                onClick = ::closeInfo,
                                 modifier = Modifier.focusRequester(infoFocus),
                             ) {
                                 Text(stringResource(R.string.player_info_close))
@@ -615,19 +612,12 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
-                showSimpleTvExit = showSimpleTvExit,
-                fullOptionsAvailable = fullPlaybackOptionsAvailable,
                 onPageChange = { optionsPage = it },
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
                     scope.launch { settingsStore.setAspectRatio(mode) }
                 },
                 onStatsVisibleChange = { statsVisible = it },
-                onSimpleTvExit = {
-                    optionsPage = null
-                    restoreOptionsFocus = true
-                    onUnlock()
-                },
             )
         }
     }

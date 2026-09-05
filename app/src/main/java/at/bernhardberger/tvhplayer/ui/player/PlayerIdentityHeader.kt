@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -31,6 +32,7 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTextPrimaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import coil3.ImageLoader
 
 data class PlayerHeaderTags(
@@ -54,6 +56,9 @@ fun PlayerIdentityHeader(
     modifier: Modifier = Modifier,
     currentSession: CurrentSessionObservation? = null,
     tags: PlayerHeaderTags = PlayerHeaderTags(),
+    programmeStart: String? = null,
+    programmeEnd: String? = null,
+    programmeProgress: Float? = null,
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     Row(
@@ -99,6 +104,23 @@ fun PlayerIdentityHeader(
                         },
                     ),
             )
+            if (programmeStart != null && programmeEnd != null) {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(programmeStart, color = onSurface, style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.width(8.dp))
+                    if (programmeProgress != null) {
+                        ProgressStrip(progress = programmeProgress, modifier = Modifier.weight(1f))
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(programmeEnd, color = onSurface, style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.optionalTestTag(tags.clockSupport))
+                }
+            }
             support?.let {
                 HeaderText(
                     text = it,

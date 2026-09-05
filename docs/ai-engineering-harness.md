@@ -21,6 +21,7 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `.opencode/agents/tv-evidence-curator.md` | Optional validator for exact screenshot evidence sets |
 | `.opencode/agents/tv-ux-brief.md` | TV product design specialist when direction is unresolved |
 | `.opencode/agents/tv-ux-reviewer.md` | Final screenshot-first visual-quality reviewer |
+| `.opencode/agents/tv-ux-astra.md` | Native Astra UX fallback, brief, or bounded consequential recommendation challenge; reuses the existing role contracts |
 | `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
 | `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
 | `.opencode/commands/` | Verification, device, reviewer, UX, and upstream shortcuts |
@@ -88,12 +89,43 @@ risk:
 | Change | Independent review |
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
-| Security-sensitive or substantial runtime/lifecycle/concurrency change | One suitable reviewer, normally `android-reviewer` |
+| Non-trivial non-UX change, including security/runtime/lifecycle/concurrency | Independent Astra `android-reviewer` plus independent Opus `claude-audit-lead`, subject to the quota fallback below |
 | Ordinary release using the existing release path | No additional model approval; retain release artifact and authorization checks |
 | Unresolved visual direction for a substantial new or redesigned TV surface | Optional `tv-ux-brief` against supplied requirements and baseline images |
 | Screenshot-set coverage, metadata, duplication, staleness, or privacy | Primary checks it; optional `tv-evidence-curator` for useful independent work |
 | Final visual hierarchy, alignment, spacing, typography, density, focus appearance, consistency, or Material for TV design | `tv-ux-reviewer` against the curated current manifest |
-| HTSP, Media3, concurrency, subscription ownership, or DVR lifecycle | One architecture/race audit can replace runtime review; closure only for a fix that remains uncertain |
+| HTSP, Media3, subscription ownership, or DVR lifecycle | The same engineering pair, bounded to the affected architecture and races |
+
+Neither reviewer is the implementing primary. Both receive the same bounded
+change and evidence; the second initial packet is blind to the first verdict and
+findings. The primary adjudicates supported fixes. Low-impact work has no mandatory
+pair; there is no automatic third review or broad repeat audit. Follow up only on
+unresolved findings or materially changed behavior. Screenshot UX roles remain
+distinct and do not replace engineering review.
+
+### Quota routing
+
+Before EVERY Opus dispatch, including UX and follow-ups, the writable caller runs
+`./review-provider-route.sh select eligible`. The `ux` alias remains for existing
+callers; default/routine selection does not probe and cannot authorize Opus.
+Only successful stdout `opus` permits dispatch. Never source the guard or its
+credential file, use fixture mode, or reuse a cached decision for a live dispatch.
+Parsing, credential isolation and the strict remaining-quota thresholds are owned
+by this existing guard, not duplicated in prompts.
+
+The guard returns `opus` or `astra`. Use Opus only on successful `opus` output;
+otherwise use independent Astra. Engineering uses a separate `android-reviewer`
+session for the second review. For UX, use native `tv-ux-astra` with `mode=brief`,
+`review` or `closure`; do not substitute a source-only runtime review.
+Record the guard reason, actual reviewer/session/model and explicitly absent Opus
+coverage. An explicitly non-substitutable admitted Opus gate requires central
+reconciliation; fallback does not pass it.
+
+On actual Opus exhaustion, use the supported authenticated session API
+`POST /session/{exact-reviewer-id}/abort` and verify that session's state. Load
+`opencode-headless-sessions` for the attached-server procedure. Do not abort the
+primary or unrelated sessions, wait for reset, nudge the exhausted reviewer or
+repeatedly spawn replacements. Continue independent fallback and authorized work.
 
 Every code-review assignment supplies one frozen tested packet: exact acceptance
 criteria, changed files or diff, relevant source/tests, invariants, exclusions,
@@ -118,10 +150,22 @@ The primary captures production composables, checks coverage and supplies exact
 paths to `tv-ux-reviewer`; a separate curator is optional. The reviewer accepts
 `review` or a targeted `closure` over current evidence.
 After `DESIGN_READY`, the primary keeps accepted geometry fixed while wiring
-behavior. At most one closure compares named `UX-` findings with matched
+behavior. A targeted closure compares unresolved named `UX-` findings with matched
 captures and does not restart broad redesign. `DESIGN_REMEDIATE` is fixed
 autonomously when it violates accepted visual criteria; advisory polish does
 not silently expand scope.
+
+The implementing primary accepts, modifies or rejects the independent UX opinion
+with concrete product, remote, accessibility, consistency or feasibility reasons.
+Opus preference is not authority, but demonstrated usability defects cannot be
+dismissed as taste. Routine design choices do not need operator arbitration.
+Optionally use `tv-ux-astra` in `mode=challenge` for one consequential unresolved
+recommendation and exact associated screenshots, never an automatic third/full
+audit. For solo design-planning fallback, `mode=brief` can use supplied mocks and
+bounded planning material to establish direction, never implemented acceptance.
+Final review always needs actual production-composable screenshots. The native
+Astra role reuses the existing brief/review contract bodies; runtime review,
+every-Opus quota/abort rules and explicit non-substitutable gates remain separate.
 
 Continue automatically through the current slice, internal checkpoints,
 recoverable test failures, reviewer findings, child-agent errors, and one batched

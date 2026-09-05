@@ -60,6 +60,11 @@
       "variant": "medium",
       "steps": 40
     },
+    "tv-ux-astra": {
+      "model": "openai/gpt-6-astra",
+      "variant": "medium",
+      "steps": 40
+    },
     "claude-audit-lead": {
       "model": "anthropic/claude-opus-5",
       "variant": "high",
@@ -83,6 +88,7 @@
       "tv-evidence-curator": "allow",
       "tv-ux-brief": "allow",
       "tv-ux-reviewer": "allow",
+      "tv-ux-astra": "allow",
       "claude-audit-lead": "allow"
     }
   }

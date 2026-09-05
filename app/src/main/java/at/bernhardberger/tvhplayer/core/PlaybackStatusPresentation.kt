@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 enum class PlaybackStatusPresentation {
     NONE,
     COMPACT_TUNING,
+    CHANNEL_UNAVAILABLE,
     FULL_RECOVERY,
 }
 
@@ -23,7 +24,8 @@ fun compactTuningVisibilityAction(
     presentation: PlaybackStatusPresentation,
     currentlyVisible: Boolean,
 ): CompactTuningVisibilityAction = when {
-    !screenActive || presentation == PlaybackStatusPresentation.FULL_RECOVERY ->
+    !screenActive || presentation == PlaybackStatusPresentation.FULL_RECOVERY ||
+        presentation == PlaybackStatusPresentation.CHANNEL_UNAVAILABLE ->
         CompactTuningVisibilityAction.HIDE_IMMEDIATELY
     presentation == PlaybackStatusPresentation.COMPACT_TUNING && currentlyVisible ->
         CompactTuningVisibilityAction.KEEP_VISIBLE
@@ -40,8 +42,9 @@ fun playbackStatusPresentation(
     playbackPlaying: Boolean,
     playbackFailed: Boolean = false,
 ): PlaybackStatusPresentation = when {
-    !connectionAvailable || playbackRecovering || playbackFailed ->
+    !connectionAvailable || playbackRecovering ->
         PlaybackStatusPresentation.FULL_RECOVERY
+    playbackFailed -> PlaybackStatusPresentation.CHANNEL_UNAVAILABLE
     playbackStarting -> PlaybackStatusPresentation.COMPACT_TUNING
     playbackPlaying -> PlaybackStatusPresentation.NONE
     else -> PlaybackStatusPresentation.NONE

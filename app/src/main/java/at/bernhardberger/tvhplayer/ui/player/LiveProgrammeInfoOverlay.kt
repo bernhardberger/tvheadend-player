@@ -143,28 +143,11 @@ internal fun LiveProgrammeInfoOverlay(
 
     Box(
         modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = TvScrimModalAlpha))
-            .padding(
-                horizontal = TvSpacing56,
-                vertical = TvSpacing32,
-            )
-            .focusGroup(),
-        contentAlignment = Alignment.Center,
+            .fillMaxSize(),
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = LiveInfoPanelMaxWidth)
-                .heightIn(max = LiveInfoPanelMaxHeight)
-                .testTag("live-info-panel"),
-            shape = MaterialTheme.shapes.large,
-            colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(
-                    alpha = TvPanelDenseAlpha
-                ),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
+        PlaybackOptionsOverlayFrame(
+            paneTitle = paneTitle,
+            panelTag = "live-info-panel",
         ) {
             Box(
                 modifier = Modifier
@@ -189,11 +172,22 @@ internal fun LiveProgrammeInfoOverlay(
                         onClose = onClose,
                     )
                 } else {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(TvSpacing24),
-                        verticalAlignment = Alignment.Top,
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(TvSpacing24),
                     ) {
-                        piconContent?.invoke()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(TvSpacing24),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            piconContent?.invoke()
+                            Text(
+                                text = stringResource(R.string.player_current_broadcast),
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 2,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                         ProgrammeContentDetails(
                             event = event,
                             subtitle = buildString {
@@ -203,7 +197,7 @@ internal fun LiveProgrammeInfoOverlay(
                                 append("–")
                                 append(formatClock(event.stop.epochSeconds))
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             footer = {
                                 if (recordingScheduled) {
                                     Text(

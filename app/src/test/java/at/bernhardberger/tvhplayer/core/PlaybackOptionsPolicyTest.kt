@@ -5,25 +5,23 @@ import org.junit.Test
 
 class PlaybackOptionsPolicyTest {
     @Test
-    fun lateralCategoriesWrapAndHideOwnerPagesInSimpleTv() {
+    fun allPlaybackCategoriesRemainAvailable() {
         assertEquals(
-            listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES),
-            playbackOptionsCategories(fullOptionsAvailable = false),
+            listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES, PlaybackOptionsPage.DISPLAY, PlaybackOptionsPage.STATS),
+            playbackOptionsCategories(),
         )
         assertEquals(
             PlaybackOptionsPage.SUBTITLES,
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.AUDIO,
                 direction = 1,
-                fullOptionsAvailable = false,
             ),
         )
         assertEquals(
-            PlaybackOptionsPage.AUDIO,
+            PlaybackOptionsPage.DISPLAY,
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.SUBTITLES,
                 direction = 1,
-                fullOptionsAvailable = false,
             ),
         )
         assertEquals(
@@ -31,7 +29,6 @@ class PlaybackOptionsPolicyTest {
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.DISPLAY,
                 direction = 1,
-                fullOptionsAvailable = true,
             ),
         )
         assertEquals(
@@ -39,7 +36,6 @@ class PlaybackOptionsPolicyTest {
             adjacentPlaybackOptionsPage(
                 current = PlaybackOptionsPage.STATS,
                 direction = 1,
-                fullOptionsAvailable = true,
             ),
         )
     }

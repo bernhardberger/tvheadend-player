@@ -20,11 +20,13 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -58,7 +60,7 @@ class PlaybackOptionsSheetTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun rootAndDetailRestoreSemanticFocusAndContainEveryEdge() {
+    fun rightEntersCategoriesButDoesNotSelectChoicesAndReturnRestoresFocus() {
         var page by mutableStateOf(PlaybackOptionsPage.ROOT)
         setOptionsContent(
             page = { page },
@@ -70,11 +72,11 @@ class PlaybackOptionsSheetTest {
         )
 
         composeRule.onNodeWithTag("playback-options-audio").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionLeft) }
+            .performKeyInput { pressKey(Key.DirectionUp) }
             .assertIsFocused()
 
         composeRule.onNodeWithTag("playback-options-subtitles").requestFocus()
-            .performKeyInput { pressKey(Key.Enter) }
+            .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("playback-options-track-sub-de")
             .assertIsFocused()
             .assertIsSelected()
@@ -90,7 +92,29 @@ class PlaybackOptionsSheetTest {
 
         composeRule.onNodeWithTag("playback-options-stats").requestFocus()
             .performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionRight) }
-            .assertIsFocused()
+        composeRule.runOnIdle { assertEquals(PlaybackOptionsPage.STATS, page) }
+        composeRule.onNodeWithTag("playback-options-header-back").assertIsDisplayed()
+    }
+
+    @Test
+    fun unavailableCategoriesDoNotOpenDeadEndsOrStealFocusWhenTracksArrive() {
+        var tracks by mutableStateOf(emptyList<PlaybackOptionTrack>())
+        setOptionsContent(
+            page = { PlaybackOptionsPage.ROOT },
+            onPageChange = {},
+            audioTracksProvider = { tracks },
+        )
+        composeRule.onNodeWithTag("playback-options-audio").assertIsNotEnabled()
+        composeRule.onNodeWithTag("playback-options-subtitles").assertIsNotEnabled()
+        composeRule.onNodeWithText("No audio tracks available.").assertIsDisplayed()
+        composeRule.onNodeWithTag("playback-options-display").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.runOnIdle { tracks = listOf(track("new", "English", selected = true)) }
+        composeRule.onNodeWithTag("playback-options-stats").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("playback-options-audio").assertIsFocused()
+        composeRule.runOnIdle { tracks = emptyList() }
+        composeRule.onNodeWithTag("playback-options-display").assertIsFocused()
     }
 
     @Test
@@ -136,6 +160,24 @@ class PlaybackOptionsSheetTest {
         composeRule.onNodeWithTag("playback-options-track-empty")
             .assertIsDisplayed()
             .assertHasNoClickAction()
+    }
+
+    @Test
+    fun longTrackListTraversesBeyondComposedRowsInBothDirections() {
+        setOptionsContent(
+            page = { PlaybackOptionsPage.AUDIO },
+            onPageChange = {},
+            audioTracks = List(24) { track("audio-$it", "Audio track $it", selected = it == 0) },
+        )
+        for (index in 0 until 23) {
+            composeRule.onNodeWithTag("playback-options-track-audio-$index")
+                .assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        }
+        for (index in 23 downTo 1) {
+            composeRule.onNodeWithTag("playback-options-track-audio-$index")
+                .assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        }
+        composeRule.onNodeWithTag("playback-options-track-audio-0").assertIsFocused()
     }
 
     @Test
@@ -212,12 +254,9 @@ class PlaybackOptionsSheetTest {
                         tracksResolving = tracksResolving,
                         aspectRatio = AspectRatioMode.FIT,
                         statsVisible = false,
-                        showSimpleTvExit = false,
-                        fullOptionsAvailable = true,
                         onPageChange = {},
                         onAspectRatioChange = {},
                         onStatsVisibleChange = {},
-                        onSimpleTvExit = {},
                     )
                 }
             }
@@ -246,61 +285,33 @@ class PlaybackOptionsSheetTest {
         assertEquals(0, player.listenerCount)
     }
 
-    @Test
-    fun activeSimpleTvRootContainsOnlyPermittedCategoriesAndOwnerExit() {
-        composeRule.setContent {
-            TVHeadendPlayerTheme {
-                PlaybackOptionsSheetContent(
-                    page = PlaybackOptionsPage.ROOT,
-                    audioTracks = listOf(track("audio-main", "Deutsch", selected = true)),
-                    subtitleTracks = emptyList(),
-                    tracksResolving = false,
-                    aspectRatio = AspectRatioMode.FIT,
-                    statsVisible = false,
-                    showSimpleTvExit = true,
-                    fullOptionsAvailable = false,
-                    onPageChange = {},
-                    onAudioTrackSelected = {},
-                    onSubtitleTrackSelected = {},
-                    onAspectRatioChange = {},
-                    onStatsVisibleChange = {},
-                    onSimpleTvExit = {},
-                )
-            }
-        }
 
-        composeRule.onNodeWithTag("playback-options-audio").assertIsFocused()
-        composeRule.onNodeWithTag("playback-options-subtitles").assertIsDisplayed()
-        composeRule.onNodeWithTag("playback-options-display").assertDoesNotExist()
-        composeRule.onNodeWithTag("playback-options-stats").assertDoesNotExist()
-        composeRule.onNodeWithTag("playback-options-simple-tv-exit").assertIsDisplayed()
-    }
 
     @Test
     fun statsRowExposesTruthfulSwitchSemantics() {
         var statsVisible by mutableStateOf(false)
+        var page by mutableStateOf(PlaybackOptionsPage.ROOT)
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 PlaybackOptionsSheetContent(
-                    page = PlaybackOptionsPage.ROOT,
+                    page = page,
                     audioTracks = listOf(track("audio-main", "Deutsch", selected = true)),
                     subtitleTracks = emptyList(),
                     tracksResolving = false,
                     aspectRatio = AspectRatioMode.FIT,
                     statsVisible = statsVisible,
-                    showSimpleTvExit = false,
-                    fullOptionsAvailable = true,
-                    onPageChange = {},
+                    onPageChange = { page = it },
                     onAudioTrackSelected = {},
                     onSubtitleTrackSelected = {},
                     onAspectRatioChange = {},
                     onStatsVisibleChange = { statsVisible = it },
-                    onSimpleTvExit = {},
                 )
             }
         }
 
         composeRule.onNodeWithTag("playback-options-stats")
+            .requestFocus().performKeyInput { pressKey(Key.Enter) }
+        composeRule.onNode(isToggleable())
             .assertIsOff()
             .requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
@@ -329,14 +340,13 @@ class PlaybackOptionsSheetTest {
                         durationMs = 120_000L,
                         growing = false,
                         nowSec = 0L,
-                        isPlaying = true,
+                        canSeek = true,
                         controlsVisible = true,
                         optionsOpen = false,
                         onTogglePlayPause = {},
                         onSeek = {},
                         onStopPlayback = {},
                         onUserInteraction = {},
-                        showStop = true,
                         onOpenOptions = { optionsOpen = true },
                         onOpenInfo = {},
                         restoreOptionsFocus = restoreOptionsFocus,
@@ -351,23 +361,20 @@ class PlaybackOptionsSheetTest {
                         tracksResolving = false,
                         aspectRatio = AspectRatioMode.FIT,
                         statsVisible = false,
-                        showSimpleTvExit = false,
-                        fullOptionsAvailable = true,
                         onPageChange = {},
                         onAudioTrackSelected = {},
                         onSubtitleTrackSelected = {},
                         onAspectRatioChange = {},
                         onStatsVisibleChange = {},
-                        onSimpleTvExit = {},
                     )
                 }
             }
         }
 
-        composeRule.onNodeWithTag("recording-playback-options")
+        composeRule.onNodeWithTag("player-settings")
             .requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
-        composeRule.onNodeWithTag("recording-playback-options").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-settings").assertDoesNotExist()
         composeRule.onNodeWithTag("recording-seekbar").assertDoesNotExist()
         composeRule.onNodeWithTag("playback-options-audio").assertIsFocused()
 
@@ -375,7 +382,7 @@ class PlaybackOptionsSheetTest {
             restoreOptionsFocus = true
             optionsOpen = false
         }
-        composeRule.onNodeWithTag("recording-playback-options").assertIsFocused()
+        composeRule.onNodeWithTag("player-settings").assertIsFocused()
         composeRule.runOnIdle { assertFalse(restoreOptionsFocus) }
     }
 
@@ -407,14 +414,11 @@ class PlaybackOptionsSheetTest {
                             tracksResolving = false,
                             aspectRatio = AspectRatioMode.FIT,
                             statsVisible = false,
-                            showSimpleTvExit = false,
-                            fullOptionsAvailable = true,
                             onPageChange = {},
                             onAudioTrackSelected = {},
                             onSubtitleTrackSelected = {},
                             onAspectRatioChange = {},
                             onStatsVisibleChange = {},
-                            onSimpleTvExit = {},
                         )
                     }
                 }
@@ -466,14 +470,11 @@ class PlaybackOptionsSheetTest {
                     tracksResolving = tracksResolving(),
                     aspectRatio = AspectRatioMode.FIT,
                     statsVisible = false,
-                    showSimpleTvExit = false,
-                    fullOptionsAvailable = true,
                     onPageChange = onPageChange,
                     onAudioTrackSelected = {},
                     onSubtitleTrackSelected = {},
                     onAspectRatioChange = {},
                     onStatsVisibleChange = {},
-                    onSimpleTvExit = {},
                 )
             }
         }
@@ -503,10 +504,10 @@ class PlaybackOptionsSheetTest {
         assertEquals(root.width, viewport.width, 1f)
         assertEquals(root.height, viewport.height, 1f)
         assertEquals(16f / 9f, viewport.width / viewport.height, 0.001f)
-        assertTrue(panel.top >= viewport.top + viewport.height * (32f / 540f))
-        assertTrue(panel.bottom <= viewport.bottom - viewport.height * (108f / 540f))
+        assertEquals(viewport.top, panel.top, 1f)
+        assertEquals(viewport.bottom, panel.bottom, 1f)
         assertTrue(panel.left >= viewport.left)
-        assertTrue(panel.right <= viewport.right - viewport.width * (48f / 960f))
+        assertEquals(viewport.right, panel.right, 1f)
         assertTrue(panel.width < viewport.width / 2f)
     }
 

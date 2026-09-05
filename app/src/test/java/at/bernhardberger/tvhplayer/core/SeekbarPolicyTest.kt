@@ -9,6 +9,48 @@ import org.junit.Test
 
 class SeekbarPolicyTest {
     @Test
+    fun capacityScaleDoesNotGrantUncollectedHistory() {
+        val state = AppTimeshiftState(
+            available = true,
+            bufferStartMs = -1_800_000L,
+            positionMs = -900_000L,
+            capacityMs = 7_200_000L,
+        )
+        val range = timeshiftSeekbarRange(state)
+        assertEquals(-7_200_000L, range.displayStartMs)
+        assertEquals(-1_800_000L, range.startMs)
+        assertEquals(0.75f, range.availableStartFraction, 0.001f)
+        assertEquals(0.875f, range.displayProgress, 0.001f)
+        assertEquals(
+            -1_800_000L,
+            seekbarScrub(range.copy(positionMs = -1_700_000L), -1, 100),
+        )
+        assertEquals(1f, timeshiftSeekbarRange(state.copy(positionMs = 0L)).displayProgress, 0f)
+    }
+
+    @Test
+    fun unknownCapacityUsesRequestAndNeverClipsObservedHistory() {
+        val state = AppTimeshiftState(available = true, bufferStartMs = -60_000L)
+        assertEquals(-7_200_000L, timeshiftSeekbarRange(state).displayStartMs)
+        val expanded = timeshiftSeekbarRange(state.copy(bufferStartMs = -10_800_000L))
+        assertEquals(-10_800_000L, expanded.displayStartMs)
+        assertEquals(0f, expanded.availableStartFraction, 0f)
+    }
+
+    @Test
+    fun changedGrantChangesOnlyDisplayAndCannotHideHistory() {
+        val state = AppTimeshiftState(
+            available = true,
+            bufferStartMs = -1_800_000L,
+            capacityMs = 3_600_000L,
+        )
+        assertEquals(-3_600_000L, timeshiftSeekbarRange(state).displayStartMs)
+        val reduced = timeshiftSeekbarRange(state.copy(capacityMs = 600_000L))
+        assertEquals(-1_800_000L, reduced.displayStartMs)
+        assertEquals(-1_800_000L, reduced.startMs)
+    }
+
+    @Test
     fun axisIsNullWithoutAProgramme() {
         val state = AppTimeshiftState(available = true, bufferStartMs = -60_000L)
 

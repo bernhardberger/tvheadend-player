@@ -42,6 +42,8 @@ class LivePlaybackStartPolicyTest {
                     requestResult.await()
                 },
                 onResolved = { resolvedResult = it },
+                isCurrent = { true },
+                onRejected = { error("Started request must not tear down") },
             )
         }
         requestStarted.await()
@@ -52,6 +54,43 @@ class LivePlaybackStartPolicyTest {
         requestResult.complete(PlaybackTargetResult.STARTED)
         start.join()
         assertEquals(PlaybackTargetResult.STARTED, resolvedResult)
+    }
+
+    @Test
+    fun rejectedAdmissionRetiresPreviousVideoBeforeResolution() = runTest {
+        val calls = mutableListOf<String>()
+        val teardown = CompletableDeferred<Unit>()
+        val request = launch {
+            startInitialLivePlayback(
+                startPlayback = { null },
+                isCurrent = { true },
+                onRejected = { calls += "stop-old-video"; teardown.await() },
+                onResolved = { calls += "unavailable" },
+            )
+        }
+        runCurrent()
+        assertEquals(listOf("stop-old-video"), calls)
+        teardown.complete(Unit)
+        request.join()
+        assertEquals(listOf("stop-old-video", "unavailable"), calls)
+    }
+
+    @Test
+    fun supersededRejectedAdmissionCannotStopOrResolveTheNewChannel() = runTest {
+        var current = true
+        val result = CompletableDeferred<PlaybackTargetResult?>()
+        val request = launch {
+            startInitialLivePlayback(
+                startPlayback = { result.await() },
+                isCurrent = { current },
+                onRejected = { error("Old request cannot stop the new target") },
+                onResolved = { error("Old request cannot resolve the new target") },
+            )
+        }
+        runCurrent()
+        current = false
+        result.complete(null)
+        request.join()
     }
 
     @Test

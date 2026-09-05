@@ -37,14 +37,39 @@ fun PlaybackSeekbar(
     range: SeekbarRange,
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    paused: Boolean = false,
     programmeAxis: ProgrammeAxis? = null,
     programmePositionMs: Long? = null,
     programmeDurationMs: Long? = null,
 ) {
+    val bufferSummary = if (range.domain == SeekbarDomain.TIMESHIFT) stringResource(
+        R.string.player_buffer_summary,
+        formatPlaybackDuration((range.endMs - range.startMs).coerceAtLeast(0L)),
+        formatPlaybackDuration((range.endMs - range.displayStartMs).coerceAtLeast(0L)),
+    ) else null
+    if (!range.positionKnown) {
+        val unavailable = (if (paused) "${stringResource(R.string.player_paused)}. " else "") +
+            stringResource(R.string.player_timing_unavailable)
+        PlayerTimelineBlock(
+            progress = null,
+            tone = PlayerTimelineTone.AMBIENT,
+            leadingLabel = unavailable,
+            trailingLabel = bufferSummary,
+            rewindableStartFraction = range.availableStartFraction,
+            liveEdgeFraction = 1f,
+            progressSemantics = false,
+            modifier = modifier.semantics { contentDescription = unavailable },
+        )
+        return
+    }
     var focused by remember { mutableStateOf(false) }
     val programmeDuration = programmeDurationMs?.takeIf { it > 0L }
     val programmePosition = programmePositionMs?.coerceIn(0L, programmeDuration ?: 0L)
-    val displayedProgress = programmeAxis?.playbackFraction ?: range.progress
+    val displayedProgress = if (range.domain == SeekbarDomain.TIMESHIFT) {
+        range.displayProgress
+    } else {
+        programmeAxis?.playbackFraction ?: range.progress
+    }
     val timeshiftPosition = if (range.domain == SeekbarDomain.TIMESHIFT) {
         timeshiftPositionPresentation(range.positionMs, range.endMs)
     } else {
@@ -81,8 +106,12 @@ fun PlaybackSeekbar(
         )
         else -> error("Unsupported seekbar domain")
     }
-    val leadingLabel = when {
-        timeshiftPosition != null && !timeshiftPosition.atLiveEdge -> stringResource(
+    val positionDescription = if (range.positionEstimated) {
+        "${stringResource(R.string.player_timing_estimated)}. $description"
+    } else description
+    val stateDescription = if (paused) "${stringResource(R.string.player_paused)}. $positionDescription" else positionDescription
+    val positionLabel = when {
+        timeshiftPosition != null -> stringResource(
             R.string.timeshift_behind_live,
             formatPlaybackDuration(timeshiftPosition.behindLiveMs),
         )
@@ -92,7 +121,7 @@ fun PlaybackSeekbar(
         else -> null
     }
     val trailingLabel = when {
-        timeshiftPosition != null -> stringResource(R.string.timeshift_live)
+        timeshiftPosition != null -> bufferSummary
         range.domain == SeekbarDomain.RECORDING -> formatPlaybackDuration(range.endMs)
         programmePosition != null && programmeDuration != null ->
             formatPlaybackDuration(programmeDuration)
@@ -131,16 +160,19 @@ fun PlaybackSeekbar(
     PlayerTimelineBlock(
         progress = displayedProgress,
         tone = if (focused) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
-        leadingLabel = leadingLabel,
+        leadingLabel = listOfNotNull(
+            stringResource(R.string.player_paused).takeIf { paused },
+            positionLabel,
+            stringResource(R.string.player_timing_estimated).takeIf { range.positionEstimated },
+        ).joinToString(" / "),
         trailingLabel = trailingLabel,
         leadingLabelTestTag = "player-programme-progress".takeIf {
             timeshiftPosition == null && programmePosition != null && programmeDuration != null
         },
-        rewindableStartFraction = programmeAxis?.rewindableStartFraction
-            ?: 0f.takeIf { range.domain == SeekbarDomain.TIMESHIFT },
-        rewindableStartOverflow = programmeAxis?.rewindableStartsBeforeProgramme == true,
-        liveEdgeFraction = programmeAxis?.liveEdgeFraction
-            ?: 1f.takeIf { range.domain == SeekbarDomain.TIMESHIFT },
+        rewindableStartFraction = range.availableStartFraction
+            .takeIf { range.domain == SeekbarDomain.TIMESHIFT },
+        rewindableStartOverflow = false,
+        liveEdgeFraction = 1f.takeIf { range.domain == SeekbarDomain.TIMESHIFT },
         thumbTestTag = "player-seekbar-thumb",
         progressSemantics = false,
         modifier = modifier
@@ -150,18 +182,20 @@ fun PlaybackSeekbar(
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
                     Key.DirectionLeft -> {
-                        onSeekTo(seekbarScrub(range, -1, event.nativeKeyEvent.repeatCount))
+                        val target = seekbarScrub(range, -1, event.nativeKeyEvent.repeatCount)
+                        if (target < range.positionMs) onSeekTo(target)
                         true
                     }
                     Key.DirectionRight -> {
-                        onSeekTo(seekbarScrub(range, 1, event.nativeKeyEvent.repeatCount))
+                        val target = seekbarScrub(range, 1, event.nativeKeyEvent.repeatCount)
+                        if (target > range.positionMs) onSeekTo(target)
                         true
                     }
                     else -> false
                 }
             }
             .semantics {
-                contentDescription = description
+                contentDescription = stateDescription
                 progressBarRangeInfo = ProgressBarRangeInfo(accessibilityProgress, 0f..1f)
                 customActions = accessibilityActions
             }

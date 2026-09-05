@@ -34,7 +34,6 @@ enum class PlayerBackAction {
     DISMISS_SEEK_FEEDBACK,
     HIDE_CONTROLS,
     HIDE_STATS,
-    CONSUME_WITHOUT_CHANGE,
 }
 
 data class PlayerForegroundContext(
@@ -60,11 +59,11 @@ fun playerForegroundLayer(context: PlayerForegroundContext): PlayerForegroundLay
     context.channelDrawerVisible -> PlayerForegroundLayer.CHANNEL_DRAWER
     context.recoveryVisible -> PlayerForegroundLayer.RECOVERY
     context.terminalErrorVisible -> PlayerForegroundLayer.TERMINAL_ERROR
+    context.controlsVisible -> PlayerForegroundLayer.CONTROLS
     context.seekPreviewPhase == PlayerSeekPreviewPhase.PENDING ->
         PlayerForegroundLayer.PENDING_SEEK_PREVIEW
     context.seekPreviewPhase == PlayerSeekPreviewPhase.DISPATCHED ->
         PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
-    context.controlsVisible -> PlayerForegroundLayer.CONTROLS
     context.statsEnabled -> PlayerForegroundLayer.STATS
     else -> PlayerForegroundLayer.NONE
 }
@@ -88,8 +87,8 @@ fun playerRootFocusRequired(foregroundLayer: PlayerForegroundLayer): Boolean =
 
 fun playerBackAction(
     surface: PlayerSurface,
-    playerCloseAllowed: Boolean,
     foregroundLayer: PlayerForegroundLayer,
+    seekPreviewPhase: PlayerSeekPreviewPhase = PlayerSeekPreviewPhase.NONE,
 ): PlayerBackAction = when (foregroundLayer) {
     PlayerForegroundLayer.CONFIRMATION -> PlayerBackAction.DISMISS_CONFIRMATION
     PlayerForegroundLayer.INFO -> PlayerBackAction.CLOSE_INFO
@@ -99,13 +98,13 @@ fun playerBackAction(
     PlayerForegroundLayer.CHANNEL_DRAWER -> PlayerBackAction.CLOSE_CHANNEL_DRAWER
     PlayerForegroundLayer.RECOVERY,
     PlayerForegroundLayer.TERMINAL_ERROR,
-    PlayerForegroundLayer.NONE -> if (playerCloseAllowed) {
-        PlayerBackAction.CLOSE_PLAYER
-    } else {
-        PlayerBackAction.CONSUME_WITHOUT_CHANGE
-    }
+    PlayerForegroundLayer.NONE -> PlayerBackAction.CLOSE_PLAYER
     PlayerForegroundLayer.PENDING_SEEK_PREVIEW -> PlayerBackAction.CANCEL_PENDING_SEEK
     PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW -> PlayerBackAction.DISMISS_SEEK_FEEDBACK
-    PlayerForegroundLayer.CONTROLS -> PlayerBackAction.HIDE_CONTROLS
+    PlayerForegroundLayer.CONTROLS -> when (seekPreviewPhase) {
+        PlayerSeekPreviewPhase.PENDING -> PlayerBackAction.CANCEL_PENDING_SEEK
+        PlayerSeekPreviewPhase.DISPATCHED -> PlayerBackAction.DISMISS_SEEK_FEEDBACK
+        PlayerSeekPreviewPhase.NONE -> PlayerBackAction.HIDE_CONTROLS
+    }
     PlayerForegroundLayer.STATS -> PlayerBackAction.HIDE_STATS
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -65,6 +66,33 @@ import org.junit.Test
 class PlayerTimelineTruthfulnessTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun unknownTimingHasNoPositionSemanticsThumbOrSeekActions() {
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                PlaybackSeekbar(
+                    range = SeekbarRange(
+                        domain = SeekbarDomain.TIMESHIFT,
+                        startMs = -600_000L,
+                        endMs = 0L,
+                        positionMs = 0L,
+                        displayStartMs = -3_600_000L,
+                        positionKnown = false,
+                    ),
+                    onSeekTo = { error("Unknown timing must not seek") },
+                    modifier = Modifier.testTag("unknown-timeline"),
+                )
+            }
+        }
+        composeRule.onNodeWithTag("unknown-timeline")
+            .assertContentDescriptionEquals("Playback timing unavailable")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.CustomActions))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+        composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
+        composeRule.onNodeWithText("Live").assertDoesNotExist()
+    }
 
     @Test
     fun liveAndBehindLivePresentationShareTheActionBoundary() {
@@ -111,9 +139,6 @@ class PlayerTimelineTruthfulnessTest {
                                 deltaMs = -30_000L,
                                 clamped = false,
                             ),
-                            nowEpochSec = 5_400L,
-                            programmeStartSec = 3_600L,
-                            programmeStopSec = 7_200L,
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
                     }
@@ -144,13 +169,13 @@ class PlayerTimelineTruthfulnessTest {
             .assertExists()
         composeRule.onNodeWithTag("timeshift-seek-preview")
             .assertContentDescriptionEquals(
-                "Seek target 28:00. Cumulative change −0:30. " +
+                "Seek target −2:00. Cumulative change −0:30. " +
                     "2:00 behind live. Buffer starts 15:00 behind live."
             )
     }
 
     @Test
-    fun preProgrammeTimeshiftTargetUsesTruthfulOffsetAndBoundaryState() {
+    fun timeshiftTargetUsesStreamOffsetRatherThanProgrammeTime() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 val state = AppTimeshiftState(
@@ -166,9 +191,6 @@ class PlayerTimelineTruthfulnessTest {
                         deltaMs = -100_000L,
                         clamped = false,
                     ),
-                    nowEpochSec = 5_400L,
-                    programmeStartSec = 3_600L,
-                    programmeStopSec = 7_200L,
                 )
             }
         }
@@ -184,7 +206,7 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-overflow",
             useUnmergedTree = true,
-        ).assertExists()
+        ).assertDoesNotExist()
     }
 
     @Test
@@ -246,6 +268,7 @@ class PlayerTimelineTruthfulnessTest {
                 startMs = -120_000L,
                 endMs = 0L,
                 positionMs = -5_000L,
+                displayStartMs = -7_200_000L,
             )
         }
         assertEquals(listOf("−30 seconds"), accessibilityActionLabels("boundary-seekbar"))
@@ -273,7 +296,7 @@ class PlayerTimelineTruthfulnessTest {
             val rootFocus = remember { FocusRequester() }
             val layer = playerForegroundLayer(previewContext(phase))
             PlayerBackHandler {
-                when (playerBackAction(PlayerSurface.LIVE, playerCloseAllowed = true, layer)) {
+                when (playerBackAction(PlayerSurface.LIVE, layer)) {
                     PlayerBackAction.CANCEL_PENDING_SEEK -> {
                         cancelled++
                         phase = PlayerSeekPreviewPhase.NONE
@@ -324,10 +347,10 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.onNodeWithText("Still recording", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithTag("recording-seekbar").assertDoesNotExist()
         assertEquals(0, progressSemanticsCount())
-        composeRule.onNodeWithTag("recording-play-pause").requestFocus().performKeyInput {
+        composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput {
             pressKey(androidx.compose.ui.input.key.Key.DirectionUp)
         }
-        composeRule.onNodeWithTag("recording-play-pause").assertIsFocused()
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
 
         composeRule.runOnIdle {
             growing = false
@@ -338,21 +361,21 @@ class PlayerTimelineTruthfulnessTest {
         assertEquals(0, progressSemanticsCount())
 
         composeRule.runOnIdle { durationMs = 120_000L }
-        composeRule.onNodeWithTag("recording-playback-options").requestFocus()
+        composeRule.onNodeWithTag("player-settings").requestFocus()
         composeRule.runOnIdle { durationMs = C.TIME_UNSET }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("recording-playback-options").assertIsFocused()
+        composeRule.onNodeWithTag("player-settings").assertIsFocused()
 
         composeRule.runOnIdle { durationMs = 120_000L }
-        composeRule.onNodeWithTag("recording-play-pause").requestFocus().performKeyInput {
-            pressKey(androidx.compose.ui.input.key.Key.DirectionUp)
+        composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput {
+            pressKey(androidx.compose.ui.input.key.Key.DirectionDown)
         }
         composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
         assertEquals(1, progressSemanticsCount())
 
         composeRule.runOnIdle { durationMs = C.TIME_UNSET }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("recording-play-pause").assertIsFocused()
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
         assertEquals(0, progressSemanticsCount())
     }
 
@@ -416,14 +439,13 @@ class PlayerTimelineTruthfulnessTest {
                             durationMs = C.TIME_UNSET,
                             growing = false,
                             nowSec = 5_400L,
-                            isPlaying = true,
+                            canSeek = true,
                             controlsVisible = true,
                             optionsOpen = false,
                             onTogglePlayPause = {},
                             onSeek = {},
                             onStopPlayback = {},
                             onUserInteraction = {},
-                            showStop = true,
                             onOpenOptions = {},
                             onOpenInfo = {},
                         )
@@ -498,14 +520,13 @@ class PlayerTimelineTruthfulnessTest {
                     durationMs = durationMs(),
                     growing = growing(),
                     nowSec = 5_400L,
-                    isPlaying = true,
+                    canSeek = true,
                     controlsVisible = true,
                     optionsOpen = false,
                     onTogglePlayPause = {},
                     onSeek = {},
                     onStopPlayback = {},
                     onUserInteraction = {},
-                    showStop = true,
                     onOpenOptions = {},
                     onOpenInfo = {},
                 )

@@ -39,12 +39,10 @@ class MainStartupCompositionTest {
     @Test
     fun startupGatedChannelsContentInvokesTheProductionDestinationOnlyWhenAllowed() {
         var contentAllowed by mutableStateOf(false)
-        var routeAllowed by mutableStateOf(false)
         var channelsContentInvocations = 0
         composeRule.setContent {
             StartupGatedChannelsContent(
                 contentAllowed = contentAllowed,
-                routeAllowed = routeAllowed,
             ) {
                 channelsContentInvocations++
             }
@@ -53,11 +51,6 @@ class MainStartupCompositionTest {
         composeRule.runOnIdle {
             assertEquals(0, channelsContentInvocations)
             contentAllowed = true
-        }
-        composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            assertEquals(0, channelsContentInvocations)
-            routeAllowed = true
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(1, channelsContentInvocations) }
@@ -165,7 +158,6 @@ class MainStartupCompositionTest {
                         observedStartDestination = startDestination
                         MainNavigationShell(
                             showRail = shouldShowMainNavigationRail(
-                                simpleTvActive = false,
                                 currentDestination = null,
                                 navigationStartDestination = startDestination,
                             ),
@@ -234,7 +226,6 @@ class MainStartupCompositionTest {
                         observedStart = start
                         MainNavigationShell(
                             showRail = shouldShowMainNavigationRail(
-                                simpleTvActive = false,
                                 currentDestination = null,
                                 navigationStartDestination = start,
                             ),
@@ -261,7 +252,6 @@ class MainStartupCompositionTest {
             assertTrue(railCompositions > 0)
             assertTrue(
                 shouldShowMainNavigationRail(
-                    simpleTvActive = false,
                     currentDestination = null,
                     navigationStartDestination = SettingsKey(),
                 ),
@@ -289,7 +279,6 @@ class MainStartupCompositionTest {
 
         var retainedRoot: AppNavKey = LivePlayerKey(channelId = 1, channelName = "One")
         closeNormalLivePlayer(
-            playerCloseAllowed = true,
             popBackStack = { false },
             selectRoot = { retainedRoot = it },
         )
@@ -297,7 +286,6 @@ class MainStartupCompositionTest {
 
         retainedRoot = LivePlayerKey(channelId = 2, channelName = "Two")
         closeNormalLivePlayer(
-            playerCloseAllowed = true,
             popBackStack = { true },
             selectRoot = { retainedRoot = it },
         )
@@ -450,60 +438,29 @@ class MainStartupCompositionTest {
     fun startupActionsRouteWithoutRetryChangingTheGeneration() {
         var retries = 0
         var settings = 0
-        var exits = 0
 
         performMainStartupAction(
             action = MainStartupActionId.RETRY,
             onRetry = { retries++ },
             onConnectionSettings = { settings++ },
-            onExitSimpleTv = { exits++ },
         )
         performMainStartupAction(
             action = MainStartupActionId.CONNECTION_SETTINGS,
             onRetry = { retries++ },
             onConnectionSettings = { settings++ },
-            onExitSimpleTv = { exits++ },
-        )
-        performMainStartupAction(
-            action = MainStartupActionId.EXIT_SIMPLE_TV,
-            onRetry = { retries++ },
-            onConnectionSettings = { settings++ },
-            onExitSimpleTv = { exits++ },
         )
 
         assertEquals(1, retries)
         assertEquals(1, settings)
-        assertEquals(1, exits)
     }
 
     @Test
-    fun deferredResolvingBackIsContainedForSimpleTvAndCancelsNormalStartupExactly() {
-        val simpleRequests = ApplianceLaunchRequests().apply { request() }
-        val simplePending = simpleRequests.state.value
-        var simpleRoot: AppNavKey? = null
-        val simpleAction = deferredResolvingBackAction(
-            cancellationRequested = true,
-            readyState = readyStartup(startSimpleTv = true),
-        )
-
-        assertEquals(DeferredResolvingBackAction.CONTAIN_SIMPLE_TV, simpleAction)
-        assertFalse(
-            applyDeferredResolvingBack(
-                action = simpleAction,
-                requests = simpleRequests,
-                expectedState = simplePending,
-                selectRoot = { simpleRoot = it },
-            ),
-        )
-        assertEquals(simplePending, simpleRequests.state.value)
-        assertNull(simpleRoot)
-
+    fun deferredResolvingBackCancelsStartupExactlyOnce() {
         val normalRequests = ApplianceLaunchRequests().apply { request() }
         val normalPending = normalRequests.state.value
         var normalRoot: AppNavKey? = null
         val normalAction = deferredResolvingBackAction(
             cancellationRequested = true,
-            readyState = readyStartup(startSimpleTv = false),
         )
 
         assertEquals(DeferredResolvingBackAction.CANCEL_TO_CHANNELS, normalAction)
@@ -571,55 +528,7 @@ class MainStartupCompositionTest {
         composeRule.runOnIdle { assertNull(registered) }
     }
 
-    @Test
-    fun simpleTvSystemBackUsesProductionPolicyAndLeavesLaunchUnchanged() {
-        val requests = ApplianceLaunchRequests().apply { request() }
-        val expectedState = requests.state.value
-        var contract: MainStartupActivityKeyContract? = null
-        var selectedRoot: AppNavKey? = null
-        composeRule.setContent {
-            TVHeadendPlayerTheme {
-                MainStartupComposition(
-                    state = MainStartupCompositionState(
-                        presentation = MainStartupPresentation.Actionable(
-                            MainStartupMessageKind.SIMPLE_TV_FAILURE,
-                            listOf(MainStartupActionId.RETRY, MainStartupActionId.EXIT_SIMPLE_TV),
-                        ),
-                        navigationStartDestination = null,
-                        navigationAllowed = false,
-                    ),
-                    onBack = {
-                        performMainStartupBack(
-                            productProfile =
-                                at.bernhardberger.tvhplayer.core.ProductProfile.Appliance(
-                                    timeshiftAllowed = false,
-                                ),
-                            requests = requests,
-                            expectedState = expectedState,
-                            selectRoot = { selectedRoot = it },
-                        )
-                    },
-                    onAction = {},
-                    registerActivityKeyContract = {
-                        contract = it
-                        { contract = null }
-                    },
-                )
-            }
-        }
 
-        composeRule.runOnIdle {
-            assertEquals(
-                MainStartupKeyMode.Actionable,
-                contract?.mode,
-            )
-        }
-        composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        composeRule.runOnIdle {
-            assertEquals(expectedState, requests.state.value)
-            assertNull(selectedRoot)
-        }
-    }
 
     @Composable
     private fun StartupNavigationCounterHost(
@@ -655,16 +564,4 @@ class MainStartupCompositionTest {
         number = id.toLong(),
     )
 
-    private fun readyStartup(startSimpleTv: Boolean) =
-        at.bernhardberger.tvhplayer.core.MainStartupState.Ready(
-            server = at.bernhardberger.tvhplayer.settings.ServerSettings(host = "tvh.invalid"),
-            autoStartPlayback = true,
-            startupProfile = if (startSimpleTv) {
-                at.bernhardberger.tvhplayer.core.ProductProfile.Appliance(
-                    timeshiftAllowed = false,
-                )
-            } else {
-                at.bernhardberger.tvhplayer.core.ProductProfile.Standard
-            },
-        )
 }

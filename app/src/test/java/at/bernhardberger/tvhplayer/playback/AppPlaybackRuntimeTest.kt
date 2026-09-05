@@ -45,6 +45,53 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppPlaybackRuntimeTest {
     @Test
+    fun missingOrContradictoryTimingIsNotAMeasuredLivePosition() {
+        val measurements = listOf(
+            null to null,
+            null to 10.minutes,
+            30.minutes to null,
+            Duration.INFINITE to Duration.ZERO,
+            30.minutes to Duration.INFINITE,
+            1.minutes to 10.minutes,
+            (-1).minutes to Duration.ZERO,
+        )
+        measurements.forEach { (buffer, behind) ->
+            val state = measuredTimeshiftPresentation(buffer, behind, true, 1.hours)
+            assertTrue(state.available)
+            assertTrue(state.paused)
+            assertFalse(state.timingKnown)
+            assertFalse(at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(state).atLiveEdge)
+            assertFalse(at.bernhardberger.tvhplayer.core.canSeekTimeshiftBackward(state))
+            assertFalse(at.bernhardberger.tvhplayer.core.canSeekTimeshiftForward(state))
+            assertFalse(at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange(state).positionKnown)
+        }
+        val measuredLive = measuredTimeshiftPresentation(Duration.ZERO, Duration.ZERO, false)
+        assertTrue(measuredLive.timingKnown)
+        assertTrue(at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(measuredLive).atLiveEdge)
+    }
+
+    @Test
+    fun grantedCapacityIsDisplayEvidenceNotAvailableHistory() {
+        val state = measuredTimeshiftPresentation(
+            bufferedDuration = 30.minutes,
+            positionBehindLive = 10.minutes,
+            serverPaused = true,
+            grantedPeriod = 1.hours,
+        )
+        assertEquals(3_600_000L, state.capacityMs)
+        assertEquals(-1_800_000L, state.bufferStartMs)
+        assertEquals(-600_000L, state.positionMs)
+        val unknown = measuredTimeshiftPresentation(null, null, null, Duration.INFINITE)
+        assertNull(unknown.capacityMs)
+        assertEquals(0L, unknown.bufferStartMs)
+        val missingBuffer = measuredTimeshiftPresentation(null, 10.minutes, true, 1.hours)
+        assertEquals(0L, missingBuffer.bufferStartMs)
+        assertEquals(-600_000L, missingBuffer.positionMs)
+        assertFalse(missingBuffer.timingKnown)
+        assertFalse(unknown.timingKnown)
+    }
+
+    @Test
     fun enabledTimeshiftRequestsTheFixedProductPeriod() {
         assertEquals(2.hours, requestedLiveTimeshiftPeriod(timeshiftEnabled = true))
     }
@@ -65,7 +112,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun nullMeasuredTimeshiftDoesNotInventSeekableHistory() {
         assertEquals(
-            AppTimeshiftState(available = true),
+            AppTimeshiftState(available = true, timingKnown = false),
             measuredTimeshiftPresentation(
                 bufferedDuration = null,
                 positionBehindLive = null,
@@ -324,7 +371,18 @@ class AppPlaybackRuntimeTest {
             PlaybackTargetResult.NOT_READY
         }
 
+        assertEquals(AppPlaybackState.Playing, state)
+    }
+
+    @Test
+    fun pausedTargetBecomesAvailableAgainAfterBuffering() {
+        var state: AppPlaybackState = AppPlaybackState.Playing
+        state = playerReportedPlaybackState(state, false, Player.STATE_BUFFERING, false)
         assertEquals(AppPlaybackState.Starting, state)
+        state = playerReportedPlaybackState(state, false, Player.STATE_READY, false)
+        assertEquals(AppPlaybackState.Playing, state)
+        assertEquals(AppPlaybackState.Playing,
+            playerReportedPlaybackState(state, false, Player.STATE_READY, true))
     }
 
     @Test

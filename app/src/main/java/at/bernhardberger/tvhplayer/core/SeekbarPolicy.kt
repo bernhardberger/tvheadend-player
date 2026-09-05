@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.requestedLiveTimeshiftPeriod
 
 /** Initial D-pad/repeat seek step. */
 const val SEEKBAR_STEP_INITIAL_MS = 30_000L
@@ -27,11 +28,22 @@ data class SeekbarRange(
     val startMs: Long,
     val endMs: Long,
     val positionMs: Long,
+    val displayStartMs: Long = startMs,
+    val positionKnown: Boolean = true,
+    val positionEstimated: Boolean = false,
 ) {
     val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
     val progress: Float
         get() = if (durationMs <= 0L) 0f
         else ((positionMs - startMs).toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+
+    val displayProgress: Float get() = displayFraction(positionMs)
+    val availableStartFraction: Float get() = displayFraction(startMs)
+
+    private fun displayFraction(position: Long): Float =
+        if (endMs <= displayStartMs) 0f
+        else ((position - displayStartMs).toDouble() / (endMs - displayStartMs))
+            .toFloat().coerceIn(0f, 1f)
 }
 
 sealed interface RecordingTimelinePresentation {
@@ -58,7 +70,7 @@ fun programmeAnchoredAxis(
     programmeStartSec: Long?,
     programmeStopSec: Long?,
 ): ProgrammeAxis? {
-    if (!state.available || programmeStartSec == null || programmeStopSec == null) return null
+    if (!state.available || !state.timingKnown || programmeStartSec == null || programmeStopSec == null) return null
     val span = programmeStopSec - programmeStartSec
     if (span <= 0L) return null
 
@@ -103,7 +115,17 @@ fun timeshiftSeekbarRange(state: AppTimeshiftState): SeekbarRange =
         domain = SeekbarDomain.TIMESHIFT,
         startMs = state.bufferStartMs,
         endMs = state.liveEdgeMs,
-        positionMs = state.positionMs.coerceIn(state.bufferStartMs, state.liveEdgeMs),
+        positionMs = state.positionMs,
+        positionKnown = state.timingKnown,
+        positionEstimated = state.playbackTarget != null,
+        // Capacity is a display span, never permission to seek unavailable history.
+        displayStartMs = state.liveEdgeMs - maxOf(
+            state.capacityMs?.takeIf { it > 0L }
+                ?: requestedLiveTimeshiftPeriod(timeshiftEnabled = true).inWholeMilliseconds,
+            state.liveEdgeMs - state.bufferStartMs,
+            // A sampled position can outlive seekable history without making it available.
+            if (state.timingKnown) state.liveEdgeMs - state.positionMs else 0L,
+        ),
     )
 
 /**

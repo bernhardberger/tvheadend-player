@@ -119,6 +119,10 @@ data class AppTimeshiftState(
     val bufferStartMs: Long = 0L,
     val positionMs: Long = 0L,
     val liveEdgeMs: Long = 0L,
+    val capacityMs: Long? = null,
+    val timingKnown: Boolean = available,
+    val timeline: at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline? = null,
+    val playbackTarget: at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget? = null,
 )
 
 private val FIXED_LIVE_TIMESHIFT_PERIOD = 2.hours
@@ -274,7 +278,8 @@ internal fun playerReportedPlaybackState(
 ): AppPlaybackState = when {
     recoveryAttemptInProgress -> currentState
     playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
-    isPlaying -> AppPlaybackState.Playing
+    // Playing describes a ready target; Media3's play intent owns pause/progression.
+    isPlaying || playbackState == Player.STATE_READY -> AppPlaybackState.Playing
     playbackState == Player.STATE_BUFFERING -> AppPlaybackState.Starting
     playbackState == Player.STATE_IDLE -> AppPlaybackState.Idle
     else -> currentState
@@ -284,20 +289,12 @@ internal fun playerStateAfterRecoveryResolution(
     currentState: AppPlaybackState,
     playbackState: Int,
     isPlaying: Boolean,
-): AppPlaybackState = if (
-    currentState is AppPlaybackState.Recovering &&
-    playbackState == Player.STATE_READY &&
-    !isPlaying
-) {
-    AppPlaybackState.Starting
-} else {
-    playerReportedPlaybackState(
+): AppPlaybackState = playerReportedPlaybackState(
         currentState = currentState,
         recoveryAttemptInProgress = false,
         playbackState = playbackState,
         isPlaying = isPlaying,
     )
-}
 
 internal suspend fun executeForegroundPlaybackAction(
     action: ForegroundPlaybackAction,
@@ -883,6 +880,18 @@ class AppPlaybackRuntime(
         coordinator.returnToLive()
     }
     fun play() { targetCommands.runIfOpen(player::play) }
+    suspend fun seekTimeshift(target: at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget) =
+        targetCommands.serialize(
+            onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
+        ) { coordinator.seekTimeshift(target) }
+
+    suspend fun sampleTimeshiftPresentation(): AppTimeshiftState {
+        val before = livePlaybackObservation.value
+        val sample = coordinator.timeshiftPlaybackPosition()
+        if (before !== livePlaybackObservation.value) return AppTimeshiftState()
+        return (before as? LivePlaybackObservation.Active)?.timeshiftState
+            ?.toAppPresentation(sample) ?: AppTimeshiftState()
+    }
     fun pause() { targetCommands.runIfOpen(player::pause) }
     fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
     fun setDiagnosticsEnabled(enabled: Boolean) {
@@ -1181,11 +1190,12 @@ class AppPlaybackRuntime(
                 publishPlayerErrorFromPlayer()
                 return@runIfOpen
             }
-            _state.value = when {
-                player.playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
-                player.isPlaying -> AppPlaybackState.Playing
-                else -> AppPlaybackState.Starting
-            }
+            _state.value = playerReportedPlaybackState(
+                currentState = AppPlaybackState.Starting,
+                recoveryAttemptInProgress = false,
+                playbackState = player.playbackState,
+                isPlaying = player.isPlaying,
+            )
             publishDiagnosticsFromPlayer()
         }
     }
@@ -1283,21 +1293,44 @@ internal class PlaybackPresentationEpoch {
     }
 }
 
-fun LiveTimeshiftState.toAppPresentation(): AppTimeshiftState = when (this) {
+fun LiveTimeshiftState.toAppPresentation(
+    sample: at.bernhardberger.tvheadend.sdk.media3.TimeshiftPlaybackPosition =
+        at.bernhardberger.tvheadend.sdk.media3.TimeshiftPlaybackPosition.Unavailable,
+): AppTimeshiftState = when (this) {
     LiveTimeshiftState.Unavailable -> AppTimeshiftState()
-    is LiveTimeshiftState.Available -> measuredTimeshiftPresentation(
-        bufferedDuration = bufferedDuration,
-        positionBehindLive = positionBehindLive,
-        serverPaused = serverPaused == true,
-    )
+    is LiveTimeshiftState.Available -> {
+        val position = (sample as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftPlaybackPosition.Estimate)?.target
+        AppTimeshiftState(
+            available = true,
+            paused = serverPaused == true,
+            bufferStartMs = timeline?.start?.inWholeMilliseconds ?: 0L,
+            liveEdgeMs = timeline?.end?.inWholeMilliseconds ?: 0L,
+            positionMs = position?.position?.inWholeMilliseconds ?: 0L,
+            capacityMs = grantedPeriod.takeIf { it.isFinite() && it > Duration.ZERO }?.inWholeMilliseconds,
+            timingKnown = timeline != null && position != null && position.position <= timeline!!.end,
+            timeline = timeline,
+            playbackTarget = position,
+        )
+    }
 }
 
 internal fun measuredTimeshiftPresentation(
     bufferedDuration: Duration?,
     positionBehindLive: Duration?,
     serverPaused: Boolean?,
+    grantedPeriod: Duration? = null,
 ): AppTimeshiftState {
-    val behind = positionBehindLive?.inWholeMilliseconds?.coerceAtLeast(0L) ?: 0L
-    val buffered = bufferedDuration?.inWholeMilliseconds?.coerceAtLeast(behind) ?: behind
-    return AppTimeshiftState(true, serverPaused == true, -buffered, -behind, 0L)
+    val buffered = bufferedDuration?.takeIf { it.isFinite() && it >= Duration.ZERO }
+        ?.inWholeMilliseconds
+    val behind = positionBehindLive?.takeIf { it.isFinite() && it >= Duration.ZERO }
+        ?.inWholeMilliseconds
+    return AppTimeshiftState(
+        available = true,
+        paused = serverPaused == true,
+        bufferStartMs = -(buffered ?: 0L),
+        positionMs = -(behind ?: 0L),
+        capacityMs = grantedPeriod?.takeIf { it.isFinite() && it > Duration.ZERO }
+            ?.inWholeMilliseconds,
+        timingKnown = buffered != null && behind != null && behind <= buffered,
+    )
 }

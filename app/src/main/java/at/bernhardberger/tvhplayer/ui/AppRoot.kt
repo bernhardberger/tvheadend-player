@@ -37,19 +37,12 @@ import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.MainStartupState
-import at.bernhardberger.tvhplayer.core.PlaybackRecoverySecondaryAction
 import at.bernhardberger.tvhplayer.core.mainStartupPresentation
-import at.bernhardberger.tvhplayer.core.applianceProductProfile
-import at.bernhardberger.tvhplayer.core.ProductProfile
 import at.bernhardberger.tvhplayer.core.rootBackAction
 import at.bernhardberger.tvhplayer.core.serverSettingsForRuntime
 import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
-import at.bernhardberger.tvhplayer.core.SimpleTvCapability
-import at.bernhardberger.tvhplayer.core.SimpleTvRoute
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
-import at.bernhardberger.tvhplayer.core.allows
-import at.bernhardberger.tvhplayer.core.allowsRoute
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -62,7 +55,6 @@ import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
@@ -97,11 +89,9 @@ internal fun completeEnteringPlayerVisibility(
 ): Boolean = requests.completePlayerVisibility(target, channelId, channelName)
 
 internal fun shouldShowMainNavigationRail(
-    simpleTvActive: Boolean,
     currentDestination: AppNavKey?,
     navigationStartDestination: AppNavKey?,
 ): Boolean = showGlobalNavigationRail(
-    simpleTvActive = simpleTvActive,
     playerVisible = when (currentDestination ?: navigationStartDestination) {
         is LivePlayerKey, is RecordingPlayerKey -> true
         else -> false
@@ -185,21 +175,17 @@ internal fun cancelStartupAndSelectRoot(
 }
 
 internal fun closeNormalLivePlayer(
-    playerCloseAllowed: Boolean,
     popBackStack: () -> Boolean,
     selectRoot: (AppNavKey) -> Unit,
 ) {
-    if (!playerCloseAllowed) return
     if (!popBackStack()) selectRoot(ChannelsKey)
 }
 
 internal fun performMainStartupBack(
-    productProfile: ProductProfile,
     requests: ApplianceLaunchRequests,
     expectedState: ApplianceLaunchState,
     selectRoot: (AppNavKey) -> Unit,
 ) {
-    if (!productProfile.allows(SimpleTvCapability.APP_EXIT)) return
     cancelStartupAndSelectRoot(
         requests = requests,
         expectedState = expectedState,
@@ -211,16 +197,12 @@ internal fun performMainStartupBack(
 internal enum class DeferredResolvingBackAction {
     NONE,
     CANCEL_TO_CHANNELS,
-    CONTAIN_SIMPLE_TV,
 }
 
 internal fun deferredResolvingBackAction(
     cancellationRequested: Boolean,
-    readyState: MainStartupState.Ready,
 ): DeferredResolvingBackAction = when {
     !cancellationRequested -> DeferredResolvingBackAction.NONE
-    readyState.startupProfile is ProductProfile.Appliance ->
-        DeferredResolvingBackAction.CONTAIN_SIMPLE_TV
     else -> DeferredResolvingBackAction.CANCEL_TO_CHANNELS
 }
 
@@ -230,8 +212,7 @@ internal fun applyDeferredResolvingBack(
     expectedState: ApplianceLaunchState,
     selectRoot: (AppNavKey) -> Unit,
 ): Boolean = when (action) {
-    DeferredResolvingBackAction.NONE,
-    DeferredResolvingBackAction.CONTAIN_SIMPLE_TV -> false
+    DeferredResolvingBackAction.NONE -> false
     DeferredResolvingBackAction.CANCEL_TO_CHANNELS -> cancelStartupAndSelectRoot(
         requests = requests,
         expectedState = expectedState,
@@ -244,12 +225,10 @@ internal fun performMainStartupAction(
     action: MainStartupActionId,
     onRetry: () -> Unit,
     onConnectionSettings: () -> Unit,
-    onExitSimpleTv: () -> Unit,
 ) {
     when (action) {
         MainStartupActionId.RETRY -> onRetry()
         MainStartupActionId.CONNECTION_SETTINGS -> onConnectionSettings()
-        MainStartupActionId.EXIT_SIMPLE_TV -> onExitSimpleTv()
     }
 }
 
@@ -297,7 +276,6 @@ fun AppRoot(
     val readyStartupState = startupState
     val deferredBackAction = deferredResolvingBackAction(
         cancellationRequested = cancelBootstrapLaunchWhenReady,
-        readyState = readyStartupState,
     )
     if (serverSettings.host.isBlank()) {
         MainStartupComposition(
@@ -387,17 +365,6 @@ fun AppRoot(
     )
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
-    val simpleTvSession: SimpleTvSession = koinInject()
-    val productProfile by simpleTvSession.profile.collectAsStateWithLifecycle()
-    val simpleTvActive = productProfile is ProductProfile.Appliance
-    val playerCloseAllowed = productProfile.allows(SimpleTvCapability.PLAYER_CLOSE)
-    val fullPlaybackOptionsAvailable =
-        productProfile.allows(SimpleTvCapability.FULL_PLAYBACK_OPTIONS)
-    val recoverySecondaryAction = if (playerCloseAllowed) {
-        PlaybackRecoverySecondaryAction.CLOSE
-    } else {
-        PlaybackRecoverySecondaryAction.EXIT_SIMPLE_TV
-    }
     val currentChannelReadiness by
         appVm.currentChannelReadiness.collectAsStateWithLifecycle()
     val startupPresentation = mainStartupPresentation(
@@ -405,12 +372,10 @@ fun AppRoot(
         launchState = applianceLaunchState,
         connectionState = connectionUiState,
         currentChannelReadiness = currentChannelReadiness,
-        simpleTvActive = simpleTvActive,
     )
 
     val currentDestination = backStack.lastOrNull()
     val showRail = shouldShowMainNavigationRail(
-        simpleTvActive = simpleTvActive,
         currentDestination = currentDestination,
         navigationStartDestination = navigationStartDestination,
     )
@@ -487,17 +452,6 @@ fun AppRoot(
         }
     }
 
-    SimpleTvRouteGuardEffect(
-        route = currentDestination?.toSimpleTvRoute(),
-        profile = productProfile,
-        recordingActive = activeRecordingId != null,
-        orchestrator = playbackOrchestrator,
-        stopRecording = playbackRuntime::stop,
-        redirectToLive = {
-            applianceLaunchRequests.requestStartup(autoStartPlayback = true)
-        },
-    )
-
     SideEffect { onPlayerVisibilityChanged(isPlayer) }
 
     LaunchedEffect(
@@ -547,11 +501,10 @@ fun AppRoot(
         }
     }
 
-    val startupBack = remember(applianceLaunchState, productProfile, selectRoot) {
+    val startupBack = remember(applianceLaunchState, selectRoot) {
         val expectedState = applianceLaunchState
         {
             performMainStartupBack(
-                productProfile = productProfile,
                 requests = applianceLaunchRequests,
                 expectedState = expectedState,
                 selectRoot = selectRoot,
@@ -571,12 +524,7 @@ fun AppRoot(
                 warmReturn = warmReturn,
             )
         ) {
-            BackAction.FINISH_ACTIVITY -> {
-                if (productProfile.allows(SimpleTvCapability.APP_EXIT)) {
-                    onRequestExit()
-                }
-                // Simple TV never exits through Back; ignore when exit is gated.
-            }
+            BackAction.FINISH_ACTIVITY -> onRequestExit()
             BackAction.POP_NAVIGATION -> {
                 if (!backStack.popNavigation()) onRequestExit()
             }
@@ -645,8 +593,6 @@ fun AppRoot(
                     entry<ChannelsKey> {
                         ChannelsRouteContent(
                             contentAllowed = contentAllowed,
-                            routeAllowed =
-                                productProfile.allowsRoute(SimpleTvRoute.CHANNELS),
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive,
                             playingChannelId = activeChannelId,
@@ -662,7 +608,6 @@ fun AppRoot(
                     entry<GuideKey> {
                         GuideRouteContent(
                             contentAllowed = contentAllowed,
-                            routeAllowed = productProfile.allowsRoute(SimpleTvRoute.EPG),
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive,
                             connectionUiState = connectionUiState,
@@ -670,10 +615,6 @@ fun AppRoot(
                             onOpenConnectionSettings = {
                                 navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                             },
-                            timeshiftAllowed =
-                                productProfile.allows(SimpleTvCapability.TIMESHIFT),
-                            recordingsAllowed =
-                                productProfile.allows(SimpleTvCapability.RECORDINGS),
                             onPlayRecording = { playbackSelection ->
                                 val recordingId = playbackSelection.recordingId
                                 playbackSelectionScope.launch {
@@ -703,8 +644,6 @@ fun AppRoot(
                     entry<RecordingsKey> {
                         RecordingsRouteContent(
                             contentAllowed = contentAllowed,
-                            routeAllowed =
-                                productProfile.allowsRoute(SimpleTvRoute.RECORDINGS),
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive,
                             backEnabled = !applianceLaunchActive,
@@ -736,7 +675,6 @@ fun AppRoot(
                     entry<SettingsKey> { destination ->
                         SettingsRouteContent(
                             contentAllowed = contentAllowed,
-                            routeAllowed = productProfile.allowsRoute(SimpleTvRoute.SETTINGS),
                             section = destination.section,
                             initialFocusEnabled = !drawerActive,
                             contentPadding = contentPadding,
@@ -744,26 +682,12 @@ fun AppRoot(
                             onNavigate = { section ->
                                 navigateTopLevel(SettingsKey(section))
                             },
-                            onStartSimpleTv = { settings ->
-                                simpleTvSession.enter(applianceProductProfile(settings))
-                            },
                         )
                     }
 
                     entry<UnlockKey> {
-                        UnlockRouteContent(
-                            contentAllowed = contentAllowed,
-                            backEnabled = !drawerActive && !applianceLaunchActive,
-                            onExited = {
-                                navigateTopLevel(ChannelsKey)
-                            },
-                            onBack = {
-                                backStack.popNavigation()
-                                if (simpleTvActive && activeChannelId == null) {
-                                    applianceLaunchRequests.request()
-                                }
-                            },
-                        )
+                        // A restored navigation stack may still contain the retired route.
+                        LaunchedEffect(Unit) { navigateTopLevel(ChannelsKey) }
                     }
 
                     entry<LivePlayerKey> { destination ->
@@ -771,19 +695,9 @@ fun AppRoot(
                             contentAllowed = contentAllowed,
                             channelId = ChannelId(destination.channelId),
                             channelName = destination.channelName,
-                            timeshiftAllowed =
-                                productProfile.allows(SimpleTvCapability.TIMESHIFT),
-                            showStop = productProfile.allows(SimpleTvCapability.STOP),
-                            recordingActionsAllowed =
-                                productProfile.allows(SimpleTvCapability.RECORDINGS),
-                            playerCloseAllowed = playerCloseAllowed,
-                            fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
-                            recoverySecondaryAction = recoverySecondaryAction,
                             onReconnect = appVm::reconnectNow,
-                            onUnlock = { backStack.pushTransient(UnlockKey) },
                             onClose = {
                                 closeNormalLivePlayer(
-                                    playerCloseAllowed = playerCloseAllowed,
                                     popBackStack = backStack::popNavigation,
                                     selectRoot = selectRoot,
                                 )
@@ -794,17 +708,10 @@ fun AppRoot(
                     entry<RecordingPlayerKey> { destination ->
                         RecordingPlayerRouteContent(
                             contentAllowed = contentAllowed,
-                            routeAllowed =
-                                productProfile.allowsRoute(SimpleTvRoute.RECORDING_PLAYER),
                             recordingId = DvrEntryId(destination.recordingId),
                             playbackStart = destination.start.toPlaybackStart(),
-                            showStop = productProfile.allows(SimpleTvCapability.STOP),
-                            showSimpleTvExit = !playerCloseAllowed,
-                            playerCloseAllowed = playerCloseAllowed,
-                            fullPlaybackOptionsAvailable = fullPlaybackOptionsAvailable,
                             connectionState = connectionState,
                             onReconnect = appVm::reconnectNow,
-                            onUnlock = { backStack.pushTransient(UnlockKey) },
                             onClose = { backStack.popNavigation() },
                         )
                     }
@@ -827,16 +734,6 @@ fun AppRoot(
                         destination = SettingsKey(SettingsSection.CONNECTION),
                         selectRoot = selectRoot,
                     )
-                    Unit
-                },
-                onExitSimpleTv = {
-                    cancelStartupAndSelectRoot(
-                        requests = applianceLaunchRequests,
-                        expectedState = expectedState,
-                        destination = UnlockKey,
-                        selectRoot = selectRoot,
-                    )
-                    Unit
                 },
             )
         }
@@ -884,21 +781,10 @@ fun AppRoot(
                         rootRoute = AppDestination.CHANNELS,
                         showEpgMenu = uiSettings.showEpgMenu,
                         availableDestinations = buildSet {
-                            if (productProfile.allowsRoute(SimpleTvRoute.CHANNELS)) {
-                                add(AppDestination.CHANNELS)
-                            }
-                            if (productProfile.allowsRoute(SimpleTvRoute.EPG)) {
-                                add(AppDestination.GUIDE)
-                            }
-                            if (productProfile.allowsRoute(SimpleTvRoute.RECORDINGS)) {
-                                add(AppDestination.RECORDINGS)
-                            }
-                            if (productProfile.allowsRoute(SimpleTvRoute.SETTINGS)) {
-                                add(AppDestination.SETTINGS)
-                            }
-                            if (productProfile is ProductProfile.Appliance) {
-                                add(AppDestination.UNLOCK)
-                            }
+                            add(AppDestination.CHANNELS)
+                            add(AppDestination.GUIDE)
+                            add(AppDestination.RECORDINGS)
+                            add(AppDestination.SETTINGS)
                         },
                         rootBackPriority = applianceLaunchActive,
                         onRootBack = handleRootBack,
@@ -972,14 +858,4 @@ internal fun recordingPlayerKey(
 private fun RecordingStartMode.toPlaybackStart(): RecordingPlaybackStart = when (this) {
     RecordingStartMode.RESUME -> RecordingPlaybackStart.RESUME
     RecordingStartMode.START_OVER -> RecordingPlaybackStart.START_OVER
-}
-
-private fun AppNavKey.toSimpleTvRoute(): SimpleTvRoute = when (this) {
-    ChannelsKey -> SimpleTvRoute.CHANNELS
-    GuideKey -> SimpleTvRoute.EPG
-    RecordingsKey -> SimpleTvRoute.RECORDINGS
-    is SettingsKey -> SimpleTvRoute.SETTINGS
-    is LivePlayerKey -> SimpleTvRoute.PLAYER
-    is RecordingPlayerKey -> SimpleTvRoute.RECORDING_PLAYER
-    UnlockKey -> SimpleTvRoute.UNLOCK
 }

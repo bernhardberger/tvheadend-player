@@ -28,7 +28,6 @@ import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.core.SettingsBackAction
-import at.bernhardberger.tvhplayer.core.SimpleTvSettings
 import at.bernhardberger.tvhplayer.core.settingsBackAction
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnection
@@ -43,7 +42,6 @@ internal fun SettingsScreen(
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
     onNavigate: (SettingsSection) -> Unit,
-    onStartSimpleTv: (SimpleTvSettings) -> Unit,
 ) {
     SettingsScreenNavigation(
         currentSection = section,
@@ -59,7 +57,6 @@ internal fun SettingsScreen(
             SettingsSection.PLAYER -> SettingsPlayer(initialFocusRequester)
             SettingsSection.APPLIANCE -> SettingsAppliance(
                 initialFocusRequester = initialFocusRequester,
-                onStartSimpleTv = onStartSimpleTv,
             )
         }
     }

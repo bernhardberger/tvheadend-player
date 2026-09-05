@@ -22,11 +22,7 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
-import at.bernhardberger.tvhplayer.core.ProductProfile
-import at.bernhardberger.tvhplayer.core.SimpleTvCapability
-import at.bernhardberger.tvhplayer.core.allows
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
-import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import at.bernhardberger.tvhplayer.ui.player.stopPlaybackAndClose
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
@@ -102,7 +98,6 @@ private fun Int.isStartupActivationKey(): Boolean = when (this) {
 class MainActivity : AppCompatActivity() {
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
-    private val simpleTvSession: SimpleTvSession by inject()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
         onAppForegrounded = { playbackRuntime.onAppForegrounded() },
         onAppBackgrounded = { playbackRuntime.onAppBackgrounded() },
@@ -203,9 +198,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestRootExit() {
         val startupState = startupViewModel.state.value
-        val productProfile = simpleTvSession.profile.value
         lifecycleScope.launch {
-            playbackLifecycle.onRootExitRequested(startupState, productProfile)
+            playbackLifecycle.onRootExitRequested(startupState)
         }
     }
 
@@ -252,10 +246,8 @@ internal class MainActivityPlaybackLifecycle(
 
     suspend fun onRootExitRequested(
         startupState: MainStartupState,
-        productProfile: ProductProfile,
     ) {
         if (startupState !is MainStartupState.Ready) return
-        if (!productProfile.allows(SimpleTvCapability.APP_EXIT)) return
         rootExitMutex.withLock {
             if (rootExitStarted) return@withLock
             rootExitStarted = true

@@ -29,7 +29,6 @@ import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.MainStartupComposition
 import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
@@ -102,10 +101,9 @@ class SettingsStartupEntryTest {
     }
 
     @Test
-    fun applianceCategoryEntersAutoStartAndReachesSimpleTvStart() {
+    fun applianceCategoryEntersAutoStartAndReachesAccessibilitySettings() {
         val context = composeRule.activity.applicationContext
         val settingsStore = UiSettingsStore(context)
-        val simpleTvSettingsStore = SimpleTvSettingsStore(context)
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SettingsScreenNavigation(
@@ -114,9 +112,7 @@ class SettingsStartupEntryTest {
                 ) { _, focusRequester ->
                     SettingsAppliance(
                         initialFocusRequester = focusRequester,
-                        onStartSimpleTv = {},
                         settingsStore = settingsStore,
-                        simpleTvSettingsStore = simpleTvSettingsStore,
                     )
                 }
             }
@@ -133,7 +129,7 @@ class SettingsStartupEntryTest {
             repeat(12) { pressKey(Key.DirectionDown) }
         }
         composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.simple_tv_start_now)
+            composeRule.activity.getString(R.string.open_accessibility_settings)
         ).assertIsFocused()
     }
 

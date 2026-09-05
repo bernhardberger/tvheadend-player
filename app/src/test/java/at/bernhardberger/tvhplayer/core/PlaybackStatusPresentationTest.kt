@@ -29,7 +29,7 @@ class PlaybackStatusPresentationTest {
             playbackStatusPresentation(false, true, false, false),
         )
         assertEquals(
-            PlaybackStatusPresentation.FULL_RECOVERY,
+            PlaybackStatusPresentation.CHANNEL_UNAVAILABLE,
             playbackStatusPresentation(
                 connectionAvailable = true,
                 playbackStarting = false,
@@ -37,6 +37,10 @@ class PlaybackStatusPresentationTest {
                 playbackPlaying = false,
                 playbackFailed = true,
             ),
+        )
+        assertEquals(
+            CompactTuningVisibilityAction.HIDE_IMMEDIATELY,
+            compactTuningVisibilityAction(true, PlaybackStatusPresentation.CHANNEL_UNAVAILABLE, true),
         )
     }
 

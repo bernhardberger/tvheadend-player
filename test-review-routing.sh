@@ -27,10 +27,14 @@ five_hour_guard='{"ok":true,"configured":true,"usage":{"windows":{"5h":{"remaini
 weekly_guard='{"ok":true,"configured":true,"usage":{"windows":{"5h":{"remainingPercent":100},"7d":{"remainingPercent":5}}}}'
 
 assert_equal opus "$(route_for "$healthy")" 'quota above both UX guards'
-assert_equal sol "$(route_for "$five_hour_guard")" '5h guard is strict'
-assert_equal sol "$(route_for "$weekly_guard")" '7d guard is strict'
-assert_equal sol "$(route_for 'not-json')" 'malformed telemetry fails closed'
-assert_equal sol "$("$SELECTOR" select routine)" 'routine work is Sol-only'
+assert_equal astra "$(route_for "$five_hour_guard")" '5h guard is strict'
+assert_equal astra "$(route_for "$weekly_guard")" '7d guard is strict'
+assert_equal astra "$(route_for 'not-json')" 'malformed telemetry fails closed'
+assert_equal astra "$(route_for '{"ok":true,"configured":true,"usage":{"windows":{"5h":{"remainingPercent":101},"7d":{"remainingPercent":6}}}}')" 'out of range telemetry fails closed'
+assert_equal astra "$(route_for '{"ok":true,"configured":true,"usage":{"windows":{"5h":{"remainingPercent":NaN},"7d":{"remainingPercent":6}}}}')" 'nonstandard numeric telemetry fails closed'
+assert_equal astra "$(route_for '{"ok":true,"configured":true,"usage":{"windows":{"5h":{"remainingPercent":21}}}}')" 'missing window fails closed'
+assert_equal astra "$(OPENCHAMBER_ENV_FILE=/nonexistent/p24-quota-fixture "$SELECTOR" select eligible 2>/dev/null)" 'eligible route probes and fails closed without credentials'
+assert_equal astra "$("$SELECTOR" select routine)" 'routine route uses Astra'
 
 python3 -m json.tool "$CONFIG" >/dev/null || fail 'OpenCode config is invalid JSON'
 TESTS=$((TESTS + 1))

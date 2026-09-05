@@ -15,11 +15,6 @@ enum class PlaybackRecoverySurface {
     RECORDING,
 }
 
-enum class PlaybackRecoverySecondaryAction {
-    CLOSE,
-    EXIT_SIMPLE_TV,
-}
-
 enum class PlaybackRecoveryInitialAction {
     RETRY,
     CLOSE,
@@ -27,7 +22,6 @@ enum class PlaybackRecoveryInitialAction {
 
 data class PlaybackRecoveryUiModel(
     val retryCommand: PlaybackRetryCommand,
-    val secondaryAction: PlaybackRecoverySecondaryAction,
     val initialAction: PlaybackRecoveryInitialAction,
 )
 
@@ -35,7 +29,6 @@ fun playbackRecoveryUiModel(
     surface: PlaybackRecoverySurface,
     connectionState: ConnectionState,
     retryTargetAvailable: Boolean,
-    secondaryAction: PlaybackRecoverySecondaryAction,
 ): PlaybackRecoveryUiModel {
     val connectionAvailable = connectionState is ConnectionState.Connected
     val connectionRetryAvailable = connectionState is ConnectionState.Error &&
@@ -60,7 +53,6 @@ fun playbackRecoveryUiModel(
     }
     return PlaybackRecoveryUiModel(
         retryCommand = retryCommand,
-        secondaryAction = secondaryAction,
         initialAction = if (retryCommand == PlaybackRetryCommand.NONE) {
             PlaybackRecoveryInitialAction.CLOSE
         } else {

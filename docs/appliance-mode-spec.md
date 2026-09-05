@@ -2,8 +2,8 @@
 
 ## Objective
 
-Provide an optional single-purpose live-TV profile and household integration for
-TVHeadend Player users who should not need to navigate Google TV.
+Provide optional autoplay and household integration for TVHeadend Player users
+who prefer direct entry into live TV without navigating Google TV.
 
 The app must keep the configured household TVHeadend account local to the device,
 play the last selected channel after an appliance launch, support physical
@@ -114,18 +114,18 @@ fun adjacentChannelId(
   signing key.
 - Keep the operator UI on one overscan-safe TV layout grid. Use TV Material
   navigation drawers and list items rather than hand-built focusable replicas;
-  focused rows must remain unclipped, and the playback channel sheet must attach
-  to the screen edge instead of floating like a dialog. The global navigation
+  focused rows must remain unclipped, and Player details/settings panels must
+  attach to the right screen edge instead of floating like a dialog. The global navigation
   rail uses a standard push drawer so expanding it translates the closed-width
   browse viewport instead of reflowing it narrower. Settings retains the
-  collapsed global rail beside its temporary category rail; onboarding and
-  unlock use symmetric full-screen padding. Collapsed rail icons expose
+  collapsed global rail beside its temporary category rail; onboarding uses
+  symmetric full-screen padding. Collapsed rail icons expose
   destination content descriptions.
-- Normal non-autoplay launches open Channels. Autoplay and Simple TV launches
+- Normal non-autoplay launches open Channels. Autoplay launches
   continue to resume the last successfully played channel, falling back to the
   first available channel. Channels uses one channel list with a persistent
-  programme-details pane. The playback channel sheet uses the same list-row
-  presentation for Standard and Simple TV quick selection. Player Info reuses
+  programme-details pane. The playback channel shelf uses a compact horizontal
+  presentation with separate focus and playing state. Player Info reuses
   the shared Content Details composition.
 - With controls hidden, Center/Enter/Numpad Enter toggles Play/Pause and reveals
   controls for timeshift Live TV and recordings; non-timeshift Live TV reveals
@@ -134,8 +134,8 @@ fun adjacentChannelId(
   complete down/repeat/up cycle so the same press cannot act twice or activate a
   newly focused control. Programme info is an explicit player action rather than
   a hidden D-pad Up shortcut. Picking the
-  channel that is already playing from the playback channel sheet closes the
-  sheet without rebuilding or restarting the player session.
+  channel that is already playing from the playback channel shelf closes the
+  shelf without rebuilding or restarting the player session.
 - Standard Android TV Info opens the explicit programme-details surface. TV
   Contents Menu and TV Number Entry keys open the channel drawer when Android
   delivers them to the app. On the current TCL target, its Bluetooth remote's
@@ -143,34 +143,27 @@ fun adjacentChannelId(
   opens the channel drawer. Programme details include channel identity,
   full available EPG metadata, and recording status/action. Back remains the
   canonical dismiss action even when an explicit Close action is also present.
-- The transient player overlay balances the screen rather than stacking all
-  information at the bottom: channel or recording identity and a large wall clock
-  share a baseline-anchored top scrim, while the bottom scrim contains one shared
-  timeline followed by navigation, transport, and utility control groups. Live
-  timeshift keeps the timeline anchored to the current programme so focusing it
-  never changes or rescales its axis. The rewindable window and live edge appear
-  on that axis, and **Go live** is a transport action only while playback is
-  behind live. The channel identity precedes the programme title, while the clock
-  is paired with the programme end time and **Up next**, including its start time,
-  remains in the top metadata group. Successful return to live is conveyed by the
-  timeline without an additional text notice.
-  A focused seekable timeline always displays a high-contrast thumb, including at
-  the live edge.
+- The Player composition and remote/focus grammar are specified in
+  `tv-design-spec.md`. Identity and committed-programme Now/Next remain at top
+  left with start/end times and separate programme progress; the current wall
+  clock remains at top right. Stable Info, Settings, neutral Record and immediate
+  Stop icons sit above the capacity-based timeline with a reserved Live/Go live
+  footprint. EPG never sizes the buffer. Missing timing never becomes a measured
+  live position, and relative durations never establish wall-clock truth.
 - Ordinary channel tuning uses a delayed, non-focusable unboxed status indicator centered
   over the video area. It must not compete with top metadata or bottom controls;
   connection loss and genuine playback recovery continue to use the full recovery
   presentation.
-- Live and recording playback expose one **Playback options** action in the main
-  controls. An opaque compact overlay anchored above the bottom-end controls
+- Live and recording playback expose one **Settings** action in the main
+  controls. An opaque full-height right-edge panel
   presents a structured root menu for Audio, Subtitles, Display, and Stats.
   Selecting Audio, Subtitles, or Display replaces the root with that category's
   choices; Back returns to the root before closing the overlay and restoring
-  focus to the cluster. Opening the overlay suspends control auto-hide.
-  Player icon controls use recognizable symbols and accessible content
-  descriptions without reserving a separate visible label row.
-- Explicit Stop remains directly reachable as the terminal player action. It is
-  visually separated from Info and Playback options rather than placed inside
-  the options overlay.
+  focus to the invoking action. Opening the panel hides competing chrome/focus.
+  Player icon controls use recognizable symbols, accessible names and one short
+  focused label in a reserved line.
+- Explicit Stop remains directly reachable in its stable action-strip slot,
+  outside Settings. It is never an automatic focus target.
 - Stats for nerds is a non-focusable, one-second diagnostic overlay. It may show
   playback state/timing, selected formats, decoder names, rendered/dropped frame
   counters, audio underruns, measured HTSP stream/file read rate, display output,
@@ -183,21 +176,12 @@ fun adjacentChannelId(
   Back hides Stats before normal player behavior only while the Stats overlay is
   actually rendered. An enabled but obscured Stats preference must not consume
   Back ahead of the visible foreground layer.
-- Simple TV mode is a strict player-only session. Configurable state is limited to
-  startup enablement, optional timeshift, and an optional owner PIN. Granular
-  EPG/recordings/stop/settings/app-exit flags are not offered. Its startup toggle
-  affects only fresh launches, while **Start Simple TV now** enters it explicitly.
-  Recording browse and recording playback routes are unreachable while the
-  restricted session is active; entry from an existing recording context closes
-  that route through its normal playback owner before starting Live TV.
-  Back may dismiss overlays but must not leave playback while the mode is active.
-- Exiting Simple TV is deliberately secondary inside Playback options rather than
-  a primary transport action. It requires optional owner-PIN verification and a
-  separate cancellable confirmation even when no PIN is set. Confirmed exit
-  unlocks only the current app session and does not change startup.
-  When recovery prevents access to Playback options, the recovery surface also
-  exposes the same secondary Exit Simple TV flow beside Retry; Retry remains
-  initial focus and Back still cannot leave the restricted session.
+- Simple TV is retired: no restricted profile, activation toggle, owner PIN or
+  escape UI remains. Upgrade removes only the retired mode/PIN preference keys.
+  Ordinary stored autoplay is preserved, including off and absence; enabled
+  Simple TV is never migrated to autoplay-on. A restored old unlock navigation
+  entry returns to Channels. Ordinary HOME, GUIDE and wake integration is
+  independent of this retirement and retains its existing launch policy.
 - Consume only Android GUIDE and the captured TCL TV key code in the
   accessibility service; boot/wake entry must not subscribe to accessibility
   events or inspect window content.
@@ -223,8 +207,9 @@ fun adjacentChannelId(
 2. Interlaced-channel playback remains at least as good as the accepted
    TVHStream diagnostic result.
 3. During fullscreen playback, physical `CH+` and `CH-` switch to adjacent
-   visible channels and wrap at the ends of the list. When a channel browser is
-   focused, they page that list without tuning until the user confirms a row.
+    visible channels and wrap at the ends of the list, including in the Player
+    channel shelf. In ordinary browse lists they page without tuning until the
+    user confirms a row.
    The owner can independently limit each TV to All Channels, selected TVHeadend
    channel tags, or a mixture, with at least one browsing scope always enabled.
 4. Physical `0`-`9` keys show a channel-number overlay and select the matching
@@ -248,7 +233,7 @@ fun adjacentChannelId(
    finishing the activity. Ordinary HOME/background stops live playback and
    retunes it once on foreground; a playing recording pauses and resumes only
    while the same target remains current. Explicit Stop or a target replacement
-   cancels that pending foreground action. Simple TV never exits through Back.
+    cancels that pending foreground action.
 8. The player Stop control completes serialized playback teardown before it
    returns to the operator UI. It clears the warm-return opportunity so root Back
    cannot redirect to a torn-down session.
@@ -283,8 +268,8 @@ fun adjacentChannelId(
     overlay that restores row focus when closed.
     Returning from playback restores the previous mode, folder, scroll position,
     and focused item rather than resetting the recordings browser.
-    Recording playback uses an auto-hiding TV overlay with metadata, icon-based
-    transport, Playback options, and stable focus. A known real seekable duration
+    Recording playback uses an auto-hiding TV overlay with metadata, the shared
+    Info/Settings/Stop strip, and stable focus. A known real seekable duration
     shows elapsed/total time and a focusable seekbar. A growing recording with no
     known duration shows elapsed time plus **Still recording**; another unknown
     duration shows elapsed time plus **Duration unavailable**. Neither unknown

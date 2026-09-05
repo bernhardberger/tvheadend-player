@@ -94,7 +94,9 @@ internal fun PlaybackStatsOverlay(
                 StatLine(
                     stringResource(R.string.stats_timing),
                     timeshiftState?.let { state ->
-                        if (!state.available || timeshiftPositionPresentation(state).atLiveEdge) {
+                        if (state.available && !state.timingKnown) {
+                            stringResource(R.string.player_timing_unavailable)
+                        } else if (!state.available || timeshiftPositionPresentation(state).atLiveEdge) {
                             stringResource(R.string.stats_timeshift_live)
                         } else {
                             stringResource(

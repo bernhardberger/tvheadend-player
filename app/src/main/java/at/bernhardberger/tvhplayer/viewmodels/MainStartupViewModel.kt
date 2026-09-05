@@ -8,9 +8,7 @@ import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.core.StartupBootstrapCoordinator
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ServerSettings
-import at.bernhardberger.tvhplayer.settings.SimpleTvSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
-import at.bernhardberger.tvhplayer.stores.SimpleTvSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
@@ -20,8 +18,6 @@ import kotlinx.coroutines.launch
 class MainStartupViewModel(
     profileOwner: AppProfileOwner,
     uiSettingsStore: UiSettingsStore,
-    simpleTvSettingsStore: SimpleTvSettingsStore,
-    simpleTvSession: SimpleTvSession,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val createStartupRequest = shouldCreateStartupRequest(savedStateHandle)
@@ -37,8 +33,6 @@ class MainStartupViewModel(
         applianceLaunchRequests = applianceLaunchRequests,
         loadServerSettings = { profileOwner.serverSettings.first() },
         loadUiSettings = { uiSettingsStore.settings.first() },
-        loadSimpleTvSettings = { simpleTvSettingsStore.settings.first() },
-        enterProductProfile = simpleTvSession::enter,
         createStartupRequest = createStartupRequest,
         onStartupRequestCreationHandled = {
             markStartupRequestCreationHandled(savedStateHandle)

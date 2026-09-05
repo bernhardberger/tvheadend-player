@@ -164,8 +164,8 @@ class MainStartupScreenTest {
 
         composeRule.runOnIdle {
             presentation = MainStartupPresentation.Actionable(
-                MainStartupMessageKind.SIMPLE_TV_FAILURE,
-                retryAndExit,
+                MainStartupMessageKind.RETRYABLE_FAILURE,
+                retryAndSettings,
             )
         }
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY)).assertIsFocused()
@@ -176,10 +176,7 @@ class MainStartupScreenTest {
         assertTwoActionGraph(retryAndSettings, MainStartupActionId.CONNECTION_SETTINGS)
     }
 
-    @Test
-    fun retryAndExitGraphContainsEveryOuterAndVerticalEdge() {
-        assertTwoActionGraph(retryAndExit, MainStartupActionId.EXIT_SIMPLE_TV)
-    }
+
 
     @Test
     fun settingsOnlyGraphContainsEveryEdge() {
@@ -206,18 +203,18 @@ class MainStartupScreenTest {
         var action: MainStartupActionId? = null
         setStartupContent(
             presentation = MainStartupPresentation.Actionable(
-                MainStartupMessageKind.SIMPLE_TV_FAILURE,
-                retryAndExit,
+                MainStartupMessageKind.RETRYABLE_FAILURE,
+                retryAndSettings,
             ),
             onAction = { action = it },
         )
 
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY))
             .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag(actionTag(MainStartupActionId.EXIT_SIMPLE_TV))
+        composeRule.onNodeWithTag(actionTag(MainStartupActionId.CONNECTION_SETTINGS))
             .assertIsFocused()
             .performKeyInput { pressKey(Key.Enter) }
-        composeRule.runOnIdle { assertEquals(MainStartupActionId.EXIT_SIMPLE_TV, action) }
+        composeRule.runOnIdle { assertEquals(MainStartupActionId.CONNECTION_SETTINGS, action) }
     }
 
     @Test
@@ -464,10 +461,6 @@ class MainStartupScreenTest {
             MainStartupActionId.CONNECTION_SETTINGS,
         )
         val settingsOnly = listOf(MainStartupActionId.CONNECTION_SETTINGS)
-        val retryAndExit = listOf(
-            MainStartupActionId.RETRY,
-            MainStartupActionId.EXIT_SIMPLE_TV,
-        )
 
         val messageTexts = listOf(
             MessageText(MainStartupMessageKind.PREPARING, "Preparing TVHeadend Player…", "TVHeadend Player wird vorbereitet…"),
@@ -480,7 +473,6 @@ class MainStartupScreenTest {
             MessageText(MainStartupMessageKind.RETRYABLE_FAILURE, "TVHeadend is unavailable. Try again.", "TVHeadend ist nicht verfügbar. Versuchen Sie es erneut."),
             MessageText(MainStartupMessageKind.CONFIGURATION_REQUIRED, "Set up the TVHeadend connection to load channels.", "Richten Sie die TVHeadend-Verbindung ein, um Sender zu laden."),
             MessageText(MainStartupMessageKind.CREDENTIAL_UNAVAILABLE, "The saved credential is unavailable. Open connection settings and enter it again.", "Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein."),
-            MessageText(MainStartupMessageKind.SIMPLE_TV_FAILURE, "Television is unavailable in Simple TV.", "Fernsehen ist in Einfachem TV derzeit nicht verfügbar."),
         )
 
         val startupBoundsMatrix = listOf(
@@ -532,14 +524,14 @@ class MainStartupScreenTest {
             StartupBoundsScenario(
                 locale = Locale.GERMAN,
                 presentation = MainStartupPresentation.Actionable(
-                    MainStartupMessageKind.SIMPLE_TV_FAILURE,
-                    retryAndExit,
+                    MainStartupMessageKind.RETRYABLE_FAILURE,
+                    retryAndSettings,
                 ),
                 title = "Aktion erforderlich",
-                message = "Fernsehen ist in Einfachem TV derzeit nicht verfügbar.",
+                message = "TVHeadend ist nicht verfügbar. Versuchen Sie es erneut.",
                 actions = listOf(
                     StartupActionLabel(MainStartupActionId.RETRY, "Erneut versuchen"),
-                    StartupActionLabel(MainStartupActionId.EXIT_SIMPLE_TV, "Einfaches TV verlassen"),
+                    StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Verbindungseinstellungen"),
                 ),
             ),
         )

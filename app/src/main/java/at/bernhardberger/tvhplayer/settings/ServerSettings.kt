@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.first
 
 val Context.dataStore by preferencesDataStore(
     name = "tvhplayer_settings",
-    produceMigrations = { listOf(activeTagIdMigration()) },
+    produceMigrations = { listOf(activeTagIdMigration(), simpleTvRetirementMigration()) },
 )
 
 data class ServerSettings(

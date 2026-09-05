@@ -352,9 +352,6 @@ internal fun ProgrammeDetailsPanel(
     channel: Channel?,
     recording: DvrEntry?,
     nowSecProvider: () -> Long,
-    serverTimeshiftCoversEvent: (Long) -> Boolean,
-    timeshiftAllowed: Boolean,
-    recordingsAllowed: Boolean,
     canModifyRecordings: Boolean,
     actionResult: DvrMutationFeedback?,
     onAction: (ProgrammeAction) -> Unit,
@@ -366,20 +363,10 @@ internal fun ProgrammeDetailsPanel(
         event,
         nowSec,
         recording,
-        serverTimeshiftCoversEvent = serverTimeshiftCoversEvent(nowSec),
+        // Stream-coordinate history cannot establish a programme-time target.
+        serverTimeshiftCoversEvent = false,
         canModifyRecordings = canModifyRecordings,
-    ).filter { action ->
-        when (action) {
-            ProgrammeAction.RECORD,
-            ProgrammeAction.CANCEL_RECORDING -> recordingsAllowed
-            ProgrammeAction.WATCH_FROM_START -> if (recording != null) {
-                recordingsAllowed
-            } else {
-                timeshiftAllowed
-            }
-            ProgrammeAction.WATCH -> true
-        }
-    }
+    )
     LaunchedEffect(event.id, actions) { initialFocus.requestFocus() }
     val subtitle = buildString {
         append(channel?.name.orEmpty())

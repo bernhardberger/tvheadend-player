@@ -55,7 +55,6 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
-import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -99,7 +98,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
-import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -213,8 +211,6 @@ fun EpgGridScreen(
     onOpenConnectionSettings: () -> Unit = {},
     onClearCategory: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection) -> Unit = {},
-    timeshiftAllowed: Boolean = true,
-    recordingsAllowed: Boolean = true,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -241,12 +237,6 @@ fun EpgGridScreen(
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
     val activePlaybackTarget by playerSession.activeTarget.collectAsStateWithLifecycle()
     val playingChannelId = (activePlaybackTarget as? AppPlaybackTarget.Live)?.channelId
-    val livePlaybackObservation by
-        playerSession.livePlaybackObservation.collectAsStateWithLifecycle()
-    val sdkTimeshiftState =
-        (livePlaybackObservation as? LivePlaybackObservation.Active)?.timeshiftState
-            ?: LiveTimeshiftState.Unavailable
-    val timeshiftState = sdkTimeshiftState.toAppPresentation()
     val dvrEntries = observation.dvrEntries()
     val channelListState = rememberLazyListState()
     val eventFocusRequesters = remember { mutableMapOf<EventId, FocusRequester>() }
@@ -1490,23 +1480,12 @@ fun EpgGridScreen(
             val eventChannelId = event.channelId
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForProgramme(event)
-            val timeshiftCoversEvent = { nowSec: Long ->
-                playingChannelId == eventChannelId &&
-                    timeshiftAllowed &&
-                    timeshiftState.available &&
-                    event.stop.epochSeconds <= nowSec &&
-                    event.start.epochSeconds * 1_000L >=
-                    nowSec * 1_000L + timeshiftState.bufferStartMs
-            }
             ProgrammeDetailsPanel(
                 contentPadding = contentPadding,
                 event = event,
                 channel = channel,
                 recording = recording,
                 nowSecProvider = nowSecProvider,
-                serverTimeshiftCoversEvent = timeshiftCoversEvent,
-                timeshiftAllowed = timeshiftAllowed,
-                recordingsAllowed = recordingsAllowed,
                 canModifyRecordings = selectedCapability != null,
                 actionResult = actionResult,
                 onAction = actionHandler@{ action ->
@@ -1531,32 +1510,12 @@ fun EpgGridScreen(
                             }
                         }
                         ProgrammeAction.WATCH_FROM_START -> {
-                            val nowSec = nowSecProvider()
                             if (recording != null && selectedCapability != null) {
                                 onPlayRecording(
                                     RecordingPlaybackSelection(
                                         selectedCapability,
                                         recording.id,
                                     )
-                                )
-                            } else if (
-                                timeshiftCoversEvent(nowSec) &&
-                                channel != null &&
-                                selectedCapability != null
-                            ) {
-                                val targetPositionMs =
-                                    (event.start.epochSeconds - nowSec) * 1_000L
-                                coroutineScope.launch {
-                                    playerSession.seekTimeshift(
-                                        targetPositionMs - timeshiftState.positionMs
-                                    )
-                                }
-                                detailsEvent = null
-                                detailsObservation = null
-                                detailsFromSearch = false
-                                onPlay(
-                                    LivePlaybackSelection(selectedCapability, channel.id),
-                                    channel.name.orEmpty(),
                                 )
                             }
                         }
