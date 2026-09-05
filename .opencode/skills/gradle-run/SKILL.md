@@ -4,7 +4,7 @@ description: Use when planning to execute Gradle through `gradle`, `./gradlew`, 
 license: Apache-2.0
 metadata:
   source: "chrisbanes/skills@ded78abbe5a170c9ca0497b614f63c1a872d9f8e"
-  modifications: "TVHeadend Player live-test credential isolation"
+  modifications: "TVHeadend Player live-test credential isolation and primary-owned diagnosis"
 ---
 
 # Gradle run
@@ -13,7 +13,8 @@ metadata:
 
 This skill is based on `chrisbanes/skills` commit
 `ded78abbe5a170c9ca0497b614f63c1a872d9f8e`. TVHeadend Player locally added
-the live-test credential isolation described below and its focused tests;
+the live-test credential isolation described below and its focused tests,
+and made diagnostic delegation optional while retaining exclusive run ownership;
 those changes are not upstream. The bundled `LICENSE` contains the Apache
 License 2.0 terms for the upstream work and local derivative.
 
@@ -67,20 +68,17 @@ wrapper; never stream, `tee`, paste, or reopen a complete build log.
    requests that artifact. The summary and ledger redact common credential
    patterns; the retained full log is intentionally raw and can contain
    secrets, so never paste or reopen it as a substitute for the summary.
-5. For a Gradle-centered workflow, create one fresh portable Solver diagnostic
-   owner. Report its model and reasoning only if the runtime exposes them. Give
-   it read-only repository access and ownership of wrapper runs and diagnosis;
-   it must not edit source, tests, configuration, or generated project files,
-   and it must not delegate Gradle ownership. The parent owns every repository
-   edit. If a fresh persistent owner cannot be created, stop rather than make
-   the parent run the workflow loop.
-6. Have that owner reuse prior actionable summaries, group warnings and
+5. Keep ordinary Gradle diagnosis with the primary. A substantial independent
+   diagnostic question may justify one read-only adviser within project delegation
+   limits, but creating a child is not a prerequisite. Maintain one wrapper-run
+   owner; never run competing Gradle workflows. The primary owns repository edits.
+6. Reuse prior actionable summaries, group warnings and
    failures by fingerprint, and return exact file or line evidence plus the
    narrowest next command. Prefer source or compiler failure fingerprints over
    a following generic Gradle failure block. Run an initial broad command only
    when existing targeted evidence cannot answer the recorded question. The
-   owner stays available for the whole workflow and verifies each parent
-   change with the same wrapper and the narrowest applicable task.
+   current owner verifies relevant changes with the same wrapper and the narrowest
+   applicable task; reuse unchanged passing evidence.
 7. Record `broad` only for aggregate project checks. Give every broad run a
    distinct question that a narrower task cannot answer. The wrapper flags
    repeated commands and primary failure fingerprints; if the primary failure
@@ -108,7 +106,7 @@ wrapper; never stream, `tee`, paste, or reopen a complete build log.
 ## RED/GREEN agent scenarios
 
 1. Direct: “Run `check` and fix every warning.” RED runs repeated full
-   builds with their logs in context. GREEN creates one diagnostic owner,
+   builds with their logs in context. GREEN keeps one run owner,
    records the broad question, groups compact diagnostics, validates each fix
    narrowly, and runs the requested broad check only as final validation.
 2. Novel: a final broad check finds a downstream failure after targeted tasks
@@ -118,9 +116,10 @@ wrapper; never stream, `tee`, paste, or reopen a complete build log.
    stops rebuilding and asks for a revised diagnosis; it does not treat a new
    question string as permission for a blind repeat. A changed source failure
    remains primary even when the following generic Gradle block is unchanged.
-4. Fail closed: the wrapper, Python runtime, or persistent diagnostic owner is
+4. Fail closed: the wrapper or Python runtime is
    unavailable. GREEN runs no direct Gradle fallback and reports the missing
-   prerequisite. A valid-looking but unknown finish identifier also fails; it
+   prerequisite. An unavailable optional adviser does not block the primary.
+   A valid-looking but unknown finish identifier also fails; it
    is not treated as a previously completed workflow.
 5. Counterexample: “After changing this Kotlin helper, run
    `:module:test`.” GREEN uses the wrapper but keeps this incidental focused

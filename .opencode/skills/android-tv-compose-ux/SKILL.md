@@ -14,7 +14,8 @@ context; the durable caveats are stated below.
 
 ## Load focused implementation guidance
 
-Before editing, load every matching reviewed skill:
+Use the following router only for unresolved implementation questions. Read the
+smallest relevant skill, not every skill associated with a touched file:
 
 - Focus movement, requesters, restoration, or key handling:
   `compose-focus-navigation` and `compose-side-effects`; add
@@ -37,7 +38,9 @@ are audited limitations, not project conventions.
 
 ## Establish the interaction contract
 
-Before editing, write down the affected surface's:
+For changed interactions, establish the relevant parts of the surface's contract
+from the current specification; do not produce a separate exhaustive inventory
+for an unchanged interaction:
 
 1. First-entry focus target and re-entry restoration target.
 2. D-pad exits from every focusable region, including list and drawer edges.
@@ -73,9 +76,13 @@ focus to new UI.
 
 ## Verify without overstating evidence
 
-Write a failing policy or Compose UI test first for changed behavior. Cover
-initial focus, lateral entry, restoration, Back, same-event propagation, and
-long-content geometry where relevant. Run the focused test and `./tools/verify`.
+Use a focused policy or Compose UI regression for changed behavior; reproducing
+a reported bug before fixing it is useful evidence, not a requirement to invent
+a failing test for a text or token edit. Cover initial focus, lateral entry,
+restoration, Back, same-event propagation, and long-content geometry only where
+affected. Run relevant checks and the repository's required final gate once for
+the final code. Reuse unchanged passing evidence unless a failure or unresolved
+risk justifies another run. Existing admitted gates remain binding.
 
 Use the `android-tv-device-testing` skill for runtime work. A passing build or
 ADB screenshot does not prove SurfaceView visibility, focus feel, overscan,

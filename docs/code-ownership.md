@@ -28,11 +28,11 @@ entry points are exhausted; avoid asking them to rediscover this table.
   implementation of `tools/device` unless the package edits it or a reproduced
   failure has been attributed to that tool.
 - Every `./gradlew` entry is serialized by one repository-wide flock. This
-  includes `./tools/verify` and commands run through the externally exposed,
-  vendor-pinned `gradle-run` skill. A waiting command must wait rather than
+  includes `./tools/verify` and commands run through the repository-bundled
+  `gradle-run` skill. A waiting command must wait rather than
   bypass the lock or start another daemon.
 - Use the `gradle-run` skill for compact output and failure fingerprints. It is
-  exposed from the pinned coordination-workspace vendor checkout and is not
-  copied into this product repository.
+  bundled at `.opencode/skills/gradle-run`; no sibling checkout or diagnostic
+  child is required.
 - `./tools/verify` remains the final application gate. Device, credential,
   signing, and release authorization remain separate.

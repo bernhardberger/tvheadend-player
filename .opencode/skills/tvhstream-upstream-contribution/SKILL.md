@@ -45,8 +45,10 @@ exact commit graph and proposed range. Preserve published appliance history.
 2. Confirm it contains no TVHeadend Player application ID, local device/server address,
    credentials, signing assumptions, household copy, or appliance-only docs.
 3. Keep the patch narrow and match upstream naming/style.
-4. Add a regression test that proves the generic behavior.
-5. Run upstream-relevant tests and `./tools/verify`.
+4. Add a focused regression for changed generic behavior, not a test that merely
+   mirrors a docs-only or reversible low-impact edit.
+5. Run upstream-relevant checks and the applicable required repository gate.
+   Reuse unchanged passing evidence unless a concrete failure or risk remains.
 6. Exclude fork-only native binary manifests, release policy, device roles, and
    product identity unless the upstream change specifically requires them.
 7. Retain upstream copyright and GPLv3 licensing.

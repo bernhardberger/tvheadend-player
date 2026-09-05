@@ -13,7 +13,9 @@ dumps whenever it supports the required operation.
 1. Read `AGENTS.md` and `docs/device-targets.md`. Read runtime criteria from
    `docs/appliance-mode-spec.md` only for an appliance behavior check.
 2. Confirm the source tree is clean or identify the exact uncommitted slice.
-3. Run the relevant JVM test, then `./tools/verify` before installing.
+3. Confirm relevant checks and the required final gate passed for the artifact
+   being installed. Reuse unchanged verified-artifact evidence rather than
+   rerunning the build for every install. Existing admitted gates still apply.
 4. Configure the ADB serial through ignored `.tvhplayer-device.json`,
    `TVHPLAYER_ADB_SERIAL`, or `--serial`. Never commit a household device
    address as a required default.
@@ -145,5 +147,7 @@ acceptable motion quality.
 - Do not pass credential values with `--serial`, `--package`, shell arguments,
   environment variables, or raw ADB commands. Use only the ignored local secret
   file and the bounded provisioning command.
-- If a secret appears in output, stop, rotate it, verify the old value is
-  rejected, and remove the exposure path before continuing.
+- If a secret appears in output, stop the exposing operation, avoid copying it,
+  and report the affected credential and clients without its value. Contain the
+  exposure path within existing authority. Never rotate or replace a credential
+  without explicit approval; TVHeadend credentials must not be changed.

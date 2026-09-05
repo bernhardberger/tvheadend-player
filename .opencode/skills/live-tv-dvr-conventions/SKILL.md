@@ -39,23 +39,24 @@ explicit user approval.
 1. State the user-visible invariant and classify the change as generic,
    product-specific, appliance-specific, or mixed.
 2. Locate the existing pure policy and repository boundary before editing UI.
-3. Write the failing JVM policy/repository test first. Add Compose coverage only
+3. Use a focused JVM policy/repository regression for changed behavior; reproduce
+   a reported failure where practical. Do not add tests merely to mirror low-impact
+   prose/config edits. Add Compose coverage only
    for focus, semantics, geometry, or interaction that requires it.
 4. Make the minimum implementation change; avoid a new abstraction for a
    one-screen rule.
 5. If the change touches Media3, HTSP streaming, stream readers, or playback
    lifecycle, also apply `media3-htsp-playback-safety`.
-6. Run the focused tests and `./tools/verify`; list any remaining physical-TV or
-   live-server validation separately.
+6. Run relevant tests and the required final gate without repeating unchanged
+   passing checks. List remaining physical-TV or live-server validation separately;
+   preserve explicitly admitted gates and authorization boundaries.
 
 Use `android-tv-compose-ux` for the presentation and focus layer. Do not replace
 the project's details-first EPG/DVR interaction with a touch-first mobile pattern
 or make focus itself perform destructive or tuning actions.
 
 This domain skill does not replace Kotlin or Compose implementation guidance.
-Load `kotlin-flow-state-event-modeling` and
-`kotlin-coroutines-structured-concurrency` when changing repository streams or
-command lifecycles. Load `compose-state-holder-ui-split`,
-`compose-state-hoisting`, and `compose-side-effects` when changing screen state
-or event collection. Preserve explicit lifecycle owners, treat Channel delivery
+Consult the smallest relevant Kotlin/Compose skill for an unresolved stream,
+lifecycle, screen-state or event-collection question rather than loading a fixed
+bundle. Preserve explicit lifecycle owners, treat Channel delivery
 as non-durable, and avoid broad architecture churn.

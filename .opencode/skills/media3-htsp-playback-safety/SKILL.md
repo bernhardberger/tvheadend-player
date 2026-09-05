@@ -28,10 +28,10 @@ Keep a generic transport or lifecycle fix separate from product/appliance UI.
 Do not combine a dependency bump with speculative extractor, renderer, decoder,
 surface, or tuning changes.
 
-Load `kotlin-coroutines-structured-concurrency` and
-`kotlin-flow-state-event-modeling` before changing playback ownership, command
-ordering, or stream delivery. Media3 `DataSource` methods are synchronous
-framework boundaries, while app-scoped HTSP/player owners have explicit
+Consult `kotlin-coroutines-structured-concurrency` or
+`kotlin-flow-state-event-modeling` when an ownership, ordering, or delivery
+question needs that guidance; do not load both mechanically. Media3 `DataSource`
+methods are synchronous framework boundaries, while app-scoped HTSP/player owners have explicit
 close/restart lifecycles. Keep any blocking bridge narrow and review those owners
 against the audited exceptions rather than mechanically rewriting them.
 
@@ -63,11 +63,15 @@ unmatched or unexplained artifact.
 
 ## Verification gate
 
-Write a failing regression test first for transport, policy, command ordering, or
-parsing behavior. Then run the focused tests, `./tools/check-native-libs`, and
-`./tools/verify`.
+Use focused regressions for changed transport, policy, command ordering, or
+parsing behavior. Run affected tests and the repository's required final gate;
+run `./tools/check-native-libs` for dependency/native artifact changes or when
+required by that gate. Do not repeat unchanged checks or add tests mirroring
+prose/config edits. Existing admitted verification requirements remain binding.
 
-Any playback-path or Media3 change still requires the designated test TV matrix:
+Select device checks according to affected behavior. Broad Media3/decoder/native
+changes warrant the designated test TV matrix; a narrow internal change does not
+automatically require every unrelated physical check. Relevant cases include:
 progressive and interlaced live TV, representative audio/subtitle formats,
 channel changes, recording playback and seeks, timeshift where enabled,
 recovery, Back/warm return, Stop teardown, standby/wake, and repeated cold-start
