@@ -76,8 +76,14 @@ repository-configured step ceiling; deterministic wall-clock and stalled-session
 watchdogs bound orchestration. Child step limits are terminal evidence budgets,
 not a reason for generic continuation.
 
-Only the built-in writable primary writes repository files. Read-only review
-begins after its delta is stable. Writers, Gradle builds, device operations, Git
+The built-in writable primary and, inside one delegated slice, the
+`app-implementer` child write repository files. The implementer (Sonnet, high
+effort, 150 steps) receives a packet with exact paths, tests, and gate, may run
+Gradle with the repository rules, and returns changed files, test evidence, and
+open questions; it never touches Git, devices, signing, or publication, and
+never runs concurrently with the primary's own edits. The primary reviews the
+diff, runs the final gate, and commits. Read-only review begins after that
+delta is stable. Writers, Gradle builds, device operations, Git
 mutations, signing, publishing, and release operations may not overlap.
 
 ## Review lifecycle and autonomous continuation

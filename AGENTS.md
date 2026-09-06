@@ -138,7 +138,12 @@ it does not replace integrated or physical-TV gates.
 
 ## Delegation and evidence
 
-All children are read-only. The primary owns decomposition and delegation: use
+Review, analysis, and retrieval children are read-only. `app-implementer` is
+the one writable child: it may edit and run Gradle inside a single delegated
+slice with named paths, tests, and gate, but never mutates Git, devices,
+signing, or publication; the primary reviews its diff, runs the final gate, and
+owns commits. Never run it while the primary or another writer is editing the
+same worktree. The primary owns decomposition and delegation: use
 children whenever they are likely to materially improve correctness, evidence
 coverage, context isolation, turnaround time, or final quality. A roughly 20%
 resource overhead is an acceptable soft target for a meaningful quality gain,
@@ -153,9 +158,10 @@ sources are insufficient. Use `android-reviewer` for a risk-based frozen-packet
 review. Use `tv-evidence-curator` for mechanical screenshot-set validation,
 `tv-ux-brief` for pre-implementation product direction, and `tv-ux-reviewer` for
 final screenshot-first design review. Only `app-locator` children may be
-delegated by read-only children, and depth 2 is terminal. Children cannot edit,
-use shell, run builds or devices, mutate Git, or read project instructions,
-ledgers, handoffs, archives, or broad plans. Their configured model variants and
+delegated by read-only children, and depth 2 is terminal. Read-only children
+cannot edit, use shell, run builds or devices, or mutate Git. No child reads
+project instructions, ledgers, handoffs, archives, or broad plans; the packet
+carries what the child needs. Their configured model variants and
 step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
 `max` effort.
 

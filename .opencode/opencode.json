@@ -89,7 +89,8 @@
       "tv-ux-brief": "allow",
       "tv-ux-reviewer": "allow",
       "tv-ux-astra": "allow",
-      "claude-audit-lead": "allow"
+      "claude-audit-lead": "allow",
+      "app-implementer": "allow"
     }
   }
 }
