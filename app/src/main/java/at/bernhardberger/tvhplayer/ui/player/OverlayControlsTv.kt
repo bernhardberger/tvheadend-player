@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
@@ -68,12 +69,15 @@ fun OverlayControlsTv(
     nextScheduled: Boolean = false,
     paused: Boolean = false,
 ) {
+    val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val recordFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val seekable = timeshiftState.available && timeshiftState.timingKnown
-    val programmeTimeKnown = !timeshiftState.available
+    val pausable = timeshiftState.available
+    val initialFocus = if (pausable) pauseFocus else infoFocus
+    val programmeTimeKnown = programmeTimingDescribesPlayback(timeshiftState)
     var focusInitialized by remember { mutableStateOf(false) }
     var previousSeekable by remember { mutableStateOf(seekable) }
     var lastFocusWasTimeline by remember { mutableStateOf(false) }
@@ -84,8 +88,10 @@ fun OverlayControlsTv(
                 restoreInfoFocus -> infoFocus
                 restoreRecordActionFocus -> recordFocus
                 restoreOptionsFocus -> settingsFocus
-                !focusInitialized -> if (seekable) timelineFocus else infoFocus
-                previousSeekable && !seekable && lastFocusWasTimeline -> infoFocus
+                // Revealing chrome lands on the action strip; the timeline is one Down away and
+                // pausing there by accident on a fresh reveal was a recurring complaint.
+                !focusInitialized -> initialFocus
+                previousSeekable && !seekable && lastFocusWasTimeline -> initialFocus
                 else -> null
             }
             previousSeekable = seekable
@@ -119,7 +125,7 @@ fun OverlayControlsTv(
             clock = formatClock(nowSec), clockSupport = null,
             programmeStart = nowEvent?.takeIf { programmeTimeKnown }?.let { formatClock(it.start.epochSeconds) },
             programmeEnd = nowEvent?.takeIf { programmeTimeKnown }?.let { formatClock(it.stop.epochSeconds) },
-            programmeProgress = nowEvent?.takeUnless { timeshiftState.available }?.progress(nowSec),
+            programmeProgress = nowEvent?.takeIf { programmeTimeKnown }?.progress(nowSec),
             tags = PlayerHeaderTags(picon = "player-picon", eyebrow = "player-channel-identity",
                 title = "player-programme-title", support = "player-next-programme", clock = "player-clock"),
             modifier = modifier,
@@ -137,6 +143,9 @@ fun OverlayControlsTv(
                 else -> null
             },
             onGoLive = onGoLive,
+            onTogglePause = { onToggleTimeshiftPause() }.takeIf { pausable },
+            paused = paused,
+            pauseFocus = pauseFocus,
             modifier = Modifier.testTag("player-actions").focusProperties {
                 if (seekable) down = timelineFocus
             }.onPreviewKeyEvent { event ->
@@ -149,18 +158,16 @@ fun OverlayControlsTv(
                 } else false
             },
         )
-        Spacer(Modifier.height(12.dp))
-        androidx.compose.foundation.layout.Column(
-            Modifier.height(100.dp),
-        ) {
         if (timeshiftState.available) {
+            Spacer(Modifier.height(12.dp))
             PlaybackSeekbar(
                 range = timeshiftSeekbarRange(timeshiftState),
+                timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
                 paused = paused,
                 onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
                 modifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
                     .onFocusChanged { if (it.isFocused) lastFocusWasTimeline = true }
-                    .focusProperties { up = infoFocus }
+                    .focusProperties { up = initialFocus }
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
                             Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
@@ -179,7 +186,7 @@ fun OverlayControlsTv(
                                 if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                     onCommitSeek()
                                     relocatingKey = event.key
-                                    infoFocus.requestFocus()
+                                    initialFocus.requestFocus()
                                 }
                                 true
                             }
@@ -189,6 +196,5 @@ fun OverlayControlsTv(
             )
         }
         timeshiftFeedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface) }
-        }
     }
 }

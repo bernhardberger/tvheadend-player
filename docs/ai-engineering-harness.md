@@ -261,5 +261,26 @@ maintenance gate remains:
 ./tools/verify
 ```
 
+### Testing an unpublished SDK fix
+
+The app consumes the SDK only as a published Maven Central release, so a fix
+that spans both repositories cannot normally be tested before publication. To
+close that loop, stage the SDK checkout and opt in explicitly:
+
+```bash
+(cd ../tvheadend-sdk && ./gradlew --no-daemon stageLocalPublication)
+# set the staged version in gradle/libs.versions.toml, then
+./tools/verify --staged-sdk
+```
+
+The flag adds `../tvheadend-sdk/build/local-maven` as a repository restricted to
+the `at.bernhardberger.tvheadend` group, warns on every configuration, and drops
+`:app:verifyExternalSdkConsumption`, which fails by design while the
+substitution is active. Such a run reports "NOT release-verified" and proves
+nothing about provenance. It must not be signed, published, or installed on a
+production device, and the flag must never be enabled by default or committed as
+a Gradle property. Publish the SDK and re-run plain `./tools/verify` before
+treating the change as complete.
+
 OpenCode loads config-time files only at startup. After changing config, an
 agent, skill, command, or plugin, quit and restart before evaluating the result.

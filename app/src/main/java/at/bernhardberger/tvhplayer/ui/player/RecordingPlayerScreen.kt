@@ -367,6 +367,15 @@ fun RecordingPlayerScreen(
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
+                    // See VideoPlayerScreen: a focused Compose target swallows the Back cycle on
+                    // the TV before the BackHandler can fire, so Back is decided here.
+                    if (event.nativeKeyEvent.repeatCount == 0) {
+                        revealingKeyCode = keyCode
+                        handlePlaybackBack()
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 if (
                     foregroundLayer == PlayerForegroundLayer.RECOVERY ||
                     foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR

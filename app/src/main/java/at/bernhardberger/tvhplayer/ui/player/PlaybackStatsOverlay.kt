@@ -85,10 +85,14 @@ internal fun PlaybackStatsOverlay(
                                 R.string.stats_state_paused
                             },
                         )
+                        AppPlaybackState.Buffering -> stringResource(R.string.stats_state_buffering)
                         AppPlaybackState.Finished -> stringResource(R.string.stats_state_finished)
                         is AppPlaybackState.Recovering ->
                             stringResource(R.string.stats_state_recovering)
-                        is AppPlaybackState.Failed -> stringResource(R.string.stats_state_failed)
+                        is AppPlaybackState.Failed -> listOfNotNull(
+                            stringResource(R.string.stats_state_failed),
+                            diagnostics.state.playerErrorCode ?: diagnostics.state.targetResult?.toString(),
+                        ).joinToString(" · ")
                     },
                 )
                 StatLine(
@@ -239,6 +243,12 @@ internal fun PlaybackStatsOverlay(
                             formatCount(queue.droppedPFrameCount, locale),
                             formatCount(queue.droppedBFrameCount, locale),
                         ),
+                    )
+                }
+                live?.clientDroppedPacketCount?.takeIf { it > 0L }?.let { dropped ->
+                    StatLine(
+                        stringResource(R.string.stats_client_drops),
+                        stringResource(R.string.stats_packet_count, formatCount(dropped, locale)),
                     )
                 }
             }

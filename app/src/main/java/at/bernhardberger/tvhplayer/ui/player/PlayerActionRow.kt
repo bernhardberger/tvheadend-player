@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -38,6 +41,14 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 
+private data class PlayerAction(
+    val tag: String,
+    val label: String,
+    val icon: ImageVector,
+    val onClick: (() -> Unit)?,
+    val focus: FocusRequester?,
+)
+
 @Composable
 internal fun PlayerActionRow(
     infoFocus: FocusRequester,
@@ -51,8 +62,13 @@ internal fun PlayerActionRow(
     recordFocus: FocusRequester? = null,
     atLive: Boolean? = null,
     onGoLive: () -> Unit = {},
+    /** Toggles playback; null leaves the slot empty when pausing is not possible. */
+    onTogglePause: (() -> Unit)? = null,
+    paused: Boolean = false,
+    pauseFocus: FocusRequester? = null,
 ) {
     var focusedLabel by remember { mutableStateOf<String?>(null) }
+    val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val info = stringResource(R.string.player_info)
     val settings = stringResource(R.string.nav_settings)
     val record = stringResource(R.string.record)
@@ -72,25 +88,22 @@ internal fun PlayerActionRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val actions = listOf(
-                Triple(info, Icons.Filled.Info, onInfo),
-                Triple(settings, Icons.Filled.Settings, onSettings),
-                Triple(record, Icons.Filled.FiberManualRecord, onRecord),
-                Triple(stop, Icons.Filled.Stop, onStop),
+                PlayerAction("player-pause", playPause,
+                    if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, onTogglePause, pauseFocus),
+                PlayerAction("player-info", info, Icons.Filled.Info, onInfo, infoFocus),
+                PlayerAction("player-settings", settings, Icons.Filled.Settings, onSettings, settingsFocus),
+                PlayerAction("player-record", record, Icons.Filled.FiberManualRecord, onRecord, recordFocus),
+                PlayerAction("player-stop", stop, Icons.Filled.Stop, onStop, null),
             )
-            actions.forEachIndexed { index, (label, icon, action) ->
+            actions.forEach { (tag, label, icon, action, focus) ->
                 if (action == null) {
                     Spacer(Modifier.size(TvOverlayActionButtonSize))
                 } else {
                     IconButton(
                         onClick = { onInteraction(); action() },
                         modifier = Modifier.size(TvOverlayActionButtonSize)
-                            .testTag(listOf("player-info", "player-settings", "player-record", "player-stop")[index])
-                            .then(when (index) {
-                                0 -> Modifier.focusRequester(infoFocus)
-                                1 -> Modifier.focusRequester(settingsFocus)
-                                2 -> recordFocus?.let { Modifier.focusRequester(it) } ?: Modifier
-                                else -> Modifier
-                            })
+                            .testTag(tag)
+                            .then(focus?.let { Modifier.focusRequester(it) } ?: Modifier)
                             .onFocusChanged {
                                 if (it.isFocused) { focusedLabel = label; onInteraction() }
                                 else if (focusedLabel == label) focusedLabel = null

@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
 import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.createPlaybackLoadControl
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
@@ -54,6 +55,7 @@ val appModule = module {
         )
         val player = ExoPlayer.Builder(androidContext())
             .setRenderersFactory(createTvheadendRenderersFactory(androidContext()))
+            .setLoadControl(createPlaybackLoadControl())
             .build()
         lateinit var playbackRuntime: AppPlaybackRuntime
         val coordinator = createTvheadendPlaybackCoordinator(

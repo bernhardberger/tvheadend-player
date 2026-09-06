@@ -326,14 +326,20 @@ subscription-scoped selection targets. Player retains the selected target throug
 the input debounce rather than rebuilding a relative seek at dispatch. Expired,
 replaced and unavailable targets produce explicit feedback, never a clamped seek
 on a successor subscription. Playback position comes from the SDK's sampled
-Media3 mapping and is labelled as estimated; server-reader shift is not displayed
-playback position. A sampled position that outlives seekable history does not
+Media3 mapping and its accessible description says so; the visible timeline
+label shows only the distance behind live, and nothing at all at the live edge
+because the action strip already says Live. The history label states how much
+history is available, not the display span. Server-reader shift decides whether
+playback counts as live and is not displayed as playback position. A sampled position that outlives seekable history does not
 extend seek permission. Its display span may expand to retain the position while
 that expired history remains subdued.
 
-SDK 0.6.0 provides no programme wall-clock mapping. During timeshift, the header
-therefore states that programme timing is unavailable instead of claiming that
-wall-clock Now/Next describes the watched content. Live Info explicitly labels
+SDK 0.6.0 provides no programme wall-clock mapping. While playback is behind the
+live edge, or its position is unknown, the header therefore states that
+programme timing is unavailable instead of claiming that wall-clock Now/Next
+describes the watched content. A merely available timeshift buffer is not
+timeshifted playback: at the live edge the current broadcast is the watched
+content and the header shows it. Live Info explicitly labels
 its EPG and existing recording entry as **Current broadcast**, not historical
 playback metadata. Current wall time remains
 independent. Programme-time seeks from Guide are unavailable on this contract;
@@ -352,8 +358,9 @@ timing; relative durations alone do not establish a wall-clock timestamp.
 
 Live TV and recordings share one composition: artwork and identity at top left,
 current wall time at top right, and a compact action strip above the bottom
-timeline. Info, Settings, neutral Record and immediate Stop retain fixed slots;
-recordings leave Record empty. Live/Go live owns a separate reserved footprint.
+timeline. Play/Pause, Info, Settings, neutral Record and immediate Stop retain
+fixed slots; recordings leave Record empty and live without a timeshift buffer
+leaves Play/Pause empty. Live/Go live owns a separate reserved footprint.
 Only the focused icon gets a short visible label; every icon has an accessible
 name. There is no separate transport row or Actions-up hint.
 
@@ -369,8 +376,12 @@ coalesces dispatch after 400ms of idle input. Up/Down commits pending preview
 before navigation; Back cancels only undispatched preview. A neutral Up/Down
 first reveals chrome, and a separate press enters actions or the channel shelf.
 Consume the entire key cycle that reveals or relocates focus. Initial focus is
-the usable timeline, otherwise Info. Restoration uses semantic actions and never
-automatically chooses Stop or steals focus on routine timing/metadata updates.
+Play/Pause, otherwise Info; the timeline is one Down away and is never the
+landing target of a reveal, so a reflexive Center after revealing chrome acts on
+a visibly focused button rather than an unnoticed timeline. Restoration uses
+semantic actions and never automatically chooses Stop or steals focus on routine
+timing/metadata updates. Without a timeshift buffer the live composition has no
+timeline block at all; it does not reserve empty height for one.
 
 Settings and Programme/Recording Info use one full-height, edge-attached right
 panel with a deliberate video scrim and no competing chrome/focus. Settings has

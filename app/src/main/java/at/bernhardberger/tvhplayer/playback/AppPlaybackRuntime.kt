@@ -24,6 +24,7 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -34,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -47,7 +49,17 @@ sealed interface AppPlaybackState {
     data object Idle : AppPlaybackState
     data object Starting : AppPlaybackState
     data object Playing : AppPlaybackState
+
+    /**
+     * A target that has already presented is waiting for more media. This is a stall of the
+     * watched content, not a new tune, so surfaces keep the playing presentation.
+     */
+    data object Buffering : AppPlaybackState
     data object Finished : AppPlaybackState
+
+    /** The target has been presented and any Media3 buffering is a stall rather than a tune. */
+    val presented: Boolean
+        get() = this is Playing || this is Buffering
     data class Recovering(
         val reason: PlaybackRecoveryReason,
         val retryDelayMillis: Long,
@@ -55,6 +67,12 @@ sealed interface AppPlaybackState {
     data class Failed(
         val reason: AppPlaybackFailureReason,
         val targetResult: PlaybackTargetResult? = null,
+        /** Media3 error code name for a player-reported failure; diagnostics only, never a message. */
+        val playerErrorCode: String? = null,
+        /** Last TVHeadend subscription issue seen before the target was retired, so the user sees why. */
+        val subscriptionIssue: SubscriptionIssue? = null,
+        /** Last SDK recovery reason that led to retiring the target. */
+        val recoveryReason: PlaybackRecoveryReason? = null,
     ) : AppPlaybackState
 }
 
@@ -119,6 +137,12 @@ data class AppTimeshiftState(
     val bufferStartMs: Long = 0L,
     val positionMs: Long = 0L,
     val liveEdgeMs: Long = 0L,
+    /**
+     * Server reader shift behind the live edge, when reported. This is the timeshift
+     * position TVHeadend serves; [positionMs] against [liveEdgeMs] additionally contains
+     * the client's delivery and decode latency, which is not timeshift.
+     */
+    val serverBehindLiveMs: Long? = null,
     val capacityMs: Long? = null,
     val timingKnown: Boolean = available,
     val timeline: at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline? = null,
@@ -280,6 +304,8 @@ internal fun playerReportedPlaybackState(
     playbackState == Player.STATE_ENDED -> AppPlaybackState.Finished
     // Playing describes a ready target; Media3's play intent owns pause/progression.
     isPlaying || playbackState == Player.STATE_READY -> AppPlaybackState.Playing
+    // A stall after presentation keeps the watched channel; only a first start is a tune.
+    playbackState == Player.STATE_BUFFERING && currentState.presented -> AppPlaybackState.Buffering
     playbackState == Player.STATE_BUFFERING -> AppPlaybackState.Starting
     playbackState == Player.STATE_IDLE -> AppPlaybackState.Idle
     else -> currentState
@@ -377,8 +403,19 @@ internal class LiveRecoveryAttemptRunner(
 ) {
     private var current: LiveRecoveryFence? = null
 
-    val inProgress: Boolean
-        get() = current != null
+    /**
+     * True while an attempt owns exactly the target described by the arguments.
+     *
+     * Recovery holds back player state so a retune does not flicker through the states of the
+     * target it is replacing. That must stay scoped to the owned target: an attempt waiting out
+     * its backoff would otherwise suppress the state of a different target the user has since
+     * selected, leaving a playing channel presented as still starting.
+     */
+    fun ownsPlayerState(
+        activeTarget: AppPlaybackTarget?,
+        activeTargetEpoch: Long?,
+        observation: SessionObservation,
+    ): Boolean = current?.matches(activeTarget, activeTargetEpoch, observation) == true
 
     suspend fun run(
         fence: LiveRecoveryFence,
@@ -507,6 +544,7 @@ class AppPlaybackRuntime(
     private var lastLiveChannelId: ChannelId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
     private var recoveryJob: Job? = null
+    private val recoveryBackoff = LiveRecoveryBackoff()
     private val recoveryAttempts = LiveRecoveryAttemptRunner(::publishResolvedRecoveryPlayerState)
     private var targetFrameListener: Player.Listener? = null
     val state = _state.asStateFlow()
@@ -558,6 +596,7 @@ class AppPlaybackRuntime(
     suspend fun playLive(selection: LivePlaybackSelection): PlaybackTargetResult? =
         targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
             lastLiveChannelId = selection.channelId
+            recoveryBackoff.reset()
             val result = playLive(
                 channelId = selection.channelId,
                 recovering = false,
@@ -791,6 +830,7 @@ class AppPlaybackRuntime(
         onClosed = { PlaybackStopResult.SHUT_DOWN },
     ) {
         foregroundPlaybackLifecycle.onExplicitStop()
+        recoveryBackoff.reset()
         stopPlayback()
     }
 
@@ -846,6 +886,8 @@ class AppPlaybackRuntime(
     suspend fun retryLive(): PlaybackTargetResult? = targetCommands.serialize(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
     ) {
+        // An explicit retry is a user decision, so it refills the budget an exhausted target used.
+        recoveryBackoff.reset()
         lastLiveChannelId?.let { channelId ->
             playLive(
                 channelId = channelId,
@@ -885,12 +927,18 @@ class AppPlaybackRuntime(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
         ) { coordinator.seekTimeshift(target) }
 
+    /**
+     * Samples the presented timeshift position.
+     *
+     * Only subscription replacement invalidates a sample, and [toAppPresentation] detects that
+     * from the history the sample carries. Rejecting every observation that changed during the
+     * round trip also rejected ordinary subscription diagnostics, which arrive several times a
+     * second and blanked the timeline that often.
+     */
     suspend fun sampleTimeshiftPresentation(): AppTimeshiftState {
-        val before = livePlaybackObservation.value
         val sample = coordinator.timeshiftPlaybackPosition()
-        if (before !== livePlaybackObservation.value) return AppTimeshiftState()
-        return (before as? LivePlaybackObservation.Active)?.timeshiftState
-            ?.toAppPresentation(sample) ?: AppTimeshiftState()
+        return (livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState?.toAppPresentation(sample) ?: AppTimeshiftState()
     }
     fun pause() { targetCommands.runIfOpen(player::pause) }
     fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
@@ -913,35 +961,57 @@ class AppPlaybackRuntime(
             recoveryJob?.takeUnless { it === currentJob }?.cancel()
             recoveryJob = currentJob
             try {
-                targetCommands.serialize(onClosed = {}) {
+                // Admit the attempt under the command lock, then wait for the backoff delay
+                // without holding it so a channel change or Stop stays responsive meanwhile.
+                val admitted = targetCommands.serialize(onClosed = { null }) {
                     val fence = currentLiveRecoveryFence(
                         reason = dispatchedReason,
                         observation = session.observation.value,
                         activeTarget = _activeTarget.value,
                         activeTargetEpoch = activeTargetEpoch,
-                    ) ?: return@serialize
+                    ) ?: return@serialize null
                     if (!fence.matches(
                             activeTarget = _activeTarget.value,
                             activeTargetEpoch = activeTargetEpoch,
                             observation = session.observation.value,
                         )
                     ) {
-                        return@serialize
+                        return@serialize null
                     }
-                    recoveryAttempts.run(fence) {
-                        presentationEpoch.publishIfCurrent(fence.targetEpoch) {
-                            _state.value = AppPlaybackState.Recovering(
-                                reason = fence.reason,
-                                retryDelayMillis = 0L,
-                            )
-                            publishDiagnostics()
-                        }
-                        playLive(
-                            channelId = fence.selection.channelId,
-                            recovering = true,
-                            expectedPresentationEpoch = fence.targetEpoch,
-                            recoverySelection = fence.selection,
+                    val attempt = recoveryBackoff.nextAttempt()
+                    if (attempt == null) {
+                        publishRecoveryExhausted(fence.reason)
+                        return@serialize null
+                    }
+                    presentationEpoch.publishIfCurrent(fence.targetEpoch) {
+                        _state.value = AppPlaybackState.Recovering(
+                            reason = fence.reason,
+                            retryDelayMillis = attempt.delayMillis,
                         )
+                        publishDiagnostics()
+                    }
+                    fence to attempt
+                }
+                if (admitted != null) {
+                    val (fence, attempt) = admitted
+                    recoveryAttempts.run(fence) {
+                        if (attempt.delayMillis > 0L) delay(attempt.delayMillis)
+                        targetCommands.serialize(onClosed = { null }) {
+                            if (!fence.matches(
+                                    activeTarget = _activeTarget.value,
+                                    activeTargetEpoch = activeTargetEpoch,
+                                    observation = session.observation.value,
+                                )
+                            ) {
+                                return@serialize null
+                            }
+                            playLive(
+                                channelId = fence.selection.channelId,
+                                recovering = true,
+                                expectedPresentationEpoch = fence.targetEpoch,
+                                recoverySelection = fence.selection,
+                            )
+                        }
                     }
                 }
             } finally {
@@ -949,6 +1019,28 @@ class AppPlaybackRuntime(
             }
         }
     }
+
+    /**
+     * Retires a target the SDK keeps reporting as stuck.
+     *
+     * Recovery cannot succeed indefinitely, and a still-running subscription keeps consuming a
+     * tuner. Surfacing a failure lets the user choose, instead of retuning forever.
+     */
+    private suspend fun publishRecoveryExhausted(recoveryReason: PlaybackRecoveryReason) {
+        // Read the issue before stopping: the observation leaves Active with the subscription.
+        val issue = lastSubscriptionIssue()
+        stopPlayback()
+        if (!targetCommands.isOpen()) return
+        _state.value = AppPlaybackState.Failed(
+            reason = AppPlaybackFailureReason.OTHER,
+            subscriptionIssue = issue,
+            recoveryReason = recoveryReason,
+        )
+        publishDiagnostics()
+    }
+
+    private fun lastSubscriptionIssue(): SubscriptionIssue? =
+        (livePlaybackObservation.value as? LivePlaybackObservation.Active)?.subscriptionIssue
 
     suspend fun detach() {
         if (!targetCommands.close()) return
@@ -1157,7 +1249,11 @@ class AppPlaybackRuntime(
                 } else {
                     playerReportedPlaybackState(
                         currentState = _state.value,
-                        recoveryAttemptInProgress = recoveryAttempts.inProgress,
+                        recoveryAttemptInProgress = recoveryAttempts.ownsPlayerState(
+                            activeTarget = _activeTarget.value,
+                            activeTargetEpoch = activeTargetEpoch,
+                            observation = session.observation.value,
+                        ),
                         playbackState = player.playbackState,
                         isPlaying = player.isPlaying,
                     )
@@ -1206,11 +1302,13 @@ class AppPlaybackRuntime(
 
     private fun publishPlayerErrorFromPlayer() {
         _state.value = AppPlaybackState.Failed(
-            if (_activeTarget.value is AppPlaybackTarget.Recording) {
+            reason = if (_activeTarget.value is AppPlaybackTarget.Recording) {
                 AppPlaybackFailureReason.RECORDING_READ_FAILED
             } else {
                 AppPlaybackFailureReason.OTHER
             },
+            playerErrorCode = player.playerError?.errorCodeName,
+            subscriptionIssue = lastSubscriptionIssue(),
         )
         publishDiagnosticsFromPlayer()
     }
@@ -1299,13 +1397,23 @@ fun LiveTimeshiftState.toAppPresentation(
 ): AppTimeshiftState = when (this) {
     LiveTimeshiftState.Unavailable -> AppTimeshiftState()
     is LiveTimeshiftState.Available -> {
-        val position = (sample as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftPlaybackPosition.Estimate)?.target
+        val estimate =
+            sample as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftPlaybackPosition.Estimate
+        // A sample taken from a subscription that has since been replaced describes unrelated
+        // content. Presenting it against this history would report a false distance behind live
+        // and could authorise a seek on the successor derived from the predecessor's coordinate.
+        val position = estimate
+            ?.takeIf { it.timeline?.describesSameSubscription(timeline) == true }
+            ?.target
         AppTimeshiftState(
             available = true,
             paused = serverPaused == true,
             bufferStartMs = timeline?.start?.inWholeMilliseconds ?: 0L,
             liveEdgeMs = timeline?.end?.inWholeMilliseconds ?: 0L,
             positionMs = position?.position?.inWholeMilliseconds ?: 0L,
+            serverBehindLiveMs = positionBehindLive
+                ?.takeIf { it.isFinite() && it >= Duration.ZERO }
+                ?.inWholeMilliseconds,
             capacityMs = grantedPeriod.takeIf { it.isFinite() && it > Duration.ZERO }?.inWholeMilliseconds,
             timingKnown = timeline != null && position != null && position.position <= timeline!!.end,
             timeline = timeline,
@@ -1329,6 +1437,7 @@ internal fun measuredTimeshiftPresentation(
         paused = serverPaused == true,
         bufferStartMs = -(buffered ?: 0L),
         positionMs = -(behind ?: 0L),
+        serverBehindLiveMs = behind,
         capacityMs = grantedPeriod?.takeIf { it.isFinite() && it > Duration.ZERO }
             ?.inWholeMilliseconds,
         timingKnown = buffered != null && behind != null && behind <= buffered,

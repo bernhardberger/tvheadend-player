@@ -326,7 +326,7 @@
     <string name="timeshift_target_replaced">Wiedergabe geändert. Neue Position wählen.</string>
     <string name="player_timing_estimated">Geschätzte Wiedergabeposition</string>
     <string name="player_paused">Pausiert</string>
-    <string name="player_buffer_summary">%1$s verfügbar / %2$s Zeitspanne</string>
+    <string name="player_buffer_summary">%1$s verfügbar</string>
     <string name="player_current_broadcast">Aktuelle Sendung</string>
     <string name="player_programme_timing_unavailable">Sendungszeit nicht verfügbar</string>
     <string name="timeshift_setting">Timeshift</string>

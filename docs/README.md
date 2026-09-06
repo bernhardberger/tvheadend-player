@@ -35,6 +35,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 
 | Document | Scope and lifecycle |
 |---|---|
+| `defect-ledger.md` | Open and closed defects from the post-SDK-refactor player stabilisation. Read when working on live-player performance or interaction defects; close rows only with the named evidence. |
 | `appliance-mode-plan.md` | Appliance architecture and task history. Read only the sections relevant to an appliance, channel/EPG/DVR, or playback decision. Split completed history from current work in a dedicated later cleanup. |
 | `player-ui-ux-overhaul-plan.md` | Completed implementation record for fullscreen Live TV, timeshift, and recording playback through Slice 8. Slice 9 remains optional and unstarted. |
 | `product-architecture-remediation-plan.md` | Active sequence for profile isolation, dead-path removal, orchestration decomposition, and shared product flows. Read only the current package and its invariants. |

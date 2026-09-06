@@ -76,6 +76,7 @@ internal fun RecordingOverlayControls(
     onCommitSeek: () -> Unit = {},
     paused: Boolean = false,
 ) {
+    val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
@@ -90,8 +91,8 @@ internal fun RecordingOverlayControls(
             val target = when {
                 restoreInfoFocus -> infoFocus
                 restoreOptionsFocus -> settingsFocus
-                !focusInitialized -> if (seekable) timelineFocus else infoFocus
-                previousSeekable && !seekable && lastFocusWasTimeline -> infoFocus
+                !focusInitialized -> pauseFocus
+                previousSeekable && !seekable && lastFocusWasTimeline -> pauseFocus
                 else -> null
             }
             previousSeekable = seekable
@@ -123,6 +124,7 @@ internal fun RecordingOverlayControls(
             infoFocus = infoFocus, settingsFocus = settingsFocus,
             onInfo = onOpenInfo, onSettings = onOpenOptions, onStop = onStopPlayback,
             onInteraction = { lastFocusWasTimeline = false; onUserInteraction() },
+            onTogglePause = onTogglePlayPause, paused = paused, pauseFocus = pauseFocus,
             modifier = Modifier.testTag("recording-actions").focusProperties {
                 if (seekable) down = timelineFocus
             }.onPreviewKeyEvent { event ->
@@ -144,7 +146,7 @@ internal fun RecordingOverlayControls(
                 onSeekTo = { onUserInteraction(); onSeek(it - positionMs) },
                 modifier = Modifier.testTag("recording-seekbar").focusRequester(timelineFocus)
                     .onFocusChanged { if (it.isFocused) lastFocusWasTimeline = true }
-                    .focusProperties { up = infoFocus }
+                    .focusProperties { up = pauseFocus }
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
                             Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
@@ -157,7 +159,7 @@ internal fun RecordingOverlayControls(
                                 if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                     onCommitSeek()
                                     relocatingKey = event.key
-                                    if (event.key == Key.DirectionUp) infoFocus.requestFocus()
+                                    if (event.key == Key.DirectionUp) pauseFocus.requestFocus()
                                 }
                                 true
                             }

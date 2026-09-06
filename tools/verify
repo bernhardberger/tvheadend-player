@@ -4,6 +4,33 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# --staged-sdk builds against the SDK checkout staged in ../tvheadend-sdk/build/local-maven so an
+# SDK fix can be tested before it is published. Such a run cannot prove public SDK consumption, so
+# it drops the provenance gate and reports a weaker conclusion. It never gates a release.
+staged_sdk=false
+for argument in "$@"; do
+    case "$argument" in
+        --staged-sdk) staged_sdk=true ;;
+        *)
+            printf 'error: unknown option: %s\n' "$argument" >&2
+            printf 'usage: tools/verify [--staged-sdk]\n' >&2
+            exit 1
+            ;;
+    esac
+done
+
+gradle_arguments=()
+provenance_tasks=(:app:verifyExternalSdkConsumption)
+if [[ "$staged_sdk" == true ]]; then
+    gradle_arguments+=(-Ptvheadend.sdk.local=true)
+    provenance_tasks=()
+    printf '==> WARNING: building against the staged SDK\n'
+    printf '    This is a development build. It is not release-verified, must not be signed or\n'
+    printf '    published, and must not be installed on a production device.\n'
+    printf '    SDK provenance and native decoder corresponding-source gates are skipped: both\n'
+    printf '    pin the digests of a published release, which a staged build does not have.\n'
+fi
+
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
 
@@ -39,11 +66,16 @@ printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
     lintDebug \
     compileDebugAndroidTestKotlin \
     assembleDebug \
-    :app:verifyExternalSdkConsumption \
+    "${provenance_tasks[@]}" \
+    "${gradle_arguments[@]}" \
     --no-daemon --console=plain --no-scan
 
 printf '==> External native dependency and packaged APK integrity\n'
-./tools/check-native-libs
+if [[ "$staged_sdk" == true ]]; then
+    printf 'skipped: the native gate pins released artifact digests\n'
+else
+    ./tools/check-native-libs
+fi
 
 apk="app/build/outputs/apk/debug/app-debug.apk"
 if [[ ! -f "$apk" ]]; then
@@ -143,4 +175,8 @@ printf '%s\n' "$badging" | while IFS= read -r line; do
 done
 sha256sum "$apk"
 
-printf '==> Verification passed\n'
+if [[ "$staged_sdk" == true ]]; then
+    printf '==> Development checks passed against the staged SDK (NOT release-verified)\n'
+else
+    printf '==> Verification passed\n'
+fi

@@ -149,6 +149,9 @@ tasks.register("verifyExternalSdkConsumption") {
 
     val sdkGroup = "at.bernhardberger.tvheadend"
     val sdkVersion = libs.versions.tvheadend.sdk.get()
+    val stagedSdkSubstitution = providers.gradleProperty("tvheadend.sdk.local")
+        .map(String::toBooleanStrict)
+        .getOrElse(false)
     val productionClasspaths = listOf(
         "debugCompileClasspath",
         "debugRuntimeClasspath",
@@ -240,7 +243,11 @@ tasks.register("verifyExternalSdkConsumption") {
     }
 
     doLast {
-        check(sdkVersion == "0.6.1") { "Expected public SDK 0.6.1 but found $sdkVersion" }
+        check(!stagedSdkSubstitution) {
+            "Staged SDK substitution is active (-Ptvheadend.sdk.local=true), so this build cannot " +
+                "prove public SDK consumption. Publish the SDK release and re-run without the flag."
+        }
+        check(sdkVersion == "0.7.0") { "Expected public SDK 0.7.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             "implementation:sdk-android:$sdkVersion",
             "implementation:sdk-media3:$sdkVersion",

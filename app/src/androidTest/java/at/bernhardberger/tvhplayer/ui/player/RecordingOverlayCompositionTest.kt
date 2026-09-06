@@ -126,6 +126,8 @@ class RecordingOverlayCompositionTest {
         setRecordingOverlay("Recording title")
 
         val actionsBefore = bounds("recording-actions")
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
@@ -181,7 +183,8 @@ class RecordingOverlayCompositionTest {
             restoreInfoFocus = { restoreInfo },
             onInfoFocusRestored = { restoreInfo = false },
         )
-        composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.onNodeWithTag("recording-seekbar").requestFocus()
         composeRule.runOnIdle { restoreInfo = true }
         composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.waitForIdle()
@@ -189,11 +192,11 @@ class RecordingOverlayCompositionTest {
     }
 
     @Test
-    fun knownDurationWithoutSeekCapabilityIsPassiveAndStartsOnInfo() {
+    fun knownDurationWithoutSeekCapabilityIsPassiveAndStartsOnPause() {
         setRecordingOverlay(title = "Recording", durationMs = 600_000L, canSeek = false)
         composeRule.onNodeWithTag("recording-seekbar").assertDoesNotExist()
         composeRule.onNodeWithTag("recording-duration-status").assertIsDisplayed()
-        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
     }
 
     private fun setRecordingOverlay(

@@ -98,6 +98,41 @@ to inspect the printed result path. Screenshots can validate static layout,
 focus appearance, clipping, and text, but cannot establish video visibility or
 motion quality.
 
+## Video-plane progress
+
+`screencap` never captures the SurfaceView, so a black capture cannot separate
+"controls hidden over live video" from a frozen or empty picture. For a bounded
+playback-progress signal, sample the compositor's per-frame timing for the app's
+video layer:
+
+```bash
+./tools/device video-frames
+./tools/device video-frames --window-seconds 0.5
+```
+
+It prints `newFrames`, `approxFps`, and `videoPlane=rendering|frozen|no-surface`
+for frames presented between two samples of the window (0.2 to 30 seconds). The
+query carries only frame timestamps and is allowed for every device role. Repeat
+short windows after a channel change to measure time to first frame and stalls.
+It proves that frames reach the display, not what they show; picture quality,
+deinterlacing, and motion judgement remain human physical-TV gates.
+
+`--plane ui` samples the activity window instead, which shows whether the main
+thread keeps producing Compose frames, for example while a channel change is in
+flight.
+
+## Thread load
+
+```bash
+./tools/device thread-load
+./tools/device thread-load --window-seconds 5
+```
+
+It reports the app process's per-thread CPU share for one `top -H` window
+(`processCpuPercent` and the busiest threads by name). Thread names are the only
+content it exposes; it is allowed for every role. Use it before profiling to
+tell decoder or renderer work from dispatcher or main-thread churn.
+
 ## Test credential provisioning
 
 Provision only a designated test device after installing the debug APK. Put the

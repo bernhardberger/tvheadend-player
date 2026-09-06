@@ -22,6 +22,7 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
+import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
@@ -35,7 +36,7 @@ internal fun TimeshiftSeekPreview(
     decision: TimeshiftSeekDecision,
     modifier: Modifier = Modifier,
 ) {
-    val targetState = state.copy(positionMs = decision.targetMs)
+    val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
     val positionPresentation = timeshiftPositionPresentation(targetState)
     val liveLabel = stringResource(R.string.timeshift_live)

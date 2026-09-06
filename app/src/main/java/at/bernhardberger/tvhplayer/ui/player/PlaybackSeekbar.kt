@@ -27,6 +27,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAxis
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
 import at.bernhardberger.tvhplayer.core.SeekbarRange
+import at.bernhardberger.tvhplayer.core.TimeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.seekbarScrub
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
@@ -41,11 +42,19 @@ fun PlaybackSeekbar(
     programmeAxis: ProgrammeAxis? = null,
     programmePositionMs: Long? = null,
     programmeDurationMs: Long? = null,
+    /**
+     * Live-edge presentation to label the timeline with. Defaults to the measured
+     * distance within [range]; live callers pass the server-shift-aware presentation.
+     */
+    timeshiftPosition: TimeshiftPositionPresentation? = if (range.domain == SeekbarDomain.TIMESHIFT) {
+        timeshiftPositionPresentation(range.positionMs, range.endMs)
+    } else {
+        null
+    },
 ) {
     val bufferSummary = if (range.domain == SeekbarDomain.TIMESHIFT) stringResource(
         R.string.player_buffer_summary,
         formatPlaybackDuration((range.endMs - range.startMs).coerceAtLeast(0L)),
-        formatPlaybackDuration((range.endMs - range.displayStartMs).coerceAtLeast(0L)),
     ) else null
     if (!range.positionKnown) {
         val unavailable = (if (paused) "${stringResource(R.string.player_paused)}. " else "") +
@@ -69,11 +78,6 @@ fun PlaybackSeekbar(
         range.displayProgress
     } else {
         programmeAxis?.playbackFraction ?: range.progress
-    }
-    val timeshiftPosition = if (range.domain == SeekbarDomain.TIMESHIFT) {
-        timeshiftPositionPresentation(range.positionMs, range.endMs)
-    } else {
-        null
     }
     val timeshiftBoundary = if (range.domain == SeekbarDomain.TIMESHIFT) {
         stringResource(
@@ -111,6 +115,8 @@ fun PlaybackSeekbar(
     } else description
     val stateDescription = if (paused) "${stringResource(R.string.player_paused)}. $positionDescription" else positionDescription
     val positionLabel = when {
+        // At the live edge the action strip already says Live; a distance adds nothing.
+        timeshiftPosition?.atLiveEdge == true -> null
         timeshiftPosition != null -> stringResource(
             R.string.timeshift_behind_live,
             formatPlaybackDuration(timeshiftPosition.behindLiveMs),
@@ -160,10 +166,10 @@ fun PlaybackSeekbar(
     PlayerTimelineBlock(
         progress = displayedProgress,
         tone = if (focused) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
+        // The estimate qualifier stays in the accessible description; visibly it is noise.
         leadingLabel = listOfNotNull(
             stringResource(R.string.player_paused).takeIf { paused },
             positionLabel,
-            stringResource(R.string.player_timing_estimated).takeIf { range.positionEstimated },
         ).joinToString(" / "),
         trailingLabel = trailingLabel,
         leadingLabelTestTag = "player-programme-progress".takeIf {

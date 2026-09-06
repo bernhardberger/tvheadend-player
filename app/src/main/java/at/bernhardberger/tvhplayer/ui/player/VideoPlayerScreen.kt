@@ -11,6 +11,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -123,6 +124,7 @@ import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.resolveLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
+import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
@@ -141,6 +143,9 @@ import org.koin.compose.koinInject
 
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
+
+/** Quiet time after the last CH+/CH- press before the shown channel is subscribed. */
+private const val CHANNEL_ZAP_SETTLE_MS = 350L
 
 internal fun SubscriptionIssue.messageResource(): Int = when (this) {
     SubscriptionIssue.NO_INPUT -> R.string.tvh_no_input
@@ -300,10 +305,13 @@ fun VideoPlayerScreen(
     var currentChannelId by remember { mutableStateOf(channelId) }
     var currentChannelName by remember { mutableStateOf(channelName) }
     val confirmedPlayingChannelId = playingLiveChannelId.takeIf {
-        it == currentChannelId && playbackState is AppPlaybackState.Playing
+        it == currentChannelId && playbackState.presented
     }
     var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }
-    LaunchedEffect(videoPlayerViewModel, activeLivePlayback) {
+    // Key on the identity of the live target, not on the observation value. The observation
+    // carries subscription counters that change several times a second, and restarting the loop
+    // on those blanked the timeline and the distance behind live continuously.
+    LaunchedEffect(videoPlayerViewModel, activeLivePlayback != null, playingLiveChannelId) {
         sampledTimeshiftState = AppTimeshiftState()
         while (true) {
             sampledTimeshiftState = videoPlayerViewModel.sampleTimeshiftPresentation()
@@ -323,6 +331,7 @@ fun VideoPlayerScreen(
     )
     var initialPlaybackResolved by remember { mutableStateOf(false) }
     var liveRequestToken by remember { mutableLongStateOf(0L) }
+    var zapSettlePending by remember { mutableStateOf(false) }
     var requestedChannelFailed by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -420,6 +429,10 @@ fun VideoPlayerScreen(
         if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
         val playbackSelection = authorizedLiveSelection ?: return@LaunchedEffect
         val requestToken = liveRequestToken
+        if (zapSettlePending) {
+            delay(CHANNEL_ZAP_SETTLE_MS)
+            zapSettlePending = false
+        }
         startInitialLivePlayback(
             startPlayback = { videoPlayerViewModel.playChannel(playbackSelection) },
             isCurrent = { requestToken == liveRequestToken },
@@ -526,7 +539,11 @@ fun VideoPlayerScreen(
         ) ?: return false
 
         val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
-        return tuneChannel(channel)
+        if (!tuneChannel(channel)) return false
+        // Zapping shows the new channel immediately but subscribes only once the
+        // remote settles, so a CH+/- burst does not open one tuner per key press.
+        zapSettlePending = true
+        return true
     }
 
     fun tuneEnteredChannel(): Boolean {
@@ -599,11 +616,12 @@ fun VideoPlayerScreen(
             optimisticRecordingMatchesCurrent)
     val recordActionEligible = !infoRecordingScheduled && canRecordFromInfo
     val currentSubscriptionFailure = subscriptionFailure.takeIf { playingLiveChannelId == currentChannelId }
+        ?: (playbackState as? AppPlaybackState.Failed)?.subscriptionIssue
     val statusPresentation = playbackStatusPresentation(
         connectionAvailable = connState is ConnectionState.Connected,
         playbackStarting = playbackState is AppPlaybackState.Starting,
         playbackRecovering = playbackState is AppPlaybackState.Recovering,
-        playbackPlaying = playbackState is AppPlaybackState.Playing,
+        playbackPlaying = playbackState.presented,
         playbackFailed = requestedChannelFailed || playbackState is AppPlaybackState.Failed ||
             currentSubscriptionFailure != null,
     )
@@ -816,6 +834,16 @@ fun VideoPlayerScreen(
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
+                    // A focused Compose target swallows the Back key cycle on the TV before the
+                    // activity can track it, so the BackHandler never fires. Decide Back here,
+                    // where Left already works, and let the matching KeyUp be consumed above.
+                    if (event.nativeKeyEvent.repeatCount == 0) {
+                        layerState.beginOpeningKeyCycle(keyCode)
+                        handlePlaybackBack()
+                    }
+                    return@onPreviewKeyEvent true
+                }
                 if (foregroundLayer == PlayerForegroundLayer.RECOVERY) {
                     return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
                 }
@@ -1073,7 +1101,7 @@ fun VideoPlayerScreen(
                     layerState.openOptions()
                 },
                 timeshiftState = timelineState.preview?.let {
-                    effectiveTimeshiftState.copy(positionMs = it.decision.targetMs)
+                    projectedTimeshiftState(effectiveTimeshiftState, it.decision.targetMs)
                 } ?: effectiveTimeshiftState,
                 liveAvailable = !channelUnavailable,
                 channelRecordingNow = currentChannelId in recordingChannelIds,
@@ -1243,14 +1271,33 @@ fun VideoPlayerScreen(
         }
 
         if (channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE)) {
-            Text(
-                text = stringResource(currentSubscriptionFailure?.messageResource() ?: R.string.player_playback_failed),
-                style = MaterialTheme.typography.titleLarge,
+            val failedState = playbackState as? AppPlaybackState.Failed
+            val failureDetail = listOfNotNull(
+                failedState?.recoveryReason?.name,
+                failedState?.playerErrorCode,
+                failedState?.targetResult?.toString(),
+            ).joinToString(" · ")
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.align(Alignment.Center)
-                    .background(Color.Black.copy(alpha = 0.78f))
+                    .background(Color.Black.copy(alpha = 0.78f), MaterialTheme.shapes.large)
                     .padding(24.dp)
                     .testTag("player-channel-unavailable"),
-            )
+            ) {
+                Text(
+                    text = stringResource(currentSubscriptionFailure?.messageResource() ?: R.string.player_playback_failed),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White,
+                )
+                if (failureDetail.isNotEmpty()) {
+                    Text(
+                        text = failureDetail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
         }
         CompactTuningStatus(
             visible = compactTuningVisible,

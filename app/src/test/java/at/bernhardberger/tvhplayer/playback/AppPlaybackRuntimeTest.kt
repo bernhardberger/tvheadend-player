@@ -129,6 +129,7 @@ class AppPlaybackRuntimeTest {
                 paused = true,
                 bufferStartMs = -120_000L,
                 positionMs = -30_000L,
+                serverBehindLiveMs = 30_000L,
             ),
             measuredTimeshiftPresentation(
                 bufferedDuration = 2.minutes,
@@ -342,7 +343,7 @@ class AppPlaybackRuntimeTest {
         var state: AppPlaybackState = recovering
         lateinit var recoveryAttempts: LiveRecoveryAttemptRunner
         recoveryAttempts = LiveRecoveryAttemptRunner { resolvedFence, result ->
-            assertFalse(recoveryAttempts.inProgress)
+            assertFalse(recoveryAttempts.ownsPlayerState(target, 25L, observations.observation.value))
             if (shouldRepublishPlayerStateAfterRecovery(
                     result = result,
                     fence = resolvedFence,
@@ -363,7 +364,11 @@ class AppPlaybackRuntimeTest {
         recoveryAttempts.run(fence) {
             state = playerReportedPlaybackState(
                 currentState = state,
-                recoveryAttemptInProgress = recoveryAttempts.inProgress,
+                recoveryAttemptInProgress = recoveryAttempts.ownsPlayerState(
+                    target,
+                    25L,
+                    observations.observation.value,
+                ),
                 playbackState = Player.STATE_BUFFERING,
                 isPlaying = false,
             )
@@ -375,14 +380,67 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
+    fun waitingRecoveryDoesNotSuppressStateOfATargetTheUserSelectedInstead() = runTest {
+        val recovering = Channel.create(id = ChannelId(23), name = "Twenty-three")
+        val replacement = Channel.create(id = ChannelId(24), name = "Twenty-four")
+        val observations = FakeSessionObservation(
+            currentObservation(channels = listOf(recovering, replacement)),
+        )
+        val fence = LiveRecoveryFence(
+            reason = PlaybackRecoveryReason.LIVE_ENDED,
+            selection = LivePlaybackSelection(
+                currentSession = observations.captureCurrentSession(),
+                channelId = recovering.id,
+            ),
+            targetEpoch = 25L,
+        )
+        val replacementTarget = AppPlaybackTarget.Live(replacement.id)
+        var state: AppPlaybackState = AppPlaybackState.Starting
+        val recoveryAttempts = LiveRecoveryAttemptRunner { _, _ -> }
+
+        recoveryAttempts.run(fence) {
+            // The user tuned a different channel while the attempt was waiting out its backoff.
+            state = playerReportedPlaybackState(
+                currentState = state,
+                recoveryAttemptInProgress = recoveryAttempts.ownsPlayerState(
+                    replacementTarget,
+                    26L,
+                    observations.observation.value,
+                ),
+                playbackState = Player.STATE_READY,
+                isPlaying = true,
+            )
+            PlaybackTargetResult.NOT_READY
+        }
+
+        assertEquals(AppPlaybackState.Playing, state)
+    }
+
+    @Test
     fun pausedTargetBecomesAvailableAgainAfterBuffering() {
         var state: AppPlaybackState = AppPlaybackState.Playing
         state = playerReportedPlaybackState(state, false, Player.STATE_BUFFERING, false)
-        assertEquals(AppPlaybackState.Starting, state)
+        assertEquals(AppPlaybackState.Buffering, state)
+        state = playerReportedPlaybackState(state, false, Player.STATE_BUFFERING, false)
+        assertEquals(AppPlaybackState.Buffering, state)
         state = playerReportedPlaybackState(state, false, Player.STATE_READY, false)
         assertEquals(AppPlaybackState.Playing, state)
         assertEquals(AppPlaybackState.Playing,
             playerReportedPlaybackState(state, false, Player.STATE_READY, true))
+    }
+
+    @Test
+    fun aStallAfterPresentationIsNotANewTune() {
+        assertTrue(AppPlaybackState.Buffering.presented)
+        assertFalse(AppPlaybackState.Starting.presented)
+        assertEquals(
+            AppPlaybackState.Starting,
+            playerReportedPlaybackState(AppPlaybackState.Starting, false, Player.STATE_BUFFERING, false),
+        )
+        assertEquals(
+            AppPlaybackState.Starting,
+            playerReportedPlaybackState(AppPlaybackState.Idle, false, Player.STATE_BUFFERING, false),
+        )
     }
 
     @Test

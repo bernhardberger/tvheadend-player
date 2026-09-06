@@ -1725,6 +1725,94 @@ class DevicePolicyTest(unittest.TestCase):
 
         self.assertEqual(args.action, "appliance-status")
 
+    def test_video_frames_is_a_bounded_read_only_action(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["video-frames"])
+
+        self.assertEqual(args.action, "video-frames")
+        self.assertEqual(args.window_seconds, 2.0)
+        for role in ("production", "test", "unclassified"):
+            self.assertIsNone(action_policy_error(role, "video-frames"))
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["video-frames", "--window-seconds", "60"])
+
+    def test_video_frames_counts_only_frames_presented_between_samples(self) -> None:
+        pending = str(DEVICE["VIDEO_FRAME_PENDING_NS"])
+        samples = iter(
+            [
+                "16666666\n100 200 300\n0 0 0\n150 250 350\n",
+                f"16666666\n100 200 300\n150 250 350\n160 400 500\n170 {pending} 0\n",
+            ]
+        )
+
+        def fake_run(command, **kwargs):
+            self.assertEqual(command[-3:-1], ["SurfaceFlinger", "--latency"])
+            self.assertIn("SurfaceView[at.bernhardberger.tvhplayer/", command[-1])
+            return subprocess.CompletedProcess(command, 0, stdout=next(samples), stderr="")
+
+        output = io.StringIO()
+        with (
+            patch.object(DEVICE_GLOBALS["subprocess"], "run", side_effect=fake_run),
+            patch.object(DEVICE_GLOBALS["time"], "sleep"),
+            redirect_stdout(output),
+        ):
+            DEVICE["show_video_frames"]("adb", "test-device", "at.bernhardberger.tvhplayer", 0.5)
+
+        self.assertIn("newFrames=1\n", output.getvalue())
+        self.assertIn("approxFps=2.0\n", output.getvalue())
+        self.assertIn("videoPlane=rendering\n", output.getvalue())
+
+    def test_video_frames_ui_plane_samples_the_activity_window(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["video-frames", "--plane", "ui"])
+
+        self.assertEqual(args.plane, "ui")
+        self.assertEqual(
+            DEVICE["video_surface_layer"]("at.bernhardberger.tvhplayer", "ui"),
+            "at.bernhardberger.tvhplayer/at.bernhardberger.tvhplayer.ui.MainActivity#0",
+        )
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["video-frames", "--plane", "audio"])
+
+    def test_thread_load_is_a_bounded_read_only_action(self) -> None:
+        parser = DEVICE["build_parser"]()
+
+        args = parser.parse_args(["thread-load"])
+
+        self.assertEqual(args.action, "thread-load")
+        for role in ("production", "test", "unclassified"):
+            self.assertIsNone(action_policy_error(role, "thread-load"))
+
+    def test_thread_load_reports_the_second_sample_sorted_by_cpu(self) -> None:
+        outputs = iter(
+            [
+                "4242\n",
+                "Tasks: 3\n  TID %CPU CMD\n 4242 1.0 main\n 4243 2.0 old\n"
+                "Tasks: 3\n  TID %CPU CMD\n 4242 8.5 main\n 4243 40.0 DefaultDispatch\n 4244 0.0 idle\n",
+            ]
+        )
+
+        def fake_run(command, **kwargs):
+            return subprocess.CompletedProcess(command, 0, stdout=next(outputs), stderr="")
+
+        output = io.StringIO()
+        with (
+            patch.object(DEVICE_GLOBALS["subprocess"], "run", side_effect=fake_run),
+            redirect_stdout(output),
+        ):
+            DEVICE["show_thread_load"]("adb", "test-device", "at.bernhardberger.tvhplayer", 2.0)
+
+        lines = output.getvalue().splitlines()
+        self.assertIn("pid=4242", lines)
+        self.assertIn("processCpuPercent=48", lines)
+        thread_lines = [line for line in lines if line.startswith("thread ")]
+        self.assertEqual(
+            thread_lines,
+            ["thread tid=4243 cpu=40% name=DefaultDispatch", "thread tid=4242 cpu=8% name=main"],
+        )
+
     def test_auto_start_repair_requires_accessibility_confirmation(self) -> None:
         parser = DEVICE["build_parser"]()
 

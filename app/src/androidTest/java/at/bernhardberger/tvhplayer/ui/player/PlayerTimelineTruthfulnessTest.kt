@@ -375,7 +375,7 @@ class PlayerTimelineTruthfulnessTest {
 
         composeRule.runOnIdle { durationMs = C.TIME_UNSET }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
         assertEquals(0, progressSemanticsCount())
     }
 

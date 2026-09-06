@@ -164,6 +164,7 @@
     <string name="stats_state_starting" translatable="false">Starting</string>
     <string name="stats_state_playing" translatable="false">Playing</string>
     <string name="stats_state_paused" translatable="false">Paused</string>
+    <string name="stats_state_buffering" translatable="false">Buffering</string>
     <string name="stats_state_finished" translatable="false">Finished</string>
     <string name="stats_state_recovering" translatable="false">Recovering</string>
     <string name="stats_state_failed" translatable="false">Failed</string>
@@ -208,6 +209,7 @@
     <string name="stats_packet_count" translatable="false">%1$s packets</string>
     <string name="stats_server_drops" translatable="false">Server frame drops</string>
     <string name="stats_server_drops_value" translatable="false">I %1$s · P %2$s · B %3$s</string>
+    <string name="stats_client_drops" translatable="false">Client packet drops</string>
     <string name="stats_system" translatable="false">System</string>
     <string name="stats_output" translatable="false">Display output</string>
     <string name="stats_output_value" translatable="false">%1$dx%2$d @ %3$s Hz</string>
@@ -416,7 +418,7 @@
     <string name="timeshift_target_replaced">Playback changed. Select a new position.</string>
     <string name="player_timing_estimated">Estimated playback position</string>
     <string name="player_paused">Paused</string>
-    <string name="player_buffer_summary">%1$s available / %2$s span</string>
+    <string name="player_buffer_summary">%1$s available</string>
     <string name="player_current_broadcast">Current broadcast</string>
     <string name="player_programme_timing_unavailable">Programme timing unavailable</string>
     <string name="timeshift_setting">Timeshift</string>

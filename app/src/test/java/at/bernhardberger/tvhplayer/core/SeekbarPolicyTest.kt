@@ -251,4 +251,51 @@ class SeekbarPolicyTest {
         assertTrue(shouldShowProgrammeProgress(hasCurrentEpgEvent = true))
         assertFalse(shouldShowProgrammeProgress(hasCurrentEpgEvent = false))
     }
+
+    @Test
+    fun programmeTimingDescribesLivePlaybackEvenWithATimeshiftBuffer() {
+        val live = AppTimeshiftState(
+            available = true,
+            bufferStartMs = -3_600_000L,
+            positionMs = -TIMESHIFT_LIVE_EDGE_TOLERANCE_MS,
+            liveEdgeMs = 0L,
+        )
+        assertTrue(programmeTimingDescribesPlayback(AppTimeshiftState()))
+        assertTrue(programmeTimingDescribesPlayback(live))
+        assertFalse(
+            programmeTimingDescribesPlayback(
+                live.copy(positionMs = -TIMESHIFT_LIVE_EDGE_TOLERANCE_MS - 1L),
+            ),
+        )
+        assertFalse(programmeTimingDescribesPlayback(live.copy(timingKnown = false)))
+    }
+
+    @Test
+    fun liveIsDecidedByTheServerShiftNotByDeliveryLatency() {
+        // Directly after a tune the rendered position trails the history edge by
+        // pipeline latency while TVHeadend serves the live edge.
+        val freshlyTuned = AppTimeshiftState(
+            available = true,
+            bufferStartMs = 0L,
+            positionMs = 2_000L,
+            liveEdgeMs = 10_000L,
+            serverBehindLiveMs = 0L,
+        )
+        val presentation = timeshiftPositionPresentation(freshlyTuned)
+        assertTrue(presentation.atLiveEdge)
+        assertEquals(0L, presentation.behindLiveMs)
+        assertTrue(programmeTimingDescribesPlayback(freshlyTuned))
+        assertFalse(canSeekTimeshiftForward(freshlyTuned))
+
+        val shifted = freshlyTuned.copy(serverBehindLiveMs = TIMESHIFT_LIVE_EDGE_TOLERANCE_MS + 1L)
+        assertFalse(timeshiftPositionPresentation(shifted).atLiveEdge)
+        assertEquals(TIMESHIFT_LIVE_EDGE_TOLERANCE_MS + 1L, timeshiftPositionPresentation(shifted).behindLiveMs)
+        assertTrue(canSeekTimeshiftForward(shifted))
+
+        val unreported = freshlyTuned.copy(serverBehindLiveMs = null)
+        assertFalse(timeshiftPositionPresentation(unreported).atLiveEdge)
+        assertEquals(8_000L, timeshiftPositionPresentation(unreported).behindLiveMs)
+
+        assertFalse(timeshiftPositionPresentation(freshlyTuned.copy(timingKnown = false)).atLiveEdge)
+    }
 }

@@ -38,13 +38,50 @@ fun timeshiftPositionPresentation(
     )
 }
 
-fun timeshiftPositionPresentation(state: AppTimeshiftState): TimeshiftPositionPresentation =
-    timeshiftPositionPresentation(
-        positionMs = state.positionMs,
-        liveEdgeMs = state.liveEdgeMs,
-    ).let { position ->
-        if (state.timingKnown) position else position.copy(atLiveEdge = false)
+/**
+ * Where playback stands relative to live, as the viewer understands it.
+ *
+ * The server reader shift is the timeshift position TVHeadend actually serves,
+ * so it decides whether playback is live. The measured distance between the
+ * rendered position and the history edge also contains delivery and decode
+ * latency, which is present directly after every tune and is not timeshift; it
+ * is only used when the server has not reported a shift.
+ */
+fun timeshiftPositionPresentation(state: AppTimeshiftState): TimeshiftPositionPresentation {
+    val serverBehindLiveMs = state.serverBehindLiveMs
+    val position = if (serverBehindLiveMs != null) {
+        TimeshiftPositionPresentation(
+            atLiveEdge = serverBehindLiveMs <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS,
+            behindLiveMs = serverBehindLiveMs,
+        )
+    } else {
+        timeshiftPositionPresentation(
+            positionMs = state.positionMs,
+            liveEdgeMs = state.liveEdgeMs,
+        )
     }
+    return if (state.timingKnown) position else position.copy(atLiveEdge = false)
+}
+
+/**
+ * Whether wall-clock Now/Next describes what the viewer is watching.
+ *
+ * The SDK provides no programme wall-clock mapping for timeshifted playback, so
+ * the header must not claim that the current broadcast describes historical
+ * content. That only holds while playback is actually behind the live edge (or
+ * its position is unknown), not merely because a timeshift buffer exists: on
+ * TVHeadend a live subscription essentially always has one.
+ */
+fun programmeTimingDescribesPlayback(state: AppTimeshiftState): Boolean =
+    !state.available || timeshiftPositionPresentation(state).atLiveEdge
+
+/**
+ * The state as it would present at a seek target the server has not served yet.
+ * The current server shift does not describe that target, so it is measured
+ * against the history instead.
+ */
+fun projectedTimeshiftState(state: AppTimeshiftState, targetMs: Long): AppTimeshiftState =
+    state.copy(positionMs = targetMs, serverBehindLiveMs = null)
 
 fun canSeekTimeshiftBackward(state: AppTimeshiftState): Boolean =
     state.available && state.timingKnown && state.positionMs - state.bufferStartMs > 1_000L

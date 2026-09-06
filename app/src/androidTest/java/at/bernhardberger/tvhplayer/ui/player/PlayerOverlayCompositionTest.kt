@@ -118,7 +118,7 @@ class PlayerOverlayCompositionTest {
         val actions = composeRule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
         val timeline = composeRule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot
         val goLive = composeRule.onNodeWithTag("player-go-live").fetchSemanticsNode().boundsInRoot
-        val icons = listOf("player-info", "player-settings", "player-record", "player-stop")
+        val icons = listOf("player-pause", "player-info", "player-settings", "player-record", "player-stop")
             .map { composeRule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot }
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         val sidePaddingPx = with(composeRule.density) { TvOverlaySidePadding.toPx() }
@@ -146,7 +146,7 @@ class PlayerOverlayCompositionTest {
         )
         composeRule.onNodeWithText("Programme timing unavailable").assertExists()
 
-        composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
         composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput {
             pressKey(Key.DirectionDown)
         }

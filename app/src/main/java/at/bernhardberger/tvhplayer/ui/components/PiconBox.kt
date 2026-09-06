@@ -10,7 +10,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
@@ -43,8 +45,19 @@ fun PiconBox(
                 contentDescription = null,
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
-                loading = { PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f)) },
-                error = { PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f)) },
+                // A pending load must not look like a settled failure: the loading placeholder
+                // is subdued so a picon that failed reads differently from one still arriving.
+                loading = {
+                    PiconPlaceholder(
+                        modifier = Modifier
+                            .fillMaxSize(0.5f)
+                            .alpha(PICON_LOADING_ALPHA)
+                            .testTag("picon-loading"),
+                    )
+                },
+                error = {
+                    PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f).testTag("picon-failed"))
+                },
             )
         }
     }
@@ -70,3 +83,5 @@ fun PiconPlaceholder(
         )
     }
 }
+
+private const val PICON_LOADING_ALPHA = 0.35f

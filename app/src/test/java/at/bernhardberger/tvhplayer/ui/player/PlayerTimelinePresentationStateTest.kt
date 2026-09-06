@@ -77,6 +77,23 @@ class PlayerTimelinePresentationStateTest {
     }
 
     @Test
+    fun aSampleFromAReplacedSubscriptionIsNotPresentedAgainstTheSuccessorHistory() {
+        val fixture = fixture()
+        val stale = fixture.playbackPosition(540_000L.milliseconds)
+        fixture.replaceSubscription()
+        fixture.updateHistory(start = 0.seconds, end = 600.seconds)
+
+        val presentation = fixture.state.value.toAppPresentation(stale)
+
+        // Overlapping numbers must not authorise the successor's timeline to be seeked using a
+        // coordinate that belonged to the subscription it replaced.
+        assertFalse(presentation.timingKnown)
+        assertNull(presentation.playbackTarget)
+        assertEquals(0L, presentation.positionMs)
+        assertEquals(600_000L, presentation.liveEdgeMs)
+    }
+
+    @Test
     fun sampledPlaybackDoesNotFollowHistoryAndDoesNotExtendSeekPermission() = runTest {
         val fixture = fixture()
         val pausedSample = fixture.playbackPosition(500.seconds)

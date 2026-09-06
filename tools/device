@@ -497,6 +497,169 @@ def show_current_focus(adb: str, serial: str) -> None:
     print("\n".join(lines))
 
 
+VIDEO_FRAME_PENDING_NS = 9223372036854775807
+DEFAULT_VIDEO_FRAME_WINDOW_SECONDS = 2.0
+MAX_VIDEO_FRAME_WINDOW_SECONDS = 30.0
+
+
+def bounded_frame_window(value: str) -> float:
+    try:
+        window = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("window must be a number of seconds") from exc
+    if not 0.2 <= window <= MAX_VIDEO_FRAME_WINDOW_SECONDS:
+        raise argparse.ArgumentTypeError(
+            f"window must be between 0.2 and {MAX_VIDEO_FRAME_WINDOW_SECONDS:g} seconds"
+        )
+    return window
+
+
+VIDEO_FRAME_PLANES = ("video", "ui")
+
+
+def video_surface_layer(package_name: str, plane: str = "video") -> str:
+    activity = f"{package_name}/{package_name}.ui.MainActivity"
+    if plane == "ui":
+        return f"{activity}#0"
+    return f"SurfaceView[{activity}](BLAST)#0"
+
+
+def presented_video_frames(
+    adb: str,
+    serial: str,
+    layer: str,
+    *,
+    announce: bool,
+) -> set[int]:
+    """Present timestamps SurfaceFlinger recorded for the video layer.
+
+    The latency query returns only per-frame timing for one named layer; it
+    carries no pixels, text, or app data. A missing layer yields no frames.
+    """
+    result = run(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "dumpsys",
+            "SurfaceFlinger",
+            "--latency",
+            shlex.quote(layer),
+        ),
+        capture=True,
+        check=False,
+        announce=announce,
+    )
+    frames: set[int] = set()
+    for line in result.stdout.splitlines()[1:]:
+        fields = line.split()
+        if len(fields) < 3:
+            continue
+        try:
+            presented = int(fields[1])
+        except ValueError:
+            continue
+        if 0 < presented < VIDEO_FRAME_PENDING_NS:
+            frames.add(presented)
+    return frames
+
+
+def show_video_frames(
+    adb: str,
+    serial: str,
+    package_name: str,
+    window_seconds: float,
+    plane: str = "video",
+) -> None:
+    """Report whether one of the app's planes presented new frames in a window.
+
+    The ``ui`` plane is the activity window (Compose overlay); it shows whether
+    the main thread keeps producing frames, for example during a channel change.
+
+    Screenshots cannot capture the SurfaceView, so a black capture never
+    distinguishes hidden overlays over live video from a frozen or empty
+    picture. This samples the compositor's per-frame timing twice and counts
+    frames that appeared in between; it is the only bounded playback-progress
+    evidence available without app instrumentation.
+    """
+    layer = video_surface_layer(package_name, plane)
+    before = presented_video_frames(adb, serial, layer, announce=True)
+    time.sleep(window_seconds)
+    after = presented_video_frames(adb, serial, layer, announce=False)
+    new_frames = len(after - before)
+    rate = new_frames / window_seconds
+    if not before and not after:
+        state = "no-surface"
+    elif new_frames == 0:
+        state = "frozen"
+    else:
+        state = "rendering"
+    print(f"plane={plane}")
+    print(f"windowSeconds={window_seconds:g}")
+    print(f"newFrames={new_frames}")
+    print(f"approxFps={rate:.1f}")
+    print(f"videoPlane={state}")
+
+
+THREAD_LOAD_ROWS = 12
+
+
+def show_thread_load(adb: str, serial: str, package_name: str, window_seconds: float) -> None:
+    pid_result = run(
+        adb_command(adb, serial, "shell", "pidof", package_name),
+        capture=True,
+        check=False,
+    )
+    pid = pid_result.stdout.strip().split()[0] if pid_result.stdout.strip() else ""
+    if not pid.isdigit():
+        fail(f"package {package_name} is not running")
+    delay = f"{window_seconds:g}"
+    result = run(
+        adb_command(
+            adb,
+            serial,
+            "shell",
+            "top",
+            "-H",
+            "-b",
+            "-n",
+            "2",
+            "-d",
+            delay,
+            "-p",
+            pid,
+            "-o",
+            "TID,%CPU,CMD",
+        ),
+        capture=True,
+    )
+    # Keep only the second (delta-based) sample: everything after the last header row.
+    lines = result.stdout.splitlines()
+    header_indexes = [index for index, line in enumerate(lines) if "TID" in line and "%CPU" in line]
+    if not header_indexes:
+        fail("top produced no per-thread sample")
+    sample = lines[header_indexes[-1] + 1 :]
+    rows: list[tuple[float, str, str]] = []
+    for line in sample:
+        parts = line.split(None, 2)
+        if len(parts) < 3 or not parts[0].isdigit():
+            continue
+        try:
+            cpu = float(parts[1])
+        except ValueError:
+            continue
+        rows.append((cpu, parts[0], parts[2].strip()))
+    rows.sort(reverse=True)
+    total = sum(cpu for cpu, _, _ in rows)
+    print(f"pid={pid}")
+    print(f"windowSeconds={delay}")
+    print(f"processCpuPercent={total:.0f}")
+    for cpu, tid, name in rows[:THREAD_LOAD_ROWS]:
+        if cpu <= 0.0:
+            break
+        print(f"thread tid={tid} cpu={cpu:.0f}% name={name}")
+
+
 def show_package_info(adb: str, serial: str, package_name: str) -> None:
     result = run(
         adb_command(adb, serial, "shell", "dumpsys", "package", package_name),
@@ -1151,6 +1314,32 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("launch", help="Launch the Leanback activity")
     subparsers.add_parser("force-stop", help="Force-stop the selected package")
     subparsers.add_parser("current", help="Show only the current/focused activity")
+    frames_parser = subparsers.add_parser(
+        "video-frames",
+        help="Count video-plane frames presented in a short window (playback progress)",
+    )
+    frames_parser.add_argument(
+        "--window-seconds",
+        type=bounded_frame_window,
+        default=DEFAULT_VIDEO_FRAME_WINDOW_SECONDS,
+        help=f"Sampling window (default: {DEFAULT_VIDEO_FRAME_WINDOW_SECONDS:g} s)",
+    )
+    frames_parser.add_argument(
+        "--plane",
+        choices=VIDEO_FRAME_PLANES,
+        default="video",
+        help="video = SurfaceView picture (default); ui = Compose activity window",
+    )
+    load_parser = subparsers.add_parser(
+        "thread-load",
+        help="Show per-thread CPU of the app process over a short window (top -H)",
+    )
+    load_parser.add_argument(
+        "--window-seconds",
+        type=bounded_frame_window,
+        default=DEFAULT_VIDEO_FRAME_WINDOW_SECONDS,
+        help=f"Sampling window (default: {DEFAULT_VIDEO_FRAME_WINDOW_SECONDS:g} s)",
+    )
     subparsers.add_parser("package-info", help="Show bounded package metadata")
     subparsers.add_parser(
         "appliance-status",
@@ -1498,6 +1687,14 @@ def main() -> int:
 
     if args.action == "current":
         show_current_focus(adb, serial)
+        return 0
+
+    if args.action == "video-frames":
+        show_video_frames(adb, serial, package_name, args.window_seconds, args.plane)
+        return 0
+
+    if args.action == "thread-load":
+        show_thread_load(adb, serial, package_name, args.window_seconds)
         return 0
 
     if args.action == "package-info":
