@@ -11,6 +11,38 @@ import org.junit.Test
 class MainStartupPresentationTest {
 
     @Test
+    fun retainedCatalogDoesNotHideActionableConnectionFailures() {
+        val readiness = CurrentChannelReadiness.Browsable(listOf(Channel.create(ChannelId(1))))
+        for (connection in listOf(
+            ConnectionUiState.NeedsConfiguration,
+            ConnectionUiState.CredentialUnavailable,
+            ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY),
+            ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED),
+        )) {
+            assertEquals(presentation(connection), presentation(connection, readiness))
+        }
+    }
+
+    @Test
+    fun seededCatalogEntersBrowsingWithoutResolvingAutoplay() {
+        val channels = listOf(Channel.create(ChannelId(1)))
+        val readiness = CurrentChannelReadiness.Browsable(channels)
+        for (connection in listOf(
+            ConnectionUiState.Connecting,
+            ConnectionUiState.SyncingChannels,
+            ConnectionUiState.Reconnecting,
+            ConnectionUiState.Ready,
+        )) {
+            assertEquals(MainStartupPresentation.Inactive, presentation(connection, readiness))
+        }
+        val requests = ApplianceLaunchRequests()
+        requests.request()
+        val pending = requests.state.value as ApplianceLaunchState.Pending
+        assertEquals(null, requests.resolve(pending.request, readiness, channels.first().id))
+        assertEquals(pending, requests.state.value)
+    }
+
+    @Test
     fun resolvingLocal_takesPrecedenceAndIsPassivePreparing() {
         assertEquals(
             MainStartupPresentation.Passive(MainStartupMessageKind.PREPARING),

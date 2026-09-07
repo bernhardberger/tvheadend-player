@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.RetainedMetadataAuthority
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import org.junit.Assert.assertEquals
@@ -16,22 +17,27 @@ class CurrentChannelReadinessTest {
             CurrentChannelReadiness.Waiting,
             deriveCurrentChannelReadiness(
                 connected = false,
-                metadataReady = true,
+                authority = RetainedMetadataAuthority.CURRENT,
                 channels = listOf(Channel.create(ChannelId(1))),
             ),
         )
     }
 
     @Test
-    fun connectedTransportWithRetainedChannelsButMetadataNotReadyWaits() {
-        assertEquals(
-            CurrentChannelReadiness.Waiting,
-            deriveCurrentChannelReadiness(
-                connected = true,
-                metadataReady = false,
-                channels = listOf(Channel.create(ChannelId(1))),
-            ),
-        )
+    fun seededCatalogIsBrowsableRegardlessOfTransportReadiness() {
+        val channels = listOf(Channel.create(ChannelId(1)))
+        for (authority in listOf(RetainedMetadataAuthority.SYNCHRONIZING_WITH_RETAINED_DATA, RetainedMetadataAuthority.STALE)) {
+            for (connected in listOf(false, true)) {
+                assertEquals(
+                    CurrentChannelReadiness.Browsable(channels),
+                    deriveCurrentChannelReadiness(connected, authority, channels),
+                )
+                assertEquals(
+                    CurrentChannelReadiness.Waiting,
+                    deriveCurrentChannelReadiness(connected, authority, emptyList()),
+                )
+            }
+        }
     }
 
     @Test
@@ -42,7 +48,7 @@ class CurrentChannelReadinessTest {
             CurrentChannelReadiness.Ready(channels),
             deriveCurrentChannelReadiness(
                 connected = true,
-                metadataReady = true,
+                authority = RetainedMetadataAuthority.CURRENT,
                 channels = channels,
             ),
         )
@@ -54,7 +60,7 @@ class CurrentChannelReadinessTest {
             CurrentChannelReadiness.Ready(emptyList()),
             deriveCurrentChannelReadiness(
                 connected = true,
-                metadataReady = true,
+                authority = RetainedMetadataAuthority.CURRENT,
                 channels = emptyList(),
             ),
         )
@@ -67,7 +73,7 @@ class CurrentChannelReadinessTest {
 
         val readiness = deriveCurrentChannelReadiness(
             connected = true,
-            metadataReady = true,
+            authority = RetainedMetadataAuthority.CURRENT,
             channels = source,
         ) as CurrentChannelReadiness.Ready
         source.clear()

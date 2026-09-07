@@ -124,6 +124,9 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.tvheadend.sdk.testing) {
+        version { strictly(libs.versions.tvheadend.sdk.get()) }
+    }
     // Device-only surface fixture intentionally constructs a concrete player.
     androidTestImplementation(libs.androidx.media3.exoplayer)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
@@ -247,7 +250,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "Staged SDK substitution is active (-Ptvheadend.sdk.local=true), so this build cannot " +
                 "prove public SDK consumption. Publish the SDK release and re-run without the flag."
         }
-        check(sdkVersion == "0.7.0") { "Expected public SDK 0.7.0 but found $sdkVersion" }
+        check(sdkVersion == "0.8.0") { "Expected public SDK 0.8.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             "implementation:sdk-android:$sdkVersion",
             "implementation:sdk-media3:$sdkVersion",

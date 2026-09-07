@@ -1,12 +1,30 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import java.io.File
+import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
+import at.bernhardberger.tvhplayer.core.removeLegacyCoilCache
+import org.junit.rules.TemporaryFolder
+import org.junit.Rule
+import kotlin.time.Duration.Companion.days
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GuideRenderingCostContractTest {
+    @get:Rule val temporaryFolder = TemporaryFolder()
+
+    @Test
+    fun legacyCoilCleanupLeavesOtherCachesUntouched() {
+        val root = temporaryFolder.newFolder()
+        val legacy = File(root, "coil_disk_cache").apply { mkdirs() }
+        File(legacy, "old-entry").writeText("unused cache")
+        val other = File(root, "sdk-owned-sentinel").apply { writeText("keep") }
+        removeLegacyCoilCache(root)
+        removeLegacyCoilCache(root)
+        assertFalse(legacy.exists())
+        assertEquals("keep", other.readText())
+    }
     private val repositoryRoot = generateSequence(
         File(requireNotNull(System.getProperty("user.dir"))),
     ) { it.parentFile }.first { File(it, ".git").exists() }
@@ -31,9 +49,14 @@ class GuideRenderingCostContractTest {
     fun appSessionUsesTheExplicitGuideCoveragePolicy() {
         assertEquals(
             1,
-            appModuleSource.count("createTvheadendSession(GUIDE_EPG_COVERAGE_POLICY)"),
+            appModuleSource.count("createTvheadendSession(\n            GUIDE_EPG_COVERAGE_POLICY,\n            appMetadataCachePolicy(cacheRoot),"),
         )
         assertFalse(appModuleSource.contains("val session = createTvheadendSession()"))
+        assertTrue(appModuleSource.contains("val cacheRoot = androidContext().cacheDir"))
+        val policy = appMetadataCachePolicy(File("unused-test-cache"))
+        assertEquals(7.days, policy.metadataRetention)
+        assertEquals(30.days, policy.artworkRetention)
+        assertEquals(64L * 1024 * 1024, policy.artworkMaxBytes)
     }
 
     @Test

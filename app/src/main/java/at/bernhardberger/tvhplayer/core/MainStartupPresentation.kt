@@ -47,6 +47,14 @@ fun mainStartupPresentation(
         is ApplianceLaunchState.Pending -> launchState
     }
 
+    if (
+        currentChannelReadiness is CurrentChannelReadiness.Browsable &&
+        currentChannelReadiness.channels.isNotEmpty() &&
+        connectionState.primaryRecoveryAction() == ConnectionRecoveryAction.NONE
+    ) {
+        return MainStartupPresentation.Inactive
+    }
+
     return when (connectionState) {
         ConnectionUiState.Connecting ->
             MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
@@ -55,7 +63,8 @@ fun mainStartupPresentation(
         ConnectionUiState.Reconnecting ->
             MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING)
         ConnectionUiState.Ready -> when (currentChannelReadiness) {
-            CurrentChannelReadiness.Waiting ->
+            CurrentChannelReadiness.Waiting,
+            is CurrentChannelReadiness.Browsable ->
                 MainStartupPresentation.Passive(
                     MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA,
                 )

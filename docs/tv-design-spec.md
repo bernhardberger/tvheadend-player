@@ -279,6 +279,21 @@ Settings is intentionally exempt. Its fixed category rail and detail pane are a
 local master-detail hierarchy whose outer panels begin at the shell's top inset;
 do not add a redundant top-level Settings header above them.
 
+### 5.2 General storage
+
+General places Storage after Navigation, with one TV Material "Clear cache"
+action. Support copy shows combined metadata/artwork usage in decimal MB and
+the artwork count, without paths or server identity. Clearing does not change
+connection settings, active playback or the in-memory catalog. Current metadata
+may be written again immediately; images refresh on demand.
+
+General retains first entry on Follow system. Down reaches Storage after the
+language choices and Guide-menu switch; the action remains focusable while
+clearing and ignores repeated activation until completion. Completion is an
+in-row transient confirmation; failure stays actionable for retry. Back returns
+to the General category, then to the existing shell owner. Enlarged English and
+German text wraps inside the scrolling pane rather than truncating the action.
+
 ---
 
 ## 6. Components

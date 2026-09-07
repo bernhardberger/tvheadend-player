@@ -17,10 +17,10 @@ CHECKER = runpy.run_path(str(CHECKER_PATH), run_name="native_checker_test")
 
 class NativePublicationEvidenceTest(unittest.TestCase):
     def test_public_release_bytes_and_corresponding_sources_are_pinned(self) -> None:
-        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.6.1")
+        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.8.0")
         self.assertEqual(
             CHECKER["EXPECTED_AAR_SHA256"],
-            "392f6a6e5d09ad45472e169f40e1c2e6867565d2823b2b14c4f2efc2aa6f2daf",
+            "337e1b0f3693d66e48b7d254a46c27de80e773dd5fe15d90aa3293faee1ac775",
         )
         self.assertEqual(
             CHECKER["EXPECTED_FFMPEG_SOURCES_SHA256"],
@@ -30,14 +30,14 @@ class NativePublicationEvidenceTest(unittest.TestCase):
         self.assertEqual(
             CHECKER["EXPECTED_STANDARD_SOURCE_SHA256"],
             {
-                "sdk-android-0.6.1-sources.jar":
-                    "3657dc308898f850d735ee662480ec9b1ce177de722b10f7504676e4640a477a",
-                "sdk-core-0.6.1-sources.jar":
-                    "4eafd18aa1bed8b1fd8c428c08f7fb69cecfbae5fa1a8ecca0df02486237f040",
-                "sdk-media3-0.6.1-sources.jar":
-                    "8be8c8d24a41d3b888d463fc947920c1d1996fd8e05e00b6d9ccfaa4905f707a",
-                "sdk-playback-0.6.1-sources.jar":
-                    "b8ca72b164a06b7bbffded3d454067c72e535670a963d6797e60a1ad1af56bc9",
+                "sdk-android-0.8.0-sources.jar":
+                    "605da05e61b13fb4b5c18a87a9009e3ac95503cb72e66b25f3dcbfc9142f5695",
+                "sdk-core-0.8.0-sources.jar":
+                    "b53b15c24c8d4d15fb81e8fcb455c4fb4f7e1d2e117ea07b4efc2dc42cab10dc",
+                "sdk-media3-0.8.0-sources.jar":
+                    "13b28b397b3451a44543004bc93253a6d5e4395329f34fc5467983ece40e2558",
+                "sdk-playback-0.8.0-sources.jar":
+                    "e85f1f65c5259c25fba1cfd8634cd31a3d30bb39c2bb167676b20e50558a1557",
             },
         )
 

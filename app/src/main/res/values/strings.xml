@@ -1,4 +1,12 @@
 <resources>
+    <string name="connection_refreshing_channels">Refreshing channel information…</string>
+    <string name="settings_storage">Storage</string>
+    <string name="clear_cache">Clear cache</string>
+    <string name="cache_statistics">%1$s MB, %2$d images</string>
+    <string name="cache_clear_description">Removes cached listings and images; connection settings stay.</string>
+    <string name="cache_clearing">Clearing cache…</string>
+    <string name="cache_cleared">Cache cleared. Listings and images refresh as needed.</string>
+    <string name="cache_clear_failed">Could not clear cache. Press OK to try again.</string>
     <string name="app_name" translatable="false">TVHeadend Player</string>
 
     <string name="channel_list">Channel List</string>

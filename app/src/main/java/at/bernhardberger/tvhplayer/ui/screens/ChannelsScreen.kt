@@ -441,9 +441,9 @@ internal fun ChannelsScreenContent(
             return@Column
         }
 
-        if (connectionUiState != ConnectionUiState.Ready) {
+        if (connectionUiState != ConnectionUiState.Ready || !channelScopeState.channelCatalogCurrent) {
             InlineConnectionState(
-                state = connectionUiState,
+                state = if (connectionUiState == ConnectionUiState.Ready) ConnectionUiState.SyncingChannels else connectionUiState,
                 onRetry = onRetryConnection,
                 onOpenSettings = onOpenConnectionSettings,
                 modifier = Modifier.padding(start = startPadding, end = endPadding),
@@ -715,7 +715,11 @@ private fun InlineConnectionState(
                 modifier = Modifier.size(28.dp),
             )
             Text(
-                text = connectionMessage(state),
+                text = if (state == ConnectionUiState.SyncingChannels) {
+                    stringResource(R.string.connection_refreshing_channels)
+                } else {
+                    connectionMessage(state)
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (state.isError()) {
                     MaterialTheme.colorScheme.error

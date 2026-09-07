@@ -1,9 +1,9 @@
 # Persistent cache plan
 
-Status: approved design, not started. Closes defect-ledger rows D16 (picons
-refetched every start), D19 (cold start stuck on "Loading channel
-information…"), and D23 (no "Clear cache" control). Depends on SDK 0.8.0
-implementing `tvheadend-sdk/docs/persistent-cache-design.md`.
+Status: implemented, verified and independently reviewed on the app base
+`8097141`. Closes defect-ledger rows D16 (picons refetched every
+start), D19 (cold start stuck on "Loading channel information…"), and D23
+(no "Clear cache" control). Consumes published SDK 0.8.0 from Maven Central.
 
 ## Boundary
 
@@ -29,31 +29,38 @@ files, keys, TTL buckets, or fetch throttles of its own; the pre-refactor
 
 ### Slice A: wire the policy and remove dead app caching
 
-- `di/AppModule.kt:46`: `createTvheadendSession(GUIDE_EPG_COVERAGE_POLICY, MetadataCachePolicy.create(androidContext().cacheDir))`. Keep the policy constants in `core/` next to the EPG policy so a JVM test can assert them.
-- `images/TvheadendArtworkLoader.kt:27-31`: delete the Coil `DiskCache` block. It has never held a picon (custom fetchers do not write Coil's disk cache) and its directory `coil_disk_cache` should be removed on first start after upgrade.
+- `di/AppModule.kt` passes `appMetadataCachePolicy(cacheRoot)`, where
+  `cacheRoot = androidContext().cacheDir`,
+  alongside `GUIDE_EPG_COVERAGE_POLICY`; the policy lives in `core/` and its
+  retention/budget values are covered by `GuideRenderingCostContractTest`.
+- `images/TvheadendArtworkLoader.kt` disables Coil disk caching. The removed
+  custom disk cache was not used by the SDK fetcher; SDK artwork persistence now
+  owns that data. `removeLegacyCoilCache` removes only the former app-owned
+  `coil_disk_cache` directory on IO, without touching SDK or platform caches.
 - `core/IconResolver.kt` / `ui/components/PiconBox.kt`: unchanged. Coil memory keys become stable through the SDK keyer; `remember(currentSession, …)` stays because the fetch still needs a current observation.
-- Test: `GuideRenderingCostContractTest.kt:34-36` currently pins the one-argument call; update it to the two-argument form and assert the policy constants.
+- `GuideRenderingCostContractTest` covers composition-root wiring, policy
+  constants and idempotent legacy cleanup that preserves unrelated files.
 
 ### Slice B: enter on a cached catalog (D19)
 
-Today `AppConnectionViewModel.kt:45-56` and `MainStartupPresentation.kt:57-68`
-hold the startup screen until `channelCatalogAuthority == CURRENT`. With a
-cached catalog the SDK publishes `Synchronizing(previousCatalog)` before the
-socket is even open.
+`AppConnectionViewModel` derives separate browsing and tuning readiness from
+the SDK observation. A cached catalog can be displayed before the socket is open.
 
-- `core/CurrentChannelReadiness.kt`: add a `Browsable(channels)` outcome for a
-  non-empty catalog whose authority is `SYNCHRONIZING` or `STALE`. `Ready`
-  keeps meaning `CURRENT`.
-- `core/MainStartupPresentation.kt`: `Browsable` enters the channel list. It
-  does not autoplay; autoplay and any tune still require `SessionState.Ready`
-  (`appliance` auto-start and `LastPlayedChannelStore` consumers wait for
-  `Ready`, unchanged).
-- `ui/screens/ChannelsScreen.kt:414-451` already renders a non-current
-  catalog with the inline progress banner; verify the banner text says the
-  list is being refreshed, not loading.
-- Tests: `MainStartupPresentationTest.kt`, `CurrentChannelReadinessTest.kt`
-  gain the `Browsable` cases; the empty-catalog `AUTHORITATIVE_NO_CHANNELS`
-  branch must still require `CURRENT`.
+- `core/CurrentChannelReadiness.kt` returns `Browsable(channels)` for a non-empty
+  catalog whose authority is `SYNCHRONIZING_WITH_RETAINED_DATA` or `STALE`.
+  `Ready` requires both `CURRENT` and `SessionState.Ready`.
+- `core/MainStartupPresentation.kt`: `Browsable` permits the channel list.
+  `AppRoot` cancels the pending startup request and selects Channels with the
+  existing expected-state transition. That request cannot unexpectedly autoplay
+  when synchronization later finishes. Fresh starts without a cache retain the
+  existing Ready-only autoplay; tuning still requires `SessionState.Ready`.
+  Automatic reconnect backoff permits browsing; credential/configuration and
+  explicit-retry failures retain their actions.
+- `ui/screens/ChannelsScreen.kt` shows the inline refresh banner for a retained
+  catalog even when the connection UI is Ready; the empty list keeps loading text.
+- `MainStartupPresentationTest`, `CurrentChannelReadinessTest` and
+  `CachedStartupTransitionTest` cover retained/empty/current authority, actionable
+  failures, cancel-and-route, duplicate transitions and no later surprise autoplay.
 - Physical-TV gate: cold start with a warm cache shows the channel list within
   2 s of the app window; `./tools/device screenshot` at 1 s intervals. Cold
   start with a cleared cache behaves exactly as today.
@@ -64,31 +71,65 @@ socket is even open.
   `SettingsSectionTitle` "Storage" with one action row "Clear cache" and a
   support line from `SessionCache.statistics` ("12 MB, 340 images"). No
   paths, no host names.
-- Action: `session.cache.clear()` on the view-model scope; on completion show
-  a transient confirmation in the row's support text; the picons re-fetch on
-  demand. Keep the row focusable and D-pad reachable per `docs/tv-design-spec.md`.
+- Action: `session.cache.clear()` from the view-model scope. An accepted clear
+  finishes even if Settings is closed, without cancelling the SDK writer restart.
+  Repeated activation is ignored while busy. A four-second confirmation or a
+  retryable error stays in the focused row; artwork refetches on demand.
 - Not a "forget server" action; connection settings stay as they are.
-- Tests: JVM test for the statistics formatting; androidTest for row presence
-  and focus order in `SettingsGeneral`.
+- `SettingsStorageViewModelTest` covers statistics formatting/overflow, clear,
+  coalescing, retry, confirmation timers and completion after view-model disposal.
+  `StorageScreenshotTest` covers production General focus, action and Back.
 
 ### Slice D: release pins
 
-After SDK 0.8.0 is on Central: `gradle/libs.versions.toml:20`,
-`app/build.gradle.kts:243`, `tools/check-native-libs:16-23`,
-`tools/prepare-release:7-8`, `tools/tests/test_release_metadata.py:190`,
-`tools/tests/test_native_publication_evidence.py:20-39`; then plain
-`./tools/verify`.
+SDK 0.8.0 is published. `gradle/libs.versions.toml`, `app/build.gradle.kts`,
+`tools/check-native-libs`, `tools/prepare-release` and release-tool tests agree.
+Hashes were calculated from downloaded Maven Central artifacts, not a local
+publication. Public tag `v0.8.0` identifies SDK source
+`25b96c1ccabf1bc00d36ca111cb56e5e67e41f44`.
 
 ## Acceptance
 
-- Warm cold start: channel list visible before `SessionState.Ready`; picons
-  appear without any HTSP `fileOpen` for cached ids (SDK statistics show hits).
-- `Clear cache` empties the SDK statistics and the next start behaves like a
-  first start.
-- No app code touches files, keys, or namespaces for cache purposes.
-- `./tools/verify` passes; independent Astra review of slices A–C together
-  (non-trivial, non-UX except slice C's row, which also needs a
-  `tv-ux-reviewer` screenshot pass).
+- Physical-TV gate: warm cold start shows the channel list before
+  `SessionState.Ready`; cached picons do not need another HTSP file fetch.
+- `Clear cache` deletes persisted namespaces but preserves active in-memory
+  data. A connected SDK session can immediately repersist current metadata, so
+  zero usage is not a lasting guarantee. Artwork is fetched again on demand.
+- No app code touches SDK cache files, keys or namespaces. The only file cleanup
+  is removal of the obsolete app-owned Coil directory.
+- `./tools/verify` passes; independent Astra and Opus engineering reviews plus
+  a screenshot-first `tv-ux-reviewer` pass cover the changed boundaries.
+
+### Verification evidence (2026-09-07)
+
+- Final plain `./tools/verify` passed against Maven Central, including
+  `:app:verifyExternalSdkConsumption`, JVM tests, lint, Android test compilation,
+  debug APK and `tools/check-native-libs`. No `--staged-sdk` evidence was used.
+  Managed log: `/tmp/gradle-run/456c6a9f3379c7023415774f2dadc8aa/0009.log`.
+- Static rules, 124 Python tool-policy tests and documentation authority passed.
+- Authorized LXC119 Google TV API 36 emulator: live identity verified, 16/16
+  final Storage cases passed, including four Up/Down steps back through the pane.
+  The existing Settings/startup matrix also passed
+  18 tests. App/test packages were uninstalled and the emulator stopped.
+- Final production-composable captures: ignored
+  `captures/p26-a1/final-v3/storage-captures/`, 1920x1080 at density 2, EN/DE,
+  font scales 1.0/1.3, focused Clear action in idle/clearing/cleared/failed states.
+  All 16 are byte-identical to reviewed `final-v2/storage-captures/`; the final
+  focus guard only disables the fade when navigating away from Clear cache.
+- Astra engineering closure `ses_f851d6a1dffeQ46d2uy6eUTokD`: CLEAN. Opus second
+  `ses_f851d6a20ffewb6UjGRKAwbx5i`: NON_BLOCKING, named gaps closed. Primary
+  checked the remaining evidence questions: published `MetadataCacheRuntime`
+  wraps deletion in `withContext(ioDispatcher)`; the base artwork loader names
+  `coil_disk_cache` exactly. No extra dispatcher wrapper or speculative deletion
+  is needed. The unused local and warm-return naming suggestion are pre-existing;
+  test relocation is optional cleanup, not an acceptance defect.
+- Screenshot-first Opus closure `ses_f8517f23affeMFi8TFqhYBUiP6`: DESIGN_READY.
+  Busy ring/track and emphasized text, distinct result glyphs, viewport fade and
+  localized wrapping pass. Each Opus dispatch followed a fresh eligible route.
+- The pre-existing operator `ChannelsScreenshotTest.kt` remains untracked,
+  regular mode 0644 and byte-identical to its admitted preservation baseline.
+- Physical-TV warm-start latency, actual artwork reuse and remote/overscan feel
+  remain open human gates. Offline screenshots cannot establish them.
 
 ## Deferred
 

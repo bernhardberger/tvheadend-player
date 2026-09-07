@@ -1,4 +1,12 @@
 <resources>
+    <string name="connection_refreshing_channels">Senderinformationen werden aktualisiert…</string>
+    <string name="settings_storage">Speicher</string>
+    <string name="clear_cache">Cache leeren</string>
+    <string name="cache_statistics">%1$s MB, %2$d Bilder</string>
+    <string name="cache_clear_description">Entfernt gespeicherte Programmdaten und Bilder. Verbindungseinstellungen bleiben erhalten.</string>
+    <string name="cache_clearing">Cache wird geleert…</string>
+    <string name="cache_cleared">Cache geleert. Programmdaten und Bilder werden bei Bedarf neu geladen.</string>
+    <string name="cache_clear_failed">Cache konnte nicht geleert werden. Mit OK erneut versuchen.</string>
     <string name="channel_list">Senderliste</string>
     <string name="all_channels">Alle Sender</string>
     <string name="choose_channel_tag">Sendergruppe wählen</string>

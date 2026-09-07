@@ -392,6 +392,7 @@ private class ProfileSession(
     override val observation: StateFlow<SessionObservation>,
     private val discover: suspend (CurrentSessionObservation) -> StreamProfilesResult,
 ) : TvheadendSession {
+    override val cache: at.bernhardberger.tvheadend.sdk.core.SessionCache get() = error("unused")
     override val epgRepository: EpgRepository get() = error("unused")
     override val dvrRepository: DvrRepository get() = error("unused")
     override val artwork: ArtworkLoader get() = error("unused")

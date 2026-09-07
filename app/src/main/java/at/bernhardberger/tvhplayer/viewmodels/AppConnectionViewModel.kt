@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
-import at.bernhardberger.tvheadend.sdk.core.RetainedMetadataAuthority
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -44,15 +43,10 @@ class AppConnectionViewModel(
 
     val currentChannelReadiness: StateFlow<CurrentChannelReadiness> = session.observation.map {
             observation ->
-        val metadataReady = observation.channelCatalogAuthority == RetainedMetadataAuthority.CURRENT
         deriveCurrentChannelReadiness(
             connected = observation.sessionState is SessionState.Ready,
-            metadataReady = metadataReady,
-            channels = if (metadataReady) {
-                observation.channelCatalogForDisplay?.channels.orEmpty()
-            } else {
-                emptyList()
-            },
+            authority = observation.channelCatalogAuthority,
+            channels = observation.channelCatalogForDisplay?.channels.orEmpty(),
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, CurrentChannelReadiness.Waiting)
 

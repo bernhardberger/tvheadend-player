@@ -42,6 +42,8 @@ import at.bernhardberger.tvhplayer.ui.popNavigation
 import at.bernhardberger.tvhplayer.ui.rememberAppNavBackStack
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
 import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsGeneral
+import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -78,6 +80,7 @@ class SettingsStartupEntryTest {
     @Test
     fun generalCategoryEntersProductionFirstLanguageControl() {
         val settingsStore = UiSettingsStore(composeRule.activity.applicationContext)
+        val storageViewModel = SettingsStorageViewModel(FakeTvheadendSession().cache)
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 SettingsScreenNavigation(
@@ -87,6 +90,7 @@ class SettingsStartupEntryTest {
                     SettingsGeneral(
                         initialFocusRequester = focusRequester,
                         settingsStore = settingsStore,
+                        storageViewModel = storageViewModel,
                     )
                 }
             }
