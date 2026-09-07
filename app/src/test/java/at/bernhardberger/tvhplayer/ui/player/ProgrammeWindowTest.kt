@@ -46,6 +46,23 @@ class ProgrammeWindowTest {
         assertNull(state.timeline.select(0.minutes))
     }
 
+    @Test fun elapsedFillTracksMappedLiveEndNotPlaybackOrPreviewPosition() {
+        val fixture = fixture()
+        val early = requireNotNull(programmeWindow(fixture.presentation(65), eventAt = ::lookup))
+        val later = requireNotNull(programmeWindow(fixture.presentation(80), eventAt = ::lookup))
+        assertNotEquals(early.positionFraction, later.positionFraction)
+        assertEquals(0.5f, early.availableEndFraction, 0.0001f)
+        assertEquals(early.availableEndFraction, later.availableEndFraction)
+
+        fixture.updateHistory(50.minutes, 100.minutes, estimatedLiveEdgeTime = live + 10.minutes)
+        val advanced = requireNotNull(programmeWindow(fixture.presentation(65), eventAt = ::lookup))
+        assertEquals(early.positionFraction, advanced.positionFraction)
+        assertEquals(40f / 60, advanced.availableEndFraction, 0.0001f)
+        val completed = requireNotNull(programmeWindow(fixture.presentation(55), eventAt = ::lookup))
+        assertNull(completed.liveFraction)
+        assertEquals(1f, completed.availableEndFraction)
+    }
+
     @Test fun shallowMissingGapMidnightAndReplacementStayHonest() {
         val fixture = fixture()
         fixture.updateHistory(89.minutes, 90.minutes, estimatedLiveEdgeTime = live)

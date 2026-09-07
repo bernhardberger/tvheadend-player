@@ -59,7 +59,7 @@ fun PlayerTimelineBar(
     liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
     availableEndFraction: Float? = liveEdgeFraction,
-    futureStartFraction: Float? = null,
+    programmeElapsedFraction: Float? = null,
     programmeTargetAvailable: Boolean? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
@@ -102,6 +102,13 @@ fun PlayerTimelineBar(
                         ),
                 )
             }
+            programmeElapsedFraction?.let { elapsed ->
+                Box(
+                    Modifier.fillMaxWidth(elapsed.coerceIn(0f, 1f))
+                        .height(barHeight)
+                        .background(PlaybackPositionColor.copy(alpha = 0.45f)),
+                )
+            }
             if (rewindableStartFraction != null && availableEndFraction != null) {
                 val start = rewindableStartFraction.coerceIn(0f, 1f)
                 val end = availableEndFraction.coerceIn(start, 1f)
@@ -111,21 +118,10 @@ fun PlayerTimelineBar(
                         .width(maxWidth * (end - start))
                         .height(barHeight)
                         .background(
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = if (programmeTargetAvailable != null) 0.65f else TvOverlayGhostFillAlpha,
-                            ),
+                            if (programmeElapsedFraction != null) PlaybackPositionColor
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayGhostFillAlpha),
                         ),
                 )
-            }
-            futureStartFraction?.takeIf { it < 1f }?.let { future ->
-                val color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTrackAlpha)
-                Canvas(Modifier.fillMaxSize()) {
-                    var x = size.width * future.coerceIn(0f, 1f)
-                    while (x < size.width) {
-                        drawLine(color, Offset(x, size.height / 2), Offset((x + 4.dp.toPx()).coerceAtMost(size.width), size.height / 2), size.height)
-                        x += 8.dp.toPx()
-                    }
-                }
             }
             if (rewindableStartFraction == null && currentProgress != null) {
                 Box(
@@ -224,7 +220,18 @@ fun PlayerTimelineBar(
                 )
             }
         }
-        if (tone != PlayerTimelineTone.AMBIENT && currentProgress != null) {
+        if (programmeElapsedFraction != null && currentProgress != null) {
+            BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
+                Box(
+                    Modifier
+                        .offset(x = (maxWidth * currentProgress - 1.dp).coerceIn(0.dp, maxWidth - 2.dp))
+                        .width(2.dp)
+                        .height(barHeight + 8.dp)
+                        .background(if (tone == PlayerTimelineTone.ACTIVE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        .then(thumbTestTag?.let(Modifier::testTag) ?: Modifier),
+                )
+            }
+        } else if (tone != PlayerTimelineTone.AMBIENT && currentProgress != null) {
             val thumbSize = if (tone == PlayerTimelineTone.INTERACTIVE) 8.dp else TvOverlayTimelineThumbSize
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
                 Box(
@@ -304,7 +311,9 @@ fun PlayerTimelineBlock(
             rewindableStartOverflow = rewindableStartOverflow,
             liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
             availableEndFraction = programmeWindow?.availableEndFraction ?: liveEdgeFraction,
-            futureStartFraction = programmeWindow?.availableEndFraction,
+            // The mapped history end is clamped to scheduled bounds, including 1f
+            // when live is beyond an old programme. It is not playback position.
+            programmeElapsedFraction = programmeWindow?.availableEndFraction,
             programmeTargetAvailable = programmeWindow?.targetAvailable,
             thumbTestTag = thumbTestTag,
             rewindableBoundaryTestTag = rewindableBoundaryTestTag,

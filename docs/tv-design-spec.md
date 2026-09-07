@@ -331,9 +331,12 @@ selected target during preview, using SDK 0.9.0's immutable schedule-grade
 estimate. Scheduled start/end clocks are display edges, not seek permissions.
 Crossing a boundary changes the window without snapping or animation. The nearby
 programme title follows preview; main identity describes sampled committed
-playback. Cross-midnight edges include dates. Unavailable history is subdued,
-available history neutral, and future schedule dashed. Orange identifies
-playback/target. The live marker appears only inside its window; the existing
+playback. Cross-midnight edges include dates. Orange fill shows scheduled elapsed
+progress from the mapped live end, with seekable history in a brighter shade of
+the same orange. Future schedule is an unfilled track, without dashes. Completed
+programmes fill completely even when live is outside their window. A thin position
+marker replaces the programme-window thumb; cyan reinforces remote focus.
+The live marker appears only inside its window; the existing
 Go live action remains reachable outside it. The estimate has no accuracy
 guarantee. Player owns no server clock machinery.
 
