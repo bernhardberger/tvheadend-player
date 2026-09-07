@@ -40,14 +40,20 @@ stability, late metadata and eviction using the published SDK fixture.
 `ProgrammeWindowInputTest` renders production composables and drives the real
 preview owner with remote input. It captures initial, preview, settled and live
 states for essential/shallow/missing/midnight/paused/held/late/evicted scenarios,
-plus compact held preview and Go Live while a seek is still pending. Native repeat
+plus compact held/evicted previews, a 1.5 font-scale case, and Go Live while a seek
+is still pending. Native repeat
 counts 12/13 exercise held acceleration. The essential input uses eleven 30-second
 steps; held input uses two 5-minute steps. Assertions protect fixed control/track
-positions across preview and feedback, and matching visual/accessibility progress.
+positions across preview and feedback, matching visual/accessibility progress,
+expired-target announcements, and target-label alignment at mid-window and during
+held preview. The fixture deliberately presses Center between preview and settled
+captures and asserts the pause toggle; a changed Play/Pause glyph is that input,
+not a side effect of seek rejection.
 Existing timeline truthfulness, navigation, key-cycle and Back tests retain
 recording elapsed/duration and no-capability semantics coverage.
 
-The offline canvas is 1920x1080 at 320dpi, English, font scale 1.0, UTC and a bright
+The offline canvas is 1920x1080 at 320dpi, English, font scale 1.0 (1.5 in the
+scaled case), UTC and a bright
 synthetic backdrop. Generated captures remain ignored. The programme title and
 scheduled edges explain the window change; Go live remains reachable without
 crossing back through every programme. This is a practical prototype, not proof
@@ -57,9 +63,14 @@ feel, SurfaceView visibility, overscan and programme-time accuracy are unclaimed
 The full and compact preview share a relative-to-live target readout above the
 handle. Scheduled edges remain clock labels; the readout does not suggest that
 the estimated broadcast alignment is precise. Focus adds a contrasting handle
-ring; evicted targets become hollow. Available history is brighter than the
+ring, including the relative fallback; evicted targets become hollow, their
+readout is subdued, and the existing expired-target message appears visually and
+in accessibility semantics before dispatch. Available history is brighter than the
 unavailable track and future remains dashed. Reserved title/readout/status slots
-keep the controls stable when metadata or rejection feedback changes.
+scale with text and keep the controls stable when metadata or rejection feedback
+changes. The mapped window also states the runtime available duration. A shallow
+buffer stays proportionally narrow rather than inflating its drawn range and
+implying that unavailable content can be reached.
 
 The pre-existing header progress remains passive and tied to committed identity;
 it is not a second seek control. Removing it or redesigning the header is outside

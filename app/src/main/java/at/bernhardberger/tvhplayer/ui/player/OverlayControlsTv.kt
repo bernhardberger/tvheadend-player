@@ -22,6 +22,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -205,8 +206,12 @@ fun OverlayControlsTv(
             )
         }
         if (timeshiftState.available && at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-            androidx.compose.foundation.layout.Box(Modifier.heightIn(min = 24.dp)) {
-                timeshiftFeedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+            val slotHeight = with(androidx.compose.ui.platform.LocalDensity.current) { 24.sp.toDp() }
+            val feedback = timeshiftFeedback ?: if (previewing && programmeWindow?.targetAvailable == false) {
+                stringResource(R.string.timeshift_target_expired)
+            } else null
+            androidx.compose.foundation.layout.Box(Modifier.heightIn(min = slotHeight)) {
+                feedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
                     style = androidx.tv.material3.MaterialTheme.typography.labelLarge) }
             }
         } else timeshiftFeedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface) }

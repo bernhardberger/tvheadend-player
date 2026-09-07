@@ -2,11 +2,8 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.width
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -83,6 +80,7 @@ internal fun TimeshiftSeekPreview(
         behindLiveLabel,
         bufferStartDescription,
     )
+    val unavailableTarget = stringResource(R.string.timeshift_target_expired)
 
     androidx.compose.foundation.layout.Column(
         modifier = modifier
@@ -97,7 +95,8 @@ internal fun TimeshiftSeekPreview(
             .testTag("timeshift-seek-preview")
             .clearAndSetSemantics {
                 contentDescription = programmeWindow?.let {
-                    "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $description"
+                    "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $description" +
+                        if (!it.targetAvailable) " $unavailableTarget" else ""
                 } ?: description
                 liveRegion = LiveRegionMode.Polite
             },
@@ -107,7 +106,7 @@ internal fun TimeshiftSeekPreview(
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("timeshift-preview-programme"))
         }
-        TimelineTargetLabel(targetLabel, displayedProgress)
+        TimelineTargetLabel(targetLabel, displayedProgress, available = programmeWindow?.targetAvailable != false)
         PlayerTimelineBlock(
             progress = range.displayProgress,
             tone = PlayerTimelineTone.PREVIEW,
@@ -145,25 +144,31 @@ internal fun TimeshiftSeekPreview(
                 modifier = Modifier.testTag("timeshift-preview-position"),
             )
         }
+        if (programmeWindow?.targetAvailable == false) {
+            Text(unavailableTarget, color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
 @Composable
-internal fun TimelineTargetLabel(label: String, progress: Float) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+internal fun TimelineTargetLabel(label: String, progress: Float, available: Boolean = true) {
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = when {
-                progress > 0.9f -> TextAlign.End
-                progress < 0.1f -> TextAlign.Start
-                else -> TextAlign.Center
-            },
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else TvOverlayTextTertiaryAlpha),
             maxLines = 1,
-            modifier = Modifier.width(180.dp)
-                .offset(x = (maxWidth * progress - 90.dp).coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp)))
+            modifier = Modifier
+                .layout { measurable, constraints ->
+                    val label = measurable.measure(constraints.copy(minWidth = 0))
+                    layout(constraints.maxWidth, label.height) {
+                        label.placeRelative(
+                            (constraints.maxWidth * progress - label.width / 2f).roundToInt()
+                                .coerceIn(0, constraints.maxWidth - label.width),
+                            0,
+                        )
+                    }
+                }
                 .testTag("timeshift-preview-target"),
         )
-    }
 }

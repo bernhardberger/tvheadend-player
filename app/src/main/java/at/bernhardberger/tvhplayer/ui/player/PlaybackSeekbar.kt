@@ -18,6 +18,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -25,6 +26,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAxis
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
@@ -171,9 +173,11 @@ fun PlaybackSeekbar(
         }
     }
     val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
+    val unavailableTarget = stringResource(R.string.timeshift_target_expired)
+    val slotHeight = with(LocalDensity.current) { 24.sp.toDp() }
     androidx.compose.foundation.layout.Column {
     if (range.domain == SeekbarDomain.TIMESHIFT && at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-    androidx.compose.foundation.layout.Box(Modifier.heightIn(min = 24.dp)) {
+    androidx.compose.foundation.layout.Row(Modifier.heightIn(min = slotHeight).fillMaxWidth()) {
     programmeWindow?.let {
         androidx.tv.material3.Text(
             text = it.event.title.orEmpty(),
@@ -181,16 +185,24 @@ fun PlaybackSeekbar(
             style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.testTag("player-window-title"),
+            modifier = Modifier.weight(1f).testTag("player-window-title"),
+        )
+        androidx.tv.material3.Text(
+            text = bufferSummary.orEmpty(),
+            color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+            style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            modifier = Modifier.testTag("player-window-available"),
         )
     }
     }
-    androidx.compose.foundation.layout.Box(Modifier.heightIn(min = 24.dp).fillMaxWidth()) {
+    androidx.compose.foundation.layout.Box(Modifier.heightIn(min = slotHeight).fillMaxWidth()) {
         if (previewing && programmeWindow != null && timeshiftPosition != null) {
             TimelineTargetLabel(
                 if (timeshiftPosition.atLiveEdge) stringResource(R.string.timeshift_live)
                 else "−${formatPlaybackDuration(timeshiftPosition.behindLiveMs)}",
                 programmeWindow.positionFraction,
+                available = programmeWindow.targetAvailable,
             )
         }
     }
@@ -236,7 +248,8 @@ fun PlaybackSeekbar(
             }
             .semantics {
                 contentDescription = programmeWindow?.let {
-                    "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $stateDescription"
+                    "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $stateDescription" +
+                        if (!it.targetAvailable) " $unavailableTarget" else ""
                 } ?: stateDescription
                 progressBarRangeInfo = ProgressBarRangeInfo(accessibilityProgress, 0f..1f)
                 customActions = accessibilityActions

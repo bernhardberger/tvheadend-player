@@ -11,6 +11,8 @@ import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -78,6 +80,8 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 val preview = owner.preview
                 val committed = programmeWindow(state, mappingTimeline = preview?.mappingTimeline ?: state.timeline, eventAt = ::lookup)
                 val window = if (preview == null) committed else programmeWindow(state, preview.target, preview.mappingTimeline, ::lookup)
+                val density = LocalDensity.current
+                CompositionLocalProvider(LocalDensity provides Density(density.density, if (scenario == "font-scaled") 1.5f else 1f)) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize()) {
                         DebugVideoBackdrop(true, Modifier.fillMaxSize())
@@ -107,11 +111,13 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                             })
                     }
                 }
+                }
             }
             rule.runOnIdle { input.requestInputMode(InputMode.Keyboard) }
             rule.mainClock.advanceTimeBy(100)
             rule.onNodeWithTag("player-pause").assertIsFocused()
             capture("initial")
+            if (shallow) rule.onNodeWithTag("player-window-available").assertTextEquals("1:00 available")
             val actionTop = rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top
             val trackTop = rule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot.top
             rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
@@ -152,6 +158,15 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 assertSame(target, owner.preview!!.target)
             }
             capture("preview")
+            if (scenario == "evicted") {
+                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(
+                    "That position is no longer in the buffer.", substring = true)
+                rule.onNodeWithText("That position is no longer in the buffer.").assertExists()
+            }
+            if (shallow || scenario == "held") {
+                assertEquals(rule.onNodeWithTag("player-seekbar-thumb").fetchSemanticsNode().boundsInRoot.center.x,
+                    rule.onNodeWithTag("timeshift-preview-target").fetchSemanticsNode().boundsInRoot.center.x, 1f)
+            }
             assertEquals(actionTop, rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top)
             assertEquals(trackTop, rule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot.top)
             if (!missing) rule.onNodeWithTag("timeshift-preview-target").assertExists()
@@ -174,10 +189,12 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 capture("live")
                 return
             }
-            if (scenario == "held") {
+            if (scenario == "held" || scenario == "evicted") {
                 rule.runOnIdle { compactPreview = true }
                 rule.mainClock.advanceTimeByFrame()
                 capture("compact-preview")
+                if (scenario == "evicted") rule.onNodeWithTag("timeshift-seek-preview").assertContentDescriptionContains(
+                    "That position is no longer in the buffer.", substring = true)
                 rule.runOnIdle { compactPreview = false }
                 rule.mainClock.advanceTimeBy(50)
                 rule.onNodeWithTag("player-seekbar").requestFocus()
@@ -221,6 +238,6 @@ class ProgrammeWindowInputTest(private val scenario: String) {
 
     companion object {
         @JvmStatic @Parameterized.Parameters(name = "{0}")
-        fun scenarios() = listOf("essential", "shallow", "missing", "midnight", "paused", "held", "late", "evicted", "go-live-pending")
+        fun scenarios() = listOf("essential", "shallow", "missing", "midnight", "paused", "held", "late", "evicted", "go-live-pending", "font-scaled")
     }
 }
