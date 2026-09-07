@@ -599,6 +599,9 @@ fun VideoPlayerScreen(
             }
         } ?: committedWindow.takeIf { timelineState.preview == null }
     } else null
+    val displayedNextEvent = if (committedWindow != null) {
+        observation.nextEvent(currentChannelId, committedWindow.estimatedPosition)
+    } else nextEvent
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,
@@ -1086,12 +1089,11 @@ fun VideoPlayerScreen(
                 channelName = currentChannelName,
                 piconPath = currentChannel?.icon,
                 nowEvent = (committedWindow?.event ?: nowEvent).takeUnless { channelUnavailable },
-                nextEvent = (committedWindow?.let {
-                    observation.nextEvent(currentChannelId, it.estimatedPosition)
-                } ?: nextEvent).takeUnless { channelUnavailable },
+                nextEvent = displayedNextEvent.takeUnless { channelUnavailable },
                 committedTimeshiftState = effectiveTimeshiftState,
                 committedWindow = committedWindow,
                 programmeWindow = displayedWindow,
+                previewing = timelineState.preview != null,
                 nowSec = nowSec,
                 controlsVisible = layerState.controlsVisible,
                 optionsOpen = layerState.optionsPage != null,
@@ -1122,7 +1124,7 @@ fun VideoPlayerScreen(
                 } ?: effectiveTimeshiftState,
                 liveAvailable = !channelUnavailable,
                 channelRecordingNow = currentChannelId in recordingChannelIds,
-                nextScheduled = nextEvent?.let { observation.dvrEntryForEvent(it.id) }?.state ==
+                nextScheduled = displayedNextEvent?.let { observation.dvrEntryForEvent(it.id) }?.state ==
                     at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
                 timeshiftFeedback = timelineState.feedback,
                 paused = !player.playWhenReady,

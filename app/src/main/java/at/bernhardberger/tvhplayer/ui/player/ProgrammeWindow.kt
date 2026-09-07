@@ -17,6 +17,7 @@ data class ProgrammeWindow(
     val availableStartFraction: Float,
     val availableEndFraction: Float,
     val liveFraction: Float?,
+    val targetAvailable: Boolean,
 )
 
 internal fun programmeWindow(
@@ -37,7 +38,7 @@ internal fun programmeWindow(
     if (span <= 0.0) return null
     fun fraction(time: Instant) = ((time - event.start).inWholeMilliseconds / span).toFloat().coerceIn(0f, 1f)
     return ProgrammeWindow(event, position, fraction(position), fraction(start), fraction(end),
-        fraction(end).takeIf { end >= event.start && end <= event.stop })
+        fraction(end).takeIf { end >= event.start && end <= event.stop }, target.position in history.start..history.end)
 }
 
 internal fun programmeWindowClockLabels(event: EpgEvent, zone: ZoneId = ZoneId.systemDefault()): Pair<String, String> {

@@ -11,6 +11,8 @@ import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -18,6 +20,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -66,6 +69,11 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 owner = remember { LiveTimelinePresentationState(scope, { base.toEpochMilliseconds() }, { rule.mainClock.currentTime }) }
                 val context = LocalContext.current
                 val imageLoader = remember { ImageLoader.Builder(context).build() }
+                val unavailable = stringResource(R.string.timeshift_unavailable)
+                val clamped = stringResource(R.string.timeshift_seek_clamped)
+                val expired = stringResource(R.string.timeshift_target_expired)
+                val replaced = stringResource(R.string.timeshift_target_replaced)
+                val uncertain = stringResource(R.string.timeshift_seek_uncertain)
                 fun lookup(time: Instant) = events.singleOrNull { metadata && time >= it.start && time < it.stop }
                 val preview = owner.preview
                 val committed = programmeWindow(state, mappingTimeline = preview?.mappingTimeline ?: state.timeline, eventAt = ::lookup)
@@ -80,10 +88,11 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                             controlsVisible = true, optionsOpen = false, onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
                             timeshiftState = preview?.let { projectedTimeshiftState(state, it.decision.targetMs) } ?: state,
                             committedTimeshiftState = state, committedWindow = committed, programmeWindow = window,
+                            previewing = preview != null,
                             timeshiftFeedback = owner.feedback, paused = paused, onToggleTimeshiftPause = { paused = !paused },
                             onCommitSeek = owner::commitPendingSeek,
                             onSeekTimeshift = { delta ->
-                                owner.queueRelativeSeek(state, delta, "Unavailable", "Clamped", "Expired", "Replaced", "Uncertain") { target ->
+                                owner.queueRelativeSeek(state, delta, unavailable, clamped, expired, replaced, uncertain) { target ->
                                     fixture.seek(target) {
                                         dispatches += target.position.inWholeMilliseconds
                                         state = fixture.state.value.toAppPresentation(fixture.playbackPosition(target.position))
@@ -103,8 +112,11 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             rule.mainClock.advanceTimeBy(100)
             rule.onNodeWithTag("player-pause").assertIsFocused()
             capture("initial")
+            val actionTop = rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top
+            val trackTop = rule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot.top
             rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
             rule.onNodeWithTag("player-seekbar").assertIsFocused()
+            capture("focused")
             rule.mainClock.autoAdvance = false
             if (scenario == "held") {
                 val now = android.os.SystemClock.uptimeMillis()
@@ -140,6 +152,28 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 assertSame(target, owner.preview!!.target)
             }
             capture("preview")
+            assertEquals(actionTop, rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top)
+            assertEquals(trackTop, rule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot.top)
+            if (!missing) rule.onNodeWithTag("timeshift-preview-target").assertExists()
+            if (!missing) {
+                val expected = requireNotNull(programmeWindow(state, target, owner.preview!!.mappingTimeline) { time ->
+                    events.singleOrNull { time >= it.start && time < it.stop }
+                })
+                assertEquals(expected.positionFraction, rule.onNodeWithTag("player-seekbar").fetchSemanticsNode()
+                    .config[SemanticsProperties.ProgressBarRangeInfo].current)
+                assertEquals(scenario != "evicted", expected.targetAvailable)
+            }
+            if (scenario == "go-live-pending") {
+                rule.onNodeWithTag("player-go-live").requestFocus().performKeyInput { pressKey(Key.Enter) }
+                rule.mainClock.advanceTimeBy(500)
+                rule.runOnIdle {
+                    assertTrue(dispatches.isEmpty())
+                    assertNull(owner.preview)
+                    assertEquals(90.minutes.inWholeMilliseconds, state.positionMs)
+                }
+                capture("live")
+                return
+            }
             if (scenario == "held") {
                 rule.runOnIdle { compactPreview = true }
                 rule.mainClock.advanceTimeByFrame()
@@ -155,10 +189,11 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             rule.mainClock.advanceTimeBy(450)
             rule.waitForIdle()
             assertEquals(if (scenario == "evicted") emptyList<Long>() else listOf(target.position.inWholeMilliseconds), dispatches)
-            if (scenario == "evicted") assertEquals("Expired", owner.feedback)
+            if (scenario == "evicted") assertEquals("That position is no longer in the buffer.", owner.feedback)
             rule.mainClock.advanceTimeBy(1_000)
             rule.mainClock.autoAdvance = true
             capture("settled")
+            assertEquals(actionTop, rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top)
             rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
             rule.onNodeWithTag("player-pause").assertIsFocused()
             rule.onRoot().performKeyInput { repeat(5) { pressKey(Key.DirectionRight) } }
@@ -186,6 +221,6 @@ class ProgrammeWindowInputTest(private val scenario: String) {
 
     companion object {
         @JvmStatic @Parameterized.Parameters(name = "{0}")
-        fun scenarios() = listOf("essential", "shallow", "missing", "midnight", "paused", "held", "late", "evicted")
+        fun scenarios() = listOf("essential", "shallow", "missing", "midnight", "paused", "held", "late", "evicted", "go-live-pending")
     }
 }

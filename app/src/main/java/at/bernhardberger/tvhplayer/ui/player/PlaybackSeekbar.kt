@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,7 @@ fun PlaybackSeekbar(
     programmePositionMs: Long? = null,
     programmeDurationMs: Long? = null,
     programmeWindow: ProgrammeWindow? = null,
+    previewing: Boolean = false,
     /**
      * Live-edge presentation to label the timeline with. Defaults to the measured
      * distance within [range]; live callers pass the server-shift-aware presentation.
@@ -142,7 +144,7 @@ fun PlaybackSeekbar(
     val seekForwardLabel = stringResource(R.string.seek_forward_30)
     val seekBackTarget = seekbarScrub(range, -1, 0)
     val seekForwardTarget = seekbarScrub(range, 1, 0)
-    val accessibilityProgress = if (range.domain == SeekbarDomain.TIMESHIFT) {
+    val accessibilityProgress = programmeWindow?.positionFraction ?: if (range.domain == SeekbarDomain.TIMESHIFT) {
         range.progress
     } else {
         displayedProgress
@@ -170,6 +172,8 @@ fun PlaybackSeekbar(
     }
     val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
     androidx.compose.foundation.layout.Column {
+    if (range.domain == SeekbarDomain.TIMESHIFT && at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+    androidx.compose.foundation.layout.Box(Modifier.heightIn(min = 24.dp)) {
     programmeWindow?.let {
         androidx.tv.material3.Text(
             text = it.event.title.orEmpty(),
@@ -179,6 +183,17 @@ fun PlaybackSeekbar(
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.testTag("player-window-title"),
         )
+    }
+    }
+    androidx.compose.foundation.layout.Box(Modifier.heightIn(min = 24.dp).fillMaxWidth()) {
+        if (previewing && programmeWindow != null && timeshiftPosition != null) {
+            TimelineTargetLabel(
+                if (timeshiftPosition.atLiveEdge) stringResource(R.string.timeshift_live)
+                else "−${formatPlaybackDuration(timeshiftPosition.behindLiveMs)}",
+                programmeWindow.positionFraction,
+            )
+        }
+    }
     }
     PlayerTimelineBlock(
         progress = displayedProgress,

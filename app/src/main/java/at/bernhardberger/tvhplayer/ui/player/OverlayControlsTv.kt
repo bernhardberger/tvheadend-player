@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -71,6 +72,7 @@ fun OverlayControlsTv(
     committedTimeshiftState: AppTimeshiftState = timeshiftState,
     committedWindow: ProgrammeWindow? = null,
     programmeWindow: ProgrammeWindow? = null,
+    previewing: Boolean = false,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -169,6 +171,7 @@ fun OverlayControlsTv(
                 range = timeshiftSeekbarRange(timeshiftState),
                 timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
                 programmeWindow = programmeWindow,
+                previewing = previewing,
                 paused = paused,
                 onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
                 modifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
@@ -201,6 +204,11 @@ fun OverlayControlsTv(
                     },
             )
         }
-        timeshiftFeedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface) }
+        if (timeshiftState.available && at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+            androidx.compose.foundation.layout.Box(Modifier.heightIn(min = 24.dp)) {
+                timeshiftFeedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+                    style = androidx.tv.material3.MaterialTheme.typography.labelLarge) }
+            }
+        } else timeshiftFeedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface) }
     }
 }

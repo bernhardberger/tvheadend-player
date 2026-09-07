@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -59,6 +60,7 @@ fun PlayerTimelineBar(
     progressSemantics: Boolean = true,
     availableEndFraction: Float? = liveEdgeFraction,
     futureStartFraction: Float? = null,
+    programmeTargetAvailable: Boolean? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
     val barHeight = if (tone == PlayerTimelineTone.ACTIVE) {
@@ -110,7 +112,7 @@ fun PlayerTimelineBar(
                         .height(barHeight)
                         .background(
                             MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = TvOverlayGhostFillAlpha,
+                                alpha = if (programmeTargetAvailable != null) 0.65f else TvOverlayGhostFillAlpha,
                             ),
                         ),
                 )
@@ -212,7 +214,7 @@ fun PlayerTimelineBar(
                         .then(liveEdgeTestTag?.let(Modifier::testTag) ?: Modifier),
                 )
             }
-            if (rewindableStartFraction != null && currentProgress != null) {
+            if (rewindableStartFraction != null && currentProgress != null && programmeTargetAvailable != false) {
                 Box(
                     Modifier
                         .offset(x = (maxWidth * currentProgress - 1.dp).coerceAtLeast(0.dp))
@@ -230,7 +232,10 @@ fun PlayerTimelineBar(
                         .offset(x = maxWidth * currentProgress - thumbSize / 2)
                         .size(thumbSize)
                         .clip(CircleShape)
-                        .background(PlaybackPositionColor)
+                        .background(if (programmeTargetAvailable == false) Color.Transparent else PlaybackPositionColor)
+                        .then(if (programmeTargetAvailable != null && (tone == PlayerTimelineTone.ACTIVE || !programmeTargetAvailable)) {
+                            Modifier.border(2.dp, if (tone == PlayerTimelineTone.ACTIVE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, CircleShape)
+                        } else Modifier)
                         .then(thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier),
                 )
             }
@@ -300,6 +305,7 @@ fun PlayerTimelineBlock(
             liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
             availableEndFraction = programmeWindow?.availableEndFraction ?: liveEdgeFraction,
             futureStartFraction = programmeWindow?.availableEndFraction,
+            programmeTargetAvailable = programmeWindow?.targetAvailable,
             thumbTestTag = thumbTestTag,
             rewindableBoundaryTestTag = rewindableBoundaryTestTag,
             rewindableOverflowTestTag = rewindableOverflowTestTag,

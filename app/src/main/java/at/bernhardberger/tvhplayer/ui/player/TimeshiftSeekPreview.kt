@@ -107,22 +107,7 @@ internal fun TimeshiftSeekPreview(
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("timeshift-preview-programme"))
         }
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Text(
-                text = targetLabel,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = when {
-                    displayedProgress > 0.9f -> TextAlign.End
-                    displayedProgress < 0.1f -> TextAlign.Start
-                    else -> TextAlign.Center
-                },
-                maxLines = 1,
-                modifier = Modifier.width(180.dp)
-                    .offset(x = (maxWidth * displayedProgress - 90.dp).coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp)))
-                    .testTag("timeshift-preview-target"),
-            )
-        }
+        TimelineTargetLabel(targetLabel, displayedProgress)
         PlayerTimelineBlock(
             progress = range.displayProgress,
             tone = PlayerTimelineTone.PREVIEW,
@@ -160,5 +145,25 @@ internal fun TimeshiftSeekPreview(
                 modifier = Modifier.testTag("timeshift-preview-position"),
             )
         }
+    }
+}
+
+@Composable
+internal fun TimelineTargetLabel(label: String, progress: Float) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = when {
+                progress > 0.9f -> TextAlign.End
+                progress < 0.1f -> TextAlign.Start
+                else -> TextAlign.Center
+            },
+            maxLines = 1,
+            modifier = Modifier.width(180.dp)
+                .offset(x = (maxWidth * progress - 90.dp).coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp)))
+                .testTag("timeshift-preview-target"),
+        )
     }
 }
