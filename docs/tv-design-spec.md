@@ -243,8 +243,8 @@ No new type scale. Roles are fixed so slots stop being re-chosen per screen.
 |---|---|---|
 | Screen title | `headlineMedium` | primary |
 | Section heading | `titleLarge` | primary |
-| Item title | `bodyLarge` / `headlineMedium` in the player | primary |
-| Eyebrow / channel identity | `titleMedium` | secondary |
+| Item title | `bodyLarge` / bounded two-line `headlineSmall` in the player | primary |
+| Eyebrow / channel identity | `titleMedium` / `labelLarge` in the player | secondary |
 | Metadata / supporting | `labelLarge` | tertiary |
 
 Long localized text must not change a layout's anchors. See 6.1.
@@ -373,11 +373,19 @@ timing; relative durations alone do not establish a wall-clock timestamp.
 
 Live TV and recordings share one composition: artwork and identity at top left,
 current wall time at top right, and a compact action strip above the bottom
-timeline. Play/Pause, Info, Settings, neutral Record and immediate Stop retain
-fixed slots; recordings leave Record empty and live without a timeshift buffer
+timeline. Play/Pause and immediate Stop form the transport group; a modest gap
+separates Info, neutral Record and Settings. Actions retain fixed slots;
+recordings leave Record empty and live without a timeshift buffer
 leaves Play/Pause empty. Live/Go live owns a separate reserved footprint.
 Only the focused icon gets a short visible label; every icon has an accessible
-name. There is no separate transport row or Actions-up hint.
+name. Idle utility actions have no filled backing, unlike Play/Pause. There is
+no separate transport row or Actions-up hint. Header artwork fits an inset
+96-by-64dp container; the 480dp-bounded two-line headline outranks channel identity, timing
+and Next. Informational cyan programme progress is bounded to a 320dp timing row,
+not stretched into a second seekbar. Seek previews place precise stream-relative
+targets near the thumb, bounded inside the viewport, without changing seek bounds.
+The focused caption follows its control and scales with text size. Missing
+programme metadata gets secondary unavailable copy, not a duplicate channel title.
 
 Live Now/Next describes the committed programme, not the uncommitted seek
 preview. Both programmes show start/end times. Programme progress is a separate
@@ -404,13 +412,24 @@ at most a category root and one choices/details level, using TV Material list
 rows with current values, explicit selection and unavailable/loading states.
 Info retains existing recording actions and confirmations, not Settings
 diagnostics. Back returns through panel levels and restores the invoking action.
+Programme-backed Info and Recording Info initially focus a scrollable reading
+region, never Record. Titles and synopsis scroll together; actions remain below
+the reading region. Down at the end reaches the actions and Up returns to reading.
+An explicit outlined Close is secondary to Back. Unavailable Info retains its
+safe Close focus and bottom-end action placement. Scroll edges fade inside the
+reading viewport, away from the focus border. Settings and Info share 32dp horizontal and 16dp inner vertical
+padding inside the existing frame.
 
 The channel shelf is horizontal and compact. Entry scrolls to the playing
 channel before requesting focus. Focus-following Now/Next is independent of
 playing and channel-recording-now state. Selecting the playing channel closes
 without retuning; CH+/CH- tunes directly even in the shelf. Digit entry supports
-timeout, explicit confirmation and cancellation. An ordinary connected tune
-failure leaves channel access and navigation available, shows no false playing
+timeout, explicit confirmation and cancellation. One compact playing identity
+heads the composition; one focused-channel Now/Next block sits above 88dp cards.
+The focus border, playing triangle and recording dot have separate meanings and
+accessible labels; do not repeat channel identity or visible Playing labels.
+An ordinary connected tune failure leaves channel access and navigation
+available, shows no false playing
 marker or borrowed buffer, and does not offer generic Retry without useful
 runtime evidence. Connection loss and actual runtime recovery remain distinct.
 

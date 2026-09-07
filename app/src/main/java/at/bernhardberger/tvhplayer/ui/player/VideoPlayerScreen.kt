@@ -1035,9 +1035,9 @@ fun VideoPlayerScreen(
                     PlayerIdentityHeader(
                         imageLoader = imageLoader, currentSession = currentSession,
                         piconPath = currentChannel?.icon,
-                        eyebrow = currentChannelNumber?.toString(),
-                        title = currentChannelName,
-                        support = if (confirmedPlayingChannelId != null) stringResource(R.string.player_shelf_playing) else null,
+                        eyebrow = null,
+                        title = listOfNotNull(currentChannelNumber?.toString(), currentChannelName).joinToString(" "),
+                        support = null,
                         clock = formatClock(nowSec), clockSupport = null,
                         modifier = modifier,
                     )

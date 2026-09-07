@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -26,6 +29,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -35,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
@@ -67,46 +72,55 @@ internal fun PlayerActionRow(
     paused: Boolean = false,
     pauseFocus: FocusRequester? = null,
 ) {
-    var focusedLabel by remember { mutableStateOf<String?>(null) }
+    var focusedTag by remember { mutableStateOf<String?>(null) }
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val info = stringResource(R.string.player_info)
     val settings = stringResource(R.string.nav_settings)
     val record = stringResource(R.string.record)
     val stop = stringResource(R.string.stop_playback)
     val goLive = stringResource(R.string.timeshift_go_live)
+    val actions = listOf(
+        PlayerAction("player-pause", playPause,
+            if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, onTogglePause, pauseFocus),
+        PlayerAction("player-stop", stop, Icons.Filled.Stop, onStop, null),
+        PlayerAction("player-info", info, Icons.Filled.Info, onInfo, infoFocus),
+        PlayerAction("player-record", record, Icons.Filled.FiberManualRecord, onRecord, recordFocus),
+        PlayerAction("player-settings", settings, Icons.Filled.Settings, onSettings, settingsFocus),
+    )
+    val focusedLabel = if (focusedTag == "player-go-live") goLive else actions.firstOrNull { it.tag == focusedTag }?.label
     androidx.compose.foundation.layout.Column(modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().height(24.dp)) {
-            focusedLabel?.let {
-                Text(it, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("player-action-context-label")
-                        .semantics { hideFromAccessibility() })
-            }
+        BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 24.dp)) {
+            val index = actions.indexOfFirst { it.tag == focusedTag }.coerceAtLeast(0)
+            val labelStart = if (focusedTag == "player-go-live") maxWidth - 144.dp else
+                (TvOverlayActionButtonSize + TvOverlayActionGap) * index + if (index >= 2) 16.dp + TvOverlayActionGap else 0.dp
+            Text(focusedLabel.orEmpty(), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.width(180.dp)
+                    .offset(x = labelStart.coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp)))
+                    .testTag("player-action-context-label")
+                    .semantics { hideFromAccessibility() })
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val actions = listOf(
-                PlayerAction("player-pause", playPause,
-                    if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, onTogglePause, pauseFocus),
-                PlayerAction("player-info", info, Icons.Filled.Info, onInfo, infoFocus),
-                PlayerAction("player-settings", settings, Icons.Filled.Settings, onSettings, settingsFocus),
-                PlayerAction("player-record", record, Icons.Filled.FiberManualRecord, onRecord, recordFocus),
-                PlayerAction("player-stop", stop, Icons.Filled.Stop, onStop, null),
-            )
             actions.forEach { (tag, label, icon, action, focus) ->
+                if (tag == "player-info") Spacer(Modifier.width(16.dp))
                 if (action == null) {
                     Spacer(Modifier.size(TvOverlayActionButtonSize))
                 } else {
                     IconButton(
                         onClick = { onInteraction(); action() },
+                        colors = IconButtonDefaults.colors(
+                            containerColor = if (tag == "player-pause") MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                            contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.78f),
+                        ),
                         modifier = Modifier.size(TvOverlayActionButtonSize)
                             .testTag(tag)
                             .then(focus?.let { Modifier.focusRequester(it) } ?: Modifier)
                             .onFocusChanged {
-                                if (it.isFocused) { focusedLabel = label; onInteraction() }
-                                else if (focusedLabel == label) focusedLabel = null
+                                if (it.isFocused) { focusedTag = tag; onInteraction() }
+                                else if (focusedTag == tag) focusedTag = null
                             },
                     ) { Icon(icon, contentDescription = label) }
                 }
@@ -119,8 +133,8 @@ internal fun PlayerActionRow(
                     false -> Button(
                         onClick = { onInteraction(); onGoLive() },
                         modifier = Modifier.testTag("player-go-live").onFocusChanged {
-                            if (it.isFocused) { focusedLabel = goLive; onInteraction() }
-                            else if (focusedLabel == goLive) focusedLabel = null
+                            if (it.isFocused) { focusedTag = "player-go-live"; onInteraction() }
+                            else if (focusedTag == "player-go-live") focusedTag = null
                         },
                     ) { Text(goLive, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     null -> Unit

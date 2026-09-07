@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.offset
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -211,12 +214,22 @@ internal fun RecordingSeekPreview(
             .testTag("recording-seek-preview")
             .clearAndSetSemantics { contentDescription = description; liveRegion = LiveRegionMode.Polite },
     ) {
+        if (presentation is RecordingTimelinePresentation.Seekable) {
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                Text(target, style = MaterialTheme.typography.titleMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier
+                        .width(180.dp)
+                        .offset(x = (maxWidth * presentation.range.progress - 90.dp)
+                            .coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp))))
+            }
+        }
         when (presentation) {
             is RecordingTimelinePresentation.Seekable -> PlayerTimelineBlock(
                 progress = presentation.range.progress,
                 tone = PlayerTimelineTone.PREVIEW,
                 ghostProgress = originMs?.let { (it.toFloat() / presentation.range.endMs).coerceIn(0f, 1f) },
-                leadingLabel = formatPlaybackDuration(targetMs),
+                leadingLabel = null,
                 trailingLabel = originMs?.let { formatPlaybackDelta(targetMs - it) }
                     ?: formatPlaybackDuration(presentation.range.endMs),
             )

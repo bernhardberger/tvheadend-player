@@ -2,6 +2,11 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -92,12 +97,25 @@ internal fun TimeshiftSeekPreview(
                 liveRegion = LiveRegionMode.Polite
             },
     ) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            Text(
+                text = targetLabel,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = when {
+                    range.displayProgress > 0.9f -> TextAlign.End
+                    range.displayProgress < 0.1f -> TextAlign.Start
+                    else -> TextAlign.Center
+                },
+                maxLines = 1,
+                modifier = Modifier.width(180.dp)
+                    .offset(x = (maxWidth * range.displayProgress - 90.dp).coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp)))
+                    .testTag("timeshift-preview-target"),
+            )
+        }
         PlayerTimelineBlock(
             progress = range.displayProgress,
             tone = PlayerTimelineTone.PREVIEW,
-            leadingLabel = targetLabel,
-            trailingLabel = liveLabel,
-            leadingLabelTestTag = "timeshift-preview-target",
             rewindableStartFraction = range.availableStartFraction,
             rewindableStartOverflow = false,
             liveEdgeFraction = 1f,
@@ -111,14 +129,6 @@ internal fun TimeshiftSeekPreview(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = deltaLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(
-                    alpha = TvOverlayTextTertiaryAlpha,
-                ),
-                modifier = Modifier.testTag("timeshift-preview-delta"),
-            )
-            Text(
                 text = bufferStartLabel,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -128,11 +138,10 @@ internal fun TimeshiftSeekPreview(
                 ),
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = TvOverlaySidePadding / 4)
                     .testTag("timeshift-preview-buffer-start"),
             )
             Text(
-                text = behindLiveLabel,
+                text = if (targetLabel == liveLabel) "" else liveLabel,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface.copy(
                     alpha = TvOverlayTextTertiaryAlpha,

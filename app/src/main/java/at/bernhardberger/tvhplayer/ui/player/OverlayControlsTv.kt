@@ -78,6 +78,7 @@ fun OverlayControlsTv(
     val pausable = timeshiftState.available
     val initialFocus = if (pausable) pauseFocus else infoFocus
     val programmeTimeKnown = programmeTimingDescribesPlayback(timeshiftState)
+    val programmeTitle = nowEvent?.takeIf { programmeTimeKnown }?.title.orEmpty()
     var focusInitialized by remember { mutableStateOf(false) }
     var previousSeekable by remember { mutableStateOf(seekable) }
     var lastFocusWasTimeline by remember { mutableStateOf(false) }
@@ -116,8 +117,9 @@ fun OverlayControlsTv(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
             eyebrow = channelTitleText(channelNumber, channelName) +
                 if (channelRecordingNow) " / " + stringResource(R.string.player_shelf_recording) else "",
-            title = nowEvent?.takeIf { programmeTimeKnown }?.title.orEmpty().ifEmpty { channelName },
-            support = if (!programmeTimeKnown) stringResource(R.string.player_programme_timing_unavailable) else nextEvent?.let {
+            title = programmeTitle,
+            support = if (!programmeTimeKnown) stringResource(R.string.player_programme_timing_unavailable)
+            else if (programmeTitle.isBlank()) stringResource(R.string.player_info_unavailable_title) else nextEvent?.let {
                 stringResource(R.string.player_next_event_with_range,
                     "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}", it.title.orEmpty()) +
                     if (nextScheduled) " / " + stringResource(R.string.recording_state_scheduled) else ""

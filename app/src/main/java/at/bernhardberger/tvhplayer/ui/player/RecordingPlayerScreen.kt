@@ -484,13 +484,16 @@ fun RecordingPlayerScreen(
                     paneTitle = stringResource(R.string.player_info),
                     panelTag = "recording-info-panel",
                 ) {
-                    RecordingContentDetails(
-                        entry = entry,
-                        modifier = Modifier.padding(28.dp),
-                        actions = {
-                            Button(
+                    PlayerInfoReadingContent(
+                        title = entry.title.orEmpty(),
+                        subtitle = listOfNotNull(entry.subtitle, entry.channelName).joinToString(" / "),
+                        body = entry.summary?.takeIf(String::isNotBlank) ?: entry.description,
+                        readingFocus = infoFocus,
+                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp),
+                        footer = {
+                            androidx.tv.material3.OutlinedButton(
                                 onClick = ::closeInfo,
-                                modifier = Modifier.focusRequester(infoFocus),
+                                modifier = Modifier.align(Alignment.End),
                             ) {
                                 Text(stringResource(R.string.player_info_close))
                             }

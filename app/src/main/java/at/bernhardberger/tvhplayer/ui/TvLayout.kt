@@ -84,11 +84,11 @@ val TvOverlayBottomPadding = TvSpacing32
 val TvOverlayHeaderGradientRunout = 72.dp
 val TvOverlayFooterGradientRunout = 80.dp
 
-val TvOverlayHeaderMinHeight = 96.dp
+val TvOverlayHeaderMinHeight = 72.dp
 /** First-baseline anchor for both header columns. Must exceed the clock's ascent. */
-val TvOverlayHeaderFirstBaseline = 44.dp
-val TvOverlayHeaderPiconWidth = 160.dp
-val TvOverlayHeaderPiconHeight = 90.dp
+val TvOverlayHeaderFirstBaseline = 24.dp
+val TvOverlayHeaderPiconWidth = 96.dp
+val TvOverlayHeaderPiconHeight = 64.dp
 val TvOverlayHeaderPiconGap = TvSpacing24
 val TvOverlayHeaderColumnGap = TvSpacing48
 

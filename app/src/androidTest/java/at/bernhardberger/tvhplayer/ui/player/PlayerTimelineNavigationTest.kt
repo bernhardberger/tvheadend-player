@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.requestFocus
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -54,14 +55,15 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
             }
         }
         val timeline = if (recording) "recording-seekbar" else "player-seekbar"
-        rule.onNodeWithTag(timeline).assertIsFocused()
+        rule.onNodeWithTag("player-pause").assertIsFocused()
+        rule.onNodeWithTag(timeline).requestFocus().assertIsFocused()
         rule.onRoot().performKeyInput { keyDown(Key.DirectionUp) }
-        rule.onNodeWithTag("player-info").assertIsFocused()
+        rule.onNodeWithTag("player-pause").assertIsFocused()
         InstrumentationRegistry.getInstrumentation().sendKeySync(
             KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 2),
         )
         rule.onRoot().performKeyInput { keyUp(Key.DirectionUp) }
-        rule.onNodeWithTag("player-info").assertIsFocused()
+        rule.onNodeWithTag("player-pause").assertIsFocused()
         rule.runOnIdle { assertEquals(1, commits); assertEquals(0, leakedEvents) }
         rule.onRoot().performKeyInput { keyDown(Key.DirectionDown) }
         rule.onNodeWithTag(timeline).assertIsFocused()

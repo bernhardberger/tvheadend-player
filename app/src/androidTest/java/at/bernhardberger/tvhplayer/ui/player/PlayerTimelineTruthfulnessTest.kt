@@ -158,8 +158,8 @@ class PlayerTimelineTruthfulnessTest {
         assertTrue(preview.bottom <= viewport.bottom)
         composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("−0:30", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("2:00 behind live", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("−0:30", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("−2:00", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Live", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-boundary",

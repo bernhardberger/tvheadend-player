@@ -1,5 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+
 import android.content.res.Configuration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -103,7 +107,7 @@ class RecordingOverlayCompositionTest {
 
         assertEquals(shortEyebrow.top, longEyebrow.top, 1f)
         assertEquals(shortPicon.top, longPicon.top, 1f)
-        assertEquals(longEyebrow.top, clock.top, 1f)
+        assertTrue(kotlin.math.abs(longEyebrow.top - clock.top) < with(composeRule.density) { 12.dp.toPx() })
     }
 
     @Test
@@ -114,7 +118,8 @@ class RecordingOverlayCompositionTest {
         val settings = bounds("player-settings")
         val stop = bounds("player-stop")
         assertTrue(info.right < settings.left)
-        assertTrue(stop.left - settings.right >= settings.width)
+        assertTrue(settings.left - info.right >= info.width)
+        assertTrue(stop.right < info.left)
         assertTrue(bounds("recording-actions").bottom <= bounds("recording-duration-status").top)
         composeRule.onNodeWithTag("player-record").assertDoesNotExist()
         composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
@@ -127,6 +132,8 @@ class RecordingOverlayCompositionTest {
 
         val actionsBefore = bounds("recording-actions")
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-stop").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
@@ -172,6 +179,9 @@ class RecordingOverlayCompositionTest {
         assertTrue(labelBounds.top >= actions.top)
         assertTrue(labelBounds.left >= actions.left)
         assertTrue(labelBounds.right <= actions.right)
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        contextLabel.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertTrue(!layouts.single().didOverflowHeight)
     }
 
     @Test

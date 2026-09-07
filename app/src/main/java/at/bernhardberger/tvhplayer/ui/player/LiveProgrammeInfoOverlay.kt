@@ -101,6 +101,7 @@ internal fun LiveProgrammeInfoOverlay(
 ) {
     val closeFocus = remember { FocusRequester() }
     val recordFocus = remember { FocusRequester() }
+    val readingFocus = remember { FocusRequester() }
     val showingRecordingDialog = confirmationVisible &&
         recordingState !is LiveInfoRecordingState.Idle
     val paneTitle = if (showingRecordingDialog) {
@@ -116,7 +117,7 @@ internal fun LiveProgrammeInfoOverlay(
     LaunchedEffect(event?.id, showingRecordingDialog) {
         if (showingRecordingDialog || restoreRecordFocus) return@LaunchedEffect
         withFrameNanos { }
-        closeFocus.requestFocus()
+        (if (event != null) readingFocus else closeFocus).requestFocus()
     }
 
     LaunchedEffect(
@@ -156,7 +157,7 @@ internal fun LiveProgrammeInfoOverlay(
                         this.paneTitle = paneTitle
                         if (showingRecordingDialog) dialog()
                     }
-                    .padding(TvSpacing24),
+                    .padding(horizontal = TvSpacing32, vertical = 16.dp),
             ) {
                 if (showingRecordingDialog) {
                     ProgrammeRecordingConfirmation(
@@ -183,21 +184,25 @@ internal fun LiveProgrammeInfoOverlay(
                             piconContent?.invoke()
                             Text(
                                 text = stringResource(R.string.player_current_broadcast),
-                                style = MaterialTheme.typography.labelLarge,
+                                style = MaterialTheme.typography.titleLarge,
                                 maxLines = 2,
                                 modifier = Modifier.weight(1f),
                             )
                         }
-                        ProgrammeContentDetails(
-                            event = event,
+                        PlayerInfoReadingContent(
+                            title = event.title.orEmpty(),
+                            body = at.bernhardberger.tvhplayer.core.programmeDetailsBody(event),
+                            readingFocus = readingFocus,
                             subtitle = buildString {
                                 append(channelIdentity)
                                 append(" • ")
                                 append(formatClock(event.start.epochSeconds))
                                 append("–")
                                 append(formatClock(event.stop.epochSeconds))
+                                at.bernhardberger.tvhplayer.ui.common.programmeMetadata(event)
+                                    ?.takeIf(String::isNotBlank)?.let { append("\n"); append(it) }
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().weight(1f),
                             footer = {
                                 if (recordingScheduled) {
                                     Text(
@@ -261,23 +266,21 @@ private fun UnavailableProgrammeInfo(
     closeFocus: FocusRequester,
     onClose: () -> Unit,
 ) {
-    ActionsTemplate(
+    val readingFocus = remember { FocusRequester() }
+    PlayerInfoReadingContent(
         title = stringResource(R.string.player_info_unavailable_title),
         subtitle = channelIdentity,
-        body = {
-            Text(
-                text = stringResource(R.string.player_info_unavailable_message, channelName),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        actions = {
+        body = stringResource(R.string.player_info_unavailable_message, channelName),
+        readingFocus = readingFocus,
+        footer = {
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             OutlinedButton(
                 onClick = onClose,
                 modifier = Modifier
                     .testTag("live-info-close")
                     .focusRequester(closeFocus)
                     .focusProperties {
-                        up = FocusRequester.Cancel
+                        up = readingFocus
                         down = FocusRequester.Cancel
                         left = FocusRequester.Cancel
                         right = FocusRequester.Cancel
@@ -285,6 +288,7 @@ private fun UnavailableProgrammeInfo(
             ) {
                 Text(stringResource(R.string.player_info_close))
             }
+          }
         },
     )
 }

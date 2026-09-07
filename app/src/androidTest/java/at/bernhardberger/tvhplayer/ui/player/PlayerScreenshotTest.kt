@@ -5,6 +5,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.LaunchedEffect
+import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
@@ -46,12 +57,14 @@ import org.junit.runners.Parameterized
 /** Offline production chrome only; these captures do not establish live video or SDK timing. */
 @RunWith(Parameterized::class)
 @OptIn(ExperimentalTestApi::class)
-class PlayerScreenshotTest(private val scenario: String) {
+class PlayerScreenshotTest(private val scenario: String, private val dark: Boolean) {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun captureProductionChrome() {
         lateinit var inputModeManager: InputModeManager
+        var infoOpen by mutableStateOf(false)
+        var restoreInfo by mutableStateOf(false)
         composeRule.setContent {
             inputModeManager = LocalInputModeManager.current
             val context = LocalContext.current
@@ -59,6 +72,7 @@ class PlayerScreenshotTest(private val scenario: String) {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
+                    if (dark) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)))
                     if (scenario.startsWith("settings")) {
                         PlaybackOptionsSheetContent(
                             page = if (scenario == "settings") PlaybackOptionsPage.ROOT else PlaybackOptionsPage.AUDIO,
@@ -69,19 +83,45 @@ class PlayerScreenshotTest(private val scenario: String) {
                             onPageChange = {}, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
                             onAspectRatioChange = {}, onStatsVisibleChange = {},
                         )
-                    } else if (scenario == "info") {
+                    } else if (scenario.startsWith("info") || infoOpen) {
                         LiveProgrammeInfoOverlay(
-                            event = programme(), channelIdentity = "1 Documentary HD", channelName = "Documentary HD",
+                            event = if (scenario == "info-missing") null else programme(long = scenario.startsWith("info-long")), channelIdentity = "1 Documentary HD", channelName = "Documentary HD",
                             recordingScheduled = false, canRecord = true, recordingState = LiveInfoRecordingState.Idle,
                             confirmationVisible = false, restoreRecordFocus = false, onRecord = {},
-                            onRecordingActivate = {}, onRecordingDismiss = {}, onClose = {},
+                            onRecordingActivate = {}, onRecordingDismiss = {}, onClose = { infoOpen = false; restoreInfo = true },
                         )
-                    } else if (scenario == "shelf") {
-                        Box(Modifier.align(Alignment.BottomCenter)) {
+                    } else if (scenario == "recording-info") {
+                        val readingFocus = remember { FocusRequester() }
+                        LaunchedEffect(Unit) { readingFocus.requestFocus() }
+                        PlaybackOptionsOverlayFrame(paneTitle = "Info", panelTag = "recording-info-panel") {
+                            PlayerInfoReadingContent(title = programme(true).title.orEmpty(), subtitle = "Documentary HD / The high mountains",
+                                body = programme(true).description, readingFocus = readingFocus,
+                                modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp)) {
+                                androidx.tv.material3.OutlinedButton(onClick = {}, modifier = Modifier.align(Alignment.End)) { androidx.tv.material3.Text("Close info") }
+                            }
+                        }
+                    } else if (scenario.startsWith("seek")) {
+                        val history = if (scenario == "seek-shallow") 60_000L else 5_400_000L
+                        TimeshiftSeekPreview(
+                            state = AppTimeshiftState(available = true, bufferStartMs = -history,
+                                positionMs = -30_000L, liveEdgeMs = 0L),
+                            decision = TimeshiftSeekDecision(if (scenario == "seek-live") 0L else -history / 2, -30_000L, false),
+                            modifier = Modifier.align(Alignment.BottomCenter),
+                        )
+                    } else if (scenario.startsWith("shelf")) {
+                        PlayerOverlayChrome(
+                            footerPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            headerContent = { modifier ->
+                                PlayerIdentityHeader(imageLoader, null, null, "12 Documentary 12", null,
+                                    "21:30", null, modifier = modifier)
+                            },
+                        ) {
                             ChannelDrawer(
                                 channels = List(15) { Channel.create(id = ChannelId(it + 1L), name = "Documentary ${it + 1}") },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
-                                nowEvent = { programme() }, nextEvent = { null }, imageLoader = imageLoader,
+                             nowEvent = { programme() }, nextEvent = { EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
+                                 start = Instant.fromEpochSeconds(1_783_022_400L), stop = Instant.fromEpochSeconds(1_783_024_200L),
+                                 title = "The world beneath the ice") }, imageLoader = imageLoader,
                                 onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
                             )
                         }
@@ -100,29 +140,29 @@ class PlayerScreenshotTest(private val scenario: String) {
                         OverlayControlsTv(
                             imageLoader = imageLoader, channelNumber = 1, channelName = "Documentary HD",
                             piconPath = null,
-                            nowEvent = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),
-                                start = Instant.fromEpochSeconds(1_783_018_800L),
-                                stop = Instant.fromEpochSeconds(1_783_022_400L), title = "A journey through the Alps"),
+                            nowEvent = if (scenario == "missing") null else programme(long = scenario == "long"),
                             nextEvent = EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
                                 start = Instant.fromEpochSeconds(1_783_022_400L),
                                 stop = Instant.fromEpochSeconds(1_783_024_200L), title = "The world beneath the ice"),
                             nowSec = 1_783_020_600L, controlsVisible = true, optionsOpen = false,
                             onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                            onOpenInfo = { infoOpen = true }, restoreInfoFocus = restoreInfo,
+                            onInfoFocusRestored = { restoreInfo = false },
                             timeshiftState = remember(scenario) {
-                                if (scenario == "live") AppTimeshiftState() else {
+                                if (scenario in listOf("live", "long", "missing", "return-info")) AppTimeshiftState() else {
                                     val fixture = TimeshiftTestFixture(7_200.seconds)
-                                    fixture.updateHistory(3_000.seconds, 3_600.seconds)
+                                    fixture.updateHistory(if (scenario.endsWith("deep")) 0.seconds else 3_000.seconds, 3_600.seconds)
                                     fixture.state.value.toAppPresentation(fixture.playbackPosition(
                                         when (scenario) {
                                             "timing-unavailable" -> null
-                                            "paused" -> 3_300.seconds
+                                            "paused", "paused-deep" -> 3_300.seconds
                                             else -> 3_600.seconds
                                         },
                                     ))
                                 }
                             },
                             timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
-                            paused = scenario == "paused",
+                            paused = scenario.startsWith("paused"),
                         )
                     }
                 }
@@ -130,6 +170,20 @@ class PlayerScreenshotTest(private val scenario: String) {
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { inputModeManager.requestInputMode(InputMode.Keyboard) }
+        if (scenario == "return-info") {
+            composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput { pressKey(Key.Enter) }
+            composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
+            composeRule.onNodeWithTag("live-info-close").requestFocus().performKeyInput { pressKey(Key.Enter) }
+            composeRule.onNodeWithTag("player-info").assertIsFocused()
+        }
+        if (scenario == "info-long-end") {
+            repeat(80) { composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) } }
+            composeRule.onNodeWithTag("live-info-record").assertIsFocused()
+        }
+        if (scenario == "shelf-browse") {
+            composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+            composeRule.onNodeWithText("13  Documentary 13").assertIsFocused()
+        }
         if (scenario == "live") {
             composeRule.onNodeWithText("A journey through the Alps").assertExists()
             composeRule.onNodeWithTag("player-next-programme").assertExists()
@@ -141,17 +195,21 @@ class PlayerScreenshotTest(private val scenario: String) {
         val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
         val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "player-captures")
         assertTrue(directory.isDirectory || directory.mkdirs())
-        File(directory, "$scenario.png").outputStream().use {
+        File(directory, "$scenario-${if (dark) "dark" else "bright"}.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
     }
 
     companion object {
-        @JvmStatic @Parameterized.Parameters(name = "{0}")
-        fun scenarios() = listOf("live", "timeshift-live", "paused", "timing-unavailable", "recording", "recording-unknown", "settings", "settings-audio", "info", "shelf")
+        @JvmStatic @Parameterized.Parameters(name = "{0}-dark={1}")
+        fun scenarios() = listOf("live", "timeshift-live", "timeshift-live-deep", "paused", "paused-deep", "timing-unavailable",
+            "seek-shallow", "seek-deep", "seek-live", "long", "missing", "recording", "recording-unknown", "recording-info",
+            "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "return-info")
+            .flatMap { scenario -> listOf(false, true).map { dark -> arrayOf<Any>(scenario, dark) } }
 
-        private fun programme() = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),
+        private fun programme(long: Boolean = false) = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),
             start = Instant.fromEpochSeconds(1_783_018_800L), stop = Instant.fromEpochSeconds(1_783_022_400L),
-            title = "A journey through the Alps", description = "Explore the high mountains, their wildlife and the people who live in this extraordinary landscape.")
+            title = if (long) "A journey through the Alps: the extraordinary landscapes, wildlife and people of the high mountains across Europe" else "A journey through the Alps",
+            description = "Explore the high mountains, their wildlife and the people who live in this extraordinary landscape. ".repeat(if (long) 24 else 1))
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.paddingFrom
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,7 +73,8 @@ fun PlayerIdentityHeader(
             modifier = Modifier
                 .width(TvOverlayHeaderPiconWidth)
                 .height(TvOverlayHeaderPiconHeight)
-                .optionalTestTag(tags.picon),
+                .optionalTestTag(tags.picon)
+                .padding(8.dp),
         )
         Spacer(Modifier.width(TvOverlayHeaderPiconGap))
         Column(Modifier.weight(1f).padding(end = TvOverlayHeaderColumnGap)) {
@@ -91,6 +93,7 @@ fun PlayerIdentityHeader(
                 color = onSurface.copy(alpha = TvOverlayTextPrimaryAlpha),
                 style = HeaderTextStyle.TITLE,
                 modifier = Modifier
+                    .widthIn(max = 480.dp)
                     .optionalTestTag(tags.title)
                     .semantics { heading() }
                     .then(
@@ -106,10 +109,10 @@ fun PlayerIdentityHeader(
             )
             if (programmeStart != null && programmeEnd != null) {
                 Row(
-                    Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    Modifier.widthIn(max = 320.dp).fillMaxWidth().padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(programmeStart, color = onSurface, style = MaterialTheme.typography.labelLarge)
+                    Text(programmeStart, color = onSurface.copy(alpha = TvOverlayTextSecondaryAlpha), style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.width(8.dp))
                     if (programmeProgress != null) {
                         ProgressStrip(progress = programmeProgress, modifier = Modifier.weight(1f))
@@ -117,7 +120,7 @@ fun PlayerIdentityHeader(
                         Spacer(Modifier.weight(1f))
                     }
                     Spacer(Modifier.width(8.dp))
-                    Text(programmeEnd, color = onSurface, style = MaterialTheme.typography.labelLarge,
+                    Text(programmeEnd, color = onSurface.copy(alpha = TvOverlayTextSecondaryAlpha), style = MaterialTheme.typography.labelLarge,
                         modifier = Modifier.optionalTestTag(tags.clockSupport))
                 }
             }
@@ -166,8 +169,8 @@ private fun HeaderText(
         text = text,
         color = color,
         style = when (style) {
-            HeaderTextStyle.EYEBROW -> MaterialTheme.typography.titleMedium
-            HeaderTextStyle.TITLE -> MaterialTheme.typography.headlineMedium
+            HeaderTextStyle.EYEBROW -> MaterialTheme.typography.labelLarge
+            HeaderTextStyle.TITLE -> MaterialTheme.typography.headlineSmall
             HeaderTextStyle.SUPPORT -> MaterialTheme.typography.labelLarge
         },
         maxLines = if (style == HeaderTextStyle.TITLE) 2 else 1,

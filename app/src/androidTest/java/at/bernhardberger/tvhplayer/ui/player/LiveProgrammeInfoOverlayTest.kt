@@ -193,7 +193,8 @@ class LiveProgrammeInfoOverlayTest {
             onRecordFocusRestored = { restoreRecordFocus = false },
         )
 
-        composeRule.onNodeWithTag("live-info-close").assertIsFocused()
+        composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
+        composeRule.onNodeWithTag("live-info-close").requestFocus()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("live-info-record").assertIsFocused()
             .performKeyInput { pressKey(Key.Enter) }
@@ -440,7 +441,8 @@ class LiveProgrammeInfoOverlayTest {
         composeRule.onNodeWithTag("player-info").requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
         composeRule.onNodeWithTag("player-info").assertDoesNotExist()
-        composeRule.onNodeWithTag("live-info-close").assertIsFocused()
+        composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
+        composeRule.onNodeWithTag("live-info-close").requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
         composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.runOnIdle { assertFalse(restoreInfoFocus) }

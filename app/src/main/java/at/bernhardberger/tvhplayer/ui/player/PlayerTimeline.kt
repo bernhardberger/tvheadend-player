@@ -84,7 +84,7 @@ fun PlayerTimelineBar(
                 .fillMaxWidth()
                 .height(barHeight)
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTrackAlpha)),
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (rewindableStartFraction != null) 0.10f else TvOverlayTrackAlpha)),
         ) {
             ghostProgress?.coerceIn(0f, 1f)?.let { ghost ->
                 Box(
@@ -210,12 +210,13 @@ fun PlayerTimelineBar(
                 )
             }
         }
-        if (tone == PlayerTimelineTone.ACTIVE && currentProgress != null) {
+        if (tone != PlayerTimelineTone.AMBIENT && currentProgress != null) {
+            val thumbSize = if (tone == PlayerTimelineTone.INTERACTIVE) 8.dp else TvOverlayTimelineThumbSize
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
                 Box(
                     modifier = Modifier
-                        .offset(x = maxWidth * currentProgress - TvOverlayTimelineThumbSize / 2)
-                        .size(TvOverlayTimelineThumbSize)
+                        .offset(x = maxWidth * currentProgress - thumbSize / 2)
+                        .size(thumbSize)
                         .clip(CircleShape)
                         .background(PlaybackPositionColor)
                         .then(thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier),

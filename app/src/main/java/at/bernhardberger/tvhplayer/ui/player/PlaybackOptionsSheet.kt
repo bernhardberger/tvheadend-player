@@ -277,8 +277,8 @@ internal fun PlaybackOptionsSheetContent(
         },
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = TvSpacing24, vertical = TvSpacing16),
-            verticalArrangement = Arrangement.spacedBy(TvSpacing12),
+            modifier = Modifier.padding(horizontal = TvSpacing32, vertical = TvSpacing16),
+            verticalArrangement = Arrangement.spacedBy(TvSpacing24),
         ) {
             when (page) {
                 PlaybackOptionsPage.ROOT -> PlaybackOptionsRoot(

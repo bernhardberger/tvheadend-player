@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.assertTextEquals
+
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -32,6 +35,29 @@ import org.junit.Test
 import kotlin.time.Instant
 
 class PlayerOverlayCompositionTest {
+    @Test
+    fun focusedPauseCaptionTracksPlaybackWithoutMovingFocus() {
+        val paused = mutableStateOf(false)
+        composeRule.setContent {
+            val pauseFocus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+            val infoFocus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+            val settingsFocus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+            androidx.compose.runtime.LaunchedEffect(Unit) { pauseFocus.requestFocus() }
+            TVHeadendPlayerTheme {
+                PlayerActionRow(infoFocus, settingsFocus, {}, {}, {}, {},
+                    onTogglePause = { paused.value = !paused.value }, paused = paused.value, pauseFocus = pauseFocus)
+            }
+        }
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+            .performKeyInput { pressKey(Key.Enter) }
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.onNodeWithText("Play", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Pause", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.Enter) }
+        composeRule.onNodeWithText("Pause", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Play", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -108,8 +134,7 @@ class PlayerOverlayCompositionTest {
 
         composeRule.waitForIdle()
         val picon = composeRule.onNodeWithTag("player-picon").fetchSemanticsNode().boundsInRoot
-        val title = composeRule.onNodeWithTag("player-programme-title")
-            .fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag("player-programme-title").assertTextEquals("")
         val channel = composeRule.onNodeWithTag("player-channel-identity")
             .fetchSemanticsNode().boundsInRoot
         val next = composeRule.onNodeWithTag("player-next-programme")
@@ -118,21 +143,19 @@ class PlayerOverlayCompositionTest {
         val actions = composeRule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
         val timeline = composeRule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot
         val goLive = composeRule.onNodeWithTag("player-go-live").fetchSemanticsNode().boundsInRoot
-        val icons = listOf("player-pause", "player-info", "player-settings", "player-record", "player-stop")
+        val icons = listOf("player-pause", "player-stop", "player-info", "player-record", "player-settings")
             .map { composeRule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot }
         val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
         val sidePaddingPx = with(composeRule.density) { TvOverlaySidePadding.toPx() }
 
         assertEquals(root.left + sidePaddingPx, picon.left, 1f)
         assertEquals(root.right - sidePaddingPx, clock.right, 1f)
-        assertTrue(picon.left < title.left)
-        assertTrue(picon.height > title.height)
-        assertTrue(channel.bottom <= title.top)
-        assertTrue(title.bottom <= next.top)
-        assertTrue(clock.left > title.left)
+        assertTrue(picon.left < channel.left)
+        assertTrue(channel.bottom <= next.top)
+        assertTrue(clock.left > channel.left)
         assertTrue(clock.height > 0f)
-        assertEquals(channel.top, clock.top, 1f)
-        assertTrue(title.bottom < timeline.top)
+        assertTrue(kotlin.math.abs(channel.top - clock.top) < with(composeRule.density) { 12.dp.toPx() })
+        assertTrue(next.bottom < timeline.top)
         assertTrue(actions.bottom <= timeline.top)
         assertTrue(icons.zipWithNext().all { (left, right) -> left.right < right.left })
         assertTrue(goLive.left > icons.last().right)
@@ -235,17 +258,20 @@ class PlayerOverlayCompositionTest {
 
         val actionsBefore = composeRule.onNodeWithTag("player-actions")
             .fetchSemanticsNode().boundsInRoot
-        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
         composeRule.onNodeWithTag("player-info").requestFocus()
         composeRule.onNodeWithTag("player-action-context-label").assertExists()
         composeRule.onNodeWithText("Info", useUnmergedTree = true).assertExists()
-        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("player-settings").assertIsFocused()
-        composeRule.onNodeWithText("Settings", useUnmergedTree = true).assertExists()
+        assertEquals(
+            composeRule.onNodeWithTag("player-info").fetchSemanticsNode().boundsInRoot.left,
+            composeRule.onNodeWithTag("player-action-context-label").fetchSemanticsNode().boundsInRoot.left,
+            1f,
+        )
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-record").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("player-stop").assertIsFocused()
+        composeRule.onNodeWithTag("player-settings").assertIsFocused()
+        composeRule.onNodeWithText("Settings", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("player-action-context-label").assertExists()
         val actionsAfter = composeRule.onNodeWithTag("player-actions")
             .fetchSemanticsNode().boundsInRoot

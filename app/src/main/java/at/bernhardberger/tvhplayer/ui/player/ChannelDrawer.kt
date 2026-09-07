@@ -10,6 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.FiberManualRecord
+import androidx.tv.material3.Icon
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -102,10 +107,9 @@ fun ChannelDrawer(
                 } else false
             },
     ) {
-        Column(Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 56.dp)) {
-            Text(focused?.name.orEmpty(), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge)
-            Text(now?.let { "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}  ${it.title.orEmpty()}" }
-                ?: stringResource(R.string.no_epg), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge,
+        Column(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 56.dp)) {
+            Text(now?.let { "${focusedId?.let { id -> ChannelNavigation.numberForId(ids, numbers, id) } ?: ""} / ${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}  ${it.title.orEmpty()}" }
+                ?: stringResource(R.string.no_epg), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             next?.let {
                 Text(stringResource(R.string.player_next_event_with_range,
@@ -124,26 +128,34 @@ fun ChannelDrawer(
             horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(channels, key = { it.id.value }) { channel ->
                 Card(onClick = { onPickChannel(channel) },
+                     colors = androidx.tv.material3.CardDefaults.colors(
+                         focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
+                         focusedContentColor = MaterialTheme.colorScheme.onSurface,
+                     ),
                      border = androidx.tv.material3.CardDefaults.border(
                          focusedBorder = androidx.tv.material3.Border(
                              androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface),
                          ),
                      ),
-                    modifier = Modifier.width(184.dp).height(112.dp)
+                     modifier = Modifier.width(184.dp).height(88.dp)
                         .focusRequester(requesters.getValue(channel.id))
                         .onFocusChanged {
                             if (it.isFocused) { focusedId = channel.id; onFocusChannel(channel.id) }
                         }) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        PiconBox(imageLoader = imageLoader, currentSession = currentSession,
-                            piconPath = channel.icon, modifier = Modifier.size(52.dp, 36.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            PiconBox(imageLoader = imageLoader, currentSession = currentSession,
+                                piconPath = channel.icon, modifier = Modifier.size(64.dp, 40.dp).padding(4.dp))
+                            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                            if (channel.id == playingChannelId) Icon(Icons.Filled.PlayArrow,
+                                contentDescription = stringResource(R.string.player_shelf_playing),
+                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            if (channel.id in recordingChannelIds) Icon(Icons.Filled.FiberManualRecord,
+                                contentDescription = stringResource(R.string.player_shelf_recording),
+                                tint = at.bernhardberger.tvhplayer.ui.TvRecordingColor, modifier = Modifier.size(12.dp))
+                        }
                         Text(channelTitleText(ChannelNavigation.numberForId(ids, numbers, channel.id), channel.name.orEmpty()),
                             style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (channel.id == playingChannelId) Text(stringResource(R.string.player_shelf_playing), style = MaterialTheme.typography.labelSmall)
-                            if (channel.id in recordingChannelIds) Text(stringResource(R.string.player_shelf_recording),
-                                color = at.bernhardberger.tvhplayer.ui.TvRecordingColor, style = MaterialTheme.typography.labelSmall)
-                        }
                     }
                 }
             }
