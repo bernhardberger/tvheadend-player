@@ -326,8 +326,25 @@ be built from the player timeline, and must not use mobile Material's
 `LinearProgressIndicator`, whose default stop indicator draws a mark at 100%
 regardless of actual progress.
 
-The live timeshift seekbar uses capacity, not programme bounds, for its display
-span. The released SDK's finite positive `grantedPeriod` is preferred; when it
+Prototype B displays the scheduled programme containing sampled playback, or the
+selected target during preview, using SDK 0.9.0's immutable schedule-grade
+estimate. Scheduled start/end clocks are display edges, not seek permissions.
+Crossing a boundary changes the window without snapping or animation. The nearby
+programme title follows preview; main identity describes sampled committed
+playback. Cross-midnight edges include dates. Unavailable history is subdued,
+available history neutral, and future schedule dashed. Orange identifies
+playback/target. The live marker appears only inside its window; the existing
+Go live action remains reachable outside it. The estimate has no accuracy
+guarantee. Player owns no server clock machinery.
+
+`-Pplayer.programmeWindowB=false` restores the capacity timeline at build time;
+there is no public preference. Missing estimates, EPG gaps and out-of-range events
+use the relative-history fallback. Preview retains the SDK mapping snapshot and
+opaque media target, so late EPG/estimate updates and eviction cannot retarget a
+command. Current runtime history alone authorizes dispatch.
+
+The fallback live timeshift seekbar uses capacity for its display span. The
+released SDK's finite positive `grantedPeriod` is preferred; when it
 is unavailable the app's requested period defines only the display span. Expand
 that span to include all observed history if history exceeds the grant/request.
 A changed grant changes display scale, never actual seek permission. Live stays
@@ -349,18 +366,18 @@ playback counts as live and is not displayed as playback position. A sampled pos
 extend seek permission. Its display span may expand to retain the position while
 that expired history remains subdued.
 
-SDK 0.6.0 provides no programme wall-clock mapping. While playback is behind the
-live edge, or its position is unknown, the header therefore states that
+When no estimated programme can be resolved and playback is behind the
+live edge, or its position is unknown, the header states that
 programme timing is unavailable instead of claiming that wall-clock Now/Next
 describes the watched content. A merely available timeshift buffer is not
 timeshifted playback: at the live edge the current broadcast is the watched
 content and the header shows it. Live Info explicitly labels
 its EPG and existing recording entry as **Current broadcast**, not historical
 playback metadata. Current wall time remains
-independent. Programme-time seeks from Guide are unavailable on this contract;
+independent. Programme-time seeks from Guide remain unavailable;
 supported recording-based Watch from start remains available. Neither EPG bounds,
 packet coordinates nor local time minus server-reader shift may substitute for
-the absent wall-clock anchor.
+an unavailable SDK estimate.
 
 Missing, non-finite or contradictory buffer/position measurements are not a
 measured live position. Keep the capacity display and observed history, but omit

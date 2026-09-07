@@ -57,6 +57,8 @@ fun PlayerTimelineBar(
     rewindableOverflowTestTag: String? = null,
     liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
+    availableEndFraction: Float? = liveEdgeFraction,
+    futureStartFraction: Float? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
     val barHeight = if (tone == PlayerTimelineTone.ACTIVE) {
@@ -98,9 +100,9 @@ fun PlayerTimelineBar(
                         ),
                 )
             }
-            if (rewindableStartFraction != null && liveEdgeFraction != null) {
+            if (rewindableStartFraction != null && availableEndFraction != null) {
                 val start = rewindableStartFraction.coerceIn(0f, 1f)
-                val end = liveEdgeFraction.coerceIn(start, 1f)
+                val end = availableEndFraction.coerceIn(start, 1f)
                 Box(
                     Modifier
                         .offset(x = maxWidth * start)
@@ -112,6 +114,16 @@ fun PlayerTimelineBar(
                             ),
                         ),
                 )
+            }
+            futureStartFraction?.takeIf { it < 1f }?.let { future ->
+                val color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTrackAlpha)
+                Canvas(Modifier.fillMaxSize()) {
+                    var x = size.width * future.coerceIn(0f, 1f)
+                    while (x < size.width) {
+                        drawLine(color, Offset(x, size.height / 2), Offset((x + 4.dp.toPx()).coerceAtMost(size.width), size.height / 2), size.height)
+                        x += 8.dp.toPx()
+                    }
+                }
             }
             if (rewindableStartFraction == null && currentProgress != null) {
                 Box(
@@ -247,6 +259,7 @@ fun PlayerTimelineBlock(
     rewindableOverflowTestTag: String? = null,
     liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
+    programmeWindow: ProgrammeWindow? = null,
 ) {
     Column(modifier.fillMaxWidth()) {
         if (leadingLabel != null || trailingLabel != null) {
@@ -278,13 +291,15 @@ fun PlayerTimelineBlock(
             Spacer(Modifier.height(TvOverlayTimelineLabelGap))
         }
         PlayerTimelineBar(
-            progress = progress,
+            progress = programmeWindow?.positionFraction ?: progress,
             tone = tone,
             ghostProgress = ghostProgress,
             boundaryFractions = boundaryFractions,
-            rewindableStartFraction = rewindableStartFraction,
+            rewindableStartFraction = programmeWindow?.availableStartFraction ?: rewindableStartFraction,
             rewindableStartOverflow = rewindableStartOverflow,
-            liveEdgeFraction = liveEdgeFraction,
+            liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
+            availableEndFraction = programmeWindow?.availableEndFraction ?: liveEdgeFraction,
+            futureStartFraction = programmeWindow?.availableEndFraction,
             thumbTestTag = thumbTestTag,
             rewindableBoundaryTestTag = rewindableBoundaryTestTag,
             rewindableOverflowTestTag = rewindableOverflowTestTag,

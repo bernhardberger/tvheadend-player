@@ -40,9 +40,12 @@ internal fun TimeshiftSeekPreview(
     state: AppTimeshiftState,
     decision: TimeshiftSeekDecision,
     modifier: Modifier = Modifier,
+    programmeWindow: ProgrammeWindow? = null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
+    val displayedProgress = programmeWindow?.positionFraction ?: range.displayProgress
+    val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
     val positionPresentation = timeshiftPositionPresentation(targetState)
     val liveLabel = stringResource(R.string.timeshift_live)
     val behindLiveLabel = if (positionPresentation.atLiveEdge) {
@@ -93,23 +96,30 @@ internal fun TimeshiftSeekPreview(
             )
             .testTag("timeshift-seek-preview")
             .clearAndSetSemantics {
-                contentDescription = description
+                contentDescription = programmeWindow?.let {
+                    "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $description"
+                } ?: description
                 liveRegion = LiveRegionMode.Polite
             },
     ) {
+        programmeWindow?.let {
+            Text(it.event.title.orEmpty(), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("timeshift-preview-programme"))
+        }
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             Text(
                 text = targetLabel,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = when {
-                    range.displayProgress > 0.9f -> TextAlign.End
-                    range.displayProgress < 0.1f -> TextAlign.Start
+                    displayedProgress > 0.9f -> TextAlign.End
+                    displayedProgress < 0.1f -> TextAlign.Start
                     else -> TextAlign.Center
                 },
                 maxLines = 1,
                 modifier = Modifier.width(180.dp)
-                    .offset(x = (maxWidth * range.displayProgress - 90.dp).coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp)))
+                    .offset(x = (maxWidth * displayedProgress - 90.dp).coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp)))
                     .testTag("timeshift-preview-target"),
             )
         }
@@ -123,13 +133,14 @@ internal fun TimeshiftSeekPreview(
             rewindableOverflowTestTag = "timeshift-preview-rewindable-overflow",
             liveEdgeTestTag = "timeshift-preview-live-edge",
             progressSemantics = false,
+            programmeWindow = programmeWindow,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = bufferStartLabel,
+                text = clockLabels?.first ?: bufferStartLabel,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.labelLarge,
@@ -141,7 +152,7 @@ internal fun TimeshiftSeekPreview(
                     .testTag("timeshift-preview-buffer-start"),
             )
             Text(
-                text = if (targetLabel == liveLabel) "" else liveLabel,
+                text = clockLabels?.second ?: if (targetLabel == liveLabel) "" else liveLabel,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface.copy(
                     alpha = TvOverlayTextTertiaryAlpha,

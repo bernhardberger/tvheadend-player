@@ -587,6 +587,18 @@ fun VideoPlayerScreen(
     val currentChannel = remember(observation, currentChannelId) {
         observation.channel(currentChannelId)
     }
+    val committedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+        programmeWindow(effectiveTimeshiftState,
+            mappingTimeline = timelineState.preview?.mappingTimeline ?: effectiveTimeshiftState.timeline,
+        ) { observation.eventAt(currentChannelId, it) }
+    } else null
+    val displayedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+        timelineState.preview?.let { preview ->
+            programmeWindow(effectiveTimeshiftState, preview.target, preview.mappingTimeline) {
+                observation.eventAt(currentChannelId, it)
+            }
+        } ?: committedWindow.takeIf { timelineState.preview == null }
+    } else null
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,
@@ -1073,8 +1085,13 @@ fun VideoPlayerScreen(
                 channelNumber = currentChannelNumber,
                 channelName = currentChannelName,
                 piconPath = currentChannel?.icon,
-                nowEvent = nowEvent.takeUnless { channelUnavailable },
-                nextEvent = nextEvent.takeUnless { channelUnavailable },
+                nowEvent = (committedWindow?.event ?: nowEvent).takeUnless { channelUnavailable },
+                nextEvent = (committedWindow?.let {
+                    observation.nextEvent(currentChannelId, it.estimatedPosition)
+                } ?: nextEvent).takeUnless { channelUnavailable },
+                committedTimeshiftState = effectiveTimeshiftState,
+                committedWindow = committedWindow,
+                programmeWindow = displayedWindow,
                 nowSec = nowSec,
                 controlsVisible = layerState.controlsVisible,
                 optionsOpen = layerState.optionsPage != null,
@@ -1128,6 +1145,7 @@ fun VideoPlayerScreen(
                     queueTimeshiftSeek(deltaMs)
                 },
                 onGoLive = {
+                    timelineState.cancelPendingSeek()
                     timeshiftCommandToken += 1L
                     val commandToken = timeshiftCommandToken
                     val feedbackToken = timelineState.beginFeedbackOperation()
@@ -1172,6 +1190,7 @@ fun VideoPlayerScreen(
             TimeshiftSeekPreview(
                 state = effectiveTimeshiftState,
                 decision = requireNotNull(timelineState.preview).decision,
+                programmeWindow = displayedWindow,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }

@@ -16,6 +16,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +43,7 @@ fun PlaybackSeekbar(
     programmeAxis: ProgrammeAxis? = null,
     programmePositionMs: Long? = null,
     programmeDurationMs: Long? = null,
+    programmeWindow: ProgrammeWindow? = null,
     /**
      * Live-edge presentation to label the timeline with. Defaults to the measured
      * distance within [range]; live callers pass the server-shift-aware presentation.
@@ -166,16 +168,29 @@ fun PlaybackSeekbar(
             )
         }
     }
+    val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
+    androidx.compose.foundation.layout.Column {
+    programmeWindow?.let {
+        androidx.tv.material3.Text(
+            text = it.event.title.orEmpty(),
+            color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+            style = androidx.tv.material3.MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("player-window-title"),
+        )
+    }
     PlayerTimelineBlock(
         progress = displayedProgress,
         tone = if (focused) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
         // The estimate qualifier stays in the accessible description; visibly it is noise.
-        leadingLabel = listOfNotNull(
+        leadingLabel = clockLabels?.first ?: listOfNotNull(
             stringResource(R.string.player_paused).takeIf { paused },
             positionLabel,
         ).joinToString(" / "),
-        trailingLabel = trailingLabel,
-        leadingLabelTestTag = "player-programme-progress".takeIf {
+        trailingLabel = clockLabels?.second ?: trailingLabel,
+        trailingLabelTestTag = "player-window-end".takeIf { programmeWindow != null },
+        leadingLabelTestTag = if (programmeWindow != null) "player-window-start" else "player-programme-progress".takeIf {
             timeshiftPosition == null && programmePosition != null && programmeDuration != null
         },
         rewindableStartFraction = range.availableStartFraction
@@ -184,6 +199,7 @@ fun PlaybackSeekbar(
         liveEdgeFraction = 1f.takeIf { range.domain == SeekbarDomain.TIMESHIFT },
         thumbTestTag = "player-seekbar-thumb",
         progressSemantics = false,
+        programmeWindow = programmeWindow,
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
@@ -204,11 +220,14 @@ fun PlaybackSeekbar(
                 }
             }
             .semantics {
-                contentDescription = stateDescription
+                contentDescription = programmeWindow?.let {
+                    "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $stateDescription"
+                } ?: stateDescription
                 progressBarRangeInfo = ProgressBarRangeInfo(accessibilityProgress, 0f..1f)
                 customActions = accessibilityActions
             }
             .focusable()
             .padding(vertical = 8.dp),
     )
+    }
 }

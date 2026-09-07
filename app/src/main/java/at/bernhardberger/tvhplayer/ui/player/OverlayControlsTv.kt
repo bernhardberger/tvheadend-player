@@ -68,6 +68,9 @@ fun OverlayControlsTv(
     channelRecordingNow: Boolean = false,
     nextScheduled: Boolean = false,
     paused: Boolean = false,
+    committedTimeshiftState: AppTimeshiftState = timeshiftState,
+    committedWindow: ProgrammeWindow? = null,
+    programmeWindow: ProgrammeWindow? = null,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -77,7 +80,7 @@ fun OverlayControlsTv(
     val seekable = timeshiftState.available && timeshiftState.timingKnown
     val pausable = timeshiftState.available
     val initialFocus = if (pausable) pauseFocus else infoFocus
-    val programmeTimeKnown = programmeTimingDescribesPlayback(timeshiftState)
+    val programmeTimeKnown = committedWindow != null || programmeTimingDescribesPlayback(committedTimeshiftState)
     val programmeTitle = nowEvent?.takeIf { programmeTimeKnown }?.title.orEmpty()
     var focusInitialized by remember { mutableStateOf(false) }
     var previousSeekable by remember { mutableStateOf(seekable) }
@@ -127,7 +130,7 @@ fun OverlayControlsTv(
             clock = formatClock(nowSec), clockSupport = null,
             programmeStart = nowEvent?.takeIf { programmeTimeKnown }?.let { formatClock(it.start.epochSeconds) },
             programmeEnd = nowEvent?.takeIf { programmeTimeKnown }?.let { formatClock(it.stop.epochSeconds) },
-            programmeProgress = nowEvent?.takeIf { programmeTimeKnown }?.progress(nowSec),
+            programmeProgress = nowEvent?.takeIf { programmeTimeKnown }?.progress(committedWindow?.estimatedPosition?.epochSeconds ?: nowSec),
             tags = PlayerHeaderTags(picon = "player-picon", eyebrow = "player-channel-identity",
                 title = "player-programme-title", support = "player-next-programme", clock = "player-clock"),
             modifier = modifier,
@@ -165,6 +168,7 @@ fun OverlayControlsTv(
             PlaybackSeekbar(
                 range = timeshiftSeekbarRange(timeshiftState),
                 timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
+                programmeWindow = programmeWindow,
                 paused = paused,
                 onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
                 modifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)

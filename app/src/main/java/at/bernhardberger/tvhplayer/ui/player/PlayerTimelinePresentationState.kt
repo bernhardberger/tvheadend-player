@@ -53,6 +53,7 @@ internal data class LiveTimeshiftSeekPreview(
     val decision: TimeshiftSeekDecision,
     val dispatched: Boolean,
     val target: TimeshiftContentTarget,
+    val mappingTimeline: TimeshiftTimeline? = null,
 )
 
 private class LiveTimelineSourceGeneration(
@@ -159,6 +160,7 @@ internal class LiveTimelinePresentationState(
             decision = decision,
             dispatched = false,
             target = target,
+            mappingTimeline = selectionTimeline,
         )
         generation.seekFeedbackJob?.cancel()
         generation.seekFeedbackJob = null
