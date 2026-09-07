@@ -121,7 +121,10 @@ fun PlaybackSeekbar(
             R.string.timeshift_behind_live,
             formatPlaybackDuration(timeshiftPosition.behindLiveMs),
         )
-        range.domain == SeekbarDomain.RECORDING -> formatPlaybackDuration(range.positionMs)
+        range.domain == SeekbarDomain.RECORDING -> {
+            val elapsed = formatPlaybackDuration(range.positionMs)
+            if (range.endMs >= 3_600_000L && range.positionMs < 3_600_000L) "0:${elapsed.padStart(5, '0')}" else elapsed
+        }
         programmePosition != null && programmeDuration != null ->
             formatPlaybackDuration(programmePosition)
         else -> null

@@ -209,6 +209,14 @@ class RecordingOverlayCompositionTest {
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
     }
 
+    @Test
+    fun longRecordingElapsedMatchesTotalPrecision() {
+        setRecordingOverlay("Recording", durationMs = 5_400_000L)
+        composeRule.onNodeWithText("0:00:30").assertIsDisplayed()
+        composeRule.onNodeWithText("1:30:00").assertIsDisplayed()
+        composeRule.onNodeWithText("0:30").assertDoesNotExist()
+    }
+
     private fun setRecordingOverlay(
         title: String,
         german: Boolean = false,
