@@ -346,6 +346,7 @@ fun VideoPlayerScreen(
     LaunchedEffect(timelineState, effectiveTimeshiftState.timeline) {
         timelineState.updateTimeline(effectiveTimeshiftState.timeline)
     }
+    val visibleSeekPreview = timelineState.previewForTimeline(effectiveTimeshiftState.timeline)
     val nowSec = timelineState.nowEpochSec
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
@@ -592,15 +593,15 @@ fun VideoPlayerScreen(
     }
     val committedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
         programmeWindow(effectiveTimeshiftState,
-            mappingTimeline = timelineState.preview?.mappingTimeline ?: effectiveTimeshiftState.timeline,
+            mappingTimeline = visibleSeekPreview?.mappingTimeline ?: effectiveTimeshiftState.timeline,
         ) { observation.eventAt(currentChannelId, it) }
     } else null
     val displayedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-        timelineState.preview?.let { preview ->
+        visibleSeekPreview?.let { preview ->
             programmeWindow(effectiveTimeshiftState, preview.target, preview.mappingTimeline) {
                 observation.eventAt(currentChannelId, it)
             }
-        } ?: committedWindow.takeIf { timelineState.preview == null }
+        } ?: committedWindow.takeIf { visibleSeekPreview == null }
     } else null
     val displayedNextEvent = if (committedWindow != null) {
         observation.nextEvent(currentChannelId, committedWindow.estimatedPosition)
@@ -1101,7 +1102,7 @@ fun VideoPlayerScreen(
                 committedTimeshiftState = effectiveTimeshiftState,
                 committedWindow = committedWindow,
                 programmeWindow = displayedWindow,
-                previewing = timelineState.preview != null,
+                previewing = visibleSeekPreview != null,
                 channelsAvailable = channels.isNotEmpty(),
                 nowSec = nowSec,
                 controlsVisible = layerState.controlsVisible,
@@ -1128,7 +1129,7 @@ fun VideoPlayerScreen(
                     restoreOptionsFocus = false
                     layerState.openOptions()
                 },
-                timeshiftState = timelineState.preview?.let {
+                timeshiftState = visibleSeekPreview?.let {
                     projectedTimeshiftState(effectiveTimeshiftState, it.decision.targetMs)
                 } ?: effectiveTimeshiftState,
                 liveAvailable = !channelUnavailable,
@@ -1195,12 +1196,14 @@ fun VideoPlayerScreen(
         }
 
         if (
-            foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
-            foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
+            visibleSeekPreview != null && (
+                foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
+                    foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
+                )
         ) {
             TimeshiftSeekPreview(
                 state = effectiveTimeshiftState,
-                decision = requireNotNull(timelineState.preview).decision,
+                decision = visibleSeekPreview.decision,
                 programmeWindow = displayedWindow,
                 channelsAvailable = channels.isNotEmpty(),
                 modifier = Modifier.align(Alignment.BottomCenter),

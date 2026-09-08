@@ -930,8 +930,9 @@ class AppPlaybackRuntime(
     /**
      * Samples the presented timeshift position.
      *
-     * Only subscription replacement invalidates a sample, and [toAppPresentation] detects that
-     * from the history the sample carries. Rejecting every observation that changed during the
+     * Segment replacement (including same-subscription restart) invalidates a sample.
+     * [toAppPresentation] detects that from the history the sample carries. Rejecting every
+     * observation that changed during the
      * round trip also rejected ordinary subscription diagnostics, which arrive several times a
      * second and blanked the timeline that often.
      */

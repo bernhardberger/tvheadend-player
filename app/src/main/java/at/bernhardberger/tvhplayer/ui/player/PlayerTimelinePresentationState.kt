@@ -123,6 +123,9 @@ internal class LiveTimelinePresentationState(
         sourceGeneration.feedback = null
     }
 
+    fun previewForTimeline(timeline: TimeshiftTimeline?): LiveTimeshiftSeekPreview? =
+        preview?.takeIf { it.mappingTimeline?.describesSameSegment(timeline) == true }
+
     fun updateTimeline(timeline: TimeshiftTimeline?) {
         val selection = sourceGeneration.selectionTimeline ?: return
         if (!selection.describesSameSegment(timeline)) {

@@ -24,6 +24,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,6 +51,7 @@ class PlayerTimelinePresentationStateTest {
             }
         }
         fixture.updateHistory(10.seconds, 610.seconds)
+        assertNotNull(owner.previewForTimeline(fixture.presentation().timeline))
         owner.updateTimeline(fixture.presentation().timeline)
         advanceTimeBy(400L)
         runCurrent()
@@ -128,6 +131,7 @@ class PlayerTimelinePresentationStateTest {
         val current = fixture.presentation()
         assertTrue(oldTimeline.describesSameSubscription(current.timeline))
         assertFalse(oldTimeline.describesSameSegment(current.timeline))
+        assertNotEquals(oldTimeline, current.timeline)
         val stale = fixture.state.value.toAppPresentation(oldSample)
         assertFalse(stale.timingKnown)
         assertNull(stale.playbackTarget)
@@ -146,6 +150,10 @@ class PlayerTimelinePresentationStateTest {
         val retired = requireNotNull(owner.preview).target
         fixture.restartSegment()
         fixture.updateHistory(0.seconds, 600.seconds)
+        // Rendering must reject the old projection before the clearing effect has run.
+        assertNotNull(owner.preview)
+        assertNull(owner.previewForTimeline(fixture.presentation().timeline))
+        assertNull(owner.previewForTimeline(null))
         owner.updateTimeline(fixture.presentation().timeline)
         assertNull(owner.preview)
         assertFalse(owner.seekPending)
