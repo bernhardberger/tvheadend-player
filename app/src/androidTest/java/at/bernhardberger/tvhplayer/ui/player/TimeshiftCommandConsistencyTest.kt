@@ -21,11 +21,21 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult
+import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
+import at.bernhardberger.tvhplayer.playback.toAppPresentation
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-@OptIn(ExperimentalTestApi::class)
+@OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
 class TimeshiftCommandConsistencyTest {
     @get:Rule val rule = createComposeRule()
 
@@ -53,9 +63,15 @@ class TimeshiftCommandConsistencyTest {
         rule.onNodeWithTag("player-seekbar").requestFocus()
         rule.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
         assertEquals(listOf(-seekStepMs(0), seekStepMs(0)), commands)
+        rule.onNodeWithTag("player-seekbar").assertIsFocused()
+        rule.onRoot().performKeyInput { keyDown(Key.DirectionLeft); advanceEventTime(1_500L); keyUp(Key.DirectionLeft) }
+        org.junit.Assert.assertTrue(commands.drop(2).size > 1)
+        org.junit.Assert.assertTrue(commands.drop(2).any { it == -seekStepMs(12) })
+        rule.onNodeWithTag("player-seekbar").assertIsFocused()
+        val admitted = commands.size
         rule.runOnIdle { visible.value = false }
         rule.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
-        assertEquals(2, commands.size)
+        assertEquals(admitted, commands.size)
     }
 
     @Test fun reducedPreviewExposesUncertainCommandFeedback() {
@@ -79,5 +95,48 @@ class TimeshiftCommandConsistencyTest {
             "p36-numeric-captures/reduced-uncertain.png")
         output.parentFile!!.mkdirs()
         output.outputStream().use { rule.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test fun stackedTimeoutKeepsOnlyDispatchedOutcomeVisibleForFeedbackInterval() {
+        val scope = TestScope()
+        val owner = LiveTimelinePresentationState(scope, { 0L }, { scope.testScheduler.currentTime })
+        val fixture = TimeshiftTestFixture(600.seconds).apply {
+            updateHistory(0.seconds, 600.seconds)
+        }
+        val state = fixture.state.value.toAppPresentation(fixture.playbackPosition(540.seconds))
+        val result = CompletableDeferred<TimeshiftContentSeekResult>()
+        rule.setContent {
+            TVHeadendPlayerTheme {
+                owner.previewForTimeline(state.timeline)?.let { preview ->
+                    TimeshiftSeekPreview(state, preview.decision, feedback = owner.feedback)
+                }
+            }
+        }
+        try {
+            rule.runOnIdle {
+                owner.queueRelativeSeek(state, -30_000L,
+                    "unavailable", "clamped", "expired", "replaced", "Seek result uncertain") { result.await() }
+                scope.advanceTimeBy(400L)
+                scope.runCurrent()
+                owner.queueRelativeSeek(state, -30_000L,
+                    "unavailable", "clamped", "expired", "replaced", "Seek result uncertain") {
+                    error("Discarded stacked input must not dispatch")
+                }
+                scope.advanceTimeBy(401L)
+                result.complete(fixture.completed(TimeshiftCommandResult.TIMEOUT))
+                scope.runCurrent()
+                assertEquals(510_000L, owner.preview?.decision?.targetMs)
+                assertEquals(true, owner.preview?.dispatched)
+            }
+            rule.onNodeWithTag("timeshift-seek-preview")
+                .assertContentDescriptionContains("Seek result uncertain", substring = true)
+            rule.onNodeWithText("Seek result uncertain", useUnmergedTree = true).assertIsDisplayed()
+            rule.runOnIdle { scope.advanceTimeBy(949L); scope.runCurrent() }
+            rule.onNodeWithText("Seek result uncertain", useUnmergedTree = true).assertIsDisplayed()
+            rule.runOnIdle { scope.advanceTimeBy(1L); scope.runCurrent() }
+            rule.onNodeWithTag("timeshift-seek-preview").assertDoesNotExist()
+        } finally {
+            rule.runOnIdle { owner.dispose() }
+        }
     }
 }

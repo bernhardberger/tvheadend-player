@@ -68,6 +68,7 @@ private class LiveTimelineSourceGeneration(
     var seekQueuedAtMs = 0L
     var commitRequested = false
     var positionSampleEpoch = 0L
+    var positionCommandsInFlight = 0
     val seekWake = Channel<Unit>(Channel.CONFLATED)
     var feedback by mutableStateOf<String?>(null)
     var preview by mutableStateOf<LiveTimeshiftSeekPreview?>(null)
@@ -105,6 +106,7 @@ internal class LiveTimelinePresentationState(
     }
 
     fun beginFeedbackOperation(): Long {
+        sourceGeneration.feedback = null
         sourceGeneration.feedbackToken += 1L
         return sourceGeneration.feedbackToken
     }
@@ -138,14 +140,26 @@ internal class LiveTimelinePresentationState(
 
     suspend fun sampleTimeshiftPresentation(sample: suspend () -> AppTimeshiftState): AppTimeshiftState? {
         val generation = sourceGeneration
-        if (disposed || generation.seekQueue.dispatchInFlight) return null
+        if (disposed || generation.positionCommandsInFlight != 0) return null
         val epoch = generation.positionSampleEpoch
         val result = sample()
         // A seek can suspend independently of sampling. Only admit evidence from one
         // uninterrupted command epoch; numeric direction is not evidence of staleness.
         return result.takeIf {
             !disposed && generation === sourceGeneration &&
-                epoch == generation.positionSampleEpoch && !generation.seekQueue.dispatchInFlight
+                epoch == generation.positionSampleEpoch && generation.positionCommandsInFlight == 0
+        }
+    }
+
+    suspend fun <T> positionCommand(command: suspend () -> T): T {
+        val generation = sourceGeneration
+        generation.positionSampleEpoch++
+        generation.positionCommandsInFlight++
+        return try {
+            command()
+        } finally {
+            generation.positionSampleEpoch++
+            generation.positionCommandsInFlight--
         }
     }
 
@@ -164,6 +178,7 @@ internal class LiveTimelinePresentationState(
         val generation = sourceGeneration
         if (generation.selectionTimeline?.describesSameSegment(state.timeline) == false) return
         if (generation.preview == null && requestedDeltaMs < 0L && state.positionMs <= state.bufferStartMs) return
+        if (generation.preview == null && requestedDeltaMs > 0L && state.positionMs >= state.liveEdgeMs) return
         val selectionTimeline = generation.selectionTimeline ?: state.timeline ?: return
         generation.selectionTimeline = selectionTimeline
         val nextQueue = queueTimeshiftSeek(
@@ -214,21 +229,17 @@ internal class LiveTimelinePresentationState(
                         break
                     }
                     generation.seekQueue = dispatch.queue
-                    generation.positionSampleEpoch++
                     val dispatchToken = generation.preview?.token ?: generation.seekToken
                     val dispatchFeedbackToken = generation.preview?.feedbackToken
                         ?: generation.feedbackToken
                     generation.preview = generation.preview
                         ?.takeIf { it.token == dispatchToken }
                         ?.copy(dispatched = true)
+                    val dispatchedPreview = generation.preview
 
                     val contentTarget = generation.pendingContentTarget ?: break
                     generation.pendingContentTarget = null
-                    val result = try {
-                        seekContent(contentTarget)
-                    } finally {
-                        generation.positionSampleEpoch++
-                    }
+                    val result = positionCommand { seekContent(contentTarget) }
                     val command = (result as? TimeshiftContentSeekResult.Completed)?.command
                     val accepted = command?.disposition == TimeshiftCommandDisposition.ACCEPTED
                     generation.seekQueue = completeTimeshiftSeekDispatch(
@@ -252,6 +263,11 @@ internal class LiveTimelinePresentationState(
                                 result == TimeshiftContentSeekResult.Replaced -> replacedText
                                 else -> unavailableText
                             }
+                        }
+                        if (!accepted && generation.preview != null) {
+                            // Discard stacked input, but keep the attempted request's outcome
+                            // visible in compact mode. Never restore a dismissed preview.
+                            generation.preview = dispatchedPreview
                         }
                         generation.seekFeedbackJob?.cancel()
                         generation.seekFeedbackJob = scope.launch {

@@ -1161,7 +1161,7 @@ fun VideoPlayerScreen(
                     val commandToken = timeshiftCommandToken
                     val feedbackToken = timelineState.beginFeedbackOperation()
                     scope.launch {
-                        val result = videoPlayerViewModel.goLive()
+                        val result = timelineState.positionCommand { videoPlayerViewModel.goLive() }
                         if (commandToken != timeshiftCommandToken) return@launch
                         val resumeResult = if (result.isAccepted) {
                             videoPlayerViewModel.resumeTimeshift()

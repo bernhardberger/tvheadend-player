@@ -39,6 +39,56 @@ class PlayerTimelinePresentationStateTest {
         state.value.toAppPresentation(playbackPosition(positionMs.milliseconds))
 
     @Test
+    fun goLiveFencesOlderSamplesAndOverlappingPositionCommands() = runTest {
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val fixture = fixture()
+        val oldSample = CompletableDeferred<AppTimeshiftState>()
+        var admitted: AppTimeshiftState? = fixture.presentation()
+        val sampleJob = launch { admitted = owner.sampleTimeshiftPresentation { oldSample.await() } }
+        runCurrent()
+        val first = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        val firstJob = launch { owner.positionCommand { first.await() } }
+        val secondJob = launch { owner.positionCommand { second.await() } }
+        runCurrent()
+        first.complete(Unit)
+        runCurrent()
+        assertNull(owner.sampleTimeshiftPresentation { error("Another command is still active") })
+        second.complete(Unit)
+        runCurrent()
+        oldSample.complete(fixture.presentation())
+        sampleJob.join()
+        firstJob.join()
+        secondJob.join()
+        assertNull(admitted)
+        assertEquals(600_000L, owner.sampleTimeshiftPresentation { fixture.presentation(600_000L) }?.positionMs)
+        try {
+            owner.positionCommand { throw CancellationException("cancelled command") }
+        } catch (_: CancellationException) { }
+        assertNotNull(owner.sampleTimeshiftPresentation { fixture.presentation() })
+        owner.dispose()
+    }
+
+    @Test
+    fun newSeekClearsOldOutcomeAndInitialBoundaryNoOpsHaveNoPreview() = runTest {
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val fixture = fixture()
+        for ((position, delta) in listOf(0L to -30_000L, 600_000L to 30_000L)) {
+            owner.queueRelativeSeek(fixture.presentation(position), delta,
+                "unavailable", "clamped", "expired", "replaced", "uncertain") { error("Boundary no-op") }
+            assertNull(owner.preview)
+        }
+        owner.showFeedback("old uncertainty")
+        val oldToken = owner.feedbackToken
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain") { fixture.completed() }
+        assertNull(owner.feedback)
+        assertFalse(owner.applyFeedback(oldToken, "stale result"))
+        assertFalse(owner.preview!!.dispatched)
+        owner.dispose()
+    }
+
+    @Test
     fun sharedCommandQueueClampsInitialAndRepeatedStepsToActualHistoryNotCapacity() = runTest {
         for ((position, delta, expected) in listOf(
             Triple(10_000L, -30_000L, 0L),
@@ -580,6 +630,26 @@ class PlayerTimelinePresentationStateTest {
         runCurrent()
         assertEquals(1, dispatches)
         assertEquals("expired", state.feedback)
+        assertEquals(510_000L, state.preview?.decision?.targetMs)
+        assertTrue(state.preview?.dispatched == true)
+        advanceTimeBy(950L)
+        runCurrent()
+        assertNull(state.preview)
+        state.dispose()
+    }
+
+    @Test
+    fun dismissedInFlightPreviewIsNotRestoredByAnUncertainOutcome() = runTest {
+        val fixture = fixture()
+        val result = CompletableDeferred<TimeshiftContentSeekResult>()
+        val state = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        state.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain") { result.await() }
+        advanceTimeBy(400L)
+        runCurrent()
+        state.cancelPendingSeek()
+        result.complete(fixture.completed(TimeshiftCommandResult.TIMEOUT))
+        runCurrent()
         assertNull(state.preview)
         state.dispose()
     }

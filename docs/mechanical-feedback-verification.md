@@ -10,8 +10,8 @@ not a public release or physical-TV acceptance result.
   through fade-out. Empty input no longer shrinks the outgoing surface. Confirm
   and both timeout paths still use the existing numeric admission and tune code.
 - G10-20: position sampling rejects a suspended result that crosses a seek
-  dispatch/settlement or source-generation boundary. Samples are not requested
-  during a seek. A fresh lower position remains admissible; direction alone does
+  dispatch/settlement, Go Live or source-generation boundary. Samples are not requested
+  during a position-changing command. A fresh lower position remains admissible; direction alone does
   not establish staleness. Neither command acceptance, reader acknowledgement,
   preview expiry nor timeout is promoted to confirmed displayed position.
 - G10-19: normal D-pad seeking sends the same signed step as reduced seeking to
@@ -19,6 +19,11 @@ not a public release or physical-TV acceptance result.
   rather than normal mode pre-clamping before queue admission. Hidden normal
   controls reject these keys. Reduced preview now exposes command feedback,
   including uncertain outcomes, visually and through accessibility semantics.
+  If a command rejects stacked input, only the actually dispatched request stays
+  as an outcome preview for the existing 950 ms interval; discarded input is not
+  presented as completed playback, and a dismissed preview is not restored.
+  A new command clears the previous outcome label. Initial no-op input at either
+  history boundary does not create a preview; held-key acceleration retains focus.
 
 The normal preview previously switched from its target to the latest sampled
 position after a fixed feedback interval. That permits an apparent UI rollback
@@ -58,8 +63,9 @@ was changed to guess at those causes.
   command ownership and repeated commands at both observed buffer boundaries.
 - Offline `ChannelNumberOverlayTest`: 2 passed; visible, exiting and absent
   captures show coherent numeric/background exit without size collapse.
-- Offline `TimeshiftCommandConsistencyTest`: 2 passed; normal signed steps,
-  hidden input rejection and accessible reduced uncertain-result feedback.
+- Offline `TimeshiftCommandConsistencyTest`: 3 passed across focused runs; normal
+  signed steps, hidden input rejection and accessible reduced uncertain-result
+  feedback, including a suspended seek followed by stacked input and timeout.
 - Offline `NumericChannelReturnTest`: 6 passed.
 - Existing offline `ProgrammeWindowInputTest`: 10 passed, retaining P35 input,
   target expiry, delayed result and font-scaled behavior.
