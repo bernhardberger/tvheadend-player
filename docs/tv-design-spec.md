@@ -318,7 +318,7 @@ are unchanged.
 | Where | player overlays, including passive schedule | cards, channel rows, hero |
 | Interactive | only with known playback timing and seek capability | no |
 | Fill | **orange** playback; `primary` cyan passive schedule | `primary` cyan |
-| Extras | thumb, labels, ghost fill, live edge | none |
+| Extras | thumb, labels, ghost fill, history boundary tick | none |
 | Component | `PlayerTimeline.kt` | `ProgressStrip` in `ui/components/` |
 
 These are separate components and must stay separate. An ambient strip must not

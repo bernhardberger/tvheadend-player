@@ -102,6 +102,9 @@ class PlayerOverlayCompositionTest {
         }
         val progress = composeRule.onNodeWithTag("player-schedule-progress").fetchSemanticsNode().config
         assertEquals(0.5f, progress[androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo].current)
+        assertEquals(listOf("Current broadcast. ${formatClock(0)} - ${formatClock(3600)}"),
+            progress[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription])
+        assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
         assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsActions.SetProgress))
         assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsProperties.Focused))
         composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()

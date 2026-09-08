@@ -285,7 +285,9 @@ fun OverlayControlsTv(
                 feedback = previewFeedback,
                 feedbackIsError = timeshiftFeedback != null,
                 timelineModifier = if (event != null) Modifier.testTag("player-schedule-progress")
-                    .semantics(mergeDescendants = true) { contentDescription = description } else Modifier,
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "$description. ${formatClock(event.start.epochSeconds)} - ${formatClock(event.stop.epochSeconds)}"
+                    } else Modifier,
             )
         }
         Spacer(Modifier.height(8.dp))
