@@ -6,13 +6,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import at.bernhardberger.tvhplayer.core.shouldKeepPlaybackScreenOn
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 
 @OptIn(UnstableApi::class)
@@ -24,6 +34,31 @@ fun PlayerVideoSurface(
     modifier: Modifier = Modifier,
     debugVideoBackdropVisible: Boolean = false,
 ) {
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var keepScreenOn by remember(player, lifecycle, videoVisible) { mutableStateOf(false) }
+    DisposableEffect(player, lifecycle, videoVisible) {
+        fun updateScreenOn() {
+            // A retained surface or paused READY player is not active video playback.
+            keepScreenOn = shouldKeepPlaybackScreenOn(
+                isForeground = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED),
+                isVideoVisible = videoVisible,
+                isPlaying = player.isPlaying,
+                hasSelectedVideo = player.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO),
+                hasError = player.playerError != null,
+            )
+        }
+        val playerListener = object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) = updateScreenOn()
+        }
+        val lifecycleObserver = LifecycleEventObserver { _, _ -> updateScreenOn() }
+        player.addListener(playerListener)
+        lifecycle.addObserver(lifecycleObserver)
+        updateScreenOn()
+        onDispose {
+            player.removeListener(playerListener)
+            lifecycle.removeObserver(lifecycleObserver)
+        }
+    }
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             factory = { context ->
@@ -36,10 +71,12 @@ fun PlayerVideoSurface(
                     isClickable = false
                     importantForAccessibility =
                         View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                    keepScreenOn = true
+                    this.keepScreenOn = false
                 }
             },
             update = { view ->
+                view.player = player
+                view.keepScreenOn = keepScreenOn
                 view.alpha = if (videoVisible) 1f else 0f
                 view.resizeMode = when (aspectRatio) {
                     AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
