@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,8 +39,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Card
 import androidx.tv.material3.MaterialTheme
@@ -52,7 +57,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import coil3.ImageLoader
 import kotlinx.coroutines.flow.first
 
@@ -79,6 +83,7 @@ fun ChannelDrawer(
     val emptyFocus = remember { FocusRequester() }
     LaunchedEffect(ids) {
         if (ids.isEmpty()) {
+            withFrameNanos { }
             emptyFocus.requestFocus()
             return@LaunchedEffect
         }
@@ -92,14 +97,17 @@ fun ChannelDrawer(
         requesters.getValue(target).requestFocus()
         entered = true
     }
-    val focused = channels.firstOrNull { it.id == focusedId }
-    val now = focused?.let { nowEvent(it.id) }
-    val next = focused?.let { nextEvent(it.id) }
+    val cardHeight = with(LocalDensity.current) {
+        40.dp + maxOf(64.dp, MaterialTheme.typography.titleMedium.lineHeight.toDp() * 2 +
+            maxOf(20.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp())) +
+            MaterialTheme.typography.bodyMedium.lineHeight.toDp() * 2 +
+            MaterialTheme.typography.labelMedium.lineHeight.toDp() * 2
+    }
     Column(
         Modifier.fillMaxWidth().background(Brush.verticalGradient(
             0f to Color.Transparent, 0.18f to Color.Black.copy(alpha = 0.94f), 1f to Color.Black,
         ))
-            .padding(top = 32.dp, bottom = 32.dp).testTag("player-channel-shelf")
+            .padding(top = 16.dp, bottom = 24.dp).testTag("player-channel-shelf")
             .onPreviewKeyEvent { event ->
                 if (event.key == Key.DirectionUp) {
                     if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) onCloseDrawer(event.nativeKeyEvent.keyCode)
@@ -107,55 +115,87 @@ fun ChannelDrawer(
                 } else false
             },
     ) {
-        Column(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 56.dp)) {
-            Text(now?.let { "${focusedId?.let { id -> ChannelNavigation.numberForId(ids, numbers, id) } ?: ""} / ${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}  ${it.title.orEmpty()}" }
-                ?: stringResource(R.string.no_epg), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            next?.let {
-                Text(stringResource(R.string.player_next_event_with_range,
-                    "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}", it.title.orEmpty()),
-                    color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
         if (channels.isEmpty()) {
             Text(stringResource(R.string.empty_channel_tag), Modifier.padding(horizontal = 48.dp), color = MaterialTheme.colorScheme.onSurface)
             androidx.tv.material3.Button(
                 onClick = { onCloseDrawer(null) },
-                modifier = Modifier.padding(horizontal = 48.dp).focusRequester(emptyFocus),
+                modifier = Modifier.padding(horizontal = 56.dp).focusRequester(emptyFocus).testTag("player-shelf-close"),
             ) { Text(stringResource(R.string.close)) }
         }
         LazyRow(state = listState, contentPadding = PaddingValues(horizontal = 56.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(channels, key = { it.id.value }) { channel ->
-                Card(onClick = { onPickChannel(channel) },
-                     colors = androidx.tv.material3.CardDefaults.colors(
-                         focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
-                         focusedContentColor = MaterialTheme.colorScheme.onSurface,
-                     ),
-                     border = androidx.tv.material3.CardDefaults.border(
-                         focusedBorder = androidx.tv.material3.Border(
-                             androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface),
-                         ),
-                     ),
-                     modifier = Modifier.width(184.dp).height(88.dp)
+                Card(
+                    onClick = { onPickChannel(channel) },
+                    colors = androidx.tv.material3.CardDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
+                        focusedContentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    border = androidx.tv.material3.CardDefaults.border(
+                        focusedBorder = androidx.tv.material3.Border(
+                            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface),
+                        ),
+                    ),
+                    scale = androidx.tv.material3.CardDefaults.scale(focusedScale = 1f),
+                    modifier = Modifier
+                        .width(288.dp)
+                        .heightIn(min = cardHeight)
+                        .testTag("player-channel-card-${channel.id.value}")
                         .focusRequester(requesters.getValue(channel.id))
                         .onFocusChanged {
                             if (it.isFocused) { focusedId = channel.id; onFocusChannel(channel.id) }
-                        }) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        },
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             PiconBox(imageLoader = imageLoader, currentSession = currentSession,
-                                piconPath = channel.icon, modifier = Modifier.size(64.dp, 40.dp).padding(4.dp))
-                            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                            if (channel.id == playingChannelId) Icon(Icons.Filled.PlayArrow,
-                                contentDescription = stringResource(R.string.player_shelf_playing),
-                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                            if (channel.id in recordingChannelIds) Icon(Icons.Filled.FiberManualRecord,
-                                contentDescription = stringResource(R.string.player_shelf_recording),
-                                tint = at.bernhardberger.tvhplayer.ui.TvRecordingColor, modifier = Modifier.size(12.dp))
+                                piconPath = channel.icon, modifier = Modifier.size(96.dp, 64.dp)
+                                    .testTag("player-channel-${channel.id.value}-picon").padding(4.dp))
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Row(Modifier.height(with(LocalDensity.current) { maxOf(20.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp()) }),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(ChannelNavigation.numberForId(ids, numbers, channel.id)?.toString().orEmpty(),
+                                        modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f), maxLines = 1)
+                                    if (channel.id == playingChannelId) Icon(Icons.Filled.PlayArrow,
+                                        contentDescription = stringResource(R.string.player_shelf_playing),
+                                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                    if (channel.id in recordingChannelIds) Icon(Icons.Filled.FiberManualRecord,
+                                        contentDescription = stringResource(R.string.player_shelf_recording),
+                                        tint = at.bernhardberger.tvhplayer.ui.TvRecordingColor, modifier = Modifier.size(12.dp))
+                                }
+                                Text(channel.name.orEmpty(),
+                                    modifier = Modifier.testTag("player-channel-${channel.id.value}-identity"),
+                                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
                         }
-                        Text(channelTitleText(ChannelNavigation.numberForId(ids, numbers, channel.id), channel.name.orEmpty()),
-                            style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val now = nowEvent(channel.id)
+                        val next = nextEvent(channel.id)
+                        val nowRange = now?.let { "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}" }.orEmpty()
+                        Column {
+                            Text("${stringResource(R.string.now)} $nowRange".trim(),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                                style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(now?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.no_epg),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
+                                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal,
+                                minLines = 2, maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.testTag("player-channel-${channel.id.value}-now"))
+                        }
+                        val nextRange = next?.let { "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}" }.orEmpty()
+                        val nextTitle = next?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.no_epg)
+                        val nextDescription = stringResource(R.string.player_next_event_with_range, nextRange, nextTitle)
+                        Text(
+                            text = if (next != null) stringResource(R.string.player_next_event_with_range,
+                                formatClock(next.start.epochSeconds), nextTitle) else nextTitle,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
+                            style = MaterialTheme.typography.labelMedium, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.testTag("player-channel-${channel.id.value}-next")
+                                .semantics { contentDescription = nextDescription },
+                        )
                     }
                 }
             }

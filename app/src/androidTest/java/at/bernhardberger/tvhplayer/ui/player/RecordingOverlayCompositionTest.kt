@@ -5,12 +5,12 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +43,44 @@ import org.junit.Rule
 import org.junit.Test
 
 class RecordingOverlayCompositionTest {
+    @Test
+    fun recordingTrackKeepsAnchorAcrossFocusedAndHiddenPreviewAtLargeText() {
+        val hidden = mutableStateOf(false)
+        val previewing = mutableStateOf(false)
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
+                TVHeadendPlayerTheme {
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                        if (hidden.value) RecordingSeekPreview(
+                            targetMs = 30_000, originMs = 60_000, durationMs = 5_400_000, growing = false,
+                            modifier = androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+                        ) else RecordingOverlayControls(
+                            imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                            piconPath = null, title = "A long recording title", subtitle = null, channelName = "Channel",
+                            positionMs = 30_000, durationMs = 5_400_000, growing = false, nowSec = 1800,
+                            canSeek = true, controlsVisible = true, optionsOpen = false,
+                            onTogglePlayPause = {}, onSeek = {}, onStopPlayback = {}, onUserInteraction = {},
+                            onOpenOptions = {}, onOpenInfo = {}, previewing = previewing.value,
+                        )
+                    }
+                }
+            }
+        }
+        fun track() = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val resting = track()
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+        assertEquals(resting, track())
+        composeRule.runOnIdle { previewing.value = true }
+        assertEquals(resting, track())
+        composeRule.runOnIdle { hidden.value = true }
+        assertEquals(resting, track())
+        composeRule.onNodeWithTag("recording-actions").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("1:30:00", useUnmergedTree = true).assertIsDisplayed()
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -61,7 +99,9 @@ class RecordingOverlayCompositionTest {
         assertEquals(root.right - sidePaddingPx, clock.right, 1f)
         assertTrue(channel.bottom <= title.top)
         assertTrue(title.bottom <= subtitle.top)
-        assertEquals(channel.top, clock.top, 1f)
+        assertTrue(kotlin.math.abs(channel.top - clock.top) < with(composeRule.density) { 12.dp.toPx() })
+        assertEquals(channel.left, title.left, 1f)
+        assertEquals(with(composeRule.density) { 64.dp.toPx() }, bounds("recording-picon").height, 1f)
     }
 
     @Test
@@ -111,23 +151,24 @@ class RecordingOverlayCompositionTest {
     }
 
     @Test
-    fun recordingKeepsTheRecordSlotEmptyAndActionsAboveTheTimeline() {
+    fun recordingOmitsRecordWithoutAnEmptySlotAndKeepsTimelineAboveActions() {
         setRecordingOverlay("Recording title")
 
         val info = bounds("player-info")
         val settings = bounds("player-settings")
         val stop = bounds("player-stop")
         assertTrue(info.right < settings.left)
-        assertTrue(settings.left - info.right >= info.width)
+        assertTrue(settings.left - info.right < info.width)
         assertTrue(stop.right < info.left)
-        assertTrue(bounds("recording-actions").bottom <= bounds("recording-duration-status").top)
+        assertTrue(bounds("recording-duration-status").bottom <= bounds("recording-actions").top)
+        composeRule.onNodeWithTag("player-channels-cue").assertDoesNotExist()
         composeRule.onNodeWithTag("player-record").assertDoesNotExist()
         composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
     }
 
     @Test
     @OptIn(ExperimentalTestApi::class)
-    fun recordingContextLabelAppearsOnlyForAFocusedNonObviousAction() {
+    fun recordingUtilitiesRemainReachableWithoutFloatingCaptions() {
         setRecordingOverlay("Recording title")
 
         val actionsBefore = bounds("recording-actions")
@@ -138,14 +179,12 @@ class RecordingOverlayCompositionTest {
         composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
-        composeRule.onNodeWithTag("player-action-context-label").assertExists()
-        composeRule.onNodeWithText("Settings", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-settings").assertContentDescriptionEquals("Settings")
         val actionsAfter = bounds("recording-actions")
         val timeline = bounds("recording-duration-status")
-        val contextLabel = bounds("player-action-context-label")
         assertEquals(actionsBefore, actionsAfter)
-        assertTrue(actionsAfter.bottom <= timeline.top)
-        assertTrue(contextLabel.top >= actionsAfter.top)
+        assertTrue(timeline.bottom <= actionsAfter.top)
 
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("player-info").assertIsFocused()
@@ -153,11 +192,11 @@ class RecordingOverlayCompositionTest {
 
     @Test
     @OptIn(ExperimentalTestApi::class)
-    fun germanContextLabelFitsTheGapAndKeepsOnlyTheIconAccessibleAtLargeText() {
+    fun germanUtilitiesRetainAccessibleNamesWithoutCaptionsAtLargeText() {
         setRecordingOverlay(
             title = "Eine außergewöhnlich lange deutschsprachige Aufnahme",
             german = true,
-            fontScale = 1.3f,
+            fontScale = 1.5f,
         )
 
         composeRule.onNodeWithTag("player-info").requestFocus()
@@ -167,21 +206,16 @@ class RecordingOverlayCompositionTest {
 
         val options = composeRule.onNodeWithTag("player-settings")
         val contextLabel = composeRule.onNodeWithTag("player-action-context-label")
-        val labelBounds = contextLabel.fetchSemanticsNode().boundsInRoot
         val timeline = bounds("recording-duration-status")
         val actions = bounds("recording-actions")
         options.assertIsFocused().assertContentDescriptionEquals("Einstellungen")
-        composeRule.onNodeWithText("Einstellungen", useUnmergedTree = true).assertExists()
-        contextLabel.assert(
-            SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility),
-        )
-        assertTrue(actions.bottom <= timeline.top)
-        assertTrue(labelBounds.top >= actions.top)
-        assertTrue(labelBounds.left >= actions.left)
-        assertTrue(labelBounds.right <= actions.right)
+        composeRule.onNodeWithText("Einstellungen", useUnmergedTree = true).assertDoesNotExist()
+        contextLabel.assertDoesNotExist()
+        assertTrue(timeline.bottom <= actions.top)
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-        contextLabel.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertTrue(!layouts.single().didOverflowHeight)
+        composeRule.onNodeWithTag("recording-title").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(2, layouts.single().lineCount)
+        assertTrue(layouts.single().getLineBottom(1) <= layouts.single().size.height)
     }
 
     @Test

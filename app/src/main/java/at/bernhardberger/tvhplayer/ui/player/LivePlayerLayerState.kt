@@ -48,6 +48,23 @@ internal class LivePlayerLayerState(
     private var autoHideEligible = false
     private var autoHideJob: Job? = null
     private var disposed = false
+    private var lastFocusedAction: String? = null
+    private var channelDrawerReturnAction: String? = null
+    var restoreChannelAction by mutableStateOf<String?>(null)
+        private set
+
+    fun onActionFocused(action: String) {
+        lastFocusedAction = action.takeIf { it in setOf("player-pause", "player-info", "player-record", "player-settings") }
+    }
+
+    fun onChannelActionRestored() {
+        restoreChannelAction = null
+    }
+
+    fun dismissChannelDrawer() {
+        restoreChannelAction = channelDrawerReturnAction ?: "player-pause"
+        showControls()
+    }
 
     fun showControls() {
         controlsVisible = true
@@ -101,6 +118,8 @@ internal class LivePlayerLayerState(
     }
 
     fun openChannelDrawer() {
+        channelDrawerReturnAction = lastFocusedAction.takeIf { controlsVisible }
+        restoreChannelAction = null
         suspendAutoHide()
         controlsVisible = false
         infoOpen = false

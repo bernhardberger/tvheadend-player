@@ -201,7 +201,8 @@ fun mediaPlaybackAction(
     playKeyCode: Int,
     pauseKeyCode: Int,
     toggleKeyCode: Int,
-): MediaPlaybackAction = when (keyCode) {
+    repeatCount: Int = 0,
+): MediaPlaybackAction = if (repeatCount != 0) MediaPlaybackAction.NONE else when (keyCode) {
     playKeyCode -> MediaPlaybackAction.PLAY
     pauseKeyCode -> MediaPlaybackAction.PAUSE
     toggleKeyCode -> MediaPlaybackAction.TOGGLE

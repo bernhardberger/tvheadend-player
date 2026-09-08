@@ -1,14 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -27,8 +25,8 @@ import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
-import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
+import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 
@@ -38,10 +36,10 @@ internal fun TimeshiftSeekPreview(
     decision: TimeshiftSeekDecision,
     modifier: Modifier = Modifier,
     programmeWindow: ProgrammeWindow? = null,
+    channelsAvailable: Boolean = true,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
-    val displayedProgress = programmeWindow?.positionFraction ?: range.displayProgress
     val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
     val positionPresentation = timeshiftPositionPresentation(targetState)
     val liveLabel = stringResource(R.string.timeshift_live)
@@ -61,12 +59,6 @@ internal fun TimeshiftSeekPreview(
         "−${formatPlaybackDuration(positionPresentation.behindLiveMs)}"
     }
     val deltaLabel = formatPlaybackDelta(decision.deltaMs)
-    val bufferStartLabel = stringResource(
-        R.string.timeshift_buffer_start,
-        formatPlaybackDuration(
-            (targetState.liveEdgeMs - targetState.bufferStartMs).coerceAtLeast(0L)
-        ),
-    )
     val bufferStartDescription = stringResource(
         R.string.timeshift_buffer_start_description,
         formatPlaybackDuration(
@@ -81,6 +73,7 @@ internal fun TimeshiftSeekPreview(
         bufferStartDescription,
     )
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
+    val targetLineHeight = MaterialTheme.typography.titleMedium.lineHeight
 
     androidx.compose.foundation.layout.Column(
         modifier = modifier
@@ -90,7 +83,7 @@ internal fun TimeshiftSeekPreview(
                 start = TvOverlaySidePadding,
                 end = TvOverlaySidePadding,
                 top = TvOverlayFooterGradientRunout,
-                bottom = TvOverlayBottomPadding,
+                bottom = playerSeekPreviewBottomPadding(channelsAvailable),
             )
             .testTag("timeshift-seek-preview")
             .clearAndSetSemantics {
@@ -102,11 +95,21 @@ internal fun TimeshiftSeekPreview(
             },
     ) {
         programmeWindow?.let {
-            Text(it.event.title.orEmpty(), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge,
+            Text(if (it.targetAvailable) it.event.title.orEmpty() else unavailableTarget,
+                color = if (it.targetAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer,
+                style = MaterialTheme.typography.labelLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.testTag("timeshift-preview-programme"))
+                modifier = Modifier.layout { measurable, constraints ->
+                    val title = measurable.measure(constraints.copy(minHeight = 0))
+                     // Match the full chrome's centered status row above the target clearance.
+                     layout(title.width, 0) {
+                         title.placeRelative(0, -8.dp.roundToPx() - targetLineHeight.roundToPx() -
+                             (TvOverlayActionButtonSize.roundToPx() + title.height) / 2)
+                     }
+                }.then(if (!it.targetAvailable) Modifier.background(MaterialTheme.colorScheme.errorContainer,
+                    MaterialTheme.shapes.small).padding(horizontal = 8.dp) else Modifier)
+                    .testTag("timeshift-preview-programme"))
         }
-        TimelineTargetLabel(targetLabel, displayedProgress, available = programmeWindow?.targetAvailable != false)
         PlayerTimelineBlock(
             progress = range.displayProgress,
             tone = PlayerTimelineTone.PREVIEW,
@@ -115,60 +118,36 @@ internal fun TimeshiftSeekPreview(
             liveEdgeFraction = 1f,
             rewindableBoundaryTestTag = "timeshift-preview-rewindable-boundary",
             rewindableOverflowTestTag = "timeshift-preview-rewindable-overflow",
-            liveEdgeTestTag = "timeshift-preview-live-edge",
             progressSemantics = false,
             programmeWindow = programmeWindow,
+            reserveLabelSpace = true,
+            leadingLabel = clockLabels?.first ?: behindLiveLabel.takeUnless { positionPresentation.atLiveEdge },
+            trailingLabel = clockLabels?.second,
+            leadingLabelTestTag = "timeshift-preview-buffer-start",
+            trailingLabelTestTag = "timeshift-preview-position",
+            previewLabel = targetLabel,
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = clockLabels?.first ?: bufferStartLabel,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(
-                    alpha = TvOverlayTextTertiaryAlpha,
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("timeshift-preview-buffer-start"),
-            )
-            Text(
-                text = clockLabels?.second ?: if (targetLabel == liveLabel) "" else liveLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(
-                    alpha = TvOverlayTextTertiaryAlpha,
-                ),
-                modifier = Modifier.testTag("timeshift-preview-position"),
-            )
-        }
-        if (programmeWindow?.targetAvailable == false) {
-            Text(unavailableTarget, color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.labelLarge)
-        }
     }
 }
 
 @Composable
 internal fun TimelineTargetLabel(label: String, progress: Float, available: Boolean = true) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else TvOverlayTextTertiaryAlpha),
-            maxLines = 1,
-            modifier = Modifier
-                .layout { measurable, constraints ->
-                    val label = measurable.measure(constraints.copy(minWidth = 0))
-                    layout(constraints.maxWidth, label.height) {
-                        label.placeRelative(
-                            (constraints.maxWidth * progress - label.width / 2f).roundToInt()
-                                .coerceIn(0, constraints.maxWidth - label.width),
-                            0,
-                        )
-                    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else TvOverlayTextTertiaryAlpha),
+        maxLines = 1,
+        modifier = Modifier
+            .layout { measurable, constraints ->
+                val label = measurable.measure(constraints.copy(minWidth = 0))
+                layout(constraints.maxWidth, label.height) {
+                    label.placeRelative(
+                        (constraints.maxWidth * progress - label.width / 2f).roundToInt()
+                            .coerceIn(0, constraints.maxWidth - label.width),
+                        0,
+                    )
                 }
-                .testTag("timeshift-preview-target"),
-        )
+            }
+            .testTag("timeshift-preview-target"),
+    )
 }

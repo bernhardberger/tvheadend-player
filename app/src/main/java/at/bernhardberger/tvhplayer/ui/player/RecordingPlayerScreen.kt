@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -29,9 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.tv.material3.Button
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -67,7 +63,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
-import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
@@ -397,8 +392,10 @@ fun RecordingPlayerScreen(
                     playKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
                     pauseKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
                     toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    repeatCount = event.nativeKeyEvent.repeatCount,
                 )
                 if (mediaAction != MediaPlaybackAction.NONE) {
+                    revealingKeyCode = keyCode
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> session.play()
                         MediaPlaybackAction.PAUSE -> pausePlayback()
@@ -456,6 +453,7 @@ fun RecordingPlayerScreen(
                     nowSec = nowSec,
                     canSeek = timelineState.canSeek,
                     paused = !player.playWhenReady,
+                    previewing = timelineState.pendingTargetMs != null,
                     controlsVisible = controlsVisible,
                     optionsOpen = optionsPage != null,
                     onTogglePlayPause = ::togglePlayPause,
@@ -523,29 +521,6 @@ fun RecordingPlayerScreen(
                     growing = growing,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
-            }
-
-            if (
-                controlsVisible &&
-                timelineState.pendingTargetMs != null &&
-                timelineState.pendingOriginMs != null
-            ) {
-                val seekDeltaMs = requireNotNull(timelineState.pendingTargetMs) -
-                    requireNotNull(timelineState.pendingOriginMs)
-                Surface(
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    colors = SurfaceDefaults.colors(
-                        containerColor = Color.Black.copy(alpha = 0.78f),
-                        contentColor = Color.White,
-                    ),
-                    shape = MaterialTheme.shapes.large,
-                ) {
-                    Text(
-                        text = formatPlaybackDelta(seekDeltaMs),
-                        style = MaterialTheme.typography.headlineMedium,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                    )
-                }
             }
 
         }

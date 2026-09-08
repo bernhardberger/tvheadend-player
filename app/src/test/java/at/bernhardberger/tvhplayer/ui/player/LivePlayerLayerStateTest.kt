@@ -16,6 +16,34 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LivePlayerLayerStateTest {
     @Test
+    fun shelfDismissalRestoresInvokerWithoutChangingTuneCloseBehavior() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        for (action in listOf("player-pause", "player-info", "player-record", "player-settings", "player-stop")) {
+            state.showControls()
+            state.onActionFocused(action)
+            state.openChannelDrawer()
+            state.beginOpeningKeyCycle(19)
+            state.dismissChannelDrawer()
+            assertEquals(PlayerForegroundLayer.CONTROLS, playerForegroundLayer(state.foregroundContext()))
+            assertEquals(if (action == "player-stop") "player-pause" else action, state.restoreChannelAction)
+            assertEquals(19, state.revealingKeyCode)
+            state.onChannelActionRestored()
+            assertNull(state.restoreChannelAction)
+            state.endOpeningKeyCycle(19)
+        }
+        state.onActionFocused("player-settings")
+        state.hideControls()
+        state.openChannelDrawer()
+        state.dismissChannelDrawer()
+        assertEquals("player-pause", state.restoreChannelAction)
+        state.onChannelActionRestored()
+        state.openChannelDrawer()
+        state.closeChannelDrawer()
+        assertFalse(state.controlsVisible)
+        assertNull(state.restoreChannelAction)
+    }
+
+    @Test
     fun layerOpeningsAreExclusiveAndCloseInForegroundOrder() = runTest {
         val state = LivePlayerLayerState(
             scope = this,

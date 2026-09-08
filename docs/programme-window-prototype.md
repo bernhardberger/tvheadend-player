@@ -14,18 +14,18 @@ Player does not estimate server time or create subscriptions for presentation.
 Use an independently authorized test installation with runtime history available.
 No physical device is mutated by the offline fixture test.
 
-1. Reveal controls with Up. Initial focus is Play/Pause. Press Down to reach the
+1. Reveal controls with Up. Initial focus is Play/Pause. Press Up to reach the
    timeline. Center still toggles pause, not seek confirmation.
 2. With B 20:00-21:00, live 20:30, playback 20:05 and history beginning 19:50,
    press Left eleven times without settling between presses. The target reaches
    approximately 19:59:30 and the window changes to A 19:00-20:00. The main title
    remains B until sampled playback moves to the dispatched content.
-3. Check that 19:00-19:50 is visibly unavailable. Further rewind must stop at
+3. Check the thin timeshift-start tick at 19:50. Further rewind must stop at
    runtime history, not the displayed programme start. A held Left accelerates
    existing steps; it never snaps to a programme boundary.
 4. Before dispatch, Back cancels preview. Otherwise release the remote and let
    the existing 400ms idle debounce dispatch. Pause remains unchanged by seeking.
-5. Press Up from the timeline, then Right through Stop, Info, Record and Settings
+5. Press Down from the timeline, then Right through Stop, Info, Record and Settings
    to Go live. Press Center. Go live is independent of the window's right edge.
 6. Repeat while paused, with a shallow buffer, missing EPG, and a midnight
    programme. Missing mapping/EPG uses relative history; midnight edges include
@@ -61,18 +61,19 @@ that a jumping window is preferable. Physical readability over motion, remote
 feel, SurfaceView visibility, overscan and programme-time accuracy are unclaimed.
 
 The full and compact preview share a relative-to-live target readout above the
-handle. Scheduled edges remain clock labels; the readout does not suggest that
-the estimated broadcast alignment is precise. Focus adds a contrasting handle
-ring, including the relative fallback; evicted targets become hollow, their
-readout is subdued, and the existing expired-target message appears visually and
-in accessibility semantics before dispatch. Available history is brighter than the
-unavailable track and future remains dashed. Reserved title/readout/status slots
-scale with text and keep the controls stable when metadata or rejection feedback
-changes. The mapped window also states the runtime available duration. A shallow
-buffer stays proportionally narrow rather than inflating its drawn range and
-implying that unavailable content can be reached.
+orange fill edge. Scheduled edges remain clock labels below the track; the readout does
+not suggest that estimated broadcast alignment is precise. Focus thickens the
+bar and shows a thumb only while focused. Orange follows playback or preview, gray indicates buffered content ahead,
+and future remains dark. Only an interior timeshift-start tick remains. Evicted
+targets retain subdued readouts and explicit visual/accessibility feedback.
+Metadata/readouts overlay above the stable track during preview and rejection,
+without empty reserved rows. Runtime history duration is accessible but not a
+visible available-duration label; orange progress before the timeshift-start tick
+does not grant seek permission.
 
-The pre-existing header progress remains passive and tied to committed identity;
-it is not a second seek control. Removing it or redesigning the header is outside
-this experiment. The synthetic backdrop intentionally includes a hard-ended dark
-rectangle; it must not be mistaken for the production overlay scrim in captures.
+The lower layout aligns the full-width track above left transport and right
+utilities, with Go live above the track and the Channels-down cue below actions.
+Hidden and focused previews keep the same track anchor. Each compact channel card
+contains its own Now/Next, and the duplicate header
+progress strip is removed. The synthetic backdrop intentionally includes a
+hard-ended dark rectangle; it is not the production overlay scrim.

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +24,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -33,10 +36,8 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayGhostFillAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBarFocusedHeight
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBarHeight
-import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineLabelGap
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineRowHeight
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineThumbSize
-import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineTickAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTrackAlpha
 
 private val PlaybackPositionColor = Color(0xFFFA7F00)
@@ -49,17 +50,15 @@ fun PlayerTimelineBar(
     tone: PlayerTimelineTone,
     modifier: Modifier = Modifier,
     ghostProgress: Float? = null,
-    boundaryFractions: List<Float> = emptyList(),
     rewindableStartFraction: Float? = null,
     rewindableStartOverflow: Boolean = false,
     liveEdgeFraction: Float? = null,
     thumbTestTag: String? = null,
     rewindableBoundaryTestTag: String? = null,
     rewindableOverflowTestTag: String? = null,
-    liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
     availableEndFraction: Float? = liveEdgeFraction,
-    programmeElapsedFraction: Float? = null,
+    programmeWindow: Boolean = false,
     programmeTargetAvailable: Boolean? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
@@ -90,7 +89,7 @@ fun PlayerTimelineBar(
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (rewindableStartFraction != null) 0.10f else TvOverlayTrackAlpha)),
         ) {
-            ghostProgress?.coerceIn(0f, 1f)?.let { ghost ->
+            ghostProgress?.takeUnless { programmeWindow }?.coerceIn(0f, 1f)?.let { ghost ->
                 Box(
                     Modifier
                         .fillMaxWidth(ghost)
@@ -102,13 +101,6 @@ fun PlayerTimelineBar(
                         ),
                 )
             }
-            programmeElapsedFraction?.let { elapsed ->
-                Box(
-                    Modifier.fillMaxWidth(elapsed.coerceIn(0f, 1f))
-                        .height(barHeight)
-                        .background(PlaybackPositionColor.copy(alpha = 0.45f)),
-                )
-            }
             if (rewindableStartFraction != null && availableEndFraction != null) {
                 val start = rewindableStartFraction.coerceIn(0f, 1f)
                 val end = availableEndFraction.coerceIn(start, 1f)
@@ -118,12 +110,11 @@ fun PlayerTimelineBar(
                         .width(maxWidth * (end - start))
                         .height(barHeight)
                         .background(
-                            if (programmeElapsedFraction != null) PlaybackPositionColor
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayGhostFillAlpha),
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayGhostFillAlpha),
                         ),
                 )
             }
-            if (rewindableStartFraction == null && currentProgress != null) {
+            if ((programmeWindow || rewindableStartFraction == null) && currentProgress != null) {
                 Box(
                     Modifier
                         .fillMaxWidth(currentProgress)
@@ -131,7 +122,7 @@ fun PlayerTimelineBar(
                         .background(PlaybackPositionColor),
                 )
             }
-            rewindableStartFraction?.let { fraction ->
+            rewindableStartFraction?.takeIf { it > 0f && it < 1f }?.let { fraction ->
                 val start = fraction.coerceIn(0f, 1f)
                 if (rewindableStartOverflow) {
                     val markerColor = MaterialTheme.colorScheme.onSurface
@@ -187,30 +178,7 @@ fun PlayerTimelineBar(
                     )
                 }
             }
-            boundaryFractions.forEach { fraction ->
-                Box(
-                    Modifier
-                        .offset(x = maxWidth * fraction.coerceIn(0f, 1f) - 1.dp)
-                        .width(2.dp)
-                        .height(barHeight)
-                        .background(
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = TvOverlayTimelineTickAlpha,
-                            ),
-                        ),
-                )
-            }
-            liveEdgeFraction?.let { fraction ->
-                Box(
-                    Modifier
-                        .offset(x = maxWidth * fraction.coerceIn(0f, 1f) - 1.dp)
-                        .width(2.dp)
-                        .height(barHeight)
-                        .background(MaterialTheme.colorScheme.onSurface)
-                        .then(liveEdgeTestTag?.let(Modifier::testTag) ?: Modifier),
-                )
-            }
-            if (rewindableStartFraction != null && currentProgress != null && programmeTargetAvailable != false) {
+            if (!programmeWindow && rewindableStartFraction != null && currentProgress != null && programmeTargetAvailable != false) {
                 Box(
                     Modifier
                         .offset(x = (maxWidth * currentProgress - 1.dp).coerceAtLeast(0.dp))
@@ -220,19 +188,8 @@ fun PlayerTimelineBar(
                 )
             }
         }
-        if (programmeElapsedFraction != null && currentProgress != null) {
-            BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
-                Box(
-                    Modifier
-                        .offset(x = (maxWidth * currentProgress - 1.dp).coerceIn(0.dp, maxWidth - 2.dp))
-                        .width(2.dp)
-                        .height(barHeight + 8.dp)
-                        .background(if (tone == PlayerTimelineTone.ACTIVE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                        .then(thumbTestTag?.let(Modifier::testTag) ?: Modifier),
-                )
-            }
-        } else if (tone != PlayerTimelineTone.AMBIENT && currentProgress != null) {
-            val thumbSize = if (tone == PlayerTimelineTone.INTERACTIVE) 8.dp else TvOverlayTimelineThumbSize
+        if (tone == PlayerTimelineTone.ACTIVE && currentProgress != null) {
+            val thumbSize = TvOverlayTimelineThumbSize
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
                 Box(
                     modifier = Modifier
@@ -262,20 +219,47 @@ fun PlayerTimelineBlock(
     leadingLabelTestTag: String? = null,
     trailingLabelTestTag: String? = null,
     ghostProgress: Float? = null,
-    boundaryFractions: List<Float> = emptyList(),
     rewindableStartFraction: Float? = null,
     rewindableStartOverflow: Boolean = false,
     liveEdgeFraction: Float? = null,
     thumbTestTag: String? = null,
     rewindableBoundaryTestTag: String? = null,
     rewindableOverflowTestTag: String? = null,
-    liveEdgeTestTag: String? = null,
     progressSemantics: Boolean = true,
     programmeWindow: ProgrammeWindow? = null,
+    reserveLabelSpace: Boolean = false,
+    previewLabel: String? = null,
 ) {
     Column(modifier.fillMaxWidth()) {
-        if (leadingLabel != null || trailingLabel != null) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (previewLabel != null) {
+            Box(Modifier.fillMaxWidth().layout { measurable, constraints ->
+                val label = measurable.measure(constraints.copy(minHeight = 0))
+                layout(label.width, 0) { label.placeRelative(0, -label.height) }
+            }) {
+                TimelineTargetLabel(previewLabel, programmeWindow?.positionFraction ?: progress ?: 0f,
+                    programmeWindow?.targetAvailable != false)
+            }
+        }
+        PlayerTimelineBar(
+            progress = programmeWindow?.positionFraction ?: progress,
+            tone = tone,
+            modifier = Modifier.testTag("player-timeline-track"),
+            ghostProgress = ghostProgress,
+            rewindableStartFraction = programmeWindow?.availableStartFraction ?: rewindableStartFraction,
+            rewindableStartOverflow = rewindableStartOverflow,
+            liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
+            availableEndFraction = programmeWindow?.availableEndFraction ?: liveEdgeFraction,
+            programmeWindow = programmeWindow != null,
+            programmeTargetAvailable = programmeWindow?.targetAvailable,
+            thumbTestTag = thumbTestTag,
+            rewindableBoundaryTestTag = rewindableBoundaryTestTag,
+            rewindableOverflowTestTag = rewindableOverflowTestTag,
+            progressSemantics = progressSemantics,
+        )
+        // Playback endpoint readouts never shorten or move the track, even at large font scales.
+        if (reserveLabelSpace || leadingLabel != null || trailingLabel != null) {
+            val labelHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
+            Row(Modifier.fillMaxWidth().height(labelHeight), verticalAlignment = Alignment.CenterVertically) {
                 leadingLabel?.let {
                     Text(
                         text = it,
@@ -300,26 +284,6 @@ fun PlayerTimelineBlock(
                     )
                 }
             }
-            Spacer(Modifier.height(TvOverlayTimelineLabelGap))
         }
-        PlayerTimelineBar(
-            progress = programmeWindow?.positionFraction ?: progress,
-            tone = tone,
-            ghostProgress = ghostProgress,
-            boundaryFractions = boundaryFractions,
-            rewindableStartFraction = programmeWindow?.availableStartFraction ?: rewindableStartFraction,
-            rewindableStartOverflow = rewindableStartOverflow,
-            liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
-            availableEndFraction = programmeWindow?.availableEndFraction ?: liveEdgeFraction,
-            // The mapped history end is clamped to scheduled bounds, including 1f
-            // when live is beyond an old programme. It is not playback position.
-            programmeElapsedFraction = programmeWindow?.availableEndFraction,
-            programmeTargetAvailable = programmeWindow?.targetAvailable,
-            thumbTestTag = thumbTestTag,
-            rewindableBoundaryTestTag = rewindableBoundaryTestTag,
-            rewindableOverflowTestTag = rewindableOverflowTestTag,
-            liveEdgeTestTag = liveEdgeTestTag,
-            progressSemantics = progressSemantics,
-        )
     }
 }

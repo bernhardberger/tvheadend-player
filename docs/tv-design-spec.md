@@ -331,13 +331,14 @@ selected target during preview, using SDK 0.9.0's immutable schedule-grade
 estimate. Scheduled start/end clocks are display edges, not seek permissions.
 Crossing a boundary changes the window without snapping or animation. The nearby
 programme title follows preview; main identity describes sampled committed
-playback. Cross-midnight edges include dates. Orange fill shows scheduled elapsed
-progress from the mapped live end, with seekable history in a brighter shade of
-the same orange. Future schedule is an unfilled track, without dashes. Completed
-programmes fill completely even when live is outside their window. A thin position
-marker replaces the programme-window thumb; cyan reinforces remote focus.
-The live marker appears only inside its window; the existing
-Go live action remains reachable outside it. The estimate has no accuracy
+playback. Cross-midnight edges include dates. Solid orange fills from programme
+start to playback position, following the target during seek preview. Buffered
+content ahead is brighter gray; future schedule remains a quiet dark track.
+Rewinding shortens the orange fill, including in completed programmes. The orange
+edge indicates position; a thumb appears only while the seekbar is focused. Only an interior
+timeshift-start boundary gets a thin tick; programme edges and live have no ticks.
+The thicker active bar preserves remote focus. The existing
+Go live action remains reachable outside the live window. The estimate has no accuracy
 guarantee. Player owns no server clock machinery.
 
 `-Pplayer.programmeWindowB=false` restores the capacity timeline at build time;
@@ -363,8 +364,8 @@ replaced and unavailable targets produce explicit feedback, never a clamped seek
 on a successor subscription. Playback position comes from the SDK's sampled
 Media3 mapping and its accessible description says so; the visible timeline
 label shows only the distance behind live, and nothing at all at the live edge
-because the action strip already says Live. The history label states how much
-history is available, not the display span. Server-reader shift decides whether
+because the action strip already says Live. History duration remains in the
+accessible description, not a visible available-duration label. Server-reader shift decides whether
 playback counts as live and is not displayed as playback position. A sampled position that outlives seekable history does not
 extend seek permission. Its display span may expand to retain the position while
 that expired history remains subdued.
@@ -391,25 +392,45 @@ timing; relative durations alone do not establish a wall-clock timestamp.
 
 ### Player composition
 
+Inline timeline endpoints remain neutral text without cyan filled labels. Focus
+thickens the track and shows a thumb, including in the programme window.
+Unavailable-target feedback has an error-toned surface above the timeline.
+
 Live TV and recordings share one composition: artwork and identity at top left,
-current wall time at top right, and a compact action strip above the bottom
-timeline. Play/Pause and immediate Stop form the transport group; a modest gap
-separates Info, neutral Record and Settings. Actions retain fixed slots;
-recordings leave Record empty and live without a timeshift buffer
-leaves Play/Pause empty. Live/Go live owns a separate reserved footprint.
-Only the focused icon gets a short visible label; every icon has an accessible
-name. Idle utility actions have no filled backing, unlike Play/Pause. There is
+current wall time at top right, and a timeline above the bottom action strip.
+Programme clock endpoints and recording elapsed/duration sit directly below the
+full-width bar, aligned to its ends; long readouts never shorten the track.
+Play/Pause and immediate Stop form the transport group; only Play/Pause has an idle
+filled backing. Transport is left-aligned; Info, neutral Record and Settings form
+one right-aligned utility group on the same band. Info's label is inside its TV Material pill.
+Unavailable actions are omitted rather than leaving empty slots. Live/Go live
+sits above the right end of the track, separate from the programme-end timestamp.
+Up from the seekbar reaches actionable Go live; Down returns to the seekbar.
+At passive Live, Up remains on the seekbar. Right from Settings also reaches Go
+live, and Left returns to Settings. If the focused
+Go live becomes passive Live, focus returns to Play/Pause (otherwise Info), consuming
+the activating key cycle. Icons retain accessible names without floating captions;
+necessary visible text belongs inside its control. Idle Stop and utility actions
+have no filled backing. There is
 no separate transport row or Actions-up hint. Header artwork fits an inset
-96-by-64dp container; the 480dp-bounded two-line headline outranks channel identity, timing
-and Next. Informational cyan programme progress is bounded to a 320dp timing row,
-not stretched into a second seekbar. Seek previews place precise stream-relative
-targets near the thumb, bounded inside the viewport, without changing seek bounds.
-The focused caption follows its control and scales with text size. Missing
+96-by-64dp container at the shell's left safe edge, beside a readable channel
+identity and programme text column. Compact shelf chrome retains the same artwork
+size. The two-line headline aligns with the channel name and outranks timing
+and Next. There is no competing header progress strip. The timeline repeats a
+programme title only during preview, when it can differ from committed playback.
+Seek previews place stream-relative targets above the fill edge, bounded inside
+the actual track, without changing seek bounds.
+Preview and genuine error feedback use a stable status row above the track, with
+constant clearance for the track-relative target label whenever a timeline exists.
+Starting, settling or cancelling a seek and missing programme metadata must not
+move the status, bar or endpoint readouts. Compact previews share those anchors.
+Focused seeking dims the header and
+still-visible action band rather than uncomposing focused nodes; hidden-controls
+previews reuse the same track and bottom anchor without hidden focusables. Missing
 programme metadata gets secondary unavailable copy, not a duplicate channel title.
 
 Live Now/Next describes the committed programme, not the uncommitted seek
-preview. Both programmes show start/end times. Programme progress is a separate
-ambient strip. SDK-supported playback coordinates and explicit timing authority
+preview. Shelf cards show both programmes with start/end times. SDK-supported playback coordinates and explicit timing authority
 determine historical metadata; server reader position and relative durations
 are not proof of a UTC timestamp. Unknown timing must remain explicit.
 
@@ -419,9 +440,13 @@ coalesces dispatch after 400ms of idle input. Up/Down commits pending preview
 before navigation; Back cancels only undispatched preview. A neutral Up/Down
 first reveals chrome, and a separate press enters actions or the channel shelf.
 Consume the entire key cycle that reveals or relocates focus. Initial focus is
-Play/Pause, otherwise Info; the timeline is one Down away and is never the
+Play/Pause, otherwise Info; the timeline is one Up away and is never the
 landing target of a reveal, so a reflexive Center after revealing chrome acts on
-a visibly focused button rather than an unnoticed timeline. Restoration uses
+a visibly focused button rather than an unnoticed timeline. Up/Down from the timeline
+commits pending preview; Up reaches actionable Go live (otherwise stays), and Down
+returns to the transport group. Down from the action
+strip opens Channels; a visible Channels-down cue below the strip appears only
+when channels exist. Recordings have neither the cue nor a shelf. Restoration uses
 semantic actions and never automatically chooses Stop or steals focus on routine
 timing/metadata updates. Without a timeshift buffer the live composition has no
 timeline block at all; it does not reserve empty height for one.
@@ -440,12 +465,24 @@ safe Close focus and bottom-end action placement. Scroll edges fade inside the
 reading viewport, away from the focus border. Settings and Info share 32dp horizontal and 16dp inner vertical
 padding inside the existing frame.
 
-The channel shelf is horizontal and compact. Entry scrolls to the playing
+The channel shelf is horizontal and compact. Its cards enter from below and leave
+downward; upper identity and clock remain pinned. Back or Up dismisses only the
+shelf, reveals ordinary player controls and restores the invoking safe action
+(Play/Pause or Info fallback, never Stop). Consume the complete dismissal key cycle;
+a separate Back from controls hides chrome. Entry scrolls to the playing
 channel before requesting focus. Focus-following Now/Next is independent of
 playing and channel-recording-now state. Selecting the playing channel closes
 without retuning; CH+/CH- tunes directly even in the shelf. Digit entry supports
 timeout, explicit confirmation and cancellation. One compact playing identity
-heads the composition; one focused-channel Now/Next block sits above 88dp cards.
+heads the composition. Each stable-size 288dp-wide card contains its own channel
+identity and Now/Next titles with schedule ranges, or explicit missing-EPG copy.
+Card height follows text line heights at the user's font scale; all cards have
+the same dimensions: a substantial 96-by-64dp picon and prominent two-line channel
+name dominate; Now is secondary with up to two title lines; Next is quieter
+single-line support combining start time and title, with its full schedule in
+accessibility semantics. Card surrounds are 16dp above and 24dp below, plus 8dp
+focus overflow on each side of the row. There are no nested actions or focus scaling.
+No separate focused-channel Now/Next block sits above the shelf.
 The focus border, playing triangle and recording dot have separate meanings and
 accessible labels; do not repeat channel identity or visible Playing labels.
 An ordinary connected tune failure leaves channel access and navigation
@@ -463,6 +500,14 @@ Recordings use actual elapsed/duration/capabilities, without a live shelf or
 Go live. Unknown duration is passive. Back dismisses the foreground/chrome and
 then returns to warm browse; it never means Stop. Explicit Stop awaits serialized
 teardown and clears the warm return opportunity.
+
+The retained player surface keeps the screen awake only while the host is started,
+video is visible, a video track is selected, and Media3 reports active, error-free
+playback. Pause, buffering, idle, ended/error, audio-only playback, and background
+release that request without detaching the surface or changing playback commands.
+Buffering/recovery does not add an application-owned grace timer. Clearing the
+request permits Ambient Mode; the app does not activate it or control the system's
+inactivity timing. Warm browsing over active video retains the request.
 
 ### 6.3 Cards
 

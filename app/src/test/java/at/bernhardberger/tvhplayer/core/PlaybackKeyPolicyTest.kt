@@ -9,6 +9,26 @@ import org.junit.Test
 
 class PlaybackKeyPolicyTest {
     @Test
+    fun mediaPlaybackActsOnlyOnInitialDownIncludingAfterAReleasedCycle() {
+        for (keyCode in listOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+            fun action(repeatCount: Int) = mediaPlaybackAction(
+                keyCode,
+                playKeyCode = KeyEvent.KEYCODE_MEDIA_PLAY,
+                pauseKeyCode = KeyEvent.KEYCODE_MEDIA_PAUSE,
+                toggleKeyCode = KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                repeatCount = repeatCount,
+            )
+            val initialAction = action(0)
+            assertTrue(initialAction != MediaPlaybackAction.NONE)
+            assertEquals(MediaPlaybackAction.NONE, action(1))
+            assertEquals(MediaPlaybackAction.NONE, action(2))
+            assertEquals(MediaPlaybackAction.NONE, action(20))
+            // A new deliberate press is not suppressed by repeat history.
+            assertEquals(initialAction, action(0))
+        }
+    }
+
+    @Test
     fun mapsOnlyMediaPlaybackKeys() {
         assertEquals(
             MediaPlaybackAction.TOGGLE,

@@ -30,6 +30,20 @@ import org.junit.Rule
 import org.junit.Test
 
 class PlayerIdentityHeaderTest {
+    @Test
+    fun shelfHeaderContainsOnlyCompactIdentityAndIndependentClock() {
+        setHeader(mutableStateOf(HeaderContent("104 Documentary", "Unused title", "Unused next", "")), compact = true)
+        composeRule.onNodeWithTag("player-header-title").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-header-support").assertDoesNotExist()
+        val picon = bounds("player-header-picon")
+        val identity = bounds("player-header-eyebrow")
+        val clock = bounds("player-header-clock")
+        assertEquals(with(composeRule.density) { 96.dp.toPx() }, picon.width, 1f)
+        assertEquals(with(composeRule.density) { 64.dp.toPx() }, picon.height, 1f)
+        assertTrue(identity.left > picon.right)
+        assertTrue(identity.right < clock.left)
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -89,7 +103,7 @@ class PlayerIdentityHeaderTest {
         )
         setHeader(
             content = content,
-            fontScale = 1.3f,
+            fontScale = 1.5f,
         )
         val shortAnchors = anchors()
         composeRule.runOnIdle {
@@ -118,7 +132,7 @@ class PlayerIdentityHeaderTest {
         )
         setHeader(
             content = content,
-            fontScale = 1.3f,
+            fontScale = 1.5f,
         )
         val shortAnchors = anchors()
         composeRule.runOnIdle {
@@ -139,6 +153,7 @@ class PlayerIdentityHeaderTest {
     private fun setHeader(
         content: State<HeaderContent>,
         fontScale: Float = 1f,
+        compact: Boolean = false,
     ) {
         composeRule.setContent {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
@@ -160,6 +175,7 @@ class PlayerIdentityHeaderTest {
                             support = content.value.support,
                             clock = "23:59",
                             clockSupport = content.value.clockSupport,
+                            compact = compact,
                             modifier = Modifier.padding(
                                 start = TvOverlaySidePadding,
                                 end = TvOverlaySidePadding,
@@ -200,7 +216,10 @@ class PlayerIdentityHeaderTest {
         assertTrue(eyebrow.bottom <= title.top)
         assertTrue(title.bottom <= support.top)
         assertTrue(clock.bottom <= clockSupport.top)
-        assertEquals(eyebrow.top, clock.top, 1f)
+        assertTrue(kotlin.math.abs(eyebrow.top - clock.top) < with(composeRule.density) { 12.dp.toPx() })
+        assertEquals(eyebrow.left, title.left, 1f)
+        assertEquals(with(composeRule.density) { 96.dp.toPx() }, picon.width, 1f)
+        assertEquals(with(composeRule.density) { 64.dp.toPx() }, picon.height, 1f)
         assertTrue(title.right < trailingColumnStart)
         assertTrue(support.right < trailingColumnStart)
         assertTrue(support.bottom < surface.bottom / 2f)
@@ -221,6 +240,7 @@ class PlayerIdentityHeaderTest {
             action(textLayouts)
         }
         assertEquals(2, textLayouts.single().lineCount)
+        assertTrue(textLayouts.single().getLineBottom(1) <= textLayouts.single().size.height)
     }
 
     private fun bounds(tag: String) =

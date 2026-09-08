@@ -117,11 +117,15 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             rule.mainClock.advanceTimeBy(100)
             rule.onNodeWithTag("player-pause").assertIsFocused()
             capture("initial")
-            if (shallow) rule.onNodeWithTag("player-window-available").assertTextEquals("1:00 available")
+            rule.onNodeWithTag("player-window-available").assertDoesNotExist()
+            rule.onNodeWithTag("player-window-title").assertDoesNotExist()
+            rule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
             val actionTop = rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top
-            val trackTop = rule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot.top
-            rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+            val trackCenter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y
+            rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
             rule.onNodeWithTag("player-seekbar").assertIsFocused()
+            rule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertExists()
+            assertEquals(trackCenter, rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y)
             capture("focused")
             rule.mainClock.autoAdvance = false
             if (scenario == "held") {
@@ -164,11 +168,16 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 rule.onNodeWithText("That position is no longer in the buffer.").assertExists()
             }
             if (shallow || scenario == "held") {
-                assertEquals(rule.onNodeWithTag("player-seekbar-thumb").fetchSemanticsNode().boundsInRoot.center.x,
+                val bar = rule.onNodeWithTag("player-seekbar").fetchSemanticsNode()
+                val track = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val fillEnd = track.left + track.width *
+                    bar.config[SemanticsProperties.ProgressBarRangeInfo].current
+                rule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertExists()
+                assertEquals(fillEnd,
                     rule.onNodeWithTag("timeshift-preview-target").fetchSemanticsNode().boundsInRoot.center.x, 1f)
             }
             assertEquals(actionTop, rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top)
-            assertEquals(trackTop, rule.onNodeWithTag("player-seekbar").fetchSemanticsNode().boundsInRoot.top)
+            assertEquals(trackCenter, rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y)
             if (!missing) rule.onNodeWithTag("timeshift-preview-target").assertExists()
             if (!missing) {
                 val expected = requireNotNull(programmeWindow(state, target, owner.preview!!.mappingTimeline) { time ->
@@ -211,8 +220,9 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             rule.mainClock.autoAdvance = true
             capture("settled")
             assertEquals(actionTop, rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top)
-            rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
             rule.onNodeWithTag("player-pause").assertIsFocused()
+            rule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
             rule.onRoot().performKeyInput { repeat(5) { pressKey(Key.DirectionRight) } }
             rule.onNodeWithTag("player-go-live").assertIsFocused()
             rule.onRoot().performKeyInput { pressKey(Key.Enter) }

@@ -35,6 +35,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 
 | Document | Scope and lifecycle |
 |---|---|
+| `programme-window-prototype.md` | Programme-window Player prototype behavior, interaction checks and current experiment boundaries. |
 | `defect-ledger.md` | Open and closed defects from the post-SDK-refactor player stabilisation. Read when working on live-player performance or interaction defects; close rows only with the named evidence. |
 | `persistent-cache-plan.md` | Approved, unstarted plan for SDK-owned catalog/EPG/picon persistence with app-supplied policy (D16, D19, D23). Depends on SDK 0.8.0; read only when working on that package. |
 | `appliance-mode-plan.md` | Appliance architecture and task history. Read only the sections relevant to an appliance, channel/EPG/DVR, or playback decision. Split completed history from current work in a dedicated later cleanup. |

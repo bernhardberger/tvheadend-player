@@ -6,8 +6,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -826,7 +826,7 @@ fun VideoPlayerScreen(
                 restoreOptionsFocus = true
             }
             PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
-            PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.closeChannelDrawer()
+            PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.dismissChannelDrawer()
             PlayerBackAction.CLOSE_PLAYER -> onClose()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
@@ -876,11 +876,13 @@ fun VideoPlayerScreen(
                     playKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
                     pauseKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
                     toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    repeatCount = event.nativeKeyEvent.repeatCount,
                 )
                 if (
                     mediaAction != MediaPlaybackAction.NONE &&
                     effectiveTimeshiftState.available
                 ) {
+                    layerState.beginOpeningKeyCycle(keyCode)
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> {
                             videoPlayerViewModel.play()
@@ -1036,29 +1038,30 @@ fun VideoPlayerScreen(
             .playerRootSemantics(stringResource(R.string.player_live_tv_surface))
             .focusable()
     ) {
-        AnimatedVisibility(
-            visible = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-            enter = slideInHorizontally(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { -it },
-            exit = slideOutHorizontally(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { -it },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-        ) {
+        if (foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER) {
             PlayerOverlayChrome(
                 footerPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                 headerContent = { modifier ->
                     PlayerIdentityHeader(
                         imageLoader = imageLoader, currentSession = currentSession,
                         piconPath = currentChannel?.icon,
-                        eyebrow = null,
-                        title = listOfNotNull(currentChannelNumber?.toString(), currentChannelName).joinToString(" "),
+                        eyebrow = listOfNotNull(currentChannelNumber?.toString(), currentChannelName).joinToString(" "),
+                        title = "",
+                        compact = true,
                         support = null,
                         clock = formatClock(nowSec), clockSupport = null,
                         modifier = modifier,
                     )
                 },
-            ) {
-              ChannelDrawer(
+            ) {}
+        }
+        AnimatedVisibility(
+            visible = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
+            enter = slideInVertically(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { it },
+            exit = slideOutVertically(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { it },
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+        ) {
+            ChannelDrawer(
                 channels = channels,
                 selectedId = selectedId,
                 playingChannelId = confirmedPlayingChannelId,
@@ -1071,10 +1074,9 @@ fun VideoPlayerScreen(
                 onPickChannel = { tuneChannel(it) },
                 onCloseDrawer = { keyCode ->
                     if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
-                    layerState.closeChannelDrawer()
+                    layerState.dismissChannelDrawer()
                 },
             )
-            }
         }
 
         PlayerControlsLayer(
@@ -1083,6 +1085,9 @@ fun VideoPlayerScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             OverlayControlsTv(
+                restoreChannelAction = layerState.restoreChannelAction,
+                onChannelActionRestored = layerState::onChannelActionRestored,
+                onActionFocused = layerState::onActionFocused,
                 imageLoader = imageLoader,
                 currentSession = currentSession,
                 channelNumber = currentChannelNumber,
@@ -1094,6 +1099,7 @@ fun VideoPlayerScreen(
                 committedWindow = committedWindow,
                 programmeWindow = displayedWindow,
                 previewing = timelineState.preview != null,
+                channelsAvailable = channels.isNotEmpty(),
                 nowSec = nowSec,
                 controlsVisible = layerState.controlsVisible,
                 optionsOpen = layerState.optionsPage != null,
@@ -1193,6 +1199,7 @@ fun VideoPlayerScreen(
                 state = effectiveTimeshiftState,
                 decision = requireNotNull(timelineState.preview).decision,
                 programmeWindow = displayedWindow,
+                channelsAvailable = channels.isNotEmpty(),
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
         }

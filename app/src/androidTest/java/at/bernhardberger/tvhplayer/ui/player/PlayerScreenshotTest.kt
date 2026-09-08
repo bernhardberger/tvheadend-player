@@ -1,6 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import coil3.map.Mapper
+import coil3.request.Options
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
+import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.LaunchedEffect
@@ -68,7 +76,38 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         composeRule.setContent {
             inputModeManager = LocalInputModeManager.current
             val context = LocalContext.current
-            val imageLoader = remember { ImageLoader.Builder(context).build() }
+            val currentSession = remember { FakeSessionObservation(testSessionObservation()).captureCurrentSession() }
+            val imageLoader = remember {
+                ImageLoader.Builder(context).components {
+                    add(object : Mapper<AppArtworkSource, Bitmap> {
+                        override fun map(data: AppArtworkSource, options: Options): Bitmap {
+                            val id = data.selector.substringAfterLast('/').toInt()
+                            val width = if (id % 2 == 0) 240 else 96
+                            return Bitmap.createBitmap(width, 96, Bitmap.Config.ARGB_8888).apply {
+                                Canvas(this).apply {
+                                    drawColor(android.graphics.Color.rgb(20, 74, 112))
+                                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = android.graphics.Color.WHITE
+                                        textAlign = Paint.Align.CENTER
+                                        textSize = if (width > 100) 48f else 34f
+                                    }
+                                    drawText(if (width > 100) "DOC $id" else "TV", width / 2f, 62f, paint)
+                                }
+                            }
+                        }
+                    })
+                }.build()
+            }
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val large = scenario in listOf("long", "shelf-long")
+            val configuration = android.content.res.Configuration(androidx.compose.ui.platform.LocalConfiguration.current).apply {
+                setLocale(if (large) java.util.Locale.GERMAN else java.util.Locale.US)
+            }
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, if (large) 1.5f else 1f),
+                androidx.compose.ui.platform.LocalConfiguration provides configuration,
+                LocalContext provides context.createConfigurationContext(configuration),
+            ) {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
@@ -112,22 +151,24 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                         PlayerOverlayChrome(
                             footerPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                             headerContent = { modifier ->
-                                PlayerIdentityHeader(imageLoader, null, null, "12 Documentary 12", null,
-                                    "21:30", null, modifier = modifier)
+                                PlayerIdentityHeader(imageLoader, "imagecache/12", "12 Documentary 12", "", null,
+                                    "21:30", null, modifier = modifier, currentSession = currentSession, compact = true)
                             },
                         ) {
                             ChannelDrawer(
-                                channels = List(15) { Channel.create(id = ChannelId(it + 1L), name = "Documentary ${it + 1}") },
+                                channels = if (scenario == "shelf-empty") emptyList() else List(15) {
+                                    Channel.create(id = ChannelId(it + 1L), icon = "imagecache/${it + 1}", name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
+                                },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
-                             nowEvent = { programme() }, nextEvent = { EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
+                             nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") }, nextEvent = { if (scenario == "shelf-missing") null else EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
                                  start = Instant.fromEpochSeconds(1_783_022_400L), stop = Instant.fromEpochSeconds(1_783_024_200L),
                                  title = "The world beneath the ice") }, imageLoader = imageLoader,
-                                onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
+                                 onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {}, currentSession = currentSession,
                             )
                         }
                     } else if (scenario.startsWith("recording")) {
                         RecordingOverlayControls(
-                            imageLoader = imageLoader, piconPath = null,
+                            imageLoader = imageLoader, piconPath = "imagecache/13", currentSession = currentSession,
                             title = "A journey through the Alps", subtitle = "The high mountains",
                             channelName = "Documentary HD", positionMs = 1_200_000L,
                             durationMs = if (scenario == "recording-unknown") androidx.media3.common.C.TIME_UNSET else 5_400_000L,
@@ -139,7 +180,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                     } else {
                         OverlayControlsTv(
                             imageLoader = imageLoader, channelNumber = 1, channelName = "Documentary HD",
-                            piconPath = null,
+                            piconPath = "imagecache/12", currentSession = currentSession,
                             nowEvent = if (scenario == "missing") null else programme(long = scenario == "long"),
                             nextEvent = EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
                                 start = Instant.fromEpochSeconds(1_783_022_400L),
@@ -167,9 +208,11 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                     }
                 }
             }
+            }
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { inputModeManager.requestInputMode(InputMode.Keyboard) }
+        if (scenario == "shelf-empty") composeRule.onNodeWithTag("player-shelf-close").assertIsFocused()
         if (scenario == "return-info") {
             composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput { pressKey(Key.Enter) }
             composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
@@ -182,7 +225,25 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         }
         if (scenario == "shelf-browse") {
             composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-            composeRule.onNodeWithText("13  Documentary 13").assertIsFocused()
+            composeRule.onNodeWithTag("player-channel-card-13").assertIsFocused()
+        }
+        if (scenario.startsWith("shelf") && scenario != "shelf-empty") {
+            val id = if (scenario == "shelf-browse") 13 else 12
+            val card = composeRule.onNodeWithTag("player-channel-card-$id").assertIsFocused().fetchSemanticsNode().boundsInRoot
+            for (part in listOf("now", "next")) {
+                val programme = composeRule.onNodeWithTag("player-channel-$id-$part", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertTrue(programme.left >= card.left && programme.right <= card.right)
+                assertTrue(programme.top >= card.top && programme.bottom <= card.bottom)
+                if (scenario == "shelf-long") {
+                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    composeRule.onNodeWithTag("player-channel-$id-$part", useUnmergedTree = true)
+                        .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                    val layout = layouts.single()
+                    assertTrue("$part: line bottom ${layout.getLineBottom(layout.lineCount - 1)} must fit text height ${layout.size.height}",
+                        layout.getLineBottom(layout.lineCount - 1) <= layout.size.height)
+                    if (part == "now") assertTrue("Long Now title must retain two lines", layout.lineCount == 2)
+                }
+            }
         }
         if (scenario == "live") {
             composeRule.onNodeWithText("A journey through the Alps").assertExists()
@@ -204,7 +265,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         @JvmStatic @Parameterized.Parameters(name = "{0}-dark={1}")
         fun scenarios() = listOf("live", "timeshift-live", "timeshift-live-deep", "paused", "paused-deep", "timing-unavailable",
             "seek-shallow", "seek-deep", "seek-live", "long", "missing", "recording", "recording-unknown", "recording-info",
-            "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "return-info")
+            "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "shelf-long", "shelf-missing", "shelf-empty", "return-info")
             .flatMap { scenario -> listOf(false, true).map { dark -> arrayOf<Any>(scenario, dark) } }
 
         private fun programme(long: Boolean = false) = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),

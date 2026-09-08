@@ -1,14 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.offset
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -43,7 +42,6 @@ import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.recordingTimelinePresentation
-import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
@@ -78,6 +76,7 @@ internal fun RecordingOverlayControls(
     onInfoFocusRestored: () -> Unit = {},
     onCommitSeek: () -> Unit = {},
     paused: Boolean = false,
+    previewing: Boolean = false,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -89,6 +88,7 @@ internal fun RecordingOverlayControls(
     var previousSeekable by remember { mutableStateOf(seekable) }
     var lastFocusWasTimeline by remember { mutableStateOf(false) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
+    var timelineFocused by remember { mutableStateOf(false) }
     LaunchedEffect(controlsVisible, optionsOpen, restoreOptionsFocus, restoreInfoFocus, seekable) {
         if (controlsVisible && !optionsOpen) {
             val target = when {
@@ -118,69 +118,81 @@ internal fun RecordingOverlayControls(
         PlayerIdentityHeader(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
             eyebrow = channelName, title = title, support = subtitle,
-            clock = formatClock(nowSec), clockSupport = null, modifier = modifier,
+            clock = formatClock(nowSec), clockSupport = null,
+            modifier = modifier.alpha(if (previewing || timelineFocused) 0.45f else 1f),
             tags = PlayerHeaderTags(picon = "recording-picon", eyebrow = "recording-channel-identity",
                 title = "recording-title", support = "recording-subtitle", clock = "recording-clock"),
         )
     }) {
+        Column(Modifier.heightIn(min = 48.dp)) {
+            when (presentation) {
+                is RecordingTimelinePresentation.Seekable -> if (canSeek) PlaybackSeekbar(
+                    range = presentation.range,
+                    paused = paused,
+                    previewing = previewing,
+                    onSeekTo = { onUserInteraction(); onSeek(it - positionMs) },
+                    modifier = Modifier
+                        .testTag("recording-seekbar")
+                        .focusRequester(timelineFocus)
+                        .onFocusChanged {
+                            timelineFocused = it.isFocused
+                            if (it.isFocused) lastFocusWasTimeline = true
+                        }
+                        .focusProperties { down = pauseFocus; up = FocusRequester.Cancel }
+                        .onPreviewKeyEvent { event ->
+                            when (event.key) {
+                                Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
+                                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                                        onUserInteraction(); onTogglePlayPause()
+                                    }
+                                    true
+                                }
+                                Key.DirectionUp, Key.DirectionDown -> {
+                                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                                        onCommitSeek()
+                                        relocatingKey = event.key
+                                        pauseFocus.requestFocus()
+                                    }
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
+                ) else RecordingDurationStatus(
+                    presentation.range.positionMs,
+                    stringResource(R.string.recording_known_duration, formatPlaybackDuration(presentation.range.endMs)),
+                )
+                is RecordingTimelinePresentation.StillRecording -> RecordingDurationStatus(
+                    presentation.elapsedMs, stringResource(R.string.recording_still_recording),
+                )
+                is RecordingTimelinePresentation.DurationUnavailable -> RecordingDurationStatus(
+                    presentation.elapsedMs, stringResource(R.string.recording_duration_unavailable),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         PlayerActionRow(
             infoFocus = infoFocus, settingsFocus = settingsFocus,
             onInfo = onOpenInfo, onSettings = onOpenOptions, onStop = onStopPlayback,
             onInteraction = { lastFocusWasTimeline = false; onUserInteraction() },
             onTogglePause = onTogglePlayPause, paused = paused, pauseFocus = pauseFocus,
-            modifier = Modifier.testTag("recording-actions").focusProperties {
-                if (seekable) down = timelineFocus
-            }.onPreviewKeyEvent { event ->
-                if (seekable && event.key == Key.DirectionDown) {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        relocatingKey = event.key
-                        timelineFocus.requestFocus()
-                    }
-                    true
-                } else false
-            },
-        )
-        Spacer(Modifier.height(12.dp))
-        Column(Modifier.height(100.dp)) {
-        when (presentation) {
-            is RecordingTimelinePresentation.Seekable -> if (canSeek) PlaybackSeekbar(
-                range = presentation.range,
-                paused = paused,
-                onSeekTo = { onUserInteraction(); onSeek(it - positionMs) },
-                modifier = Modifier.testTag("recording-seekbar").focusRequester(timelineFocus)
-                    .onFocusChanged { if (it.isFocused) lastFocusWasTimeline = true }
-                    .focusProperties { up = pauseFocus }
-                    .onPreviewKeyEvent { event ->
-                        when (event.key) {
-                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                                    onUserInteraction(); onTogglePlayPause()
-                                }
-                                true
-                            }
-                            Key.DirectionUp, Key.DirectionDown -> {
-                                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                                    onCommitSeek()
-                                    relocatingKey = event.key
-                                    if (event.key == Key.DirectionUp) pauseFocus.requestFocus()
-                                }
-                                true
-                            }
-                            else -> false
+            modifier = Modifier
+                .alpha(if (timelineFocused) 0.55f else 1f)
+                .testTag("recording-actions")
+                .focusProperties {
+                    up = if (seekable) timelineFocus else FocusRequester.Cancel
+                    down = FocusRequester.Cancel
+                }
+                .onPreviewKeyEvent { event ->
+                    if (event.key == Key.DirectionUp || event.key == Key.DirectionDown) {
+                        if (seekable && event.key == Key.DirectionUp && event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            relocatingKey = event.key
+                            timelineFocus.requestFocus()
                         }
-                    },
-            ) else RecordingDurationStatus(
-                presentation.range.positionMs,
-                stringResource(R.string.recording_known_duration, formatPlaybackDuration(presentation.range.endMs)),
-            )
-            is RecordingTimelinePresentation.StillRecording -> RecordingDurationStatus(
-                presentation.elapsedMs, stringResource(R.string.recording_still_recording),
-            )
-            is RecordingTimelinePresentation.DurationUnavailable -> RecordingDurationStatus(
-                presentation.elapsedMs, stringResource(R.string.recording_duration_unavailable),
-            )
-        }
-        }
+                        true
+                    } else false
+                },
+        )
     }
 }
 
@@ -197,7 +209,8 @@ internal fun RecordingSeekPreview(
         durationMs = durationMs.takeIf { it != C.TIME_UNSET },
         growing = growing,
     )
-    val target = formatPlaybackDuration(targetMs)
+    val elapsed = formatPlaybackDuration(targetMs)
+    val target = if (durationMs >= 3_600_000L && targetMs < 3_600_000L) "0:${elapsed.padStart(5, '0')}" else elapsed
     val delta = formatPlaybackDelta((originMs ?: targetMs).let { targetMs - it })
     val durationStatus = when (presentation) {
         is RecordingTimelinePresentation.Seekable -> stringResource(
@@ -210,28 +223,18 @@ internal fun RecordingSeekPreview(
     Column(
         modifier = modifier.fillMaxWidth().background(bottomGradient)
             .padding(start = TvOverlaySidePadding, end = TvOverlaySidePadding,
-                top = TvOverlayFooterGradientRunout, bottom = TvOverlayBottomPadding)
+                top = TvOverlayFooterGradientRunout, bottom = playerSeekPreviewBottomPadding(false))
             .testTag("recording-seek-preview")
             .clearAndSetSemantics { contentDescription = description; liveRegion = LiveRegionMode.Polite },
     ) {
-        if (presentation is RecordingTimelinePresentation.Seekable) {
-            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
-                Text(target, style = MaterialTheme.typography.titleMedium,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier
-                        .width(180.dp)
-                        .offset(x = (maxWidth * presentation.range.progress - 90.dp)
-                            .coerceIn(0.dp, (maxWidth - 180.dp).coerceAtLeast(0.dp))))
-            }
-        }
         when (presentation) {
             is RecordingTimelinePresentation.Seekable -> PlayerTimelineBlock(
                 progress = presentation.range.progress,
                 tone = PlayerTimelineTone.PREVIEW,
                 ghostProgress = originMs?.let { (it.toFloat() / presentation.range.endMs).coerceIn(0f, 1f) },
-                leadingLabel = null,
-                trailingLabel = originMs?.let { formatPlaybackDelta(targetMs - it) }
-                    ?: formatPlaybackDuration(presentation.range.endMs),
+                leadingLabel = target,
+                trailingLabel = formatPlaybackDuration(presentation.range.endMs),
+                previewLabel = target,
             )
             is RecordingTimelinePresentation.StillRecording -> RecordingDurationStatus(
                 elapsedMs = presentation.elapsedMs, status = stringResource(R.string.recording_still_recording),

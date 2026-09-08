@@ -2,7 +2,22 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.alpha
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.ui.Alignment
+import androidx.tv.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -22,7 +37,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -32,7 +46,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.common.formatClock
-import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import coil3.ImageLoader
 
@@ -74,40 +87,65 @@ fun OverlayControlsTv(
     committedWindow: ProgrammeWindow? = null,
     programmeWindow: ProgrammeWindow? = null,
     previewing: Boolean = false,
+    channelsAvailable: Boolean = true,
+    restoreChannelAction: String? = null,
+    onChannelActionRestored: () -> Unit = {},
+    onActionFocused: (String) -> Unit = {},
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val recordFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
+    val goLiveFocus = remember { FocusRequester() }
     val seekable = timeshiftState.available && timeshiftState.timingKnown
     val pausable = timeshiftState.available
     val initialFocus = if (pausable) pauseFocus else infoFocus
     val programmeTimeKnown = committedWindow != null || programmeTimingDescribesPlayback(committedTimeshiftState)
     val programmeTitle = nowEvent?.takeIf { programmeTimeKnown }?.title.orEmpty()
     var focusInitialized by remember { mutableStateOf(false) }
-    var previousSeekable by remember { mutableStateOf(seekable) }
-    var lastFocusWasTimeline by remember { mutableStateOf(false) }
+    var lastFocusedControl by remember { mutableStateOf<String?>(null) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
-    LaunchedEffect(controlsVisible, optionsOpen, restoreInfoFocus, restoreRecordActionFocus, restoreOptionsFocus, seekable) {
+    var timelineFocused by remember { mutableStateOf(false) }
+    val atLive = when {
+        !liveAvailable -> null
+        !timeshiftState.available -> true
+        timeshiftState.timingKnown -> timeshiftPositionPresentation(timeshiftState).atLiveEdge
+        else -> null
+    }
+    // Capture ownership before removing focus nodes. Compose may automatically focus a
+    // surviving action during apply; that must not erase the disappearing node's fallback.
+    val removedFocusTarget = when (lastFocusedControl) {
+        "player-go-live" -> initialFocus.takeIf { atLive != false }
+        "player-pause" -> infoFocus.takeIf { !pausable }
+        "player-seekbar" -> initialFocus.takeIf { !seekable }
+        else -> null
+    }
+    LaunchedEffect(controlsVisible, optionsOpen, restoreInfoFocus, restoreRecordActionFocus, restoreOptionsFocus, restoreChannelAction, seekable, pausable, atLive) {
         if (controlsVisible && !optionsOpen) {
             val target = when {
                 restoreInfoFocus -> infoFocus
                 restoreRecordActionFocus -> recordFocus
                 restoreOptionsFocus -> settingsFocus
-                // Revealing chrome lands on the action strip; the timeline is one Down away and
+                restoreChannelAction != null -> when (restoreChannelAction) {
+                    "player-info" -> infoFocus
+                    "player-record" -> recordFocus
+                    "player-settings" -> settingsFocus
+                    else -> initialFocus
+                }
+                // Revealing chrome lands on the action strip; the timeline is one Up away and
                 // pausing there by accident on a fresh reveal was a recurring complaint.
                 !focusInitialized -> initialFocus
-                previousSeekable && !seekable && lastFocusWasTimeline -> initialFocus
+                removedFocusTarget != null -> removedFocusTarget
                 else -> null
             }
-            previousSeekable = seekable
             if (target != null) androidx.compose.runtime.withFrameNanos { }
             if (target?.requestFocus() == true) {
                 focusInitialized = true
                 if (restoreInfoFocus) onInfoFocusRestored()
                 if (restoreRecordActionFocus) onRecordActionFocusRestored()
                 if (restoreOptionsFocus) onOptionsFocusRestored()
+                if (restoreChannelAction != null) onChannelActionRestored()
             }
         } else {
             focusInitialized = false
@@ -131,53 +169,107 @@ fun OverlayControlsTv(
                     if (nextScheduled) " / " + stringResource(R.string.recording_state_scheduled) else ""
             },
             clock = formatClock(nowSec), clockSupport = null,
-            programmeStart = nowEvent?.takeIf { programmeTimeKnown }?.let { formatClock(it.start.epochSeconds) },
-            programmeEnd = nowEvent?.takeIf { programmeTimeKnown }?.let { formatClock(it.stop.epochSeconds) },
-            programmeProgress = nowEvent?.takeIf { programmeTimeKnown }?.progress(committedWindow?.estimatedPosition?.epochSeconds ?: nowSec),
+            programmeStart = nowEvent?.takeIf { programmeTimeKnown && !timeshiftState.available }?.let { formatClock(it.start.epochSeconds) },
+            programmeEnd = nowEvent?.takeIf { programmeTimeKnown && !timeshiftState.available }?.let { formatClock(it.stop.epochSeconds) },
             tags = PlayerHeaderTags(picon = "player-picon", eyebrow = "player-channel-identity",
                 title = "player-programme-title", support = "player-next-programme", clock = "player-clock"),
-            modifier = modifier,
+            modifier = modifier.alpha(if (previewing || timelineFocused) 0.45f else 1f),
         )
     }) {
-        PlayerActionRow(
-            infoFocus = infoFocus, settingsFocus = settingsFocus,
-            onInfo = onOpenInfo, onSettings = onOpenOptions, onRecord = onOpenRecord,
-            recordFocus = recordFocus,
-            onStop = onStopPlayback, onInteraction = { lastFocusWasTimeline = false; onUserInteraction() },
-            atLive = when {
-                !liveAvailable -> null
-                !timeshiftState.available -> true
-                timeshiftState.timingKnown -> timeshiftPositionPresentation(timeshiftState).atLiveEdge
-                else -> null
-            },
-            onGoLive = onGoLive,
-            onTogglePause = { onToggleTimeshiftPause() }.takeIf { pausable },
-            paused = paused,
-            pauseFocus = pauseFocus,
-            modifier = Modifier.testTag("player-actions").focusProperties {
-                if (seekable) down = timelineFocus
-            }.onPreviewKeyEvent { event ->
-                if (event.key == Key.DirectionDown) {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        relocatingKey = event.key
-                        if (seekable) timelineFocus.requestFocus() else onOpenChannels()
-                    }
-                    true
-                } else false
-            },
-        )
+        val previewFeedback = timeshiftFeedback ?: if (previewing) {
+            if (programmeWindow?.targetAvailable == false) stringResource(R.string.timeshift_target_expired)
+            else programmeWindow?.event?.title
+        } else null
+        if (timeshiftState.available || atLive != null || previewFeedback != null) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(TvOverlayActionButtonSize)
+                    .testTag("player-timeline-status"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (previewFeedback != null) {
+                    val errorFeedback = timeshiftFeedback != null || programmeWindow?.targetAvailable == false
+                    Text(previewFeedback,
+                        modifier = Modifier.weight(1f).padding(end = 24.dp)
+                            .then(if (errorFeedback) Modifier.background(MaterialTheme.colorScheme.errorContainer,
+                                MaterialTheme.shapes.small).padding(horizontal = 8.dp) else Modifier)
+                            .testTag("player-window-title"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (errorFeedback) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else Spacer(Modifier.weight(1f))
+                if (atLive == true) {
+                    Text(stringResource(R.string.timeshift_live),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.testTag("player-live-status"))
+                } else if (atLive == false) {
+                    Button(
+                        onClick = { onUserInteraction(); onGoLive() },
+                        scale = ButtonDefaults.scale(focusedScale = 1f),
+                        modifier = Modifier
+                            .testTag("player-go-live")
+                            .focusRequester(goLiveFocus)
+                            .focusProperties {
+                                left = settingsFocus
+                                right = FocusRequester.Cancel
+                                down = if (seekable) timelineFocus else initialFocus
+                                up = FocusRequester.Cancel
+                            }
+                            .onFocusChanged {
+                                if (it.isFocused) { lastFocusedControl = "player-go-live"; onUserInteraction() }
+                            }
+                             .onPreviewKeyEvent { event ->
+                                 when (event.key) {
+                                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
+                                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                                            relocatingKey = event.key
+                                            onUserInteraction()
+                                            onGoLive()
+                                        }
+                                        true
+                                    }
+                                    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight -> {
+                                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                                            relocatingKey = event.key
+                                            when (event.key) {
+                                                 Key.DirectionDown -> if (seekable) timelineFocus.requestFocus() else initialFocus.requestFocus()
+                                                 Key.DirectionLeft -> settingsFocus.requestFocus()
+                                                else -> Unit
+                                            }
+                                        }
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            },
+                    ) { Text(stringResource(R.string.timeshift_go_live), maxLines = 1) }
+                }
+            }
+        }
         if (timeshiftState.available) {
-            Spacer(Modifier.height(12.dp))
+            // Keep status and preview targets anchored even before a seek starts.
+            Spacer(Modifier.height(with(LocalDensity.current) { MaterialTheme.typography.titleMedium.lineHeight.toDp() }))
+        }
+        if (timeshiftState.available) {
             PlaybackSeekbar(
                 range = timeshiftSeekbarRange(timeshiftState),
                 timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
                 programmeWindow = programmeWindow,
                 previewing = previewing,
+                showFeedback = false,
+                feedback = timeshiftFeedback ?: if (previewing && programmeWindow?.targetAvailable == false) {
+                    stringResource(R.string.timeshift_target_expired)
+                } else null,
                 paused = paused,
                 onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
                 modifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
-                    .onFocusChanged { if (it.isFocused) lastFocusWasTimeline = true }
-                    .focusProperties { up = initialFocus }
+                    .onFocusChanged {
+                        timelineFocused = it.isFocused
+                        if (it.isFocused) lastFocusedControl = "player-seekbar"
+                    }
+                    .focusProperties { down = initialFocus; up = if (atLive == false) goLiveFocus else FocusRequester.Cancel }
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
                             Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
@@ -186,17 +278,12 @@ fun OverlayControlsTv(
                                 }
                                 true
                             }
-                            Key.DirectionDown -> {
-                                if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                                    onCommitSeek(); onOpenChannels()
-                                }
-                                true
-                            }
-                            Key.DirectionUp -> {
+                            Key.DirectionDown, Key.DirectionUp -> {
                                 if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                     onCommitSeek()
                                     relocatingKey = event.key
-                                    initialFocus.requestFocus()
+                                     if (event.key == Key.DirectionDown) initialFocus.requestFocus()
+                                     else if (atLive == false) goLiveFocus.requestFocus()
                                 }
                                 true
                             }
@@ -205,15 +292,49 @@ fun OverlayControlsTv(
                     },
             )
         }
-        if (timeshiftState.available && at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-            val slotHeight = with(androidx.compose.ui.platform.LocalDensity.current) { 24.sp.toDp() }
-            val feedback = timeshiftFeedback ?: if (previewing && programmeWindow?.targetAvailable == false) {
-                stringResource(R.string.timeshift_target_expired)
-            } else null
-            androidx.compose.foundation.layout.Box(Modifier.heightIn(min = slotHeight)) {
-                feedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
-                    style = androidx.tv.material3.MaterialTheme.typography.labelLarge) }
+        Spacer(Modifier.height(8.dp))
+        PlayerActionRow(
+            infoFocus = infoFocus, settingsFocus = settingsFocus,
+            onInfo = onOpenInfo, onSettings = onOpenOptions, onRecord = onOpenRecord,
+            recordFocus = recordFocus,
+            onStop = onStopPlayback,
+            onInteraction = onUserInteraction,
+            onActionFocused = { lastFocusedControl = it; onActionFocused(it) },
+            goLiveFocus = goLiveFocus.takeIf { atLive == false },
+            onTogglePause = { onToggleTimeshiftPause() }.takeIf { pausable },
+            paused = paused, pauseFocus = pauseFocus,
+            modifier = Modifier
+                .alpha(if (timelineFocused) 0.55f else 1f)
+                .testTag("player-actions")
+                .focusProperties {
+                    up = if (seekable) timelineFocus else FocusRequester.Cancel
+                    down = FocusRequester.Cancel
+                }
+                .onPreviewKeyEvent { event ->
+                    when (event.key) {
+                        Key.DirectionUp, Key.DirectionDown -> {
+                            if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                                if (event.key == Key.DirectionUp) {
+                                    relocatingKey = event.key
+                                    if (seekable) timelineFocus.requestFocus()
+                                } else if (channelsAvailable) {
+                                    // The screen owns this cross-layer cycle, including its release.
+                                    onOpenChannels()
+                                }
+                            }
+                            true
+                        }
+                        else -> false
+                    }
+                },
+        )
+        if (channelsAvailable) {
+            Row(Modifier.fillMaxWidth().height(playerChannelsCueHeight).testTag("player-channels-cue"),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.nav_channels), color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
+                    style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = androidx.tv.material3.MaterialTheme.colorScheme.onSurface)
             }
-        } else timeshiftFeedback?.let { Text(it, color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface) }
+        }
     }
 }

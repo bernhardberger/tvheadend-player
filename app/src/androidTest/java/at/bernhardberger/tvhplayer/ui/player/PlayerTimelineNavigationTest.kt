@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.runtime.mutableStateOf
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -33,6 +34,8 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
     fun verticalRelocationCommitsOnceAndConsumesRepeatAndRelease() {
         var commits = 0
         var leakedEvents = 0
+        var shelfOpens = 0
+        val channelsAvailable = mutableStateOf(true)
         rule.setContent {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
@@ -46,7 +49,8 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
                     ) else OverlayControlsTv(
                         imageLoader = imageLoader, channelNumber = 1, channelName = "Channel", piconPath = null,
                         nowEvent = null, nextEvent = null, nowSec = 0, controlsVisible = true, optionsOpen = false,
-                        onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                        onOpenChannels = { shelfOpens++ }, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                        channelsAvailable = channelsAvailable.value,
                         timeshiftState = AppTimeshiftState(available = true, bufferStartMs = 0, positionMs = 60_000, liveEdgeMs = 120_000),
                         timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
                         onCommitSeek = { commits++ },
@@ -57,22 +61,44 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
         val timeline = if (recording) "recording-seekbar" else "player-seekbar"
         rule.onNodeWithTag("player-pause").assertIsFocused()
         rule.onNodeWithTag(timeline).requestFocus().assertIsFocused()
-        rule.onRoot().performKeyInput { keyDown(Key.DirectionUp) }
-        rule.onNodeWithTag("player-pause").assertIsFocused()
-        InstrumentationRegistry.getInstrumentation().sendKeySync(
-            KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 2),
-        )
-        rule.onRoot().performKeyInput { keyUp(Key.DirectionUp) }
-        rule.onNodeWithTag("player-pause").assertIsFocused()
-        rule.runOnIdle { assertEquals(1, commits); assertEquals(0, leakedEvents) }
         rule.onRoot().performKeyInput { keyDown(Key.DirectionDown) }
-        rule.onNodeWithTag(timeline).assertIsFocused()
+        rule.onNodeWithTag("player-pause").assertIsFocused()
         InstrumentationRegistry.getInstrumentation().sendKeySync(
             KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 2),
         )
         rule.onRoot().performKeyInput { keyUp(Key.DirectionDown) }
+        rule.onNodeWithTag("player-pause").assertIsFocused()
+        rule.runOnIdle { assertEquals(1, commits); assertEquals(0, leakedEvents) }
+        rule.onRoot().performKeyInput { keyDown(Key.DirectionDown) }
+        InstrumentationRegistry.getInstrumentation().sendKeySync(
+            KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 2),
+        )
+        rule.onRoot().performKeyInput { keyUp(Key.DirectionDown) }
+        rule.runOnIdle { assertEquals(if (recording) 0 else 1, shelfOpens); channelsAvailable.value = false }
+        rule.onNodeWithTag("player-channels-cue").assertDoesNotExist()
+        rule.onRoot().performKeyInput { keyDown(Key.DirectionDown); keyUp(Key.DirectionDown) }
+        rule.runOnIdle { assertEquals(if (recording) 0 else 1, shelfOpens) }
+        rule.onRoot().performKeyInput { keyDown(Key.DirectionUp) }
+        rule.onNodeWithTag(timeline).assertIsFocused()
+        InstrumentationRegistry.getInstrumentation().sendKeySync(
+            KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 2),
+        )
+        rule.onRoot().performKeyInput { keyUp(Key.DirectionUp) }
         rule.onNodeWithTag(timeline).assertIsFocused()
         rule.runOnIdle { assertEquals(1, commits); assertEquals(0, leakedEvents) }
+        rule.onRoot().performKeyInput { keyDown(Key.DirectionUp) }
+        rule.onNodeWithTag(if (recording) "player-pause" else "player-go-live").assertIsFocused()
+        InstrumentationRegistry.getInstrumentation().sendKeySync(
+            KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 2),
+        )
+        rule.onRoot().performKeyInput { keyUp(Key.DirectionUp) }
+        rule.onNodeWithTag(if (recording) "player-pause" else "player-go-live").assertIsFocused()
+        rule.runOnIdle { assertEquals(2, commits); assertEquals(0, leakedEvents) }
+        if (!recording) {
+            rule.onRoot().performKeyInput { keyDown(Key.DirectionDown); keyUp(Key.DirectionDown) }
+            rule.onNodeWithTag(timeline).assertIsFocused()
+            rule.runOnIdle { assertEquals(2, commits); assertEquals(0, leakedEvents) }
+        }
     }
 
     companion object {

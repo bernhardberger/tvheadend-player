@@ -28,6 +28,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyPress
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
+import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
+import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
@@ -45,6 +47,40 @@ import org.junit.Test
 class PlayerKeyCycleDispatcherTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun liveMediaPlaybackKeysConsumeRepeatsAndUpBeforeTheNextPress() {
+        assertMediaPlaybackCycles(DispatcherMode.LIVE_TIMESHIFT)
+    }
+
+    @Test
+    fun recordingMediaPlaybackKeysConsumeRepeatsAndUpBeforeTheNextPress() {
+        assertMediaPlaybackCycles(DispatcherMode.RECORDING)
+    }
+
+    private fun assertMediaPlaybackCycles(mode: DispatcherMode) {
+        val counts = DispatcherCounts()
+        awaitWindowFocus()
+        composeRule.setContent { DispatcherHarness(mode, counts) }
+        composeRule.waitForIdle()
+        for (keyCode in listOf(AndroidKeyEvent.KEYCODE_MEDIA_PLAY, AndroidKeyEvent.KEYCODE_MEDIA_PAUSE, AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
+            val before = counts.playbackActions
+            dispatchKey(DISPATCHER_ROOT, AndroidKeyEvent.ACTION_DOWN, keyCode)
+            composeRule.onNodeWithTag(OPENED_TARGET).assertIsFocused()
+            dispatchKey(OPENED_TARGET, AndroidKeyEvent.ACTION_DOWN, keyCode, repeatCount = 1)
+            dispatchKey(OPENED_TARGET, AndroidKeyEvent.ACTION_DOWN, keyCode, repeatCount = 2)
+            dispatchKey(OPENED_TARGET, AndroidKeyEvent.ACTION_UP, keyCode)
+            composeRule.runOnIdle {
+                assertEquals(before + 1, counts.playbackActions)
+                assertEquals(0, counts.openedTargetEvents)
+            }
+            pressKey(OPENED_TARGET, keyCode)
+            composeRule.runOnIdle {
+                assertEquals(before + 2, counts.playbackActions)
+                assertEquals(0, counts.openedTargetEvents)
+            }
+        }
+    }
 
     @Test
     fun liveCenterVariantsConsumeTheirCompleteOpeningCycles() {
@@ -325,6 +361,20 @@ private fun DispatcherHarness(
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 if (infoOpen || drawerOpen) return@onPreviewKeyEvent false
+
+                val mediaAction = mediaPlaybackAction(
+                    keyCode,
+                    playKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY,
+                    pauseKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PAUSE,
+                    toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                    repeatCount = event.nativeKeyEvent.repeatCount,
+                )
+                if (mode != DispatcherMode.LIVE && mediaAction != MediaPlaybackAction.NONE) {
+                    openingKeyCode = keyCode
+                    counts.playbackActions++
+                    controlsVisible = true
+                    return@onPreviewKeyEvent true
+                }
 
                 when (mode) {
                     DispatcherMode.LIVE,

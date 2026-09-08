@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -15,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalConfiguration
@@ -31,6 +34,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -66,6 +70,63 @@ import org.junit.Test
 class PlayerTimelineTruthfulnessTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun programmeFillFollowsPositionWithGrayBufferAndOnlyHistoryStartTick() {
+        val event = EpgEvent.create(
+            id = EventId(1), channelId = ChannelId(1),
+            start = Instant.fromEpochSeconds(0), stop = Instant.fromEpochSeconds(3600),
+            title = "Programme",
+        )
+        var window by mutableStateOf(
+            ProgrammeWindow(event, Instant.fromEpochSeconds(2700), 0.75f, 0.2f, 0.75f, 0.75f, true),
+        )
+        var tone by mutableStateOf(PlayerTimelineTone.ACTIVE)
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.size(400.dp, 40.dp).background(Color.Black)) {
+                    PlayerTimelineBlock(
+                        progress = 0f, tone = tone,
+                        modifier = Modifier.testTag("programme-bar"),
+                        programmeWindow = window,
+                        thumbTestTag = "programme-thumb",
+                        rewindableBoundaryTestTag = "programme-history",
+                    )
+                }
+            }
+        }
+        val orange = android.graphics.Color.rgb(250, 127, 0)
+        fun pixel(fraction: Float): Int {
+            val image = composeRule.onNodeWithTag("programme-bar").captureToImage().asAndroidBitmap()
+            return image.getPixel((image.width * fraction).toInt(), image.height / 2)
+        }
+        assertEquals(orange, pixel(0.1f))
+        assertEquals(orange, pixel(0.3f))
+        assertEquals(orange, pixel(0.7f))
+        val future = pixel(0.9f)
+        composeRule.onNodeWithTag("programme-thumb", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("programme-live", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("programme-history", useUnmergedTree = true).assertExists()
+
+        composeRule.runOnIdle { window = window.copy(positionFraction = 0.4f) }
+        assertEquals(orange, pixel(0.3f))
+        val buffer = pixel(0.6f)
+        assertTrue(android.graphics.Color.red(buffer) > android.graphics.Color.red(future))
+        assertTrue(kotlin.math.abs(android.graphics.Color.red(buffer) - android.graphics.Color.blue(buffer)) < 10)
+        assertEquals(future, pixel(0.9f))
+
+        // A previous programme remains partially orange while playing within it.
+        composeRule.runOnIdle {
+            window = window.copy(availableStartFraction = 0f, availableEndFraction = 1f, liveFraction = null)
+        }
+        assertEquals(orange, pixel(0.3f))
+        assertEquals(buffer, pixel(0.9f))
+        composeRule.onNodeWithTag("programme-history", useUnmergedTree = true).assertDoesNotExist()
+        for (unfocusedTone in listOf(PlayerTimelineTone.AMBIENT, PlayerTimelineTone.INTERACTIVE, PlayerTimelineTone.PREVIEW)) {
+            composeRule.runOnIdle { tone = unfocusedTone }
+            composeRule.onNodeWithTag("programme-thumb", useUnmergedTree = true).assertDoesNotExist()
+        }
+    }
 
     @Test
     fun unknownTimingHasNoPositionSemanticsThumbOrSeekActions() {
@@ -160,13 +221,13 @@ class PlayerTimelineTruthfulnessTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("−0:30", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("−2:00", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("Live", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("15:00 available", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-boundary",
             useUnmergedTree = true,
         ).assertExists()
         composeRule.onNodeWithTag("timeshift-preview-live-edge", useUnmergedTree = true)
-            .assertExists()
+            .assertDoesNotExist()
         composeRule.onNodeWithTag("timeshift-seek-preview")
             .assertContentDescriptionEquals(
                 "Seek target −2:00. Cumulative change −0:30. " +
@@ -197,7 +258,7 @@ class PlayerTimelineTruthfulnessTest {
 
         composeRule.onNodeWithText("−33:20", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("Buffer: 1:00:00 ago", useUnmergedTree = true)
-            .assertIsDisplayed()
+            .assertDoesNotExist()
         composeRule.onNodeWithText("0:00", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-boundary",
@@ -368,7 +429,7 @@ class PlayerTimelineTruthfulnessTest {
 
         composeRule.runOnIdle { durationMs = 120_000L }
         composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput {
-            pressKey(androidx.compose.ui.input.key.Key.DirectionDown)
+            pressKey(androidx.compose.ui.input.key.Key.DirectionUp)
         }
         composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
         assertEquals(1, progressSemanticsCount())

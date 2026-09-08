@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performKeyPress
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.runtime.mutableStateOf
@@ -36,7 +37,294 @@ import kotlin.time.Instant
 
 class PlayerOverlayCompositionTest {
     @Test
-    fun focusedPauseCaptionTracksPlaybackWithoutMovingFocus() {
+    fun infoContentsStayVerticallyCenteredAtNormalAndLargeTextWithFocus() {
+        val fontScale = mutableStateOf(1f)
+        composeRule.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, fontScale.value),
+            ) {
+                TVHeadendPlayerTheme { ModernLiveFixture(AppTimeshiftState(available = true)) }
+            }
+        }
+        for (scale in listOf(1f, 1.5f)) {
+            composeRule.runOnIdle { fontScale.value = scale }
+            for (focus in listOf("player-pause", "player-info", "player-settings")) {
+                composeRule.onNodeWithTag(focus).requestFocus()
+                val info = composeRule.onNodeWithTag("player-info").fetchSemanticsNode().boundsInRoot
+                val icon = composeRule.onNodeWithTag("player-info-icon", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val label = composeRule.onNodeWithText("Info", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val settings = composeRule.onNodeWithTag("player-settings").fetchSemanticsNode().boundsInRoot
+                assertEquals(settings.center.y, info.center.y, 1f)
+                assertEquals(info.center.y, icon.center.y, 1f)
+                assertEquals(info.center.y, label.center.y, 1f)
+            }
+        }
+    }
+
+    @Test
+    fun timelineStatusReadoutsAndFeedbackKeepAnchorsAcrossPreviewAndMetadataTransitions() {
+        val preview = mutableStateOf(false)
+        val hidden = mutableStateOf(false)
+        val feedback = mutableStateOf<String?>(null)
+        val programme = event(1, 0, 3600, "Preview programme")
+        val estimatedWindow = ProgrammeWindow(programme, Instant.fromEpochSeconds(1800), 0.5f, 0.2f, 0.75f, 0.75f, true)
+        val window = mutableStateOf<ProgrammeWindow?>(estimatedWindow)
+        val state = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
+        composeRule.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, 1.5f),
+            ) {
+                TVHeadendPlayerTheme {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                        if (hidden.value) TimeshiftSeekPreview(state,
+                            at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(-30_000, 0, false),
+                            programmeWindow = window.value, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
+                        else ModernLiveFixture(state, window.value, preview.value, feedback = feedback.value)
+                    }
+                }
+            }
+        }
+        fun bounds(tag: String) = composeRule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val track = bounds("player-timeline-track")
+        val goLive = bounds("player-go-live")
+        val status = bounds("player-timeline-status")
+        val endpoints = bounds("player-window-start")
+        for (candidate in listOf(estimatedWindow, null, estimatedWindow.copy(targetAvailable = false), estimatedWindow)) {
+            composeRule.runOnIdle { window.value = candidate }
+            for (seeking in listOf(true, false, true, false)) {
+                composeRule.runOnIdle { preview.value = seeking }
+                assertEquals(track, bounds("player-timeline-track"))
+                assertEquals(goLive, bounds("player-go-live"))
+                assertEquals(status, bounds("player-timeline-status"))
+                if (candidate != null) assertEquals(endpoints, bounds("player-window-start"))
+                if (seeking) composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
+            }
+        }
+        composeRule.runOnIdle { preview.value = true }
+        val title = bounds("player-window-title")
+        val target = bounds("timeshift-preview-target")
+        composeRule.runOnIdle { hidden.value = true }
+        assertEquals(track, bounds("player-timeline-track"))
+        assertEquals(target, bounds("timeshift-preview-target"))
+        assertEquals(title.top, bounds("timeshift-preview-programme").top, 1f)
+        composeRule.runOnIdle { hidden.value = false; feedback.value = "Target expired" }
+        assertEquals(track, bounds("player-timeline-track"))
+        assertEquals(status, bounds("player-timeline-status"))
+        composeRule.runOnIdle { feedback.value = null; preview.value = false }
+        assertEquals(track, bounds("player-timeline-track"))
+        assertEquals(goLive, bounds("player-go-live"))
+    }
+
+    @Test
+    fun losingKnownTimingBufferWhilePauseFocusedRestoresInfo() {
+        assertPauseRemovalRestoresInfo(timingKnown = true)
+    }
+
+    @Test
+    fun losingUnknownTimingBufferWhilePauseFocusedRestoresInfo() {
+        assertPauseRemovalRestoresInfo(timingKnown = false)
+    }
+
+    private fun assertPauseRemovalRestoresInfo(timingKnown: Boolean) {
+        val state = mutableStateOf(AppTimeshiftState(available = true, timingKnown = timingKnown))
+        var pauses = 0
+        composeRule.setContent { TVHeadendPlayerTheme { ModernLiveFixture(state.value, onPause = { pauses++ }) } }
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.runOnIdle { state.value = AppTimeshiftState() }
+        composeRule.onNodeWithTag("player-pause").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        assertEquals(0, pauses)
+    }
+
+    @Test
+    fun capabilityUpdatesPreserveSurvivingInfoAndSettingsFocus() {
+        val buffered = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
+        val state = mutableStateOf(buffered)
+        composeRule.setContent { TVHeadendPlayerTheme { ModernLiveFixture(state.value) } }
+        for (tag in listOf("player-info", "player-settings")) {
+            composeRule.onNodeWithTag(tag).requestFocus().assertIsFocused()
+            for (updated in listOf(buffered.copy(positionMs = 0), buffered.copy(timingKnown = false), AppTimeshiftState(), buffered)) {
+                composeRule.runOnIdle { state.value = updated }
+                composeRule.onNodeWithTag(tag).assertIsFocused()
+            }
+        }
+    }
+
+    @Test
+    fun passiveGoLiveTransitionRestoresPauseButDoesNotStealSettingsAfterLeavingGoLive() {
+        val buffered = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
+        val state = mutableStateOf(buffered)
+        var pauses = 0
+        composeRule.setContent { TVHeadendPlayerTheme { ModernLiveFixture(state.value, onPause = { pauses++ }) } }
+        composeRule.onNodeWithTag("player-settings").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused()
+        composeRule.runOnIdle { state.value = buffered.copy(positionMs = 0) }
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.runOnIdle { state.value = buffered }
+        composeRule.onNodeWithTag("player-settings").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("player-settings").assertIsFocused()
+        composeRule.runOnIdle { state.value = buffered.copy(positionMs = 0) }
+        composeRule.onNodeWithTag("player-settings").assertIsFocused()
+        assertEquals(0, pauses)
+    }
+
+    @Test
+    @OptIn(ExperimentalTestApi::class)
+    fun heldGoLiveEnterConsumesRepeatsAndUpBeforeNextDeliberatePausePress() {
+        val state = mutableStateOf(AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0))
+        var pauses = 0
+        var goLiveCalls = 0
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                ModernLiveFixture(state.value, onPause = { pauses++ }, onGoLive = {
+                    goLiveCalls++
+                    state.value = state.value.copy(positionMs = 0)
+                })
+            }
+        }
+        composeRule.onNodeWithTag("player-settings").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused()
+        val downTime = android.os.SystemClock.uptimeMillis()
+        fun dispatch(action: Int, repeatCount: Int = 0) {
+            assertTrue(composeRule.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(
+                android.view.KeyEvent(downTime, android.os.SystemClock.uptimeMillis(), action,
+                    android.view.KeyEvent.KEYCODE_ENTER, repeatCount),
+            )))
+        }
+        dispatch(android.view.KeyEvent.ACTION_DOWN)
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        dispatch(android.view.KeyEvent.ACTION_DOWN, 1)
+        dispatch(android.view.KeyEvent.ACTION_DOWN, 2)
+        dispatch(android.view.KeyEvent.ACTION_UP)
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        assertEquals(1, goLiveCalls)
+        assertEquals(0, pauses)
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.Enter) }
+        assertEquals(1, pauses)
+    }
+
+    @Test
+    fun noBufferHasNoBlankTimelineSlotAndStartsOnInfo() {
+        composeRule.setContent { TVHeadendPlayerTheme { ModernLiveFixture(AppTimeshiftState()) } }
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onNodeWithTag("player-pause").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-timeline-track").assertDoesNotExist()
+        val status = composeRule.onNodeWithTag("player-timeline-status").fetchSemanticsNode().boundsInRoot
+        val actions = composeRule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
+        assertEquals(with(composeRule.density) { 8.dp.toPx() }, actions.top - status.bottom, 1f)
+    }
+
+    @Test
+    fun goLiveIsReachableFromUtilitiesAndStatusTransitionRestoresPauseWithoutActivation() {
+        val state = mutableStateOf(AppTimeshiftState(
+            available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0,
+        ))
+        var goLiveCalls = 0
+        var pauses = 0
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                ModernLiveFixture(state.value, onPause = { pauses++ }, onGoLive = {
+                    goLiveCalls++
+                    state.value = state.value.copy(positionMs = 0)
+                })
+            }
+        }
+        composeRule.onNodeWithTag("player-pause").assertIsFocused().performKeyInput {
+            repeat(4) { pressKey(Key.DirectionRight) }
+        }
+        composeRule.onNodeWithTag("player-settings").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused().performKeyInput { pressKey(Key.Enter) }
+        composeRule.onNodeWithTag("player-live-status").assertExists()
+        composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        assertEquals(1, goLiveCalls)
+        assertEquals(0, pauses)
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
+        composeRule.runOnIdle { state.value = state.value.copy(positionMs = -30_000) }
+        composeRule.onNodeWithTag("player-settings").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused()
+        composeRule.runOnIdle { state.value = AppTimeshiftState() }
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        assertEquals(1, goLiveCalls)
+        assertEquals(0, pauses)
+    }
+
+    @Test
+    fun largeTextLiveTrackKeepsAnchorAcrossRestFocusPreviewAndHiddenPreview() {
+        val stage = mutableStateOf(0)
+        val state = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
+        val programme = event(1, 0, 3600, "A long programme title for a deterministic preview")
+        val window = ProgrammeWindow(programme, Instant.fromEpochSeconds(1800), 0.5f, 0.2f, 0.75f, 0.75f, true)
+        composeRule.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, 1.5f),
+            ) {
+                TVHeadendPlayerTheme {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                        if (stage.value == 3) {
+                            TimeshiftSeekPreview(state, at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(-30_000, 0, false),
+                                programmeWindow = window, modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
+                        } else ModernLiveFixture(state, window, previewing = stage.value == 2)
+                    }
+                }
+            }
+        }
+        fun track() = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val resting = track()
+        val actions = composeRule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
+        assertEquals(actions.left, resting.left, 1f)
+        assertEquals(actions.right, resting.right, 1f)
+        composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
+        composeRule.onNodeWithTag("player-seekbar-thumb").assertExists()
+        assertEquals(resting, track())
+        composeRule.runOnIdle { stage.value = 2 }
+        assertEquals(resting, track())
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
+        val target = composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val goLive = composeRule.onNodeWithTag("player-go-live").fetchSemanticsNode().boundsInRoot
+        assertTrue(goLive.bottom <= target.top)
+        assertTrue(target.bottom <= resting.top)
+        composeRule.runOnIdle { stage.value = 3 }
+        assertEquals(resting, track())
+        composeRule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("player-actions").assertDoesNotExist()
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun ModernLiveFixture(
+        state: AppTimeshiftState,
+        window: ProgrammeWindow? = null,
+        previewing: Boolean = false,
+        onPause: () -> Unit = {},
+        onGoLive: () -> Unit = {},
+        feedback: String? = null,
+    ) {
+        OverlayControlsTv(
+            imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+            channelNumber = 1, channelName = "Documentary", piconPath = null,
+            nowEvent = window?.event, nextEvent = null, nowSec = 1800,
+            controlsVisible = true, optionsOpen = false,
+            onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+            timeshiftState = state, timeshiftFeedback = feedback,
+            onToggleTimeshiftPause = onPause, onSeekTimeshift = {}, onGoLive = onGoLive,
+            committedWindow = window, programmeWindow = window, previewing = previewing,
+        )
+    }
+
+    @Test
+    fun pauseAccessibleNameTracksPlaybackWithoutFloatingCaptionOrMovingFocus() {
         val paused = mutableStateOf(false)
         composeRule.setContent {
             val pauseFocus = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
@@ -51,11 +339,12 @@ class PlayerOverlayCompositionTest {
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
             .performKeyInput { pressKey(Key.Enter) }
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
-        composeRule.onNodeWithText("Play", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithContentDescription("Play").assertExists()
         composeRule.onNodeWithText("Pause", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.Enter) }
-        composeRule.onNodeWithText("Pause", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithContentDescription("Pause").assertExists()
         composeRule.onNodeWithText("Play", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
     }
 
     @get:Rule
@@ -134,7 +423,7 @@ class PlayerOverlayCompositionTest {
 
         composeRule.waitForIdle()
         val picon = composeRule.onNodeWithTag("player-picon").fetchSemanticsNode().boundsInRoot
-        composeRule.onNodeWithTag("player-programme-title").assertTextEquals("")
+        composeRule.onNodeWithTag("player-programme-title").assertDoesNotExist()
         val channel = composeRule.onNodeWithTag("player-channel-identity")
             .fetchSemanticsNode().boundsInRoot
         val next = composeRule.onNodeWithTag("player-next-programme")
@@ -156,11 +445,18 @@ class PlayerOverlayCompositionTest {
         assertTrue(clock.height > 0f)
         assertTrue(kotlin.math.abs(channel.top - clock.top) < with(composeRule.density) { 12.dp.toPx() })
         assertTrue(next.bottom < timeline.top)
-        assertTrue(actions.bottom <= timeline.top)
+        assertTrue(timeline.bottom <= actions.top)
         assertTrue(icons.zipWithNext().all { (left, right) -> left.right < right.left })
-        assertTrue(goLive.left > icons.last().right)
+        assertTrue(goLive.bottom <= timeline.top)
+        assertEquals(actions.right, goLive.right, 1f)
+        assertEquals(actions.left, icons.first().left, 1f)
+        assertEquals(actions.right, icons.last().right, 1f)
+        assertTrue(icons[2].left > root.center.x)
+        val infoLabel = composeRule.onNodeWithText("Info", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(icons[2].contains(infoLabel.center))
         composeRule.onNodeWithTag("player-transport-actions").assertDoesNotExist()
-        assertEquals(0, composeRule.onAllNodesWithText("Channels").fetchSemanticsNodes().size)
+        assertEquals(1, composeRule.onAllNodesWithText("Channels").fetchSemanticsNodes().size)
+        assertTrue(actions.bottom <= composeRule.onNodeWithTag("player-channels-cue").fetchSemanticsNode().boundsInRoot.top)
         assertEquals(
             0,
             composeRule.onAllNodesWithText(
@@ -171,7 +467,7 @@ class PlayerOverlayCompositionTest {
 
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
         composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput {
-            pressKey(Key.DirectionDown)
+            pressKey(Key.DirectionUp)
         }
         composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
     }
@@ -211,6 +507,8 @@ class PlayerOverlayCompositionTest {
 
         composeRule.waitForIdle()
         assertEquals(1, composeRule.onAllNodesWithText("Live").fetchSemanticsNodes().size)
+        composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
+        composeRule.onNodeWithText("1:00:00 available").assertDoesNotExist()
 
         composeRule.onNodeWithTag("player-seekbar").requestFocus()
         composeRule.waitForIdle()
@@ -224,7 +522,7 @@ class PlayerOverlayCompositionTest {
 
     @Test
     @OptIn(ExperimentalTestApi::class)
-    fun liveContextLabelAppearsOnlyForAFocusedNonObviousAction() {
+    fun liveUtilitiesKeepAccessibleNamesAndStableGeometryWithoutCaptions() {
         composeRule.setContent {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
@@ -260,30 +558,21 @@ class PlayerOverlayCompositionTest {
             .fetchSemanticsNode().boundsInRoot
         composeRule.onNodeWithTag("player-pause").assertIsFocused()
         composeRule.onNodeWithTag("player-info").requestFocus()
-        composeRule.onNodeWithTag("player-action-context-label").assertExists()
-        composeRule.onNodeWithText("Info", useUnmergedTree = true).assertExists()
-        assertEquals(
-            composeRule.onNodeWithTag("player-info").fetchSemanticsNode().boundsInRoot.left,
-            composeRule.onNodeWithTag("player-action-context-label").fetchSemanticsNode().boundsInRoot.left,
-            1f,
-        )
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
+        composeRule.onNodeWithText("Info").assertExists()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-record").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
-        composeRule.onNodeWithText("Settings", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithTag("player-action-context-label").assertExists()
+        composeRule.onNodeWithContentDescription("Settings").assertExists()
+        composeRule.onNodeWithText("Settings", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
         val actionsAfter = composeRule.onNodeWithTag("player-actions")
-            .fetchSemanticsNode().boundsInRoot
-        val contextLabel = composeRule.onNodeWithTag("player-action-context-label")
             .fetchSemanticsNode().boundsInRoot
         val timeline = composeRule.onNodeWithTag("player-seekbar")
             .fetchSemanticsNode().boundsInRoot
         assertEquals(actionsBefore, actionsAfter)
-        assertTrue(contextLabel.left >= actionsAfter.left)
-        assertTrue(contextLabel.right <= actionsAfter.right)
-        assertTrue(actionsAfter.bottom <= timeline.top)
-        assertTrue(contextLabel.top >= actionsAfter.top)
+        assertTrue(timeline.bottom <= actionsAfter.top)
 
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("player-record").assertIsFocused()
@@ -337,7 +626,10 @@ class PlayerOverlayCompositionTest {
 
         assertEquals(shortEyebrow.top, longEyebrow.top, 1f)
         assertEquals(shortPicon.top, longPicon.top, 1f)
-        assertEquals(longEyebrow.top, clock.top, 1f)
+        assertTrue(kotlin.math.abs(longEyebrow.top - clock.top) < with(composeRule.density) { 12.dp.toPx() })
+        val title = composeRule.onNodeWithTag("player-programme-title").fetchSemanticsNode().boundsInRoot
+        assertEquals(longEyebrow.left, title.left, 1f)
+        assertEquals(with(composeRule.density) { 64.dp.toPx() }, longPicon.height, 1f)
     }
 
     private fun event(id: Int, start: Long, stop: Long, title: String) = EpgEvent.create(
