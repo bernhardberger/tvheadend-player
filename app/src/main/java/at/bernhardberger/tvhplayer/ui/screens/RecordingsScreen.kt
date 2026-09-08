@@ -651,7 +651,14 @@ internal fun RecordingsScreenContent(
 
     val action = pendingAction
     val target = opened
-    if (action != null && target != null) {
+    LaunchedEffect(action, selectedCapability) {
+        if (action != null && selectedCapability == null) {
+            pendingAction = null
+            pendingMutation = null
+            actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE
+        }
+    }
+    if (action != null && target != null && selectedCapability != null) {
         RecordingConfirmationDialog(
             action = action,
             title = target.title.orEmpty(),

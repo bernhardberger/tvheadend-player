@@ -221,6 +221,7 @@ internal fun ArchiveList(
     val scope = rememberCoroutineScope()
     var pageFocusJob by remember { mutableStateOf<Job?>(null) }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
+    var pendingPageKey by remember { mutableStateOf<String?>(null) }
     val focusTargetKey = recordingFocusTargetKey(items.map { it.key }, pageTargetKey ?: selectedKey)
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }.collect(onScrollChanged)
@@ -235,6 +236,7 @@ internal fun ArchiveList(
                 if (!it.hasFocus) {
                     pageFocusJob?.cancel()
                     pageTargetKey = null
+                    pendingPageKey = null
                 }
             }
             .focusGroup()
@@ -246,14 +248,18 @@ internal fun ArchiveList(
                 pageTargetKey = null
                 val direction = ChannelNavigation.pageDirectionForKeyCode(
                     event.nativeKeyEvent.keyCode
-                ) ?: return@onPreviewKeyEvent false
-                val current = items.indexOfFirst { it.key == selectedKey }
+                ) ?: run {
+                    pendingPageKey = null
+                    return@onPreviewKeyEvent false
+                }
+                val current = items.indexOfFirst { it.key == (pendingPageKey ?: selectedKey) }
                 val target = recordingListPageTargetIndex(
                     itemCount = items.size,
                     currentIndex = current,
                     visibleItemCount = listState.layoutInfo.visibleItemsInfo.size,
                     direction = direction,
                 ) ?: return@onPreviewKeyEvent true
+                pendingPageKey = items[target].key
                 pageFocusJob = scope.launch {
                     listState.animateScrollToItem(target)
                     pageTargetKey = items[target].key
@@ -268,6 +274,7 @@ internal fun ArchiveList(
                     if (pageTargetKey == item.key) {
                         runCatching { selectedFocus.requestFocus() }
                         pageTargetKey = null
+                        pendingPageKey = null
                     }
                 }
             }
@@ -639,6 +646,7 @@ internal fun RecordingSchedule(
     }
     val entries = groups.flatMap { it.entries }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
+    var pendingPageKey by remember { mutableStateOf<String?>(null) }
     val focusTargetKey = recordingFocusTargetKey(
         entries.map { "recording:${recordingItemKey(it.id)}" },
         pageTargetKey ?: selectedKey,
@@ -668,6 +676,7 @@ internal fun RecordingSchedule(
                 if (!it.hasFocus) {
                     pageFocusJob?.cancel()
                     pageTargetKey = null
+                    pendingPageKey = null
                 }
             }
             .focusGroup()
@@ -679,9 +688,12 @@ internal fun RecordingSchedule(
                 pageTargetKey = null
                 val direction = ChannelNavigation.pageDirectionForKeyCode(
                     event.nativeKeyEvent.keyCode
-                ) ?: return@onPreviewKeyEvent false
+                ) ?: run {
+                    pendingPageKey = null
+                    return@onPreviewKeyEvent false
+                }
                 val current = entries.indexOfFirst {
-                    "recording:${recordingItemKey(it.id)}" == selectedKey
+                    "recording:${recordingItemKey(it.id)}" == (pendingPageKey ?: selectedKey)
                 }
                 val target = recordingListPageTargetIndex(
                     entries.size,
@@ -689,6 +701,7 @@ internal fun RecordingSchedule(
                     listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
                     direction,
                 ) ?: return@onPreviewKeyEvent true
+                pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
                 pageFocusJob = scope.launch {
                     listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id))
                     pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
@@ -710,6 +723,7 @@ internal fun RecordingSchedule(
                         if (pageTargetKey == rowKey) {
                             runCatching { selectedFocus.requestFocus() }
                             pageTargetKey = null
+                            pendingPageKey = null
                         }
                     }
                 }
@@ -754,6 +768,7 @@ internal fun RecordingProblems(
     val scope = rememberCoroutineScope()
     var pageFocusJob by remember { mutableStateOf<Job?>(null) }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
+    var pendingPageKey by remember { mutableStateOf<String?>(null) }
     val focusTargetKey = recordingFocusTargetKey(
         entries.map { "recording:${recordingItemKey(it.id)}" },
         pageTargetKey ?: selectedKey,
@@ -781,6 +796,7 @@ internal fun RecordingProblems(
                 if (!it.hasFocus) {
                     pageFocusJob?.cancel()
                     pageTargetKey = null
+                    pendingPageKey = null
                 }
             }
             .focusGroup()
@@ -792,9 +808,12 @@ internal fun RecordingProblems(
                 pageTargetKey = null
                 val direction = ChannelNavigation.pageDirectionForKeyCode(
                     event.nativeKeyEvent.keyCode
-                ) ?: return@onPreviewKeyEvent false
+                ) ?: run {
+                    pendingPageKey = null
+                    return@onPreviewKeyEvent false
+                }
                 val current = entries.indexOfFirst {
-                    "recording:${recordingItemKey(it.id)}" == selectedKey
+                    "recording:${recordingItemKey(it.id)}" == (pendingPageKey ?: selectedKey)
                 }
                 val target = recordingListPageTargetIndex(
                     entries.size,
@@ -802,6 +821,7 @@ internal fun RecordingProblems(
                     listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
                     direction,
                 ) ?: return@onPreviewKeyEvent true
+                pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
                 pageFocusJob = scope.launch {
                     listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id))
                     pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
@@ -830,6 +850,7 @@ internal fun RecordingProblems(
                             if (pageTargetKey == rowKey) {
                                 runCatching { selectedFocus.requestFocus() }
                                 pageTargetKey = null
+                                pendingPageKey = null
                             }
                         }
                     }
