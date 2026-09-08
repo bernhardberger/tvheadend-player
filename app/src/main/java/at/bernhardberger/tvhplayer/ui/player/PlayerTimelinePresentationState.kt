@@ -67,6 +67,7 @@ private class LiveTimelineSourceGeneration(
     var seekToken = 0
     var seekQueuedAtMs = 0L
     var commitRequested = false
+    var positionSampleEpoch = 0L
     val seekWake = Channel<Unit>(Channel.CONFLATED)
     var feedback by mutableStateOf<String?>(null)
     var preview by mutableStateOf<LiveTimeshiftSeekPreview?>(null)
@@ -135,6 +136,19 @@ internal class LiveTimelinePresentationState(
         }
     }
 
+    suspend fun sampleTimeshiftPresentation(sample: suspend () -> AppTimeshiftState): AppTimeshiftState? {
+        val generation = sourceGeneration
+        if (disposed || generation.seekQueue.dispatchInFlight) return null
+        val epoch = generation.positionSampleEpoch
+        val result = sample()
+        // A seek can suspend independently of sampling. Only admit evidence from one
+        // uninterrupted command epoch; numeric direction is not evidence of staleness.
+        return result.takeIf {
+            !disposed && generation === sourceGeneration &&
+                epoch == generation.positionSampleEpoch && !generation.seekQueue.dispatchInFlight
+        }
+    }
+
     fun queueRelativeSeek(
         state: AppTimeshiftState,
         requestedDeltaMs: Long,
@@ -200,6 +214,7 @@ internal class LiveTimelinePresentationState(
                         break
                     }
                     generation.seekQueue = dispatch.queue
+                    generation.positionSampleEpoch++
                     val dispatchToken = generation.preview?.token ?: generation.seekToken
                     val dispatchFeedbackToken = generation.preview?.feedbackToken
                         ?: generation.feedbackToken
@@ -209,7 +224,11 @@ internal class LiveTimelinePresentationState(
 
                     val contentTarget = generation.pendingContentTarget ?: break
                     generation.pendingContentTarget = null
-                    val result = seekContent(contentTarget)
+                    val result = try {
+                        seekContent(contentTarget)
+                    } finally {
+                        generation.positionSampleEpoch++
+                    }
                     val command = (result as? TimeshiftContentSeekResult.Completed)?.command
                     val accepted = command?.disposition == TimeshiftCommandDisposition.ACCEPTED
                     generation.seekQueue = completeTimeshiftSeekDispatch(

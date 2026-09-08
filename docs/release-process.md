@@ -26,6 +26,8 @@ for debug acceptance, retaining SDK 0.10.0 / HTSP 0.9.0.
 Version `0.2.3` (`versionCode` 9) retains the channel-audio persistence fixes
 with public SDK 0.10.1 / HTSP 0.9.0. Version `0.2.4` (`versionCode` 10) unifies
 Player timeline presentation for debug acceptance with those same dependencies.
+Version `0.2.5` (`versionCode` 11) packages the numeric-overlay exit and bounded
+seek-state/command consistency corrections, retaining those dependencies.
 None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.

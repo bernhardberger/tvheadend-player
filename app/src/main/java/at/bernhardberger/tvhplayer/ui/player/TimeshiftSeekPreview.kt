@@ -29,6 +29,7 @@ internal fun TimeshiftSeekPreview(
     modifier: Modifier = Modifier,
     programmeWindow: ProgrammeWindow? = null,
     channelsAvailable: Boolean = true,
+    feedback: String? = null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
@@ -78,10 +79,10 @@ internal fun TimeshiftSeekPreview(
             )
             .testTag("timeshift-seek-preview")
             .clearAndSetSemantics {
-                contentDescription = programmeWindow?.let {
+                contentDescription = (programmeWindow?.let {
                     "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $description" +
                         if (!it.targetAvailable) " $unavailableTarget" else ""
-                } ?: description
+                } ?: description) + feedback?.let { ". $it" }.orEmpty()
                 liveRegion = LiveRegionMode.Polite
             },
     ) {
@@ -102,8 +103,8 @@ internal fun TimeshiftSeekPreview(
             trailingLabelTestTag = "timeshift-preview-position",
             previewLabel = targetLabel,
             reserveStatusSpace = true,
-            feedback = programmeWindow?.let { if (it.targetAvailable) it.event.title.orEmpty() else unavailableTarget },
-            feedbackIsError = programmeWindow?.targetAvailable == false,
+            feedback = feedback ?: programmeWindow?.let { if (it.targetAvailable) it.event.title.orEmpty() else unavailableTarget },
+            feedbackIsError = feedback != null || programmeWindow?.targetAvailable == false,
             feedbackTestTag = "timeshift-preview-programme",
         )
     }

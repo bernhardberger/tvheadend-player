@@ -39,6 +39,79 @@ class PlayerTimelinePresentationStateTest {
         state.value.toAppPresentation(playbackPosition(positionMs.milliseconds))
 
     @Test
+    fun sharedCommandQueueClampsInitialAndRepeatedStepsToActualHistoryNotCapacity() = runTest {
+        for ((position, delta, expected) in listOf(
+            Triple(10_000L, -30_000L, 0L),
+            Triple(590_000L, 30_000L, 600_000L),
+            Triple(540_000L, -300_000L, 0L),
+        )) {
+            val fixture = fixture()
+            val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+            val commands = mutableListOf<Long>()
+            val seek: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult = { target ->
+                commands += target.position.inWholeMilliseconds
+                fixture.completed()
+            }
+            val state = fixture.presentation(position).copy(capacityMs = 7_200_000L)
+            owner.queueRelativeSeek(state, delta, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+            owner.queueRelativeSeek(state, delta, "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+            assertEquals(expected, owner.preview?.decision?.targetMs)
+            advanceTimeBy(400L)
+            runCurrent()
+            assertEquals(listOf(expected), commands)
+            owner.dispose()
+        }
+    }
+
+    @Test
+    fun samplesCrossingSeekDispatchAndSettlementAreRejectedButFreshBackwardEvidenceIsAdmitted() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val oldSample = CompletableDeferred<AppTimeshiftState>()
+        var admitted: AppTimeshiftState? = null
+        val sampling = launch { admitted = owner.sampleTimeshiftPresentation { oldSample.await() } }
+        runCurrent()
+        val completion = CompletableDeferred<TimeshiftContentSeekResult>()
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain") { completion.await() }
+        advanceTimeBy(400L)
+        runCurrent()
+        assertNull(owner.sampleTimeshiftPresentation { error("Do not sample during seek") })
+        completion.complete(fixture.completed(readerReached = null))
+        runCurrent()
+        oldSample.complete(fixture.presentation())
+        sampling.join()
+        assertNull(admitted)
+        val fresh = fixture.presentation(480_000L)
+        assertEquals(fresh, owner.sampleTimeshiftPresentation { fresh })
+        advanceTimeBy(950L)
+        runCurrent()
+        assertNull(owner.preview)
+        assertEquals(fresh, owner.sampleTimeshiftPresentation { fresh })
+        owner.dispose()
+    }
+
+    @Test
+    fun sourceReplacementRejectsSuspendedSampleWithoutRejectingOrdinaryHistoryAdvance() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val oldSample = CompletableDeferred<AppTimeshiftState>()
+        var admitted: AppTimeshiftState? = null
+        val sampling = launch { admitted = owner.sampleTimeshiftPresentation { oldSample.await() } }
+        runCurrent()
+        owner.invalidateForSourceChange()
+        oldSample.complete(fixture.presentation())
+        sampling.join()
+        assertNull(admitted)
+        val fresh = owner.sampleTimeshiftPresentation {
+            fixture.updateHistory(10.seconds, 610.seconds)
+            fixture.presentation()
+        }
+        assertEquals(610_000L, fresh?.liveEdgeMs)
+        owner.dispose()
+    }
+
+    @Test
     fun contentSelectionStaysAbsoluteWhileTheLiveEdgeAdvances() = runTest {
         val fixture = fixture()
         val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })

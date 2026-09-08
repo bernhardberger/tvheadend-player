@@ -165,7 +165,7 @@ class AppAudioRoundtripTest {
     }
 }
 
-private class ControlledAudioPlayer {
+internal class ControlledAudioPlayer {
     private val listeners = mutableSetOf<Player.Listener>()
     var parameters = TrackSelectionParameters.DEFAULT_WITHOUT_CONTEXT
         private set
@@ -194,6 +194,7 @@ private class ControlledAudioPlayer {
             "getCurrentTracks" -> tracks
             "getCurrentMediaItem" -> item
             "getCurrentTimeline" -> Timeline.EMPTY
+            "getAvailableCommands" -> Player.Commands.EMPTY
             "getVideoSize" -> VideoSize.UNKNOWN
             "getPlayerError" -> null
             "getVideoFormat", "getAudioFormat" -> null

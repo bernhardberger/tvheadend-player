@@ -42,7 +42,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -53,8 +52,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
@@ -307,6 +304,8 @@ fun VideoPlayerScreen(
     val confirmedPlayingChannelId = playingLiveChannelId.takeIf {
         it == currentChannelId && playbackState.presented
     }
+    val player = remember { videoPlayerViewModel.getPlayerInstance() }
+    val timelineState = rememberLiveTimelinePresentationState(player)
     var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }
     // Key on the identity of the live target, not on the observation value. The observation
     // carries subscription counters that change several times a second, and restarting the loop
@@ -314,7 +313,9 @@ fun VideoPlayerScreen(
     LaunchedEffect(videoPlayerViewModel, activeLivePlayback != null, playingLiveChannelId) {
         sampledTimeshiftState = AppTimeshiftState()
         while (true) {
-            sampledTimeshiftState = videoPlayerViewModel.sampleTimeshiftPresentation()
+            timelineState.sampleTimeshiftPresentation(videoPlayerViewModel::sampleTimeshiftPresentation)?.let {
+                sampledTimeshiftState = it
+            }
             delay(250L)
         }
     }
@@ -341,8 +342,6 @@ fun VideoPlayerScreen(
     val timeshiftExpiredText = stringResource(R.string.timeshift_target_expired)
     val timeshiftReplacedText = stringResource(R.string.timeshift_target_replaced)
     val timeshiftUncertainText = stringResource(R.string.timeshift_seek_uncertain)
-    val player = remember { videoPlayerViewModel.getPlayerInstance() }
-    val timelineState = rememberLiveTimelinePresentationState(player)
     LaunchedEffect(timelineState, effectiveTimeshiftState.timeline) {
         timelineState.updateTimeline(effectiveTimeshiftState.timeline)
     }
@@ -1204,6 +1203,7 @@ fun VideoPlayerScreen(
             TimeshiftSeekPreview(
                 state = effectiveTimeshiftState,
                 decision = visibleSeekPreview.decision,
+                feedback = timelineState.feedback,
                 programmeWindow = displayedWindow,
                 channelsAvailable = channels.isNotEmpty(),
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -1280,29 +1280,12 @@ fun VideoPlayerScreen(
             )
         }
 
-        AnimatedVisibility(
-            visible = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY,
-            enter = fadeIn(),
-            exit = fadeOut(),
+        ChannelNumberOverlay(
+            number = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty(),
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(48.dp)
-        ) {
-            Surface(
-                colors = SurfaceDefaults.colors(
-                    containerColor = Color.Black.copy(alpha = 0.78f),
-                    contentColor = Color.White,
-                ),
-                shape = MaterialTheme.shapes.large,
-            ) {
-                Text(
-                    text = channelNumberInput,
-                    fontSize = 56.sp,
-                    style = MaterialTheme.typography.displayMedium,
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
-                )
-            }
-        }
+                .padding(48.dp),
+        )
 
         if (channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE)) {
             val failedState = playbackState as? AppPlaybackState.Failed

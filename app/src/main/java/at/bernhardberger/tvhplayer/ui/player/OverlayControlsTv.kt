@@ -246,6 +246,14 @@ fun OverlayControlsTv(
                     .focusProperties { down = initialFocus; up = if (atLive == false) goLiveFocus else FocusRequester.Cancel }
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
+                            Key.DirectionLeft, Key.DirectionRight -> {
+                                if (controlsVisible && seekable && event.type == KeyEventType.KeyDown) {
+                                    onUserInteraction()
+                                    val step = at.bernhardberger.tvhplayer.core.seekStepMs(event.nativeKeyEvent.repeatCount)
+                                    onSeekTimeshift(if (event.key == Key.DirectionLeft) -step else step)
+                                }
+                                true
+                            }
                             Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                                 if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                     onUserInteraction(); onToggleTimeshiftPause()
