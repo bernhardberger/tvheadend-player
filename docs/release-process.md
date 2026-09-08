@@ -18,7 +18,7 @@ Publication and production-device mutation still require explicit owner approval
 `0.1.3` (`versionCode` 4) consolidates the live and recording player overlays.
 Version `0.1.4` (`versionCode` 5) adds the Shield HDMI-CEC channel-key
 compatibility fix. Version `0.2.0` (`versionCode` 6) consolidates the player
-polish, channel/Guide/recording fixes and published SDK 0.9.1 adoption.
+polish, channel/Guide/recording fixes and published SDK 0.10.0 adoption.
 None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.
@@ -75,7 +75,7 @@ commands are:
 ./tools/release verify-signed build/release/signed/0.2.0
 ```
 
-`prepare` resolves the byte-pinned SDK 0.9.1 artifacts and source classifiers
+`prepare` resolves the byte-pinned SDK 0.10.0 artifacts and source classifiers
 from the public repositories, verifies them, and creates the unsigned bundle.
 `sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source

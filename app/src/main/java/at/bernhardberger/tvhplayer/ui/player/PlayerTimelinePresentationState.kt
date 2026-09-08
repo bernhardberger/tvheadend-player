@@ -123,6 +123,15 @@ internal class LiveTimelinePresentationState(
         sourceGeneration.feedback = null
     }
 
+    fun updateTimeline(timeline: TimeshiftTimeline?) {
+        val selection = sourceGeneration.selectionTimeline ?: return
+        if (!selection.describesSameSegment(timeline)) {
+            // Drop queued coordinates, but let an in-flight SDK operation settle without
+            // cancelling it: operation cancellation can retire the playback owner.
+            cancelPendingSeek()
+        }
+    }
+
     fun queueRelativeSeek(
         state: AppTimeshiftState,
         requestedDeltaMs: Long,
@@ -133,8 +142,10 @@ internal class LiveTimelinePresentationState(
         uncertainText: String,
         seekContent: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult,
     ) {
+        updateTimeline(state.timeline)
         if (disposed || !state.available || !state.timingKnown) return
         val generation = sourceGeneration
+        if (generation.selectionTimeline?.describesSameSegment(state.timeline) == false) return
         if (generation.preview == null && requestedDeltaMs < 0L && state.positionMs <= state.bufferStartMs) return
         val selectionTimeline = generation.selectionTimeline ?: state.timeline ?: return
         generation.selectionTimeline = selectionTimeline

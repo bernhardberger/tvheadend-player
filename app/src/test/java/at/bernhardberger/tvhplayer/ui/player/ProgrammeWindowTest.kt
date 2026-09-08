@@ -82,6 +82,18 @@ class ProgrammeWindowTest {
         assertNull(programmeWindow(state.copy(timingKnown = false), eventAt = ::lookup))
     }
 
+    @Test fun restartRejectsRetainedMappingEvenWhenTransportAndScheduleMatch() {
+        val fixture = fixture()
+        val previous = fixture.presentation()
+        fixture.restartSegment()
+        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        val current = fixture.presentation()
+        assertTrue(previous.timeline!!.describesSameSubscription(current.timeline))
+        assertFalse(previous.timeline.describesSameSegment(current.timeline))
+        assertNull(programmeWindow(current, previous.playbackTarget, previous.timeline, ::lookup))
+        assertNotNull(programmeWindow(current, eventAt = ::lookup))
+    }
+
     @Test fun previewPinsEstimateAcrossHeldInputLateMetadataPauseAndEviction() = runTest {
         val fixture = fixture()
         val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })

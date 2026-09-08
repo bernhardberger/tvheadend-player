@@ -17,6 +17,9 @@ client for TVHeadend servers. Requires Android 9 or newer and a TVHeadend server
   settings panels, with repeat-safe remote input.
 - Keep the screen awake during visible, active video playback, and release that
   request when paused, buffering, stopped, backgrounded or playing audio only.
+- SDK-owned stream restarts retain the Player and play/pause intent. Timeshift
+  samples and previews are segment-scoped: a restart clears old preview
+  coordinates instead of applying them to replacement content.
 
 ### Browsing And Settings
 
@@ -25,8 +28,8 @@ client for TVHeadend servers. Requires Android 9 or newer and a TVHeadend server
 - Recording folders, selection and details retain predictable focus as metadata
   changes. Old action results cannot update a replacement details session.
 - Long stream-profile lists remain reachable with the remote and enlarged text.
-- Published TVHeadend SDK 0.9.1 supplies cache namespace isolation and metadata
-  efficiency fixes. Playback remains on Media3 1.11.0.
+- Published TVHeadend SDK 0.10.0 includes cache/metadata fixes and same-subscription
+  stream restart support, with HTSP 0.9.0. Playback remains on Media3 1.11.0.
 
 ### Limits And Installation
 

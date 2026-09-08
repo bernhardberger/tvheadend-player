@@ -358,7 +358,7 @@ and accessibility seek bounds remain the observed buffer start and live edge.
 Recordings retain their elapsed/duration geometry.
 
 The supported SDK timeline supplies absolute stream coordinates and opaque,
-subscription-scoped selection targets. Player retains the selected target through
+segment-scoped selection targets. Player retains the selected target through
 the input debounce rather than rebuilding a relative seek at dispatch. Expired,
 replaced and unavailable targets produce explicit feedback, never a clamped seek
 on a successor subscription. Playback position comes from the SDK's sampled
@@ -369,6 +369,14 @@ accessible description, not a visible available-duration label. Server-reader sh
 playback counts as live and is not displayed as playback position. A sampled position that outlives seekable history does not
 extend seek permission. Its display span may expand to retain the position while
 that expired history remains subdued.
+
+Sample/history pairing and retained preview mappings use SDK segment identity,
+not just subscription identity. On interruption or segment replacement, discard
+queued previews and retained coordinates; do not retarget them onto the new
+segment. Let already-dispatched SDK operations settle without cancelling them
+merely to clear UI. Ordinary SDK-owned restart retains the Player and play intent;
+nonterminal startup/buffering is not playback end. Uncertain-seek restart and
+operation-cancellation teardown remain the SDK's intentional fail-closed paths.
 
 When no estimated programme can be resolved and playback is behind the
 live edge, or its position is unknown, the header states that

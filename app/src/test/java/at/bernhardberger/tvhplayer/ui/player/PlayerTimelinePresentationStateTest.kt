@@ -49,6 +49,7 @@ class PlayerTimelinePresentationStateTest {
             }
         }
         fixture.updateHistory(10.seconds, 610.seconds)
+        owner.updateTimeline(fixture.presentation().timeline)
         advanceTimeBy(400L)
         runCurrent()
         assertEquals(listOf(510_000L), dispatches)
@@ -57,7 +58,7 @@ class PlayerTimelinePresentationStateTest {
 
     @Test
     fun expiredUnavailableAndReplacedSelectionsNeverDispatchOrClamp() = runTest {
-        for (outcome in listOf("expired", "unavailable", "replaced")) {
+        for (outcome in listOf("expired", "unavailable", "replaced", "segment")) {
             val fixture = fixture()
             val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
             owner.queueRelativeSeek(fixture.presentation(), -30_000L,
@@ -68,10 +69,14 @@ class PlayerTimelinePresentationStateTest {
                 "expired" -> fixture.updateHistory(520.seconds, 620.seconds)
                 "unavailable" -> fixture.updateHistory(null, null)
                 "replaced" -> fixture.replaceSubscription()
+                "segment" -> {
+                    fixture.restartSegment()
+                    fixture.updateHistory(0.seconds, 600.seconds)
+                }
             }
             advanceTimeBy(400L)
             runCurrent()
-            assertEquals(outcome, owner.feedback)
+            assertEquals(if (outcome == "segment") "replaced" else outcome, owner.feedback)
             owner.dispose()
         }
     }
@@ -111,6 +116,94 @@ class PlayerTimelinePresentationStateTest {
         runCurrent()
         assertNull(owner.preview)
         assertFalse(owner.seekPending)
+    }
+
+    @Test
+    fun sameTransportRestartRejectsTheOldSampleDespiteIdenticalCoordinates() {
+        val fixture = fixture()
+        val oldTimeline = requireNotNull(fixture.presentation().timeline)
+        val oldSample = fixture.playbackPosition(540.seconds)
+        fixture.restartSegment()
+        fixture.updateHistory(0.seconds, 600.seconds)
+        val current = fixture.presentation()
+        assertTrue(oldTimeline.describesSameSubscription(current.timeline))
+        assertFalse(oldTimeline.describesSameSegment(current.timeline))
+        val stale = fixture.state.value.toAppPresentation(oldSample)
+        assertFalse(stale.timingKnown)
+        assertNull(stale.playbackTarget)
+        assertTrue(current.timingKnown)
+        assertEquals(540_000L, current.positionMs)
+    }
+
+    @Test
+    fun sameTransportRestartClearsQueuedPreviewWithoutRetargeting() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain") {
+            error("Retired preview must not dispatch")
+        }
+        val retired = requireNotNull(owner.preview).target
+        fixture.restartSegment()
+        fixture.updateHistory(0.seconds, 600.seconds)
+        owner.updateTimeline(fixture.presentation().timeline)
+        assertNull(owner.preview)
+        assertFalse(owner.seekPending)
+        owner.commitPendingSeek()
+        advanceTimeBy(401)
+        runCurrent()
+        assertEquals(TimeshiftContentSeekResult.Replaced, fixture.seek(retired) {
+            error("SDK must reject a retained old-segment target")
+        })
+        val dispatched = mutableListOf<Long>()
+        owner.queueRelativeSeek(fixture.presentation(570_000L), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain") { target ->
+            fixture.seek(target) {
+                dispatched += target.position.inWholeMilliseconds
+                fixture.completed()
+            }
+        }
+        owner.commitPendingSeek()
+        runCurrent()
+        assertEquals(listOf(540_000L), dispatched)
+        owner.dispose()
+    }
+
+    @Test
+    fun interruptionClearsPreviewWithoutCancellingAnInFlightSdkOperation() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val result = CompletableDeferred<TimeshiftContentSeekResult>()
+        var cancelled = false
+        var calls = 0
+        val seek: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult = {
+            calls++
+            try { result.await() } catch (failure: CancellationException) {
+                cancelled = true
+                throw failure
+            }
+        }
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        owner.commitPendingSeek()
+        runCurrent()
+        assertEquals(1, calls)
+        fixture.restartSegment()
+        owner.updateTimeline(null)
+        assertNull(owner.preview)
+        assertFalse(cancelled)
+        fixture.updateHistory(0.seconds, 600.seconds)
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "clamped", "expired", "replaced", "uncertain", seek)
+        assertNull(owner.preview)
+        result.complete(TimeshiftContentSeekResult.Replaced)
+        runCurrent()
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(1, calls)
+        assertFalse(cancelled)
+        assertNull(owner.preview)
+        owner.dispose()
     }
 
     @Test

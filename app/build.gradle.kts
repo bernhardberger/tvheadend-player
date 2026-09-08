@@ -251,7 +251,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "Staged SDK substitution is active (-Ptvheadend.sdk.local=true), so this build cannot " +
                 "prove public SDK consumption. Publish the SDK release and re-run without the flag."
         }
-        check(sdkVersion == "0.9.1") { "Expected public SDK 0.9.1 but found $sdkVersion" }
+        check(sdkVersion == "0.10.0") { "Expected public SDK 0.10.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             "implementation:sdk-android:$sdkVersion",
             "implementation:sdk-media3:$sdkVersion",
@@ -279,7 +279,7 @@ tasks.register("verifyExternalSdkConsumption") {
         }
 
         val expectedTvheadendModules = mapOf(
-            "htsp" to "0.7.0",
+            "htsp" to "0.9.0",
             "sdk-android" to sdkVersion,
             "sdk-core" to sdkVersion,
             "sdk-media3" to sdkVersion,

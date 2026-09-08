@@ -28,7 +28,7 @@ internal fun programmeWindow(
 ): ProgrammeWindow? {
     if (!state.available || !state.timingKnown || target == null) return null
     val history = state.timeline ?: return null
-    if (mappingTimeline?.describesSameSubscription(history) != true) return null
+    if (mappingTimeline?.describesSameSegment(history) != true) return null
     val mapping = mappingTimeline.wallClockMapping as? TimeshiftWallClockMapping.Estimate ?: return null
     val position = mapping.estimate(target) ?: return null
     val event = eventAt(position)?.takeIf { it.start <= position && position < it.stop } ?: return null

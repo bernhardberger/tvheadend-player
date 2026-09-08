@@ -1399,11 +1399,11 @@ fun LiveTimeshiftState.toAppPresentation(
     is LiveTimeshiftState.Available -> {
         val estimate =
             sample as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftPlaybackPosition.Estimate
-        // A sample taken from a subscription that has since been replaced describes unrelated
+        // A sample taken from a stream segment that has since been replaced describes unrelated
         // content. Presenting it against this history would report a false distance behind live
         // and could authorise a seek on the successor derived from the predecessor's coordinate.
         val position = estimate
-            ?.takeIf { it.timeline?.describesSameSubscription(timeline) == true }
+            ?.takeIf { it.timeline?.describesSameSegment(timeline) == true }
             ?.target
         AppTimeshiftState(
             available = true,

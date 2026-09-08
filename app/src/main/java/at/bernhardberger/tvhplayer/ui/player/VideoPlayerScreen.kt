@@ -343,6 +343,9 @@ fun VideoPlayerScreen(
     val timeshiftUncertainText = stringResource(R.string.timeshift_seek_uncertain)
     val player = remember { videoPlayerViewModel.getPlayerInstance() }
     val timelineState = rememberLiveTimelinePresentationState(player)
+    LaunchedEffect(timelineState, effectiveTimeshiftState.timeline) {
+        timelineState.updateTimeline(effectiveTimeshiftState.timeline)
+    }
     val nowSec = timelineState.nowEpochSec
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
