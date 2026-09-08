@@ -443,6 +443,11 @@ def effective_command(command: list[str]) -> list[str]:
         if len(command) != 1:
             raise ValueError("tools/verify does not accept arguments")
         return [str(verify)]
+    release = verify.with_name("release")
+    if Path(command[0]).resolve() == release:
+        if command[1:] != ["prepare"]:
+            raise ValueError("tools/release only accepts prepare in the Gradle wrapper")
+        return [str(release), "prepare"]
     if not is_gradle_launcher(command[0]):
         raise ValueError("command must start with a Gradle launcher")
     effective = list(command)

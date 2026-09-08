@@ -17,7 +17,9 @@ Publication and production-device mutation still require explicit owner approval
 (`versionCode` 2 and 3) are interlaced-playback diagnostic updates. Version
 `0.1.3` (`versionCode` 4) consolidates the live and recording player overlays.
 Version `0.1.4` (`versionCode` 5) adds the Shield HDMI-CEC channel-key
-compatibility fix. None update the predecessor or temporary
+compatibility fix. Version `0.2.0` (`versionCode` 6) consolidates the player
+polish, channel/Guide/recording fixes and published SDK 0.9.1 adoption.
+None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.
 `versionName` follows semantic versioning; do not reuse an APK version for
@@ -70,10 +72,10 @@ commands are:
 ```bash
 ./tools/release prepare
 ./tools/release sign
-./tools/release verify-signed build/release/signed/0.1.4
+./tools/release verify-signed build/release/signed/0.2.0
 ```
 
-`prepare` resolves the byte-pinned SDK 0.3.0 artifacts and source classifiers
+`prepare` resolves the byte-pinned SDK 0.9.1 artifacts and source classifiers
 from the public repositories, verifies them, and creates the unsigned bundle.
 `sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source
@@ -113,7 +115,7 @@ Run the signing tool from a trusted, reviewed checkout on LXC 117, not from file
 inside the incoming bundle. Identify the incoming bundle and protected keystore:
 
 ```bash
-./tools/sign-release /path/to/incoming/0.1.3 /secure/path/release.jks
+./tools/sign-release /path/to/incoming/0.2.0 /secure/path/release.jks
 ```
 
 The tool uses `umask 077` and verifies incoming checksums, manifest identity,
@@ -165,7 +167,7 @@ through the bounded wrapper:
 
 ```bash
 ./tools/device --target g08 install-release \
-  --bundle build/release/signed/0.1.4 \
+  --bundle build/release/signed/0.2.0 \
   --confirm-release-install
 ```
 

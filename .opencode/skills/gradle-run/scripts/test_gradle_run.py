@@ -694,6 +694,16 @@ class GradleRunProcessTest(GradleRunTestCase):
         with self.assertRaisesRegex(ValueError, "Gradle launcher"):
             GRADLE_RUN.effective_command([str(self.root / "tools/verify")])
 
+    def test_repository_release_preparation_is_accepted_without_gradle_arguments(self) -> None:
+        release = Path(__file__).resolve().parents[4] / "tools/release"
+        command = [str(release), "prepare"]
+        self.assertEqual(command, GRADLE_RUN.effective_command(command))
+        for arguments in ([], ["sign"], ["prepare", "--scan"]):
+            with self.assertRaisesRegex(ValueError, "only accepts prepare"):
+                GRADLE_RUN.effective_command([str(release), *arguments])
+        with self.assertRaisesRegex(ValueError, "Gradle launcher"):
+            GRADLE_RUN.effective_command([str(self.root / "tools/release"), "prepare"])
+
     def test_custom_gradle_wrapper_script_is_accepted(self) -> None:
         workflow = self.create_workflow()
         custom_wrapper = self.gradle.with_name("gradlew_custom")

@@ -60,6 +60,10 @@ wrapper; never stream, `tee`, paste, or reopen a complete build log.
    the script supplies its own Gradle console/no-scan defaults. This retains the
    same compact diagnostics, credential isolation and process ownership without
    a second launcher or a nested Gradle lock.
+   For authorized release preparation, pass `./tools/release prepare` with no
+   additional arguments. Its existing verifier and clean release build run under
+   the same compact-output workflow. Signing is not a Gradle operation and is
+   deliberately not accepted by this wrapper.
 4. For incidental validation, stay in the current agent and run the smallest
    owning task with a non-empty verification question:
 
