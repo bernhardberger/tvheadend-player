@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AudioGroupRoundtripContractTest {
     @Test
-    fun equalFreshAudioGroupAcceptsAnEarlierExplicitSelection() {
+    fun equalFreshAudioGroupAcceptsAnEarlierExplicitSelection() = try {
         val format = Format.Builder().setId("1").setSampleMimeType(MimeTypes.AUDIO_AAC)
             .setLanguage("en").setChannelCount(2).setSampleRate(48_000).build()
         val earlierGroup = TrackGroup(format)
@@ -52,6 +52,10 @@ class AudioGroupRoundtripContractTest {
             periodClass.declaredMethods.single { it.name.startsWith("release$") }
                 .apply { isAccessible = true }.invoke(period)
         }
+    } catch (error: ReflectiveOperationException) {
+        throw AssertionError("SDK 0.10.1 internal-symbol probe needs maintenance; this is not a track-selection verdict", error)
+    } catch (error: NoSuchElementException) {
+        throw AssertionError("SDK 0.10.1 internal-symbol probe needs maintenance; constructor/method lookup changed", error)
     }
 
     private fun select(period: MediaPeriod, group: TrackGroup) {

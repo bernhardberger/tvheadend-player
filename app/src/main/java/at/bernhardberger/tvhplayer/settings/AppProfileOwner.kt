@@ -385,7 +385,11 @@ class AppProfileOwner internal constructor(
 
     private suspend fun applyServerProfile(profile: ServerProfileReadResult) {
         val audioIdentity = if (profile is ServerProfileReadResult.Available) {
-            playerSettings.audioChoices.profileIdentity()
+            try {
+                playerSettings.audioChoices.profileIdentity()
+            } catch (_: java.io.IOException) {
+                null
+            }
         } else null
         when (profile) {
             is ServerProfileReadResult.Available -> session.connect(profile.profile)

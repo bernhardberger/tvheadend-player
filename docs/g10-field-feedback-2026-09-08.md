@@ -43,9 +43,13 @@ at the end supersedes those decisions, not the original operator observations.
   missing remembered ID remain; a profile replacement cancels pending startup.
   Bootstrap/readiness/request regressions exercise cached reconnect followed by
   current readiness, exact remembered selection and cancellation non-revival.
-- `AudioChoiceStoreTest` closes and reopens a real disk DataStore. LXC119 ran six
+- `AudioChoiceStoreTest` closes and reopens a real disk DataStore. LXC119 ran eight
   passing audio tests, including fresh profile-owner/settings-store/Player/runtime
   reconstruction, fresh reordered groups, missing selection and profile isolation.
+  Review corrections also cover subtitle-only updates preserving audio eviction
+  order and audio-identity IO failure retaining the configured server while
+  rejecting an unsafe profile replacement. The pinned SDK reflection probe labels
+  internal-symbol lookup failures as probe maintenance, not playback regressions.
   These controlled-Player tests prove app ownership and persistence, not decoder
   behavior or physical sound. The emulator packages were uninstalled and stopped.
 - `./tools/verify` passes with the published pins, including source/native gates.

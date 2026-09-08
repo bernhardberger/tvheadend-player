@@ -50,6 +50,44 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AppAudioRoundtripTest {
     @Test
+    fun audioIdentityIoFailureKeepsExistingProfileButRejectsUnsafeAccountReplacement() = runBlocking {
+        withTimeout(20.seconds) {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val profileStore = TvheadendServerProfileStore(context)
+            check(profileStore.storeAnonymous("offline.invalid", 9982) is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
+            val failingStore = object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> {
+                override val data = kotlinx.coroutines.flow.flow<androidx.datastore.preferences.core.Preferences> {
+                    throw java.io.IOException("Injected audio preference failure")
+                }
+                override suspend fun updateData(transform: suspend (androidx.datastore.preferences.core.Preferences) -> androidx.datastore.preferences.core.Preferences): androidx.datastore.preferences.core.Preferences {
+                    throw java.io.IOException("Injected audio preference failure")
+                }
+            }
+            val session = FakeTvheadendSession()
+            val owner = AppProfileOwner(context, session, profileStore, LegacyCredentialSource(context), PlayerSettingsStore(failingStore), Dispatchers.IO)
+            val job = launch { owner.run() }
+            try {
+                assertTrue(owner.serverProfile.filterNotNull().first() is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
+                org.junit.Assert.assertNull(owner.audioProfileId)
+                var rejected = false
+                try {
+                    owner.saveServer("replacement.invalid", 9982)
+                } catch (_: java.io.IOException) {
+                    rejected = true
+                }
+                assertTrue(rejected)
+                val retained = profileStore.loadProfile() as at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available
+                assertEquals("offline.invalid", retained.host)
+                assertTrue(owner.serverProfile.value is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
+            } finally {
+                job.cancelAndJoin()
+                session.shutdown()
+                profileStore.clearProfile()
+            }
+        }
+    }
+
+    @Test
     fun explicitChoiceSurvivesAppOwnedChannelRoundtripWithFreshTracks() = runBlocking {
         withTimeout(20.seconds) {
             withContext(Dispatchers.Main) {

@@ -181,7 +181,10 @@ fun adjacentChannelId(
   SDK profile storage, so an interrupted edit cannot transfer old audio choices
   to a different account. Re-entering a configuration is a new profile identity;
   ordinary reconnect and restart are not. No credential-derived identity is
-  read or stored for audio. Future multi-profile support must retain each
+  read or stored for audio. An audio-identity read failure disables persisted
+  audio without hiding an intact server configuration. Identity-rotation failure
+  rejects the profile edit before SDK storage changes; allowing that edit would
+  risk inheriting an old account's choice after restart. Future multi-profile support must retain each
   profile's identity rather than merge choices by endpoint or channel number.
   A future remember toggle, language/codec preference or schema migration must
   define precedence over these explicit per-channel choices and safe handling of

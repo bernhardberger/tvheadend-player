@@ -55,6 +55,7 @@ internal class SessionAudioSelection {
         val index = override.trackIndices.single()
         if (index !in 0 until group.length || !group.isTrackSupported(index)) return null
         val selected = choice(group.getTrackFormat(index))
+        if (choices[currentChannel] == selected) return null
         load(currentChannel, selected)
         return currentChannel to selected
     }

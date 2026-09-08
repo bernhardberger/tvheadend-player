@@ -9,13 +9,23 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.settings.AudioChoiceStore
 import at.bernhardberger.tvhplayer.ui.player.collectTracks
 import at.bernhardberger.tvhplayer.ui.player.selectAudioTrack
 import java.lang.reflect.Proxy
+import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -23,6 +33,39 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class SessionAudioSelectionTest {
+    @Test
+    fun subtitleChangesDoNotRefreshPersistedAudioEvictionOrder() = runBlocking {
+        val job = SupervisorJob()
+        val file = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
+            "audio-eviction-${java.util.UUID.randomUUID()}.preferences_pb")
+        val store = AudioChoiceStore(PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(job + Dispatchers.IO), produceFile = { file },
+        ))
+        try {
+            val fixture = Fixture()
+            suspend fun choose(id: Long) {
+                fixture.tune(id)
+                selectAudioTrack(fixture.player, collectTracks(fixture.tracks, C.TRACK_TYPE_AUDIO).last())
+                val selected = checkNotNull(fixture.owner.rememberExplicitChoice(fixture.player))
+                store.write("profile", selected.first, selected.second)
+            }
+            for (id in 1L..64L) choose(id)
+            fixture.tune(1)
+            fixture.player.trackSelectionParameters = fixture.parameters.buildUpon()
+                .setPreferredTextLanguage("fr").build()
+            // Same callback used by the runtime, including deferred restore notifications.
+            fixture.owner.rememberExplicitChoice(fixture.player)?.let {
+                store.write("profile", it.first, it.second)
+            }
+            choose(65)
+            assertNull(store.read("profile", ChannelId(1)))
+            assertEquals("alternate", store.read("profile", ChannelId(2))?.id)
+        } finally {
+            job.cancelAndJoin()
+            file.delete()
+        }
+    }
+
     @Test
     fun roundtripRebindsExplicitChoiceToFreshReorderedGroups() {
         val fixture = Fixture()
