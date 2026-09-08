@@ -640,18 +640,29 @@ class PlayerTimelinePresentationStateTest {
 
     @Test
     fun dismissedInFlightPreviewIsNotRestoredByAnUncertainOutcome() = runTest {
-        val fixture = fixture()
-        val result = CompletableDeferred<TimeshiftContentSeekResult>()
-        val state = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
-        state.queueRelativeSeek(fixture.presentation(), -30_000L,
-            "unavailable", "clamped", "expired", "replaced", "uncertain") { result.await() }
-        advanceTimeBy(400L)
-        runCurrent()
-        state.cancelPendingSeek()
-        result.complete(fixture.completed(TimeshiftCommandResult.TIMEOUT))
-        runCurrent()
-        assertNull(state.preview)
-        state.dispose()
+        for (queueAfterDismissal in listOf(false, true)) {
+            val fixture = fixture()
+            val result = CompletableDeferred<TimeshiftContentSeekResult>()
+            val state = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+            var dispatches = 0
+            state.queueRelativeSeek(fixture.presentation(), -30_000L,
+                "unavailable", "clamped", "expired", "replaced", "uncertain") { dispatches++; result.await() }
+            advanceTimeBy(400L)
+            runCurrent()
+            state.cancelPendingSeek()
+            if (queueAfterDismissal) {
+                state.queueRelativeSeek(fixture.presentation(), -30_000L,
+                    "unavailable", "clamped", "expired", "replaced", "uncertain") { error("Discarded input") }
+            }
+            result.complete(fixture.completed(TimeshiftCommandResult.TIMEOUT))
+            runCurrent()
+            assertNull(state.preview)
+            advanceTimeBy(400L)
+            runCurrent()
+            assertEquals(1, dispatches)
+            assertFalse(state.seekPending)
+            state.dispose()
+        }
     }
 
     @Test

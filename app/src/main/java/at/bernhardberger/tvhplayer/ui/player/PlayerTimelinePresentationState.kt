@@ -65,6 +65,7 @@ private class LiveTimelineSourceGeneration(
     var seekJob: Job? = null
     var seekFeedbackJob: Job? = null
     var seekToken = 0
+    var previewDismissalEpoch = 0L
     var seekQueuedAtMs = 0L
     var commitRequested = false
     var positionSampleEpoch = 0L
@@ -236,6 +237,7 @@ internal class LiveTimelinePresentationState(
                         ?.takeIf { it.token == dispatchToken }
                         ?.copy(dispatched = true)
                     val dispatchedPreview = generation.preview
+                    val dispatchPreviewEpoch = generation.previewDismissalEpoch
 
                     val contentTarget = generation.pendingContentTarget ?: break
                     generation.pendingContentTarget = null
@@ -267,7 +269,9 @@ internal class LiveTimelinePresentationState(
                         if (!accepted && generation.preview != null) {
                             // Discard stacked input, but keep the attempted request's outcome
                             // visible in compact mode. Never restore a dismissed preview.
-                            generation.preview = dispatchedPreview
+                            generation.preview = dispatchedPreview.takeIf {
+                                generation.previewDismissalEpoch == dispatchPreviewEpoch
+                            }
                         }
                         generation.seekFeedbackJob?.cancel()
                         generation.seekFeedbackJob = scope.launch {
@@ -363,6 +367,7 @@ internal class LiveTimelinePresentationState(
     }
 
     private fun clearPreview(generation: LiveTimelineSourceGeneration) {
+        generation.previewDismissalEpoch++
         generation.seekFeedbackJob?.cancel()
         generation.seekFeedbackJob = null
         generation.preview = null
