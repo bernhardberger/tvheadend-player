@@ -174,21 +174,6 @@ internal fun cancelStartupAndSelectRoot(
     return true
 }
 
-internal fun enterCachedChannelList(
-    presentation: MainStartupPresentation,
-    readiness: CurrentChannelReadiness,
-    requests: ApplianceLaunchRequests,
-    expectedState: ApplianceLaunchState,
-    selectRoot: (AppNavKey) -> Unit,
-): Boolean {
-    if (
-        presentation != MainStartupPresentation.Inactive ||
-        readiness !is CurrentChannelReadiness.Browsable ||
-        expectedState !is ApplianceLaunchState.Pending
-    ) return false
-    return cancelStartupAndSelectRoot(requests, expectedState, ChannelsKey, selectRoot)
-}
-
 internal fun closeNormalLivePlayer(
     popBackStack: () -> Boolean,
     selectRoot: (AppNavKey) -> Unit,
@@ -491,18 +476,12 @@ fun AppRoot(
         }
     }
 
-    LaunchedEffect(startupPresentation, currentChannelReadiness, applianceLaunchState) {
-        // Cached browsing replaces this startup request, never a later surprise autoplay.
-        enterCachedChannelList(
-            presentation = startupPresentation,
-            readiness = currentChannelReadiness,
-            requests = applianceLaunchRequests,
-            expectedState = applianceLaunchState,
-            selectRoot = selectRoot,
-        )
-    }
-
     val enterDirective = startupPresentation as? MainStartupPresentation.Enter
+    LaunchedEffect(applianceLaunchState, navigationStartDestination) {
+        if (applianceLaunchState == ApplianceLaunchState.Idle && navigationStartDestination == null) {
+            selectRoot(ChannelsKey)
+        }
+    }
     LaunchedEffect(enterDirective, currentChannelReadiness) {
         val directive = enterDirective ?: return@LaunchedEffect
         val readiness = currentChannelReadiness as? CurrentChannelReadiness.Ready

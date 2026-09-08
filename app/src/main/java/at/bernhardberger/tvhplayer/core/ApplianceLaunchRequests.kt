@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +38,13 @@ class ApplianceLaunchRequests(
         } ?: ApplianceLaunchState.Idle,
     )
     val state = _state.asStateFlow()
+    private var profile: ServerProfileReadResult? = null
+
+    @Synchronized
+    fun observeProfile(current: ServerProfileReadResult) {
+        if (profile != null && profile !== current) cancel(_state.value)
+        profile = current
+    }
 
     @Synchronized
     fun request() {

@@ -9,10 +9,12 @@ import at.bernhardberger.tvhplayer.core.StartupBootstrapCoordinator
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.settings.toServerSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 class MainStartupViewModel(
@@ -31,7 +33,11 @@ class MainStartupViewModel(
     val runtimeServerSettings = _runtimeServerSettings.asStateFlow()
     private val bootstrapCoordinator = StartupBootstrapCoordinator(
         applianceLaunchRequests = applianceLaunchRequests,
-        loadServerSettings = { profileOwner.serverSettings.first() },
+        loadServerSettings = {
+            profileOwner.serverProfile.filterNotNull().first().also {
+                applianceLaunchRequests.observeProfile(it)
+            }.toServerSettings()
+        },
         loadUiSettings = { uiSettingsStore.settings.first() },
         createStartupRequest = createStartupRequest,
         onStartupRequestCreationHandled = {
@@ -45,8 +51,9 @@ class MainStartupViewModel(
             bootstrapCoordinator.bootstrap()
             // Ready keeps the immutable startup decision; this observation only
             // refreshes the configured/onboarding branch after bootstrap.
-            profileOwner.serverSettings.collect { server ->
-                _runtimeServerSettings.value = server
+            profileOwner.serverProfile.filterNotNull().collect { profile ->
+                applianceLaunchRequests.observeProfile(profile)
+                _runtimeServerSettings.value = profile.toServerSettings()
             }
         }
     }

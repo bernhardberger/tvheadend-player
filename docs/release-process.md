@@ -79,7 +79,7 @@ commands are:
 ./tools/release verify-signed build/release/signed/0.2.1
 ```
 
-`prepare` resolves the byte-pinned SDK 0.10.0 artifacts and source classifiers
+`prepare` resolves the byte-pinned SDK 0.10.1 artifacts and source classifiers
 from the public repositories, verifies them, and creates the unsigned bundle.
 `sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source

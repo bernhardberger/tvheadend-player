@@ -24,6 +24,8 @@ data class PlayerSettings(
 class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
 
+    internal val audioChoices = AudioChoiceStore(dataStore)
+
     private object Keys {
         val PROFILE_UUID = stringPreferencesKey("profileUuid")
         val LEGACY_PROFILE_NAME = stringPreferencesKey("profile")

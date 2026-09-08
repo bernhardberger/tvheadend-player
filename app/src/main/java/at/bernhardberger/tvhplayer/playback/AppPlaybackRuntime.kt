@@ -3,8 +3,11 @@
 package at.bernhardberger.tvhplayer.playback
 
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -529,6 +532,8 @@ class AppPlaybackRuntime(
 ) {
     private val targetCommands = PlaybackTargetCommandSerialization()
     private val foregroundPlaybackLifecycle = ForegroundPlaybackLifecycle()
+    private val audioSelection = SessionAudioSelection()
+    private var audioWriteJob: Job? = null
     private val presentationEpoch = PlaybackPresentationEpoch()
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     private val _activeTarget = MutableStateFlow<AppPlaybackTarget?>(null)
@@ -576,6 +581,34 @@ class AppPlaybackRuntime(
     }
 
     private val listener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (!targetCommands.isOpen()) return
+            audioSelection.useProfile(profileOwner.serverProfile.value, player)
+            audioSelection.onMediaItemTransition(player)
+        }
+
+        override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
+            if (!targetCommands.isOpen()) return
+            audioSelection.useProfile(profileOwner.serverProfile.value, player)
+            val profileId = profileOwner.audioProfileId ?: return
+            val selected = audioSelection.rememberExplicitChoice(player) ?: return
+            val previous = audioWriteJob
+            audioWriteJob = scope.launch {
+                previous?.join()
+                try {
+                    settings.audioChoices.write(profileId, selected.first, selected.second)
+                } catch (_: java.io.IOException) {
+                    // A storage failure must not interrupt otherwise valid playback.
+                }
+            }
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+            if (targetInstallationInProgress || !targetCommands.isOpen()) return
+            audioSelection.useProfile(profileOwner.serverProfile.value, player)
+            audioSelection.restore(player)
+        }
+
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (!targetInstallationInProgress && targetCommands.isOpen()) publishPlayerState()
         }
@@ -637,7 +670,20 @@ class AppPlaybackRuntime(
             )
         }
         val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession)
+        val audioProfile = profileOwner.serverProfile.value
+        val audioProfileId = profileOwner.audioProfileId
+        audioWriteJob?.join()
+        val storedAudio = try {
+            audioProfileId?.let { settings.audioChoices.read(it, channelId) }
+        } catch (_: java.io.IOException) {
+            null
+        }
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        if (profileOwner.serverProfile.value !== audioProfile || profileOwner.audioProfileId != audioProfileId) {
+            return PlaybackTargetResult.NOT_READY
+        }
+        audioSelection.useProfile(audioProfile, player)
+        audioSelection.load(channelId, storedAudio)
         val selection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (selection == null) {
             return completeUnavailableTarget(
@@ -1057,7 +1103,9 @@ class AppPlaybackRuntime(
             targetFrameListener?.let(player::removeListener)
             targetFrameListener = null
             player.removeListener(listener)
+            audioSelection.clear(player)
         }
+        audioWriteJob?.join()
     }
 
     private suspend fun installTargetForPresentation(
@@ -1090,6 +1138,12 @@ class AppPlaybackRuntime(
             result
         } finally {
             targetInstallationInProgress = false
+            if (targetCommands.isOpen()) {
+                audioSelection.useProfile(profileOwner.serverProfile.value, player)
+                (_activeTarget.value as? AppPlaybackTarget.Live)?.let {
+                    audioSelection.activate(it.channelId, player)
+                }
+            }
         }
     }
 

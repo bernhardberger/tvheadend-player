@@ -9,6 +9,9 @@ workspace's `control_plane/context/player-g10-field-notes-2026-09-08.md` and
 
 ## Ordered disposition
 
+The G10-08/02 deferrals below record the initial P33 triage. The P34 follow-up
+at the end supersedes those decisions, not the original operator observations.
+
 | Order / ID | Disposition | Evidence and remaining boundary |
 |---|---|---|
 | FIRST G10-05 | Fixed presentation | No buffer: current valid EPG supplies cyan schedule-elapsed progress and endpoints in the footer. No thumb, focus or seek action. Missing/future/ended EPG supplies no progress. `PlayerOverlayCompositionTest.passiveScheduleProgressIsTruthfulAndNeverSeekableAcrossTuning` protects these cases and buffer arrival. Runtime seek authority and SDK segment fences are unchanged. |
@@ -18,7 +21,41 @@ workspace's `control_plane/context/player-g10-field-notes-2026-09-08.md` and
 | THEN G10-08 | Bounded-triage deferral: product precedence | `MainStartupPresentation` and `AppRoot.enterCachedChannelList` deliberately enter retained Channels and cancel pending autoplay before current readiness. `CachedStartupTransitionTest` proves later readiness cannot revive it. Decide whether configured autoplay should instead wait for current metadata, with explicit Back cancellation, or whether immediate cached browsing retains precedence. Do not merely preserve autoplay after exposing browsing: that would surprise the viewer. No last-channel-store defect was established. A restored launch versus fresh request is also an unresolved field discriminator. |
 | THEN G10-02 | Bounded-triage deferral: trigger and retention | `PlayerHelpers.selectAudioTrack` assigns the chosen group/index override once; settings update existing parameters without clearing that override. The options sheet reads selected flags and does not clear them on dismissal. No immediate app reset was demonstrated. Establish whether selection changes within unchanged player/groups, at stream replacement/reconnect, or at restart, and distinguish focused row from selected marker/audible output. Agree retention lifetime before introducing persistence. |
 
-## Evidence
+## P34 audio and autoplay follow-up
+
+- The supplied audio A-B-A reproducer exposed a producer contract defect:
+  Media3 may retain an override containing an equal but fresh track group, while
+  SDK 0.10.0 required group object identity. The consumed-SDK instrumentation
+  probe failed with `Selected Media3 track is unavailable`; the same probe
+  passes with public SDK 0.10.1. The producer independently verified actual
+  ExoPlayer playing/paused restart and retune, including an identity-only
+  negative control. Player does not patch SDK queues or protocol behavior.
+- SDK 0.10.1 is pinned from the published release at source
+  `f76f7aafb15cdfc5529791679238424bb9b6f6b8`; the resolved media3 AAR SHA256 is
+  `7f5ec09d53151ee1d1901da7df2fcdf0a570153827a067e0f3ab9d77decedf4f`.
+  HTSP 0.9.0, Media3 1.11.0 and corresponding native sources are unchanged.
+- Explicit live audio choices now persist through the app-private DataStore.
+  The accepted lifetime, profile-edit isolation, 64-choice bound, missing-track
+  fallback and future settings/migration constraints are in
+  `appliance-mode-spec.md`. Session-only retention is not the accepted outcome.
+- Enabled cold startup now waits rather than entering cached browsing. Existing
+  one-shot Back/navigation cancellation and first-current-channel fallback for a
+  missing remembered ID remain; a profile replacement cancels pending startup.
+  Bootstrap/readiness/request regressions exercise cached reconnect followed by
+  current readiness, exact remembered selection and cancellation non-revival.
+- `AudioChoiceStoreTest` closes and reopens a real disk DataStore. LXC119 ran six
+  passing audio tests, including fresh profile-owner/settings-store/Player/runtime
+  reconstruction, fresh reordered groups, missing selection and profile isolation.
+  These controlled-Player tests prove app ownership and persistence, not decoder
+  behavior or physical sound. The emulator packages were uninstalled and stopped.
+- `./tools/verify` passes with the published pins, including source/native gates.
+  No G10 install, TV reboot, server operation, signing or public Player release
+  was performed. All other field feedback remains outside this repair.
+- Preserved 0.2.2 debug bytes remain at ignored
+  `captures/p34-a1-preserved-0.2.2-502d86a-debug.apk`, SHA256
+  `6d4c3fec183deeb5ea9ee2076cfc1ddedafc129a8af0d271d0d463cf5b04601c`.
+
+## P33 evidence
 
 - Final `./tools/verify` passed (exit 0, 57.396 seconds); unchanged runtime/overlay
   behavioral evidence is reused after removing the unreachable header branch.

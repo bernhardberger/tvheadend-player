@@ -36,7 +36,7 @@ class MainStartupPresentationTest {
     }
 
     @Test
-    fun seededCatalogEntersBrowsingWithoutResolvingAutoplay() {
+    fun seededCatalogKeepsAutoplayWaitingForCurrentMetadata() {
         val channels = listOf(Channel.create(ChannelId(1)))
         val readiness = CurrentChannelReadiness.Browsable(channels)
         for (connection in listOf(
@@ -45,7 +45,7 @@ class MainStartupPresentationTest {
             ConnectionUiState.Reconnecting,
             ConnectionUiState.Ready,
         )) {
-            assertEquals(MainStartupPresentation.Inactive, presentation(connection, readiness))
+            assertEquals(presentation(connection, CurrentChannelReadiness.Waiting), presentation(connection, readiness))
         }
         val requests = ApplianceLaunchRequests()
         requests.request()

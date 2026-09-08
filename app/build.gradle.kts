@@ -115,7 +115,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.tvheadend.sdk.testing) {
         version { strictly(libs.versions.tvheadend.sdk.get()) }
     }
@@ -251,7 +251,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "Staged SDK substitution is active (-Ptvheadend.sdk.local=true), so this build cannot " +
                 "prove public SDK consumption. Publish the SDK release and re-run without the flag."
         }
-        check(sdkVersion == "0.10.0") { "Expected public SDK 0.10.0 but found $sdkVersion" }
+        check(sdkVersion == "0.10.1") { "Expected public SDK 0.10.1 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             "implementation:sdk-android:$sdkVersion",
             "implementation:sdk-media3:$sdkVersion",

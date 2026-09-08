@@ -234,7 +234,7 @@ class AppProfileOwnerTest {
         val ioDispatcher = StandardTestDispatcher(testScheduler, name = "profile-owner-io")
         val secondId = StreamProfileId("22222222222222222222222222222222")
         var discoveries = 0
-        var settingsUpdates = 0
+        var pauseSelectionUpdate = false
         val session = ProfileSession(observations.observation) { originatingSession ->
             assertSame(ioDispatcher, currentCoroutineContext()[ContinuationInterceptor])
             discoveries += 1
@@ -252,8 +252,8 @@ class AppProfileOwnerTest {
             }
         }
         val dataStore = InMemoryPreferencesDataStore(beforeUpdate = {
-            settingsUpdates += 1
-            if (settingsUpdates == 2) {
+            if (pauseSelectionUpdate) {
+                pauseSelectionUpdate = false
                 selectionStarted.complete(Unit)
                 withContext(NonCancellable) { releaseSelection.await() }
             }
@@ -282,6 +282,7 @@ class AppProfileOwnerTest {
         assertTrue(failedMutation.await().isFailure)
         assertTrue(owner.serverProfile.value != null)
 
+        pauseSelectionUpdate = true
         val selection = async { owner.selectStreamProfile(secondId) }
         runCurrent()
         selectionStarted.await()

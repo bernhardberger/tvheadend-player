@@ -47,14 +47,6 @@ fun mainStartupPresentation(
         is ApplianceLaunchState.Pending -> launchState
     }
 
-    if (
-        currentChannelReadiness is CurrentChannelReadiness.Browsable &&
-        currentChannelReadiness.channels.isNotEmpty() &&
-        connectionState.primaryRecoveryAction() == ConnectionRecoveryAction.NONE
-    ) {
-        return MainStartupPresentation.Inactive
-    }
-
     return when (connectionState) {
         ConnectionUiState.Connecting ->
             MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)

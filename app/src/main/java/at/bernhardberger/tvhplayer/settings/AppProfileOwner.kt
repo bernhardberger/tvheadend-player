@@ -79,6 +79,8 @@ class AppProfileOwner internal constructor(
     private var availableForObservation: CurrentSessionObservation? = null
 
     val serverProfile: StateFlow<ServerProfileReadResult?> = mutableServerProfile.asStateFlow()
+    internal var audioProfileId: String? = null
+        private set
     override val serverSettings: Flow<ServerSettings> = serverProfile
         .filterNotNull()
         .map(ServerProfileReadResult::toServerSettings)
@@ -201,6 +203,8 @@ class AppProfileOwner internal constructor(
 
     private suspend fun commitServer(host: String, htspPort: Int) = serverMutex.withLock {
         mutableServerProfile.value = null
+        audioProfileId = null
+        playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.storeAnonymous(host, htspPort)
         check(profile is ServerProfileReadResult.Available)
         clearLegacyProfileMaterial()
@@ -214,6 +218,8 @@ class AppProfileOwner internal constructor(
         password: String,
     ) = serverMutex.withLock {
         mutableServerProfile.value = null
+        audioProfileId = null
+        playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.storePassword(host, htspPort, username, password)
         check(profile is ServerProfileReadResult.Available)
         clearLegacyProfileMaterial()
@@ -222,6 +228,8 @@ class AppProfileOwner internal constructor(
 
     private suspend fun clearServerProfile() = serverMutex.withLock {
         mutableServerProfile.value = null
+        audioProfileId = null
+        playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.clearProfile()
         check(profile == ServerProfileReadResult.Missing)
         clearLegacyProfileMaterial()
@@ -376,11 +384,15 @@ class AppProfileOwner internal constructor(
     }
 
     private suspend fun applyServerProfile(profile: ServerProfileReadResult) {
+        val audioIdentity = if (profile is ServerProfileReadResult.Available) {
+            playerSettings.audioChoices.profileIdentity()
+        } else null
         when (profile) {
             is ServerProfileReadResult.Available -> session.connect(profile.profile)
             ServerProfileReadResult.Missing,
             ServerProfileReadResult.Unavailable -> session.disconnect()
         }
+        audioProfileId = audioIdentity
         mutableServerProfile.value = profile
     }
 }
@@ -448,7 +460,7 @@ internal fun ServerProfileReadResult.matchesLegacyProfile(legacy: LegacyServerPr
             ServerProfileAuthenticationMode.ANONYMOUS
         }
 
-private fun ServerProfileReadResult.toServerSettings(): ServerSettings = when (this) {
+internal fun ServerProfileReadResult.toServerSettings(): ServerSettings = when (this) {
     is ServerProfileReadResult.Available -> serverSettingsForEditing(
         host = host,
         htspPort = port,

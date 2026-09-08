@@ -123,7 +123,12 @@ fun adjacentChannelId(
   destination content descriptions.
 - Normal non-autoplay launches open Channels. Autoplay launches
   continue to resume the last successfully played channel, falling back to the
-  first available channel. Channels uses one channel list with a persistent
+  first available current channel if the remembered channel is absent. Enabled
+  startup autoplay takes precedence over retained cached browsing: keep the
+  startup presentation until current channel data is ready, including automatic
+  reconnect. Never expose cached browsing and then autoplay unexpectedly. Back
+  and explicit navigation cancel the one-shot request; profile replacement also
+  cancels it, and later readiness cannot revive it. Channels uses one channel list with a persistent
   programme-details pane. The playback channel shelf uses a compact horizontal
   presentation with separate focus and playing state. Player Info reuses
   the shared Content Details composition.
@@ -164,6 +169,23 @@ fun adjacentChannelId(
   focused label in a reserved line.
 - Explicit Stop remains directly reachable in its stable action-strip slot,
   outside Settings. It is never an automatic focus target.
+- Explicit live audio choices persist in app-private Preferences DataStore,
+  scoped by the configured profile identity and channel ID. Keep at most 64
+  choices across profile identities, evicting the least recently explicitly
+  selected. Resolve semantic track metadata against the current supported tracks
+  after every retune; never persist a Media3 group or track index. Missing or
+  ambiguous matches use normal audio selection without deleting the remembered
+  choice. Recording audio is not covered by this live-channel preference.
+- The app-owned random profile identity survives process death and reboot.
+  Server/account edits and profile removal replace that identity before changing
+  SDK profile storage, so an interrupted edit cannot transfer old audio choices
+  to a different account. Re-entering a configuration is a new profile identity;
+  ordinary reconnect and restart are not. No credential-derived identity is
+  read or stored for audio. Future multi-profile support must retain each
+  profile's identity rather than merge choices by endpoint or channel number.
+  A future remember toggle, language/codec preference or schema migration must
+  define precedence over these explicit per-channel choices and safe handling of
+  disabled, unknown and ambiguous entries. Those settings are not implemented.
 - Stats for nerds is a non-focusable, one-second diagnostic overlay. It may show
   playback state/timing, selected formats, decoder names, rendered/dropped frame
   counters, audio underruns, measured HTSP stream/file read rate, display output,
