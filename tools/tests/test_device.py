@@ -1706,6 +1706,47 @@ class DevicePolicyTest(unittest.TestCase):
                     ["force-stop", "at.bernhardberger.tvhplayer"],
                 )
 
+    def test_package_certificate_verifies_only_base_apk_and_cleans_up(self) -> None:
+        fingerprint = "ab" * 32
+        commands = []
+
+        def fake_run(command, **kwargs):
+            commands.append(command)
+            self.assertTrue(kwargs["capture"])
+            self.assertFalse(kwargs["announce"])
+            if "path" in command:
+                output = "package:/data/app/~~abc/pkg-123/base.apk\npackage:/data/app/~~abc/pkg-123/split.apk\n"
+            elif "pull" in command:
+                self.assertTrue(Path(command[-1]).parent.is_dir())
+                output = ""
+            else:
+                output = f"Signer #1 certificate SHA-256 digest: {fingerprint}\n"
+            return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
+
+        output = io.StringIO()
+        with (
+            patch.dict(DEVICE_GLOBALS, {"run": fake_run}),
+            patch.object(DEVICE_GLOBALS["os"], "access", return_value=True),
+            redirect_stdout(output),
+        ):
+            DEVICE["show_package_certificate"]("adb", "test-device", "at.bernhardberger.tvhplayer")
+        self.assertIn(f"certificateSha256={fingerprint}", output.getvalue())
+        self.assertEqual(commands[1][-2], "/data/app/~~abc/pkg-123/base.apk")
+        self.assertFalse(Path(commands[1][-1]).parent.exists())
+        self.assertNotIn("test-device", output.getvalue())
+
+    def test_package_certificate_rejects_missing_or_unsafe_base_apk(self) -> None:
+        for path in ("", "package:/data/user/0/pkg/base.apk\n", "package:/data/app/pkg/base.apk\npackage:/data/app/other/base.apk\n"):
+            with self.subTest(path=path):
+                run_mock = Mock(return_value=subprocess.CompletedProcess([], 0, stdout=path))
+                with (
+                    patch.dict(DEVICE_GLOBALS, {"run": run_mock}),
+                    patch.object(DEVICE_GLOBALS["os"], "access", return_value=True),
+                    self.assertRaises(SystemExit),
+                ):
+                    DEVICE["show_package_certificate"]("adb", "test-device", "at.bernhardberger.tvhplayer")
+                self.assertEqual(run_mock.call_count, 1)
+
     def test_read_only_actions_are_allowed_for_every_role(self) -> None:
         for role in ("production", "test", "unclassified"):
             for action in (
@@ -1713,6 +1754,7 @@ class DevicePolicyTest(unittest.TestCase):
                 "doctor",
                 "current",
                 "package-info",
+                "package-certificate",
                 "appliance-status",
             ):
                 with self.subTest(role=role, action=action):

@@ -18,7 +18,9 @@ Publication and production-device mutation still require explicit owner approval
 `0.1.3` (`versionCode` 4) consolidates the live and recording player overlays.
 Version `0.1.4` (`versionCode` 5) adds the Shield HDMI-CEC channel-key
 compatibility fix. Version `0.2.0` (`versionCode` 6) consolidates the player
-polish, channel/Guide/recording fixes and published SDK 0.10.0 adoption.
+polish and channel/Guide/recording fixes using SDK 0.9.1. Its unsigned bundle
+remains historical. Version `0.2.1` (`versionCode` 7) is the subsequent acceptance
+candidate with published SDK 0.10.0 / HTSP 0.9.0 and segment-safe previews.
 None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.
@@ -72,7 +74,7 @@ commands are:
 ```bash
 ./tools/release prepare
 ./tools/release sign
-./tools/release verify-signed build/release/signed/0.2.0
+./tools/release verify-signed build/release/signed/0.2.1
 ```
 
 `prepare` resolves the byte-pinned SDK 0.10.0 artifacts and source classifiers
@@ -115,7 +117,7 @@ Run the signing tool from a trusted, reviewed checkout on LXC 117, not from file
 inside the incoming bundle. Identify the incoming bundle and protected keystore:
 
 ```bash
-./tools/sign-release /path/to/incoming/0.2.0 /secure/path/release.jks
+./tools/sign-release /path/to/incoming/0.2.1 /secure/path/release.jks
 ```
 
 The tool uses `umask 077` and verifies incoming checksums, manifest identity,
@@ -143,6 +145,9 @@ never release artifacts.
 ## Test deployment
 
 Read `docs/device-targets.md` and load the `android-tv-device-testing` workflow.
+Use `./tools/device --target g10 package-info` and `package-certificate` before
+staging to compare installed version and verified APK certificate. The latter
+temporarily retrieves only the installed base APK, never app-private data.
 Run `./tools/device doctor` before every mutation and proceed only when the live
 identity is an explicitly indexed test target. A release-signed APK
 cannot update a debug-signed installation; uninstalling the debug package erases
@@ -167,7 +172,7 @@ through the bounded wrapper:
 
 ```bash
 ./tools/device --target g08 install-release \
-  --bundle build/release/signed/0.2.0 \
+  --bundle build/release/signed/0.2.1 \
   --confirm-release-install
 ```
 

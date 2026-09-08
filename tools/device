@@ -660,6 +660,37 @@ def show_thread_load(adb: str, serial: str, package_name: str, window_seconds: f
         print(f"thread tid={tid} cpu={cpu:.0f}% name={name}")
 
 
+def show_package_certificate(adb: str, serial: str, package_name: str) -> None:
+    android_home = Path(os.environ.get("ANDROID_HOME", "/opt/android-sdk"))
+    signer = next(
+        (android_home / "build-tools" / version / "apksigner"
+         for version in ("36.0.0", "35.0.0")
+         if os.access(android_home / "build-tools" / version / "apksigner", os.X_OK)),
+        None,
+    )
+    if signer is None:
+        fail("apksigner is required to inspect the installed certificate")
+    result = run(adb_command(adb, serial, "shell", "pm", "path", package_name),
+                 capture=True, announce=False)
+    paths = [line.removeprefix("package:").strip() for line in result.stdout.splitlines()
+             if line.startswith("package:")]
+    bases = [path for path in paths if re.fullmatch(r"/data/app/[A-Za-z0-9_./=+~-]+/base\.apk", path)]
+    if len(bases) != 1:
+        fail("expected exactly one installed base APK")
+    with tempfile.TemporaryDirectory(prefix="tvhplayer-certificate-") as directory:
+        apk = Path(directory) / "base.apk"
+        run(adb_command(adb, serial, "pull", bases[0], str(apk)),
+            capture=True, announce=False)
+        report = run([str(signer), "verify", "--print-certs", str(apk)],
+                     capture=True, announce=False)
+        fingerprints = re.findall(r"^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]{64})$",
+                                  report.stdout, re.MULTILINE)
+        if len(fingerprints) != 1:
+            fail("expected exactly one verified APK signer")
+        print(f"package={package_name}")
+        print(f"certificateSha256={fingerprints[0].lower()}")
+
+
 def show_package_info(adb: str, serial: str, package_name: str) -> None:
     result = run(
         adb_command(adb, serial, "shell", "dumpsys", "package", package_name),
@@ -1341,6 +1372,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Sampling window (default: {DEFAULT_VIDEO_FRAME_WINDOW_SECONDS:g} s)",
     )
     subparsers.add_parser("package-info", help="Show bounded package metadata")
+    subparsers.add_parser("package-certificate", help="Verify the installed base APK signing certificate")
     subparsers.add_parser(
         "appliance-status",
         help="Show bounded accessibility binding and TCL auto-start state",
@@ -1695,6 +1727,10 @@ def main() -> int:
 
     if args.action == "thread-load":
         show_thread_load(adb, serial, package_name, args.window_seconds)
+        return 0
+
+    if args.action == "package-certificate":
+        show_package_certificate(adb, serial, package_name)
         return 0
 
     if args.action == "package-info":
