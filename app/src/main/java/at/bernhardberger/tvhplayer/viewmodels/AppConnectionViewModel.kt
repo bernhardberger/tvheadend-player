@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,10 +44,16 @@ class AppConnectionViewModel(
 
     val currentChannelReadiness: StateFlow<CurrentChannelReadiness> = session.observation.map {
             observation ->
+        Triple(
+            observation.sessionState is SessionState.Ready,
+            observation.channelCatalogAuthority,
+            observation.channelCatalogForDisplay?.channels.orEmpty(),
+        )
+    }.distinctUntilChanged().map { (connected, authority, channels) ->
         deriveCurrentChannelReadiness(
-            connected = observation.sessionState is SessionState.Ready,
-            authority = observation.channelCatalogAuthority,
-            channels = observation.channelCatalogForDisplay?.channels.orEmpty(),
+            connected = connected,
+            authority = authority,
+            channels = channels,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, CurrentChannelReadiness.Waiting)
 

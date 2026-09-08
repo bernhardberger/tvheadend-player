@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -47,11 +48,14 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
+import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
@@ -140,6 +144,7 @@ internal fun RecordingsScreenContent(
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val currentSession = observation.currentSession
+    val latestSession by rememberUpdatedState(currentSession)
     val entries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
     val channels = observation.channelCatalogForDisplay?.channels.orEmpty()
     val channelsById = remember(channels) { channels.associateBy { it.id } }
@@ -148,6 +153,7 @@ internal fun RecordingsScreenContent(
     val scope = rememberCoroutineScope()
     val screenState = state ?: remember { RecordingsScreenState() }
     val contentFocus = remember { FocusRequester() }
+    val modeFocus = remember { FocusRequester() }
     val folderPreviewFocus = remember { FocusRequester() }
     val selectedKeys = screenState.selectedKeys
     val archiveScrollPositions = screenState.archiveScrollPositions
@@ -156,11 +162,13 @@ internal fun RecordingsScreenContent(
     var requestContentFocus by remember { mutableStateOf(true) }
     var contentHasFocus by remember { mutableStateOf(false) }
     var contentFocusOwned by remember { mutableStateOf(false) }
+    var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
     var folderPreviewFocused by remember { mutableStateOf(false) }
     var folderPreviewRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
     var detailsOpenedFromFolderPreview by remember { mutableStateOf(false) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
+    var detailsGeneration by remember { mutableIntStateOf(0) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var detailsInitialAction by remember {
         mutableStateOf<RecordingDetailsAction?>(null)
@@ -191,6 +199,8 @@ internal fun RecordingsScreenContent(
             .flatMap { problemGroups[it].orEmpty() }
             .map { "recording:${recordingItemKey(it.id)}" }
     }
+    val retryAvailable = entries.isEmpty() &&
+        connectionUiState.primaryRecoveryAction() == ConnectionRecoveryAction.RETRY
     val selectedArchiveItem = archiveItems.firstOrNull { it.key == selectedKeys[location] }
     val selectedRecording = when (mode) {
         DvrLibraryMode.ARCHIVE ->
@@ -209,12 +219,15 @@ internal fun RecordingsScreenContent(
         selectedKeys[location],
         requestContentFocus,
         initialFocusEnabled,
+        retryAvailable,
     ) {
-        if (itemKeys.isEmpty()) {
-            requestContentFocus = false
+        if (itemKeys.isEmpty() && !retryAvailable) {
+            if (!initialFocusEnabled || !requestContentFocus) return@LaunchedEffect
+            withFrameNanos { }
+            if (modeFocus.requestFocus()) requestContentFocus = false
             return@LaunchedEffect
         }
-        if (selectedKeys[location] !in itemKeys) {
+        if (itemKeys.isNotEmpty() && selectedKeys[location] !in itemKeys) {
             selectedKeys[location] = itemKeys.first()
             archiveScrollPositions[location] = 0
             focusRecoveryGeneration++
@@ -249,7 +262,10 @@ internal fun RecordingsScreenContent(
             withFrameNanos { }
             val restored = runCatching {
                 when (target) {
-                    RecordingDetailsReturnTarget.CONTENT -> contentFocus.requestFocus()
+                    RecordingDetailsReturnTarget.CONTENT -> {
+                        if (itemKeys.isEmpty() && !retryAvailable) modeFocus.requestFocus()
+                        else contentFocus.requestFocus()
+                    }
                     RecordingDetailsReturnTarget.FOLDER_PREVIEW -> {
                         folderPreviewFocused = true
                         folderPreviewFocus.requestFocus()
@@ -282,12 +298,22 @@ internal fun RecordingsScreenContent(
             .fillMaxSize()
             .semantics { if (detailsEntry != null) hideFromAccessibility() }
             .onPreviewKeyEvent { event ->
+                if (event.key == relocatingKey) {
+                    if (event.type == KeyEventType.KeyUp) relocatingKey = null
+                    return@onPreviewKeyEvent true
+                }
                 if (
                     event.type == KeyEventType.KeyDown &&
                     event.key == Key.DirectionUp &&
-                    contentHasFocus
+                    contentHasFocus &&
+                    selectedKeys[location] == itemKeys.firstOrNull()
                 ) {
-                    contentFocusOwned = false
+                    relocatingKey = event.key
+                    if (modeFocus.requestFocus()) {
+                        contentFocusOwned = false
+                        requestContentFocus = false
+                    }
+                    return@onPreviewKeyEvent true
                 }
                 false
             }
@@ -311,6 +337,7 @@ internal fun RecordingsScreenContent(
         ) {
             RecordingModeTabs(
                 selected = mode,
+                selectedFocus = modeFocus,
                 onFocused = {
                     if (mode != it) {
                         contentFocusOwned = false
@@ -350,6 +377,8 @@ internal fun RecordingsScreenContent(
             RecordingsEmptyState(
                 connectionUiState = connectionUiState,
                 onRetry = onRetry,
+                retryFocus = contentFocus,
+                upFocus = modeFocus,
                 modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
         } else {
@@ -402,6 +431,7 @@ internal fun RecordingsScreenContent(
                                     detailsOpenedFromFolderPreview = false
                                     detailsInitialAction = null
                                     detailsEntry = it
+                                    detailsGeneration++
                                     detailsObservation = observation
                                     actionResult = null
                                 },
@@ -441,6 +471,7 @@ internal fun RecordingsScreenContent(
                                     detailsOpenedFromFolderPreview = true
                                     detailsInitialAction = null
                                     detailsEntry = it
+                                    detailsGeneration++
                                     detailsObservation = observation
                                     actionResult = null
                                 },
@@ -477,6 +508,7 @@ internal fun RecordingsScreenContent(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
+                                detailsGeneration++
                                 detailsObservation = observation
                                 actionResult = null
                             },
@@ -515,6 +547,7 @@ internal fun RecordingsScreenContent(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
+                                detailsGeneration++
                                 detailsObservation = observation
                                 actionResult = null
                             },
@@ -536,15 +569,30 @@ internal fun RecordingsScreenContent(
         }
     }
 
-    val opened = detailsEntry
+    // Refresh metadata only within the opening session. Never substitute a colliding ID
+    // from a later session, including while a captured confirmation is pending.
+    val selectedCapability = detailsObservation?.currentSession
+        ?.takeIf { observation.currentSession === it }
+    val opened = detailsEntry?.let { entry ->
+        if (selectedCapability != null && observation.dvrState is DvrRepositoryState.Current) {
+            observation.dvrEntry(entry.id)
+        } else entry
+    }
+    LaunchedEffect(detailsEntry, opened) {
+        if (detailsEntry != null && opened == null) {
+            pendingAction = null
+            pendingMutation = null
+            detailsEntry = null
+            detailsObservation = null
+            detailsInitialAction = null
+            actionResult = null
+            pendingDetailsReturn = RecordingDetailsReturnTarget.CONTENT
+        }
+    }
     if (opened != null && pendingAction == null) {
-        val selectedObservation = detailsObservation ?: observation
-        val authoritative = selectedObservation.dvrEntry(opened.id) ?: opened
-        val selectedCapability = selectedObservation.currentSession
-            ?.takeIf { observation.currentSession === it }
         RecordingDetailsPanel(
             contentPadding = contentPadding,
-            entry = authoritative,
+            entry = opened,
             actionResult = actionResult,
             canModifyRecordings = selectedCapability != null,
             playbackEligible = selectedCapability != null,
@@ -558,7 +606,7 @@ internal fun RecordingsScreenContent(
                     actionResult = null
                     requestContentFocus = true
                     onPlayRecording(
-                        RecordingPlaybackSelection(capability, authoritative.id),
+                        RecordingPlaybackSelection(capability, opened.id),
                         intent,
                     )
                 }
@@ -566,14 +614,14 @@ internal fun RecordingsScreenContent(
             onCancel = {
                 detailsInitialAction = RecordingDetailsAction.CANCEL
                 pendingMutation = selectedCapability?.let { capability ->
-                    DvrMutationAction.Cancel(capability, authoritative.id)
+                    DvrMutationAction.Cancel(capability, opened.id)
                 }
                 pendingAction = PendingRecordingAction.CANCEL
             },
             onDelete = {
                 detailsInitialAction = RecordingDetailsAction.DELETE
                 pendingMutation = selectedCapability?.let { capability ->
-                    DvrMutationAction.Delete(capability, authoritative.id)
+                    DvrMutationAction.Delete(capability, opened.id)
                 }
                 pendingAction = PendingRecordingAction.DELETE
             },
@@ -602,7 +650,7 @@ internal fun RecordingsScreenContent(
     }
 
     val action = pendingAction
-    val target = detailsEntry
+    val target = opened
     if (action != null && target != null) {
         RecordingConfirmationDialog(
             action = action,
@@ -616,8 +664,18 @@ internal fun RecordingsScreenContent(
                 pendingAction = null
                 val mutation = pendingMutation
                 pendingMutation = null
+                val mutationEntry = detailsEntry
+                val mutationObservation = detailsObservation
+                val mutationGeneration = detailsGeneration
                 scope.launch {
-                    actionResult = dvrMutationActions.execute(mutation)
+                    val result = dvrMutationActions.execute(mutation)
+                    if (
+                        detailsGeneration == mutationGeneration &&
+                        detailsEntry === mutationEntry && detailsObservation === mutationObservation &&
+                        latestSession != null && mutationObservation?.currentSession === latestSession
+                    ) {
+                        actionResult = result
+                    }
                 }
             },
         )

@@ -70,6 +70,36 @@ internal fun shouldWaitForGuideCoverage(
     coverageSettled: Boolean,
 ): Boolean = connectionReady && acquisitionPending && (!hasCurrentSnapshot || !coverageSettled)
 
+internal enum class GuidePendingNavigationAction { WAIT, RESTORE_ORIGIN, HEADER, MOVE }
+
+/** Cancels navigation intent, never grants coverage to an unknown destination. */
+internal fun guidePendingNavigationAction(
+    direction: EpgFocusDirection,
+    frontierDirection: Int?,
+    channelDirection: Int?,
+    windowPending: Boolean,
+    originPending: Boolean,
+): GuidePendingNavigationAction {
+    if (frontierDirection == null && channelDirection == null && !windowPending && !originPending) {
+        return GuidePendingNavigationAction.MOVE
+    }
+    if (frontierDirection != null && (
+        direction == EpgFocusDirection.LEFT && frontierDirection > 0 ||
+            direction == EpgFocusDirection.RIGHT && frontierDirection < 0
+        )
+    ) return GuidePendingNavigationAction.RESTORE_ORIGIN
+    if (channelDirection != null && (
+        direction == EpgFocusDirection.UP && channelDirection > 0 ||
+            direction == EpgFocusDirection.DOWN && channelDirection < 0
+        )
+    ) return GuidePendingNavigationAction.MOVE
+    return if (direction == EpgFocusDirection.UP) {
+        GuidePendingNavigationAction.HEADER
+    } else {
+        GuidePendingNavigationAction.WAIT
+    }
+}
+
 internal fun firstUnsettledGuidePageIndex(
     currentChannelIndex: Int,
     targetChannelIndex: Int,

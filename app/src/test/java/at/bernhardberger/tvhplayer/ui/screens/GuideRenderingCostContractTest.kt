@@ -192,6 +192,37 @@ class GuideRenderingCostContractTest {
     }
 
     @Test
+    fun explicitGuideEntryRetainsOwnershipUntilAnOffscreenTargetIsComposed() {
+        val entry = screenSource.section("fun focusGuideContent()", "fun leaveGuideScope()")
+        assertTrue(entry.contains("hasProgrammeTarget = selectedTarget != null"))
+        val programmeBranch = entry.section(
+            "GuideEntryFocusTarget.PROGRAMME ->", "GuideEntryFocusTarget.RETRY ->",
+        )
+        assertTrue(programmeBranch.contains("programmeFocus?.requestFocus()"))
+        assertFalse(programmeBranch.contains("focusGuideHeader()"))
+        val scopeEntry = screenSource.section("fun leaveGuideScope()", "fun ")
+        assertTrue(scopeEntry.contains("hasProgrammeTarget = selectedTarget != null"))
+        val ownership = screenSource.section("val mayFocusProgramme", "fun focusGuideHeader()")
+        assertTrue(ownership.contains("programmeFocusOwned"))
+        assertFalse(ownership.contains("scopeRowFocused"))
+        assertTrue(screenSource.contains("onSelectTag = {\n                        releaseProgrammeFocus()"))
+    }
+
+    @Test
+    fun invalidatedGuideConfirmationClearsPendingFocusBlockers() {
+        val invalidation = screenSource.section(
+            "LaunchedEffect(confirmationAction, confirmationMutation, configChoices, currentSession)",
+            "if (\n            confirmationAction != null",
+        )
+        assertTrue(invalidation.contains("confirmationAction != null && confirmationMutation == null"))
+        assertTrue(invalidation.contains("detailsObservation?.currentSession !== currentSession"))
+        for (state in listOf("pendingAction", "pendingMutation", "pendingRecordingTarget", "configChoices")) {
+            assertTrue(invalidation.contains("$state = null"))
+        }
+        assertTrue(invalidation.contains("actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE"))
+    }
+
+    @Test
     fun guideClockUpdatesAreReadThroughAConsumerProvider() {
         val guide = screenSource.section(
             "fun EpgGridScreen(",

@@ -15,6 +15,38 @@ import kotlin.time.Instant
 
 class GuideWindowPolicyTest {
     @Test
+    fun frontierReverseRestoresOriginWithoutWaitingForCoverageTimeout() {
+        assertEquals(GuidePendingNavigationAction.RESTORE_ORIGIN,
+            guidePendingNavigationAction(EpgFocusDirection.LEFT, 1, null, false, false))
+        assertEquals(GuidePendingNavigationAction.RESTORE_ORIGIN,
+            guidePendingNavigationAction(EpgFocusDirection.RIGHT, -1, null, false, false))
+        assertEquals(GuidePendingNavigationAction.WAIT,
+            guidePendingNavigationAction(EpgFocusDirection.RIGHT, 1, null, false, false))
+    }
+
+    @Test
+    fun pendingTimeNavigationAlwaysAllowsSafeHeaderEscape() {
+        assertEquals(GuidePendingNavigationAction.HEADER,
+            guidePendingNavigationAction(EpgFocusDirection.UP, 1, null, false, false))
+        assertEquals(GuidePendingNavigationAction.HEADER,
+            guidePendingNavigationAction(EpgFocusDirection.UP, null, null, true, false))
+        assertEquals(GuidePendingNavigationAction.HEADER,
+            guidePendingNavigationAction(EpgFocusDirection.UP, null, null, false, true))
+    }
+
+    @Test
+    fun channelReverseRerunsCoverageGatedMovementRatherThanSelectingUnknownDestination() {
+        assertEquals(GuidePendingNavigationAction.MOVE,
+            guidePendingNavigationAction(EpgFocusDirection.UP, null, 1, false, false))
+        assertEquals(GuidePendingNavigationAction.MOVE,
+            guidePendingNavigationAction(EpgFocusDirection.DOWN, null, -1, false, false))
+        assertEquals(GuidePendingNavigationAction.WAIT,
+            guidePendingNavigationAction(EpgFocusDirection.DOWN, null, 1, false, false))
+        assertEquals(GuidePendingNavigationAction.WAIT,
+            guidePendingNavigationAction(EpgFocusDirection.RIGHT, null, null, true, false))
+    }
+
+    @Test
     fun appSelectsSevenDaySdkCoveragePolicy() {
         assertEquals(7.days, GUIDE_EPG_COVERAGE_POLICY.futureHorizon)
     }
@@ -309,6 +341,63 @@ class GuideWindowPolicyTest {
                 connectionReady = true,
                 hasCurrentSnapshot = true,
                 acquisitionPending = false,
+            ),
+        )
+    }
+
+    @Test
+    fun missingChannelOriginRecoveryCannotSelectCachedProgrammeBeyondPendingPage() {
+        val ids = (1L..18L).map(::ChannelId)
+        val through = Instant.fromEpochSeconds(10_800L)
+        val rows = ids.mapIndexed { index, id ->
+            EpgFocusColumn(id, if (index == 12) {
+                listOf(event(130, id.value, 7_200L, 10_800L, "Beyond pending page"))
+            } else emptyList())
+        }
+        val pendingPage = ids.subList(6, 12).toSet()
+        val partialCoverage = ids.map { id ->
+            EpgCoverage.create(
+                channelId = id,
+                coveredFrom = Instant.fromEpochSeconds(0L),
+                coveredTo = if (id in pendingPage) Instant.fromEpochSeconds(7_200L) else through,
+            )
+        }
+        // The origin event is gone. Unrestricted reconciliation would cross the pending page.
+        assertEquals(EpgFocusTarget(12, EventId(130)), reconcileTimelineEpgFocus(
+            rows = rows, current = EpgFocusTarget(0, EventId(10)),
+            preferredChannelIndex = 0, targetSec = 7_200L,
+        ))
+        for (acquisitionPending in listOf(true, false)) {
+            assertEquals(
+                if (acquisitionPending) GuideCoverageFocusResolution.Wait
+                else GuideCoverageFocusResolution.Release,
+                resolveGuideWindowFocus(
+                    rows = rows, preferredChannelId = ids[6], targetSec = 7_200L,
+                    requestedChannelIds = pendingPage, coverages = partialCoverage,
+                    requestedThrough = through, connectionReady = true,
+                    hasCurrentSnapshot = true, acquisitionPending = acquisitionPending,
+                ),
+            )
+        }
+        val settled = ids.map { id -> EpgCoverage.create(
+            channelId = id, coveredFrom = Instant.fromEpochSeconds(0L), coveredTo = through,
+        ) }
+        assertEquals(GuideCoverageFocusResolution.Release, resolveGuideWindowFocus(
+            rows = rows, preferredChannelId = ids[6], targetSec = 7_200L,
+            requestedChannelIds = pendingPage, coverages = settled,
+            requestedThrough = through, connectionReady = true,
+            hasCurrentSnapshot = true, acquisitionPending = false,
+        ))
+        val coveredEvent = event(70, ids[6].value, 7_200L, 10_800L, "Covered recovery")
+        assertEquals(GuideCoverageFocusResolution.Select(EpgFocusTarget(6, coveredEvent.id)),
+            resolveGuideWindowFocus(
+                rows = rows.mapIndexed { index, row ->
+                    if (index == 6) row.copy(events = listOf(coveredEvent)) else row
+                },
+                preferredChannelId = ids[6], targetSec = 7_200L,
+                requestedChannelIds = pendingPage, coverages = settled,
+                requestedThrough = through, connectionReady = true,
+                hasCurrentSnapshot = true, acquisitionPending = false,
             ),
         )
     }

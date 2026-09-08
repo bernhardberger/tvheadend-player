@@ -318,7 +318,7 @@ internal fun RecordingDetailsPanel(
                             canDelete -> deleteFocus
                             else -> FocusRequester.Cancel
                         }
-                        up = primaryFocus
+                        up = if (canPlay) primaryFocus else FocusRequester.Cancel
                         down = FocusRequester.Cancel
                     }
                     .testTag("recording-details-close"),

@@ -20,6 +20,7 @@ import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -36,11 +37,11 @@ class ChannelsViewModel(
     val observation: StateFlow<SessionObservation> = session.observation
 
     val scope: StateFlow<ChannelScopeState> = combine(
-        session.observation,
+        session.observation.map { it.channelState }.distinctUntilChanged(),
         tagSettings.activeTagId,
         tagSettings.scopeVisibility,
-    ) { observation, activeTagId, visibility ->
-        resolveChannelScopeState(observation.channelState, activeTagId, visibility)
+    ) { channelState, activeTagId, visibility ->
+        resolveChannelScopeState(channelState, activeTagId, visibility)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,

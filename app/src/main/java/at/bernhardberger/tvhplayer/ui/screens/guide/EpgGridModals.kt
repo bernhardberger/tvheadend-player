@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -358,7 +359,6 @@ internal fun ProgrammeDetailsPanel(
     onClose: () -> Unit,
 ) {
     val nowSec = nowSecProvider()
-    val initialFocus = remember { FocusRequester() }
     val actions = programmeActions(
         event,
         nowSec,
@@ -367,7 +367,20 @@ internal fun ProgrammeDetailsPanel(
         serverTimeshiftCoversEvent = false,
         canModifyRecordings = canModifyRecordings,
     )
-    LaunchedEffect(event.id, actions) { initialFocus.requestFocus() }
+    val actionFocus = remember { ProgrammeAction.entries.associateWith { FocusRequester() } }
+    val closeFocus = remember { FocusRequester() }
+    var focusedAction by remember(event.id) { mutableStateOf(actions.firstOrNull()) }
+    // Capture before apply can automatically move focus from a removed action to Close.
+    val removedFocusTarget = if (focusedAction != null && focusedAction !in actions) {
+        actions.firstOrNull()?.let(actionFocus::get) ?: closeFocus
+    } else null
+    LaunchedEffect(event.id) {
+        (focusedAction?.let(actionFocus::get) ?: closeFocus).requestFocus()
+    }
+    LaunchedEffect(actions) {
+        // A surviving action (including Close) retains ownership during DVR publication.
+        removedFocusTarget?.requestFocus()
+    }
     val subtitle = buildString {
         append(channel?.name.orEmpty())
         if (isNotEmpty()) append(" • ")
@@ -441,25 +454,21 @@ internal fun ProgrammeDetailsPanel(
                 }
             },
             actions = {
-                actions.forEachIndexed { index, action ->
-                    Button(
-                        onClick = { onAction(action) },
-                        modifier = if (index == 0) {
-                            Modifier.focusRequester(initialFocus)
-                        } else {
-                            Modifier
-                        },
-                    ) {
-                        Text(programmeActionLabel(action))
+                actions.forEach { action ->
+                    key(action) {
+                        Button(
+                            onClick = { onAction(action) },
+                            modifier = Modifier.focusRequester(actionFocus.getValue(action))
+                                .onFocusChanged { if (it.isFocused) focusedAction = action },
+                        ) {
+                            Text(programmeActionLabel(action))
+                        }
                     }
                 }
                 OutlinedButton(
                     onClick = onClose,
-                    modifier = if (actions.isEmpty()) {
-                        Modifier.focusRequester(initialFocus)
-                    } else {
-                        Modifier
-                    },
+                    modifier = Modifier.focusRequester(closeFocus)
+                        .onFocusChanged { if (it.isFocused) focusedAction = null },
                 ) {
                     Text(stringResource(R.string.close))
                 }

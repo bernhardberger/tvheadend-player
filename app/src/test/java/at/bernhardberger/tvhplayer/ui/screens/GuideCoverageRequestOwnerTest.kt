@@ -2,6 +2,9 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -13,6 +16,30 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GuideCoverageRequestOwnerTest {
+    @Test
+    fun cancelledNavigationReleasesBeforeTimeoutAndLateCompletionCannotSettleReplacement() = runTest {
+        val owner = GuideCoverageRequestOwner(backgroundScope, timeoutMillis = 10_000L)
+        val lateCompletion = CompletableDeferred<Unit>()
+        val channelId = ChannelId(7)
+        val abandoned = owner.request(listOf(channelId), windowStartSec = 100L) {
+            withContext(NonCancellable) { lateCompletion.await() }
+        }
+        runCurrent()
+        owner.cancel(abandoned)
+        assertFalse(owner.isPending(abandoned))
+        val replacement = owner.request(listOf(channelId), windowStartSec = 200L) {
+            awaitCancellation()
+        }
+        runCurrent()
+        lateCompletion.complete(Unit)
+        runCurrent()
+
+        assertEquals(0L, testScheduler.currentTime)
+        assertFalse(owner.isPending(abandoned))
+        assertTrue(owner.isPending(replacement))
+        owner.dispose()
+    }
+
     @Test
     fun stalledAcquisitionTimesOutBeforeRetryStarts() = runTest {
         var starts = 0
