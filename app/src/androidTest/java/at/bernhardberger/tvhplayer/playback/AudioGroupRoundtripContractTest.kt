@@ -53,9 +53,9 @@ class AudioGroupRoundtripContractTest {
                 .apply { isAccessible = true }.invoke(period)
         }
     } catch (error: ReflectiveOperationException) {
-        throw AssertionError("SDK 0.10.1 internal-symbol probe needs maintenance; this is not a track-selection verdict", error)
+        throw AssertionError("SDK 0.11.0 internal-symbol probe needs maintenance; this is not a track-selection verdict", error)
     } catch (error: NoSuchElementException) {
-        throw AssertionError("SDK 0.10.1 internal-symbol probe needs maintenance; constructor/method lookup changed", error)
+        throw AssertionError("SDK 0.11.0 internal-symbol probe needs maintenance; constructor/method lookup changed", error)
     }
 
     private fun select(period: MediaPeriod, group: TrackGroup) {

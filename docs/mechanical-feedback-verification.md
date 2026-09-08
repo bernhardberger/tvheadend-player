@@ -1,8 +1,9 @@
 # Mechanical Player feedback verification
 
-This product-specific slice retains the P35 programme timeline and public
-SDK 0.10.1 / HTSP 0.9.0. Version 0.2.5 (code 11) is a debug acceptance build,
-not a public release or physical-TV acceptance result.
+This product-specific slice retains the P35 programme timeline. Its mechanical
+corrections were delivered as 0.2.5 (code 11) with SDK 0.10.1 / HTSP 0.9.0.
+Version 0.2.6 (code 12) retains them and adopts public SDK 0.11.0 / HTSP 0.10.0.
+These are debug acceptance builds, not public releases or physical-TV acceptance.
 
 ## Demonstrated corrections
 
@@ -55,6 +56,28 @@ valid numeric target. The observed intermittent physical failure remains
 unattributed: these fixtures do not reproduce remote timing, live catalog changes
 or real playback failure. No numeric lookup, lifecycle, audio or autoplay behavior
 was changed to guess at those causes.
+
+## Published dependency adoption
+
+The same-outcome consumer correction adopts SDK 0.11.0 from source
+`80a1433302e3624b41eb57d52781b93a9812e5c9` and transitive HTSP 0.10.0 from
+`a32af6157a3c29fe6e54fa732eb32927664dbea9`. The public SDK release manifest has
+SHA-256 `efe88f3ccb5d514f61bf0843022f2a2a208d8345987e24340898c77cdf842570`.
+The native checker pins its exact source classifiers. SDK Media3 AAR, decoder
+payloads and FFmpeg corresponding-source bytes are unchanged from 0.10.1.
+
+The app is recompiled for the queue constructor/copy ABI changes. It does not
+consume `errorCount` or introduce a diagnostics UI; absent counts are not
+converted to zero or conflated with frame/client drops. Producer wire, nullable
+unsigned-count, signature and publication evidence is reused, not reimplemented.
+Actual app dependency-graph, build and affected offline checks remain required.
+The installed 0.2.5 artifact is retained rather than relabelled or overwritten.
+
+The recompiled app passed its exact public dependency-graph check and focused
+timeline JVM tests. Offline consumer checks passed: diagnostics 4/4, numeric
+A-B-A 6/6 and command consistency 3/3. The diagnostics test's existing ambiguous
+single-node assertions were corrected to require both displayed Source labels
+and both equal signal measurements; no production diagnostics UI changed.
 
 ## Evidence
 

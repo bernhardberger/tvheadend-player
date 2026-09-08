@@ -16,9 +16,11 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.geometry.Rect
@@ -71,11 +73,17 @@ class PlaybackStatsOverlayTest {
         composeRule.onNodeWithText("Playback").assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading),
         )
-        composeRule.onNodeWithText("Source").assertIsDisplayed()
+        composeRule.onAllNodesWithText("Source").assertCountEquals(2).also { nodes ->
+            nodes[0].assertIsDisplayed()
+            nodes[1].assertIsDisplayed()
+        }
         composeRule.onNodeWithText("Tuner").assertIsDisplayed()
         composeRule.onNodeWithText("TVHeadend queue").assertIsDisplayed()
         composeRule.onNodeWithText("DVB-T Adapter", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithText("75.0%", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("75.0%", substring = true).assertCountEquals(2).also { nodes ->
+            nodes[0].assertIsDisplayed()
+            nodes[1].assertIsDisplayed()
+        }
         composeRule.onNodeWithText("250.0 ms").assertIsDisplayed()
         composeRule.onNodeWithText("admin:secret", substring = true).assertDoesNotExist()
         composeRule.onNodeWithTag("playback-stats-overlay")

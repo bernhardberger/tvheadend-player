@@ -25,8 +25,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.2.5"
+        versionCode = 12
+        versionName = "0.2.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROGRAMME_WINDOW_B", providers.gradleProperty("player.programmeWindowB").orElse("true").map { it.toBooleanStrict().toString() }.get())
@@ -251,7 +251,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "Staged SDK substitution is active (-Ptvheadend.sdk.local=true), so this build cannot " +
                 "prove public SDK consumption. Publish the SDK release and re-run without the flag."
         }
-        check(sdkVersion == "0.10.1") { "Expected public SDK 0.10.1 but found $sdkVersion" }
+        check(sdkVersion == "0.11.0") { "Expected public SDK 0.11.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             "implementation:sdk-android:$sdkVersion",
             "implementation:sdk-media3:$sdkVersion",
@@ -279,7 +279,7 @@ tasks.register("verifyExternalSdkConsumption") {
         }
 
         val expectedTvheadendModules = mapOf(
-            "htsp" to "0.9.0",
+            "htsp" to "0.10.0",
             "sdk-android" to sdkVersion,
             "sdk-core" to sdkVersion,
             "sdk-media3" to sdkVersion,
