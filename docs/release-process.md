@@ -21,6 +21,8 @@ compatibility fix. Version `0.2.0` (`versionCode` 6) consolidates the player
 polish and channel/Guide/recording fixes using SDK 0.9.1. Its unsigned bundle
 remains historical. Version `0.2.1` (`versionCode` 7) is the subsequent acceptance
 candidate with published SDK 0.10.0 / HTSP 0.9.0 and segment-safe previews.
+Version `0.2.2` (`versionCode` 8) packages the bounded G10 field corrections
+for debug acceptance, retaining SDK 0.10.0 / HTSP 0.9.0.
 None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.
