@@ -6,14 +6,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.background
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.alpha
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.ui.Alignment
@@ -49,7 +45,6 @@ import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import coil3.ImageLoader
 
 @Composable
@@ -181,25 +176,7 @@ fun OverlayControlsTv(
             if (programmeWindow?.targetAvailable == false) stringResource(R.string.timeshift_target_expired)
             else programmeWindow?.event?.title
         } else null
-        if (timeshiftState.available || atLive != null || previewFeedback != null) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(TvOverlayActionButtonSize)
-                    .testTag("player-timeline-status"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (previewFeedback != null) {
-                    val errorFeedback = timeshiftFeedback != null || programmeWindow?.targetAvailable == false
-                    Text(previewFeedback,
-                        modifier = Modifier.weight(1f).padding(end = 24.dp)
-                            .then(if (errorFeedback) Modifier.background(MaterialTheme.colorScheme.errorContainer,
-                                MaterialTheme.shapes.small).padding(horizontal = 8.dp) else Modifier)
-                            .testTag("player-window-title"),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (errorFeedback) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                } else Spacer(Modifier.weight(1f))
+        val statusAction: @Composable () -> Unit = {
                 if (atLive == true) {
                     Text(stringResource(R.string.timeshift_live),
                         style = MaterialTheme.typography.labelLarge,
@@ -247,11 +224,6 @@ fun OverlayControlsTv(
                             },
                     ) { Text(stringResource(R.string.timeshift_go_live), maxLines = 1) }
                 }
-            }
-        }
-        if (timeshiftState.available) {
-            // Keep status and preview targets anchored even before a seek starts.
-            Spacer(Modifier.height(with(LocalDensity.current) { MaterialTheme.typography.titleMedium.lineHeight.toDp() }))
         }
         if (timeshiftState.available) {
             PlaybackSeekbar(
@@ -259,7 +231,8 @@ fun OverlayControlsTv(
                 timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
                 programmeWindow = programmeWindow,
                 previewing = previewing,
-                showFeedback = false,
+                reserveStatusSpace = true,
+                statusAction = statusAction,
                 feedback = timeshiftFeedback ?: if (previewing && programmeWindow?.targetAvailable == false) {
                     stringResource(R.string.timeshift_target_expired)
                 } else null,
@@ -292,25 +265,28 @@ fun OverlayControlsTv(
                         }
                     },
             )
-        }
-        if (!timeshiftState.available) {
+        } else {
             // Schedule elapsed time is informational, never a playback coordinate or seek grant.
-            nowEvent?.takeIf {
+            val event = nowEvent?.takeIf {
                 it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds
-            }?.let { event ->
-                val start = event.start.epochSeconds
-                val end = event.stop.epochSeconds
-                val description = stringResource(R.string.player_current_broadcast)
-                ProgressStrip(
-                    progress = ((nowSec - start).toDouble() / (end - start)).toFloat(),
-                    modifier = Modifier.fillMaxWidth().testTag("player-schedule-progress")
-                        .semantics { contentDescription = description },
-                )
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatClock(start), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-                    Text(formatClock(end), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-                }
             }
+            val description = stringResource(R.string.player_current_broadcast)
+            PlayerTimelineBlock(
+                progress = event?.let { ((nowSec - it.start.epochSeconds).toDouble() /
+                    (it.stop.epochSeconds - it.start.epochSeconds)).toFloat() },
+                tone = PlayerTimelineTone.AMBIENT,
+                fillColor = MaterialTheme.colorScheme.primary,
+                showTrack = event != null,
+                leadingLabel = event?.let { formatClock(it.start.epochSeconds) },
+                trailingLabel = event?.let { formatClock(it.stop.epochSeconds) },
+                reserveLabelSpace = true,
+                reserveStatusSpace = true,
+                statusAction = statusAction,
+                feedback = previewFeedback,
+                feedbackIsError = timeshiftFeedback != null,
+                timelineModifier = if (event != null) Modifier.testTag("player-schedule-progress")
+                    .semantics(mergeDescendants = true) { contentDescription = description } else Modifier,
+            )
         }
         Spacer(Modifier.height(8.dp))
         PlayerActionRow(

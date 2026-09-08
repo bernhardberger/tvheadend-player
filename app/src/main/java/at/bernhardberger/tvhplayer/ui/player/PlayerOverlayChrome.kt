@@ -31,7 +31,7 @@ internal val playerChannelsCueHeight
 @Composable
 @ReadOnlyComposable
 internal fun playerSeekPreviewBottomPadding(channelsAvailable: Boolean) =
-    TvOverlayBottomPadding + TvOverlayActionButtonSize + 16.dp +
+    TvOverlayBottomPadding + TvOverlayActionButtonSize + 8.dp +
         if (channelsAvailable) playerChannelsCueHeight else 0.dp
 
 @Composable

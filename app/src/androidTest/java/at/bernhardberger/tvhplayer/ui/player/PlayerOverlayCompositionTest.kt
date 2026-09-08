@@ -37,6 +37,53 @@ import kotlin.time.Instant
 
 class PlayerOverlayCompositionTest {
     @Test
+    fun timelineGeometrySurvivesScheduleHistoryAndTimingLossAtLargeText() {
+        val buffered = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
+        val state = mutableStateOf(AppTimeshiftState())
+        val current = mutableStateOf<EpgEvent?>(event(1, 0, 3600, "Programme"))
+        val scale = mutableStateOf(1f)
+        composeRule.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, scale.value),
+            ) {
+                TVHeadendPlayerTheme {
+                    OverlayControlsTv(
+                        imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                        channelNumber = 1, channelName = "Documentary", piconPath = null,
+                        nowEvent = current.value, nextEvent = null, nowSec = 1800,
+                        controlsVisible = true, optionsOpen = false,
+                        onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                        timeshiftState = state.value, timeshiftFeedback = null,
+                        onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
+                    )
+                }
+            }
+        }
+        fun anchors() = listOf("player-timeline-status", "player-timeline-track", "player-timeline-labels", "player-actions")
+            .map { composeRule.onNodeWithTag(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot }
+        for (fontScale in listOf(1f, 1.5f)) {
+            composeRule.runOnIdle { scale.value = fontScale }
+            val baseline = anchors()
+            for (epg in listOf(event(1, 0, 3600, "Programme"), null, event(2, 3600, 7200, "Future"))) {
+                composeRule.runOnIdle { current.value = epg }
+                for (candidate in listOf(buffered, buffered.copy(timingKnown = false), AppTimeshiftState())) {
+                    composeRule.runOnIdle { state.value = candidate }
+                    assertEquals(baseline, anchors())
+                    if (!candidate.timingKnown || !candidate.available) {
+                        composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
+                        if (candidate.available) {
+                            val semantics = composeRule.onNodeWithTag("player-seekbar").fetchSemanticsNode().config
+                            assertTrue(!semantics.contains(androidx.compose.ui.semantics.SemanticsProperties.Focused))
+                            assertTrue(!semantics.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun passiveScheduleProgressIsTruthfulAndNeverSeekableAcrossTuning() {
         val state = mutableStateOf(AppTimeshiftState())
         val current = mutableStateOf<EpgEvent?>(event(1, 0, 3600, "Programme"))
@@ -248,15 +295,15 @@ class PlayerOverlayCompositionTest {
     }
 
     @Test
-    fun noBufferHasNoBlankTimelineSlotAndStartsOnInfo() {
+    fun noBufferReservesTimelineGeometryWithoutInventingProgressAndStartsOnInfo() {
         composeRule.setContent { TVHeadendPlayerTheme { ModernLiveFixture(AppTimeshiftState()) } }
         composeRule.onNodeWithTag("player-info").assertIsFocused()
         composeRule.onNodeWithTag("player-pause").assertDoesNotExist()
         composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
-        composeRule.onNodeWithTag("player-timeline-track").assertDoesNotExist()
-        val status = composeRule.onNodeWithTag("player-timeline-status").fetchSemanticsNode().boundsInRoot
-        val actions = composeRule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
-        assertEquals(with(composeRule.density) { 8.dp.toPx() }, actions.top - status.bottom, 1f)
+        val track = composeRule.onNodeWithTag("player-timeline-track").fetchSemanticsNode().config
+        assertTrue(!track.contains(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo))
+        composeRule.onNodeWithTag("player-schedule-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
     }
 
     @Test

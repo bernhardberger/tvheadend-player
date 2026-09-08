@@ -23,6 +23,9 @@ remains historical. Version `0.2.1` (`versionCode` 7) is the subsequent acceptan
 candidate with published SDK 0.10.0 / HTSP 0.9.0 and segment-safe previews.
 Version `0.2.2` (`versionCode` 8) packages the bounded G10 field corrections
 for debug acceptance, retaining SDK 0.10.0 / HTSP 0.9.0.
+Version `0.2.3` (`versionCode` 9) retains the channel-audio persistence fixes
+with public SDK 0.10.1 / HTSP 0.9.0. Version `0.2.4` (`versionCode` 10) unifies
+Player timeline presentation for debug acceptance with those same dependencies.
 None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.

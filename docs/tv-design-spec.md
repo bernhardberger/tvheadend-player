@@ -315,9 +315,9 @@ are unchanged.
 
 | | Seekbar | Ambient strip |
 |---|---|---|
-| Where | player overlays | cards, channel rows, hero |
-| Interactive | yes — focusable, scrubs | no |
-| Fill | **orange** | `primary` cyan |
+| Where | player overlays, including passive schedule | cards, channel rows, hero |
+| Interactive | only with known playback timing and seek capability | no |
+| Fill | **orange** playback; `primary` cyan passive schedule | `primary` cyan |
 | Extras | thumb, labels, ghost fill, live edge | none |
 | Component | `PlayerTimeline.kt` | `ProgressStrip` in `ui/components/` |
 
@@ -325,6 +325,14 @@ These are separate components and must stay separate. An ambient strip must not
 be built from the player timeline, and must not use mobile Material's
 `LinearProgressIndicator`, whose default stop indicator draws a mark at 100%
 regardless of actual progress.
+
+Player's passive schedule, seekable playback and unavailable states use the same
+`PlayerTimelineBlock`, not the generic `ProgressStrip`. The block owns track,
+`labelLarge` endpoints and preview readouts, spacing and feedback placement.
+The playback adapter owns seek semantics and input, scoped to the track/readout
+body; Live/Go live remains outside that focus target. Passive schedule coordinates
+never become playback coordinates or seek grants. Missing EPG draws no progress
+or clocks but retains the timeline geometry through tuning and history changes.
 
 Prototype B displays the scheduled programme containing sampled playback, or the
 selected target during preview, using SDK 0.9.0's immutable schedule-grade

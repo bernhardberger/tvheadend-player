@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,6 +31,8 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
+import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvOverlayGhostFillAlpha
@@ -39,8 +42,31 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBarHeight
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineRowHeight
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineThumbSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayTrackAlpha
+import kotlin.math.roundToInt
 
 private val PlaybackPositionColor = Color(0xFFFA7F00)
+
+@Composable
+private fun TimelineTargetLabel(label: String, progress: Float, available: Boolean = true) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else TvOverlayTextTertiaryAlpha),
+        maxLines = 1,
+        modifier = Modifier
+            .layout { measurable, constraints ->
+                val label = measurable.measure(constraints.copy(minWidth = 0))
+                layout(constraints.maxWidth, label.height) {
+                    label.placeRelative(
+                        (constraints.maxWidth * progress - label.width / 2f).roundToInt()
+                            .coerceIn(0, constraints.maxWidth - label.width),
+                        0,
+                    )
+                }
+            }
+            .testTag("timeshift-preview-target"),
+    )
+}
 
 enum class PlayerTimelineTone { AMBIENT, INTERACTIVE, ACTIVE, PREVIEW }
 
@@ -60,6 +86,8 @@ fun PlayerTimelineBar(
     availableEndFraction: Float? = liveEdgeFraction,
     programmeWindow: Boolean = false,
     programmeTargetAvailable: Boolean? = null,
+    fillColor: Color = PlaybackPositionColor,
+    showTrack: Boolean = true,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
     val barHeight = if (tone == PlayerTimelineTone.ACTIVE) {
@@ -81,7 +109,7 @@ fun PlayerTimelineBar(
                 },
             ),
     ) {
-        BoxWithConstraints(
+        if (showTrack) BoxWithConstraints(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
@@ -119,7 +147,7 @@ fun PlayerTimelineBar(
                     Modifier
                         .fillMaxWidth(currentProgress)
                         .height(barHeight)
-                        .background(PlaybackPositionColor),
+                        .background(fillColor),
                 )
             }
             rewindableStartFraction?.takeIf { it > 0f && it < 1f }?.let { fraction ->
@@ -229,59 +257,91 @@ fun PlayerTimelineBlock(
     programmeWindow: ProgrammeWindow? = null,
     reserveLabelSpace: Boolean = false,
     previewLabel: String? = null,
+    fillColor: Color = PlaybackPositionColor,
+    showTrack: Boolean = true,
+    timelineModifier: Modifier = Modifier,
+    feedback: String? = null,
+    feedbackIsError: Boolean = false,
+    feedbackTestTag: String = "player-window-title",
+    reserveStatusSpace: Boolean = false,
+    statusAction: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier.fillMaxWidth()) {
-        if (previewLabel != null) {
-            Box(Modifier.fillMaxWidth().layout { measurable, constraints ->
-                val label = measurable.measure(constraints.copy(minHeight = 0))
-                layout(label.width, 0) { label.placeRelative(0, -label.height) }
-            }) {
-                TimelineTargetLabel(previewLabel, programmeWindow?.positionFraction ?: progress ?: 0f,
-                    programmeWindow?.targetAvailable != false)
+        if (reserveStatusSpace || feedback != null || statusAction != null) {
+            Row(
+                Modifier.fillMaxWidth().height(TvOverlayActionButtonSize).testTag("player-timeline-status"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (feedback != null) {
+                    Text(
+                        feedback,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (feedbackIsError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(end = 24.dp)
+                            .wrapContentWidth(Alignment.Start)
+                            .then(if (feedbackIsError) Modifier.background(MaterialTheme.colorScheme.errorContainer,
+                                MaterialTheme.shapes.small).padding(horizontal = 8.dp) else Modifier)
+                            .testTag(feedbackTestTag),
+                    )
+                } else Spacer(Modifier.weight(1f))
+                statusAction?.invoke()
             }
         }
-        PlayerTimelineBar(
-            progress = programmeWindow?.positionFraction ?: progress,
-            tone = tone,
-            modifier = Modifier.testTag("player-timeline-track"),
-            ghostProgress = ghostProgress,
-            rewindableStartFraction = programmeWindow?.availableStartFraction ?: rewindableStartFraction,
-            rewindableStartOverflow = rewindableStartOverflow,
-            liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
-            availableEndFraction = programmeWindow?.availableEndFraction ?: liveEdgeFraction,
-            programmeWindow = programmeWindow != null,
-            programmeTargetAvailable = programmeWindow?.targetAvailable,
-            thumbTestTag = thumbTestTag,
-            rewindableBoundaryTestTag = rewindableBoundaryTestTag,
-            rewindableOverflowTestTag = rewindableOverflowTestTag,
-            progressSemantics = progressSemantics,
-        )
-        // Playback endpoint readouts never shorten or move the track, even at large font scales.
-        if (reserveLabelSpace || leadingLabel != null || trailingLabel != null) {
-            val labelHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
-            Row(Modifier.fillMaxWidth().height(labelHeight), verticalAlignment = Alignment.CenterVertically) {
-                leadingLabel?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = leadingLabelColor
-                            ?: MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = TvOverlayTextTertiaryAlpha,
-                            ),
-                        modifier = leadingLabelTestTag?.let(Modifier::testTag) ?: Modifier,
-                    )
+        // Live modes reserve the same target clearance, including tuning and missing EPG.
+        if (reserveStatusSpace || previewLabel != null) {
+            Spacer(Modifier.height(with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }))
+        }
+        Column(timelineModifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            if (previewLabel != null) {
+                Box(Modifier.fillMaxWidth().layout { measurable, constraints ->
+                    val label = measurable.measure(constraints.copy(minHeight = 0))
+                    layout(label.width, 0) { label.placeRelative(0, -label.height) }
+                }) {
+                    TimelineTargetLabel(previewLabel, programmeWindow?.positionFraction ?: progress ?: 0f,
+                        programmeWindow?.targetAvailable != false)
                 }
-                Spacer(Modifier.weight(1f))
-                trailingLabel?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = trailingLabelColor
-                            ?: MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = TvOverlayTextTertiaryAlpha,
-                            ),
-                        modifier = trailingLabelTestTag?.let(Modifier::testTag) ?: Modifier,
-                    )
+            }
+            PlayerTimelineBar(
+                progress = programmeWindow?.positionFraction ?: progress,
+                tone = tone,
+                modifier = Modifier.testTag("player-timeline-track"),
+                ghostProgress = ghostProgress,
+                rewindableStartFraction = programmeWindow?.availableStartFraction ?: rewindableStartFraction,
+                rewindableStartOverflow = rewindableStartOverflow,
+                liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
+                availableEndFraction = programmeWindow?.availableEndFraction ?: liveEdgeFraction,
+                programmeWindow = programmeWindow != null,
+                programmeTargetAvailable = programmeWindow?.targetAvailable,
+                thumbTestTag = thumbTestTag,
+                rewindableBoundaryTestTag = rewindableBoundaryTestTag,
+                rewindableOverflowTestTag = rewindableOverflowTestTag,
+                progressSemantics = progressSemantics,
+                fillColor = fillColor,
+                showTrack = showTrack,
+            )
+            // Endpoint readouts never shorten or move the track, even at large font scales.
+            if (reserveLabelSpace || leadingLabel != null || trailingLabel != null) {
+                val labelHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
+                Row(Modifier.fillMaxWidth().height(labelHeight).testTag("player-timeline-labels"), verticalAlignment = Alignment.CenterVertically) {
+                    leadingLabel?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = leadingLabelColor ?: MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
+                            modifier = leadingLabelTestTag?.let(Modifier::testTag) ?: Modifier,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    trailingLabel?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = trailingLabelColor ?: MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
+                            modifier = trailingLabelTestTag?.let(Modifier::testTag) ?: Modifier,
+                        )
+                    }
                 }
             }
         }

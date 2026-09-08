@@ -100,7 +100,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                 }.build()
             }
             val density = androidx.compose.ui.platform.LocalDensity.current
-            val large = scenario in listOf("long", "shelf-long")
+            val large = scenario in listOf("long", "shelf-long") || scenario.endsWith("-large")
             val configuration = android.content.res.Configuration(androidx.compose.ui.platform.LocalConfiguration.current).apply {
                 setLocale(if (large) java.util.Locale.GERMAN else java.util.Locale.US)
             }
@@ -183,7 +183,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                         OverlayControlsTv(
                             imageLoader = imageLoader, channelNumber = 1, channelName = "Documentary HD",
                             piconPath = "imagecache/12", currentSession = currentSession,
-                            nowEvent = if (scenario == "missing" || scenario.endsWith("-missing")) null else programme(long = scenario == "long"),
+                             nowEvent = if (scenario == "missing" || scenario.endsWith("-missing")) null else programme(long = large),
                             nextEvent = EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
                                 start = Instant.fromEpochSeconds(1_783_022_400L),
                                 stop = Instant.fromEpochSeconds(1_783_024_200L), title = "The world beneath the ice"),
@@ -192,12 +192,12 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             onOpenInfo = { infoOpen = true }, restoreInfoFocus = restoreInfo,
                             onInfoFocusRestored = { restoreInfo = false },
                             timeshiftState = remember(scenario, tuningComplete) {
-                                if ((scenario.startsWith("field-") && !tuningComplete) || scenario in listOf("live", "long", "missing", "return-info")) AppTimeshiftState() else {
+                                 if ((scenario.startsWith("field-") && !tuningComplete) || scenario in listOf("live", "long", "missing", "return-info", "timeline-passive-large")) AppTimeshiftState() else {
                                     val fixture = TimeshiftTestFixture(7_200.seconds)
                                     fixture.updateHistory(if (scenario.endsWith("deep")) 0.seconds else 3_000.seconds, 3_600.seconds)
                                     fixture.state.value.toAppPresentation(fixture.playbackPosition(
                                         when (scenario) {
-                                            "timing-unavailable" -> null
+                                             "timing-unavailable", "timeline-unavailable-large" -> null
                                             "paused", "paused-deep" -> 3_300.seconds
                                             else -> 3_600.seconds
                                         },
@@ -205,7 +205,12 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 }
                             },
                             timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
-                            paused = scenario.startsWith("paused"),
+                             paused = scenario.startsWith("paused"),
+                             previewing = scenario.startsWith("timeline-preview"),
+                             programmeWindow = if (scenario.startsWith("timeline-preview") && !scenario.endsWith("-missing")) {
+                                 ProgrammeWindow(programme(long = large), Instant.fromEpochSeconds(1_783_020_600L),
+                                     0.5f, 0.25f, 0.75f, 0.75f, !scenario.endsWith("-expired"))
+                             } else null,
                         )
                     }
                 }
@@ -214,6 +219,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { inputModeManager.requestInputMode(InputMode.Keyboard) }
+        if (scenario.startsWith("timeline-preview")) composeRule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
         if (scenario == "shelf-empty") composeRule.onNodeWithTag("player-shelf-close").assertIsFocused()
         if (scenario == "return-info") {
             composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput { pressKey(Key.Enter) }
@@ -281,7 +287,9 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
 
     companion object {
         @JvmStatic @Parameterized.Parameters(name = "{0}-dark={1}")
-        fun scenarios() = listOf("field-disabled", "field-disabled-missing", "field-unavailable", "field-unavailable-missing", "field-tuning",
+        fun scenarios() = listOf("timeline-preview", "timeline-preview-missing", "timeline-preview-expired", "timeline-preview-large",
+            "timeline-passive-large", "timeline-unavailable-large",
+            "field-disabled", "field-disabled-missing", "field-unavailable", "field-unavailable-missing", "field-tuning",
             "live", "timeshift-live", "timeshift-live-deep", "paused", "paused-deep", "timing-unavailable",
             "seek-shallow", "seek-deep", "seek-live", "long", "missing", "recording", "recording-unknown", "recording-info",
             "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "shelf-long", "shelf-missing", "shelf-empty", "return-info")

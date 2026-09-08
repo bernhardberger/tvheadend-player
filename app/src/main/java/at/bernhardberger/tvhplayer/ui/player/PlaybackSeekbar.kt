@@ -1,14 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,17 +15,12 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ProgrammeAxis
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
@@ -55,7 +43,8 @@ fun PlaybackSeekbar(
     programmeWindow: ProgrammeWindow? = null,
     previewing: Boolean = false,
     feedback: String? = null,
-    showFeedback: Boolean = true,
+    reserveStatusSpace: Boolean = false,
+    statusAction: (@Composable () -> Unit)? = null,
     /**
      * Live-edge presentation to label the timeline with. Defaults to the measured
      * distance within [range]; live callers pass the server-shift-aware presentation.
@@ -77,9 +66,11 @@ fun PlaybackSeekbar(
             liveEdgeFraction = 1f,
             progressSemantics = false,
             reserveLabelSpace = true,
-            modifier = modifier
-                .semantics { contentDescription = unavailable }
-                .padding(vertical = 8.dp),
+            reserveStatusSpace = reserveStatusSpace,
+            statusAction = statusAction,
+            feedback = feedback,
+            feedbackIsError = feedback != null,
+            timelineModifier = modifier.semantics { contentDescription = unavailable },
         )
         return
     }
@@ -181,27 +172,6 @@ fun PlaybackSeekbar(
     val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
     val windowFeedback = feedback ?: programmeWindow?.event?.title?.takeIf { previewing && it.isNotBlank() }
-    Column {
-        if (windowFeedback != null && showFeedback) {
-            Row(Modifier.fillMaxWidth().layout { measurable, constraints ->
-                val row = measurable.measure(constraints.copy(minHeight = 0))
-                // Feedback floats above the target readout; neither creates an empty row.
-                layout(row.width, 0) { row.placeRelative(0, -row.height - 24.sp.roundToPx()) }
-            }) {
-                Text(
-                    text = windowFeedback,
-                    color = if (feedback != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).testTag("player-window-title")
-                        .then(if (feedback != null) Modifier.padding(end = 24.dp).wrapContentWidth(Alignment.Start).background(
-                            MaterialTheme.colorScheme.errorContainer,
-                            MaterialTheme.shapes.small,
-                        ).padding(horizontal = 8.dp) else Modifier),
-                )
-            }
-        }
         PlayerTimelineBlock(
             progress = displayedProgress,
             tone = if (focused) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
@@ -223,11 +193,15 @@ fun PlaybackSeekbar(
             progressSemantics = false,
             programmeWindow = programmeWindow,
             reserveLabelSpace = true,
+            reserveStatusSpace = reserveStatusSpace,
+            statusAction = statusAction,
+            feedback = windowFeedback,
+            feedbackIsError = feedback != null,
             previewLabel = if (previewing && timeshiftPosition != null) {
                 if (timeshiftPosition.atLiveEdge) stringResource(R.string.timeshift_live)
                 else "−${formatPlaybackDuration(timeshiftPosition.behindLiveMs)}"
             } else if (previewing && range.domain == SeekbarDomain.RECORDING) positionLabel else null,
-            modifier = modifier
+            timelineModifier = modifier
                 .fillMaxWidth()
                 .onFocusChanged { focused = it.isFocused }
                 .onPreviewKeyEvent { event ->
@@ -254,8 +228,6 @@ fun PlaybackSeekbar(
                     progressBarRangeInfo = ProgressBarRangeInfo(accessibilityProgress, 0f..1f)
                     customActions = accessibilityActions
                 }
-                .focusable()
-                .padding(vertical = 8.dp),
+                .focusable(),
         )
-    }
 }
