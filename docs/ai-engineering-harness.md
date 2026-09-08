@@ -33,6 +33,25 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 
 ## Primary agents and model assignments
 
+### Imported R8 analysis guidance
+
+`.agents/skills/r8-analyzer/` is the official Google `android/skills` analysis-only
+skill, pinned in `skills-lock.json`. Installation does not authorize optimization
+changes. Its Gradle tasks must use this repository's existing `gradle-run` wrapper.
+At revision `bac232fd02b0855df9275281a2a7a47643768719`, upstream references
+`scripts/convert_pb_to_json.py` and `scripts/analyze.py` but ships neither script;
+the published quantitative workflow is incomplete. Conversion, analysis and
+protobuf-binding examples do exist inside `references/CONFIGURATION-ANALYZER.md`,
+but are not packaged at the executable paths required by SKILL.md. Adapting those
+examples requires validating syntax, paths and the actual report schema, with
+local changes attributed separately. Preserve the upstream files and do not
+fabricate scores. The Android CLI's distributed payload has not been compared;
+the missing files were verified in the complete pinned GitHub tree, not inferred
+from the local installation alone.
+
+Restart the Player OpenCode instance to refresh skill discovery after installation;
+do not restart the shared backend or unrelated sessions automatically.
+
 The built-in `build` is the sole writable primary for application and repository
 work. `AGENTS.md` and the operator's task supply authority; an already admitted
 package retains its explicit contract. New direct work needs no package. No

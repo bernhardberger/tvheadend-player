@@ -119,6 +119,13 @@
       "sourceType": "github",
       "skillPath": "skills/kotlin-types-value-class/SKILL.md",
       "computedHash": "6242e1c9b75a25816cfa5733bebfd32c7f2d3c00c963cd51fae6021a3ae656ec"
+    },
+    "r8-analyzer": {
+      "source": "android/skills",
+      "ref": "bac232fd02b0855df9275281a2a7a47643768719",
+      "sourceType": "github",
+      "skillPath": "performance/r8-analyzer/SKILL.md",
+      "computedHash": "992952bc5eb1b21d896c0e9d6a914820f01e22a378b4f7e01eba5e4fc96ac628"
     }
   }
 }

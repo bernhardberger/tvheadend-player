@@ -25,6 +25,12 @@ are selected unmodified files from Chris Banes' `chrisbanes/skills` release
 content hashes are recorded in `skills-lock.json`; the upstream release retains
 the applicable Apache License text.
 
+The `r8-analyzer` engineering skill under `.agents/skills/r8-analyzer/`
+contains unmodified guidance and references from Google LLC's `android/skills`,
+revision `bac232fd02b0855df9275281a2a7a47643768719`, under Apache License 2.0.
+The source pin and hash are recorded in `skills-lock.json`; a copy of the
+upstream license is retained in that skill's `LICENSE.txt`.
+
 The released `at.bernhardberger.tvheadend:sdk-media3:0.3.0` AAR contains
 AndroidX Media3 1.11.0's Apache-2.0 FFmpeg extension. FFmpeg remains under
 LGPL-2.1-or-later. The app uses the extension as the AC-3/E-AC-3/MP3 fallback
