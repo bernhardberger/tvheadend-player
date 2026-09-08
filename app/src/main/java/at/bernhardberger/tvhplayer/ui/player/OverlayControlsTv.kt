@@ -36,6 +36,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -47,6 +49,7 @@ import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import coil3.ImageLoader
 
 @Composable
@@ -169,8 +172,6 @@ fun OverlayControlsTv(
                     if (nextScheduled) " / " + stringResource(R.string.recording_state_scheduled) else ""
             },
             clock = formatClock(nowSec), clockSupport = null,
-            programmeStart = nowEvent?.takeIf { programmeTimeKnown && !timeshiftState.available }?.let { formatClock(it.start.epochSeconds) },
-            programmeEnd = nowEvent?.takeIf { programmeTimeKnown && !timeshiftState.available }?.let { formatClock(it.stop.epochSeconds) },
             tags = PlayerHeaderTags(picon = "player-picon", eyebrow = "player-channel-identity",
                 title = "player-programme-title", support = "player-next-programme", clock = "player-clock"),
             modifier = modifier.alpha(if (previewing || timelineFocused) 0.45f else 1f),
@@ -291,6 +292,25 @@ fun OverlayControlsTv(
                         }
                     },
             )
+        }
+        if (!timeshiftState.available) {
+            // Schedule elapsed time is informational, never a playback coordinate or seek grant.
+            nowEvent?.takeIf {
+                it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds
+            }?.let { event ->
+                val start = event.start.epochSeconds
+                val end = event.stop.epochSeconds
+                val description = stringResource(R.string.player_current_broadcast)
+                ProgressStrip(
+                    progress = ((nowSec - start).toDouble() / (end - start)).toFloat(),
+                    modifier = Modifier.fillMaxWidth().testTag("player-schedule-progress")
+                        .semantics { contentDescription = description },
+                )
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(formatClock(start), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                    Text(formatClock(end), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
         }
         Spacer(Modifier.height(8.dp))
         PlayerActionRow(

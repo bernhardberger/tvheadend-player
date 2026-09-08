@@ -65,7 +65,8 @@ internal fun shouldPresentEmptyTag(
     activeTagSelected
 
 fun SessionState.toConnectionUiState(): ConnectionUiState = when (this) {
-    SessionState.Disconnected -> ConnectionUiState.NeedsConfiguration
+    // The caller has an available profile; transport state cannot establish missing settings.
+    SessionState.Disconnected -> ConnectionUiState.Connecting
     SessionState.Connecting -> ConnectionUiState.Connecting
     SessionState.Synchronizing -> ConnectionUiState.SyncingChannels
     is SessionState.Ready -> ConnectionUiState.Ready

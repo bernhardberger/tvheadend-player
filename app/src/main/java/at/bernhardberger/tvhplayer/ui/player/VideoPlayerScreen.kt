@@ -215,7 +215,7 @@ internal suspend fun startInitialLivePlayback(
 
 val bottomGradient = Brush.verticalGradient(
     0f to Color.Transparent,
-    0.35f to Color.Black.copy(alpha = 0.35f),
+    0.35f to Color.Black.copy(alpha = 0.70f),
     0.70f to Color.Black.copy(alpha = 0.75f),
     1f to Color.Black.copy(alpha = 0.92f)
 )
@@ -230,8 +230,8 @@ internal data class PlayerTopScrimTone(
 internal val playerTopScrimTone = PlayerTopScrimTone(
     topAlpha = 0.88f,
     middleStop = 0.58f,
-    middleAlpha = 0.64f,
-    endAlpha = 0.08f,
+    middleAlpha = 0.72f,
+    endAlpha = 0f,
 )
 
 val topGradient = Brush.verticalGradient(

@@ -17,8 +17,9 @@ class PlayerVisualStylePolicyTest {
     @Test
     fun topScrimProtectsBothIdentityColumnsThroughSupportingText() {
         assertTrue(playerTopScrimTone.topAlpha >= 0.84f)
-        assertTrue(playerTopScrimTone.middleAlpha >= 0.60f)
+        assertTrue(playerTopScrimTone.middleAlpha >= 0.70f)
         assertTrue(playerTopScrimTone.middleStop >= 0.55f)
+        assertEquals(0f, playerTopScrimTone.endAlpha)
     }
 
     @Test

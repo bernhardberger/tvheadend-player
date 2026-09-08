@@ -456,8 +456,11 @@ returns to the transport group. Down from the action
 strip opens Channels; a visible Channels-down cue below the strip appears only
 when channels exist. Recordings have neither the cue nor a shelf. Restoration uses
 semantic actions and never automatically chooses Stop or steals focus on routine
-timing/metadata updates. Without a timeshift buffer the live composition has no
-timeline block at all; it does not reserve empty height for one.
+timing/metadata updates. Without a timeshift buffer, a current valid EPG event
+supplies a cyan, noninteractive schedule-elapsed strip and schedule endpoints
+in the footer. It has no thumb, focus, or seek actions and is not a playback-position
+estimate. Missing or out-of-date EPG omits the strip rather than inventing progress.
+The header does not add a temporary timeband while tuning or waiting for history.
 
 Settings and Programme/Recording Info use one full-height, edge-attached right
 panel with a deliberate video scrim and no competing chrome/focus. Settings has

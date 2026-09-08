@@ -9,6 +9,18 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MainStartupPresentationTest {
+    @Test
+    fun configuredDisconnectedTransportDoesNotPresentSetupDuringStartup() {
+        val connection = at.bernhardberger.tvheadend.sdk.core.SessionState.Disconnected.toConnectionUiState()
+        assertEquals(ConnectionUiState.Connecting, connection)
+        assertEquals(
+            MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING),
+            presentation(connection),
+        )
+        assertEquals(ConnectionRecoveryAction.NONE, connection.primaryRecoveryAction())
+        assertEquals(ConnectionRecoveryAction.SETTINGS, ConnectionUiState.NeedsConfiguration.primaryRecoveryAction())
+        assertEquals(ConnectionRecoveryAction.SETTINGS, ConnectionUiState.CredentialUnavailable.primaryRecoveryAction())
+    }
 
     @Test
     fun retainedCatalogDoesNotHideActionableConnectionFailures() {

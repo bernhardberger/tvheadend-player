@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.paddingFrom
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +30,6 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTextPrimaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import coil3.ImageLoader
 
 data class PlayerHeaderTags(
@@ -55,9 +53,6 @@ fun PlayerIdentityHeader(
     modifier: Modifier = Modifier,
     currentSession: CurrentSessionObservation? = null,
     tags: PlayerHeaderTags = PlayerHeaderTags(),
-    programmeStart: String? = null,
-    programmeEnd: String? = null,
-    programmeProgress: Float? = null,
     compact: Boolean = false,
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
@@ -97,24 +92,6 @@ fun PlayerIdentityHeader(
                             .optionalTestTag(tags.title)
                             .semantics { heading() },
                     )
-                }
-                if (programmeStart != null && programmeEnd != null) {
-                    if (programmeProgress == null) Text(
-                        "$programmeStart - $programmeEnd",
-                        color = onSurface.copy(alpha = TvOverlayTextSecondaryAlpha),
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(vertical = 8.dp).optionalTestTag(tags.clockSupport),
-                    ) else Row(
-                        Modifier.widthIn(max = 320.dp).fillMaxWidth().padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(programmeStart, color = onSurface.copy(alpha = TvOverlayTextSecondaryAlpha), style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.width(8.dp))
-                        ProgressStrip(progress = programmeProgress, modifier = Modifier.weight(1f))
-                        Spacer(Modifier.width(8.dp))
-                        Text(programmeEnd, color = onSurface.copy(alpha = TvOverlayTextSecondaryAlpha), style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.optionalTestTag(tags.clockSupport))
-                    }
                 }
                 support?.let {
                     HeaderText(

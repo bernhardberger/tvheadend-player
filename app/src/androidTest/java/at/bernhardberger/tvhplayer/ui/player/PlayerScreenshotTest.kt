@@ -73,6 +73,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         lateinit var inputModeManager: InputModeManager
         var infoOpen by mutableStateOf(false)
         var restoreInfo by mutableStateOf(false)
+        var tuningComplete by mutableStateOf(false)
         composeRule.setContent {
             inputModeManager = LocalInputModeManager.current
             val context = LocalContext.current
@@ -110,7 +111,8 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
             ) {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
-                    DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
+                    if (scenario.startsWith("field-")) Box(Modifier.fillMaxSize().background(Color.White))
+                    else DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
                     if (dark) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)))
                     if (scenario.startsWith("settings")) {
                         PlaybackOptionsSheetContent(
@@ -181,7 +183,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                         OverlayControlsTv(
                             imageLoader = imageLoader, channelNumber = 1, channelName = "Documentary HD",
                             piconPath = "imagecache/12", currentSession = currentSession,
-                            nowEvent = if (scenario == "missing") null else programme(long = scenario == "long"),
+                            nowEvent = if (scenario == "missing" || scenario.endsWith("-missing")) null else programme(long = scenario == "long"),
                             nextEvent = EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
                                 start = Instant.fromEpochSeconds(1_783_022_400L),
                                 stop = Instant.fromEpochSeconds(1_783_024_200L), title = "The world beneath the ice"),
@@ -189,8 +191,8 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
                             onOpenInfo = { infoOpen = true }, restoreInfoFocus = restoreInfo,
                             onInfoFocusRestored = { restoreInfo = false },
-                            timeshiftState = remember(scenario) {
-                                if (scenario in listOf("live", "long", "missing", "return-info")) AppTimeshiftState() else {
+                            timeshiftState = remember(scenario, tuningComplete) {
+                                if ((scenario.startsWith("field-") && !tuningComplete) || scenario in listOf("live", "long", "missing", "return-info")) AppTimeshiftState() else {
                                     val fixture = TimeshiftTestFixture(7_200.seconds)
                                     fixture.updateHistory(if (scenario.endsWith("deep")) 0.seconds else 3_000.seconds, 3_600.seconds)
                                     fixture.state.value.toAppPresentation(fixture.playbackPosition(
@@ -253,17 +255,34 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         }
         composeRule.mainClock.advanceTimeBy(500L)
         composeRule.waitForIdle()
-        val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
         val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "player-captures")
         assertTrue(directory.isDirectory || directory.mkdirs())
-        File(directory, "$scenario-${if (dark) "dark" else "bright"}.png").outputStream().use {
-            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+        fun capture(name: String) {
+            val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
+            if (scenario.startsWith("field-")) {
+                val status = composeRule.onNodeWithTag("player-live-status").fetchSemanticsNode().boundsInRoot
+                val background = bitmap.getPixel(bitmap.width - 1, status.center.y.toInt())
+                val contrast = androidx.core.graphics.ColorUtils.calculateContrast(
+                    android.graphics.Color.rgb(227, 227, 232), background,
+                )
+                assertTrue("Live text contrast is $contrast", contrast >= 4.5)
+            }
+            File(directory, "$name-${if (dark) "dark" else "bright"}.png").outputStream().use {
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+        }
+        capture(scenario)
+        if (scenario == "field-tuning") {
+            composeRule.runOnIdle { tuningComplete = true }
+            composeRule.waitForIdle()
+            capture("field-playing")
         }
     }
 
     companion object {
         @JvmStatic @Parameterized.Parameters(name = "{0}-dark={1}")
-        fun scenarios() = listOf("live", "timeshift-live", "timeshift-live-deep", "paused", "paused-deep", "timing-unavailable",
+        fun scenarios() = listOf("field-disabled", "field-disabled-missing", "field-unavailable", "field-unavailable-missing", "field-tuning",
+            "live", "timeshift-live", "timeshift-live-deep", "paused", "paused-deep", "timing-unavailable",
             "seek-shallow", "seek-deep", "seek-live", "long", "missing", "recording", "recording-unknown", "recording-info",
             "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "shelf-long", "shelf-missing", "shelf-empty", "return-info")
             .flatMap { scenario -> listOf(false, true).map { dark -> arrayOf<Any>(scenario, dark) } }

@@ -37,6 +37,47 @@ import kotlin.time.Instant
 
 class PlayerOverlayCompositionTest {
     @Test
+    fun passiveScheduleProgressIsTruthfulAndNeverSeekableAcrossTuning() {
+        val state = mutableStateOf(AppTimeshiftState())
+        val current = mutableStateOf<EpgEvent?>(event(1, 0, 3600, "Programme"))
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                OverlayControlsTv(
+                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                    channelNumber = 1, channelName = "Documentary", piconPath = null,
+                    nowEvent = current.value, nextEvent = event(2, 3600, 7200, "Next programme"), nowSec = 1800,
+                    controlsVisible = true, optionsOpen = false,
+                    onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                    timeshiftState = state.value, timeshiftFeedback = null,
+                    onToggleTimeshiftPause = {}, onSeekTimeshift = { error("Passive progress sought") }, onGoLive = {},
+                )
+            }
+        }
+        val progress = composeRule.onNodeWithTag("player-schedule-progress").fetchSemanticsNode().config
+        assertEquals(0.5f, progress[androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo].current)
+        assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsActions.SetProgress))
+        assertTrue(!progress.contains(androidx.compose.ui.semantics.SemanticsProperties.Focused))
+        composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-info").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        fun headerBounds() = listOf("player-channel-identity", "player-programme-title", "player-next-programme", "player-clock")
+            .map { composeRule.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot }
+        val tuningHeader = headerBounds()
+        composeRule.runOnIdle {
+            state.value = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0, liveEdgeMs = 0)
+        }
+        assertEquals(tuningHeader, headerBounds())
+        composeRule.onNodeWithTag("player-schedule-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar").assertExists()
+        composeRule.runOnIdle { state.value = AppTimeshiftState() }
+        for (epg in listOf(null, event(3, 3600, 7200, "Future"), event(4, 0, 1800, "Ended"))) {
+            composeRule.runOnIdle { current.value = epg }
+            composeRule.onNodeWithTag("player-schedule-progress").assertDoesNotExist()
+            composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
+        }
+    }
+
+    @Test
     fun infoContentsStayVerticallyCenteredAtNormalAndLargeTextWithFocus() {
         val fontScale = mutableStateOf(1f)
         composeRule.setContent {
