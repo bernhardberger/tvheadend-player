@@ -138,6 +138,12 @@ it does not replace integrated or physical-TV gates.
 
 ## Delegation and evidence
 
+`app-device-operator` is an operational child with Bash, but no repository edits
+or delegation. It may use `tools/device` only for an explicitly authorized task
+after exclusive device ownership is handed over by the primary. All device,
+identity, credential and capture rules still apply. This is the device-operation
+exception to the read-only child restrictions below, not a second code writer.
+
 Review, analysis, and retrieval children are read-only. `app-implementer` is
 the one writable child: it may edit and run Gradle inside a single delegated
 slice with named paths, tests, and gate, but never mutates Git, devices,

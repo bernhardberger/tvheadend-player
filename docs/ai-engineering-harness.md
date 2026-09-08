@@ -53,6 +53,12 @@ mixed supported models are valid, and changing one is not a product gate.
 
 ## Delegation and context containment
 
+`app-device-operator` is the bounded device-operation exception to read-only
+delegation. It has Bash but no repository edits or child delegation. The primary
+hands over exclusive device ownership with an exact authorized target and task,
+then waits for its result before resuming device operations. Review and retrieval
+roles remain read-only; do not dispatch operational work through `general`.
+
 Delegation is read-only and may nest through one additional locator level.
 The primary owns decomposition and delegation and may use as many children as it
 judges useful for correctness, evidence coverage, context isolation, turnaround,
