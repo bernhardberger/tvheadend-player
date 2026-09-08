@@ -25,8 +25,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.2.2"
+        versionCode = 9
+        versionName = "0.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROGRAMME_WINDOW_B", providers.gradleProperty("player.programmeWindowB").orElse("true").map { it.toBooleanStrict().toString() }.get())
