@@ -187,7 +187,7 @@ internal fun RecordingDetailsPanel(
             )
             val failureReason = entry.subscriptionError?.name
             when {
-                !failureReason.isNullOrBlank() -> Text(
+                actionResult == null && !failureReason.isNullOrBlank() -> Text(
                     failureReason,
                     color = MaterialTheme.colorScheme.error,
                     maxLines = 2,
