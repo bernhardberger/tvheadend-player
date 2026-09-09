@@ -120,8 +120,9 @@ qualification is claimed.
 installed the actual distributed skill. `--agent=claude` was rejected. All delivered
 guidance/references match the repository's pinned
 `android/skills@bac232fd02b0855df9275281a2a7a47643768719` tree. The CLI package omits
-the local pinned `LICENSE.txt` and both required scripts:
-`scripts/convert_pb_to_json.py` and `scripts/analyze.py`. Therefore its documented
+`LICENSE.txt`, which the local pinned import retains. Like the pinned upstream
+revision, it ships neither required script: `scripts/convert_pb_to_json.py` nor
+`scripts/analyze.py`. Therefore its documented
 quantitative R8 workflow is **not executable as delivered**. No analyzer task,
 conversion or score is claimed. Keep the pinned licensed import; do not generate
 a substitute analyzer or change AGP/R8 to hide this payload defect.

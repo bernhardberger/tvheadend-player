@@ -50,11 +50,12 @@ class GradleEnvironmentTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             pid_file = Path(temporary) / "pid"
             result = subprocess.run(
-                ["timeout", "--kill-after=0.2s", "0.3s", "sh", "-c",
+                ["timeout", "--kill-after=0.2s", "5s", "sh", "-c",
                  'trap "" TERM; sleep 60 & echo $! > "$1"; wait', "sh", str(pid_file)],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True, text=True, timeout=10,
             )
             self.assertEqual(-9, result.returncode)
+            self.assertTrue(pid_file.exists(), "fixture did not start before its timeout")
             pid = int(pid_file.read_text())
             deadline = time.monotonic() + 2
             while time.monotonic() < deadline:
@@ -68,10 +69,13 @@ class GradleEnvironmentTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("timeout"), "GNU timeout")
     def test_standard_timeout_preserves_command_failure_and_reports_timeout(self):
-        for command, expected in ((["sh", "-c", "exit 23"], 23), (["sleep", "60"], 124)):
+        for command, duration, expected in (
+            (["sh", "-c", "exit 23"], "5s", 23),
+            (["sleep", "60"], "0.1s", 124),
+        ):
             with self.subTest(command=command):
                 result = subprocess.run(
-                    ["timeout", "--kill-after=0.2s", "0.1s", *command], timeout=5,
+                    ["timeout", "--kill-after=0.2s", duration, *command], timeout=10,
                 )
                 self.assertEqual(expected, result.returncode)
 
