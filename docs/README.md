@@ -26,6 +26,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `code-ownership.md` | Compact source and tooling ownership map; read before locating application code or delegating broad repository mapping. |
 | `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
+| `android-tooling.md` | Standard build and explicit-target offline emulator workflow; qualified Android CLI and R8 payload limits. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
 | `test-device-credential-provisioning.md` | Test-device credential workflow; provisioning work only. |
@@ -47,6 +48,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 
 | Document | Evidence boundary |
 |---|---|
+| `mechanical-feedback-verification.md` | Dated debug verification for the 0.2.5/0.2.6 mechanical-feedback slice; not a current task or physical acceptance result. |
 | `g10-field-feedback-2026-09-08.md` | Bounded G10-05/09/15 and configured-state corrections, G10-08/02 triage, and static evidence limits. Original operator observations are preserved separately. |
 | `ai-skills-audit-2026-07-28.md` | Audit record for the imported skill set. Current agents and local skills carry the durable routing and caveats; this audit is not mandatory startup reading. |
 | `codebase-audit-2026-07-23.md` | Point-in-time hardening audit with later updates. Use only for a specifically identified finding, then verify current source. |

@@ -528,30 +528,26 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertIsNone(args.output)
         self.assertEqual(args.name, "current-screen")
 
-    def test_default_screenshot_uses_revision_dirty_state_timestamp_and_name(self) -> None:
+    def test_default_screenshot_uses_timestamp_and_name_without_checkout_attribution(self) -> None:
         output = default_screenshot_output(
             "Channels trailing clipping",
-            revision="b5856e7abcde",
-            dirty=True,
             now=datetime(2026, 7, 28, 21, 15, 30, tzinfo=timezone.utc),
         )
 
         self.assertEqual(
             output,
             ROOT
-            / "captures/device/b5856e7abcde-dirty"
-            / "20260728T211530Z-channels-trailing-clipping.png",
+            / "captures/device"
+            / "20260728T211530.000000Z-channels-trailing-clipping.png",
         )
         self.assertEqual(
             default_screenshot_output(
                 "Guide scope tabs",
-                revision="b5856e7abcde",
-                dirty=False,
                 now=datetime(2026, 7, 28, 21, 16, 2, tzinfo=timezone.utc),
             ),
             ROOT
-            / "captures/device/b5856e7abcde"
-            / "20260728T211602Z-guide-scope-tabs.png",
+            / "captures/device"
+            / "20260728T211602.000000Z-guide-scope-tabs.png",
         )
 
     def test_screenshot_name_is_safe_and_has_a_useful_fallback(self) -> None:

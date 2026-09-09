@@ -5,8 +5,10 @@ description: Use for TVHeadend Player Android TV or TCL ADB testing, screenshots
 
 # Android TV Device Testing
 
-Use the repository's bounded `./tools/device` wrapper instead of ad-hoc broad ADB
-dumps whenever it supports the required operation.
+Use `./tools/device` for physical-TV role/identity, credential and acceptance
+operations. For authorized offline LXC119 work, use the standard explicit-device
+workflow in `docs/android-tooling.md`; no Player device profile or duplicate
+install/instrument transport is needed. Neither route permits broad ADB dumps.
 
 ## Before touching the device
 
@@ -87,10 +89,12 @@ screen is visible, capture the designated test TV with:
 ```
 
 The default owner-only output is written beneath the ignored workspace path
-`captures/device/<12-char-HEAD>[-dirty]/` with a UTC timestamp and the sanitized
-`--name` slug. If `--name` is omitted, it falls back to `current-screen`. This
-keeps screenshots previewable in OpenCode/OpenChamber while recording their base
-revision without pretending a dirty working tree exactly matches that commit.
+`captures/device/` with a UTC timestamp and the sanitized `--name` slug. If
+`--name` is omitted, it falls back to `current-screen`. Filenames do not establish
+source provenance. For attributed evidence, record the installed app/test APK
+hashes matched to verified local artifacts, source revision, scenario, canvas,
+locale, font scale and focus. Keep host screenshots distinct from composable
+captures and never attribute a launcher image to Player.
 Pass `--output` only when an exact path is required; repository paths are allowed
 only beneath `captures/device/`. The wrapper requires exact test-device identity,
 validates the PNG, and replaces the output atomically. Use the file-reading tool

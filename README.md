@@ -143,7 +143,12 @@ The verifier checks native-library integrity and 16 KB alignment, tool policy,
 JVM tests, lint, Android-test compilation, debug assembly, and APK identity and
 ABI requirements.
 
-Device operations use an ignored local configuration and the bounded wrapper:
+For actual offline instrumentation and captures on the existing emulator lane,
+see [Android tooling](docs/android-tooling.md). Use standard Gradle and explicit
+ADB device selection; no Gradle workflow ledger is required. Android-test
+compilation alone is not execution.
+
+Physical-TV operations use an ignored local configuration and the bounded wrapper:
 
 ```bash
 cp .tvhplayer-device.example.json .tvhplayer-device.json

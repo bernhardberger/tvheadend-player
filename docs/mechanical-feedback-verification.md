@@ -1,5 +1,7 @@
 # Mechanical Player feedback verification
 
+Status: Dated verification reference for the delivered 0.2.5/0.2.6 slice; not current instructions.
+
 This product-specific slice retains the P35 programme timeline. Its mechanical
 corrections were delivered as 0.2.5 (code 11) with SDK 0.10.1 / HTSP 0.9.0.
 Version 0.2.6 (code 12) retains them and adopts public SDK 0.11.0 / HTSP 0.10.0.

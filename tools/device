@@ -1133,43 +1133,14 @@ def sanitize_screenshot_name(value: str) -> str:
     return slug[:80].rstrip("-") or DEFAULT_SCREENSHOT_NAME
 
 
-def screenshot_revision() -> tuple[str, bool]:
-    head = subprocess.run(
-        ["git", "rev-parse", "--short=12", "HEAD"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if head.returncode != 0 or not head.stdout.strip():
-        fail("cannot determine the current Git revision for screenshot output")
-    status = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=normal"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if status.returncode != 0:
-        fail("cannot determine the working-tree state for screenshot output")
-    return head.stdout.strip(), bool(status.stdout.strip())
-
-
 def default_screenshot_output(
     name: str,
     *,
-    revision: str | None = None,
-    dirty: bool | None = None,
     now: datetime | None = None,
 ) -> Path:
-    if revision is None or dirty is None:
-        detected_revision, detected_dirty = screenshot_revision()
-        revision = revision or detected_revision
-        dirty = detected_dirty if dirty is None else dirty
-    revision_directory = f"{revision}-dirty" if dirty else revision
     timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    filename = f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}-{sanitize_screenshot_name(name)}.png"
-    return CAPTURE_ROOT / revision_directory / filename
+    filename = f"{timestamp.strftime('%Y%m%dT%H%M%S.%fZ')}-{sanitize_screenshot_name(name)}.png"
+    return CAPTURE_ROOT / filename
 
 
 def resolve_screenshot_output(path: Path) -> Path:
@@ -1393,7 +1364,7 @@ def build_parser() -> argparse.ArgumentParser:
     screenshot_parser.add_argument(
         "--output",
         type=Path,
-        help="Exact PNG output path; defaults to ignored captures/device/<revision>/",
+        help="Exact PNG output path; defaults to a timestamped file in ignored captures/device/",
     )
     screenshot_parser.add_argument(
         "--name",

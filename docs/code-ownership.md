@@ -31,8 +31,9 @@ entry points are exhausted; avoid asking them to rediscover this table.
   includes `./tools/verify` and commands run through the repository-bundled
   `gradle-run` skill. A waiting command must wait rather than
   bypass the lock or start another daemon.
-- Use the `gradle-run` skill for compact output and failure fingerprints. It is
-  bundled at `.opencode/skills/gradle-run`; no sibling checkout or diagnostic
-  child is required.
+- Use the `gradle-run` skill for standard bounded execution and private diagnostics.
+  No workflow ledger, sibling checkout or diagnostic child is required.
+- Authorized offline emulator work uses `docs/android-tooling.md`; the physical
+  device wrapper is not required for ordinary explicit-serial install and capture.
 - `./tools/verify` remains the final application gate. Device, credential,
   signing, and release authorization remain separate.

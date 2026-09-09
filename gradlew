@@ -115,7 +115,7 @@ case "$( uname )" in                #(
 esac
 
 # All player worktrees share one Gradle owner on the integration host. Holding
-# this descriptor serializes direct wrapper calls, tools/verify, and gradle-run.
+# this descriptor serializes direct wrapper calls and tools/verify.
 if command -v flock >/dev/null 2>&1; then
     gradle_lock_uid=$(id -u) || die "Unable to resolve the Gradle lock owner"
     gradle_lock_dir=/tmp/tvheadend-player-gradle-$gradle_lock_uid
@@ -127,6 +127,10 @@ elif [ "$( uname -s )" = Linux ]; then
     die "flock is required to serialize TVHeadend Player Gradle builds"
 fi
 
+# Ordinary builds must not activate credential-gated live SDK tests by inheritance.
+if [ "${GRADLE_RUN_ALLOW_LIVE_TESTS:-}" != 1 ]; then
+    unset TVHEADEND_SOAK_CREDENTIALS_FILE TVHEADEND_SOAK_NODVR_CREDENTIALS_FILE
+fi
 
 
 # Determine the Java command to use to start the JVM.
