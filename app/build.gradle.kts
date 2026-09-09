@@ -40,11 +40,19 @@ android {
                 "proguard-rules.pro",
             )
         }
+        create("profile") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            applicationIdSuffix = ".profile"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+        }
     }
     buildFeatures {
         buildConfig = true
         compose = true
     }
+    sourceSets.getByName("profile").kotlin.srcDir("src/release/java")
 }
 
 val releasedSdkSources = configurations.create("releasedSdkSources") {

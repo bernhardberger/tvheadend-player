@@ -27,6 +27,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
 | `android-tooling.md` | Standard build and explicit-target offline emulator workflow; qualified Android CLI and R8 payload limits. |
+| `profiling.md` | Nondebuggable offline rail fixture, standard Perfetto workflow, first measurement and physical-TV limits. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
 | `test-device-credential-provisioning.md` | Test-device credential workflow; provisioning work only. |

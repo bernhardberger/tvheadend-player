@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <application android:name="android.app.Application" tools:replace="android:name">
+        <profileable android:shell="true" />
+        <activity android:name=".ui.MainActivity" tools:node="remove" />
+        <service android:name=".accessibility.ApplianceEntryAccessibilityService" tools:node="remove" />
+        <activity android:name=".profiling.RailProfileActivity"
+            android:exported="true" />
+    </application>
+</manifest>

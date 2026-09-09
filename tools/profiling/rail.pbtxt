@@ -1,0 +1,19 @@
+# Android 12-compatible sources; no logcat, heap, stacks or broad app atrace.
+duration_ms: 20000
+buffers { size_kb: 8192 fill_policy: DISCARD }
+data_sources {
+  config {
+    name: "linux.ftrace"
+    ftrace_config {
+      atrace_categories: "gfx"
+      atrace_categories: "view"
+      atrace_apps: "at.bernhardberger.tvhplayer.profile"
+    }
+  }
+}
+data_sources {
+  config {
+    name: "linux.process_stats"
+    process_stats_config { scan_all_processes_on_start: true }
+  }
+}
