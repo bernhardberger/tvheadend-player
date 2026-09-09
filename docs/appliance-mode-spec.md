@@ -33,7 +33,7 @@ backs out to those screens.
 ```bash
 ./tools/verify
 # Mutating commands require an explicitly configured test device.
-./tools/device install-debug
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/debug/app-debug.apk --use-delta-install=false --install-options=-r,-t
 ./tools/device launch
 ```
 
@@ -49,7 +49,9 @@ on the Android debug keystore.
   target. Addresses remain only in ignored local device configuration, and
   tooling must verify manufacturer, model, device, and product before every
   mutation.
-- `tools/device` enforces this boundary: production and unclassified devices
+- The role boundary applies to official CLI and ADB alike; ordinary install and
+  capture follow `android-tooling.md`, not a mandatory wrapper. `tools/device`
+  also enforces this boundary: production and unclassified devices
   reject debug install, launch, force-stop, smoke, screenshot, synthetic-key,
   and credential-provisioning actions. An exact-identity production or test
   deployment target may receive a fully verified product-signed bundle only

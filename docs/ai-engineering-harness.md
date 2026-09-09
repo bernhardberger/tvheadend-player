@@ -270,8 +270,11 @@ or archive-containment rules. Routine product verification does not invoke it.
 ## Device, native, and release boundaries
 
 Physical-device work must load `android-tv-device-testing`, read
-`docs/device-targets.md`, and use `./tools/device`. Reachable serials and any
-credential-file reference live only in ignored owner configuration. Production
+`docs/device-targets.md`, and follow the CLI-first ordinary install/capture
+workflow in `docs/android-tooling.md` with explicit `--device`. Use ADB only for
+missing CLI capabilities; specialized release and credential gates remain.
+Reachable serials and any credential-file reference live only in ignored owner
+configuration. Production
 and unclassified targets remain read-only except for an explicitly approved
 production-signed update. Credential provisioning is limited to the designated
 test-device workflow in `docs/test-device-credential-provisioning.md`.

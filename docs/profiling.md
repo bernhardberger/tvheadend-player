@@ -40,8 +40,9 @@ ZIP member. Do not compare compressed APK sizes as an optimization measurement.
 Use the existing LXC119 tunnel and exact identity procedure in
 [Android tooling](android-tooling.md). No new AVD, service, root, boot property,
 server, credential provisioning or data reset is needed. Install only the
-profile APK with standard explicit-serial `adb install -r`, then compare the
-installed base APK's SHA-256 with the local APK. Preserve prior artifacts and
+profile APK, only if needed, with official CLI explicit `--device`,
+`--use-delta-install=false` and `--install-options=-r` as in `android-tooling.md`,
+then compare the installed base APK's SHA-256 with the local APK. Preserve prior artifacts and
 stop rather than retrying with uninstall, downgrade or another signer.
 
 Recording uses Android's installed `perfetto` CLI, not a custom recorder.

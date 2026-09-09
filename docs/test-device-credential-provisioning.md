@@ -48,9 +48,12 @@ Restrict the file and provision an installed debug build:
 
 ```bash
 chmod 600 .tvhplayer-credentials.json
-./tools/device install-debug
 ./tools/device provision-test-credentials
 ```
+
+If the required verified debug APK is not already installed, install it using
+official CLI with explicit `--device` under `android-tooling.md` first. Provisioning
+does not itself require reinstallation.
 
 `TVHPLAYER_CREDENTIAL_FILE` may select a different owner-only local file by
 path. It carries only the path; never put credential values in that variable.

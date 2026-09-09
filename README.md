@@ -144,23 +144,16 @@ JVM tests, lint, Android-test compilation, debug assembly, and APK identity and
 ABI requirements.
 
 For actual offline instrumentation and captures on the existing emulator lane,
-see [Android tooling](docs/android-tooling.md). Use standard Gradle and explicit
-ADB device selection; no Gradle workflow ledger is required. Android-test
-compilation alone is not execution.
+see [Android tooling](docs/android-tooling.md). Use standard Gradle and official
+Android CLI with explicit `--device` for ordinary install/capture; use ADB for
+missing CLI capabilities such as instrumentation. No Gradle workflow ledger is
+required. Android-test compilation alone is not execution.
 
-Physical-TV operations use an ignored local configuration and the bounded wrapper:
-
-```bash
-cp .tvhplayer-device.example.json .tvhplayer-device.json
-./tools/device doctor
-./tools/device --target nvidia-shield doctor
-```
-
-The ignored config can retain named G10, Shield, and production profiles. Its
-`active_target` is used by default; `--target` or
-`TVHPLAYER_DEVICE_TARGET` selects another profile for one command. Every
-restricted operation still verifies that profile's role and all four expected
-identity fields against the live device.
+Physical-TV operations follow [device targets](docs/device-targets.md) and the
+same CLI-first workflow. Confirm the intended role and all four live identity
+fields before mutation. Existing ignored named profiles remain useful for the
+specialized credential, acceptance and release tools, but are not a prerequisite
+for ordinary CLI install/capture and do not select its `--device`.
 
 Never put TVHeadend credentials, signing keys, or private device addresses in
 Git. The debug-only designated-test-device provisioning flow is documented in

@@ -19,17 +19,21 @@ roles. Do not treat “Mum's TV” or “the household TV” as an unambiguous t
 - The bedroom G08 has been handed over. Keep its local role `production`; do not
   use it for debug installs, key injection, smoke tests, signing experiments, or
   routine development.
-- Before any mutating operation, run `./tools/device doctor` and confirm the
-  configured serial, role, manufacturer/model, and device/product against the
-  selected indexed target. Stop if any live identity property differs.
+- Before mutation, confirm the intended serial, role, manufacturer/model and
+  device/product against the selected indexed target. Stop on mismatch. Use
+  official CLI with explicit `--device` for ordinary install/capture as documented
+  in `android-tooling.md`. Bounded explicit-serial ADB `getprop` supplies identity
+  fields the CLI lacks; `tools/device doctor` is an optional convenience, not an
+  additional mandatory preflight. Never automatically uninstall or clear data.
 - Both sets report the generic model name `Smart TV Pro`, so the model string by
   itself is not sufficient human evidence. Confirm `G10` / `G10_4K_GB` for the
   development target and never substitute the G08.
 - Keep private IP addresses, ADB serials, MAC addresses, credentials, and signing
   material out of tracked files. Named local profiles and their ADB serials
-  belong only in ignored `.tvhplayer-device.json`. Keep `active_target` set to
-  `g10` for routine debug work; use `--target` or
-  `TVHPLAYER_DEVICE_TARGET` for an explicit one-command override.
+  belong only in ignored owner configuration. Existing `tools/device` workflows
+  use `.tvhplayer-device.json`, `--target` or `TVHPLAYER_DEVICE_TARGET`; their
+  `active_target` does not select the official CLI target. Pass the intended serial
+  explicitly with `--device` every time; never substitute a reachable device.
 - Device roles describe current lifecycle state, not permanent hardware
   capability. Update this document and the local role deliberately when the G10
   is handed over or a new development target is assigned.

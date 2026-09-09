@@ -24,7 +24,8 @@ entry points are exhausted; avoid asking them to rediscover this table.
 
 ## Tool boundaries
 
-- Use `./tools/device --help` and documented commands. Do not read the
+- Start with the CLI-first workflow in `android-tooling.md`. For specialized
+  operations, use `./tools/device --help` and documented commands. Do not read the
   implementation of `tools/device` unless the package edits it or a reproduced
   failure has been attributed to that tool.
 - Every `./gradlew` entry is serialized by one repository-wide flock. This

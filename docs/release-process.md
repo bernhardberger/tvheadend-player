@@ -161,10 +161,14 @@ Read `docs/device-targets.md` and load the `android-tv-device-testing` workflow.
 Use `./tools/device --target g10 package-info` and `package-certificate` before
 staging to compare installed version and verified APK certificate. The latter
 temporarily retrieves only the installed base APK, never app-private data.
-Run `./tools/device doctor` before every mutation and proceed only when the live
-identity is an explicitly indexed test target. A release-signed APK
-cannot update a debug-signed installation; uninstalling the debug package erases
-its app-private settings, so reprovision the designated test credentials only
+Confirm the intended serial, role and all four live identity properties before
+mutation; `doctor` is optional, not an extra mandatory preflight. Ordinary debug
+install/capture uses official CLI with explicit `--device` under
+`android-tooling.md`. Proceed only on an explicitly indexed test target. A
+release-signed APK cannot update a debug-signed installation; uninstalling the debug package erases
+its app-private settings. Stop on a signature mismatch; never automatically
+uninstall or clear data. After a separately approved signer migration, reprovision
+the designated test credentials only
 through the approved debug staging flow or enter them normally in the release
 app.
 
@@ -214,7 +218,9 @@ adb -s "$TVHPLAYER_ADB_SERIAL" shell monkey -p at.leoville.tvhstream 1
 ```
 
 Use those raw commands only for an explicitly approved rollback; routine device
-work remains behind `tools/device`. Do not remove Headent, the diagnostic client,
+work follows the CLI-first `android-tooling.md` workflow. The signed-bundle
+installation above remains a specialized provenance gate, not an ordinary
+install/capture mandate. Do not remove Headent, the diagnostic client,
 Google Basic TV, or their data during validation.
 
 For an already accepted product release, prepare a forward-versioned rollback

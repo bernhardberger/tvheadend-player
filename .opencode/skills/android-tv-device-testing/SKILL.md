@@ -5,10 +5,11 @@ description: Use for TVHeadend Player Android TV or TCL ADB testing, screenshots
 
 # Android TV Device Testing
 
-Use `./tools/device` for physical-TV role/identity, credential and acceptance
-operations. For authorized offline LXC119 work, use the standard explicit-device
-workflow in `docs/android-tooling.md`; no Player device profile or duplicate
-install/instrument transport is needed. Neither route permits broad ADB dumps.
+Use official Android CLI with explicit `--device` for ordinary install/capture
+on physical TVs and the authorized existing LXC119 emulator. Follow
+`docs/android-tooling.md`; use explicit-serial ADB only for capabilities the CLI
+lacks. Keep specialized credential, signed-release and instrumentation acceptance
+gates. No route permits broad ADB dumps or automatic uninstall/data clearing.
 
 ## Before touching the device
 
@@ -18,31 +19,27 @@ install/instrument transport is needed. Neither route permits broad ADB dumps.
 3. Confirm relevant checks and the required final gate passed for the artifact
    being installed. Reuse unchanged verified-artifact evidence rather than
    rerunning the build for every install. Existing admitted gates still apply.
-4. Configure the ADB serial through ignored `.tvhplayer-device.json`,
-   `TVHPLAYER_ADB_SERIAL`, or `--serial`. Never commit a household device
-   address as a required default.
+4. Select the intended serial from ignored owner configuration and pass it
+   explicitly as CLI `--device` (or ADB `-s`). A `tools/device` profile does not
+   select the CLI target. Never commit a household address as a required default.
 5. Confirm the package under test. The appliance default is
    `at.bernhardberger.tvhplayer`; rollback clients use different package IDs.
-6. Run `./tools/device doctor` and confirm the local role. Only a designated
-   development target may be `test`,
-   and mutations require matching manufacturer, model, device, and product.
+6. Confirm the selected role and matching live manufacturer, model, device and
+   product before mutation. Only a designated development target may be `test`.
+   Bounded ADB `getprop` supplies these fields; `tools/device doctor` is optional,
+   not a redundant mandatory preflight.
 
 ## Safe sequence
 
-The following restricted sequence is available only for a configured test device:
+For an authorized test device, install only when the required verified APK is not
+already installed. An install does not authorize credential provisioning or launch:
 
 ```bash
-./tools/device doctor
-./tools/device install-debug
-./tools/device provision-test-credentials
-./tools/device force-stop
-./tools/device launch
-./tools/device current
-./tools/device package-info
-./tools/device screenshot --confirm-safe-screen
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/debug/app-debug.apk --use-delta-install=false --install-options=-r,-t
 ```
 
-Use named key commands rather than numeric key codes:
+The CLI lacks standalone remote-key input. Existing bounded named key commands
+remain useful for separately authorized navigation:
 
 ```bash
 ./tools/device key up
@@ -85,20 +82,21 @@ After confirming that no connection, settings, password, or other secret-bearing
 screen is visible, capture the designated test TV with:
 
 ```bash
-./tools/device screenshot --confirm-safe-screen --name channels-trailing-clipping
+android --no-metrics screen capture --device="$TVHPLAYER_ADB_SERIAL" --output="$evidence/channels-trailing-clipping.png"
 ```
 
-The default owner-only output is written beneath the ignored workspace path
-`captures/device/` with a UTC timestamp and the sanitized `--name` slug. If
-`--name` is omitted, it falls back to `current-screen`. Filenames do not establish
-source provenance. For attributed evidence, record the installed app/test APK
+Use a fresh filename in a private ignored evidence directory (`umask 077`,
+directory mode 0700), and open the newly produced PNG to confirm usable output and
+the intended screen. CLI 1.0.16261425 can exit 0 with no PNG for a nonexistent
+device; missing/stale output is failure, not a reason for an ADB fallback or a new
+checker/preflight framework. Filenames do not establish source provenance.
+For attributed evidence, record the installed app/test APK
 hashes matched to verified local artifacts, source revision, scenario, canvas,
 locale, font scale and focus. Keep host screenshots distinct from composable
 captures and never attribute a launcher image to Player.
-Pass `--output` only when an exact path is required; repository paths are allowed
-only beneath `captures/device/`. The wrapper requires exact test-device identity,
-validates the PNG, and replaces the output atomically. Use the file-reading tool
-to inspect the printed result path. Screenshots can validate static layout,
+The existing `tools/device screenshot --synthetic-video-backdrop` flow remains
+specialized setup/capture/cleanup for a debug backdrop, not ordinary capture or
+proof of live video. Screenshots can validate static layout,
 focus appearance, clipping, and text, but cannot establish video visibility or
 motion quality.
 

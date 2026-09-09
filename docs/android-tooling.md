@@ -2,11 +2,19 @@
 
 ## Standard workflow
 
-Use Gradle/AGP for builds, AndroidJUnitRunner for instrumentation, and explicit
-ADB serials for the authorized existing LXC119 emulator. No Player device profile,
+Use official Android CLI with explicit `--device` for ordinary installs and
+current-screen captures, Gradle/AGP for builds, AndroidJUnitRunner for
+instrumentation, and Perfetto for profiling. Use explicit-serial ADB only for
+capabilities the CLI lacks, such as instrumentation, file pull, package inspection
+and bounded shell operations. No Player device profile,
 Gradle workflow ledger, emulator reset, uninstall, data clear, new AVD or
 credential provisioning is part of an offline run. Keep one operation owner.
-Physical TV operations still follow `device-targets.md` and `tools/device`.
+Physical TV operations follow `device-targets.md` with the same CLI-first default.
+The release/signature and credential workflows retain their specific gates; they
+are not prerequisites for ordinary capture. Never automatically uninstall, clear
+data, downgrade or switch target. Reinstall only with a demonstrated need.
+For physical targets, `$TVHPLAYER_ADB_SERIAL` in examples must be the selected
+nonempty serial, not a CLI default; confirm it against the intended role/identity.
 
 Build on the engineering host, with disk-backed `$HOME/.gradle`:
 
@@ -22,19 +30,20 @@ Use the `gradle-run` skill for bounded logs, cancellation and live-test isolatio
 
 Use the existing remote lane only to obtain the ADB tunnel. This example runs a
 single bounded ADB command; for a sequence, use one owner shell/script as the
-command after `--`, with the same explicit serial on every ADB invocation:
+command after `--`, with explicit `--device` on CLI operations and `-s` on ADB:
 
 ```bash
 /root/homelab/tools/android-emulator with-adb-tunnel offline-player -- /opt/android-sdk/platform-tools/adb -s emulator-5556 get-state
 ```
 
-Inside that tunnel, use these standard operations in order. Do not run them
+Inside that tunnel, use these standard operations as needed. Skip installation
+when the required verified APKs are already installed. Do not run them
 outside it: `emulator-5556` is scoped to that remote ADB server, not globally unique.
 
 ```bash
 adb -s emulator-5556 shell 'for p in ro.product.manufacturer ro.product.model ro.product.device ro.product.name; do getprop "$p"; done'
-adb -s emulator-5556 install -r -t app/build/outputs/apk/debug/app-debug.apk
-adb -s emulator-5556 install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+android --no-metrics install --device=emulator-5556 --apks=app/build/outputs/apk/debug/app-debug.apk --use-delta-install=false --install-options=-r,-t
+android --no-metrics install --device=emulator-5556 --apks=app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk --use-delta-install=false --install-options=-r,-t
 adb -s emulator-5556 shell pm list instrumentation
 adb -s emulator-5556 shell pm path at.bernhardberger.tvhplayer
 adb -s emulator-5556 shell pm path at.bernhardberger.tvhplayer.test
@@ -75,9 +84,18 @@ and test hashes, runner/scenario, image hash, canvas, locale, font scale and foc
 together. The example scenario uses US English, font scale 1.0 and Info focus;
 canvas depends on the emulator. A checkout-based filename is not installed provenance.
 
-For a safe current-screen capture, standard
-`adb -s emulator-5556 exec-out screencap -p` writes PNG bytes to a private file.
-Validate the PNG and inspect its content. A post-test launcher image is not a
+For a safe current-screen capture, use a fresh filename in the private evidence
+directory:
+
+```bash
+android --no-metrics screen capture --device=emulator-5556 --output="$evidence/current-screen.png"
+```
+
+Open the newly produced PNG and inspect its content. CLI 1.0.16261425 has a known
+bug: capture for a nonexistent device can exit 0 without creating a PNG. Missing,
+stale or unusable output is not capture success. Ordinary fresh-output observation
+is sufficient; do not add a checker, fallback wrapper or mandatory preflight.
+A post-test launcher image is not a
 Player screenshot. Never capture connection/password/account-entry screens or
 dump layouts/logcat/app data. Offline fake-state captures do not prove live video,
 TVHeadend interaction, motion quality or physical-TV acceptance.
@@ -159,8 +177,9 @@ its remote ADB server and `emulator-5556`; no G10 selection trial was performed.
   evidence only, separate from the composable PNG.
 - A nonexistent CLI `--device` printed `Error: Device with serial or AVD name
   'p38-nonexistent' not found.` but exited **0** and produced no PNG. Standard ADB
-  explicit-serial `get-state` returned **1** for that nonexistent target. CLI is
-  optional, not the default unattended failure-reporting gate.
+  explicit-serial `get-state` returned **1** for that nonexistent target. P38's
+  resulting ADB-default decision is superseded: CLI is now the ordinary
+  install/capture workflow, with fresh usable output observed as described above.
 - A deliberately missing instrumentation class reported `initializationError`,
   status **-2**, `FAILURES!!!`, yet ADB exited **0** and instrumentation ended **-1**.
   It was rejected as a failed test, not accepted as transport success.
@@ -170,10 +189,12 @@ its remote ADB server and `emulator-5556`; no G10 selection trial was performed.
   after both timeout expiry and an external cancellation signal. The final
   verifier ran 127 tool tests successfully and retained the same app APK hash.
 
-Retained custom pieces cover specific gaps: physical-TV role/identity and secret
-provisioning, live acceptance result/count/skip checks, private validated physical
-captures, shared build serialization and the existing remote SSH tunnel. They
-are not prerequisites for this offline install/instrument/pull sequence. Removed:
+Caller inspection retains custom pieces for secret provisioning, live acceptance
+result/count/skip checks, signed-bundle verification, synthetic-backdrop setup and
+cleanup, bounded diagnostics/keys, shared build serialization and the existing
+remote SSH tunnel. Legacy `tools/device install-debug` and ordinary `screenshot`
+remain available but are not the prescribed workflow; no new code delegates CLI
+through that wrapper. These retained pieces are not universal preflights. Removed:
 mandatory Gradle ledger wrapper/tests and screenshot Git-state lookups. Prior
 logs, captures, tags and P37 results are not deleted or reinterpreted.
 

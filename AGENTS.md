@@ -121,8 +121,10 @@ it does not replace integrated or physical-TV gates.
   environment variables, Git, Gradle properties, logs, screenshots, reports, or
   generated output.
 - Before any physical-device operation, read `docs/device-targets.md`, load
-  `android-tv-device-testing`, and use `./tools/device`. Confirm the selected
-  role and all four live identity properties before mutation.
+  `android-tv-device-testing`, and follow `docs/android-tooling.md`: official CLI
+  with explicit `--device` for ordinary install/capture, ADB only for missing CLI
+  capabilities. Confirm the selected role and all four live identity properties
+  before mutation; `tools/device doctor` is not a mandatory extra preflight.
 - Production and unclassified devices are read-only except for an explicitly
   approved production-signed update. Never substitute one TV for another based
   only on a generic model string.
@@ -139,7 +141,7 @@ it does not replace integrated or physical-TV gates.
 ## Delegation and evidence
 
 `app-device-operator` is an operational child with Bash, but no repository edits
-or delegation. It may use `tools/device` only for an explicitly authorized task
+or delegation. It may operate devices only for an explicitly authorized task
 after exclusive device ownership is handed over by the primary. All device,
 identity, credential and capture rules still apply. This is the device-operation
 exception to the read-only child restrictions below, not a second code writer.
