@@ -27,6 +27,10 @@ Inspect the packaged manifest with `aapt2 dump xmltree <apk> --file
 AndroidManifest.xml`: require absent/false `debuggable`, `profileable shell=true`,
 the suffixed ID and no INTERNET permission. A debug **certificate** does not make
 an APK debuggable. Verify the signer using `apksigner verify --print-certs`.
+The only exported activity must be `RailProfileActivity`; its export permits
+explicit shell `am start` on the nondebuggable fixture and accepts no payload.
+Require no production activity or accessibility service. The dependency-provided
+ProfileInstaller receiver retains its `android.permission.DUMP` protection.
 Compare release/profile resolved compile/runtime artifacts and their hashes,
 build-type minification/shrinking/ProGuard settings, and each uncompressed `lib/`
 ZIP member. Do not compare compressed APK sizes as an optimization measurement.
@@ -129,12 +133,22 @@ and uncompressed bytes matched across release/profile. SDK remains public 0.12.0
 Media3 1.11.0, AGP 9.3.1, Kotlin 2.4.10; the final verifier passed native/source
 provenance, 127 tool tests, static checks, JVM tests, debug lint/assembly and
 Android-test compilation. Profile assembly and profile lint passed separately.
+The regular SDK-consumption gate enumerates debug/release, not profile; profile
+equivalence rests on the separate artifact-byte comparison above, which must be
+repeated when build settings or dependencies change. The final merged manifest
+also confirmed shell profileability, the suffixed ID, no INTERNET permission,
+and only the fixture activity exported; `apkanalyzer` returned `false` for
+debuggability. The existing release no-op source is tracked despite the broad
+release-directory ignore pattern. Release preparation selects the exact unsigned
+release APK path, not a wildcard including the profile output.
 Android instrumentation tests were not executed for this fixture.
 
 Each final recording requested 20 seconds and completed normally. Only the
 active UI events span about 5.6 seconds; idle time need not generate frames.
 Every final trace imported without overrides, returned no nonzero non-info
 health stats, and contained one attributed app layer with 54 complete frames.
+All three runs had zero incomplete app frames. `health.sql` rejects any incomplete
+app frame, and `rail.sql` excludes negative-duration sentinels from aggregates.
 
 | Run | App PID / layer suffix | Event bounds (s) | Frames | Mean (ms) | p50 (ms) | p95 (ms) | Max (ms) |
 |---|---|---:|---:|---:|---:|---:|---:|
