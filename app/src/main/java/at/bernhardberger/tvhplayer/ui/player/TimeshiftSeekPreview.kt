@@ -30,6 +30,7 @@ internal fun TimeshiftSeekPreview(
     programmeWindow: ProgrammeWindow? = null,
     channelsAvailable: Boolean = true,
     feedback: String? = null,
+    feedbackIsError: Boolean = feedback != null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
@@ -104,7 +105,7 @@ internal fun TimeshiftSeekPreview(
             previewLabel = targetLabel,
             reserveStatusSpace = true,
             feedback = feedback ?: programmeWindow?.let { if (it.targetAvailable) it.event.title.orEmpty() else unavailableTarget },
-            feedbackIsError = feedback != null || programmeWindow?.targetAvailable == false,
+            feedbackIsError = if (feedback != null) feedbackIsError else programmeWindow?.targetAvailable == false,
             feedbackTestTag = "timeshift-preview-programme",
         )
     }

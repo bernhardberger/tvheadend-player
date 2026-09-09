@@ -290,8 +290,11 @@ fun PlayerTimelineBlock(
             }
         }
         // Live modes reserve the same target clearance, including tuning and missing EPG.
+        // The timeline's top padding already contributes 8dp of that clearance.
         if (reserveStatusSpace || previewLabel != null) {
-            Spacer(Modifier.height(with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }))
+            Spacer(Modifier.height(with(LocalDensity.current) {
+                (MaterialTheme.typography.labelLarge.lineHeight.toDp() - 8.dp).coerceAtLeast(0.dp)
+            }))
         }
         Column(timelineModifier.fillMaxWidth().padding(vertical = 8.dp)) {
             if (previewLabel != null) {

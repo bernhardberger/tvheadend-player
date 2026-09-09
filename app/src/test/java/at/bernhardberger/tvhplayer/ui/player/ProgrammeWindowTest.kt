@@ -77,8 +77,8 @@ class ProgrammeWindowTest {
         assertNull(programmeWindow(fixture.presentation(), state.playbackTarget, state.timeline, ::lookup))
         val midnight = event(3, "2026-09-07T23:30:00Z", "2026-09-08T00:30:00Z", "Midnight")
         val labels = programmeWindowClockLabels(midnight, ZoneId.of("UTC"))
-        assertEquals("07 Sep 23:30", labels.first)
-        assertEquals("08 Sep 00:30", labels.second)
+        assertEquals("23:30", labels.first)
+        assertEquals("00:30", labels.second)
         assertNull(programmeWindow(state.copy(timingKnown = false), eventAt = ::lookup))
     }
 

@@ -150,6 +150,7 @@ data class AppTimeshiftState(
     val timingKnown: Boolean = available,
     val timeline: at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline? = null,
     val playbackTarget: at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget? = null,
+    val playbackSeek: at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekToken? = null,
 )
 
 private val FIXED_LIVE_TIMESHIFT_PERIOD = 2.hours
@@ -1473,6 +1474,7 @@ fun LiveTimeshiftState.toAppPresentation(
             timingKnown = timeline != null && position != null && position.position <= timeline!!.end,
             timeline = timeline,
             playbackTarget = position,
+            playbackSeek = estimate?.seek.takeIf { position != null },
         )
     }
 }

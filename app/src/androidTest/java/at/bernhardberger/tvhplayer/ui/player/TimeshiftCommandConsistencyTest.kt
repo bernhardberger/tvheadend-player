@@ -31,6 +31,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.launch
+import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -38,6 +40,68 @@ import org.junit.Test
 @OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
 class TimeshiftCommandConsistencyTest {
     @get:Rule val rule = createComposeRule()
+
+    @Test fun acquisitionRetainsTimelineAndDirectionalRecoveryWithoutResuming() {
+        val state = mutableStateOf(AppTimeshiftState())
+        val feedback = mutableStateOf<String?>(null)
+        val feedbackIsError = mutableStateOf(false)
+        var toggles = 0
+        val commands = mutableListOf<Long>()
+        lateinit var input: InputModeManager
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            input = LocalInputModeManager.current
+            TVHeadendPlayerTheme {
+                OverlayControlsTv(
+                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                    channelName = "Fixture", channelNumber = 1, piconPath = null,
+                    nowEvent = null, nextEvent = null, nowSec = 0L,
+                    controlsVisible = true, optionsOpen = false,
+                    onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                    timeshiftState = state.value, paused = true,
+                    onSeekTimeshift = commands::add, timeshiftFeedback = feedback.value,
+                    timeshiftFeedbackIsError = feedbackIsError.value,
+                    onToggleTimeshiftPause = { toggles++ }, onGoLive = {},
+                )
+            }
+        }
+        rule.mainClock.advanceTimeBy(100L)
+        rule.runOnIdle { input.requestInputMode(InputMode.Keyboard) }
+        rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).assertExists()
+        rule.runOnIdle { state.value = AppTimeshiftState(available = true, timingKnown = false) }
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeBy(1_480L, ignoreFrameDuration = true)
+        rule.onNodeWithText("Playback timing unavailable", substring = true).assertDoesNotExist()
+        rule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
+        rule.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
+        assertEquals(emptyList<Long>(), commands)
+        rule.runOnIdle {
+            state.value = AppTimeshiftState(available = true, positionMs = 1_000L, liveEdgeMs = 3_000L)
+        }
+        rule.mainClock.advanceTimeBy(100L)
+        rule.onNodeWithTag("player-seekbar").assertIsFocused()
+        rule.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionLeft) }
+        assertEquals(listOf(30_000L, -30_000L), commands)
+        rule.runOnIdle { state.value = state.value.copy(timingKnown = false) }
+        rule.mainClock.advanceTimeByFrame()
+        val restartedAt = rule.mainClock.currentTime
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithTag("player-seekbar").assertIsFocused()
+        rule.runOnIdle { feedback.value = "Command failed"; feedbackIsError.value = true }
+        rule.mainClock.advanceTimeBy(16L)
+        rule.onNodeWithText("Command failed", useUnmergedTree = true).assertIsDisplayed()
+        rule.runOnIdle { feedback.value = "Reached the available buffer limit"; feedbackIsError.value = false }
+        rule.mainClock.advanceTimeBy(restartedAt + 1_480L - rule.mainClock.currentTime, ignoreFrameDuration = true)
+        rule.onNodeWithText("Playback timing unavailable", useUnmergedTree = true).assertDoesNotExist()
+        rule.mainClock.advanceTimeBy(32L)
+        rule.mainClock.advanceTimeByFrame()
+        rule.onNodeWithText("Playback timing unavailable", useUnmergedTree = true).assertIsDisplayed()
+        rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        rule.onNodeWithTag("player-pause").assertIsFocused()
+        rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        rule.onNodeWithTag("player-seekbar").assertIsFocused()
+        assertEquals(0, toggles)
+    }
 
     @Test fun normalDpadPassesTheSameUnclampedStepAsReducedAndRejectsHiddenInput() {
         val visible = mutableStateOf(true)
@@ -72,6 +136,99 @@ class TimeshiftCommandConsistencyTest {
         rule.runOnIdle { visible.value = false }
         rule.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
         assertEquals(admitted, commands.size)
+    }
+
+    @Test fun acceptedPausedAndPlayingEdgeRequestsSurviveDelayedSamplesAndKeepFocusRecovery() {
+        val scope = TestScope()
+        val owner = LiveTimelinePresentationState(scope, { 0L }, { scope.testScheduler.currentTime })
+        val fixture = TimeshiftTestFixture(600.seconds).apply { updateHistory(0.seconds, 600.seconds) }
+        val sample = mutableStateOf(fixture.state.value.toAppPresentation(fixture.playbackPosition(590.seconds)))
+        val reduced = mutableStateOf(false)
+        var toggles = 0
+        lateinit var input: InputModeManager
+        rule.setContent {
+            input = LocalInputModeManager.current
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize()) {
+                    val preview = owner.previewForTimeline(sample.value.timeline)
+                    if (reduced.value) {
+                        preview?.let {
+                            TimeshiftSeekPreview(sample.value, it.decision, feedback = owner.feedback,
+                                feedbackIsError = owner.feedbackIsError,
+                                modifier = Modifier.align(Alignment.BottomCenter))
+                        }
+                    } else {
+                        OverlayControlsTv(
+                            imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                            channelName = "Fixture", channelNumber = 1, piconPath = null,
+                            nowEvent = null, nextEvent = null, nowSec = 0L,
+                            controlsVisible = true, optionsOpen = false,
+                            onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                            timeshiftState = preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
+                                ?: sample.value,
+                            committedTimeshiftState = sample.value, paused = sample.value.paused,
+                            previewing = preview != null, timeshiftFeedback = owner.feedback,
+                            timeshiftFeedbackIsError = owner.feedbackIsError,
+                            onSeekTimeshift = {}, onToggleTimeshiftPause = { toggles++ }, onGoLive = {},
+                        )
+                    }
+                }
+            }
+        }
+        rule.runOnIdle { input.requestInputMode(InputMode.Keyboard) }
+        try {
+            for (paused in listOf(false, true)) for (forward in listOf(false, true)) {
+                val result = fixture.completed(readerReached = null)
+                val target = if (forward) 600.seconds else 0.seconds
+                rule.runOnIdle {
+                    sample.value = fixture.state.value.toAppPresentation(
+                        fixture.playbackPosition(if (forward) 590.seconds else 10.seconds)
+                    ).copy(paused = paused)
+                    owner.queueRelativeSeek(sample.value, if (forward) 30_000L else -30_000L,
+                        "Unavailable", "Reached the available buffer limit", "Expired", "Replaced", "Uncertain") { result }
+                    scope.advanceTimeBy(400L); scope.runCurrent()
+                }
+                rule.onNodeWithTag("player-seekbar").requestFocus()
+                rule.runOnIdle {
+                    scope.advanceTimeBy(3_000L); scope.runCurrent()
+                    scope.launch {
+                        sample.value = requireNotNull(owner.sampleTimeshiftPresentation {
+                            fixture.state.value.toAppPresentation().copy(paused = paused)
+                        })
+                    }
+                    scope.runCurrent()
+                    org.junit.Assert.assertNotNull(owner.preview)
+                }
+                rule.onNodeWithTag("player-seekbar").assertIsFocused()
+                rule.onNodeWithText("Seek requested. Waiting for playback position", useUnmergedTree = true).assertIsDisplayed()
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                rule.onNodeWithTag("player-pause").assertIsFocused()
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+                rule.onNodeWithTag("player-seekbar").assertIsFocused()
+                val output = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
+                    "p37-settlement-captures/waiting-${if (paused) "paused" else "playing"}-${if (forward) "latest" else "earliest"}.png")
+                output.parentFile!!.mkdirs()
+                output.outputStream().use { rule.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+                rule.runOnIdle { reduced.value = true }
+                rule.onNodeWithTag("timeshift-seek-preview").assertExists()
+                rule.runOnIdle {
+                    reduced.value = false
+                    scope.launch {
+                        sample.value = requireNotNull(owner.sampleTimeshiftPresentation {
+                            fixture.state.value.toAppPresentation(fixture.playbackPosition(target, result.seek))
+                                .copy(paused = paused)
+                        })
+                    }
+                    scope.runCurrent()
+                    org.junit.Assert.assertNull(owner.preview)
+                    assertEquals(paused, sample.value.paused)
+                }
+                rule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
+                assertEquals(0, toggles)
+            }
+        } finally {
+            rule.runOnIdle { owner.dispose() }
+        }
     }
 
     @Test fun reducedPreviewExposesUncertainCommandFeedback() {

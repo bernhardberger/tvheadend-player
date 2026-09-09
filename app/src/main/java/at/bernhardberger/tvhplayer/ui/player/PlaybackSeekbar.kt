@@ -43,6 +43,7 @@ fun PlaybackSeekbar(
     programmeWindow: ProgrammeWindow? = null,
     previewing: Boolean = false,
     feedback: String? = null,
+    feedbackIsError: Boolean = feedback != null,
     reserveStatusSpace: Boolean = false,
     statusAction: (@Composable () -> Unit)? = null,
     /**
@@ -69,7 +70,7 @@ fun PlaybackSeekbar(
             reserveStatusSpace = reserveStatusSpace,
             statusAction = statusAction,
             feedback = feedback,
-            feedbackIsError = feedback != null,
+            feedbackIsError = feedbackIsError,
             timelineModifier = modifier.semantics { contentDescription = unavailable },
         )
         return
@@ -196,7 +197,7 @@ fun PlaybackSeekbar(
             reserveStatusSpace = reserveStatusSpace,
             statusAction = statusAction,
             feedback = windowFeedback,
-            feedbackIsError = feedback != null,
+            feedbackIsError = feedbackIsError,
             previewLabel = if (previewing && timeshiftPosition != null) {
                 if (timeshiftPosition.atLiveEdge) stringResource(R.string.timeshift_live)
                 else "−${formatPlaybackDuration(timeshiftPosition.behindLiveMs)}"

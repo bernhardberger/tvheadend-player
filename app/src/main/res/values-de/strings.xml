@@ -1,4 +1,5 @@
 <resources>
+    <string name="timeshift_seek_waiting">Sprung angefordert. Warten auf die Wiedergabeposition</string>
     <string name="connection_refreshing_channels">Senderinformationen werden aktualisiert…</string>
     <string name="settings_storage">Speicher</string>
     <string name="clear_cache">Cache leeren</string>

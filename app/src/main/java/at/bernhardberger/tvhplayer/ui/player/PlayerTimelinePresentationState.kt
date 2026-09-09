@@ -12,11 +12,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.media3.common.C
 import androidx.media3.common.Player
-import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekToken
 import kotlin.time.Duration.Companion.milliseconds
 import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.TimeshiftSeekQueueState
@@ -54,6 +54,7 @@ internal data class LiveTimeshiftSeekPreview(
     val dispatched: Boolean,
     val target: TimeshiftContentTarget,
     val mappingTimeline: TimeshiftTimeline? = null,
+    val acceptedSeek: TimeshiftSeekToken? = null,
 )
 
 private class LiveTimelineSourceGeneration(
@@ -72,6 +73,7 @@ private class LiveTimelineSourceGeneration(
     var positionCommandsInFlight = 0
     val seekWake = Channel<Unit>(Channel.CONFLATED)
     var feedback by mutableStateOf<String?>(null)
+    var feedbackIsError by mutableStateOf(false)
     var preview by mutableStateOf<LiveTimeshiftSeekPreview?>(null)
     var feedbackToken by mutableLongStateOf(initialFeedbackToken)
 }
@@ -92,6 +94,8 @@ internal class LiveTimelinePresentationState(
         private set
     val feedback: String?
         get() = sourceGeneration.feedback
+    val feedbackIsError: Boolean
+        get() = sourceGeneration.feedback != null && sourceGeneration.feedbackIsError
     val preview: LiveTimeshiftSeekPreview?
         get() = sourceGeneration.preview
     val feedbackToken: Long
@@ -116,11 +120,13 @@ internal class LiveTimelinePresentationState(
         val generation = sourceGeneration
         if (token != generation.feedbackToken) return false
         generation.feedback = value
+        generation.feedbackIsError = value != null
         return true
     }
 
     fun showFeedback(value: String?) {
         sourceGeneration.feedback = value
+        sourceGeneration.feedbackIsError = value != null
     }
 
     fun clearFeedback() {
@@ -146,10 +152,18 @@ internal class LiveTimelinePresentationState(
         val result = sample()
         // A seek can suspend independently of sampling. Only admit evidence from one
         // uninterrupted command epoch; numeric direction is not evidence of staleness.
-        return result.takeIf {
-            !disposed && generation === sourceGeneration &&
-                epoch == generation.positionSampleEpoch && generation.positionCommandsInFlight == 0
+        if (disposed || generation !== sourceGeneration ||
+            epoch != generation.positionSampleEpoch || generation.positionCommandsInFlight != 0
+        ) return null
+        val pending = generation.preview
+        if (pending?.acceptedSeek != null && result.timingKnown &&
+            pending.mappingTimeline?.describesSameSegment(result.timeline) == true &&
+            result.playbackSeek === pending.acceptedSeek
+        ) {
+            // Correlated Player-position evidence, not a decoded/displayed frame acknowledgement.
+            clearPreview(generation)
         }
+        return result
     }
 
     suspend fun <T> positionCommand(command: suspend () -> T): T {
@@ -242,8 +256,9 @@ internal class LiveTimelinePresentationState(
                     val contentTarget = generation.pendingContentTarget ?: break
                     generation.pendingContentTarget = null
                     val result = positionCommand { seekContent(contentTarget) }
-                    val command = (result as? TimeshiftContentSeekResult.Completed)?.command
-                    val accepted = command?.disposition == TimeshiftCommandDisposition.ACCEPTED
+                    val completed = result as? TimeshiftContentSeekResult.Completed
+                    val command = completed?.command
+                    val accepted = command === TimeshiftCommandResult.ACCEPTED && completed.seek != null
                     generation.seekQueue = completeTimeshiftSeekDispatch(
                         generation.seekQueue,
                         accepted,
@@ -265,6 +280,7 @@ internal class LiveTimelinePresentationState(
                                 result == TimeshiftContentSeekResult.Replaced -> replacedText
                                 else -> unavailableText
                             }
+                            generation.feedbackIsError = !accepted
                         }
                         if (!accepted && generation.preview != null) {
                             // Discard stacked input, but keep the attempted request's outcome
@@ -274,7 +290,12 @@ internal class LiveTimelinePresentationState(
                             }
                         }
                         generation.seekFeedbackJob?.cancel()
-                        generation.seekFeedbackJob = scope.launch {
+                        if (accepted) {
+                            generation.preview = generation.preview
+                                ?.takeIf { it.token == dispatchToken }
+                                ?.copy(acceptedSeek = completed.seek)
+                        }
+                        generation.seekFeedbackJob = if (accepted) null else scope.launch {
                             delay(TIMESHIFT_SEEK_FEEDBACK_MS)
                             if (
                                 generation === sourceGeneration &&

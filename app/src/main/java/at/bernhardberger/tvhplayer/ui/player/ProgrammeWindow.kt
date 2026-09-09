@@ -44,6 +44,6 @@ internal fun programmeWindow(
 internal fun programmeWindowClockLabels(event: EpgEvent, zone: ZoneId = ZoneId.systemDefault()): Pair<String, String> {
     val start = java.time.Instant.ofEpochSecond(event.start.epochSeconds).atZone(zone)
     val end = java.time.Instant.ofEpochSecond(event.stop.epochSeconds).atZone(zone)
-    val formatter = DateTimeFormatter.ofPattern(if (start.toLocalDate() == end.toLocalDate()) "HH:mm" else "dd MMM HH:mm")
+    val formatter = DateTimeFormatter.ofPattern("HH:mm")
     return start.format(formatter) to end.format(formatter)
 }

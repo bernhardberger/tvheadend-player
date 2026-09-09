@@ -74,7 +74,7 @@ class PlayerOverlayCompositionTest {
                         composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
                         if (candidate.available) {
                             val semantics = composeRule.onNodeWithTag("player-seekbar").fetchSemanticsNode().config
-                            assertTrue(!semantics.contains(androidx.compose.ui.semantics.SemanticsProperties.Focused))
+                            assertEquals(false, semantics[androidx.compose.ui.semantics.SemanticsProperties.Focused])
                             assertTrue(!semantics.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
                         }
                     }

@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
@@ -89,6 +91,7 @@ fun OverlayControlsTv(
     restoreChannelAction: String? = null,
     onChannelActionRestored: () -> Unit = {},
     onActionFocused: (String) -> Unit = {},
+    timeshiftFeedbackIsError: Boolean = timeshiftFeedback != null,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -98,6 +101,14 @@ fun OverlayControlsTv(
     val goLiveFocus = remember { FocusRequester() }
     val seekable = timeshiftState.available && timeshiftState.timingKnown
     val pausable = timeshiftState.available
+    var timingUnavailable by remember(channelNumber, channelName) { mutableStateOf(false) }
+    LaunchedEffect(channelNumber, channelName, pausable, seekable) {
+        timingUnavailable = false
+        if (pausable && !seekable) {
+            kotlinx.coroutines.delay(1_500L)
+            timingUnavailable = true
+        }
+    }
     val initialFocus = if (pausable) pauseFocus else infoFocus
     val programmeTimeKnown = committedWindow != null || programmeTimingDescribesPlayback(committedTimeshiftState)
     val programmeTitle = nowEvent?.takeIf { programmeTimeKnown }?.title.orEmpty()
@@ -116,7 +127,7 @@ fun OverlayControlsTv(
     val removedFocusTarget = when (lastFocusedControl) {
         "player-go-live" -> initialFocus.takeIf { atLive != false }
         "player-pause" -> infoFocus.takeIf { !pausable }
-        "player-seekbar" -> initialFocus.takeIf { !seekable }
+        "player-seekbar" -> if (pausable) timelineFocus else initialFocus
         else -> null
     }
     LaunchedEffect(controlsVisible, optionsOpen, restoreInfoFocus, restoreRecordActionFocus, restoreOptionsFocus, restoreChannelAction, seekable, pausable, atLive) {
@@ -192,7 +203,7 @@ fun OverlayControlsTv(
                             .focusProperties {
                                 left = settingsFocus
                                 right = FocusRequester.Cancel
-                                down = if (seekable) timelineFocus else initialFocus
+                                down = if (pausable) timelineFocus else initialFocus
                                 up = FocusRequester.Cancel
                             }
                             .onFocusChanged {
@@ -212,7 +223,7 @@ fun OverlayControlsTv(
                                         if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                             relocatingKey = event.key
                                             when (event.key) {
-                                                 Key.DirectionDown -> if (seekable) timelineFocus.requestFocus() else initialFocus.requestFocus()
+                                                  Key.DirectionDown -> if (pausable) timelineFocus.requestFocus() else initialFocus.requestFocus()
                                                  Key.DirectionLeft -> settingsFocus.requestFocus()
                                                 else -> Unit
                                             }
@@ -225,20 +236,8 @@ fun OverlayControlsTv(
                     ) { Text(stringResource(R.string.timeshift_go_live), maxLines = 1) }
                 }
         }
-        if (timeshiftState.available) {
-            PlaybackSeekbar(
-                range = timeshiftSeekbarRange(timeshiftState),
-                timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
-                programmeWindow = programmeWindow,
-                previewing = previewing,
-                reserveStatusSpace = true,
-                statusAction = statusAction,
-                feedback = timeshiftFeedback ?: if (previewing && programmeWindow?.targetAvailable == false) {
-                    stringResource(R.string.timeshift_target_expired)
-                } else null,
-                paused = paused,
-                onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
-                modifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
+        val timelineModifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
+                    .then(if (timelineFocused && !seekable && !previewing) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
                     .onFocusChanged {
                         timelineFocused = it.isFocused
                         if (it.isFocused) lastFocusedControl = "player-seekbar"
@@ -271,31 +270,79 @@ fun OverlayControlsTv(
                             }
                             else -> false
                         }
-                    },
+                    }
+        if (seekable) {
+            PlaybackSeekbar(
+                range = timeshiftSeekbarRange(timeshiftState),
+                timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
+                programmeWindow = programmeWindow,
+                previewing = previewing,
+                reserveStatusSpace = true,
+                statusAction = statusAction,
+                feedback = timeshiftFeedback ?: if (previewing && programmeWindow?.targetAvailable == false) {
+                    stringResource(R.string.timeshift_target_expired)
+                } else null,
+                feedbackIsError = if (timeshiftFeedback != null) timeshiftFeedbackIsError
+                    else previewing && programmeWindow?.targetAvailable == false,
+                paused = paused,
+                onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
+                modifier = timelineModifier,
+            )
+        } else if (previewing && pausable) {
+            val range = timeshiftSeekbarRange(timeshiftState)
+            val targetLabel = "-${at.bernhardberger.tvhplayer.core.formatPlaybackDuration(
+                (timeshiftState.liveEdgeMs - timeshiftState.positionMs).coerceAtLeast(0L)
+            )}"
+            val waiting = stringResource(R.string.timeshift_seek_waiting)
+            PlayerTimelineBlock(
+                progress = range.displayProgress,
+                tone = if (timelineFocused) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.PREVIEW,
+                rewindableStartFraction = range.availableStartFraction,
+                liveEdgeFraction = 1f,
+                programmeWindow = programmeWindow,
+                previewLabel = targetLabel,
+                reserveLabelSpace = true,
+                reserveStatusSpace = true,
+                statusAction = statusAction,
+                feedback = if (timeshiftFeedbackIsError) timeshiftFeedback else waiting,
+                feedbackIsError = timeshiftFeedbackIsError,
+                timelineModifier = timelineModifier.semantics {
+                    contentDescription = "$waiting. $targetLabel"
+                }.focusable(),
             )
         } else {
             // Schedule elapsed time is informational, never a playback coordinate or seek grant.
+            val showTimingUnavailable = pausable && timingUnavailable
             val event = nowEvent?.takeIf {
                 it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds
             }
-            val description = stringResource(R.string.player_current_broadcast)
+            val description = listOfNotNull(
+                stringResource(R.string.player_paused).takeIf { paused },
+                stringResource(R.string.player_current_broadcast).takeIf { event != null },
+                stringResource(R.string.player_timing_unavailable).takeIf { event == null || showTimingUnavailable },
+            ).joinToString(". ")
             PlayerTimelineBlock(
                 progress = event?.let { ((nowSec - it.start.epochSeconds).toDouble() /
                     (it.stop.epochSeconds - it.start.epochSeconds)).toFloat() },
                 tone = PlayerTimelineTone.AMBIENT,
                 fillColor = MaterialTheme.colorScheme.primary,
-                showTrack = event != null,
+                showTrack = true,
                 leadingLabel = event?.let { formatClock(it.start.epochSeconds) },
                 trailingLabel = event?.let { formatClock(it.stop.epochSeconds) },
                 reserveLabelSpace = true,
                 reserveStatusSpace = true,
                 statusAction = statusAction,
-                feedback = previewFeedback,
-                feedbackIsError = timeshiftFeedback != null,
-                timelineModifier = if (event != null) Modifier.testTag("player-schedule-progress")
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "$description. ${formatClock(event.start.epochSeconds)} - ${formatClock(event.stop.epochSeconds)}"
-                    } else Modifier,
+                feedback = if (showTimingUnavailable && !timeshiftFeedbackIsError) {
+                    stringResource(R.string.player_timing_unavailable)
+                } else previewFeedback,
+                feedbackIsError = timeshiftFeedbackIsError,
+                timelineModifier = (if (pausable) timelineModifier else if (event != null) Modifier.testTag("player-schedule-progress") else Modifier)
+                    .then(if (pausable || event != null) Modifier.semantics(mergeDescendants = true) {
+                        contentDescription = description + event?.let {
+                            ". ${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}"
+                        }.orEmpty()
+                    } else Modifier)
+                    .then(if (pausable) Modifier.focusable() else Modifier),
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -313,7 +360,7 @@ fun OverlayControlsTv(
                 .alpha(if (timelineFocused) 0.55f else 1f)
                 .testTag("player-actions")
                 .focusProperties {
-                    up = if (seekable) timelineFocus else FocusRequester.Cancel
+                    up = if (pausable) timelineFocus else FocusRequester.Cancel
                     down = FocusRequester.Cancel
                 }
                 .onPreviewKeyEvent { event ->
@@ -322,7 +369,7 @@ fun OverlayControlsTv(
                             if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                 if (event.key == Key.DirectionUp) {
                                     relocatingKey = event.key
-                                    if (seekable) timelineFocus.requestFocus()
+                                     if (pausable) timelineFocus.requestFocus()
                                 } else if (channelsAvailable) {
                                     // The screen owns this cross-layer cycle, including its release.
                                     onOpenChannels()

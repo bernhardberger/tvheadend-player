@@ -1136,6 +1136,7 @@ fun VideoPlayerScreen(
                 nextScheduled = displayedNextEvent?.let { observation.dvrEntryForEvent(it.id) }?.state ==
                     at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
                 timeshiftFeedback = timelineState.feedback,
+                timeshiftFeedbackIsError = timelineState.feedbackIsError,
                 paused = !player.playWhenReady,
                 onToggleTimeshiftPause = {
                     if (!player.playWhenReady) {
@@ -1204,6 +1205,7 @@ fun VideoPlayerScreen(
                 state = effectiveTimeshiftState,
                 decision = visibleSeekPreview.decision,
                 feedback = timelineState.feedback,
+                feedbackIsError = timelineState.feedbackIsError,
                 programmeWindow = displayedWindow,
                 channelsAvailable = channels.isNotEmpty(),
                 modifier = Modifier.align(Alignment.BottomCenter),

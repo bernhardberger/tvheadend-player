@@ -197,20 +197,30 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                     fixture.updateHistory(if (scenario.endsWith("deep")) 0.seconds else 3_000.seconds, 3_600.seconds)
                                     fixture.state.value.toAppPresentation(fixture.playbackPosition(
                                         when (scenario) {
-                                             "timing-unavailable", "timeline-unavailable-large" -> null
+                                              "timing-unavailable", "timeline-unavailable-large", "timeline-acquiring", "timeline-acquiring-focused", "timeline-unavailable-focused" -> null
+                                             "timeline-clamped", "timeline-overnight", "timeline-overnight-large" -> 3_300.seconds
                                             "paused", "paused-deep" -> 3_300.seconds
                                             else -> 3_600.seconds
                                         },
                                     ))
                                 }
                             },
-                            timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
-                             paused = scenario.startsWith("paused"),
+                             timeshiftFeedback = "Reached the available buffer limit".takeIf { scenario == "timeline-clamped" },
+                             timeshiftFeedbackIsError = false,
+                             onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
+                              paused = scenario.startsWith("paused") || scenario == "timeline-clamped",
                              previewing = scenario.startsWith("timeline-preview"),
                              programmeWindow = if (scenario.startsWith("timeline-preview") && !scenario.endsWith("-missing")) {
                                  ProgrammeWindow(programme(long = large), Instant.fromEpochSeconds(1_783_020_600L),
                                      0.5f, 0.25f, 0.75f, 0.75f, !scenario.endsWith("-expired"))
-                             } else null,
+                              } else if (scenario.startsWith("timeline-overnight")) {
+                                  val start = java.time.LocalDate.of(2026, 9, 7).atTime(23, 30)
+                                      .atZone(java.time.ZoneId.systemDefault()).toEpochSecond()
+                                  ProgrammeWindow(EpgEvent.create(id = EventId(3), channelId = ChannelId(1),
+                                      start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + 3_600L),
+                                      title = "Across midnight"), Instant.fromEpochSeconds(start + 1_800L),
+                                      0.5f, 0.25f, 0.75f, 0.75f, true)
+                              } else null,
                         )
                     }
                 }
@@ -220,6 +230,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         composeRule.waitForIdle()
         composeRule.runOnIdle { inputModeManager.requestInputMode(InputMode.Keyboard) }
         if (scenario.startsWith("timeline-preview")) composeRule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
+        if (scenario.endsWith("-focused")) composeRule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
         if (scenario == "shelf-empty") composeRule.onNodeWithTag("player-shelf-close").assertIsFocused()
         if (scenario == "return-info") {
             composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput { pressKey(Key.Enter) }
@@ -259,9 +270,9 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
             composeRule.onNodeWithTag("player-info").requestFocus()
             composeRule.onNodeWithTag("player-info").assertIsFocused()
         }
-        composeRule.mainClock.advanceTimeBy(500L)
+        composeRule.mainClock.advanceTimeBy(if (scenario in listOf("timing-unavailable", "timeline-unavailable-large", "timeline-unavailable-focused")) 1_600L else 500L)
         composeRule.waitForIdle()
-        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "player-captures")
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "p37-player-captures")
         assertTrue(directory.isDirectory || directory.mkdirs())
         fun capture(name: String) {
             val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
@@ -287,12 +298,13 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
 
     companion object {
         @JvmStatic @Parameterized.Parameters(name = "{0}-dark={1}")
-        fun scenarios() = listOf("timeline-preview", "timeline-preview-missing", "timeline-preview-expired", "timeline-preview-large",
+        fun scenarios() = (InstrumentationRegistry.getArguments().getString("playerScenarios")?.split(',') ?: listOf("timeline-preview", "timeline-preview-missing", "timeline-preview-expired", "timeline-preview-large",
             "timeline-passive-large", "timeline-unavailable-large",
             "field-disabled", "field-disabled-missing", "field-unavailable", "field-unavailable-missing", "field-tuning",
             "live", "timeshift-live", "timeshift-live-deep", "paused", "paused-deep", "timing-unavailable",
             "seek-shallow", "seek-deep", "seek-live", "long", "missing", "recording", "recording-unknown", "recording-info",
-            "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "shelf-long", "shelf-missing", "shelf-empty", "return-info")
+            "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "shelf-long", "shelf-missing", "shelf-empty", "return-info",
+            "timeline-clamped", "timeline-acquiring", "timeline-overnight", "timeline-overnight-large", "timeline-acquiring-focused", "timeline-unavailable-focused"))
             .flatMap { scenario -> listOf(false, true).map { dark -> arrayOf<Any>(scenario, dark) } }
 
         private fun programme(long: Boolean = false) = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),

@@ -30,6 +30,10 @@ Version `0.2.5` (`versionCode` 11) packages the numeric-overlay exit and bounded
 seek-state/command consistency corrections, retaining those dependencies.
 Version `0.2.6` (`versionCode` 12) retains those corrections and recompiles against
 public SDK 0.11.0 / HTSP 0.10.0, with unchanged Media3/native payloads.
+Version `0.2.7` (`versionCode` 13) adopts public SDK 0.12.0 for correlated
+content-seek settlement and bounded timeline recovery. HTSP 0.10.0 and
+Media3/native payloads remain unchanged. This is a debug acceptance candidate,
+not a claim of physical paused-frame acceptance.
 None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.
@@ -86,7 +90,7 @@ commands are:
 ./tools/release verify-signed build/release/signed/0.2.1
 ```
 
-`prepare` resolves the byte-pinned SDK 0.11.0 artifacts and source classifiers
+`prepare` resolves the byte-pinned SDK 0.12.0 artifacts and source classifiers
 from the public repositories, verifies them, and creates the unsigned bundle.
 `sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source
