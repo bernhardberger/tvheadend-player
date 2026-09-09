@@ -75,3 +75,6 @@ __pycache__/
 
 # Local AI planning, handoff, and session records are never current authority
 /artifacts/ai-session-notes/
+
+# Private offline profiling traces, APKs and captures
+/artifacts/p38-profile/
