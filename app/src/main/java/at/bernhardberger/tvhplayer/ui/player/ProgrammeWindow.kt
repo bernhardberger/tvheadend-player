@@ -22,11 +22,12 @@ data class ProgrammeWindow(
 
 internal fun programmeWindow(
     state: AppTimeshiftState,
-    target: TimeshiftContentTarget? = state.playbackTarget,
+    target: TimeshiftContentTarget? = state.playbackTarget.takeIf { state.timingKnown },
     mappingTimeline: TimeshiftTimeline? = state.timeline,
     eventAt: (Instant) -> EpgEvent?,
 ): ProgrammeWindow? {
-    if (!state.available || !state.timingKnown || target == null) return null
+    // An explicit selection remains displayable while the seek has no committed position.
+    if (!state.available || target == null) return null
     val history = state.timeline ?: return null
     if (mappingTimeline?.describesSameSegment(history) != true) return null
     val mapping = mappingTimeline.wallClockMapping as? TimeshiftWallClockMapping.Estimate ?: return null
@@ -37,8 +38,10 @@ internal fun programmeWindow(
     val span = (event.stop - event.start).inWholeMilliseconds.toDouble()
     if (span <= 0.0) return null
     fun fraction(time: Instant) = ((time - event.start).inWholeMilliseconds / span).toFloat().coerceIn(0f, 1f)
+    val targetAvailable = target.position in history.start..history.end ||
+        (state.timingKnown && target === state.playbackTarget && target.position >= history.start)
     return ProgrammeWindow(event, position, fraction(position), fraction(start), fraction(end),
-        fraction(end).takeIf { end >= event.start && end <= event.stop }, target.position in history.start..history.end)
+        fraction(end).takeIf { end >= event.start && end <= event.stop }, targetAvailable)
 }
 
 internal fun programmeWindowClockLabels(event: EpgEvent, zone: ZoneId = ZoneId.systemDefault()): Pair<String, String> {

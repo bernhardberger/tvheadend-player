@@ -58,6 +58,89 @@ import org.junit.Test
 class AppProfileOwnerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun isolatedLegacyMigrationPersistsBeforeCleanupAndUsesEditingDependency() = runTest {
+        val store = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
+        val events = mutableListOf<String>()
+        val owner = AppProfileOwner(
+            session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(),
+            profileStore = store,
+            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            readProfileForEditing = {
+                events += "edit"
+                at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult.Missing
+            },
+            readLegacyProfile = {
+                events += "read"
+                LegacyServerProfile("offline.invalid", 9982, "", LegacyPassword.Empty)
+            },
+            clearLegacyProfile = {
+                assertEquals(listOf(
+                    at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall.LOAD_PROFILE,
+                    at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStoreCall.STORE_ANONYMOUS,
+                ), store.calls)
+                events += "clear"
+            },
+        )
+        val job = backgroundScope.launch { owner.run() }
+        runCurrent()
+        assertTrue(owner.serverProfile.value is ServerProfileReadResult.Available)
+        owner.loadServerForEditing { _, _, _, _ -> error("Missing profile must not expose editing values") }
+        assertEquals(listOf("read", "clear", "edit"), events)
+        job.cancelAndJoin()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun isolatedCleanupFailurePublishesUnavailableWithoutConnecting() = runTest {
+        val session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
+        val store = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore(
+            ServerProfileReadResult.anonymous("offline.invalid"),
+        )
+        val owner = AppProfileOwner(
+            session = session, profileStore = store,
+            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            readProfileForEditing = { error("Unexpected editing read") },
+            readLegacyProfile = { error("Existing profile must not read legacy state") },
+            clearLegacyProfile = { throw java.io.IOException("Offline cleanup failure") },
+        )
+        val job = backgroundScope.launch { owner.run() }
+        runCurrent()
+        assertEquals(ServerProfileReadResult.Unavailable, owner.serverProfile.value)
+        assertFalse(session.calls.contains(at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.CONNECT))
+        assertTrue(session.calls.contains(at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.DISCONNECT))
+        job.cancelAndJoin()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancellationStillWaitsForNonCancellableProfileInitialization() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val owner = AppProfileOwner(
+            session = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(),
+            profileStore = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore(),
+            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            readProfileForEditing = { error("Unexpected editing read") },
+            readLegacyProfile = { entered.complete(Unit); release.await(); null },
+            clearLegacyProfile = { error("Missing profile must not clean legacy material") },
+        )
+        val job = backgroundScope.launch { owner.run() }
+        runCurrent()
+        assertTrue(entered.isCompleted)
+        job.cancel()
+        runCurrent()
+        assertFalse(job.isCompleted)
+        release.complete(Unit)
+        job.join()
+        assertTrue(job.isCancelled)
+        assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun cancelledPendingPasswordSaveReleasesCredentialLease() = runTest {
         val session = ProfileSession(
             FakeSessionObservation(currentObservation("server")).observation,

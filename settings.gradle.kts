@@ -15,7 +15,10 @@ pluginManagement {
  * SDK checkout, and set the matching version in `gradle/libs.versions.toml`. A build using it is
  * deliberately not release-verifiable: `:app:verifyExternalSdkConsumption` fails while it is on.
  */
-val stagedSdkRepository = file("../tvheadend-sdk/build/local-maven").canonicalFile
+val stagedSdkRepository = file(
+    providers.gradleProperty("tvheadend.sdk.local.repository")
+        .getOrElse("../tvheadend-sdk/build/local-maven"),
+).canonicalFile
     .takeIf {
         providers.gradleProperty("tvheadend.sdk.local").map(String::toBooleanStrict).getOrElse(false)
     }

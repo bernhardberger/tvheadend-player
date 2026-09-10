@@ -99,7 +99,10 @@ fun OverlayControlsTv(
     val recordFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val goLiveFocus = remember { FocusRequester() }
-    val seekable = timeshiftState.available && timeshiftState.timingKnown
+    val seekable = timeshiftState.available && (timeshiftState.timingKnown || previewing)
+    val timelinePosition = if (previewing) {
+        timeshiftPositionPresentation(timeshiftState.positionMs, timeshiftState.liveEdgeMs)
+    } else timeshiftPositionPresentation(timeshiftState)
     val pausable = timeshiftState.available
     var timingUnavailable by remember(channelNumber, channelName) { mutableStateOf(false) }
     LaunchedEffect(channelNumber, channelName, pausable, seekable) {
@@ -119,7 +122,7 @@ fun OverlayControlsTv(
     val atLive = when {
         !liveAvailable -> null
         !timeshiftState.available -> true
-        timeshiftState.timingKnown -> timeshiftPositionPresentation(timeshiftState).atLiveEdge
+        seekable -> timelinePosition.atLiveEdge
         else -> null
     }
     // Capture ownership before removing focus nodes. Compose may automatically focus a
@@ -273,42 +276,24 @@ fun OverlayControlsTv(
                     }
         if (seekable) {
             PlaybackSeekbar(
-                range = timeshiftSeekbarRange(timeshiftState),
-                timeshiftPosition = timeshiftPositionPresentation(timeshiftState),
+                range = timeshiftSeekbarRange(timeshiftState).let { range ->
+                    if (previewing) range.copy(positionKnown = true) else range
+                },
+                timeshiftPosition = timelinePosition,
                 programmeWindow = programmeWindow,
                 previewing = previewing,
                 reserveStatusSpace = true,
                 statusAction = statusAction,
-                feedback = timeshiftFeedback ?: if (previewing && programmeWindow?.targetAvailable == false) {
-                    stringResource(R.string.timeshift_target_expired)
-                } else null,
-                feedbackIsError = if (timeshiftFeedback != null) timeshiftFeedbackIsError
-                    else previewing && programmeWindow?.targetAvailable == false,
+                feedback = when {
+                    timeshiftFeedbackIsError -> timeshiftFeedback
+                    previewing && programmeWindow?.targetAvailable == false -> stringResource(R.string.timeshift_target_expired)
+                    previewing && !timeshiftState.timingKnown -> stringResource(R.string.timeshift_seek_waiting)
+                    else -> timeshiftFeedback
+                },
+                feedbackIsError = timeshiftFeedbackIsError || previewing && programmeWindow?.targetAvailable == false,
                 paused = paused,
                 onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
                 modifier = timelineModifier,
-            )
-        } else if (previewing && pausable) {
-            val range = timeshiftSeekbarRange(timeshiftState)
-            val targetLabel = "-${at.bernhardberger.tvhplayer.core.formatPlaybackDuration(
-                (timeshiftState.liveEdgeMs - timeshiftState.positionMs).coerceAtLeast(0L)
-            )}"
-            val waiting = stringResource(R.string.timeshift_seek_waiting)
-            PlayerTimelineBlock(
-                progress = range.displayProgress,
-                tone = if (timelineFocused) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.PREVIEW,
-                rewindableStartFraction = range.availableStartFraction,
-                liveEdgeFraction = 1f,
-                programmeWindow = programmeWindow,
-                previewLabel = targetLabel,
-                reserveLabelSpace = true,
-                reserveStatusSpace = true,
-                statusAction = statusAction,
-                feedback = if (timeshiftFeedbackIsError) timeshiftFeedback else waiting,
-                feedbackIsError = timeshiftFeedbackIsError,
-                timelineModifier = timelineModifier.semantics {
-                    contentDescription = "$waiting. $targetLabel"
-                }.focusable(),
             )
         } else {
             // Schedule elapsed time is informational, never a playback coordinate or seek grant.

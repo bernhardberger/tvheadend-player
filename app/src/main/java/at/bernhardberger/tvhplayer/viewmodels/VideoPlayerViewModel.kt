@@ -52,9 +52,11 @@ class VideoPlayerViewModel(
 
     suspend fun resumeTimeshift() = playbackRuntime.resumeTimeshift()
 
-    suspend fun seekTimeshift(deltaMs: Long) = playbackRuntime.seekTimeshift(deltaMs)
     suspend fun seekTimeshift(target: at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget) =
         playbackRuntime.seekTimeshift(target)
+
+    suspend fun seekTimeshift(selection: at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekSelection) =
+        playbackRuntime.seekTimeshift(selection)
 
     suspend fun sampleTimeshiftPresentation() = playbackRuntime.sampleTimeshiftPresentation()
 

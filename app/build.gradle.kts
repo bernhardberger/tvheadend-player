@@ -25,8 +25,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.2.7"
+        versionCode = 19
+        versionName = "0.2.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROGRAMME_WINDOW_B", providers.gradleProperty("player.programmeWindowB").orElse("true").map { it.toBooleanStrict().toString() }.get())
@@ -53,6 +53,9 @@ android {
         compose = true
     }
     sourceSets.getByName("profile").kotlin.srcDir("src/release/java")
+    providers.gradleProperty("player.offlineMediaAssets").orNull?.let {
+        sourceSets.getByName("androidTest").assets.srcDir(it)
+    }
 }
 
 val releasedSdkSources = configurations.create("releasedSdkSources") {

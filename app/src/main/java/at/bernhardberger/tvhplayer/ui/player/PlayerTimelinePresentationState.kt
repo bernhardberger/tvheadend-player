@@ -14,6 +14,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekSelection
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekToken
@@ -24,8 +25,6 @@ import at.bernhardberger.tvhplayer.core.beginTimeshiftSeekDispatch
 import at.bernhardberger.tvhplayer.core.cancelPendingTimeshiftSeek
 import at.bernhardberger.tvhplayer.core.completeTimeshiftSeekDispatch
 import at.bernhardberger.tvhplayer.core.playerPlaybackProgressing
-import at.bernhardberger.tvhplayer.core.queueTimeshiftSeek
-import at.bernhardberger.tvhplayer.core.queuedTimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.recordingSeekFeedbackSettled
 import at.bernhardberger.tvhplayer.core.recordingStackedSeekTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -53,6 +52,7 @@ internal data class LiveTimeshiftSeekPreview(
     val decision: TimeshiftSeekDecision,
     val dispatched: Boolean,
     val target: TimeshiftContentTarget,
+    val selection: TimeshiftSeekSelection,
     val mappingTimeline: TimeshiftTimeline? = null,
     val acceptedSeek: TimeshiftSeekToken? = null,
 )
@@ -62,7 +62,7 @@ private class LiveTimelineSourceGeneration(
 ) {
     var seekQueue by mutableStateOf(TimeshiftSeekQueueState())
     var selectionTimeline: TimeshiftTimeline? = null
-    var pendingContentTarget: TimeshiftContentTarget? = null
+    var pendingContentTarget: TimeshiftSeekSelection? = null
     var seekJob: Job? = null
     var seekFeedbackJob: Job? = null
     var seekToken = 0
@@ -142,7 +142,20 @@ internal class LiveTimelinePresentationState(
             // Drop queued coordinates, but let an in-flight SDK operation settle without
             // cancelling it: operation cancellation can retire the playback owner.
             cancelPendingSeek()
+            return
         }
+        val generation = sourceGeneration
+        val preview = generation.preview ?: return
+        if (preview.dispatched) return
+        val refreshed = timeline?.resolveSelection(preview.target, preview.selection) ?: return
+        generation.preview = preview.copy(
+            target = refreshed.target,
+            selection = refreshed,
+            decision = TimeshiftSeekDecision(refreshed.target.position.inWholeMilliseconds,
+                refreshed.displacement.inWholeMilliseconds, refreshed.boundary != TimeshiftSeekSelection.Boundary.NONE),
+        )
+        generation.pendingContentTarget = refreshed
+        generation.seekQueue = generation.seekQueue.copy(pendingTargetMs = refreshed.target.position.inWholeMilliseconds)
     }
 
     suspend fun sampleTimeshiftPresentation(sample: suspend () -> AppTimeshiftState): AppTimeshiftState? {
@@ -182,35 +195,42 @@ internal class LiveTimelinePresentationState(
         state: AppTimeshiftState,
         requestedDeltaMs: Long,
         unavailableText: String,
-        clampedText: String,
         expiredText: String,
         replacedText: String,
         uncertainText: String,
-        seekContent: suspend (TimeshiftContentTarget) -> TimeshiftContentSeekResult,
+        seekContent: suspend (TimeshiftSeekSelection) -> TimeshiftContentSeekResult,
     ) {
         updateTimeline(state.timeline)
-        if (disposed || !state.available || !state.timingKnown) return
+        if (disposed || !state.available) return
         val generation = sourceGeneration
+        val pendingSelection = generation.preview?.takeIf {
+            !it.dispatched || generation.seekQueue.dispatchInFlight || it.acceptedSeek != null
+        }
+        if (!state.timingKnown && pendingSelection == null) return
         if (generation.selectionTimeline?.describesSameSegment(state.timeline) == false) return
         if (generation.preview == null && requestedDeltaMs < 0L && state.positionMs <= state.bufferStartMs) return
         if (generation.preview == null && requestedDeltaMs > 0L && state.positionMs >= state.liveEdgeMs) return
-        val selectionTimeline = generation.selectionTimeline ?: state.timeline ?: return
+        val latestTimeline = state.timeline ?: return
+        val selectionTimeline = generation.selectionTimeline ?: latestTimeline
+        val anchor = pendingSelection?.target ?: state.playbackTarget ?: return
+        val selection = latestTimeline.resolveSelection(anchor, pendingSelection?.selection, requestedDeltaMs.milliseconds)
+            ?: return
         generation.selectionTimeline = selectionTimeline
-        val nextQueue = queueTimeshiftSeek(
-            queue = generation.seekQueue,
-            state = state.copy(
-                bufferStartMs = selectionTimeline.start.inWholeMilliseconds,
-                liveEdgeMs = selectionTimeline.end.inWholeMilliseconds,
-            ),
-            requestedDeltaMs = requestedDeltaMs,
+        val target = selection.target
+        val decision = TimeshiftSeekDecision(target.position.inWholeMilliseconds,
+            selection.displacement.inWholeMilliseconds, selection.boundary != TimeshiftSeekSelection.Boundary.NONE)
+        val dispatchBase = generation.seekQueue.inFlightTargetMs
+            ?: generation.seekQueue.projectedPositionMs ?: state.positionMs
+        val nextQueue = generation.seekQueue.copy(
+            pendingDeltaMs = target.position.inWholeMilliseconds - dispatchBase,
+            pendingTargetMs = target.position.inWholeMilliseconds,
+            pendingClamped = decision.clamped,
         )
-        val decision = queuedTimeshiftSeekDecision(nextQueue)
-        val target = selectionTimeline.select(decision.targetMs.milliseconds) ?: return
         val operationFeedbackToken = beginFeedbackOperation()
         generation.seekQueue = nextQueue
         generation.seekToken++
         val token = generation.seekToken
-        generation.pendingContentTarget = target
+        generation.pendingContentTarget = selection
         generation.seekQueuedAtMs = monotonicTimeMillis()
         generation.preview = LiveTimeshiftSeekPreview(
             token = token,
@@ -218,6 +238,7 @@ internal class LiveTimelinePresentationState(
             decision = decision,
             dispatched = false,
             target = target,
+            selection = selection,
             mappingTimeline = selectionTimeline,
         )
         generation.seekFeedbackJob?.cancel()
@@ -250,13 +271,24 @@ internal class LiveTimelinePresentationState(
                     generation.preview = generation.preview
                         ?.takeIf { it.token == dispatchToken }
                         ?.copy(dispatched = true)
-                    val dispatchedPreview = generation.preview
+                    var dispatchedPreview = generation.preview
                     val dispatchPreviewEpoch = generation.previewDismissalEpoch
 
                     val contentTarget = generation.pendingContentTarget ?: break
                     generation.pendingContentTarget = null
                     val result = positionCommand { seekContent(contentTarget) }
                     val completed = result as? TimeshiftContentSeekResult.Completed
+                    completed?.selection?.let { resolved ->
+                        dispatchedPreview = dispatchedPreview?.copy(
+                            selection = resolved,
+                            target = resolved.target,
+                            decision = TimeshiftSeekDecision(resolved.target.position.inWholeMilliseconds,
+                                resolved.displacement.inWholeMilliseconds, resolved.boundary != TimeshiftSeekSelection.Boundary.NONE),
+                        )
+                        if (generation === sourceGeneration && generation.preview?.token == dispatchToken &&
+                            generation.previewDismissalEpoch == dispatchPreviewEpoch
+                        ) generation.preview = dispatchedPreview
+                    }
                     val command = completed?.command
                     val accepted = command === TimeshiftCommandResult.ACCEPTED && completed.seek != null
                     generation.seekQueue = completeTimeshiftSeekDispatch(
@@ -273,9 +305,7 @@ internal class LiveTimelinePresentationState(
                             generation.feedback = when {
                                 command?.isOutcomeUncertain == true -> uncertainText
                                 command?.isTerminal == true -> unavailableText
-                                command?.isAccepted == true -> clampedText.takeIf {
-                                    generation.preview?.decision?.clamped == true
-                                }
+                                command?.isAccepted == true -> null
                                 result == TimeshiftContentSeekResult.Expired -> expiredText
                                 result == TimeshiftContentSeekResult.Replaced -> replacedText
                                 else -> unavailableText
@@ -291,9 +321,17 @@ internal class LiveTimelinePresentationState(
                         }
                         generation.seekFeedbackJob?.cancel()
                         if (accepted) {
+                            val resolved = completed.selection
                             generation.preview = generation.preview
                                 ?.takeIf { it.token == dispatchToken }
-                                ?.copy(acceptedSeek = completed.seek)
+                                ?.let { current -> current.copy(
+                                    acceptedSeek = completed.seek,
+                                    selection = resolved ?: current.selection,
+                                    target = resolved?.target ?: current.target,
+                                    decision = resolved?.let { TimeshiftSeekDecision(it.target.position.inWholeMilliseconds,
+                                        it.displacement.inWholeMilliseconds, it.boundary != TimeshiftSeekSelection.Boundary.NONE) }
+                                        ?: current.decision,
+                                ) }
                         }
                         generation.seekFeedbackJob = if (accepted) null else scope.launch {
                             delay(TIMESHIFT_SEEK_FEEDBACK_MS)

@@ -573,13 +573,29 @@ class AppPlaybackRuntime(
                 if (!targetInstallationInProgress) {
                     observedLivePlayIntent(
                         activeTarget = _activeTarget.value,
-                        serverPaused = timeshift?.serverPaused,
+                        serverPaused = timeshift?.playbackPaused,
                     )?.let { player.playWhenReady = it }
                 }
                 publishDiagnostics()
             }
         }
     }
+
+    private var diagnosticDecoderName = "unknown"
+    private var diagnosticDecoderGeneration = 0
+    private val seekDiagnosticsListener = if (at.bernhardberger.tvhplayer.BuildConfig.DEBUG) {
+        object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onVideoDecoderInitialized(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedTimestampMs: Long,
+                initializationDurationMs: Long,
+            ) {
+                diagnosticDecoderName = decoderName.take(80).replace(Regex("[^A-Za-z0-9._-]"), "_")
+                diagnosticDecoderGeneration++
+            }
+        }
+    } else null
 
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -624,7 +640,10 @@ class AppPlaybackRuntime(
     }
 
     init {
-        targetCommands.runIfOpen { player.addListener(listener) }
+        targetCommands.runIfOpen {
+            player.addListener(listener)
+            seekDiagnosticsListener?.let(player::addAnalyticsListener)
+        }
     }
 
     suspend fun playLive(selection: LivePlaybackSelection): PlaybackTargetResult? =
@@ -958,11 +977,6 @@ class AppPlaybackRuntime(
     ) {
         coordinator.resumeTimeshift()
     }
-    suspend fun seekTimeshift(deltaMs: Long): TimeshiftCommandResult = targetCommands.serialize(
-        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
-    ) {
-        coordinator.seekTimeshift(deltaMs.milliseconds)
-    }
     suspend fun goLive(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
     ) {
@@ -973,6 +987,41 @@ class AppPlaybackRuntime(
         targetCommands.serialize(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
         ) { coordinator.seekTimeshift(target) }
+
+    suspend fun seekTimeshift(selection: at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekSelection) =
+        targetCommands.serialize(
+            onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
+        ) {
+            val diagnose = at.bernhardberger.tvhplayer.BuildConfig.DEBUG && !player.playWhenReady
+            fun counters(): String {
+                val value = player.videoDecoderCounters ?: return "none"
+                value.ensureUpdated()
+                return "${value.queuedInputBufferCount}/${value.renderedOutputBufferCount}/" +
+                    "${value.skippedOutputBufferCount}/${value.droppedBufferCount}"
+            }
+            val before = if (diagnose) counters() else ""
+            val generation = diagnosticDecoderGeneration
+            val started = android.os.SystemClock.elapsedRealtime()
+            coordinator.seekTimeshift(selection).also { result ->
+                if (diagnose) {
+                    val completed = result as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Completed
+                    val format = player.videoFormat
+                    val videoSelected = player.currentTracks.groups.any {
+                        it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO && it.isSelected
+                    }
+                    // One bounded line per paused UI seek. No channel, profile, endpoint,
+                    // raw error, subscription identity or credential-bearing payload.
+                    android.util.Log.i("TvhSeek", "outcome=${completed?.command ?: result.javaClass.simpleName} " +
+                        "seek=${completed?.seekCommand} buffering=${completed?.buffering} pause=${completed?.pauseRestoration} " +
+                        "elapsedMs=${android.os.SystemClock.elapsedRealtime() - started} " +
+                        "countsQueuedRenderedSkippedDropped=$before->${counters()} " +
+                        "decoder=$diagnosticDecoderName generation=$generation->$diagnosticDecoderGeneration " +
+                        "videoSelected=$videoSelected size=${format?.width}x${format?.height} state=${player.playbackState} " +
+                        "playWhenReady=${player.playWhenReady} bufferedMs=${player.totalBufferedDuration} " +
+                        "requestedDeltaMs=${selection.displacement.inWholeMilliseconds}")
+                }
+            }
+        }
 
     /**
      * Samples the presented timeshift position.
@@ -1104,6 +1153,7 @@ class AppPlaybackRuntime(
             targetFrameListener?.let(player::removeListener)
             targetFrameListener = null
             player.removeListener(listener)
+            seekDiagnosticsListener?.let(player::removeAnalyticsListener)
             audioSelection.clear(player)
         }
         audioWriteJob?.join()
@@ -1463,7 +1513,7 @@ fun LiveTimeshiftState.toAppPresentation(
             ?.target
         AppTimeshiftState(
             available = true,
-            paused = serverPaused == true,
+            paused = playbackPaused == true,
             bufferStartMs = timeline?.start?.inWholeMilliseconds ?: 0L,
             liveEdgeMs = timeline?.end?.inWholeMilliseconds ?: 0L,
             positionMs = position?.position?.inWholeMilliseconds ?: 0L,
@@ -1471,7 +1521,9 @@ fun LiveTimeshiftState.toAppPresentation(
                 ?.takeIf { it.isFinite() && it >= Duration.ZERO }
                 ?.inWholeMilliseconds,
             capacityMs = grantedPeriod.takeIf { it.isFinite() && it > Duration.ZERO }?.inWholeMilliseconds,
-            timingKnown = timeline != null && position != null && position.position <= timeline!!.end,
+            // The latest status edge can lag a valid decoded-content coordinate.
+            // Seekability still comes from the observed history, not this sample.
+            timingKnown = timeline != null && position != null,
             timeline = timeline,
             playbackTarget = position,
             playbackSeek = estimate?.seek.takeIf { position != null },

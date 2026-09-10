@@ -225,9 +225,7 @@ fun PlayerTimelineBar(
                         .size(thumbSize)
                         .clip(CircleShape)
                         .background(if (programmeTargetAvailable == false) Color.Transparent else PlaybackPositionColor)
-                        .then(if ((rewindableStartFraction != null && tone == PlayerTimelineTone.ACTIVE) || programmeTargetAvailable == false) {
-                            Modifier.border(2.dp, if (tone == PlayerTimelineTone.ACTIVE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, CircleShape)
-                        } else Modifier)
+                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
                         .then(thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier),
                 )
             }

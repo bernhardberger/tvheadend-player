@@ -34,6 +34,9 @@ Version `0.2.7` (`versionCode` 13) adopts public SDK 0.12.0 for correlated
 content-seek settlement and bounded timeline recovery. HTSP 0.10.0 and
 Media3/native payloads remain unchanged. This is a debug acceptance candidate,
 not a claim of physical paused-frame acceptance.
+Version `0.2.13` (`versionCode` 19) releases the seek-selection and paused-playback
+work developed through debug candidates 0.2.8–0.2.12. It consumes public SDK
+0.13.0 / HTSP 0.10.0; Media3 1.11.0 and native binaries remain unchanged.
 None update the predecessor or temporary
 `at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
 device-installed product build must increase `versionCode`.
@@ -90,7 +93,7 @@ commands are:
 ./tools/release verify-signed build/release/signed/0.2.1
 ```
 
-`prepare` resolves the byte-pinned SDK 0.12.0 artifacts and source classifiers
+`prepare` resolves the byte-pinned SDK 0.13.0 artifacts and source classifiers
 from the public repositories, verifies them, and creates the unsigned bundle.
 `sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source

@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.ExternalTargetAcceptanceRule
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -130,9 +131,14 @@ class TimeshiftCommandDeviceAcceptanceTest {
                 continuityWatch.snapshot(),
             )
             val seekResult = withContext(Dispatchers.Main) {
-                runtime.seekTimeshift(-measuredSeek.magnitudeMillis)
+                val sample = runtime.sampleTimeshiftPresentation()
+                val selection = checkNotNull(checkNotNull(sample.timeline).resolveSelection(
+                    checkNotNull(sample.playbackTarget), delta = (-measuredSeek.magnitudeMillis).milliseconds,
+                ))
+                runtime.seekTimeshift(selection)
             }
-            assertTrue("$fixture signed-seek=$seekResult", seekResult.isAccepted)
+            assertTrue("$fixture signed-seek=$seekResult",
+                (seekResult as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Completed)?.command?.isAccepted == true)
             awaitPositionBehindLive(
                 runtime,
                 measuredSeek.beforeBehindLiveMillis + MINIMUM_SEEK_MOVEMENT_MILLIS,

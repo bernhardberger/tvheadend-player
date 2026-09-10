@@ -338,7 +338,6 @@ fun VideoPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val timeshiftUnavailableText = stringResource(R.string.timeshift_unavailable)
     val timeshiftReconnectLiveText = stringResource(R.string.timeshift_reconnect_live)
-    val timeshiftSeekClampedText = stringResource(R.string.timeshift_seek_clamped)
     val timeshiftExpiredText = stringResource(R.string.timeshift_target_expired)
     val timeshiftReplacedText = stringResource(R.string.timeshift_target_replaced)
     val timeshiftUncertainText = stringResource(R.string.timeshift_seek_uncertain)
@@ -497,7 +496,6 @@ fun VideoPlayerScreen(
             state = effectiveTimeshiftState,
             requestedDeltaMs = deltaMs,
             unavailableText = timeshiftUnavailableText,
-            clampedText = timeshiftSeekClampedText,
             expiredText = timeshiftExpiredText,
             replacedText = timeshiftReplacedText,
             uncertainText = timeshiftUncertainText,

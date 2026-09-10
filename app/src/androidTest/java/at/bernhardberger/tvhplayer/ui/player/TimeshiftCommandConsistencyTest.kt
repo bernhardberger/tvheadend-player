@@ -185,7 +185,7 @@ class TimeshiftCommandConsistencyTest {
                         fixture.playbackPosition(if (forward) 590.seconds else 10.seconds)
                     ).copy(paused = paused)
                     owner.queueRelativeSeek(sample.value, if (forward) 30_000L else -30_000L,
-                        "Unavailable", "Reached the available buffer limit", "Expired", "Replaced", "Uncertain") { result }
+                        "Unavailable", "Expired", "Replaced", "Uncertain") { result }
                     scope.advanceTimeBy(400L); scope.runCurrent()
                 }
                 rule.onNodeWithTag("player-seekbar").requestFocus()
@@ -211,11 +211,14 @@ class TimeshiftCommandConsistencyTest {
                 output.outputStream().use { rule.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
                 rule.runOnIdle { reduced.value = true }
                 rule.onNodeWithTag("timeshift-seek-preview").assertExists()
+                rule.runOnIdle { reduced.value = false }
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+                rule.onNodeWithTag("player-seekbar").assertIsFocused()
                 rule.runOnIdle {
-                    reduced.value = false
                     scope.launch {
                         sample.value = requireNotNull(owner.sampleTimeshiftPresentation {
-                            fixture.state.value.toAppPresentation(fixture.playbackPosition(target, result.seek))
+                            fixture.state.value.toAppPresentation(fixture.playbackPosition(
+                                if (forward) target + 1.seconds else target, result.seek))
                                 .copy(paused = paused)
                         })
                     }
@@ -223,8 +226,104 @@ class TimeshiftCommandConsistencyTest {
                     org.junit.Assert.assertNull(owner.preview)
                     assertEquals(paused, sample.value.paused)
                 }
-                rule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
+                rule.onNodeWithTag("player-seekbar").assertIsFocused()
+                rule.onNodeWithText("Reached the available buffer limit", substring = true).assertDoesNotExist()
                 assertEquals(0, toggles)
+            }
+        } finally {
+            rule.runOnIdle { owner.dispose() }
+        }
+    }
+
+    @Test fun pendingSeekKeepsThumbAndAcceptsFurtherDirectionalSelection() {
+        val scope = TestScope()
+        val owner = LiveTimelinePresentationState(scope, { 0L }, { scope.testScheduler.currentTime })
+        val fixture = TimeshiftTestFixture(600.seconds).apply { updateHistory(0.seconds, 600.seconds) }
+        val sample = mutableStateOf(fixture.state.value.toAppPresentation(fixture.playbackPosition(300.seconds)))
+        val requests = mutableListOf<Long>()
+        var toggles = 0
+        lateinit var input: InputModeManager
+        fun capture(name: String) {
+            val output = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null),
+                "p42-control-captures/$name.png")
+            output.parentFile!!.mkdirs()
+            output.outputStream().use {
+                rule.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }
+        rule.setContent {
+            input = LocalInputModeManager.current
+            TVHeadendPlayerTheme {
+                val preview = owner.previewForTimeline(sample.value.timeline)
+                OverlayControlsTv(
+                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                    channelName = "Fixture", channelNumber = 1, piconPath = null,
+                    nowEvent = null, nextEvent = null, nowSec = 0L,
+                    controlsVisible = true, optionsOpen = false,
+                    onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
+                    timeshiftState = preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
+                        ?: sample.value,
+                    committedTimeshiftState = sample.value, paused = sample.value.paused,
+                    previewing = preview != null, timeshiftFeedback = owner.feedback,
+                    onSeekTimeshift = { delta ->
+                        owner.queueRelativeSeek(sample.value, delta,
+                            "Unavailable", "Expired", "Replaced", "Uncertain") { selection ->
+                            val target = selection.target
+                            requests += target.position.inWholeMilliseconds
+                            fixture.completed(readerReached = null)
+                        }
+                    },
+                    onToggleTimeshiftPause = { toggles++ }, onGoLive = {},
+                )
+            }
+        }
+        rule.runOnIdle { input.requestInputMode(InputMode.Keyboard) }
+        try {
+            for (paused in listOf(false, true)) {
+                rule.runOnIdle {
+                    owner.cancelPendingSeek()
+                    sample.value = fixture.state.value.toAppPresentation(fixture.playbackPosition(300.seconds))
+                        .copy(paused = paused)
+                    requests.clear()
+                }
+                rule.onNodeWithTag("player-seekbar").requestFocus()
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+                rule.runOnIdle { scope.advanceTimeBy(400L); scope.runCurrent() }
+                assertEquals(listOf(270_000L), requests)
+                rule.runOnIdle {
+                    scope.launch {
+                        sample.value = requireNotNull(owner.sampleTimeshiftPresentation {
+                            fixture.state.value.toAppPresentation().copy(paused = paused)
+                        })
+                    }
+                    scope.runCurrent()
+                }
+                rule.onNodeWithTag("player-seekbar").assertIsFocused()
+                rule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertIsDisplayed()
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+                rule.runOnIdle { scope.advanceTimeBy(400L); scope.runCurrent() }
+                assertEquals(listOf(270_000L, 240_000L), requests)
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                rule.onNodeWithTag("player-pause").assertIsFocused()
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+                rule.onNodeWithTag("player-seekbar").assertIsFocused()
+                assertEquals(0, toggles)
+                capture("pending-${if (paused) "paused" else "playing"}")
+                rule.runOnIdle {
+                    // UI continuity only: production packet/frame settlement is tested in the SDK.
+                    val acceptedSeek = requireNotNull(owner.preview?.acceptedSeek)
+                    scope.launch {
+                        sample.value = requireNotNull(owner.sampleTimeshiftPresentation {
+                            fixture.state.value.toAppPresentation(fixture.playbackPosition(240.seconds, acceptedSeek))
+                                .copy(paused = paused)
+                        })
+                    }
+                    scope.runCurrent()
+                    org.junit.Assert.assertNull(owner.preview)
+                }
+                rule.onNodeWithTag("player-seekbar").assertIsFocused()
+                rule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertIsDisplayed()
+                capture("settled-${if (paused) "paused" else "playing"}")
             }
         } finally {
             rule.runOnIdle { owner.dispose() }
@@ -272,11 +371,11 @@ class TimeshiftCommandConsistencyTest {
         try {
             rule.runOnIdle {
                 owner.queueRelativeSeek(state, -30_000L,
-                    "unavailable", "clamped", "expired", "replaced", "Seek result uncertain") { result.await() }
+                    "unavailable", "expired", "replaced", "Seek result uncertain") { result.await() }
                 scope.advanceTimeBy(400L)
                 scope.runCurrent()
                 owner.queueRelativeSeek(state, -30_000L,
-                    "unavailable", "clamped", "expired", "replaced", "Seek result uncertain") {
+                    "unavailable", "expired", "replaced", "Seek result uncertain") {
                     error("Discarded stacked input must not dispatch")
                 }
                 scope.advanceTimeBy(401L)

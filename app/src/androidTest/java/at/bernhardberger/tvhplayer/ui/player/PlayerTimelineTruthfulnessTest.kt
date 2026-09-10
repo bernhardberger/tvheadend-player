@@ -72,6 +72,26 @@ class PlayerTimelineTruthfulnessTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
+    fun focusedRecordingThumbHasTheSameVisibleRingAsLivePlayback() {
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.size(200.dp, 40.dp).background(Color.Black)) {
+                    PlayerTimelineBar(
+                        progress = 0.5f,
+                        tone = PlayerTimelineTone.ACTIVE,
+                        thumbTestTag = "recording-style-thumb",
+                    )
+                }
+            }
+        }
+        val image = composeRule.onNodeWithTag("recording-style-thumb", useUnmergedTree = true)
+            .captureToImage().asAndroidBitmap()
+        val ringOffsetPx = with(composeRule.density) { 1.dp.toPx() }.toInt().coerceIn(0, image.height / 2 - 1)
+        assertEquals(android.graphics.Color.rgb(0x00, 0xBC, 0xFA), image.getPixel(image.width / 2, ringOffsetPx))
+        assertEquals(android.graphics.Color.rgb(0xFA, 0x7F, 0x00), image.getPixel(image.width / 2, image.height / 2))
+    }
+
+    @Test
     fun programmeFillFollowsPositionWithGrayBufferAndOnlyHistoryStartTick() {
         val event = EpgEvent.create(
             id = EventId(1), channelId = ChannelId(1),

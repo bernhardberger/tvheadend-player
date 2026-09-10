@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileAuthenticationMode
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -58,13 +59,35 @@ internal interface ConnectionProfileEditor {
 }
 
 class AppProfileOwner internal constructor(
-    private val context: Context,
     private val session: TvheadendSession,
-    private val profileStore: TvheadendServerProfileStore,
-    private val legacyCredentials: LegacyCredentialSource,
+    private val profileStore: ServerProfileStore,
     private val playerSettings: PlayerSettingsStore,
     private val ioDispatcher: CoroutineDispatcher,
+    private val readProfileForEditing: suspend () -> ServerProfileEditReadResult,
+    private val readLegacyProfile: suspend () -> LegacyServerProfile?,
+    private val clearLegacyProfile: suspend () -> Unit,
 ) : ConnectionProfileEditor {
+    internal constructor(
+        context: Context,
+        session: TvheadendSession,
+        profileStore: TvheadendServerProfileStore,
+        legacyCredentials: LegacyCredentialSource,
+        playerSettings: PlayerSettingsStore,
+        ioDispatcher: CoroutineDispatcher,
+    ) : this(
+        session = session,
+        profileStore = profileStore,
+        playerSettings = playerSettings,
+        ioDispatcher = ioDispatcher,
+        readProfileForEditing = profileStore::loadProfileForEditing,
+        readLegacyProfile = { context.loadLegacyServerProfile(legacyCredentials::loadPassword) },
+        clearLegacyProfile = {
+            legacyCredentials.clearCiphertext()
+            context.clearLegacyServerEndpoint()
+            legacyCredentials.deleteObsoleteKey()
+        },
+    )
+
     private val serverMutex = Mutex()
     private val streamMutex = Mutex()
     private val commands = Channel<ProfileCommand>(
@@ -105,7 +128,7 @@ class AppProfileOwner internal constructor(
     override suspend fun loadServerForEditing(
         applyAvailable: (host: String, port: Int, username: String, password: String) -> Unit,
     ) = serverMutex.withLock {
-        when (val result = profileStore.loadProfileForEditing()) {
+        when (val result = readProfileForEditing()) {
             is ServerProfileEditReadResult.Anonymous -> applyAvailable(
                 result.host,
                 result.port,
@@ -358,7 +381,7 @@ class AppProfileOwner internal constructor(
         }
         if (current == ServerProfileReadResult.Unavailable) return current
 
-        val legacy = context.loadLegacyServerProfile(legacyCredentials::loadPassword)
+        val legacy = readLegacyProfile()
             ?.normalizedForMigration()
             ?: return current
         val migrated = when (val password = legacy.password) {
@@ -378,9 +401,7 @@ class AppProfileOwner internal constructor(
     }
 
     private suspend fun clearLegacyProfileMaterial() {
-        legacyCredentials.clearCiphertext()
-        context.clearLegacyServerEndpoint()
-        legacyCredentials.deleteObsoleteKey()
+        clearLegacyProfile()
     }
 
     private suspend fun applyServerProfile(profile: ServerProfileReadResult) {

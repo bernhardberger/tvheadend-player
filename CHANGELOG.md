@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.13
+
+- Adopt published TVHeadend SDK 0.13.0 for anchored timeshift selections,
+  current-boundary clamping and moving live-edge selection. Reversing direction
+  at a boundary responds immediately without accumulated overshoot.
+- Preserve pause intent while the SDK buffers a seek, including H.264 recovery
+  metadata and seek-correlated video output. Deliberate pause no longer triggers
+  playing-stream recovery timers.
+- Keep programme seek previews usable while playback timing settles, retain
+  valid sampled positions beyond a delayed server-status edge, and remove the
+  normal-boundary warning. Focused recording thumbs now have the same visible
+  ring as live playback.
+- Add real-runtime tests with production buffering thresholds, paced media,
+  repeated paused/playing seeks and isolated fake credential storage.
+
+Development-device checks confirmed paused-picture updates on tested SD and HD
+streams. Programme-window colours and remaining historical-programme header
+feedback are still under review; growing-recording playback is not added here.
+Media3 1.11.0 and native decoder binaries are unchanged. Signed APKs retain the
+product key and require a matching installed certificate for an in-place update.
+
 ## 0.2.0
 
 The first GitHub release of TVHeadend Player for TV, an independent Android TV

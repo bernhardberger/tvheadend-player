@@ -46,6 +46,17 @@ class ProgrammeWindowTest {
         assertNull(state.timeline.select(0.minutes))
     }
 
+    @Test fun validPresentedPositionAheadOfStatusEdgeDoesNotLookExpired() {
+        val fixture = fixture()
+        val state = fixture.presentation(91)
+        val committed = requireNotNull(programmeWindow(state, eventAt = ::lookup))
+        assertTrue(committed.targetAvailable)
+        assertEquals(0.5f, committed.availableEndFraction)
+        assertNull(state.timeline!!.select(91.minutes))
+        val differentTarget = fixture.presentation(92).playbackTarget
+        assertFalse(requireNotNull(programmeWindow(state, differentTarget, eventAt = ::lookup)).targetAvailable)
+    }
+
     @Test fun elapsedFillTracksMappedLiveEndNotPlaybackOrPreviewPosition() {
         val fixture = fixture()
         val early = requireNotNull(programmeWindow(fixture.presentation(65), eventAt = ::lookup))
@@ -94,12 +105,32 @@ class ProgrammeWindowTest {
         assertNotNull(programmeWindow(current, eventAt = ::lookup))
     }
 
+    @Test fun pausedSeekKeepsSelectedProgrammeWhileCommittedPositionIsUnknown() {
+        val fixture = fixture()
+        val previous = fixture.presentation()
+        val mapping = requireNotNull(previous.timeline)
+        val target = requireNotNull(mapping.select(55.minutes))
+        val pending = previous.copy(paused = true, timingKnown = false, playbackTarget = null)
+
+        assertNull(programmeWindow(pending, eventAt = ::lookup))
+        val selected = requireNotNull(programmeWindow(pending, target, mapping, ::lookup))
+        assertEquals("A", selected.event.title)
+        assertEquals(55f / 60, selected.positionFraction, 0.0001f)
+        assertTrue(selected.targetAvailable)
+
+        fixture.restartSegment()
+        fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        assertNull(programmeWindow(fixture.presentation().copy(timingKnown = false), target, mapping, ::lookup))
+        assertNull(programmeWindow(pending.copy(available = false), target, mapping, ::lookup))
+    }
+
     @Test fun previewPinsEstimateAcrossHeldInputLateMetadataPauseAndEviction() = runTest {
         val fixture = fixture()
         val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
         val dispatched = mutableListOf<Long>()
         fun queue(delta: Long) = owner.queueRelativeSeek(fixture.presentation().copy(paused = true), delta,
-            "unavailable", "clamped", "expired", "replaced", "uncertain") { target ->
+            "unavailable", "expired", "replaced", "uncertain") { selection ->
+            val target = selection.target
             fixture.seek(target) { dispatched += target.position.inWholeMilliseconds; fixture.completed() }
         }
         queue(-300_000L)

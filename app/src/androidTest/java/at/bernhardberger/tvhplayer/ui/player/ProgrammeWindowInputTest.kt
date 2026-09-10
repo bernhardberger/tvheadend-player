@@ -72,7 +72,6 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 val context = LocalContext.current
                 val imageLoader = remember { ImageLoader.Builder(context).build() }
                 val unavailable = stringResource(R.string.timeshift_unavailable)
-                val clamped = stringResource(R.string.timeshift_seek_clamped)
                 val expired = stringResource(R.string.timeshift_target_expired)
                 val replaced = stringResource(R.string.timeshift_target_replaced)
                 val uncertain = stringResource(R.string.timeshift_seek_uncertain)
@@ -96,7 +95,8 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                             timeshiftFeedback = owner.feedback, paused = paused, onToggleTimeshiftPause = { paused = !paused },
                             onCommitSeek = owner::commitPendingSeek,
                             onSeekTimeshift = { delta ->
-                                owner.queueRelativeSeek(state, delta, unavailable, clamped, expired, replaced, uncertain) { target ->
+                                owner.queueRelativeSeek(state, delta, unavailable, expired, replaced, uncertain) { selection ->
+                                    val target = selection.target
                                     fixture.seek(target) {
                                         dispatches += target.position.inWholeMilliseconds
                                         state = fixture.state.value.toAppPresentation(fixture.playbackPosition(target.position))
