@@ -92,6 +92,8 @@ fun OverlayControlsTv(
     onChannelActionRestored: () -> Unit = {},
     onActionFocused: (String) -> Unit = {},
     timeshiftFeedbackIsError: Boolean = timeshiftFeedback != null,
+    channelRailOpen: Boolean = false,
+    channelRailContent: @Composable () -> Unit = {},
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -119,11 +121,18 @@ fun OverlayControlsTv(
     var lastFocusedControl by remember { mutableStateOf<String?>(null) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
+    var restoreGoLiveAfterPreview by remember { mutableStateOf(false) }
     val atLive = when {
         !liveAvailable -> null
         !timeshiftState.available -> true
         seekable -> timelinePosition.atLiveEdge
         else -> null
+    }
+    LaunchedEffect(previewing, restoreGoLiveAfterPreview, controlsVisible) {
+        if (restoreGoLiveAfterPreview && !previewing) {
+            if (controlsVisible && atLive == false) goLiveFocus.requestFocus()
+            restoreGoLiveAfterPreview = false
+        }
     }
     // Capture ownership before removing focus nodes. Compose may automatically focus a
     // surviving action during apply; that must not erase the disappearing node's fallback.
@@ -200,7 +209,9 @@ fun OverlayControlsTv(
                     Button(
                         onClick = { onUserInteraction(); onGoLive() },
                         scale = ButtonDefaults.scale(focusedScale = 1f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
                         modifier = Modifier
+                            .height(at.bernhardberger.tvhplayer.ui.TvOverlayStatusRowHeight)
                             .testTag("player-go-live")
                             .focusRequester(goLiveFocus)
                             .focusProperties {
@@ -240,6 +251,7 @@ fun OverlayControlsTv(
                 }
         }
         val timelineModifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
+                    .focusProperties { canFocus = !channelRailOpen }
                     .then(if (timelineFocused && !seekable && !previewing) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
                     .onFocusChanged {
                         timelineFocused = it.isFocused
@@ -267,7 +279,10 @@ fun OverlayControlsTv(
                                     onCommitSeek()
                                     relocatingKey = event.key
                                      if (event.key == Key.DirectionDown) initialFocus.requestFocus()
-                                     else if (atLive == false) goLiveFocus.requestFocus()
+                                      else if (atLive == false) {
+                                          if (previewing) restoreGoLiveAfterPreview = true
+                                          else goLiveFocus.requestFocus()
+                                      }
                                 }
                                 true
                             }
@@ -282,6 +297,7 @@ fun OverlayControlsTv(
                 timeshiftPosition = timelinePosition,
                 programmeWindow = programmeWindow,
                 previewing = previewing,
+                collapsed = channelRailOpen,
                 reserveStatusSpace = true,
                 statusAction = statusAction,
                 feedback = when {
@@ -309,6 +325,7 @@ fun OverlayControlsTv(
             PlayerTimelineBlock(
                 progress = event?.let { ((nowSec - it.start.epochSeconds).toDouble() /
                     (it.stop.epochSeconds - it.start.epochSeconds)).toFloat() },
+                collapsed = channelRailOpen,
                 tone = PlayerTimelineTone.AMBIENT,
                 fillColor = MaterialTheme.colorScheme.primary,
                 showTrack = true,
@@ -342,9 +359,10 @@ fun OverlayControlsTv(
             onTogglePause = { onToggleTimeshiftPause() }.takeIf { pausable },
             paused = paused, pauseFocus = pauseFocus,
             modifier = Modifier
-                .alpha(if (timelineFocused) 0.55f else 1f)
+                .alpha(if (previewing || timelineFocused) 0.55f else 1f)
                 .testTag("player-actions")
                 .focusProperties {
+                    canFocus = !channelRailOpen
                     up = if (pausable) timelineFocus else FocusRequester.Cancel
                     down = FocusRequester.Cancel
                 }
@@ -366,13 +384,10 @@ fun OverlayControlsTv(
                     }
                 },
         )
-        if (channelsAvailable) {
-            Row(Modifier.fillMaxWidth().height(playerChannelsCueHeight).testTag("player-channels-cue"),
-                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.nav_channels), color = androidx.tv.material3.MaterialTheme.colorScheme.onSurface,
-                    style = androidx.tv.material3.MaterialTheme.typography.labelLarge)
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = androidx.tv.material3.MaterialTheme.colorScheme.onSurface)
-            }
-        }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = channelRailOpen,
+            enter = androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(LIVE_PLAYER_LAYER_TRANSITION_MS), expandFrom = Alignment.Bottom),
+            exit = androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(LIVE_PLAYER_LAYER_TRANSITION_MS), shrinkTowards = Alignment.Bottom),
+        ) { channelRailContent() }
     }
 }

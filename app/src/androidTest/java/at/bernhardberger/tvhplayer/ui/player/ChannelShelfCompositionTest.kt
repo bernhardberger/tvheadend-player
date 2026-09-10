@@ -47,8 +47,9 @@ class ChannelShelfCompositionTest {
     @Test fun emptyShelfUpRestoresControlsAndInvoker() = assertShelfDismissal(Key.DirectionUp, empty = true)
     @Test fun rapidShelfUpRoundTripDoesNotSwallowTheNextDownPress() = assertShelfDismissal(Key.DirectionUp, rapid = true)
     @Test fun rapidShelfBackRoundTripDoesNotSwallowTheNextDownPress() = assertShelfDismissal(Key.Back, rapid = true)
+    @Test fun pausedSeekedBackRailPreservesFillAndPausedIcon() = assertShelfDismissal(Key.DirectionUp, pausedGuard = true)
 
-    private fun assertShelfDismissal(closeKey: Key, empty: Boolean = false, rapid: Boolean = false) {
+    private fun assertShelfDismissal(closeKey: Key, empty: Boolean = false, rapid: Boolean = false, pausedGuard: Boolean = false) {
         lateinit var layers: LivePlayerLayerState
         var activations = 0
         rule.setContent {
@@ -73,7 +74,7 @@ class ChannelShelfCompositionTest {
                         else -> false
                     }
                 }) {
-                    PlayerControlsLayer(layers.controlsVisible, modalVisible = false) {
+                    PlayerControlsLayer(layers.controlsVisible || layers.channelDrawerOpen, modalVisible = false) {
                         OverlayControlsTv(
                             imageLoader = loader, channelNumber = 1, channelName = "Channel", piconPath = null,
                             nowEvent = null, nextEvent = null, nowSec = 0, controlsVisible = layers.controlsVisible,
@@ -83,35 +84,61 @@ class ChannelShelfCompositionTest {
                             },
                             onOpenInfo = { activations++ }, onStopPlayback = { activations++ },
                             onUserInteraction = {}, onOpenOptions = { activations++ },
-                            timeshiftState = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true),
+                            timeshiftState = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(
+                                available = true, bufferStartMs = -3_600_000, positionMs = -900_000, liveEdgeMs = 0),
+                            paused = pausedGuard,
+                            programmeWindow = ProgrammeWindow(event("Programme"), Instant.fromEpochSeconds(900),
+                                0.25f, 0f, 0.75f, 0.75f, true),
                             timeshiftFeedback = null, onToggleTimeshiftPause = { activations++ },
                             onSeekTimeshift = {}, onGoLive = {},
                             restoreChannelAction = layers.restoreChannelAction,
                             onChannelActionRestored = layers::onChannelActionRestored,
                             onActionFocused = layers::onActionFocused,
+                            channelRailOpen = layers.channelDrawerOpen,
+                            channelRailContent = {
+                                ChannelDrawer(
+                                    active = layers.channelDrawerOpen,
+                                    channels = if (empty) emptyList() else listOf(Channel.create(id = ChannelId(1), name = "Channel")),
+                                    selectedId = ChannelId(1), playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
+                                    nowEvent = { null }, nextEvent = { null }, imageLoader = loader,
+                                    onFocusChannel = {}, onPickChannel = { activations++ }, onCloseDrawer = { code ->
+                                        if (code != null) layers.beginOpeningKeyCycle(code)
+                                        layers.dismissChannelDrawer()
+                                    },
+                                )
+                            },
                         )
                     }
-                    if (layers.channelDrawerOpen) ChannelDrawer(
-                        channels = if (empty) emptyList() else listOf(Channel.create(id = ChannelId(1), name = "Channel")),
-                        selectedId = ChannelId(1), playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
-                        nowEvent = { null }, nextEvent = { null }, imageLoader = loader,
-                        onFocusChannel = {}, onPickChannel = { activations++ }, onCloseDrawer = { code ->
-                            if (code != null) layers.beginOpeningKeyCycle(code)
-                            layers.dismissChannelDrawer()
-                        },
-                    )
                 }
             }
         }
         rule.waitForIdle()
         if (rapid) rule.mainClock.autoAdvance = false
         for (invoker in listOf("player-info", "player-settings", "player-stop")) {
+            val trackBefore = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val fillBefore = rule.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val actionsBefore = rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
             rule.onNodeWithTag(invoker).requestFocus().performKeyInput { pressKey(Key.DirectionDown) }
             if (rapid) rule.mainClock.advanceTimeBy(32)
             rule.onNodeWithTag(if (empty) "player-shelf-close" else "player-channel-card-1").assertIsFocused()
-            if (rapid) rule.onNodeWithTag("player-actions").assertExists() else {
+            rule.onNodeWithTag("player-actions").assertExists()
+            if (!rapid) {
                 rule.mainClock.advanceTimeBy(500)
-                rule.onNodeWithTag("player-actions").assertDoesNotExist()
+                // Neither lateral rail edge may escape into the retained controls.
+                rule.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
+                rule.onNodeWithTag(if (empty) "player-shelf-close" else "player-channel-card-1").assertIsFocused()
+                rule.onNodeWithTag("player-timeline-status").assertDoesNotExist()
+                rule.onNodeWithTag("player-timeline-labels").assertDoesNotExist()
+                if (pausedGuard) {
+                    val trackAfter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                    val fillAfter = rule.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                    assertEquals(0.25f, fillBefore.width / trackBefore.width, 0.001f)
+                    assertEquals(fillBefore.width / trackBefore.width, fillAfter.width / trackAfter.width, 0.001f)
+                    val pauseDescription = rule.onNodeWithTag("player-pause").fetchSemanticsNode().config[
+                        androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
+                    assertTrue(pauseDescription.contains("Play"))
+                    assertTrue(rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top < actionsBefore.top)
+                }
             }
             rule.onRoot().performKeyInput { keyDown(closeKey) }
             if (rapid) rule.mainClock.advanceTimeBy(48)
@@ -172,11 +199,9 @@ class ChannelShelfCompositionTest {
         now.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(nowLayouts) }
         assertTrue(identityLayouts.single().layoutInput.style.fontSize > nowLayouts.single().layoutInput.style.fontSize)
         val identityLayout = identityLayouts.single()
-        assertTrue("Identity needs two actual lines without clipping: lines=${identityLayout.lineCount}, " +
-            "size=${identityLayout.size}, constraints=${identityLayout.layoutInput.constraints}, " +
-            "lineHeight=${identityLayout.layoutInput.style.lineHeight}, density=${identityLayout.layoutInput.density}",
-            identityLayout.lineCount == 2 && !identityLayout.isLineEllipsized(0) &&
-                identityLayout.getLineBottom(1) <= identityLayout.size.height)
+        assertEquals(1, identityLayout.lineCount)
+        assertEquals(1, nowLayouts.single().lineCount)
+        assertTrue(identityLayout.getLineBottom(0) <= identityLayout.size.height)
         assertTrue(next.fetchSemanticsNode().boundsInRoot.bottom <= firstBounds.bottom - with(rule.density) { 12.dp.toPx() })
         val shelf = rule.onNodeWithTag("player-channel-shelf").fetchSemanticsNode().boundsInRoot
         assertTrue(shelf.height - firstBounds.height <= with(rule.density) { 56.dp.toPx() } + 1f)

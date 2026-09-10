@@ -22,17 +22,12 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 
-internal val playerChannelsCueHeight
-    @Composable @ReadOnlyComposable get() = with(LocalDensity.current) {
-        maxOf(24.dp, MaterialTheme.typography.labelLarge.lineHeight.toDp())
-    }
-
 /** Same bottom anchor as the composed action band, without hidden focusable controls. */
 @Composable
 @ReadOnlyComposable
+@Suppress("UNUSED_PARAMETER") // Channel availability no longer adds a cue below the actions.
 internal fun playerSeekPreviewBottomPadding(channelsAvailable: Boolean) =
-    TvOverlayBottomPadding + TvOverlayActionButtonSize + 8.dp +
-        if (channelsAvailable) playerChannelsCueHeight else 0.dp
+    TvOverlayBottomPadding + TvOverlayActionButtonSize + 8.dp
 
 @Composable
 internal fun PlayerOverlayChrome(

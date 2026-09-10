@@ -46,6 +46,7 @@ fun PlaybackSeekbar(
     feedbackIsError: Boolean = feedback != null,
     reserveStatusSpace: Boolean = false,
     statusAction: (@Composable () -> Unit)? = null,
+    collapsed: Boolean = false,
     /**
      * Live-edge presentation to label the timeline with. Defaults to the measured
      * distance within [range]; live callers pass the server-shift-aware presentation.
@@ -61,6 +62,7 @@ fun PlaybackSeekbar(
             stringResource(R.string.player_timing_unavailable)
         PlayerTimelineBlock(
             progress = null,
+            collapsed = collapsed,
             tone = PlayerTimelineTone.AMBIENT,
             leadingLabel = unavailable,
             rewindableStartFraction = range.availableStartFraction,
@@ -175,7 +177,8 @@ fun PlaybackSeekbar(
     val windowFeedback = feedback ?: programmeWindow?.event?.title?.takeIf { previewing && it.isNotBlank() }
         PlayerTimelineBlock(
             progress = displayedProgress,
-            tone = if (focused) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
+            collapsed = collapsed,
+            tone = if (focused && !collapsed) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
             // The estimate qualifier stays in the accessible description; visibly it is noise.
             leadingLabel = clockLabels?.first ?: listOfNotNull(
                 stringResource(R.string.player_paused).takeIf { paused },
@@ -227,8 +230,8 @@ fun PlaybackSeekbar(
                             if (!it.targetAvailable) " $unavailableTarget" else ""
                     } ?: stateDescription
                     progressBarRangeInfo = ProgressBarRangeInfo(accessibilityProgress, 0f..1f)
-                    customActions = accessibilityActions
+                    if (!collapsed) customActions = accessibilityActions
                 }
-                .focusable(),
+                .then(if (collapsed) Modifier else Modifier.focusable()),
         )
 }

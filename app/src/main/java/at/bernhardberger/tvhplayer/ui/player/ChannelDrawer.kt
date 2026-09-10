@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,9 +29,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -70,6 +68,7 @@ fun ChannelDrawer(
     nextEvent: (ChannelId) -> EpgEvent?,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
+    active: Boolean = true,
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: (Int?) -> Unit,
@@ -81,7 +80,11 @@ fun ChannelDrawer(
     var focusedId by remember { mutableStateOf(playingChannelId ?: selectedId) }
     var entered by remember { mutableStateOf(false) }
     val emptyFocus = remember { FocusRequester() }
-    LaunchedEffect(ids) {
+    LaunchedEffect(ids, active) {
+        if (!active) {
+            entered = false
+            return@LaunchedEffect
+        }
         if (ids.isEmpty()) {
             withFrameNanos { }
             emptyFocus.requestFocus()
@@ -98,16 +101,15 @@ fun ChannelDrawer(
         entered = true
     }
     val cardHeight = with(LocalDensity.current) {
-        40.dp + maxOf(64.dp, MaterialTheme.typography.titleMedium.lineHeight.toDp() * 2 +
-            maxOf(20.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp())) +
-            MaterialTheme.typography.bodyMedium.lineHeight.toDp() * 2 +
+        40.dp + maxOf(64.dp, MaterialTheme.typography.titleMedium.lineHeight.toDp() +
+            maxOf(24.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp())) +
+            MaterialTheme.typography.bodyMedium.lineHeight.toDp() +
             MaterialTheme.typography.labelMedium.lineHeight.toDp() * 2
     }
     Column(
-        Modifier.fillMaxWidth().background(Brush.verticalGradient(
-            0f to Color.Transparent, 0.18f to Color.Black.copy(alpha = 0.94f), 1f to Color.Black,
-        ))
-            .padding(top = 16.dp, bottom = 24.dp).testTag("player-channel-shelf")
+        Modifier.fillMaxWidth()
+            .focusProperties { canFocus = active }
+            .padding(top = 8.dp).testTag("player-channel-shelf")
             .onPreviewKeyEvent { event ->
                 if (event.key == Key.DirectionUp) {
                     if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) onCloseDrawer(event.nativeKeyEvent.keyCode)
@@ -122,7 +124,7 @@ fun ChannelDrawer(
                 modifier = Modifier.padding(horizontal = 56.dp).focusRequester(emptyFocus).testTag("player-shelf-close"),
             ) { Text(stringResource(R.string.close)) }
         }
-        LazyRow(state = listState, contentPadding = PaddingValues(horizontal = 56.dp, vertical = 8.dp),
+        LazyRow(state = listState, contentPadding = PaddingValues(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             items(channels, key = { it.id.value }) { channel ->
                 Card(
@@ -152,22 +154,22 @@ fun ChannelDrawer(
                                 piconPath = channel.icon, modifier = Modifier.size(96.dp, 64.dp)
                                     .testTag("player-channel-${channel.id.value}-picon").padding(4.dp))
                             Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                Row(Modifier.height(with(LocalDensity.current) { maxOf(20.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp()) }),
+                                Row(Modifier.height(with(LocalDensity.current) { maxOf(24.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp()) }),
                                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(ChannelNavigation.numberForId(ids, numbers, channel.id)?.toString().orEmpty(),
                                         modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f), maxLines = 1)
                                     if (channel.id == playingChannelId) Icon(Icons.Filled.PlayArrow,
                                         contentDescription = stringResource(R.string.player_shelf_playing),
-                                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                                        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                                     if (channel.id in recordingChannelIds) Icon(Icons.Filled.FiberManualRecord,
                                         contentDescription = stringResource(R.string.player_shelf_recording),
-                                        tint = at.bernhardberger.tvhplayer.ui.TvRecordingColor, modifier = Modifier.size(12.dp))
+                                        tint = at.bernhardberger.tvhplayer.ui.TvRecordingColor, modifier = Modifier.size(16.dp))
                                 }
                                 Text(channel.name.orEmpty(),
                                     modifier = Modifier.testTag("player-channel-${channel.id.value}-identity"),
                                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                         val now = nowEvent(channel.id)
@@ -180,7 +182,7 @@ fun ChannelDrawer(
                             Text(now?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.no_epg),
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
                                 style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Normal,
-                                minLines = 2, maxLines = 2,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.testTag("player-channel-${channel.id.value}-now"))
                         }

@@ -21,6 +21,8 @@ import androidx.compose.ui.test.performKeyPress
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -36,6 +38,22 @@ import org.junit.Test
 import kotlin.time.Instant
 
 class PlayerOverlayCompositionTest {
+    @Test
+    fun upCommitsPreviewBeforeFocusingGoLiveInStatusBand() {
+        val preview = mutableStateOf(false)
+        val state = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                ModernLiveFixture(state, previewing = preview.value, onCommitSeek = { preview.value = false })
+            }
+        }
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.runOnIdle { preview.value = true }
+        composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("player-go-live").assertIsFocused()
+    }
+
     @Test
     fun timelineGeometrySurvivesScheduleHistoryAndTimingLossAtLargeText() {
         val buffered = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
@@ -187,19 +205,21 @@ class PlayerOverlayCompositionTest {
             for (seeking in listOf(true, false, true, false)) {
                 composeRule.runOnIdle { preview.value = seeking }
                 assertEquals(track, bounds("player-timeline-track"))
-                assertEquals(goLive, bounds("player-go-live"))
+                if (seeking) composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
+                else assertEquals(goLive, bounds("player-go-live"))
                 assertEquals(status, bounds("player-timeline-status"))
                 if (candidate != null) assertEquals(endpoints, bounds("player-window-start"))
                 if (seeking) composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
             }
         }
         composeRule.runOnIdle { preview.value = true }
-        val title = bounds("player-window-title")
         val target = bounds("timeshift-preview-target")
+        assertTrue(status.contains(target.center))
+        composeRule.onNodeWithTag("player-window-title").assertDoesNotExist()
         composeRule.runOnIdle { hidden.value = true }
         assertEquals(track, bounds("player-timeline-track"))
         assertEquals(target, bounds("timeshift-preview-target"))
-        assertEquals(title.top, bounds("timeshift-preview-programme").top, 1f)
+        composeRule.onNodeWithTag("timeshift-preview-programme").assertDoesNotExist()
         composeRule.runOnIdle { hidden.value = false; feedback.value = "Target expired" }
         assertEquals(track, bounds("player-timeline-track"))
         assertEquals(status, bounds("player-timeline-status"))
@@ -384,8 +404,9 @@ class PlayerOverlayCompositionTest {
         assertEquals(resting, track())
         composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
         val target = composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val goLive = composeRule.onNodeWithTag("player-go-live").fetchSemanticsNode().boundsInRoot
-        assertTrue(goLive.bottom <= target.top)
+        composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
+        val status = composeRule.onNodeWithTag("player-timeline-status").fetchSemanticsNode().boundsInRoot
+        assertTrue(status.contains(target.center))
         assertTrue(target.bottom <= resting.top)
         composeRule.runOnIdle { stage.value = 3 }
         assertEquals(resting, track())
@@ -401,6 +422,7 @@ class PlayerOverlayCompositionTest {
         onPause: () -> Unit = {},
         onGoLive: () -> Unit = {},
         feedback: String? = null,
+        onCommitSeek: () -> Unit = {},
     ) {
         OverlayControlsTv(
             imageLoader = ImageLoader.Builder(LocalContext.current).build(),
@@ -411,6 +433,7 @@ class PlayerOverlayCompositionTest {
             timeshiftState = state, timeshiftFeedback = feedback,
             onToggleTimeshiftPause = onPause, onSeekTimeshift = {}, onGoLive = onGoLive,
             committedWindow = window, programmeWindow = window, previewing = previewing,
+            onCommitSeek = onCommitSeek,
         )
     }
 
@@ -546,8 +569,8 @@ class PlayerOverlayCompositionTest {
         val infoLabel = composeRule.onNodeWithText("Info", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue(icons[2].contains(infoLabel.center))
         composeRule.onNodeWithTag("player-transport-actions").assertDoesNotExist()
-        assertEquals(1, composeRule.onAllNodesWithText("Channels").fetchSemanticsNodes().size)
-        assertTrue(actions.bottom <= composeRule.onNodeWithTag("player-channels-cue").fetchSemanticsNode().boundsInRoot.top)
+        assertEquals(0, composeRule.onAllNodesWithText("Channels").fetchSemanticsNodes().size)
+        composeRule.onNodeWithTag("player-channels-cue").assertDoesNotExist()
         assertEquals(
             0,
             composeRule.onAllNodesWithText(
@@ -721,6 +744,39 @@ class PlayerOverlayCompositionTest {
         val title = composeRule.onNodeWithTag("player-programme-title").fetchSemanticsNode().boundsInRoot
         assertEquals(longEyebrow.left, title.left, 1f)
         assertEquals(with(composeRule.density) { 64.dp.toPx() }, longPicon.height, 1f)
+    }
+
+    @Test
+    fun openingAndClosingRailKeepsHeaderCompositionIdentity() {
+        var railOpen by mutableStateOf(false)
+        composeRule.setContent {
+            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
+            TVHeadendPlayerTheme {
+                PlayerControlsLayer(visible = true, modalVisible = false) {
+                    OverlayControlsTv(
+                        imageLoader = imageLoader, channelNumber = 1, channelName = "Channel",
+                        piconPath = null, nowEvent = event(1, 3_600, 7_200, "Programme"),
+                        nextEvent = null, nowSec = 5_400, controlsVisible = !railOpen,
+                        optionsOpen = false, onOpenChannels = {}, onStopPlayback = {},
+                        onUserInteraction = {}, onOpenOptions = {}, timeshiftState = AppTimeshiftState(),
+                        timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {},
+                        onGoLive = {}, channelRailOpen = railOpen,
+                        channelRailContent = { androidx.tv.material3.Text("Channel rail") },
+                    )
+                }
+            }
+        }
+        val tags = listOf("player-picon", "player-channel-identity", "player-programme-title", "player-clock")
+        val before = tags.associateWith { composeRule.onNodeWithTag(it).fetchSemanticsNode() }
+        repeat(2) {
+            composeRule.runOnIdle { railOpen = !railOpen }
+            composeRule.waitForIdle()
+            tags.forEach { tag ->
+                val after = composeRule.onNodeWithTag(tag).fetchSemanticsNode()
+                assertEquals("Header node remounted: $tag", before.getValue(tag).id, after.id)
+                assertEquals(before.getValue(tag).boundsInRoot, after.boundsInRoot)
+            }
+        }
     }
 
     private fun event(id: Int, start: Long, stop: Long, title: String) = EpgEvent.create(

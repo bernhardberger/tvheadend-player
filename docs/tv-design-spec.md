@@ -430,14 +430,17 @@ necessary visible text belongs inside its control. Idle Stop and utility actions
 have no filled backing. There is
 no separate transport row or Actions-up hint. Header artwork fits an inset
 96-by-64dp container at the shell's left safe edge, beside a readable channel
-identity and programme text column. Compact shelf chrome retains the same artwork
-size. The two-line headline aligns with the channel name and outranks timing
+identity and programme text column. Opening the shelf retains that same header
+composition and artwork; it never mounts a second compact header. The two-line headline aligns with the channel name and outranks timing
 and Next. There is no competing header progress strip. The timeline repeats a
 programme title only during preview, when it can differ from committed playback.
 Seek previews place stream-relative targets above the fill edge, bounded inside
 the actual track, without changing seek bounds.
-Preview and genuine error feedback use a stable status row above the track, with
-constant clearance for the track-relative target label whenever a timeline exists.
+Preview and genuine error feedback use a stable status row above the track at
+`TvOverlayStatusRowHeight` (32dp minimum, growing to the current `labelLarge` line
+height). Feedback is left-aligned; passive Live or compact Go live sits right.
+The preview target replaces that content inside the same band, with no separately
+reserved preview-label whitespace. Up commits preview before focusing Go live.
 Starting, settling or cancelling a seek and missing programme metadata must not
 move the status, bar or endpoint readouts. Compact previews share those anchors.
 Focused seeking dims the header and
@@ -461,8 +464,8 @@ landing target of a reveal, so a reflexive Center after revealing chrome acts on
 a visibly focused button rather than an unnoticed timeline. Up/Down from the timeline
 commits pending preview; Up reaches actionable Go live (otherwise stays), and Down
 returns to the transport group. Down from the action
-strip opens Channels; a visible Channels-down cue below the strip appears only
-when channels exist. Recordings have neither the cue nor a shelf. Restoration uses
+strip opens Channels when channels exist. There is no Channels-down cue below
+the strip. Recordings have no shelf. Restoration uses
 semantic actions and never automatically chooses Stop or steals focus on routine
 timing/metadata updates. Without a timeshift buffer, a current valid EPG event
 supplies a cyan, noninteractive schedule-elapsed strip and schedule endpoints
@@ -484,25 +487,33 @@ safe Close focus and bottom-end action placement. Scroll edges fade inside the
 reading viewport, away from the focus border. Settings and Info share 32dp horizontal and 16dp inner vertical
 padding inside the existing frame.
 
-The channel shelf is horizontal and compact. Its cards enter from below and leave
-downward; upper identity and clock remain pinned. Back or Up dismisses only the
+The channel shelf is horizontal and compact. It expands from the bottom as a
+child below the action row, pushing the footer chrome upward, and shrinks back
+down on dismissal. Shelf expansion/shrink and controls-layer fade use
+`LIVE_PLAYER_LAYER_TRANSITION_MS` (180ms). Upper identity and clock remain pinned
+and mounted throughout. While the rail is open, the timeline is the same
+`PlaybackSeekbar`, with unchanged programme-window, timeshift and paused inputs;
+only status, labels and focus are collapsed. Never substitute the passive
+schedule strip for seeked-back playback. The action row remains visible with its
+paused icon but cannot receive focus until the shelf closes. Back or Up dismisses only the
 shelf, reveals ordinary player controls and restores the invoking safe action
 (Play/Pause or Info fallback, never Stop). Consume the complete dismissal key cycle;
 a separate Back from controls hides chrome. Entry scrolls to the playing
 channel before requesting focus. Focus-following Now/Next is independent of
 playing and channel-recording-now state. Selecting the playing channel closes
 without retuning; CH+/CH- tunes directly even in the shelf. Digit entry supports
-timeout, explicit confirmation and cancellation. One compact playing identity
+timeout, explicit confirmation and cancellation. The persistent playing identity
 heads the composition. Each stable-size 288dp-wide card contains its own channel
 identity and Now/Next titles with schedule ranges, or explicit missing-EPG copy.
 Card height follows text line heights at the user's font scale; all cards have
-the same dimensions: a substantial 96-by-64dp picon and prominent two-line channel
-name dominate; Now is secondary with up to two title lines; Next is quieter
+the same dimensions: a substantial 96-by-64dp picon and prominent single-line channel
+name dominate; Now is secondary with one title line; both ellipsize long text. Next is quieter
 single-line support combining start time and title, with its full schedule in
-accessibility semantics. Card surrounds are 16dp above and 24dp below, plus 8dp
-focus overflow on each side of the row. There are no nested actions or focus scaling.
+accessibility semantics. The footer owns the scrim and safe-area padding; the
+shelf adds an 8dp top gap and 8dp vertical focus overflow around the row.
+There are no nested actions or focus scaling.
 No separate focused-channel Now/Next block sits above the shelf.
-The focus border, playing triangle and recording dot have separate meanings and
+The focus border, 24dp playing triangle and 16dp recording dot have separate meanings and
 accessible labels; do not repeat channel identity or visible Playing labels.
 An ordinary connected tune failure leaves channel access and navigation
 available, shows no false playing

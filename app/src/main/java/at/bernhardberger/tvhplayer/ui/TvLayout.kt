@@ -97,6 +97,13 @@ val TvOverlayTimelineBarFocusedHeight = 10.dp
 val TvOverlayTimelineThumbSize = 20.dp
 /** Fixed band the bar is centred in; must be at least the thumb size. */
 val TvOverlayTimelineRowHeight = 24.dp
+/** Shared feedback/preview band, growing only for the user's text scale. */
+val TvOverlayStatusRowHeight
+    @androidx.compose.runtime.Composable
+    @androidx.compose.runtime.ReadOnlyComposable
+    get() = with(androidx.compose.ui.platform.LocalDensity.current) {
+        maxOf(32.dp, androidx.tv.material3.MaterialTheme.typography.labelLarge.lineHeight.toDp())
+    }
 val TvOverlayTimelineLabelGap = TvSpacing12
 val TvOverlayTimelineBlockGap = TvSpacing24
 

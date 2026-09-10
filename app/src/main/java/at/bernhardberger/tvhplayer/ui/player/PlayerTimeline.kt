@@ -32,7 +32,7 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
-import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
+import at.bernhardberger.tvhplayer.ui.TvOverlayStatusRowHeight
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvOverlayGhostFillAlpha
@@ -147,6 +147,7 @@ fun PlayerTimelineBar(
                     Modifier
                         .fillMaxWidth(currentProgress)
                         .height(barHeight)
+                        .testTag("player-timeline-fill")
                         .background(fillColor),
                 )
             }
@@ -263,47 +264,40 @@ fun PlayerTimelineBlock(
     feedbackTestTag: String = "player-window-title",
     reserveStatusSpace: Boolean = false,
     statusAction: (@Composable () -> Unit)? = null,
+    collapsed: Boolean = false,
 ) {
     Column(modifier.fillMaxWidth()) {
-        if (reserveStatusSpace || feedback != null || statusAction != null) {
-            Row(
-                Modifier.fillMaxWidth().height(TvOverlayActionButtonSize).testTag("player-timeline-status"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (feedback != null) {
-                    Text(
-                        feedback,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (feedbackIsError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(end = 24.dp)
-                            .wrapContentWidth(Alignment.Start)
-                            .then(if (feedbackIsError) Modifier.background(MaterialTheme.colorScheme.errorContainer,
-                                MaterialTheme.shapes.small).padding(horizontal = 8.dp) else Modifier)
-                            .testTag(feedbackTestTag),
-                    )
-                } else Spacer(Modifier.weight(1f))
-                statusAction?.invoke()
-            }
-        }
-        // Live modes reserve the same target clearance, including tuning and missing EPG.
-        // The timeline's top padding already contributes 8dp of that clearance.
-        if (reserveStatusSpace || previewLabel != null) {
-            Spacer(Modifier.height(with(LocalDensity.current) {
-                (MaterialTheme.typography.labelLarge.lineHeight.toDp() - 8.dp).coerceAtLeast(0.dp)
-            }))
-        }
-        Column(timelineModifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            if (previewLabel != null) {
-                Box(Modifier.fillMaxWidth().layout { measurable, constraints ->
-                    val label = measurable.measure(constraints.copy(minHeight = 0))
-                    layout(label.width, 0) { label.placeRelative(0, -label.height) }
-                }) {
+        if (!collapsed && (reserveStatusSpace || feedback != null || statusAction != null || previewLabel != null)) {
+            Box(Modifier.fillMaxWidth().height(TvOverlayStatusRowHeight).testTag("player-timeline-status"),
+                contentAlignment = Alignment.Center) {
+                if (previewLabel != null) {
                     TimelineTargetLabel(previewLabel, programmeWindow?.positionFraction ?: progress ?: 0f,
                         programmeWindow?.targetAvailable != false)
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (feedback != null) {
+                            Text(
+                                feedback,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (feedbackIsError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(end = 24.dp)
+                                    .wrapContentWidth(Alignment.Start)
+                                    .then(if (feedbackIsError) Modifier.background(MaterialTheme.colorScheme.errorContainer,
+                                        MaterialTheme.shapes.small).padding(horizontal = 8.dp) else Modifier)
+                                    .testTag(feedbackTestTag),
+                            )
+                        } else Spacer(Modifier.weight(1f))
+                        statusAction?.invoke()
+                    }
                 }
             }
+        }
+        Column(timelineModifier.fillMaxWidth().padding(vertical = 8.dp)) {
             PlayerTimelineBar(
                 progress = programmeWindow?.positionFraction ?: progress,
                 tone = tone,
@@ -323,7 +317,7 @@ fun PlayerTimelineBlock(
                 showTrack = showTrack,
             )
             // Endpoint readouts never shorten or move the track, even at large font scales.
-            if (reserveLabelSpace || leadingLabel != null || trailingLabel != null) {
+            if (!collapsed && (reserveLabelSpace || leadingLabel != null || trailingLabel != null)) {
                 val labelHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
                 Row(Modifier.fillMaxWidth().height(labelHeight).testTag("player-timeline-labels"), verticalAlignment = Alignment.CenterVertically) {
                     leadingLabel?.let {

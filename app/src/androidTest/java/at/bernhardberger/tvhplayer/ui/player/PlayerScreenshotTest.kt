@@ -150,13 +150,19 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
                     } else if (scenario.startsWith("shelf")) {
-                        PlayerOverlayChrome(
-                            footerPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                            headerContent = { modifier ->
-                                PlayerIdentityHeader(imageLoader, "imagecache/12", "12 Documentary 12", "", null,
-                                    "21:30", null, modifier = modifier, currentSession = currentSession, compact = true)
-                            },
-                        ) {
+                        val window = ProgrammeWindow(programme(long = large), Instant.fromEpochSeconds(1_783_020_600L),
+                            if (scenario == "shelf-paused") 0.25f else 0.5f, 0f, 0.5f, 0.5f, true)
+                        OverlayControlsTv(
+                            imageLoader = imageLoader, currentSession = currentSession,
+                            channelNumber = 12, channelName = "Documentary 12", piconPath = "imagecache/12",
+                            nowEvent = programme(long = large), nextEvent = null, nowSec = 1_783_020_600L,
+                            controlsVisible = false, optionsOpen = false, onOpenChannels = {}, onStopPlayback = {},
+                            onUserInteraction = {}, onOpenOptions = {},
+                            timeshiftState = AppTimeshiftState(available = true, bufferStartMs = -3_600_000,
+                                positionMs = if (scenario == "shelf-paused") -900_000 else 0, liveEdgeMs = 0),
+                            timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
+                            paused = scenario == "shelf-paused", programmeWindow = window, committedWindow = window,
+                            channelRailOpen = true, channelRailContent = {
                             ChannelDrawer(
                                 channels = if (scenario == "shelf-empty") emptyList() else List(15) {
                                     Channel.create(id = ChannelId(it + 1L), icon = "imagecache/${it + 1}", name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
@@ -167,7 +173,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                  title = "The world beneath the ice") }, imageLoader = imageLoader,
                                  onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {}, currentSession = currentSession,
                             )
-                        }
+                        })
                     } else if (scenario.startsWith("recording")) {
                         RecordingOverlayControls(
                             imageLoader = imageLoader, piconPath = "imagecache/13", currentSession = currentSession,
@@ -260,7 +266,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                     val layout = layouts.single()
                     assertTrue("$part: line bottom ${layout.getLineBottom(layout.lineCount - 1)} must fit text height ${layout.size.height}",
                         layout.getLineBottom(layout.lineCount - 1) <= layout.size.height)
-                    if (part == "now") assertTrue("Long Now title must retain two lines", layout.lineCount == 2)
+                     if (part == "now") assertTrue("Now title remains one line", layout.lineCount == 1)
                 }
             }
         }
@@ -303,7 +309,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
             "field-disabled", "field-disabled-missing", "field-unavailable", "field-unavailable-missing", "field-tuning",
             "live", "timeshift-live", "timeshift-live-deep", "paused", "paused-deep", "timing-unavailable",
             "seek-shallow", "seek-deep", "seek-live", "long", "missing", "recording", "recording-unknown", "recording-info",
-            "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-browse", "shelf-long", "shelf-missing", "shelf-empty", "return-info",
+             "settings", "settings-audio", "info", "info-long", "info-long-end", "info-missing", "shelf", "shelf-paused", "shelf-browse", "shelf-long", "shelf-missing", "shelf-empty", "return-info",
             "timeline-clamped", "timeline-acquiring", "timeline-overnight", "timeline-overnight-large", "timeline-acquiring-focused", "timeline-unavailable-focused"))
             .flatMap { scenario -> listOf(false, true).map { dark -> arrayOf<Any>(scenario, dark) } }
 

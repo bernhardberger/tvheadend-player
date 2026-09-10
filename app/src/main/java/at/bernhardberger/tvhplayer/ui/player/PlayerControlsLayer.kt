@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
@@ -17,8 +18,8 @@ internal fun PlayerControlsLayer(
     if (!modalVisible) {
         AnimatedVisibility(
             visible = visible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)),
+            exit = fadeOut(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)),
             modifier = modifier,
             content = content,
         )

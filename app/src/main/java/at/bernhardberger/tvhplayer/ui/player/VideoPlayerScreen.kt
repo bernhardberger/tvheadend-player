@@ -1039,53 +1039,32 @@ fun VideoPlayerScreen(
             .playerRootSemantics(stringResource(R.string.player_live_tv_surface))
             .focusable()
     ) {
-        if (foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER) {
-            PlayerOverlayChrome(
-                footerPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                headerContent = { modifier ->
-                    PlayerIdentityHeader(
-                        imageLoader = imageLoader, currentSession = currentSession,
-                        piconPath = currentChannel?.icon,
-                        eyebrow = listOfNotNull(currentChannelNumber?.toString(), currentChannelName).joinToString(" "),
-                        title = "",
-                        compact = true,
-                        support = null,
-                        clock = formatClock(nowSec), clockSupport = null,
-                        modifier = modifier,
-                    )
-                },
-            ) {}
-        }
-        AnimatedVisibility(
-            visible = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-            enter = slideInVertically(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { it },
-            exit = slideOutVertically(tween(LIVE_PLAYER_LAYER_TRANSITION_MS)) { it },
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-        ) {
-            ChannelDrawer(
-                channels = channels,
-                selectedId = selectedId,
-                playingChannelId = confirmedPlayingChannelId,
-                recordingChannelIds = recordingChannelIds,
-                nowEvent = { channelsVm.nowEvent(it, nowSec) },
-                nextEvent = { channelsVm.nextEvent(it, nowSec) },
-                imageLoader = imageLoader,
-                currentSession = currentSession,
-                onFocusChannel = { selectedId = it },
-                onPickChannel = { tuneChannel(it) },
-                onCloseDrawer = { keyCode ->
-                    if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
-                    layerState.dismissChannelDrawer()
-                },
-            )
-        }
-
         PlayerControlsLayer(
-            visible = foregroundLayer == PlayerForegroundLayer.CONTROLS,
+            visible = foregroundLayer == PlayerForegroundLayer.CONTROLS || foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
             modalVisible = layerState.optionsPage != null || layerState.infoOpen,
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             OverlayControlsTv(
+                channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
+                channelRailContent = {
+                    ChannelDrawer(
+                        active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
+                        channels = channels,
+                        selectedId = selectedId,
+                        playingChannelId = confirmedPlayingChannelId,
+                        recordingChannelIds = recordingChannelIds,
+                        nowEvent = { channelsVm.nowEvent(it, nowSec) },
+                        nextEvent = { channelsVm.nextEvent(it, nowSec) },
+                        imageLoader = imageLoader,
+                        currentSession = currentSession,
+                        onFocusChannel = { selectedId = it },
+                        onPickChannel = { tuneChannel(it) },
+                        onCloseDrawer = { keyCode ->
+                            if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
+                            layerState.dismissChannelDrawer()
+                        },
+                    )
+                },
                 restoreChannelAction = layerState.restoreChannelAction,
                 onChannelActionRestored = layerState::onChannelActionRestored,
                 onActionFocused = layerState::onActionFocused,
