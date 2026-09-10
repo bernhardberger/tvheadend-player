@@ -1,5 +1,7 @@
 # Player journey measurements — 2026-09-10
 
+Status: dated reference recording completed, bounded profiling measurements.
+
 These are bounded app-side observations, not a motion-quality certification or
 an optimization change. Reproduction and source qualifications are in
 [profiling.md](profiling.md). Raw traces and screenshots remain private.
