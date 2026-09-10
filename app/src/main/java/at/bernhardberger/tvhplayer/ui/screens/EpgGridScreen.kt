@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.profiling.profileTrace
+import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -219,6 +220,7 @@ fun EpgGridScreen(
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
+    ProfileCompositionLifetime("guide")
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val timelineContentPadding = guideTimelineContentPadding(

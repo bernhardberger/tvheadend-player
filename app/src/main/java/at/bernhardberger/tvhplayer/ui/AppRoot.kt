@@ -584,6 +584,9 @@ fun AppRoot(
             Box(Modifier.fillMaxSize()) {
                 NavDisplay(
                     backStack = backStack,
+                    sceneStrategies = listOf(
+                        rememberSidebarGuideSceneStrategy(drawerActive, currentDestination),
+                    ),
                     onBack = {
                         if (showRail) browseBackHandler.value() else handleRootBack()
                     },
@@ -595,7 +598,9 @@ fun AppRoot(
                     popTransitionSpec = { appDestinationContentTransform() },
                     predictivePopTransitionSpec = { appDestinationContentTransform() },
                     entryProvider = entryProvider {
-                    entry<ChannelsKey> {
+                    entry<ChannelsKey>(
+                        metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS),
+                    ) {
                         ChannelsRouteContent(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
@@ -610,11 +615,13 @@ fun AppRoot(
                         )
                     }
 
-                    entry<GuideKey> {
+                    entry<GuideKey>(
+                        metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE),
+                    ) {
                         GuideRouteContent(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
-                            initialFocusEnabled = !drawerActive,
+                            initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
                             connectionUiState = connectionUiState,
                             onRetry = appVm::reconnectNow,
                             onOpenConnectionSettings = {

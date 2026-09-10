@@ -6,10 +6,13 @@ import android.os.Bundle
 import android.view.KeyEvent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.getValue
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
@@ -32,6 +35,14 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
+import at.bernhardberger.tvhplayer.ui.ChannelsKey
+import at.bernhardberger.tvhplayer.ui.GuideKey
+import at.bernhardberger.tvhplayer.ui.SIDEBAR_SCENE_DESTINATION
+import at.bernhardberger.tvhplayer.ui.appDestinationContentTransform
+import at.bernhardberger.tvhplayer.ui.destination
+import at.bernhardberger.tvhplayer.ui.navigateTopLevel
+import at.bernhardberger.tvhplayer.ui.rememberAppNavBackStack
+import at.bernhardberger.tvhplayer.ui.rememberSidebarGuideSceneStrategy
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
@@ -100,33 +111,51 @@ class JourneyProfileActivity : AppCompatActivity() {
             val lastPlayed = LastPlayedChannelStore(this@JourneyProfileActivity)
             val imageLoader = ImageLoader(this@JourneyProfileActivity).also { images = it }
             setContent {
-                var route by remember {
-                    mutableStateOf(if (journey == "guide") AppDestination.GUIDE else AppDestination.CHANNELS)
-                }
+                val backStack = rememberAppNavBackStack(if (journey == "guide") GuideKey else ChannelsKey)
+                val route = backStack.last()
+                val browseBack = remember { mutableStateOf<() -> Unit>({ finish() }) }
+                BackHandler { browseBack.value() }
                 TVHeadendPlayerTheme {
                     SideRail(
-                        currentRoute = route,
+                        currentRoute = route.destination,
                         showEpgMenu = true,
                         availableDestinations = setOf(AppDestination.CHANNELS, AppDestination.GUIDE),
                         onRootBack = { finish() },
-                        onNavigate = { route = it },
+                        onBackHandlerChanged = { browseBack.value = it },
+                        onNavigate = {
+                            backStack.navigateTopLevel(if (it == AppDestination.GUIDE) GuideKey else ChannelsKey)
+                        },
                     ) { padding, drawerActive ->
-                        if (route == AppDestination.GUIDE) {
-                            EpgGridScreen(
-                                contentPadding = padding, initialFocusEnabled = !drawerActive,
-                                channelViewModel = catalog, selection = selection, session = session,
-                                playerSession = runtime, lastPlayedStore = lastPlayed,
-                                guidePositionStore = guidePosition, imageLoader = imageLoader,
-                                onPlay = { _, _ -> },
-                            )
-                        } else {
-                            ChannelsScreen(
-                                contentPadding = padding, initialFocusEnabled = !drawerActive,
-                                channelViewModel = catalog, selection = selection, imageLoader = imageLoader,
-                                playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
-                                onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> },
-                            )
-                        }
+                        NavDisplay(
+                            backStack = backStack,
+                            onBack = { browseBack.value() },
+                            entryDecorators = listOf(
+                                rememberSaveableStateHolderNavEntryDecorator(),
+                                rememberViewModelStoreNavEntryDecorator(),
+                            ),
+                            sceneStrategies = listOf(rememberSidebarGuideSceneStrategy(drawerActive, route)),
+                            transitionSpec = { appDestinationContentTransform() },
+                            popTransitionSpec = { appDestinationContentTransform() },
+                            entryProvider = entryProvider {
+                                entry<GuideKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE)) {
+                                    EpgGridScreen(
+                                        contentPadding = padding, initialFocusEnabled = !drawerActive && route == GuideKey,
+                                        channelViewModel = catalog, selection = selection, session = session,
+                                        playerSession = runtime, lastPlayedStore = lastPlayed,
+                                        guidePositionStore = guidePosition, imageLoader = imageLoader,
+                                        onPlay = { _, _ -> },
+                                    )
+                                }
+                                entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
+                                    ChannelsScreen(
+                                        contentPadding = padding, initialFocusEnabled = !drawerActive,
+                                        channelViewModel = catalog, selection = selection, imageLoader = imageLoader,
+                                        playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
+                                        onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> },
+                                    )
+                                }
+                            },
+                        )
                     }
                 }
             }
