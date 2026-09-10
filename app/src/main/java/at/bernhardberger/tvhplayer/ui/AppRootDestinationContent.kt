@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.ui
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
@@ -48,7 +50,7 @@ internal fun ChannelsRouteContent(
     StartupGatedChannelsContent(
         contentAllowed = contentAllowed,
     ) {
-        ContentContainer {
+        ContentContainer(modifier = Modifier.profileLayout("channels")) {
             ChannelsScreen(
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
@@ -74,7 +76,7 @@ internal fun GuideRouteContent(
     onPlay: (LivePlaybackSelection, String) -> Unit,
 ) {
     if (contentAllowed) {
-        ContentContainer {
+        ContentContainer(modifier = Modifier.profileLayout("guide")) {
             EpgGridScreen(
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
@@ -101,7 +103,7 @@ internal fun RecordingsRouteContent(
     state: RecordingsScreenState,
 ) {
     if (contentAllowed) {
-        ContentContainer {
+        ContentContainer(modifier = Modifier.profileLayout("recordings")) {
             RecordingsScreen(
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,

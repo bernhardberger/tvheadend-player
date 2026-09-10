@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.profiling.profileLayout
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -153,9 +156,11 @@ internal fun SideRail(
     var pendingRoute by remember { mutableStateOf<AppDestination?>(null) }
     val requestRoute: (AppDestination) -> Unit = { route ->
         if (requestedRoute != route) {
-            requestedRoute = route
-            pendingRoute = route
-            onNavigate(route)
+            profileTrace("P44:sidebarRequest:${route.name}") {
+                requestedRoute = route
+                pendingRoute = route
+                onNavigate(route)
+            }
         }
     }
     LaunchedEffect(currentRoute, pendingRoute) {
@@ -279,6 +284,7 @@ internal fun SideRail(
                 }
                 Column(
                     modifier = Modifier
+                        .profileLayout("sidebar")
                         .fillMaxHeight()
                         .then(
                             if (drawerValue == DrawerValue.Open) {

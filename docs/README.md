@@ -50,6 +50,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | Document | Evidence boundary |
 |---|---|
 | `profiling-results-2026-09-10.md` | Bounded G10 and emulator journey timings, source attribution, rejected captures and measurement limits; not motion acceptance or an optimization mandate. |
+| `navigation-startup-profiling-2026-09-10.md` | G10 main-sidebar subtree attribution, repeated channel scrolling, cold/warm startup and operator-identified broadcast tuning; measurements and next experiments, not fixes. |
 | `mechanical-feedback-verification.md` | Dated debug verification for the 0.2.5/0.2.6 mechanical-feedback slice; not a current task or physical acceptance result. |
 | `g10-field-feedback-2026-09-08.md` | Bounded G10-05/09/15 and configured-state corrections, G10-08/02 triage, and static evidence limits. Original operator observations are preserved separately. |
 | `ai-skills-audit-2026-07-28.md` | Audit record for the imported skill set. Current agents and local skills carry the durable routing and caveats; this audit is not mandatory startup reading. |

@@ -9,6 +9,8 @@ if (( $# < 6 )); then
 fi
 mode=$1 device=$2 package=$3 output=$4 runs=$5
 shift 5
+key_delay=${TVHPLAYER_PROFILE_KEY_DELAY_SECONDS:-0.4}
+case "$key_delay" in 0.1|0.4) ;; *) exit 2 ;; esac
 case "$mode" in atrace|causal|frames|cpu|native-allocations) ;; *) exit 2 ;; esac
 case "$package" in at.bernhardberger.tvhplayer|at.bernhardberger.tvhplayer.profile) ;; *) exit 2 ;; esac
 [[ -n "$device" && "$runs" =~ ^[1-3]$ && $# -le 12 ]]
@@ -33,6 +35,7 @@ trap cleanup EXIT
 {
     date -u '+utc=%FT%TZ'
     printf 'mode=%s\npackage=%s\npid=%s\nruns=%s\nkeycodes=%s\n' "$mode" "$package" "$pid" "$runs" "$*"
+    printf 'key_delay_seconds=%s\n' "$key_delay"
     git rev-parse HEAD
     uptime
     adb -s "$device" shell 'for p in ro.product.manufacturer ro.product.model ro.product.device ro.product.name; do getprop "$p"; done'
@@ -48,7 +51,7 @@ fi
 # not Player work; keep guarded batches distinct from older unguarded evidence.
 guard="guard() { dumpsys window | grep 'mCurrentFocus=' | grep -Fq '$package/'; };"
 events='sleep 1;'
-for key in "$@"; do events+=" guard || exit 42; input keyevent $key; sleep 0.4;"; done
+for key in "$@"; do events+=" guard || exit 42; input keyevent $key; sleep $key_delay;"; done
 for ((run=1; run<=runs; run++)); do
     [[ "$(adb -s "$device" shell pidof "$package" | tr -d '\r')" == "$pid" ]]
     adb -s "$device" shell rm -f "$trace_path" "$remote.log"

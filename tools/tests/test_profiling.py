@@ -60,18 +60,20 @@ class ProfilingEvidenceTest(unittest.TestCase):
 
     def test_capture_rejects_exit_guide_activation_and_foreign_package_before_adb(self):
         with tempfile.TemporaryDirectory() as directory:
-            for package, key in (
-                ("at.bernhardberger.tvhplayer", "4"),
-                ("at.bernhardberger.tvhplayer", "172"),
-                ("at.bernhardberger.tvhplayer", "23"),
-                ("com.tcl.channelplus", "20"),
+            for package, key, delay in (
+                ("at.bernhardberger.tvhplayer", "4", "0.4"),
+                ("at.bernhardberger.tvhplayer", "172", "0.4"),
+                ("at.bernhardberger.tvhplayer", "23", "0.4"),
+                ("com.tcl.channelplus", "20", "0.4"),
+                ("at.bernhardberger.tvhplayer", "20", "0.4; exit 0"),
             ):
                 with self.subTest(package=package, key=key):
                     output = Path(directory) / "capture"
                     result = subprocess.run(
                         ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "invalid-device",
                          package, str(output), "1", key],
-                        env={"PATH": directory}, capture_output=True, text=True, timeout=5,
+                        env={"PATH": directory, "TVHPLAYER_PROFILE_KEY_DELAY_SECONDS": delay},
+                        capture_output=True, text=True, timeout=5,
                     )
                     self.assertEqual(result.returncode, 2)
                     self.assertFalse(output.exists())

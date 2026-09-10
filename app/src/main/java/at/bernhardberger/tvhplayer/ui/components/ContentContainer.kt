@@ -8,10 +8,11 @@ import androidx.compose.ui.Modifier
 
 @Composable
 fun ContentContainer(
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     Box(
-        Modifier
+        modifier
             .fillMaxSize()
             .focusGroup()
     ) {
