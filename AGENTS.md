@@ -164,7 +164,8 @@ duplicated assignments and unnecessarily verbose returned evidence.
 
 Use `app-locator` for mechanical retrieval, `app-explore`
 for bounded multi-file source maps and call traces, `app-planner` for an optional
-design second opinion, `app-analyze` for one concrete post-plan contradiction,
+planning second opinion for one coherent outcome with interacting decisions and
+directly relevant dependencies, `app-analyze` for one concrete post-plan contradiction,
 and `app-research` for one authoritative external-source question after local
 sources are insufficient. Use `android-reviewer` for a risk-based frozen-packet
 review. Use `tv-evidence-curator` for mechanical screenshot-set validation,
@@ -173,7 +174,13 @@ final screenshot-first design review. Only `app-locator` children may be
 delegated by read-only children, and depth 2 is terminal. Read-only children
 cannot edit, use shell, run builds or devices, or mutate Git. No child reads
 project instructions, ledgers, handoffs, archives, or broad plans; the packet
-carries what the child needs. Their configured model variants and
+carries the relevant requirements. The planner may inspect directly relevant
+source, tests and call chains within its permissions to establish feasibility;
+it distinguishes binding requirements and settled decisions from caller
+hypotheses/preferences, tests hypotheses, and flags evidence-backed contradictions
+without overriding the primary's final decisions or scope authority. Its
+recommendation and implementation/verification plan stay concise and proportional.
+Their configured model variants and
 step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
 `max` effort.
 
@@ -210,6 +217,9 @@ replacements; use the fallback and continue independent authorized work.
 Start each child as a fresh session by omitting `task_id`; never resume old child
 history. Supply one self-contained question with accepted invariants, included
 paths, exclusions, relevant evidence, and a stop condition. Do not redefine the
+planner's coherent outcome as an arbitrary single-question limit: supply its
+outcome, hard constraints, hypotheses, entry paths and evidence once, allowing
+directly relevant evidence inspection under its contract. Do not redefine the
 role's permissions, generic policy, output contract or verdict vocabulary in a
 task packet. Supply the actual relevant diff or exact readable changed paths;
 Git identity and gate status are caller-provided evidence for children that

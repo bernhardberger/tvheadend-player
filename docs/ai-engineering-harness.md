@@ -99,7 +99,20 @@ only for exact in-packet retrieval, never to reconstruct missing evidence.
 Read-only children cannot edit, use shell, run builds or devices, mutate Git, or read
 project instructions, ledgers, handoffs, archives, or broad plans. Start each as
 a fresh session without `task_id` and supply one self-contained question with
-exact evidence and a stop condition. The writable primary has no
+exact evidence and a stop condition. For `app-planner`, supply one coherent
+planning outcome, hard constraints, hypotheses, entry paths and evidence once;
+interacting decisions and directly relevant dependencies belong together rather
+than being split by an arbitrary single-question limit. The planner remains an
+optional read-only second opinion subordinate to the primary's final decisions
+and scope authority. It may inspect directly relevant source, tests and call
+chains within existing permissions to establish feasibility, rather than being
+limited to prompt evidence. Binding operator/repository requirements and settled
+decisions are distinct from caller hypotheses/preferences: test hypotheses and
+flag evidence-backed contradictions in binding assumptions without overriding
+authority. Return a decision-ready recommendation and implementation/verification
+plan, concise and proportional to the problem without a mandatory heading template.
+This is not general incident remediation or completed-diff review; reviewer
+evidence contracts remain unchanged. The writable primary has no
 repository-configured step ceiling; deterministic wall-clock and stalled-session
 watchdogs bound orchestration. Child step limits are terminal evidence budgets,
 not a reason for generic continuation.

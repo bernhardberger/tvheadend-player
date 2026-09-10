@@ -22,7 +22,7 @@
     },
     "app-planner": {
       "model": "openai/gpt-6-astra",
-      "variant": "medium",
+      "variant": "xhigh",
       "steps": 45
     },
     "app-analyze": {
