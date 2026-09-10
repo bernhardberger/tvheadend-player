@@ -32,10 +32,37 @@ class SidebarGuideNavigationTest {
     @get:Rule val compose = createAndroidComposeRule<JourneyProfileActivity>()
     private val focusHistory = mutableListOf<String>()
 
+    @Test fun leavingPairDoesNotReconstructHiddenGuideOnBackToChannels() {
+        openGuideSidebar()
+        val entries = compose.activity.guideCompositionEntries
+        assertTrue(entries > 0)
+        key(Key.DirectionDown)
+        compose.onNodeWithText("Recordings").assertIsFocused()
+        back()
+        compose.onNodeWithText("Channels").assertIsFocused()
+        compose.runOnIdle { assertEquals(entries, compose.activity.guideCompositionEntries) }
+        key(Key.DirectionDown)
+        compose.runOnIdle { assertEquals(entries + 1, compose.activity.guideCompositionEntries) }
+    }
+
     @Test fun firstRightEntryReachesGuideScopeWithoutChangingSelection() {
         openGuideSidebar()
         key(Key.DirectionRight)
         compose.onNode(hasText("All channels") and isFocused()).assertIsFocused().assertIsSelected()
+    }
+
+    @Test fun rightDuringGuideExitEntersTheSelectedChannel() {
+        openGuideSidebar()
+        compose.mainClock.autoAdvance = false
+        try {
+            key(Key.DirectionUp)
+            compose.mainClock.advanceTimeByFrame()
+            key(Key.DirectionRight)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        compose.onNode(hasText("Offline channel 1", substring = true) and isFocused()).assertIsFocused()
     }
 
     @Test fun sidebarUpdatesHiddenGuideAndRestoresLaterProgrammeWithinTheVisit() {
@@ -83,10 +110,15 @@ class SidebarGuideNavigationTest {
         assertEquals(later, focusedDescription())
         back()
         key(Key.DirectionUp)
+        val entries = compose.activity.guideCompositionEntries
         key(Key.DirectionRight) // Closing on Channels releases the retained Guide scene.
+        // Guide and Channels deliberately share browse selection by channel identity.
+        compose.onNode(hasText(later.substringBefore(','), substring = true) and isFocused()).assertIsFocused()
         back()
         compose.onNodeWithText("Channels").assertIsFocused()
         compose.onNode(hasContentDescription(later)).assertDoesNotExist()
+        key(Key.DirectionDown)
+        compose.runOnIdle { assertEquals(entries + 1, compose.activity.guideCompositionEntries) }
     }
 
     private fun openGuideSidebar() {

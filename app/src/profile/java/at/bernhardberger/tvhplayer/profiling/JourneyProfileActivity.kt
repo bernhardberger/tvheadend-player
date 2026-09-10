@@ -9,6 +9,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.tv.material3.Text
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -37,6 +39,7 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.ChannelsKey
 import at.bernhardberger.tvhplayer.ui.GuideKey
+import at.bernhardberger.tvhplayer.ui.RecordingsKey
 import at.bernhardberger.tvhplayer.ui.SIDEBAR_SCENE_DESTINATION
 import at.bernhardberger.tvhplayer.ui.appDestinationContentTransform
 import at.bernhardberger.tvhplayer.ui.destination
@@ -64,6 +67,8 @@ import kotlin.time.Clock
 class JourneyProfileActivity : AppCompatActivity() {
     private var runtimeOwner: SdkRuntimeOwner? = null
     private var images: ImageLoader? = null
+    internal var guideCompositionEntries = 0
+        private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,11 +124,17 @@ class JourneyProfileActivity : AppCompatActivity() {
                     SideRail(
                         currentRoute = route.destination,
                         showEpgMenu = true,
-                        availableDestinations = setOf(AppDestination.CHANNELS, AppDestination.GUIDE),
+                        availableDestinations = setOf(
+                            AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS,
+                        ),
                         onRootBack = { finish() },
                         onBackHandlerChanged = { browseBack.value = it },
                         onNavigate = {
-                            backStack.navigateTopLevel(if (it == AppDestination.GUIDE) GuideKey else ChannelsKey)
+                            backStack.navigateTopLevel(when (it) {
+                                AppDestination.GUIDE -> GuideKey
+                                AppDestination.RECORDINGS -> RecordingsKey
+                                else -> ChannelsKey
+                            })
                         },
                     ) { padding, drawerActive ->
                         NavDisplay(
@@ -138,6 +149,10 @@ class JourneyProfileActivity : AppCompatActivity() {
                             popTransitionSpec = { appDestinationContentTransform() },
                             entryProvider = entryProvider {
                                 entry<GuideKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE)) {
+                                    DisposableEffect(Unit) {
+                                        guideCompositionEntries++
+                                        onDispose { }
+                                    }
                                     EpgGridScreen(
                                         contentPadding = padding, initialFocusEnabled = !drawerActive && route == GuideKey,
                                         channelViewModel = catalog, selection = selection, session = session,
@@ -145,6 +160,9 @@ class JourneyProfileActivity : AppCompatActivity() {
                                         guidePositionStore = guidePosition, imageLoader = imageLoader,
                                         onPlay = { _, _ -> },
                                     )
+                                }
+                                entry<RecordingsKey> {
+                                    Text("Offline recordings destination")
                                 }
                                 entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
                                     ChannelsScreen(

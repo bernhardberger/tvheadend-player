@@ -30,7 +30,8 @@ internal fun rememberSidebarGuideSceneStrategy(
     drawerActive: Boolean,
     destination: AppNavKey?,
 ): SceneStrategy<AppNavKey> {
-    var guideShown by remember(drawerActive) { mutableStateOf(false) }
+    val inGuidePair = destination == GuideKey || destination == ChannelsKey
+    var guideShown by remember(drawerActive, inGuidePair) { mutableStateOf(false) }
     SideEffect { if (drawerActive && destination == GuideKey) guideShown = true }
     val retainGuide = drawerActive && guideShown
     return remember(retainGuide) {
@@ -79,7 +80,7 @@ private data class SidebarGuideScene(
             ) { measurables, constraints ->
                 // Keep the composition, but do no hidden Guide measure/place work after fade.
                 val child = if (guideVisible || guideAlpha.value > 0f) {
-                    measurables.single().measure(constraints)
+                    measurables.firstOrNull()?.measure(constraints)
                 } else null
                 layout(constraints.maxWidth, constraints.maxHeight) {
                     child?.placeRelative(0, 0)
