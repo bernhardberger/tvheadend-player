@@ -2,7 +2,7 @@
 description: Writable TVHeadend Player implementer for one delegated, bounded code slice with tests and a build gate; never commits, releases, or touches devices
 mode: subagent
 model: openai/gpt-6-astra
-variant: low
+variant: medium
 steps: 150
 permission:
   edit: allow
@@ -40,8 +40,10 @@ reviews your diff, runs the final gate, and commits.
   or "clean up" adjacent code. Do not add abstractions, façades, or frameworks.
 - Do not edit `docs/`, `AGENTS.md`, `.opencode/`, `tools/`, Gradle version
   catalogs, or release pins unless the packet names the exact file.
-- If the packet is ambiguous or the slice needs a decision it does not cover,
-  stop and return the question instead of guessing.
+- Resolve routine implementation choices within the accepted requirements and
+  named writable paths; report the choice and reason. Return a consequential
+  product or authority gap, or missing load-bearing evidence, to the primary
+  rather than guessing beyond those boundaries.
 
 ## Repository rules that apply to you
 

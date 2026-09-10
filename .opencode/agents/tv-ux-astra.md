@@ -22,7 +22,7 @@ Provide independent TV product design judgment, not Android runtime review.
 
 Reuse the shared role contracts by reading exactly one of these files before
 working. Their body governs evidence, permissions, scope, output and static-vs-
-runtime truth; their Opus label does not change your configured model:
+runtime truth; their model labels do not change your configured model:
 
 - `mode=brief`: `.opencode/agents/tv-ux-brief.md`.
 - `mode=review`, `mode=closure`, or `mode=challenge`:

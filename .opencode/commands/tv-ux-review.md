@@ -1,14 +1,14 @@
 ---
-description: Run an Opus final TV visual review or focused closure on a curated current evidence manifest.
+description: Run an Astra final TV visual review or focused closure on a curated current evidence manifest.
 agent: build
 ---
 
-Before dispatching `tv-ux-reviewer`, run
-`./review-provider-route.sh select eligible`. Only successful stdout `opus`
-permits Opus. Otherwise use the native `tv-ux-astra` fallback documented in
-`docs/ai-engineering-harness.md`; centrally report an explicit non-substitutable
-Opus gate rather than waiving it. Pass the screenshot-first contract below to the
-reviewer rather than performing its review in the implementing primary.
+Dispatch the configured Astra `tv-ux-reviewer` directly with its default effort.
+This is Astra coverage and does not satisfy an explicit non-substitutable Opus
+gate; report that gap centrally rather than waiving it. Actual Opus dispatches
+still require a fresh `./review-provider-route.sh select eligible` result of
+`opus`. Pass the screenshot-first contract below to the reviewer rather than
+performing its review in the implementing primary.
 
 Use `$ARGUMENTS` as the complete visual-evidence contract. It must name
 `mode=review` or `mode=closure`; the exact surface, states, visual

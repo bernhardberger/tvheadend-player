@@ -66,9 +66,12 @@ Read-only children retain their own explicit restrictions and the exact Task
 allowlist remains deny-by-default.
 
 Model, effort and step assignments live only in `.opencode/opencode.json` and
-agent frontmatter. Edit the relevant assignment directly and restart OpenCode;
-do not duplicate its value in policy or tests. Child settings do not inherit the
-primary's effort. The model-tier helper and its parallel registry were removed:
+agent frontmatter, with mode-specific overrides in caller dispatch guidance. Edit
+the relevant assignment directly; fresh-loader checks validate saved settings,
+not cached running sessions. Coordinate restart with the activation owner before
+claiming live adoption. Do not duplicate default values in policy or tests.
+Child settings do not inherit the primary's effort. The model-tier helper and its
+parallel registry were removed:
 mixed supported models are valid, and changing one is not a product gate.
 
 ## Delegation and context containment
@@ -117,6 +120,11 @@ repository-configured step ceiling; deterministic wall-clock and stalled-session
 watchdogs bound orchestration. Child step limits are terminal evidence budgets,
 not a reason for generic continuation.
 
+`app-analyze` likewise may inspect directly relevant source, tests and call chains
+within existing permissions to diagnose its bounded question. Its packet defines
+scope and requirements rather than an exhaustive evidence list. This does not
+relax reviewers' frozen-packet or screenshot evidence limits.
+
 The built-in writable primary and, inside one delegated slice, the
 `app-implementer` child write repository files. The implementer receives a
 packet with exact paths, tests, and gate, may run
@@ -128,11 +136,14 @@ delta is stable. Writers, Gradle builds, device operations, Git
 mutations, signing, publishing, and release operations may not overlap.
 
 Use the implementer's configured model and effort by default. The caller may
-override effort through Task's `reasoning` parameter: `medium` for meaningful
-unresolved implementation decisions, or `high` for a concrete reasoning
-difficulty. Keep the model inherited from the Astra assignment; do not route
-implementation to Opus or another model. Existing Opus review routing is
-unchanged.
+override effort through Task's `reasoning` parameter: `low` only for explicitly
+mechanical work, or `high` up front for evident difficult implementation. No
+lower-effort failure is required first; `max` is exceptional for a concrete
+unresolved hard case. Resolve routine implementation choices inside accepted
+requirements and writable scope. Return consequential product/authority gaps or
+missing load-bearing evidence to the primary. Keep the model inherited from the
+Astra assignment; do not route implementation to Opus or another model. Existing
+Opus review routing is unchanged.
 
 Before implementation, confirm that the dispatched session exposes an editing
 tool and Bash. If either is missing, report the capability gap rather than
@@ -180,6 +191,11 @@ session for the second review. For UX, use native `tv-ux-astra` with `mode=brief
 Record the guard reason, actual reviewer/session/model and explicitly absent Opus
 coverage. An explicitly non-substitutable admitted Opus gate requires central
 reconciliation; fallback does not pass it.
+
+For substantive `tv-ux-astra` briefs, dispatch `mode=brief` with Task
+`reasoning: "xhigh"`; mode text alone cannot select effort. Other modes use the
+configured default. Final `tv-ux-reviewer` is Astra and dispatches directly at its
+configured default without an Opus quota probe; it provides no Opus coverage.
 
 On actual Opus exhaustion, use the supported authenticated session API
 `POST /session/{exact-reviewer-id}/abort` and verify that session's state. Load
@@ -346,4 +362,8 @@ a Gradle property. Publish the SDK and re-run plain `./tools/verify` before
 treating the change as complete.
 
 OpenCode loads config-time files only at startup. After changing config, an
-agent, skill, command, or plugin, quit and restart before evaluating the result.
+agent, skill, command, or plugin, validate saved settings with a fresh loader.
+Running sessions retain cached settings until a coordinated quit/restart;
+fresh-loader success does not certify live adoption. Central owns activation
+when delivery is centrally coordinated; do not restart the shared backend or
+unrelated sessions automatically.

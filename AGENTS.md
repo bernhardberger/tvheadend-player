@@ -152,9 +152,11 @@ slice with named paths, tests, and gate, but never mutates Git, devices,
 signing, or publication; the primary reviews its diff, runs the final gate, and
 owns commits. Never run it while the primary or another writer is editing the
 same worktree. Keep implementation on Astra; do not override the implementer to
-Opus or another model. Use its configured effort by default; callers may select
-Medium for meaningful unresolved implementation decisions and escalate to High
-for a concrete reasoning difficulty. Opus review routing remains unchanged.
+Opus or another model. Use its configured effort by default; select Low only for
+explicitly mechanical work and High up front for evident difficult implementation,
+without requiring a lower-effort failure first. Resolve routine choices within
+accepted requirements and writable scope; return consequential product/authority
+gaps or missing load-bearing evidence. Opus review routing remains unchanged.
 The primary owns decomposition and delegation: use
 children whenever they are likely to materially improve correctness, evidence
 coverage, context isolation, turnaround time, or final quality. A roughly 20%
@@ -180,6 +182,9 @@ it distinguishes binding requirements and settled decisions from caller
 hypotheses/preferences, tests hypotheses, and flags evidence-backed contradictions
 without overriding the primary's final decisions or scope authority. Its
 recommendation and implementation/verification plan stay concise and proportional.
+The analyzer may inspect directly relevant source, tests and call chains within
+its permissions to diagnose its bounded question; the packet defines scope,
+not an exhaustive evidence list. Reviewers retain their frozen evidence limits.
 Their configured model variants and
 step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
 `max` effort.
@@ -203,6 +208,9 @@ Use `tv-ux-astra` for quota fallback, including design briefs, or an optional
 bounded challenge of one consequential unresolved recommendation, never an
 automatic third/full audit. Supplied mocks may establish direction, not final
 implemented UI acceptance. Do not ask routine operator taste questions.
+Dispatch substantive `tv-ux-astra` briefs with Task `reasoning: "xhigh"` and
+`mode=brief`; mode text alone does not select effort. Final `tv-ux-reviewer`
+dispatch is Astra coverage and uses its configured default directly.
 UX roles remain distinct from engineering review. Before EVERY Opus dispatch,
 including UX and follow-ups, run `./review-provider-route.sh select eligible`.
 Only successful stdout `opus` allows dispatch. Never source the guard or its

@@ -21,12 +21,14 @@ or contradiction in local TVHeadend Player evidence.
 
 - Never edit, use shell, run builds, or access the web. Delegate only exact
   in-scope mechanical retrieval to `app-locator` when useful.
-- Analyze only the supplied source, tests, and exact question. Do not perform
-  broad repository archaeology or choose package architecture.
+- Diagnose only the supplied bounded question. Inspect directly relevant source,
+  tests and call chains within existing permissions; supplied paths are entry
+  points, not the only evidence source. Do not perform broad repository
+  archaeology or choose package architecture.
 - Distinguish evidence from inference and cite exact paths and line ranges.
 - Return concise `Conclusion`, `Direct evidence`, `Inference`, `Correction
   options`, `Consequences`, and `Evidence gap`.
 - Deterministic implementation and verification remain with the primary.
-- Work only from the supplied task packet. Never read project instructions,
-  ledgers, handoffs, archives, or broad plans.
+- The supplied task packet defines scope and requirements. Never read project
+  instructions, ledgers, handoffs, archives, or broad plans.
 - The 30-step budget is terminal. Return the exact unresolved gap when reached.
