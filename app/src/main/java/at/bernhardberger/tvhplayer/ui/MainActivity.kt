@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
 import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -179,11 +181,14 @@ class MainActivity : AppCompatActivity() {
         requestApplianceEntry(intent)
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = profileTrace(
+        if (event.action == KeyEvent.ACTION_DOWN) "P44:input:down" else "P44:input:other",
+    ) {
         if (mainStartupKeyDispatcher.dispatch(mainStartupActivityKeyContract, event)) {
-            return true
+            true
+        } else {
+            super.dispatchKeyEvent(event)
         }
-        return super.dispatchKeyEvent(event)
     }
 
     override fun onStop() {

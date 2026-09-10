@@ -1,6 +1,132 @@
-# Offline Rail Profiling
+# Player Journey Profiling
 
-## Build boundary
+## Current capture workflow
+
+Use `tools/profiling/capture` and the standard Perfetto Trace Processor through
+`tools/profiling/analyze.py`. Keep traces, CSVs, screenshots and source snapshots
+private. Device authorization and exact-target checks in `device-targets.md` and
+`android-tooling.md` apply. Explicitly authorized unattended profiling does not
+require a new attended confirmation; human motion acceptance remains separate.
+
+### Two build boundaries
+
+- `profile`: isolated `.profile` UID, plain Application, no INTERNET or production
+  activity. The original static `RailProfileActivity` remains available.
+  `JourneyProfileActivity` feeds published SDK domain observations through the
+  production `ChannelsViewModel`, Channels screen and Guide indexing/navigation.
+  Its bounded extras are `dataset=normal|stress`, `journey=channels|guide`, and
+  `datasetEpochSeconds` (the beginning of the synthetic schedule). Normal has
+  60 channels × 48 half-hour programmes; stress has 300 × 144. Both have two tags,
+  complete cached coverage and no picons. This exercises application mapping,
+  not protocol decoding, network fetches or image downloads. Playback callbacks
+  in this browsing fixture are intentionally inactive.
+- `profileServer`: production UID, Application, settings and configured-server
+  behavior; nondebuggable and shell-profileable, signed with the existing local
+  test certificate. It has no fixture activity or SDK-testing dependency.
+  `verifyExternalSdkConsumption` checks its public dependency graph as well as
+  debug/release. Install only over a matching signer and non-newer version,
+  using official CLI `-r,-t`; never uninstall, downgrade or clear configuration.
+
+Both retain the existing release R8/shrinking settings and native dependencies.
+Only these two variants enable the fixed, content-free `P44:*` trace sections.
+Ordinary debug/release paths do not call Android tracing through this helper.
+
+```bash
+timeout --kill-after=5s 20m ./gradlew :app:assembleProfile :app:assembleProfileServer :app:lintProfile :app:lintProfileServer --offline --no-daemon --console=plain --no-scan
+```
+
+The isolated lifecycle regression uses the standard AGP test build type, enabled
+only by `-Ptvhplayer.profileTests=true`. Build with
+`:app:assembleProfile :app:assembleProfileAndroidTest`, install both matching APKs
+on the authorized emulator, and run `ProfileRecreationTest` through
+`at.bernhardberger.tvhplayer.profile.test/androidx.test.runner.AndroidJUnitRunner`.
+Require the named test's success status, `OK (1 test)` and final code `-1`, not
+ADB exit status alone. The test recreates the activity, checks catalog/session
+identity and dataset size, and verifies exactly one shutdown for each owner.
+The fixture deliberately restarts its activity-owned runtime on recreation and
+clears the corresponding catalog; ordinary debug instrumentation is unchanged.
+
+Record source HEAD plus any profiling diff, exact APK hash/version/signer,
+installed-byte equality, SDK provenance, dataset epoch, default or explicitly
+selected compilation state, display/awake state and warm-up separately. A source
+HEAD alone does not identify a dirty build. Keep the latest delivered chrome
+baseline distinct from earlier repair or static-rail evidence.
+
+### Capture and validate an actual journey
+
+Prepare the known screen and visible focus outside recording. Verify Player's
+foreground before each setup key; use the app's browse rail to enter Guide,
+**not hardware GUIDE**. Do not blindly repeat Back. If the known tag-navigation
+trap occurs, retain its trigger, allow at most one straightforward Back, then
+force-stop/relaunch without clearing data. A repeat ends that scenario for the run.
+
+Use a separate warm-up rehearsal and a short, reversible sequence that returns to
+its initial focus. The helper accepts only D-pad directions and channel-page keys,
+checks scoped foreground before every injected key, and checks PID continuity.
+These checks add WindowManager work: document that overhead and do not mix guarded
+and unguarded baselines. It records one to three eight-second runs and **force-stops
+only the target package on exit**. This can reveal the launcher or another app
+underneath; no further keys are sent there. A new batch needs explicit launch and
+foreground verification again.
+
+For an already prepared Channels first-row focus, for example:
+
+```bash
+bash tools/profiling/capture causal "${TVHPLAYER_ADB_SERIAL:?select the authorized device}" at.bernhardberger.tvhplayer "$PRIVATE_OUTPUT" 3 20 20 20 20 19 19 19 19
+python3 tools/profiling/analyze.py --trace-processor "$TRACE_PROCESSOR" --focus-kind channel --focus-count 8 "$PRIVATE_OUTPUT"
+```
+
+On LXC119, run capture inside the existing `with-adb-tunnel offline-player` lane
+with explicit `emulator-5556` and package `at.bernhardberger.tvhplayer.profile`.
+Use `atrace` mode where the vendor Perfetto recorder fails as described below.
+Other measured sequences are Guide `22 22 21 21 20 19 167 166` (eight Guide focus
+callbacks), Channels filter/return `19 22 21 20` (one channel callback; tag focus
+is not instrumented), and controls/open-rail `22 21 19 22 21 20 22 21` (eight
+callbacks across `--focus-kind control --focus-kind rail`). Each requires its
+documented starting focus and rehearsal, not just the right activity name.
+
+Trace health and delivered input counts alone do not establish a successful
+journey. Supply the expected focus kinds/count to analysis; without them its
+`focus_contract` is explicitly `not_checked`. Zero or ambiguous focus callbacks
+must not be converted into zero latency. Reject incomplete frames, foreign PIDs,
+ring overwrite, kernel loss, parser errors and stale files. Preserve failures
+separately rather than silently dropping a run from a batch.
+
+### Qualified sources and limits
+
+- G10 Perfetto 15: scheduling, application sections, input dispatch and FrameTimeline
+  work with `causal.pbtxt`. Actual loss required 8 MiB per-CPU buffers, 50 ms drain
+  and a 64 MiB service buffer. Inspect each trace; these values are not a guarantee.
+- LXC119 Perfetto 49 still reports `FTRACE_STATUS_PARTIAL_PAGE_READ`. Standard
+  **uncompressed atrace** reads the text trace endpoint and provides usable
+  scheduling/application sections. Check its raw entries-written accounting as
+  well as Trace Processor health. Do not use an ignore-parser-errors override.
+- `frames` records FrameTimeline separately where ftrace recording fails. It
+  cannot be joined to frames from a different run or prove the intended focus
+  journey on its own. Frame lifetime is not CPU duration or key-to-photon latency.
+- `cpu` uses standard 99 Hz scoped Perfetto call-stack sampling. Report unwinding
+  errors and unresolved frames. `native-allocations` uses scoped heapprofd with
+  16 KiB sampling: estimates of native allocation activity, not Java object
+  contents or exact managed allocation rate. These are separate, costlier
+  diagnostic captures, not the normal frame-timing baseline. No heap dump is used.
+- `work.sql`, `states.sql` and `phases.sql` intersect slices with scheduled CPU;
+  do not sum nested sections. Runnable wait differs from blocked wait. `gc.sql`
+  reports elapsed GC sections; concurrent GC duration is not a main-thread pause.
+  `latency.sql` measures app-dispatch-to-focus-callback, not physical remote or
+  photon latency. Recommendations need trace-backed attribution and explicit
+  confidence, not an assumed bottleneck from source complexity alone.
+
+Use small repeated baselines, expand only when observed variance warrants it,
+and keep builds and other captures out of measurement windows. Run affected
+tests and the final repository gate for the final relevant state; reuse unchanged
+evidence. The historical qualification below is not current journey acceptance.
+
+## Historical P38 static-rail qualification
+
+The remainder describes the earlier static-only fixture and its dated evidence.
+Its single-activity/no-testing-library inventory predates `JourneyProfileActivity`.
+
+### Earlier build boundary
 
 `profile` is a nondebuggable, shell-profileable variant initialized from `release`.
 It uses the same main Kotlin code, release-only no-op debug backdrop, compiler,

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -145,7 +147,12 @@ fun ChannelDrawer(
                         .testTag("player-channel-card-${channel.id.value}")
                         .focusRequester(requesters.getValue(channel.id))
                         .onFocusChanged {
-                            if (it.isFocused) { focusedId = channel.id; onFocusChannel(channel.id) }
+                            if (it.isFocused) {
+                                profileTrace("P44:focus:rail") {
+                                    focusedId = channel.id
+                                    onFocusChannel(channel.id)
+                                }
+                            }
                         },
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

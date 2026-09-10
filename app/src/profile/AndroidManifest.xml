@@ -8,5 +8,7 @@
         <service android:name=".accessibility.ApplianceEntryAccessibilityService" tools:node="remove" />
         <activity android:name=".profiling.RailProfileActivity"
             android:exported="true" />
+        <activity android:name=".profiling.JourneyProfileActivity"
+            android:exported="true" />
     </application>
 </manifest>

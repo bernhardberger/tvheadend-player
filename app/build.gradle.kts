@@ -18,6 +18,7 @@ kotlin {
 }
 
 android {
+    testBuildType = if (providers.gradleProperty("tvhplayer.profileTests").orNull == "true") "profile" else "debug"
     namespace = "at.bernhardberger.tvhplayer"
     compileSdk = 37
 
@@ -29,6 +30,7 @@ android {
         versionName = "0.2.13"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "PROFILE_TRACE", "false")
         buildConfigField("boolean", "PROGRAMME_WINDOW_B", providers.gradleProperty("player.programmeWindowB").orElse("true").map { it.toBooleanStrict().toString() }.get())
     }
 
@@ -43,9 +45,14 @@ android {
         create("profile") {
             initWith(getByName("release"))
             isDebuggable = false
+            buildConfigField("boolean", "PROFILE_TRACE", "true")
             applicationIdSuffix = ".profile"
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += "release"
+        }
+        create("profileServer") {
+            initWith(getByName("profile"))
+            applicationIdSuffix = null
         }
     }
     buildFeatures {
@@ -53,6 +60,12 @@ android {
         compose = true
     }
     sourceSets.getByName("profile").kotlin.srcDir("src/release/java")
+    sourceSets.getByName("profileServer").kotlin.srcDir("src/release/java")
+    if (testBuildType == "profile") {
+        sourceSets.getByName("androidTest").java.setSrcDirs(listOf("src/profileTest/java"))
+        sourceSets.getByName("androidTest").kotlin.setSrcDirs(listOf("src/profileTest/java"))
+        sourceSets.getByName("androidTest").manifest.srcFile("src/profileTest/AndroidManifest.xml")
+    }
     providers.gradleProperty("player.offlineMediaAssets").orNull?.let {
         sourceSets.getByName("androidTest").assets.srcDir(it)
     }
@@ -130,6 +143,9 @@ dependencies {
     testImplementation(libs.tvheadend.sdk.testing) {
         version { strictly(libs.versions.tvheadend.sdk.get()) }
     }
+    add("profileImplementation", "at.bernhardberger.tvheadend:sdk-testing") {
+        version { strictly(libs.versions.tvheadend.sdk.get()) }
+    }
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -172,6 +188,8 @@ tasks.register("verifyExternalSdkConsumption") {
         "debugRuntimeClasspath",
         "releaseCompileClasspath",
         "releaseRuntimeClasspath",
+        "profileServerCompileClasspath",
+        "profileServerRuntimeClasspath",
     ).associateWith(configurations::getByName)
     val productionConfigurations = productionClasspaths.values.flatMap { it.hierarchy }.toSet()
     val directSdkDependencies = productionConfigurations.flatMap { configuration ->
@@ -203,7 +221,7 @@ tasks.register("verifyExternalSdkConsumption") {
     val publicRepositoryUrls = gradle.extensions.extraProperties.get("dependencyRepositoryUrls")
     val repositoriesMode = gradle.extensions.extraProperties.get("dependencyRepositoriesMode")
     val appProjectPath = project.path
-    listOf("debug", "release").forEach { variant ->
+    listOf("debug", "release", "profileServer").forEach { variant ->
         val runtimeGraph = productionClasspaths.getValue("${variant}RuntimeClasspath")
             .incoming.resolutionResult.rootComponent.map { root ->
                 val components = mutableSetOf<ResolvedComponentResult>()
@@ -296,7 +314,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "sdk-media3" to sdkVersion,
             "sdk-playback" to sdkVersion,
         )
-        listOf("debug", "release").forEach { variant ->
+        listOf("debug", "release", "profileServer").forEach { variant ->
             val runtimeGraph = (inputs.properties.getValue("${variant}RuntimeGraph") as Iterable<*>)
                 .map(Any?::toString)
                 .toSet()

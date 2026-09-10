@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
@@ -53,7 +55,7 @@ internal class LivePlayerLayerState(
     var restoreChannelAction by mutableStateOf<String?>(null)
         private set
 
-    fun onActionFocused(action: String) {
+    fun onActionFocused(action: String) = profileTrace("P44:focus:control") {
         lastFocusedAction = action.takeIf { it in setOf("player-pause", "player-info", "player-record", "player-settings") }
     }
 

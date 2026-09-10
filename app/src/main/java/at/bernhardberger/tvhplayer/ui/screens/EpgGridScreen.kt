@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -420,12 +422,14 @@ fun EpgGridScreen(
     val epgSnapshot = observation.epgSnapshotForDisplay
     val snapshotEvents = epgSnapshot?.events.orEmpty()
     val timelineEventIndex = remember(snapshotEvents, category, windowStartSec) {
-        indexTimelineEventsByChannel(
-            events = snapshotEvents,
-            windowStartSec = windowStartSec,
-            windowEndSec = windowEndSec,
-            matches = { it.matchesProgrammeCategory(category) },
-        )
+        profileTrace("P44:guideIndex") {
+            indexTimelineEventsByChannel(
+                events = snapshotEvents,
+                windowStartSec = windowStartSec,
+                windowEndSec = windowEndSec,
+                matches = { it.matchesProgrammeCategory(category) },
+            )
+        }
     }
     val currentEventIds = remember(timelineEventIndex) {
         timelineEventIndex.visibleEventsByChannel.values
@@ -1547,11 +1551,13 @@ fun EpgGridScreen(
                                 coverageRequests.isPending(channel.id, windowStartSec)
                             },
                             onFocused = { event ->
-                                programmeFocusOwned = true
-                                selectedTarget = EpgFocusTarget(
-                                    channelIndex,
-                                    event.id,
-                                )
+                                profileTrace("P44:focus:guide") {
+                                    programmeFocusOwned = true
+                                    selectedTarget = EpgFocusTarget(
+                                        channelIndex,
+                                        event.id,
+                                    )
+                                }
                             },
                             recordingForEvent = { eventId ->
                                 observation.dvrEntryForEvent(eventId)

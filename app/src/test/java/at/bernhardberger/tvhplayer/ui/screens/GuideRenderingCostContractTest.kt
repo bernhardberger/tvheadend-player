@@ -70,12 +70,14 @@ class GuideRenderingCostContractTest {
         assertTrue(
             guide.contains(
                 """val timelineEventIndex = remember(snapshotEvents, category, windowStartSec) {
-        indexTimelineEventsByChannel(
-            events = snapshotEvents,
-            windowStartSec = windowStartSec,
-            windowEndSec = windowEndSec,
-            matches = { it.matchesProgrammeCategory(category) },
-        )
+        profileTrace("P44:guideIndex") {
+            indexTimelineEventsByChannel(
+                events = snapshotEvents,
+                windowStartSec = windowStartSec,
+                windowEndSec = windowEndSec,
+                matches = { it.matchesProgrammeCategory(category) },
+            )
+        }
     }"""
             )
         )

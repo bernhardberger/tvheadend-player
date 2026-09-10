@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -41,7 +43,9 @@ class ChannelsViewModel(
         tagSettings.activeTagId,
         tagSettings.scopeVisibility,
     ) { channelState, activeTagId, visibility ->
-        resolveChannelScopeState(channelState, activeTagId, visibility)
+        profileTrace("P44:channelScope") {
+            resolveChannelScopeState(channelState, activeTagId, visibility)
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,

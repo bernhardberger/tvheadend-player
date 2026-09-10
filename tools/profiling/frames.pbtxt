@@ -1,0 +1,5 @@
+# Emulator fallback companion: separate matched runs, never joined to atrace as one capture.
+buffers { size_kb: 8192 fill_policy: DISCARD }
+duration_ms: 8000
+data_sources { config { name: "android.surfaceflinger.frametimeline" } }
+data_sources { config { name: "linux.process_stats" process_stats_config { scan_all_processes_on_start: true record_thread_names: true } } }

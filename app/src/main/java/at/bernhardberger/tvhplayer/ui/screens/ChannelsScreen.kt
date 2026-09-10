@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -500,10 +502,12 @@ internal fun ChannelsScreenContent(
                                 val channelId = ch.id
                                 val now =
                                     remember(channelId, observation, nowSec) {
-                                        observation.eventAt(
-                                            channelId,
-                                            kotlin.time.Instant.fromEpochSeconds(nowSec),
-                                        )
+                                        profileTrace("P44:channelProgramme") {
+                                            observation.eventAt(
+                                                channelId,
+                                                kotlin.time.Instant.fromEpochSeconds(nowSec),
+                                            )
+                                        }
                                     }
                                 val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
                                 val status = channelNowStatus(
@@ -530,14 +534,16 @@ internal fun ChannelsScreenContent(
                                     recordingNow = status.recordingNow,
                                     playingNow = status.playingNow,
                                     onFocus = {
-                                        focusedChannelId = channelId
-                                        rememberedChannelIds[channelScope.activeTagId] = channelId
-                                        contentFocusOwned = true
-                                        if (isRestoring && channelId != pendingFocusId) {
-                                            cancelRestoration()
-                                        }
-                                        if (!isRestoring) {
-                                            onSelectChannel(channelId)
+                                        profileTrace("P44:focus:channel") {
+                                            focusedChannelId = channelId
+                                            rememberedChannelIds[channelScope.activeTagId] = channelId
+                                            contentFocusOwned = true
+                                            if (isRestoring && channelId != pendingFocusId) {
+                                                cancelRestoration()
+                                            }
+                                            if (!isRestoring) {
+                                                onSelectChannel(channelId)
+                                            }
                                         }
                                     },
                                     onConfirm = {
