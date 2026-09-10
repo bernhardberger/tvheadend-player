@@ -1,6 +1,6 @@
 # Sidebar Guide reconstruction: measured correction
 
-Dated P46 evidence, based on `e360616f82b33067540853642e9c6ec2ec711bbd`.
+Status: dated P46 evidence, based on `e360616f82b33067540853642e9c6ec2ec711bbd`.
 Scope: product-specific Channels/Guide sidebar destination lifetime. This is a
 repeated-navigation improvement, not cold-start or universal motion acceptance.
 
