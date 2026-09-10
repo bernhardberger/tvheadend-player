@@ -79,7 +79,9 @@ hands over exclusive device ownership with an exact authorized target and task,
 then waits for its result before resuming device operations. Review and retrieval
 roles remain read-only; do not dispatch operational work through `general`.
 
-Delegation is read-only and may nest through one additional locator level.
+Review and retrieval delegation is read-only and may nest through one additional
+locator level. The implementer and device operator are the bounded exceptions
+described here.
 The primary owns decomposition and delegation and may use as many children as it
 judges useful for correctness, evidence coverage, context isolation, turnaround,
 or final quality. A roughly 20% resource overhead is an acceptable soft target
@@ -94,7 +96,7 @@ their specialized contracts. Only `app-locator` children may be delegated by
 read-only children, and depth 2 is terminal. Reviewers may use that capability
 only for exact in-packet retrieval, never to reconstruct missing evidence.
 
-Children cannot edit, use shell, run builds or devices, mutate Git, or read
+Read-only children cannot edit, use shell, run builds or devices, mutate Git, or read
 project instructions, ledgers, handoffs, archives, or broad plans. Start each as
 a fresh session without `task_id` and supply one self-contained question with
 exact evidence and a stop condition. The writable primary has no
@@ -103,14 +105,27 @@ watchdogs bound orchestration. Child step limits are terminal evidence budgets,
 not a reason for generic continuation.
 
 The built-in writable primary and, inside one delegated slice, the
-`app-implementer` child write repository files. The implementer (Sonnet, high
-effort, 150 steps) receives a packet with exact paths, tests, and gate, may run
+`app-implementer` child write repository files. The implementer receives a
+packet with exact paths, tests, and gate, may run
 Gradle with the repository rules, and returns changed files, test evidence, and
 open questions; it never touches Git, devices, signing, or publication, and
 never runs concurrently with the primary's own edits. The primary reviews the
 diff, runs the final gate, and commits. Read-only review begins after that
 delta is stable. Writers, Gradle builds, device operations, Git
 mutations, signing, publishing, and release operations may not overlap.
+
+Use the implementer's configured model and effort by default. The caller may
+override effort through Task's `reasoning` parameter: `medium` for meaningful
+unresolved implementation decisions, or `high` for a concrete reasoning
+difficulty. Keep the model inherited from the Astra assignment; do not route
+implementation to Opus or another model. Existing Opus review routing is
+unchanged.
+
+Before implementation, confirm that the dispatched session exposes an editing
+tool and Bash. If either is missing, report the capability gap rather than
+substituting analysis for implementation. Check the resolved agent configuration
+with `opencode debug agent app-implementer` and use a fresh session after a
+configuration reload; changing models alone does not repair missing tool bindings.
 
 ## Review lifecycle and autonomous continuation
 

@@ -151,7 +151,11 @@ the one writable child: it may edit and run Gradle inside a single delegated
 slice with named paths, tests, and gate, but never mutates Git, devices,
 signing, or publication; the primary reviews its diff, runs the final gate, and
 owns commits. Never run it while the primary or another writer is editing the
-same worktree. The primary owns decomposition and delegation: use
+same worktree. Keep implementation on Astra; do not override the implementer to
+Opus or another model. Use its configured effort by default; callers may select
+Medium for meaningful unresolved implementation decisions and escalate to High
+for a concrete reasoning difficulty. Opus review routing remains unchanged.
+The primary owns decomposition and delegation: use
 children whenever they are likely to materially improve correctness, evidence
 coverage, context isolation, turnaround time, or final quality. A roughly 20%
 resource overhead is an acceptable soft target for a meaningful quality gain,
