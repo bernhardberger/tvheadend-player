@@ -69,6 +69,11 @@ java tools/RenderArtwork.java
 
 The same command creates the self-contained browser preview at
 `artifacts/brand-preview/index.html` (ignored generated output).
+It also writes `marquee-320x180.png` and `marquee-1280x720.png` in that ignored
+directory for same-canvas comparison with the accepted horizontal reference.
+These comparison intermediates regenerate on a clean clone; the portable,
+committed horizontal family deliverable is `tvheadend-player-logo.svg` and its
+960×300/1920×600 PNGs, covered by the artwork regeneration checks.
 
 Everything is generated: never hand-edit the PNGs, SVGs,
 `ic_launcher_monochrome.xml`, or `startup_brand_symbol.xml`. SVG text is outlined

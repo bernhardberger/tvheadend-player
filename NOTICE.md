@@ -1,18 +1,24 @@
 # Notices and attribution
 
-TVHeadend Player for TV is an independently developed GPLv3 application. It is
+Tvheadend Player is an independently developed GPLv3 application. It is
 derived from [Preclikos/tvhstream](https://github.com/Preclikos/tvhstream) and
 retains that project's Git history, copyright, and GNU GPL v3 licensing. The
 predecessor project in turn acknowledges ideas and code from
 [TVHClient](https://github.com/rsiebert/TVHClient).
 
-The original application mark uses a four-part cyan widescreen and an orange
-play symbol isolated by circular dark negative space. Its palette and broken visual
-rhythm recall compatibility with
+The original application mark uses a cyan rounded diamond, a dark inner core,
+and an orange play triangle. Its palette recalls compatibility with
 [Tvheadend](https://github.com/tvheadend/tvheadend), but it does not reuse the
-Tvheadend logo or its geometry. TVHeadend Player for TV is not affiliated with,
+Tvheadend logo or its geometry. Tvheadend Player is not affiliated with,
 endorsed by, or sponsored by the Tvheadend project. Artwork generation is
 documented in `artwork/README.md`.
+
+Brand artwork and the in-app wordmark use Outfit (Copyright 2021 The Outfit
+Project Authors), licensed under SIL OFL 1.1. The font source is pinned to
+Google Fonts revision `8e44913e4ff26fc997e6856c1ec40ff4791c98c5`; original and
+weight-550 derivation provenance are recorded in `artwork/README.md`. The full
+license is retained at `artwork/fonts/OFL.txt` and bundled in the APK at
+`assets/licenses/Outfit-OFL.txt`.
 
 The application uses AndroidX, Jetpack Compose, Compose for TV, Material
 Components, Media3, Kotlin coroutines, Coil, and Koin. Their own copyright and
