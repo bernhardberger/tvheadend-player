@@ -510,7 +510,7 @@ class LiveProgrammeInfoOverlayTest {
         composeRule.onNodeWithText("Abbrechen").assertIsDisplayed()
         composeRule.onNodeWithText("Aufnehmen").assertIsDisplayed()
         composeRule.onNodeWithText(
-            "TVHeadend fügt diese Sendung zu Ihren Aufnahmen hinzu.",
+            "Ihr Tvheadend-Server fügt diese Sendung zu Ihren Aufnahmen hinzu.",
         ).assertIsDisplayed()
         listOf(
             composeRule.onNodeWithText(
@@ -522,7 +522,7 @@ class LiveProgrammeInfoOverlayTest {
             composeRule.onNodeWithTag("programme-recording-confirm")
                 .fetchSemanticsNode().boundsInRoot,
             composeRule.onNodeWithText(
-                "TVHeadend fügt diese Sendung zu Ihren Aufnahmen hinzu."
+                "Ihr Tvheadend-Server fügt diese Sendung zu Ihren Aufnahmen hinzu."
             ).fetchSemanticsNode().boundsInRoot,
         ).forEach { bounds ->
             assertTrue(bounds.left >= panel.left)

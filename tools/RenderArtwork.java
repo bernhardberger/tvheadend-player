@@ -81,6 +81,7 @@ public final class RenderArtwork {
         writePlayStoreIcon();
         writeLegacyIcons();
         writeMonochrome();
+        writeStartupResources();
         writePreview();
     }
 
@@ -172,15 +173,19 @@ public final class RenderArtwork {
     }
 
     private static void text(List<Ink> ink, String text, float size, float x, float baseline, Color color) {
-        Font font = WORDMARK.deriveFont(size);
+        Font font = WORDMARK.deriveFont(size).deriveFont(
+                java.util.Map.of(java.awt.font.TextAttribute.KERNING, java.awt.font.TextAttribute.KERNING_ON));
         if (font.canDisplayUpTo(text) != -1) throw new IllegalArgumentException("Missing brand glyph");
-        ink.add(new Ink(font.createGlyphVector(FONT_CONTEXT, text).getOutline(x, baseline), color));
+        char[] characters = text.toCharArray();
+        ink.add(new Ink(font.layoutGlyphVector(FONT_CONTEXT, characters, 0, characters.length,
+                Font.LAYOUT_LEFT_TO_RIGHT).getOutline(x, baseline), color));
     }
 
     private static void writeBrandSurfaces() throws IOException {
-        List<Ink> banner = mark(12, 46, 88);
-        text(banner, "Tvheadend", 32, 110, 84, TEXT);
-        text(banner, "Player", 32, 110, 119, ORANGE);
+        // Accepted sample02 paired stack, in its original 320x180 coordinates.
+        List<Ink> banner = mark(26.5859375, 51, 78);
+        text(banner, "Tvheadend", 36, 118.1679375f, 83, TEXT);
+        text(banner, "Player", 36, 118.1679375f, 122, ORANGE);
         export("tvheadend-player-banner", 320, 180, banner, 1, 2, 4);
         // Android's documented TV banner is 320x180 at xhdpi (160x90dp).
         String[] densities = {"mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"};
@@ -190,21 +195,32 @@ public final class RenderArtwork {
                     Path.of("app/src/main/res/drawable-" + densities[i] + "/banner.png"));
         }
 
-        List<Ink> family = mark(60, 60, 180);
-        text(family, "Tvheadend", 54, 290, 168, TEXT);
-        float playerX = 290 + (float) WORDMARK.deriveFont(54f)
-                .getStringBounds("Tvheadend ", FONT_CONTEXT).getWidth();
-        text(family, "Player", 54, playerX, 168, ORANGE);
+        // Accepted sample03 marquee. Preserve its optical spacing, including
+        // the measured inter-word advance, rather than recomputing a new fit.
+        List<Ink> marquee = mark(24.125, 69, 42);
+        text(marquee, "Tvheadend", 27, 77.125f, 99, TEXT);
+        text(marquee, "Player", 27, 216.58984375f, 99, ORANGE);
+        // Three times the reference width; remove only the extra blank field
+        // vertically to retain the existing 960x300 family export canvas.
+        List<Ink> family = transformed(marquee, 3, 0, -120);
         export("tvheadend-player-logo", 960, 300, family, 1, 2);
         List<Ink> contextual = new ArrayList<>(family);
-        text(contextual, "for Android TV", 24, 290, 213, TEXT);
+        text(contextual, "for Android TV", 24, 231.375f, 230, TEXT);
         export("tvheadend-player-android-tv", 960, 300, contextual, 1, 2);
         export("tvheadend-player-symbol", 512, 512, mark(56.32, 56.32, 399.36), 1, 2);
 
-        List<Ink> social = mark(100, 155, 330);
-        text(social, "Tvheadend", 80, 500, 305, TEXT);
-        text(social, "Player", 80, 500, 395, ORANGE);
+        List<Ink> social = transformed(banner, 3, 160, 50);
         export("github-social-preview", 1280, 640, social, 1);
+        writePng(render(320, 180, marquee, 1), Path.of("artifacts/brand-preview/marquee-320x180.png"));
+        writePng(render(320, 180, marquee, 4), Path.of("artifacts/brand-preview/marquee-1280x720.png"));
+    }
+
+    private static List<Ink> transformed(List<Ink> ink, double scale, double x, double y) {
+        AffineTransform transform = AffineTransform.getTranslateInstance(x, y);
+        transform.scale(scale, scale);
+        return new ArrayList<>(ink.stream()
+                .map(item -> new Ink(transform.createTransformedShape(item.shape()), item.color()))
+                .toList());
     }
 
     private static BufferedImage render(int width, int height, List<Ink> ink, double scale) {
@@ -363,6 +379,30 @@ public final class RenderArtwork {
         if (!ImageIO.write(image, "png", path.toFile())) {
             throw new IOException("PNG writer unavailable for " + path);
         }
+    }
+
+    private static void writeStartupResources() throws IOException {
+        StringBuilder xml = new StringBuilder("""
+                <?xml version="1.0" encoding="utf-8"?>
+                <!-- Original symbol paths, tightly framed for existing in-app startup. -->
+                <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:width="96dp" android:height="96dp"
+                    android:viewportWidth="368" android:viewportHeight="368">
+                    <group android:translateX="-72" android:translateY="-72">
+                """);
+        for (Ink item : mark(56.32, 56.32, 399.36)) {
+            xml.append("        <path android:fillColor=\"")
+                    .append(String.format(Locale.ROOT, "#%06X", item.color().getRGB() & 0xFFFFFF))
+                    .append("\" android:pathData=\"").append(toPathData(item.shape())).append("\"/>\n");
+        }
+        xml.append("    </group>\n</vector>\n");
+        Files.writeString(Path.of("app/src/main/res/drawable/startup_brand_symbol.xml"), xml, StandardCharsets.UTF_8);
+        Path font = Path.of("app/src/main/res/font/outfit_550.ttf");
+        Files.createDirectories(font.getParent());
+        Files.copy(Path.of("artwork/fonts/Outfit-550.ttf"), font, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Path license = Path.of("app/src/main/assets/licenses/Outfit-OFL.txt");
+        Files.createDirectories(license.getParent());
+        Files.copy(Path.of("artwork/fonts/OFL.txt"), license, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
 
     private static void writePreview() throws IOException {

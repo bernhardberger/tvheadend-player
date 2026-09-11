@@ -67,10 +67,10 @@
     <string name="credential_save_failed">The credential could not be stored. Try clearing it and entering it again.</string>
     <string name="credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
     <string name="onboarding_title">Welcome to Tvheadend Player</string>
-    <string name="onboarding_requirement">This app connects to a TVHeadend server that provides your channels, guide and recordings.</string>
+    <string name="onboarding_requirement">Tvheadend Player connects to your Tvheadend server for channels, guide and recordings.</string>
     <string name="trusted_network_guidance">Connect only on a trusted home network or through a protected tunnel. HTSP does not encrypt the channel metadata or video stream.</string>
-    <string name="onboarding_continue">Set up TVHeadend</string>
-    <string name="onboarding_connection_title">Connect to your TVHeadend server</string>
+    <string name="onboarding_continue">Set up server connection</string>
+    <string name="onboarding_connection_title">Connect to your Tvheadend server</string>
     <string name="save_and_continue">Save and continue</string>
 
     <string name="settings_player">Player</string>
@@ -106,14 +106,14 @@
     <string name="main_startup_passive_title">Starting Tvheadend Player</string>
     <string name="main_startup_actionable_title">Action needed</string>
     <string name="main_startup_message_preparing">Preparing Tvheadend Player…</string>
-    <string name="main_startup_message_connecting">Connecting to TVHeadend…</string>
+    <string name="main_startup_message_connecting">Connecting to your Tvheadend server…</string>
     <string name="main_startup_message_syncing_channels">Loading channel information…</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Preparing channel information…</string>
-    <string name="main_startup_message_reconnecting">Reconnecting to TVHeadend…</string>
+    <string name="main_startup_message_reconnecting">Reconnecting to your Tvheadend server…</string>
     <string name="main_startup_message_starting_television">Starting television…</string>
     <string name="main_startup_message_no_channels">No channels are available for this account.</string>
-    <string name="main_startup_message_retryable_failure">TVHeadend is unavailable. Try again.</string>
-    <string name="main_startup_message_configuration_required">Set up the TVHeadend connection to load channels.</string>
+    <string name="main_startup_message_retryable_failure">Couldn’t connect to your Tvheadend server. Try again.</string>
+    <string name="main_startup_message_configuration_required">Set up your Tvheadend server connection to load channels.</string>
     <string name="main_startup_message_credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
     <string name="main_startup_action_retry">Retry</string>
     <string name="main_startup_action_connection_settings">Connection settings</string>
@@ -211,7 +211,7 @@
     <string name="stats_snr" translatable="false">SNR</string>
     <string name="stats_ber" translatable="false">Bit error rate</string>
     <string name="stats_uncorrected_blocks" translatable="false">Uncorrected blocks</string>
-    <string name="stats_server_queue" translatable="false">TVHeadend queue</string>
+    <string name="stats_server_queue" translatable="false">Tvheadend server queue</string>
     <string name="stats_queued" translatable="false">Queued</string>
     <string name="stats_queue_delay" translatable="false">Queue delay</string>
     <string name="stats_queue_delay_value" translatable="false">%1$s ms</string>
@@ -255,11 +255,11 @@
     <string name="epg_search_hint">Select the search field and press OK to enter a programme title or description.</string>
     <string name="epg_search_searching">Searching the guide…</string>
     <string name="epg_search_empty">No programmes match this search.</string>
-    <string name="epg_search_connection_unavailable">Connect to TVHeadend before searching the guide.</string>
-    <string name="epg_search_invalid">TVHeadend could not use this search. Change the search text and try again.</string>
+    <string name="epg_search_connection_unavailable">Connect to your Tvheadend server before searching the guide.</string>
+    <string name="epg_search_invalid">Your Tvheadend server could not use this search. Change the search text and try again.</string>
     <string name="epg_search_denied">This account is not allowed to search guide data.</string>
-    <string name="epg_search_connection_limit">TVHeadend is handling too many requests. Try again shortly.</string>
-    <string name="epg_search_not_supported">This TVHeadend server does not support guide search.</string>
+    <string name="epg_search_connection_limit">Your Tvheadend server is handling too many requests. Try again shortly.</string>
+    <string name="epg_search_not_supported">This Tvheadend server does not support guide search.</string>
     <string name="epg_search_unavailable">Guide search is unavailable. Try again.</string>
     <string name="epg_search_untitled">Untitled programme</string>
     <string name="epg_search_unknown_channel">Unknown channel</string>
@@ -296,7 +296,7 @@
     <string name="epg_partial">Partial guide data</string>
     <string name="epg_stale">Guide data may be out of date while reconnecting</string>
     <string name="epg_permission_denied">This account cannot read guide data</string>
-    <string name="epg_reconnecting">Reconnecting to TVHeadend…</string>
+    <string name="epg_reconnecting">Reconnecting to your Tvheadend server…</string>
     <string name="epg_server_failure">Guide unavailable. Retry the server connection.</string>
     <string name="epg_filter_empty">No programmes match this filter.</string>
     <string name="epg_state_now">on now</string>
@@ -311,20 +311,20 @@
     <string name="record">Record</string>
     <string name="cancel_recording">Cancel recording</string>
     <string name="record_confirm_title">Record “%1$s”?</string>
-    <string name="record_confirm_message">TVHeadend will add this programme to your recordings.</string>
+    <string name="record_confirm_message">Your Tvheadend server will add this programme to your recordings.</string>
     <string name="record_confirm_pane_title">Confirm recording</string>
     <string name="record_confirm_cancel">Cancel</string>
     <string name="recording_request_busy_title">Scheduling “%1$s”…</string>
-    <string name="recording_request_busy_message">Waiting for TVHeadend to answer. Closing this message does not cancel the request.</string>
+    <string name="recording_request_busy_message">Waiting for your Tvheadend server to answer. Closing this message does not cancel the request.</string>
     <string name="recording_request_busy_action">Scheduling…</string>
     <string name="recording_request_success_title">Recording scheduled</string>
-    <string name="recording_request_success_message">TVHeadend accepted the recording request for “%1$s”.</string>
+    <string name="recording_request_success_message">Your Tvheadend server accepted the recording request for “%1$s”.</string>
     <string name="recording_request_failure_title">Recording request failed</string>
     <string name="recording_request_failure_message">“%1$s” was not scheduled. %2$s</string>
     <string name="recording_config_title">Choose a recording configuration</string>
     <string name="recording_config_message">This server has several available recording configurations.</string>
     <string name="cancel_recording_confirm_title">Stop “%1$s”?</string>
-    <string name="cancel_recording_confirm_message">TVHeadend will stop or remove the scheduled recording.</string>
+    <string name="cancel_recording_confirm_message">Your Tvheadend server will stop or remove the scheduled recording.</string>
     <string name="recording_status">Recording: %1$s</string>
     <string name="recording_failure_reason">Reason: %1$s</string>
     <string name="recording_state_scheduled">Scheduled</string>
@@ -335,10 +335,10 @@
     <string name="recording_state_unknown">Server status unknown</string>
     <string name="recording_action_accepted">Request accepted. Waiting for the server status update…</string>
     <string name="recording_action_permission">This account is not allowed to manage recordings.</string>
-    <string name="recording_action_conn_limit">TVHeadend refused the request: too many connections. Try again shortly.</string>
-    <string name="recording_action_conflict">TVHeadend reported a recording or tuner conflict.</string>
-    <string name="recording_action_rejected">TVHeadend rejected the recording request.</string>
-    <string name="recording_action_connection">The recording request could not reach TVHeadend.</string>
+    <string name="recording_action_conn_limit">Your Tvheadend server refused the request: too many connections. Try again shortly.</string>
+    <string name="recording_action_conflict">Your Tvheadend server reported a recording or tuner conflict.</string>
+    <string name="recording_action_rejected">Your Tvheadend server rejected the recording request.</string>
+    <string name="recording_action_connection">The recording request could not reach your Tvheadend server.</string>
     <string name="recording_already_scheduled">This programme is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>
     <string name="recordings_archive">Archive</string>
@@ -368,15 +368,15 @@
     <string name="recordings_server_failure">Recordings are unavailable. Retry the server connection.</string>
     <string name="delete_recording">Delete recording</string>
     <string name="delete_recording_confirm_title">Delete “%1$s”?</string>
-    <string name="delete_recording_confirm_message">TVHeadend will permanently delete this completed recording.</string>
+    <string name="delete_recording_confirm_message">Your Tvheadend server will permanently delete this completed recording.</string>
     <string name="recording_unavailable_title">Recording unavailable</string>
     <string name="recording_loading">Loading recording…</string>
     <string name="recording_recovering">Restoring recording playback…</string>
     <string name="recording_playback_interrupted_title">Recording playback interrupted</string>
     <string name="recording_connection_unavailable">The recording could not be loaded because the server connection was interrupted.</string>
     <string name="recording_not_ready">This recording has not started yet.</string>
-    <string name="recording_file_unavailable">TVHeadend did not expose a playable file for this recording.</string>
-    <string name="recording_read_failed">TVHeadend could not continue reading this recording.</string>
+    <string name="recording_file_unavailable">Your Tvheadend server did not expose a playable file for this recording.</string>
+    <string name="recording_read_failed">Your Tvheadend server could not continue reading this recording.</string>
     <string name="recording_resume_from">Resume from %1$s</string>
     <plurals name="recording_duration_hours">
         <item quantity="one">%1$d hour</item>
@@ -431,7 +431,7 @@
     <string name="player_current_broadcast">Current broadcast</string>
     <string name="player_programme_timing_unavailable">Programme timing unavailable</string>
     <string name="timeshift_setting">Timeshift</string>
-    <string name="timeshift_setting_description">Allow this client to request a server timeshift buffer for live TV.</string>
+    <string name="timeshift_setting_description">Allow Tvheadend Player to request a live TV timeshift buffer from your server.</string>
     <string name="refresh_rate_matching_setting">Match content frame rate</string>
     <string name="refresh_rate_matching_setting_description">Let Android match the display refresh rate to the video when supported.</string>
 
@@ -447,8 +447,8 @@
     <string name="tvh_no_input">No input</string>
 
     <string name="status_disconnected_reconnecting">Disconnected. Reconnecting\u2026</string>
-    <string name="connection_configuration_required">Set up the TVHeadend connection to load channels.</string>
-    <string name="connection_connecting">Connecting to TVHeadend\u2026</string>
+    <string name="connection_configuration_required">Set up your Tvheadend server connection to load channels.</string>
+    <string name="connection_connecting">Connecting to your Tvheadend server\u2026</string>
     <string name="connection_loading_channels">Loading channels\u2026</string>
     <string name="no_channels_available">No channels are available.</string>
     <string name="retry">Retry</string>
@@ -458,7 +458,7 @@
     <string name="status_connection_failed_dns">Connection failed: server name not found</string>
     <string name="status_connection_failed_unreachable">Connection failed: server unreachable</string>
     <string name="status_connection_failed_timeout">Connection failed: server timed out</string>
-    <string name="status_connection_failed_incompatible">Connection failed: this TVHeadend version is not supported</string>
+    <string name="status_connection_failed_incompatible">Connection failed: this Tvheadend server version is not supported</string>
     <string name="status_connection_failed_permission">Connection failed: this account cannot read channel metadata</string>
     <string name="status_connection_failed_zero_channels">Connection succeeded, but this account has no visible channels</string>
     <string name="status_connection_failed_other">Connection failed</string>

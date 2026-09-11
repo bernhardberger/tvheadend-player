@@ -105,7 +105,7 @@ class MainStartupCompositionTest {
             }
         }
 
-        composeRule.onNodeWithText("Preparing TVHeadend Player…").assertExists()
+        composeRule.onNodeWithText("Preparing Tvheadend Player…").assertExists()
         composeRule.runOnIdle {
             assertEquals(0, navigationCompositions)
             assertEquals(0, channelCompositions)

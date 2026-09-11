@@ -6,18 +6,18 @@ Status: approved and implemented beginning 2026-07-24
 
 | Decision | Result |
 |---|---|
-| Product boundary | Independent public Android TV live-TV client for TVHeadend, with appliance behavior as an optional profile/integration layer |
+| Product boundary | Independent public Android TV live-TV client for Tvheadend, with appliance behavior as an optional profile/integration layer |
 | Public name | **Tvheadend Player** |
 | Launcher label | **Tvheadend Player** |
-| Descriptor | **Live TV client for TVHeadend servers** |
+| Descriptor | **Live TV client for Tvheadend servers** |
 | Repository | `bernhardberger/tvheadend-player` |
 | Distribution | GitHub-first, while keeping a later Google Play path possible |
-| Backends | TVHeadend/HTSP only; another backend requires an explicit identity review |
+| Backends | Tvheadend/HTSP only; another backend requires an explicit identity review |
 | Application continuity | Clean break before stable signing; credentials are provisioned or entered again without a migration bridge |
 | Mobile support | Out of scope; a future touch client should share core code but use a separate UI |
 
 The name describes compatibility and does not imply endorsement by or affiliation
-with the TVHeadend project. Public copy should identify this as an independent
+with the Tvheadend project. Public copy should identify this as an independent
 client where that distinction matters.
 
 ## Stable identifiers
@@ -47,10 +47,19 @@ during validation, but it is a separate Android application.
 
 The settled family wordmark uses Outfit 550: **Tvheadend** in off-white
 `#E3E3E8` and **Player** in orange `#FA7F00` on charcoal `#0F1014`.
-The launcher banner stacks the two words beside the original symbol. Avatars
-and app icons contain only the symbol. A separate contextual **for Android TV**
-lockup is available; the platform suffix is never baked into family artwork.
-This branding update preserves every stable identifier and existing app data.
+The paired launcher banner stacks the two words beside the original symbol;
+the horizontal family uses the accepted single-line marquee proportions.
+Avatars and app icons contain only the symbol. A separate contextual
+**for Android TV** lockup is available; family artwork has no platform suffix.
+The existing in-app startup shows a 96dp original symbol above a single-line
+32sp/40sp wordmark, specific status and the existing circular indicator or TV
+recovery actions. Its routing and timing are unchanged; the native splash remains
+symbol-only. This update preserves all identifiers and existing app data.
+
+Public copy distinguishes **Tvheadend Player** (this app) from **Tvheadend**
+(upstream) and **your Tvheadend server** (the backend). German uses
+**Ihr Tvheadend-Server**. A connection failure is not proof the server is down;
+request-specific failures retain their own meaning.
 
 The mark is a cyan diamond aperture on a dark neutral field, layered outward
 from the play symbol: orange play, neutral charcoal core, cyan diamond. The

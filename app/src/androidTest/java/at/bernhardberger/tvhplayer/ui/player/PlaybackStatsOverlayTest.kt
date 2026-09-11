@@ -78,7 +78,7 @@ class PlaybackStatsOverlayTest {
             nodes[1].assertIsDisplayed()
         }
         composeRule.onNodeWithText("Tuner").assertIsDisplayed()
-        composeRule.onNodeWithText("TVHeadend queue").assertIsDisplayed()
+        composeRule.onNodeWithText("Tvheadend server queue").assertIsDisplayed()
         composeRule.onNodeWithText("DVB-T Adapter", substring = true).assertIsDisplayed()
         composeRule.onAllNodesWithText("75.0%", substring = true).assertCountEquals(2).also { nodes ->
             nodes[0].assertIsDisplayed()
@@ -96,7 +96,7 @@ class PlaybackStatsOverlayTest {
         setStats(locale = Locale.GERMAN)
 
         composeRule.onNodeWithText("Tuner").assertDoesNotExist()
-        composeRule.onNodeWithText("TVHeadend queue").assertDoesNotExist()
+        composeRule.onNodeWithText("Tvheadend server queue").assertDoesNotExist()
     }
 
     @Test

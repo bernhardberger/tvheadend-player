@@ -40,7 +40,15 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
@@ -54,7 +62,8 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvSpacing32
 
 private val MainStartupContentMaxWidth = 800.dp
-private val MainStartupMarkSize = 120.dp
+private val MainStartupMarkSize = 96.dp
+private val MainStartupBrandFont = FontFamily(Font(R.font.outfit_550, FontWeight(550)))
 private const val MainStartupRootTag = "main-startup-root"
 private const val MainStartupMarkTag = "main-startup-mark"
 private const val MainStartupActionTagPrefix = "main-startup-action-"
@@ -109,25 +118,15 @@ private fun MainStartupPassiveContent(
         modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Text(
-            text = stringResource(R.string.main_startup_passive_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { heading() },
-        )
-        Text(
             text = stringResource(mainStartupMessageResource(messageKind)),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = TvSpacing24),
+                .fillMaxWidth(),
         )
         CircularProgressIndicator(
-            modifier = Modifier.padding(top = TvSpacing32),
+            modifier = Modifier.padding(top = TvSpacing24).size(40.dp),
             color = MaterialTheme.colorScheme.primary,
         )
     }
@@ -168,26 +167,16 @@ private fun MainStartupActionableContent(
         },
     ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { heading() },
-        )
-        Text(
             text = stringResource(mainStartupMessageResource(presentation.messageKind)),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = TvSpacing24),
+                .fillMaxWidth(),
         )
         if (presentation.actions.isNotEmpty()) {
             Row(
-                modifier = Modifier.padding(top = TvSpacing32),
+                modifier = Modifier.padding(top = TvSpacing24),
                 horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -262,11 +251,25 @@ private fun MainStartupFrame(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
-                painter = painterResource(R.drawable.ic_launcher_foreground),
+                painter = painterResource(R.drawable.startup_brand_symbol),
                 contentDescription = null,
                 modifier = Modifier
                     .size(MainStartupMarkSize)
                     .testTag(MainStartupMarkTag),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(color = Color(0xFFE3E3E8))) { append("Tvheadend ") }
+                    withStyle(SpanStyle(color = Color(0xFFFA7F00))) { append("Player") }
+                },
+                fontFamily = MainStartupBrandFont,
+                fontWeight = FontWeight(550),
+                fontSize = 32.sp,
+                lineHeight = 40.sp,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { heading() },
             )
             Spacer(modifier = Modifier.height(TvSpacing32))
             content()

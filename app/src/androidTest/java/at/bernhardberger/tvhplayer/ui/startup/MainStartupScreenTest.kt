@@ -90,9 +90,9 @@ class MainStartupScreenTest {
             )
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.IsDialog))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
-        composeRule.onNodeWithText("Starting TVHeadend Player")
+        composeRule.onNodeWithText("Tvheadend Player")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
-        composeRule.onNodeWithText("Connecting to TVHeadend…").assertIsDisplayed()
+        composeRule.onNodeWithText("Connecting to your Tvheadend server…").assertIsDisplayed()
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY)).assertDoesNotExist()
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.CONNECTION_SETTINGS))
             .assertDoesNotExist()
@@ -127,16 +127,17 @@ class MainStartupScreenTest {
                     LiveRegionMode.Polite,
                 ),
             )
-        composeRule.onNodeWithText("Action needed")
+        composeRule.onNodeWithText("Action needed").assertDoesNotExist()
+        composeRule.onNodeWithText("Tvheadend Player")
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
-        composeRule.onNodeWithText("TVHeadend is unavailable. Try again.").assertIsDisplayed()
+        composeRule.onNodeWithText("Couldn’t connect to your Tvheadend server. Try again.").assertIsDisplayed()
         composeRule.onNodeWithText("Retry").assertIsDisplayed()
         composeRule.onNodeWithText("Connection settings").assertIsDisplayed()
         composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY)).assertIsFocused()
     }
 
     @Test
-    fun initialFocusUsesFirstSemanticActionForEverySupportedSet() {
+    fun initialFocusUsesFirstActionAndPreservesSurvivingActionWhenSetExpands() {
         var presentation: MainStartupPresentation by mutableStateOf(
             MainStartupPresentation.Actionable(
                 MainStartupMessageKind.RETRYABLE_FAILURE,
@@ -168,7 +169,9 @@ class MainStartupScreenTest {
                 retryAndSettings,
             )
         }
-        composeRule.onNodeWithTag(actionTag(MainStartupActionId.RETRY)).assertIsFocused()
+        // Settings remains a valid semantic action when Retry becomes available.
+        composeRule.onNodeWithTag(actionTag(MainStartupActionId.CONNECTION_SETTINGS))
+            .assertIsFocused()
     }
 
     @Test
@@ -463,15 +466,15 @@ class MainStartupScreenTest {
         val settingsOnly = listOf(MainStartupActionId.CONNECTION_SETTINGS)
 
         val messageTexts = listOf(
-            MessageText(MainStartupMessageKind.PREPARING, "Preparing TVHeadend Player…", "TVHeadend Player wird vorbereitet…"),
-            MessageText(MainStartupMessageKind.CONNECTING, "Connecting to TVHeadend…", "Verbindung mit TVHeadend wird hergestellt…"),
+            MessageText(MainStartupMessageKind.PREPARING, "Preparing Tvheadend Player…", "Tvheadend Player wird vorbereitet…"),
+            MessageText(MainStartupMessageKind.CONNECTING, "Connecting to your Tvheadend server…", "Verbindung mit Ihrem Tvheadend-Server wird hergestellt…"),
             MessageText(MainStartupMessageKind.SYNCING_CHANNELS, "Loading channel information…", "Senderinformationen werden geladen…"),
             MessageText(MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA, "Preparing channel information…", "Senderinformationen werden vorbereitet…"),
-            MessageText(MainStartupMessageKind.RECONNECTING, "Reconnecting to TVHeadend…", "Verbindung mit TVHeadend wird wiederhergestellt…"),
+            MessageText(MainStartupMessageKind.RECONNECTING, "Reconnecting to your Tvheadend server…", "Verbindung mit Ihrem Tvheadend-Server wird wiederhergestellt…"),
             MessageText(MainStartupMessageKind.STARTING_TELEVISION, "Starting television…", "Fernsehen wird gestartet…"),
             MessageText(MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS, "No channels are available for this account.", "Für dieses Konto sind keine Sender verfügbar."),
-            MessageText(MainStartupMessageKind.RETRYABLE_FAILURE, "TVHeadend is unavailable. Try again.", "TVHeadend ist nicht verfügbar. Versuchen Sie es erneut."),
-            MessageText(MainStartupMessageKind.CONFIGURATION_REQUIRED, "Set up the TVHeadend connection to load channels.", "Richten Sie die TVHeadend-Verbindung ein, um Sender zu laden."),
+            MessageText(MainStartupMessageKind.RETRYABLE_FAILURE, "Couldn’t connect to your Tvheadend server. Try again.", "Die Verbindung mit Ihrem Tvheadend-Server konnte nicht hergestellt werden. Versuchen Sie es erneut."),
+            MessageText(MainStartupMessageKind.CONFIGURATION_REQUIRED, "Set up your Tvheadend server connection to load channels.", "Richten Sie die Verbindung mit Ihrem Tvheadend-Server ein, um Sender zu laden."),
             MessageText(MainStartupMessageKind.CREDENTIAL_UNAVAILABLE, "The saved credential is unavailable. Open connection settings and enter it again.", "Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein."),
         )
 
@@ -479,14 +482,14 @@ class MainStartupScreenTest {
             StartupBoundsScenario(
                 locale = Locale.ENGLISH,
                 presentation = MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_CHANNELS),
-                title = "Starting TVHeadend Player",
+                title = "Tvheadend Player",
                 message = "Loading channel information…",
             ),
             StartupBoundsScenario(
                 locale = Locale.GERMAN,
                 presentation = MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
-                title = "TVHeadend Player wird gestartet",
-                message = "Verbindung mit TVHeadend wird wiederhergestellt…",
+                title = "Tvheadend Player",
+                message = "Verbindung mit Ihrem Tvheadend-Server wird wiederhergestellt…",
             ),
             StartupBoundsScenario(
                 locale = Locale.ENGLISH,
@@ -494,8 +497,8 @@ class MainStartupScreenTest {
                     MainStartupMessageKind.CONFIGURATION_REQUIRED,
                     settingsOnly,
                 ),
-                title = "Action needed",
-                message = "Set up the TVHeadend connection to load channels.",
+                title = "Tvheadend Player",
+                message = "Set up your Tvheadend server connection to load channels.",
                 actions = listOf(StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Connection settings")),
             ),
             StartupBoundsScenario(
@@ -504,7 +507,7 @@ class MainStartupScreenTest {
                     MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
                     settingsOnly,
                 ),
-                title = "Aktion erforderlich",
+                title = "Tvheadend Player",
                 message = "Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein.",
                 actions = listOf(StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Verbindungseinstellungen")),
             ),
@@ -514,7 +517,7 @@ class MainStartupScreenTest {
                     MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
                     retryAndSettings,
                 ),
-                title = "Action needed",
+                title = "Tvheadend Player",
                 message = "No channels are available for this account.",
                 actions = listOf(
                     StartupActionLabel(MainStartupActionId.RETRY, "Retry"),
@@ -527,8 +530,8 @@ class MainStartupScreenTest {
                     MainStartupMessageKind.RETRYABLE_FAILURE,
                     retryAndSettings,
                 ),
-                title = "Aktion erforderlich",
-                message = "TVHeadend ist nicht verfügbar. Versuchen Sie es erneut.",
+                title = "Tvheadend Player",
+                message = "Die Verbindung mit Ihrem Tvheadend-Server konnte nicht hergestellt werden. Versuchen Sie es erneut.",
                 actions = listOf(
                     StartupActionLabel(MainStartupActionId.RETRY, "Erneut versuchen"),
                     StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Verbindungseinstellungen"),

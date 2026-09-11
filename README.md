@@ -3,23 +3,23 @@
 ![Tvheadend Player](artwork/tvheadend-player-logo.png)
 
 Tvheadend Player is an independent, remote-first live-TV client for
-TVHeadend servers, built specifically for Android TV and Google TV. It combines
+Tvheadend servers, built specifically for Android TV and Google TV. It combines
 live television, a widescreen programme guide, recordings, timeshift, and an
 optional simplified TV experience in one ten-foot interface.
 
-The app connects directly to TVHeadend over HTSP and uses AndroidX Media3 for
+The app connects directly to your Tvheadend server over HTSP and uses AndroidX Media3 for
 playback. Phone and tablet support is not currently planned.
 
 > [!IMPORTANT]
 > This project is under active development and does not yet have a stable public
-> release. It is not an official TVHeadend application and is not affiliated
-> with or endorsed by the TVHeadend project.
+> release. It is not an official Tvheadend application and is not affiliated
+> with or endorsed by the Tvheadend project.
 
 ## Why Tvheadend Player?
 
 - **Designed for the television:** Compose for TV, Material for TV, predictable
   D-pad navigation, visible focus, TV-safe layouts, and focus restoration
-- **Complete TVHeadend experience:** live TV, channel tags, programme guide,
+- **Complete Tvheadend experience:** live TV, channel tags, programme guide,
   recording management, recording playback, and server stream profiles over HTSP
 - **Physical remote support:** channel up/down, direct channel-number entry,
   media controls, Info, and supported channel-list keys
@@ -30,14 +30,14 @@ playback. Phone and tablet support is not currently planned.
 
 ## Live TV and remote control
 
-- Native TVHeadend channel synchronization, picons, channel numbers, and live
+- Native Tvheadend channel synchronization, picons, channel numbers, and live
   playback over HTSP
 - First-run connection setup with explicit connection and synchronization status
 - Normal launches open channel browsing in a detailed list or large-card layout;
   autoplay and Simple TV resume the last successfully played channel
-- Per-device browsing scopes using TVHeadend channel tags
+- Per-device browsing scopes using Tvheadend channel tags
 - `CH+` and `CH-` switching with wraparound during fullscreen playback
-- Direct 1- to 3-digit TVHeadend channel-number entry
+- Direct 1- to 3-digit Tvheadend channel-number entry
 - Hardware Info, media play/pause, TV contents, TV number-entry, and supported
   remote channel-list keys
 - Last-played-channel restoration after a fresh launch
@@ -54,14 +54,14 @@ playback. Phone and tablet support is not currently planned.
 - Programme details with channel identity, description, episode metadata,
   recording state, and available actions
 - Watch, watch from start, record, and cancel-recording actions when supported by
-  the programme state and TVHeadend account permissions
+  the programme state and Tvheadend account permissions
 - Bounded, incremental EPG synchronization that preserves the last complete
   guide while reconnecting
 
 ## Recordings
 
 - Separate **Archive**, **Schedule**, and **Problems** views
-- TVHeadend recording folders preserved as a navigable hierarchy
+- Tvheadend recording folders preserved as a navigable hierarchy
 - Recording artwork, channel identity, episode metadata, status, storage size,
   and failure information where available
 - Permission-aware recording, cancellation, and deletion actions with safe
@@ -83,12 +83,12 @@ playback. Phone and tablet support is not currently planned.
 - Optional **Stats for nerds** overlay with formats, decoders, rendered and
   dropped frames, audio underruns, HTSP read rate, display mode, thermal state,
   and app memory
-- TVHeadend tuner signal, SNR, reception errors, queue delay, and server-side
+- Tvheadend tuner signal, SNR, reception errors, queue delay, and server-side
   drops in diagnostics when the active adapter supplies them
 
-Timeshift availability depends on the TVHeadend server and selected stream
+Timeshift availability depends on the Tvheadend server and selected stream
 profile. Recording visibility and write operations follow the permissions of the
-configured TVHeadend account.
+configured Tvheadend account.
 
 ## Simple TV and appliance integration
 
@@ -115,7 +115,7 @@ on TCL firmware that gives its system launcher priority.
 ## Privacy and network security
 
 - No Firebase, analytics, advertising, or external product account
-- TVHeadend credentials remain in app-private storage
+- Tvheadend credentials remain in app-private storage
 - Password protection uses Android Keystore and AES-GCM
 - Android backup and device transfer are disabled for application data
 - Password input is kept out of saved-instance state and protected from screen
@@ -127,9 +127,9 @@ it only on a trusted local network or through a protected tunnel such as a VPN.
 ## Requirements
 
 - Android TV 9 / API 28 or newer
-- TVHeadend server reachable over HTSP
+- Tvheadend server reachable over HTSP
 - Remote control with D-pad navigation
-- Appropriate TVHeadend permissions for EPG or recording operations
+- Appropriate Tvheadend permissions for EPG or recording operations
 
 Local builds require Java 21 and Android SDK 36.
 
@@ -155,7 +155,7 @@ fields before mutation. Existing ignored named profiles remain useful for the
 specialized credential, acceptance and release tools, but are not a prerequisite
 for ordinary CLI install/capture and do not select its `--device`.
 
-Never put TVHeadend credentials, signing keys, or private device addresses in
+Never put Tvheadend credentials, signing keys, or private device addresses in
 Git. The debug-only designated-test-device provisioning flow is documented in
 [`docs/test-device-credential-provisioning.md`](docs/test-device-credential-provisioning.md).
 
@@ -184,12 +184,12 @@ signature, source, and rollback gates.
 
 This GPLv3 project descends from
 [`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) and preserves its
-Git history, copyright, and license. TVHeadend Player is now maintained as a
+Git history, copyright, and license. Tvheadend Player is now maintained as a
 standalone product repository rather than as a GitHub fork so that it can have
 its own identity, roadmap, and release process.
 
 Generic fixes can still be prepared for the predecessor project without product
-or appliance assumptions. TVHeadend Player product UX, release policy, and
+or appliance assumptions. Tvheadend Player product UX, release policy, and
 optional appliance integration remain specific to this repository. The
 predecessor acknowledges ideas and code from
 [`TVHClient`](https://github.com/rsiebert/TVHClient).

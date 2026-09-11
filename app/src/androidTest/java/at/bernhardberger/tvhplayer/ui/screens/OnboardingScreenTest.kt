@@ -42,7 +42,7 @@ class OnboardingScreenTest {
             }
         }
 
-        composeRule.onNode(hasText("Set up TVHeadend") and hasClickAction())
+        composeRule.onNode(hasText("Set up server connection") and hasClickAction())
             .requestFocus()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.waitForIdle()

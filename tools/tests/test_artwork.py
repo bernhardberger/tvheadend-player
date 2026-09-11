@@ -43,6 +43,7 @@ GENERATED_PNG_DIMENSIONS = {
 
 DETERMINISTIC_VECTOR_ARTWORK = (
     "app/src/main/res/drawable/ic_launcher_monochrome.xml",
+    "app/src/main/res/drawable/startup_brand_symbol.xml",
     "artwork/tvheadend-player-logo.svg",
     "artwork/tvheadend-player-banner.svg",
     "artwork/tvheadend-player-android-tv.svg",
@@ -77,7 +78,14 @@ class ArtworkTest(unittest.TestCase):
             ROOT
             / "app/src/main/java/at/bernhardberger/tvhplayer/ui/startup/MainStartupScreen.kt"
         ).read_text()
-        self.assertIn("painterResource(R.drawable.ic_launcher_foreground)", startup)
+        self.assertIn("painterResource(R.drawable.startup_brand_symbol)", startup)
+        symbol = ElementTree.parse(ROOT / "artwork/tvheadend-player-symbol.svg")
+        startup_symbol = ElementTree.parse(ROOT / "app/src/main/res/drawable/startup_brand_symbol.xml")
+        android = "{http://schemas.android.com/apk/res/android}"
+        self.assertEqual(
+            [(p.attrib["fill"], p.attrib["d"]) for p in symbol.findall("{http://www.w3.org/2000/svg}path")],
+            [(p.attrib[android + "fillColor"], p.attrib[android + "pathData"]) for p in startup_symbol.findall(".//path")],
+        )
 
         readme = (ROOT / "README.md").read_text()
         self.assertIn("![Tvheadend Player](artwork/tvheadend-player-logo.png)", readme)
@@ -133,7 +141,11 @@ class ArtworkTest(unittest.TestCase):
         }.items():
             self.assertEqual(digest, hashlib.sha256((ROOT / "artwork/fonts" / name).read_bytes()).hexdigest())
         self.assertIn("SIL OPEN FONT LICENSE Version 1.1", (ROOT / "artwork/fonts/OFL.txt").read_text())
-        for relative_path in DETERMINISTIC_VECTOR_ARTWORK[1:]:
+        self.assertEqual((ROOT / "artwork/fonts/Outfit-550.ttf").read_bytes(),
+                         (ROOT / "app/src/main/res/font/outfit_550.ttf").read_bytes())
+        self.assertEqual((ROOT / "artwork/fonts/OFL.txt").read_bytes(),
+                         (ROOT / "app/src/main/assets/licenses/Outfit-OFL.txt").read_bytes())
+        for relative_path in DETERMINISTIC_VECTOR_ARTWORK[2:]:
             svg = ElementTree.parse(ROOT / relative_path).getroot()
             self.assertFalse(svg.findall(".//{http://www.w3.org/2000/svg}text"))
             self.assertFalse(svg.findall(".//{http://www.w3.org/2000/svg}image"))
