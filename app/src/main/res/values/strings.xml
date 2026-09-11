@@ -8,7 +8,7 @@
     <string name="cache_clearing">Clearing cache…</string>
     <string name="cache_cleared">Cache cleared. Listings and images refresh as needed.</string>
     <string name="cache_clear_failed">Could not clear cache. Press OK to try again.</string>
-    <string name="app_name" translatable="false">TVHeadend Player</string>
+    <string name="app_name" translatable="false">Tvheadend Player</string>
 
     <string name="channel_list">Channel List</string>
     <string name="all_channels">All channels</string>
@@ -66,7 +66,7 @@
     <string name="clear_saved_password">Clear saved password</string>
     <string name="credential_save_failed">The credential could not be stored. Try clearing it and entering it again.</string>
     <string name="credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
-    <string name="onboarding_title">Welcome to TVHeadend Player</string>
+    <string name="onboarding_title">Welcome to Tvheadend Player</string>
     <string name="onboarding_requirement">This app connects to a TVHeadend server that provides your channels, guide and recordings.</string>
     <string name="trusted_network_guidance">Connect only on a trusted home network or through a protected tunnel. HTSP does not encrypt the channel metadata or video stream.</string>
     <string name="onboarding_continue">Set up TVHeadend</string>
@@ -92,20 +92,20 @@
     <string name="appliance_section_accessibility">Accessibility service</string>
     <string name="auto_start_playback">Start playback when the app opens</string>
     <string name="auto_start_playback_description">Plays the last channel after a fresh app launch. This does not enable the accessibility service.</string>
-    <string name="appliance_accessibility_disclosure">When the accessibility service is enabled, TVHeadend Player opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
+    <string name="appliance_accessibility_disclosure">When the accessibility service is enabled, Tvheadend Player opens after TV startup and screen wake, and takes over only the TV/GUIDE button. It does not read screen content or monitor text. Every other remote button passes through unchanged.</string>
     <string name="appliance_service_enabled">Appliance entry service: enabled</string>
     <string name="appliance_service_disabled">Appliance entry service: disabled</string>
     <string name="open_accessibility_settings">Open accessibility settings</string>
-    <string name="appliance_accessibility_service_label">TVHeadend Player appliance entry</string>
-    <string name="appliance_accessibility_service_description">Opens TVHeadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
+    <string name="appliance_accessibility_service_label">Tvheadend Player appliance entry</string>
+    <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
     <string name="appliance_starting_tv">Starting television…</string>
     <string name="appliance_connection_recovering">Television is currently unavailable. Reconnecting automatically…</string>
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
     <!-- Startup status screen -->
-    <string name="main_startup_passive_title">Starting TVHeadend Player</string>
+    <string name="main_startup_passive_title">Starting Tvheadend Player</string>
     <string name="main_startup_actionable_title">Action needed</string>
-    <string name="main_startup_message_preparing">Preparing TVHeadend Player…</string>
+    <string name="main_startup_message_preparing">Preparing Tvheadend Player…</string>
     <string name="main_startup_message_connecting">Connecting to TVHeadend…</string>
     <string name="main_startup_message_syncing_channels">Loading channel information…</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Preparing channel information…</string>

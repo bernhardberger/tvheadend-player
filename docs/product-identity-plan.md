@@ -7,8 +7,8 @@ Status: approved and implemented beginning 2026-07-24
 | Decision | Result |
 |---|---|
 | Product boundary | Independent public Android TV live-TV client for TVHeadend, with appliance behavior as an optional profile/integration layer |
-| Public name | **TVHeadend Player for TV** |
-| Launcher label | **TVHeadend Player** |
+| Public name | **Tvheadend Player** |
+| Launcher label | **Tvheadend Player** |
 | Descriptor | **Live TV client for TVHeadend servers** |
 | Repository | `bernhardberger/tvheadend-player` |
 | Distribution | GitHub-first, while keeping a later Google Play path possible |
@@ -44,6 +44,13 @@ Keystore alias. The previous package may remain installed as a rollback client
 during validation, but it is a separate Android application.
 
 ## Visual identity
+
+The settled family wordmark uses Outfit 550: **Tvheadend** in off-white
+`#E3E3E8` and **Player** in orange `#FA7F00` on charcoal `#0F1014`.
+The launcher banner stacks the two words beside the original symbol. Avatars
+and app icons contain only the symbol. A separate contextual **for Android TV**
+lockup is available; the platform suffix is never baked into family artwork.
+This branding update preserves every stable identifier and existing app data.
 
 The mark is a cyan diamond aperture on a dark neutral field, layered outward
 from the play symbol: orange play, neutral charcoal core, cyan diamond. The

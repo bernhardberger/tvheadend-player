@@ -10,16 +10,20 @@ import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
 import java.awt.geom.RoundRectangle2D;
+import java.awt.font.FontRenderContext;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Base64;
 import javax.imageio.ImageIO;
 
 /**
- * Reproducible launcher, banner, and marketing artwork for TVHeadend Player.
+ * Reproducible launcher, banner, and brand artwork for Tvheadend Player.
  *
  * Mark: a diamond aperture layered outward from the play symbol — orange play,
  * neutral charcoal core, and cyan diamond on a dark field. The rotated square
@@ -37,7 +41,16 @@ public final class RenderArtwork {
     private static final Color FIELD = new Color(0x0F, 0x10, 0x14);
     private static final Color CORE = new Color(0x17, 0x17, 0x17);
     private static final Color TEXT = new Color(0xE3, 0xE3, 0xE8);
-    private static final Color MUTED = new Color(0xE3, 0xE3, 0xE8, 190);
+    private static final Font WORDMARK = loadWordmark();
+    private static final FontRenderContext FONT_CONTEXT = new FontRenderContext(null, true, true);
+
+    private static Font loadWordmark() {
+        try {
+            return Font.createFont(Font.TRUETYPE_FONT, Path.of("artwork/fonts/Outfit-550.ttf").toFile());
+        } catch (Exception error) {
+            throw new IllegalStateException("Pinned Outfit 550 font is required; no fallback allowed", error);
+        }
+    }
 
     /** Adaptive-icon safe zone: 66dp of the 108dp grid. */
     private static final double SAFE_ZONE = 66.0 / 108.0;
@@ -63,14 +76,12 @@ public final class RenderArtwork {
     private RenderArtwork() {}
 
     public static void main(String[] args) throws IOException {
-        writeBanner();
-        writeLogo();
-        writeSocialPreview();
+        writeBrandSurfaces();
         writeAdaptiveLayers();
         writePlayStoreIcon();
         writeLegacyIcons();
         writeMonochrome();
-        writeSvg();
+        writePreview();
     }
 
     private static Graphics2D graphics(BufferedImage image) {
@@ -151,49 +162,81 @@ public final class RenderArtwork {
         drawMark(graphics, (extent - markSize) / 2.0, (extent - markSize) / 2.0, markSize);
     }
 
-    private static void drawWordmark(Graphics2D graphics, int x, int titleBaseline, int titleSize, int subtitleBaseline) {
-        graphics.setColor(TEXT);
-        graphics.setFont(new Font("DejaVu Sans", Font.BOLD, titleSize));
-        graphics.drawString("TVHeadend Player for TV", x, titleBaseline);
-        graphics.setColor(MUTED);
-        graphics.setFont(new Font("DejaVu Sans", Font.PLAIN, Math.max(12, titleSize / 3)));
-        graphics.drawString("Live TV client for TVHeadend servers", x, subtitleBaseline);
+    private record Ink(Shape shape, Color color) {}
+
+    private static List<Ink> mark(double x, double y, double size) {
+        return new ArrayList<>(List.of(
+                new Ink(diamond(x, y, size, OUTER_HALF, OUTER_CORNER), CYAN),
+                new Ink(diamond(x, y, size, CORE_HALF, CORE_CORNER), CORE),
+                new Ink(playSymbol(x, y, size), ORANGE)));
     }
 
-    private static void writeBanner() throws IOException {
-        BufferedImage image = new BufferedImage(320, 180, BufferedImage.TYPE_INT_RGB);
-        Graphics2D graphics = graphics(image);
-        paintField(graphics, 320, 180);
-        drawMark(graphics, 37, 55, 71);
-        graphics.setColor(TEXT);
-        graphics.setFont(new Font("DejaVu Sans", Font.BOLD, 26));
-        graphics.drawString("TVHeadend", 132, 84);
-        graphics.drawString("Player", 132, 113);
-        graphics.dispose();
-        writePng(image, Path.of("app/src/main/res/drawable/banner.png"));
+    private static void text(List<Ink> ink, String text, float size, float x, float baseline, Color color) {
+        Font font = WORDMARK.deriveFont(size);
+        if (font.canDisplayUpTo(text) != -1) throw new IllegalArgumentException("Missing brand glyph");
+        ink.add(new Ink(font.createGlyphVector(FONT_CONTEXT, text).getOutline(x, baseline), color));
     }
 
-    private static void writeLogo() throws IOException {
-        BufferedImage image = new BufferedImage(960, 300, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D graphics = graphics(image);
-        paintField(graphics, 960, 300);
-        drawMark(graphics, 60, 60, 180);
-        drawWordmark(graphics, 290, 145, 43, 190);
-        graphics.dispose();
-        writePng(image, Path.of("artwork/tvheadend-player-logo.png"));
+    private static void writeBrandSurfaces() throws IOException {
+        List<Ink> banner = mark(12, 46, 88);
+        text(banner, "Tvheadend", 32, 110, 84, TEXT);
+        text(banner, "Player", 32, 110, 119, ORANGE);
+        export("tvheadend-player-banner", 320, 180, banner, 1, 2, 4);
+        // Android's documented TV banner is 320x180 at xhdpi (160x90dp).
+        String[] densities = {"mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"};
+        double[] scales = {0.5, 0.75, 1, 1.5, 2};
+        for (int i = 0; i < densities.length; i++) {
+            writePng(render(320, 180, banner, scales[i]),
+                    Path.of("app/src/main/res/drawable-" + densities[i] + "/banner.png"));
+        }
+
+        List<Ink> family = mark(60, 60, 180);
+        text(family, "Tvheadend", 54, 290, 168, TEXT);
+        float playerX = 290 + (float) WORDMARK.deriveFont(54f)
+                .getStringBounds("Tvheadend ", FONT_CONTEXT).getWidth();
+        text(family, "Player", 54, playerX, 168, ORANGE);
+        export("tvheadend-player-logo", 960, 300, family, 1, 2);
+        List<Ink> contextual = new ArrayList<>(family);
+        text(contextual, "for Android TV", 24, 290, 213, TEXT);
+        export("tvheadend-player-android-tv", 960, 300, contextual, 1, 2);
+        export("tvheadend-player-symbol", 512, 512, mark(56.32, 56.32, 399.36), 1, 2);
+
+        List<Ink> social = mark(100, 155, 330);
+        text(social, "Tvheadend", 80, 500, 305, TEXT);
+        text(social, "Player", 80, 500, 395, ORANGE);
+        export("github-social-preview", 1280, 640, social, 1);
     }
 
-    private static void writeSocialPreview() throws IOException {
-        BufferedImage image = new BufferedImage(1280, 640, BufferedImage.TYPE_INT_RGB);
+    private static BufferedImage render(int width, int height, List<Ink> ink, double scale) {
+        BufferedImage image = new BufferedImage((int) (width * scale), (int) (height * scale), BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = graphics(image);
-        paintField(graphics, 1280, 640);
-        drawMark(graphics, 100, 155, 330);
-        drawWordmark(graphics, 505, 295, 46, 350);
-        graphics.setColor(TEXT);
-        graphics.setFont(new Font("DejaVu Sans", Font.BOLD, 21));
-        graphics.drawString("REMOTE-FIRST  /  OPEN SOURCE  /  ANDROID TV", 505, 410);
+        graphics.scale(scale, scale);
+        paintField(graphics, width, height);
+        for (Ink item : ink) {
+            if (!new java.awt.geom.Rectangle2D.Double(0, 0, width, height).contains(item.shape().getBounds2D())) {
+                throw new IllegalArgumentException("Artwork is cropped");
+            }
+            graphics.setColor(item.color());
+            graphics.fill(item.shape());
+        }
         graphics.dispose();
-        writePng(image, Path.of("artwork/github-social-preview.png"));
+        return image;
+    }
+
+    private static void export(String name, int width, int height, List<Ink> ink, int... scales) throws IOException {
+        for (int scale : scales) {
+            writePng(render(width, height, ink, scale), Path.of("artwork/" + name + (scale == 1 ? "" : "@" + scale + "x") + ".png"));
+        }
+        StringBuilder svg = new StringBuilder("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + width
+                + "\" height=\"" + height + "\" viewBox=\"0 0 " + width + " " + height + "\">\n"
+                + "  <title>Tvheadend Player" + (name.endsWith("android-tv") ? " for Android TV" : "") + "</title>\n"
+                + "  <rect width=\"100%\" height=\"100%\" fill=\"#0F1014\"/>\n");
+        for (Ink item : ink) {
+            svg.append("  <path fill=\"").append(String.format(Locale.ROOT, "#%06X", item.color().getRGB() & 0xFFFFFF))
+                    .append("\" d=\"").append(toPathData(item.shape())).append("\"/>\n");
+        }
+        svg.append("</svg>\n");
+        Files.writeString(Path.of("artwork/" + name + ".svg"), svg, StandardCharsets.UTF_8);
     }
 
     /**
@@ -315,32 +358,47 @@ public final class RenderArtwork {
                 StandardCharsets.UTF_8);
     }
 
-    private static void writeSvg() throws IOException {
-        double markSize = 180;
-        double markOrigin = 60;
-        String outer = toPathData(diamond(markOrigin, markOrigin, markSize, OUTER_HALF, OUTER_CORNER));
-        String core = toPathData(diamond(markOrigin, markOrigin, markSize, CORE_HALF, CORE_CORNER));
-        String play = toPathData(playSymbol(markOrigin, markOrigin, markSize));
-        String svg = """
-                <svg xmlns="http://www.w3.org/2000/svg" width="960" height="300" viewBox="0 0 960 300">
-                  <title>TVHeadend Player logo</title>
-                  <rect width="960" height="300" fill="#0F1014"/>
-                  <!-- Diamond aperture, layered outward from the play symbol -->
-                  <path fill="#00BCFA" d="%s"/>
-                  <path fill="#171717" d="%s"/>
-                  <!-- Player symbol -->
-                  <path fill="#FA7F00" d="%s"/>
-                  <text x="290" y="145" fill="#E3E3E8" font-family="DejaVu Sans, sans-serif" font-size="43" font-weight="700">TVHeadend Player for TV</text>
-                  <text x="290" y="190" fill="#E3E3E8" fill-opacity="0.75" font-family="DejaVu Sans, sans-serif" font-size="18">Live TV client for TVHeadend servers</text>
-                </svg>
-                """.formatted(outer, core, play);
-        Files.writeString(Path.of("artwork/tvheadend-player-logo.svg"), svg, StandardCharsets.UTF_8);
-    }
-
     private static void writePng(BufferedImage image, Path path) throws IOException {
         Files.createDirectories(path.getParent());
         if (!ImageIO.write(image, "png", path.toFile())) {
             throw new IOException("PNG writer unavailable for " + path);
         }
+    }
+
+    private static void writePreview() throws IOException {
+        StringBuilder html = new StringBuilder("""
+                <!doctype html><html lang="en"><meta charset="utf-8">
+                <meta name="viewport" content="width=device-width,initial-scale=1">
+                <title>Tvheadend Player — settled brand assets</title>
+                <style>
+                *{box-sizing:border-box}body{margin:0;background:#0F1014;color:#E3E3E8;font:16px/1.5 system-ui,sans-serif}
+                main{max-width:1080px;margin:auto;padding:32px 24px}h1{font-size:28px;margin:0}h2{font-size:19px}
+                p{max-width:80ch;color:#bbc0ca}section{margin:32px 0;padding:20px;border:1px solid #34353b;border-radius:12px}
+                img{display:block;max-width:100%;height:auto}small{display:block;color:#bbc0ca;margin-top:12px}
+                .swatches{display:flex;flex-wrap:wrap;gap:18px}.swatches span{border-top:6px solid var(--c);padding-top:6px}
+                </style><main><h1>Tvheadend Player</h1>
+                <p>Settled brand assets · original diamond/play geometry · Outfit 550.<br>
+                Independent GPLv3 client descended from Preclikos/tvhstream. Not affiliated with or endorsed by Tvheadend.</p>
+                <div class="swatches"><span style="--c:#00BCFA">Cyan #00BCFA</span><span style="--c:#FA7F00">Orange #FA7F00</span>
+                <span style="--c:#171717">Core #171717</span><span style="--c:#E3E3E8">Off-white #E3E3E8</span></div>
+                """);
+        String[][] plates = {
+                {"Launcher banner · 320 × 180", "tvheadend-player-banner.png", "320"},
+                {"Launcher banner · 1280 × 720 source", "tvheadend-player-banner@4x.png", "960"},
+                {"Family wordmark · 1920 × 600 source", "tvheadend-player-logo@2x.png", "960"},
+                {"Separate contextual lockup", "tvheadend-player-android-tv@2x.png", "960"},
+                {"Symbol-only avatar · 1024 × 1024 source", "tvheadend-player-symbol@2x.png", "256"}
+        };
+        for (String[] plate : plates) {
+            html.append("<section><h2>").append(plate[0]).append("</h2><img alt=\"").append(plate[0])
+                    .append("\" width=\"").append(plate[2]).append("\" src=\"data:image/png;base64,")
+                    .append(Base64.getEncoder().encodeToString(Files.readAllBytes(Path.of("artwork/" + plate[1]))))
+                    .append("\"><small>").append(plate[1]).append(" · rendered directly from vector shapes</small></section>");
+        }
+        html.append("<p>Portable SVGs contain outlined glyphs. Outfit font sources and SIL OFL 1.1 are preserved in artwork/fonts. "
+                + "Static exports establish artwork quality only; physical launcher placement, overscan and ten-foot acceptance remain unverified.</p></main></html>");
+        Path preview = Path.of("artifacts/brand-preview/index.html");
+        Files.createDirectories(preview.getParent());
+        Files.writeString(preview, html, StandardCharsets.UTF_8);
     }
 }

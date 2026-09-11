@@ -78,3 +78,6 @@ __pycache__/
 
 # Private offline profiling traces, APKs and captures
 /artifacts/p38-profile/
+
+# Reproducible local brand preview and review evidence
+/artifacts/brand-preview/

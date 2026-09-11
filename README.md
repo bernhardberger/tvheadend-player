@@ -1,8 +1,8 @@
-# TVHeadend Player for TV
+# Tvheadend Player
 
-![TVHeadend Player](artwork/tvheadend-player-logo.png)
+![Tvheadend Player](artwork/tvheadend-player-logo.png)
 
-TVHeadend Player for TV is an independent, remote-first live-TV client for
+Tvheadend Player is an independent, remote-first live-TV client for
 TVHeadend servers, built specifically for Android TV and Google TV. It combines
 live television, a widescreen programme guide, recordings, timeshift, and an
 optional simplified TV experience in one ten-foot interface.
@@ -15,7 +15,7 @@ playback. Phone and tablet support is not currently planned.
 > release. It is not an official TVHeadend application and is not affiliated
 > with or endorsed by the TVHeadend project.
 
-## Why TVHeadend Player?
+## Why Tvheadend Player?
 
 - **Designed for the television:** Compose for TV, Material for TV, predictable
   D-pad navigation, visible focus, TV-safe layouts, and focus restoration

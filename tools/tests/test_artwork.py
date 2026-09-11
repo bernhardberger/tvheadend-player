@@ -1,3 +1,4 @@
+import hashlib
 import shutil
 import struct
 import subprocess
@@ -11,7 +12,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 GENERATED_PNG_DIMENSIONS = {
     "app/src/main/ic_launcher-playstore.png": (512, 512),
-    "app/src/main/res/drawable/banner.png": (320, 180),
+    "app/src/main/res/drawable-mdpi/banner.png": (160, 90),
+    "app/src/main/res/drawable-hdpi/banner.png": (240, 135),
+    "app/src/main/res/drawable-xhdpi/banner.png": (320, 180),
+    "app/src/main/res/drawable-xxhdpi/banner.png": (480, 270),
+    "app/src/main/res/drawable-xxxhdpi/banner.png": (640, 360),
     "app/src/main/res/drawable/ic_launcher_background.png": (432, 432),
     "app/src/main/res/drawable/ic_launcher_foreground.png": (432, 432),
     "app/src/main/res/mipmap-hdpi/ic_launcher.png": (72, 72),
@@ -26,11 +31,23 @@ GENERATED_PNG_DIMENSIONS = {
     "app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png": (192, 192),
     "artwork/github-social-preview.png": (1280, 640),
     "artwork/tvheadend-player-logo.png": (960, 300),
+    "artwork/tvheadend-player-logo@2x.png": (1920, 600),
+    "artwork/tvheadend-player-banner.png": (320, 180),
+    "artwork/tvheadend-player-banner@2x.png": (640, 360),
+    "artwork/tvheadend-player-banner@4x.png": (1280, 720),
+    "artwork/tvheadend-player-android-tv.png": (960, 300),
+    "artwork/tvheadend-player-android-tv@2x.png": (1920, 600),
+    "artwork/tvheadend-player-symbol.png": (512, 512),
+    "artwork/tvheadend-player-symbol@2x.png": (1024, 1024),
 }
 
 DETERMINISTIC_VECTOR_ARTWORK = (
     "app/src/main/res/drawable/ic_launcher_monochrome.xml",
     "artwork/tvheadend-player-logo.svg",
+    "artwork/tvheadend-player-banner.svg",
+    "artwork/tvheadend-player-android-tv.svg",
+    "artwork/tvheadend-player-symbol.svg",
+    "artwork/github-social-preview.svg",
 )
 
 
@@ -41,7 +58,7 @@ class ArtworkTest(unittest.TestCase):
         self.assertEqual("#0F1014", colors["splash_screen_background"])
 
         logo_svg = (ROOT / "artwork/tvheadend-player-logo.svg").read_text()
-        self.assertIn('<rect width="960" height="300" fill="#0F1014"/>', logo_svg)
+        self.assertIn('<rect width="100%" height="100%" fill="#0F1014"/>', logo_svg)
         self.assertIn('<path fill="#00BCFA"', logo_svg)
         self.assertIn('<path fill="#171717"', logo_svg)
         self.assertNotIn("#0B1B2E", logo_svg.upper())
@@ -63,7 +80,7 @@ class ArtworkTest(unittest.TestCase):
         self.assertIn("painterResource(R.drawable.ic_launcher_foreground)", startup)
 
         readme = (ROOT / "README.md").read_text()
-        self.assertIn("![TVHeadend Player](artwork/tvheadend-player-logo.png)", readme)
+        self.assertIn("![Tvheadend Player](artwork/tvheadend-player-logo.png)", readme)
         identity = (ROOT / "docs/product-identity-plan.md").read_text()
         self.assertIn(
             "The mark is a cyan diamond aperture on a dark neutral field",
@@ -78,6 +95,7 @@ class ArtworkTest(unittest.TestCase):
                 ROOT / "tools/RenderArtwork.java",
                 generated_root / "tools/RenderArtwork.java",
             )
+            shutil.copytree(ROOT / "artwork/fonts", generated_root / "artwork/fonts")
             subprocess.run(
                 ["java", "tools/RenderArtwork.java"],
                 cwd=generated_root,
@@ -96,6 +114,10 @@ class ArtworkTest(unittest.TestCase):
                         expected_dimensions,
                         self._png_dimensions(generated_root / relative_path),
                     )
+                    self.assertEqual(
+                        (ROOT / relative_path).read_bytes(),
+                        (generated_root / relative_path).read_bytes(),
+                    )
 
             for relative_path in DETERMINISTIC_VECTOR_ARTWORK:
                 with self.subTest(path=relative_path):
@@ -103,6 +125,20 @@ class ArtworkTest(unittest.TestCase):
                         (ROOT / relative_path).read_text(),
                         (generated_root / relative_path).read_text(),
                     )
+
+    def test_pinned_font_and_portable_outlined_exports(self):
+        for name, digest in {
+            "Outfit-variable.ttf": "fc7287273e66929776e2ba54f144fe699080bec29f61bf649d70d871468aeade",
+            "Outfit-550.ttf": "727366fc010a90ad71c0f639ddc85336c175bb5074041311e2b863960d6ecf46",
+        }.items():
+            self.assertEqual(digest, hashlib.sha256((ROOT / "artwork/fonts" / name).read_bytes()).hexdigest())
+        self.assertIn("SIL OPEN FONT LICENSE Version 1.1", (ROOT / "artwork/fonts/OFL.txt").read_text())
+        for relative_path in DETERMINISTIC_VECTOR_ARTWORK[1:]:
+            svg = ElementTree.parse(ROOT / relative_path).getroot()
+            self.assertFalse(svg.findall(".//{http://www.w3.org/2000/svg}text"))
+            self.assertFalse(svg.findall(".//{http://www.w3.org/2000/svg}image"))
+            title = svg.findtext("{http://www.w3.org/2000/svg}title", default="")
+            self.assertEqual("for Android TV" in title, "android-tv" in relative_path)
 
     @staticmethod
     def _color_resources():

@@ -116,7 +116,7 @@ required_badging=(
     "package: name='at.bernhardberger.tvhplayer'"
     "sdkVersion:'28'"
     "targetSdkVersion:'36'"
-    "application-label:'TVHeadend Player'"
+    "application-label:'Tvheadend Player'"
     "'armeabi-v7a'"
 )
 for expected in "${required_badging[@]}"; do

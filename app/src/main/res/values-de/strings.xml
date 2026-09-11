@@ -62,7 +62,7 @@
     <string name="clear_saved_password">Gespeichertes Passwort löschen</string>
     <string name="credential_save_failed">Die Zugangsdaten konnten nicht gespeichert werden. Löschen Sie sie und geben Sie sie erneut ein.</string>
     <string name="credential_unavailable">Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffnen Sie die Verbindungseinstellungen und geben Sie sie erneut ein.</string>
-    <string name="onboarding_title">Willkommen bei TVHeadend Player</string>
+    <string name="onboarding_title">Willkommen bei Tvheadend Player</string>
     <string name="onboarding_requirement">Diese App verbindet sich mit einem TVHeadend-Server, der Sender, Programm und Aufnahmen bereitstellt.</string>
     <string name="trusted_network_guidance">Verbinden Sie sich nur in einem vertrauenswürdigen Heimnetz oder über einen geschützten Tunnel. HTSP verschlüsselt weder Senderdaten noch Videostreams.</string>
     <string name="onboarding_continue">TVHeadend einrichten</string>
@@ -88,20 +88,20 @@
     <string name="appliance_section_accessibility">Bedienungshilfen-Dienst</string>
     <string name="auto_start_playback">Wiedergabe beim Öffnen der App starten</string>
     <string name="auto_start_playback_description">Spielt nach einem neuen App-Start den letzten Sender ab. Dadurch wird der Bedienungshilfen-Dienst nicht aktiviert.</string>
-    <string name="appliance_accessibility_disclosure">Wenn der Bedienungshilfen-Dienst aktiviert ist, öffnet sich TVHeadend Player nach dem Starten und Aufwecken des Fernsehers und übernimmt ausschließlich die TV-/GUIDE-Taste. Er liest weder Bildschirminhalte noch Text. Alle anderen Fernbedienungstasten werden unverändert weitergegeben.</string>
+    <string name="appliance_accessibility_disclosure">Wenn der Bedienungshilfen-Dienst aktiviert ist, öffnet sich Tvheadend Player nach dem Starten und Aufwecken des Fernsehers und übernimmt ausschließlich die TV-/GUIDE-Taste. Er liest weder Bildschirminhalte noch Text. Alle anderen Fernbedienungstasten werden unverändert weitergegeben.</string>
     <string name="appliance_service_enabled">TV-Startdienst: aktiviert</string>
     <string name="appliance_service_disabled">TV-Startdienst: deaktiviert</string>
     <string name="open_accessibility_settings">Bedienungshilfen öffnen</string>
-    <string name="appliance_accessibility_service_label">TVHeadend Player-Start</string>
-    <string name="appliance_accessibility_service_description">Öffnet TVHeadend Player nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
+    <string name="appliance_accessibility_service_label">Tvheadend Player-Start</string>
+    <string name="appliance_accessibility_service_description">Öffnet Tvheadend Player nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
     <string name="appliance_starting_tv">Fernsehen wird gestartet…</string>
     <string name="appliance_connection_recovering">Fernsehen ist gerade nicht verfügbar. Die Verbindung wird automatisch wiederhergestellt…</string>
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
 
     <!-- Startup-Statusbildschirm -->
-    <string name="main_startup_passive_title">TVHeadend Player wird gestartet</string>
+    <string name="main_startup_passive_title">Tvheadend Player wird gestartet</string>
     <string name="main_startup_actionable_title">Aktion erforderlich</string>
-    <string name="main_startup_message_preparing">TVHeadend Player wird vorbereitet…</string>
+    <string name="main_startup_message_preparing">Tvheadend Player wird vorbereitet…</string>
     <string name="main_startup_message_connecting">Verbindung mit TVHeadend wird hergestellt…</string>
     <string name="main_startup_message_syncing_channels">Senderinformationen werden geladen…</string>
     <string name="main_startup_message_waiting_for_current_channel_metadata">Senderinformationen werden vorbereitet…</string>
