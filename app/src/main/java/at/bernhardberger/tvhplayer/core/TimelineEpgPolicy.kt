@@ -336,6 +336,15 @@ fun timelinePageFocusTarget(
     return EpgFocusTarget(targetIndex, targetEvent.id)
 }
 
+/** Logical leading-edge pixels work identically with relative placement in LTR and RTL. */
+internal fun shouldComposeTimelineCell(
+    startPx: Int,
+    widthPx: Int,
+    visibleWidthPx: Int?,
+    isFocusTarget: Boolean,
+): Boolean = isFocusTarget || visibleWidthPx == null ||
+    (visibleWidthPx > 0 && widthPx > 0 && startPx < visibleWidthPx && startPx.toLong() + widthPx > 0)
+
 fun timelineEventSpan(
     eventStartSec: Long,
     eventEndSec: Long,

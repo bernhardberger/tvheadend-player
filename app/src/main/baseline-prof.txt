@@ -1,0 +1,8 @@
+# First construction and focus navigation of the Channels/Guide sidebar pair.
+# Library rules are merged by AGP. Keep app rules bounded to these measured owners.
+HPLat/bernhardberger/tvhplayer/ui/SidebarGuideScene**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/components/SideRailKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/screens/ChannelsScreenKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/screens/EpgGridScreenKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/screens/guide/EpgGridContentKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/core/TimelineEpgPolicyKt;->**(**)**

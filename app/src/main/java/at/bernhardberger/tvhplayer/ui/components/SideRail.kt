@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -37,7 +39,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -73,6 +75,9 @@ private val DrawerStartPadding = 24.dp
 private val DrawerEndPadding = 12.dp
 private val ClosedDrawerWidth =
     DrawerStartPadding + NavigationDrawerItemDefaults.CollapsedDrawerItemWidth + DrawerEndPadding
+
+/** Current measure's visible extent from the browse content's logical leading edge. */
+internal val LocalBrowseVisibleWidthPx = compositionLocalOf<Int?> { null }
 
 @Composable
 internal fun SideRail(
@@ -323,6 +328,7 @@ internal fun SideRail(
                                             drawerValue == DrawerValue.Open &&
                                             focusState.isFocused
                                         ) {
+                                            profileTrace("P48:sidebarFocus:${item.route.name}") { }
                                             requestRoute(item.route)
                                         }
                                     },
@@ -387,12 +393,17 @@ private fun BrowseViewport(
     width: Dp,
     content: @Composable () -> Unit,
 ) {
-    Layout(
-        content = { Box(Modifier.fillMaxSize()) { content() } },
+    SubcomposeLayout(
         modifier = Modifier.fillMaxSize(),
-    ) { measurables, constraints ->
+    ) { constraints ->
         val fixedWidth = width.roundToPx()
-        val placeable = measurables.single().measure(
+        val placeable = subcompose(Unit) {
+            CompositionLocalProvider(
+                LocalBrowseVisibleWidthPx provides constraints.maxWidth,
+            ) {
+                Box(Modifier.fillMaxSize()) { content() }
+            }
+        }.single().measure(
             constraints.copy(minWidth = fixedWidth, maxWidth = fixedWidth),
         )
         // Report Material's available width while preserving the closed browse

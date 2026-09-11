@@ -184,6 +184,7 @@ class MainActivity : AppCompatActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean = profileTrace(
         if (event.action == KeyEvent.ACTION_DOWN) "P44:input:down" else "P44:input:other",
     ) {
+        at.bernhardberger.tvhplayer.profiling.profileNavigationInput(event)
         if (mainStartupKeyDispatcher.dispatch(mainStartupActivityKeyContract, event)) {
             true
         } else {

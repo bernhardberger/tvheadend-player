@@ -78,6 +78,21 @@ class ProfilingEvidenceTest(unittest.TestCase):
                     self.assertEqual(result.returncode, 2)
                     self.assertFalse(output.exists())
 
+    def test_capture_rejects_transport_injection_and_repeated_back_before_adb(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for extra, keys in (
+                ({"TVHPLAYER_PROFILE_INPUT_TRANSPORT": "cmd; exit 0"}, ["20"]),
+                ({"TVHPLAYER_PROFILE_ALLOW_BACK": "true"}, ["4", "4"]),
+                ({"TVHPLAYER_PROFILE_ALLOW_BACK": "yes"}, ["4"]),
+            ):
+                result = subprocess.run(
+                    ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "invalid-device",
+                     "at.bernhardberger.tvhplayer", str(Path(directory) / "capture"), "1", *keys],
+                    env={"PATH": directory, **extra}, capture_output=True, text=True, timeout=5,
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertFalse((Path(directory) / "capture").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

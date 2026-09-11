@@ -6,11 +6,13 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -22,6 +24,14 @@ import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvhplayer.core.guideWindowBounds
+import at.bernhardberger.tvhplayer.stores.GuidePosition
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -31,6 +41,114 @@ import org.junit.Test
 class SidebarGuideNavigationTest {
     @get:Rule val compose = createAndroidComposeRule<JourneyProfileActivity>()
     private val focusHistory = mutableListOf<String>()
+
+    @Test fun guideNumbersFollowMetadataAndFilteredScopeWithinTheSameVisit() {
+        openGuideSidebar()
+        val entries = compose.activity.guideCompositionEntries
+        fun publishChannels(transform: (List<Channel>) -> List<Channel>) {
+            compose.activityRule.scenario.onActivity { activity ->
+                val source = session(activity)
+                val old = source.observation.value
+                val catalog = checkNotNull(old.channelCatalogForDisplay)
+                source.publish(SessionObservation.create(
+                    sessionState = old.sessionState,
+                    channelState = ChannelRepositoryState.Current(
+                        ChannelCatalog.create(transform(catalog.channels), catalog.tags),
+                    ),
+                    epgState = old.epgState,
+                    dvrState = old.dvrState,
+                ))
+            }
+            compose.waitForIdle()
+        }
+        publishChannels { channels ->
+            channels.filter { it.id.value <= 3 }.map { channel ->
+                Channel.create(channel.id, name = channel.name,
+                    number = 40L - channel.id.value * 10L, tagIds = channel.tagIds)
+            }
+        }
+        compose.onNodeWithText(channelTitleText(30, "Offline channel 1")).assertIsDisplayed()
+        publishChannels { channels ->
+            channels.map { channel ->
+                Channel.create(channel.id, name = when (channel.id.value) {
+                    1L -> "Zeta"
+                    2L -> "Alpha"
+                    else -> "Beta"
+                }, tagIds = channel.tagIds)
+            }
+        }
+        // Numberless scopes retain the existing channel-ID ordering, not name order.
+        compose.onNodeWithText(channelTitleText(3, "Beta")).assertIsDisplayed()
+        compose.onNodeWithText(channelTitleText(1, "Zeta")).assertIsDisplayed()
+        key(Key.DirectionRight) // Selected All channels scope.
+        compose.onNodeWithText("All channels").assertIsFocused()
+        key(Key.DirectionRight) // Group A.
+        compose.waitUntilAtLeastOneExists(hasText("Group A") and isSelected(), 3_000)
+        compose.onNodeWithText("Group A").assertIsFocused()
+        key(Key.DirectionRight) // Group B contains Zeta and Beta, in ID order.
+        compose.waitUntilAtLeastOneExists(hasText("Group B") and isSelected(), 3_000)
+        compose.onNodeWithText("Group B").assertIsFocused()
+        compose.onNodeWithText(channelTitleText(2, "Beta")).assertIsDisplayed()
+        compose.onNodeWithText(channelTitleText(1, "Zeta")).assertIsDisplayed()
+        publishChannels { channels ->
+            channels.map { channel ->
+                Channel.create(channel.id, name = channel.name,
+                    number = 99L.takeIf { channel.id == ChannelId(1) }, tagIds = channel.tagIds)
+            }
+        }
+        compose.onNodeWithText("Beta").assertIsDisplayed()
+        compose.onNodeWithText(channelTitleText(99, "Zeta")).assertIsDisplayed()
+        compose.runOnIdle { assertEquals(entries, compose.activity.guideCompositionEntries) }
+    }
+
+    @Test fun firstGuideVisitRestoresNonzeroViewportAndProgramme() {
+        compose.waitForIdle()
+        val nowSec = System.currentTimeMillis() / 1000L
+        compose.activityRule.scenario.onActivity { activity ->
+            val snapshot = checkNotNull(session(activity).observation.value.epgSnapshotForDisplay)
+            val event = snapshot.events.first {
+                it.channelId == ChannelId(13) &&
+                    it.start.epochSeconds <= nowSec && it.stop.epochSeconds > nowSec
+            }
+            activity.guidePosition.save(GuidePosition(
+                channelId = checkNotNull(event.channelId),
+                eventId = event.id,
+                eventStartSec = event.start.epochSeconds,
+                windowStartSec = guideWindowBounds(nowSec, ZoneId.systemDefault()).earliestStartSec,
+                firstVisibleColumn = 12,
+            ))
+        }
+        openGuideSidebar()
+        compose.onNodeWithText(channelTitleText(13, "Offline channel 13")).assertIsDisplayed()
+        compose.onNodeWithText(channelTitleText(1, "Offline channel 1")).assertDoesNotExist()
+        enterProgramme()
+        assertTrue(focusedDescription().startsWith("Offline channel 13,"))
+        val restored = focusedDescription()
+        back()
+        key(Key.DirectionUp)
+        key(Key.DirectionDown)
+        enterProgramme()
+        assertEquals(restored, focusedDescription())
+    }
+
+    @Test fun visitedChannelsSurvivesAlternationButIsReleasedOnGuideClose() {
+        compose.waitForIdle()
+        val initialEntries = compose.activity.channelCompositionEntries
+        openGuideSidebar()
+        repeat(3) {
+            key(Key.DirectionUp)
+            compose.onNodeWithText("Channels").assertIsFocused()
+            key(Key.DirectionDown)
+            compose.onNode(hasText("Guide") and hasClickAction()).assertIsFocused()
+        }
+        compose.runOnIdle { assertEquals(initialEntries, compose.activity.channelCompositionEntries) }
+        key(Key.DirectionRight)
+        compose.onNode(hasText("All channels") and isFocused()).assertIsFocused()
+        back()
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Channels").assertIsFocused()
+        compose.runOnIdle { assertEquals(initialEntries + 1, compose.activity.channelCompositionEntries) }
+    }
 
     @Test fun leavingPairDoesNotReconstructHiddenGuideOnBackToChannels() {
         openGuideSidebar()
@@ -51,6 +169,24 @@ class SidebarGuideNavigationTest {
         compose.onNode(hasText("All channels") and isFocused()).assertIsFocused().assertIsSelected()
     }
 
+    @Test fun firstGuideRightDuringDrawerOpeningReachesItsSelectedScope() {
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+            compose.mainClock.advanceTimeBy(32)
+            compose.onNodeWithText("Channels").assertIsFocused()
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+            compose.mainClock.advanceTimeBy(16)
+            compose.onNode(hasText("Guide") and hasClickAction()).assertIsFocused()
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+            compose.mainClock.advanceTimeBy(64)
+            compose.onNode(hasText("All channels") and isFocused()).assertIsFocused().assertIsSelected()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
     @Test fun rightDuringGuideExitEntersTheSelectedChannel() {
         openGuideSidebar()
         compose.mainClock.autoAdvance = false
@@ -63,6 +199,22 @@ class SidebarGuideNavigationTest {
         }
         compose.waitForIdle()
         compose.onNode(hasText("Offline channel 1", substring = true) and isFocused()).assertIsFocused()
+    }
+
+    @Test fun reopeningDrawerCancelsPendingChannelsEntry() {
+        openGuideSidebar()
+        compose.mainClock.autoAdvance = false
+        try {
+            key(Key.DirectionUp)
+            compose.mainClock.advanceTimeByFrame()
+            key(Key.DirectionRight)
+            compose.mainClock.advanceTimeByFrame()
+            key(Key.DirectionLeft)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Channels").assertIsFocused()
     }
 
     @Test fun sidebarUpdatesHiddenGuideAndRestoresLaterProgrammeWithinTheVisit() {

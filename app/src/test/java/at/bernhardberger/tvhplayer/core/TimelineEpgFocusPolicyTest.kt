@@ -12,6 +12,25 @@ import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
     @Test
+    fun viewportEligibilityKeepsPartialCellsAndExcludesWhollyClippedCells() {
+        val clippedCells = listOf(990 to 310, 1135 to 165, 1083 to 217, 1010 to 290, 1038 to 262)
+        clippedCells.forEach { (start, width) ->
+            assertFalse(shouldComposeTimelineCell(start, width, 900, false))
+        }
+        assertTrue(shouldComposeTimelineCell(660, 330, 900, false))
+        assertTrue(shouldComposeTimelineCell(899, 1, 900, false))
+        assertFalse(shouldComposeTimelineCell(900, 1, 900, false))
+        assertFalse(shouldComposeTimelineCell(0, 0, 900, false))
+        assertFalse(shouldComposeTimelineCell(0, 100, 0, false))
+    }
+
+    @Test
+    fun viewportEligibilityNeverDropsTheFocusTargetOrGuessesUnknownGeometry() {
+        assertTrue(shouldComposeTimelineCell(990, 310, 900, true))
+        assertTrue(shouldComposeTimelineCell(990, 310, null, false))
+    }
+
+    @Test
     fun channelEventIndexPreservesPerChannelSnapshotOrder() {
         val first = event(11, 0, 30)
         val otherChannel = event(21, 0, 60)

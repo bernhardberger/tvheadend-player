@@ -69,6 +69,9 @@ class JourneyProfileActivity : AppCompatActivity() {
     private var images: ImageLoader? = null
     internal var guideCompositionEntries = 0
         private set
+    internal val guidePosition = GuidePositionStore()
+    internal var channelCompositionEntries = 0
+        private set
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -112,7 +115,6 @@ class JourneyProfileActivity : AppCompatActivity() {
                 viewModelFactory { initializer { ChannelsViewModel(session, tags) } },
             )[ChannelsViewModel::class]
             val selection = ChannelSelectionStore()
-            val guidePosition = GuidePositionStore()
             val lastPlayed = LastPlayedChannelStore(this@JourneyProfileActivity)
             val imageLoader = ImageLoader(this@JourneyProfileActivity).also { images = it }
             setContent {
@@ -165,8 +167,12 @@ class JourneyProfileActivity : AppCompatActivity() {
                                     Text("Offline recordings destination")
                                 }
                                 entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
+                                    DisposableEffect(Unit) {
+                                        channelCompositionEntries++
+                                        onDispose { }
+                                    }
                                     ChannelsScreen(
-                                        contentPadding = padding, initialFocusEnabled = !drawerActive,
+                                        contentPadding = padding, initialFocusEnabled = !drawerActive && route == ChannelsKey,
                                         channelViewModel = catalog, selection = selection, imageLoader = imageLoader,
                                         playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
                                         onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> },

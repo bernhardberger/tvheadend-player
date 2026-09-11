@@ -11,6 +11,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.tv.material3.Text
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -29,12 +31,15 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.tv.material3.Button
@@ -260,6 +265,7 @@ class SideRailSemanticsTest {
         val contentFocus = FocusRequester()
         var rootBackCount = 0
         var browseBackHandler: () -> Unit = {}
+        val clipMeasurements = mutableListOf<Pair<Int, Float>>()
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 BackHandler { browseBackHandler() }
@@ -271,7 +277,16 @@ class SideRailSemanticsTest {
                     onNavigate = { route.value = it },
                     onBackHandlerChanged = { browseBackHandler = it },
                     content = { _, drawerActive ->
-                        Box(Modifier.fillMaxSize().testTag("browse-viewport")) {
+                        val visibleWidth = checkNotNull(LocalBrowseVisibleWidthPx.current)
+                        ContentContainer(
+                            Modifier
+                                .fillMaxSize()
+                                .testTag("browse-viewport")
+                                .focusProperties { onEnter = { contentFocus.requestFocus() } }
+                                .onGloballyPositioned {
+                                    clipMeasurements += visibleWidth to it.boundsInWindow().width
+                                },
+                        ) {
                             Button(
                                 onClick = {},
                                 modifier = Modifier
@@ -294,8 +309,19 @@ class SideRailSemanticsTest {
 
         val closedBounds = composeRule.onNodeWithTag("browse-viewport")
             .fetchSemanticsNode().boundsInRoot
+        composeRule.mainClock.autoAdvance = false
         composeRule.onNodeWithTag("browse-focus").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.mainClock.advanceTimeBy(48)
+        // Isolate current-measure geometry from spatial key search in this one-button
+        // fixture. Production Guide early-Right entry has its own key test.
+        composeRule.runOnUiThread { contentFocus.requestFocus() }
+        composeRule.mainClock.advanceTimeBy(32)
+        composeRule.onNodeWithTag("browse-focus").assertIsFocused()
+        composeRule.onNodeWithTag("nav-channels")
+            .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.mainClock.advanceTimeBy(32)
+        composeRule.mainClock.autoAdvance = true
         composeRule.onNodeWithTag("nav-channels").assertIsFocused()
         composeRule.waitForIdle()
         val openBounds = composeRule.onNodeWithTag("browse-viewport")
@@ -303,6 +329,12 @@ class SideRailSemanticsTest {
 
         assertTrue(openBounds.left > closedBounds.left)
         assertEquals(closedBounds.width, openBounds.width, 1f)
+        composeRule.runOnIdle {
+            assertTrue(clipMeasurements.map { it.first }.distinct().size > 2)
+            clipMeasurements.forEach { (reported, actual) ->
+                assertEquals("same-frame clip extent", reported.toFloat(), actual, 1f)
+            }
+        }
 
         composeRule.onNodeWithTag("nav-channels")
             .performKeyInput { pressKey(Key.DirectionDown) }

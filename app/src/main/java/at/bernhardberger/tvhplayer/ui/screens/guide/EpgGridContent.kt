@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
+import at.bernhardberger.tvhplayer.profiling.profileViewportItem
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +19,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
+import androidx.compose.ui.platform.LocalDensity
+import at.bernhardberger.tvhplayer.core.shouldComposeTimelineCell
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,7 +55,6 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
@@ -167,7 +172,7 @@ internal fun TimelineTimeRuler(
 internal fun TimelineChannelRow(
     channel: Channel,
     channelIndex: Int,
-    allChannels: List<Channel>,
+    number: Int?,
     selectedTarget: EpgFocusTarget?,
     eventFocusRequesters: MutableMap<EventId, FocusRequester>,
     windowStartSec: Long,
@@ -184,32 +189,21 @@ internal fun TimelineChannelRow(
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
     onMoveFocus: (EpgFocusDirection) -> Boolean,
+    visibleRowWidthPx: Int? = null,
 ) {
     val nowSec = nowSecProvider()
-    val state = epgColumnDataState(
-        visibleEvents = events,
-        windowStartSec = windowStartSec,
-        windowEndSec = windowEndSec,
-        connectionState = connectionUiState,
-        filterActive = hasCachedEvents != hasMatchingCachedEvents,
-        coveragePending = coveragePending,
-        hasCachedEvents = hasCachedEvents,
-        hasMatchingCachedEvents = hasMatchingCachedEvents,
-    )
-    val orderedIds = remember(allChannels) { allChannels.map { it.id } }
-    val numbers = remember(allChannels) {
-        allChannels.associate { it.id to it.number?.toInt() }
-    }
+    ProfileCompositionLifetime("guideRow:$channelIndex")
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(TIMELINE_ROW_HEIGHT),
+            .height(TIMELINE_ROW_HEIGHT)
+            .profileViewportItem("guideRow:$channelIndex:$windowStartSec:${events.size}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TimelineChannelHeader(
             channel = channel,
-            number = ChannelNavigation.numberForId(orderedIds, numbers, channel.id),
+            number = number,
             imageLoader = imageLoader,
             currentSession = currentSession,
             selected = selectedTarget?.channelIndex == channelIndex,
@@ -222,6 +216,10 @@ internal fun TimelineChannelRow(
                 .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
         ) {
+            val density = LocalDensity.current
+            val visibleTrackWidthPx = visibleRowWidthPx?.minus(
+                with(density) { CHANNEL_HEADER_WIDTH.roundToPx() + 4.dp.roundToPx() },
+            )
             events.forEach { event ->
                 val span = timelineEventSpan(
                     eventStartSec = event.start.epochSeconds,
@@ -231,31 +229,51 @@ internal fun TimelineChannelRow(
                 ) ?: return@forEach
                 val start = maxWidth * span.startFraction
                 val width = maxWidth * (span.endFraction - span.startFraction)
-                val focusRequester = remember(event.id) {
-                    eventFocusRequesters.getOrPut(event.id) { FocusRequester() }
+                val isFocusTarget = selectedTarget?.channelIndex == channelIndex &&
+                    selectedTarget.eventId == event.id
+                if (!shouldComposeTimelineCell(
+                        startPx = with(density) { start.roundToPx() },
+                        widthPx = with(density) { width.roundToPx() },
+                        visibleWidthPx = visibleTrackWidthPx,
+                        isFocusTarget = isFocusTarget,
+                    )
+                ) return@forEach
+                key(event.id) {
+                    val focusRequester = remember(event.id) {
+                        eventFocusRequesters.getOrPut(event.id) { FocusRequester() }
+                    }
+                    TimelineProgrammeCell(
+                        event = event,
+                        channel = channel,
+                        recording = recordingForEvent(event.id),
+                        nowSec = nowSec,
+                        selected = isFocusTarget,
+                        focusRequester = focusRequester,
+                        onFocused = { onFocused(event) },
+                        onOpenDetails = { onOpenDetails(event) },
+                        onMoveFocus = onMoveFocus,
+                        width = width,
+                        modifier = Modifier
+                            .offset(x = start)
+                            .width(width)
+                            .fillMaxHeight()
+                            .profileViewportItem("guideCell:$channelIndex:${event.id.value}"),
+                    )
                 }
-                TimelineProgrammeCell(
-                    event = event,
-                    channel = channel,
-                    recording = recordingForEvent(event.id),
-                    nowSec = nowSec,
-                    selected = selectedTarget?.channelIndex == channelIndex &&
-                        selectedTarget.eventId == event.id,
-                    focusRequester = focusRequester,
-                    onFocused = { onFocused(event) },
-                    onOpenDetails = { onOpenDetails(event) },
-                    onMoveFocus = onMoveFocus,
-                    width = width,
-                    modifier = Modifier
-                        .offset(x = start)
-                        .width(width)
-                        .fillMaxHeight(),
-                )
             }
 
             if (events.isEmpty()) {
                 TimelineRowState(
-                    state = state,
+                    state = epgColumnDataState(
+                        visibleEvents = events,
+                        windowStartSec = windowStartSec,
+                        windowEndSec = windowEndSec,
+                        connectionState = connectionUiState,
+                        filterActive = hasCachedEvents != hasMatchingCachedEvents,
+                        coveragePending = coveragePending,
+                        hasCachedEvents = hasCachedEvents,
+                        hasMatchingCachedEvents = hasMatchingCachedEvents,
+                    ),
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -344,11 +362,20 @@ internal fun TimelineProgrammeCell(
         event.start.epochSeconds > nowSec -> stringResource(R.string.epg_state_future)
         else -> stringResource(R.string.epg_state_past)
     }
+    // Time labels are independent of selection, recording and the five-second clock.
+    // Keep their formatting environment in the keys so a locale/zone update is live.
+    val locale = androidx.compose.ui.platform.LocalLocale.current.platformLocale
+    val zone = java.time.ZoneId.systemDefault()
+    val startSec = event.start.epochSeconds
+    val stopSec = event.stop.epochSeconds
+    val startDate = remember(startSec, locale, zone) { startSec.formatDateTime() }
+    val startTime = remember(startSec, locale, zone) { formatHm(startSec) }
+    val stopTime = remember(stopSec, locale, zone) { formatHm(stopSec) }
     val description = stringResource(
         R.string.epg_cell_description,
         channel.name.orEmpty(),
-        event.start.epochSeconds.formatDateTime(),
-        formatHm(event.stop.epochSeconds),
+        startDate,
+        stopTime,
         event.title.orEmpty(),
         stateText,
     )
@@ -369,7 +396,7 @@ internal fun TimelineProgrammeCell(
             supportingContent = if (width >= 90.dp) {
                 {
                     Text(
-                        text = "${formatHm(event.start.epochSeconds)}–${formatHm(event.stop.epochSeconds)}",
+                        text = "$startTime–$stopTime",
                         maxLines = 1,
                         style = MaterialTheme.typography.bodySmall,
                     )

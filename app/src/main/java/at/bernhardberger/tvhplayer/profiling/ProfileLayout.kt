@@ -4,6 +4,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.draw.drawWithContent
 import at.bernhardberger.tvhplayer.BuildConfig
 
 /** Committed composition lifetime, distinct from remeasurement of an existing tree. */
@@ -24,5 +28,32 @@ internal fun Modifier.profileLayout(region: String): Modifier {
         layout(child.width, child.height) {
             profileTrace("P44:place:$region") { child.placeRelative(0, 0) }
         }
+    }
+}
+
+/** Root draw attribution only: child readiness and display presentation require separate evidence. */
+internal fun Modifier.profileRouteDraw(route: String, drawerActive: Boolean): Modifier {
+    if (!BuildConfig.PROFILE_TRACE) return this
+    return drawWithContent {
+        drawContent()
+        profileTrace("P48:draw:$route:drawer:$drawerActive") { }
+    }
+}
+
+/** Raw and ancestor-clipped geometry plus actual child draw; never writes layout state. */
+internal fun Modifier.profileViewportItem(region: String): Modifier {
+    if (!BuildConfig.PROFILE_TRACE) return this
+    return onGloballyPositioned { coordinates ->
+        val origin = coordinates.positionInWindow()
+        val clipped = coordinates.boundsInWindow()
+        profileTrace(
+            "P48:bounds:$region:${origin.x.toInt()},${origin.y.toInt()}," +
+                "${coordinates.size.width},${coordinates.size.height}:" +
+                "${clipped.left.toInt()},${clipped.top.toInt()}," +
+                "${clipped.right.toInt()},${clipped.bottom.toInt()}",
+        ) { }
+    }.drawWithContent {
+        drawContent()
+        profileTrace("P48:itemDraw:$region") { }
     }
 }

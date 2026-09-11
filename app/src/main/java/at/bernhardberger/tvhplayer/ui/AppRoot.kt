@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -581,7 +583,7 @@ fun AppRoot(
     }
     val content: @Composable (PaddingValues, Boolean, Boolean) -> Unit = {
             contentPadding, drawerActive, contentAllowed ->
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().profileRouteDraw(currentDestination?.destination?.name ?: "NONE", drawerActive)) {
                 NavDisplay(
                     backStack = backStack,
                     sceneStrategies = listOf(
@@ -604,7 +606,7 @@ fun AppRoot(
                         ChannelsRouteContent(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
-                            initialFocusEnabled = !drawerActive,
+                            initialFocusEnabled = !drawerActive && currentDestination == ChannelsKey,
                             playingChannelId = activeChannelId,
                             connectionUiState = connectionUiState,
                             onRetryConnection = appVm::reconnectNow,

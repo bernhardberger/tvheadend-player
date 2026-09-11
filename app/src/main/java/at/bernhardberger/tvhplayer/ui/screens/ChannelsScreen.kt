@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -152,6 +153,7 @@ fun ChannelsScreen(
     onOpenConnectionSettings: () -> Unit,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit
 ) {
+    at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime("channels")
     val channelScopeState by channelViewModel.scope.collectAsStateWithLifecycle()
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
@@ -243,6 +245,8 @@ internal fun ChannelsScreenContent(
         isRestoring = false
     }
 
+    val contentEntryEnabled by rememberUpdatedState(initialFocusEnabled)
+
     fun requestChannelFocus(channelId: ChannelId): Boolean {
         val index = orderedChannelIds.indexOf(channelId)
         val requester = rowFocusRequesters[channelId]
@@ -262,6 +266,7 @@ internal fun ChannelsScreenContent(
                 listState.scrollToItem(index)
                 if (!listState.awaitVisibleChannel(channelId)) return@launch
                 withFrameNanos { }
+                if (!contentEntryEnabled || restorationGeneration != generation) return@launch
                 if (runCatching(requester::requestFocus).getOrDefault(false)) {
                     focusedChannelId = channelId
                     rememberedChannelIds[tagId] = channelId
@@ -322,12 +327,16 @@ internal fun ChannelsScreenContent(
     val focusedChannel = channels.firstOrNull { it.id == detailChannelId }
     val focusedNow = remember(observation, focusedChannel?.id, nowSec) {
         focusedChannel?.id?.let {
-            observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+            profileTrace("P48:channelsNowLookup") {
+                observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+            }
         }
     }
     val focusedNext = remember(observation, focusedChannel?.id, nowSec) {
         focusedChannel?.id?.let {
-            observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+            profileTrace("P48:channelsNextLookup") {
+                observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+            }
         }
     }
 
@@ -348,6 +357,11 @@ internal fun ChannelsScreenContent(
             pendingFocusTagId == channelScope.activeTagId && it in orderedChannelIds
         }
         cancelRestoration()
+        if (!initialFocusEnabled) {
+            contentFocusOwned = false
+            didInitialRestore = false
+            return@LaunchedEffect
+        }
         if (orderedChannelIds.isEmpty()) {
             focusedChannelId = null
             return@LaunchedEffect
@@ -356,7 +370,9 @@ internal fun ChannelsScreenContent(
         if (!didInitialRestore && initialFocusEnabled) {
             didInitialRestore = true
             contentFocusOwned = true
-            val id = restoredChannelId(
+            // A retained destination can receive a newer shared selection from Guide.
+            // Re-enter that identity instead of a stale pre-visit Channels focus.
+            val id = selectedId?.takeIf { it in orderedChannelIds } ?: restoredChannelId(
                 visibleChannelIds = orderedChannelIds,
                 rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
                 selectedChannelId = selectedId,
@@ -535,6 +551,7 @@ internal fun ChannelsScreenContent(
                                     playingNow = status.playingNow,
                                     onFocus = {
                                         profileTrace("P44:focus:channel") {
+                                            profileTrace("P48:focus:channel:${channelId.value}") { }
                                             focusedChannelId = channelId
                                             rememberedChannelIds[channelScope.activeTagId] = channelId
                                             contentFocusOwned = true
