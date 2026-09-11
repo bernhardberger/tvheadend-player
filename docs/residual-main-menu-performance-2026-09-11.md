@@ -103,6 +103,25 @@ formatting-zone lookup per row on the existing clock, and restored the nested
 index-cache source guard. Those corrections are packaged as code 30 / 0.2.24;
 their measurement and delivery identity require their own evidence.
 
+The repeated code-30 cohorts exposed a separate cold-entry race: the drawer gained
+Channels focus, then pending Channels restoration took it back 9.524 ms later.
+Down and Up consequently moved channel rows instead of switching destinations.
+That trace is a failed navigation scenario despite passing transport/trace health.
+Code 31 / 0.2.25 reads the existing TV Material drawer state before scrolling and
+again before the deferred focus request. This closes the interval before
+composition's `drawerActive` feedback updates; the composition and generation
+guards remain in place. It changes no explicit paging or Guide presentation rule.
+
+A focused control reproduces the theft with a stale composition flag and live
+open-drawer state. It passes with the correction, as do the 11 affected production
+navigation tests. Five failures in the older `ChannelsScreenTest` suite also
+reproduce when the P47 Channels focus logic is restored. That control establishes
+neither their product cause nor an all-pass baseline. Their evidence is retained
+for the existing central focus/paging triage; no scope-tab trap repair is included.
+Code-30 review and verification do not certify code 31. Its exact-source checks,
+bounded reviews, higher-version install and cold-first remeasurement are separate
+evidence under the private `candidate31` and `live-drawer31` names.
+
 Remaining cost includes initial Compose construction/text/layout and large
 SDK-derived lookups. The SDK metadata lock itself remains a library concern.
 Retention focus boundaries, current-measure clipping and default versus

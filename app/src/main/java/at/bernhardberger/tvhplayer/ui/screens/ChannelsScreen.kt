@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.tv.material3.Button
+import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
@@ -85,6 +86,7 @@ import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -247,6 +249,7 @@ internal fun ChannelsScreenContent(
     }
 
     val contentEntryEnabled by rememberUpdatedState(initialFocusEnabled)
+    val drawerState = LocalBrowseDrawerState.current
 
     fun requestChannelFocus(channelId: ChannelId, preserveVisiblePosition: Boolean = false): Boolean {
         val index = orderedChannelIds.indexOf(channelId)
@@ -264,6 +267,7 @@ internal fun ChannelsScreenContent(
         isRestoring = true
         restorationJob = coroutineScope.launch {
             try {
+                if (drawerState?.currentValue == DrawerValue.Open) return@launch
                 // Re-entry must not snap an already visible row to the top before
                 // focus's bring-into-view restores it. Explicit paging keeps its policy.
                 if (!preserveVisiblePosition || listState.layoutInfo.visibleItemsInfo.none {
@@ -274,7 +278,11 @@ internal fun ChannelsScreenContent(
                 }
                 if (!listState.awaitVisibleChannel(channelId)) return@launch
                 withFrameNanos { }
-                if (!contentEntryEnabled || restorationGeneration != generation) return@launch
+                // Widget focus changes precede composition's drawerActive feedback.
+                // A queued initial restore must not take focus back in that interval.
+                if (drawerState?.currentValue == DrawerValue.Open ||
+                    !contentEntryEnabled || restorationGeneration != generation
+                ) return@launch
                 if (runCatching(requester::requestFocus).getOrDefault(false)) {
                     focusedChannelId = channelId
                     rememberedChannelIds[tagId] = channelId

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +51,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerValue
+import androidx.tv.material3.DrawerState
 import androidx.tv.material3.Icon
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
@@ -79,6 +81,9 @@ private val ClosedDrawerWidth =
 
 /** Current measure's visible extent from the browse content's logical leading edge. */
 internal val LocalBrowseVisibleWidthPx = compositionLocalOf<Int?> { null }
+
+/** Read the widget's current focus ownership at deferred focus-request time. */
+internal val LocalBrowseDrawerState = staticCompositionLocalOf<DrawerState?> { null }
 
 @Composable
 internal fun SideRail(
@@ -370,10 +375,12 @@ internal fun SideRail(
             },
             content = {
                 BrowseViewport(width = browseWidth) {
-                    content(
-                        TvScreenPadding,
-                        drawerState.currentValue == DrawerValue.Open,
-                    )
+                    CompositionLocalProvider(LocalBrowseDrawerState provides drawerState) {
+                        content(
+                            TvScreenPadding,
+                            drawerState.currentValue == DrawerValue.Open,
+                        )
+                    }
                 }
             },
         )

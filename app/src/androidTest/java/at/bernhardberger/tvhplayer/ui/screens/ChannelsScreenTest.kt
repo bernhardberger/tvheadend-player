@@ -2,13 +2,17 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -32,6 +36,11 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
+import androidx.tv.material3.Button
+import androidx.tv.material3.Text
+import androidx.tv.material3.DrawerValue
+import androidx.tv.material3.rememberDrawerState
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import coil3.ImageLoader
 import org.junit.Assert.assertEquals
@@ -43,6 +52,38 @@ import org.junit.Test
 class ChannelsScreenTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun pendingInitialRestoreDoesNotOverrideLiveDrawerOwnership() {
+        lateinit var updateChannels: (List<Channel>) -> Unit
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                val drawerState = rememberDrawerState(DrawerValue.Open)
+                Column {
+                    Button(onClick = {}) { Text("Drawer focus") }
+                    Box(Modifier.weight(1f)) {
+                        CompositionLocalProvider(LocalBrowseDrawerState provides drawerState) {
+                            TestChannelsContent(
+                                initialChannels = emptyList(),
+                                tags = emptyList(),
+                                initialSelectedId = ChannelId(2),
+                                // Simulate the old composition value before drawer feedback.
+                                initialFocusEnabled = true,
+                                onSelection = {},
+                                onUpdateChannelsReady = { updateChannels = it },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        val drawer = composeRule.onNodeWithText("Drawer focus")
+        drawer.requestFocus().assertIsFocused()
+        composeRule.runOnIdle { updateChannels(channels(1..12)) }
+        composeRule.waitForIdle()
+        row(2).assertExists()
+        drawer.assertIsFocused()
+    }
 
     @Test
     fun initialRestoreUsesLongLazyKeyAndFocusesSelectedChannel() {
