@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 import at.bernhardberger.tvhplayer.profiling.profileViewportItem
 
@@ -192,13 +193,15 @@ internal fun TimelineChannelRow(
     visibleRowWidthPx: Int? = null,
 ) {
     val nowSec = nowSecProvider()
-    ProfileCompositionLifetime("guideRow:$channelIndex")
+    // Share one zone lookup across the row's cells, refreshed on the existing clock.
+    val formattingZone = remember(nowSec) { java.time.ZoneId.systemDefault() }
+    if (BuildConfig.PROFILE_TRACE) ProfileCompositionLifetime("guideRow:$channelIndex")
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(TIMELINE_ROW_HEIGHT)
-            .profileViewportItem("guideRow:$channelIndex:$windowStartSec:${events.size}"),
+            .profileViewportItem { "guideRow:$channelIndex:$windowStartSec:${events.size}" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TimelineChannelHeader(
@@ -247,6 +250,7 @@ internal fun TimelineChannelRow(
                         channel = channel,
                         recording = recordingForEvent(event.id),
                         nowSec = nowSec,
+                        formattingZone = formattingZone,
                         selected = isFocusTarget,
                         focusRequester = focusRequester,
                         onFocused = { onFocused(event) },
@@ -257,7 +261,7 @@ internal fun TimelineChannelRow(
                             .offset(x = start)
                             .width(width)
                             .fillMaxHeight()
-                            .profileViewportItem("guideCell:$channelIndex:${event.id.value}"),
+                            .profileViewportItem { "guideCell:$channelIndex:${event.id.value}" },
                     )
                 }
             }
@@ -348,6 +352,7 @@ internal fun TimelineProgrammeCell(
     channel: Channel,
     recording: DvrEntry?,
     nowSec: Long,
+    formattingZone: java.time.ZoneId,
     selected: Boolean,
     focusRequester: FocusRequester,
     onFocused: () -> Unit,
@@ -362,15 +367,14 @@ internal fun TimelineProgrammeCell(
         event.start.epochSeconds > nowSec -> stringResource(R.string.epg_state_future)
         else -> stringResource(R.string.epg_state_past)
     }
-    // Time labels are independent of selection, recording and the five-second clock.
-    // Keep their formatting environment in the keys so a locale/zone update is live.
+    // Locale is observable; the row refreshes the shared zone on its normal clock.
+    // No standalone time-zone listener or per-cell system lookup is needed here.
     val locale = androidx.compose.ui.platform.LocalLocale.current.platformLocale
-    val zone = java.time.ZoneId.systemDefault()
     val startSec = event.start.epochSeconds
     val stopSec = event.stop.epochSeconds
-    val startDate = remember(startSec, locale, zone) { startSec.formatDateTime() }
-    val startTime = remember(startSec, locale, zone) { formatHm(startSec) }
-    val stopTime = remember(stopSec, locale, zone) { formatHm(stopSec) }
+    val startDate = remember(startSec, locale, formattingZone) { startSec.formatDateTime() }
+    val startTime = remember(startSec, locale, formattingZone) { formatHm(startSec) }
+    val stopTime = remember(stopSec, locale, formattingZone) { formatHm(stopSec) }
     val description = stringResource(
         R.string.epg_cell_description,
         channel.name.orEmpty(),

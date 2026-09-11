@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 
@@ -1586,7 +1587,9 @@ fun EpgGridScreen(
                             },
                             onFocused = { event ->
                                 profileTrace("P44:focus:guide") {
-                                    profileTrace("P48:focus:guide:${channel.id.value}:${event.id.value}") { }
+                                    if (BuildConfig.PROFILE_TRACE) {
+                                        profileTrace("P48:focus:guide:${channel.id.value}:${event.id.value}") { }
+                                    }
                                     programmeFocusOwned = true
                                     selectedTarget = EpgFocusTarget(
                                         channelIndex,

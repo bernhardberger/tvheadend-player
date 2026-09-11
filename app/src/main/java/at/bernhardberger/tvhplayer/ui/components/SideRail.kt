@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
@@ -324,7 +325,7 @@ internal fun SideRail(
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
                                     .onFocusChanged { focusState ->
-                                        if (focusState.isFocused) {
+                                        if (BuildConfig.PROFILE_TRACE && focusState.isFocused) {
                                             profileTrace("P48:sidebarFocus:${item.route.name}") { }
                                         }
                                         if (

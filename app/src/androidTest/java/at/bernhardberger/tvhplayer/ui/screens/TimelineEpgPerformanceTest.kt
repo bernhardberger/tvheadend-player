@@ -107,10 +107,12 @@ class TimelineEpgPerformanceTest {
         val channel = Channel.create(ChannelId(1), name = "Channel", number = 1)
         composeRule.setContent {
             val requester = remember { FocusRequester() }
+            val formattingZone = remember { java.time.ZoneId.systemDefault() }
             TVHeadendPlayerTheme {
                 TimelineProgrammeCell(
                     event = programme.value, channel = channel, recording = null,
                     nowSec = 0, selected = false, focusRequester = requester,
+                    formattingZone = formattingZone,
                     onFocused = {}, onOpenDetails = {}, onMoveFocus = { false },
                     width = 200.dp, modifier = Modifier.width(200.dp).height(76.dp),
                 )
@@ -161,6 +163,7 @@ class TimelineEpgPerformanceTest {
 
         composeRule.setContent {
             val selectedFocus = remember { FocusRequester() }
+            val formattingZone = remember { java.time.ZoneId.systemDefault() }
             TVHeadendPlayerTheme {
                 Box(Modifier.width(600.dp).height(76.dp)) {
                     TimelineProgrammeCell(
@@ -168,6 +171,7 @@ class TimelineEpgPerformanceTest {
                         channel = channel,
                         recording = null,
                         nowSec = 0,
+                        formattingZone = formattingZone,
                         selected = false,
                         focusRequester = selectedFocus,
                         onFocused = {},
@@ -184,6 +188,7 @@ class TimelineEpgPerformanceTest {
                         channel = channel,
                         recording = null,
                         nowSec = 0,
+                        formattingZone = formattingZone,
                         selected = false,
                         focusRequester = selectedFocus,
                         onFocused = {},

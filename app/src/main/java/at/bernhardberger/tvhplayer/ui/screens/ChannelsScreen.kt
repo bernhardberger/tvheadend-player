@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
 import androidx.compose.foundation.focusGroup
@@ -247,7 +248,7 @@ internal fun ChannelsScreenContent(
 
     val contentEntryEnabled by rememberUpdatedState(initialFocusEnabled)
 
-    fun requestChannelFocus(channelId: ChannelId): Boolean {
+    fun requestChannelFocus(channelId: ChannelId, preserveVisiblePosition: Boolean = false): Boolean {
         val index = orderedChannelIds.indexOf(channelId)
         val requester = rowFocusRequesters[channelId]
         if (index < 0 || requester == null) {
@@ -263,7 +264,14 @@ internal fun ChannelsScreenContent(
         isRestoring = true
         restorationJob = coroutineScope.launch {
             try {
-                listState.scrollToItem(index)
+                // Re-entry must not snap an already visible row to the top before
+                // focus's bring-into-view restores it. Explicit paging keeps its policy.
+                if (!preserveVisiblePosition || listState.layoutInfo.visibleItemsInfo.none {
+                        channelLazyItemMatches(it.key, channelId)
+                    }
+                ) {
+                    listState.scrollToItem(index)
+                }
                 if (!listState.awaitVisibleChannel(channelId)) return@launch
                 withFrameNanos { }
                 if (!contentEntryEnabled || restorationGeneration != generation) return@launch
@@ -378,7 +386,7 @@ internal fun ChannelsScreenContent(
                 selectedChannelId = selectedId,
             ) ?: return@LaunchedEffect
             if (selectedId != id) onSelectChannel(id)
-            requestChannelFocus(id)
+            requestChannelFocus(id, preserveVisiblePosition = true)
             return@LaunchedEffect
         }
 
@@ -551,7 +559,9 @@ internal fun ChannelsScreenContent(
                                     playingNow = status.playingNow,
                                     onFocus = {
                                         profileTrace("P44:focus:channel") {
-                                            profileTrace("P48:focus:channel:${channelId.value}") { }
+                                            if (BuildConfig.PROFILE_TRACE) {
+                                                profileTrace("P48:focus:channel:${channelId.value}") { }
+                                            }
                                             focusedChannelId = channelId
                                             rememberedChannelIds[channelScope.activeTagId] = channelId
                                             contentFocusOwned = true

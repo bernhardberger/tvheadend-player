@@ -93,6 +93,16 @@ changes are not presented as key-entry proof. The production Guide early-Right
 test supplies that separate proof. Existing physical scope-tab trap restrictions
 remain in force.
 
+Independent review found a drawer re-entry viewport defect. A settled-only test
+passed, but a frame-stepped control caught a 179 px transient jump before focus's
+bring-into-view restored the position. Re-entry now preserves an already visible
+row's position; explicit paging retains its existing scroll policy. The corrected
+11-test production fixture and seven geometry/rendering tests pass. Review also
+removed eager diagnostic-name construction from ordinary builds, shared the
+formatting-zone lookup per row on the existing clock, and restored the nested
+index-cache source guard. Those corrections are packaged as code 30 / 0.2.24;
+their measurement and delivery identity require their own evidence.
+
 Remaining cost includes initial Compose construction/text/layout and large
 SDK-derived lookups. The SDK metadata lock itself remains a library concern.
 Retention focus boundaries, current-measure clipping and default versus

@@ -41,19 +41,20 @@ internal fun Modifier.profileRouteDraw(route: String, drawerActive: Boolean): Mo
 }
 
 /** Raw and ancestor-clipped geometry plus actual child draw; never writes layout state. */
-internal fun Modifier.profileViewportItem(region: String): Modifier {
+internal inline fun Modifier.profileViewportItem(region: () -> String): Modifier {
     if (!BuildConfig.PROFILE_TRACE) return this
+    val name = region()
     return onGloballyPositioned { coordinates ->
         val origin = coordinates.positionInWindow()
         val clipped = coordinates.boundsInWindow()
         profileTrace(
-            "P48:bounds:$region:${origin.x.toInt()},${origin.y.toInt()}," +
+            "P48:bounds:$name:${origin.x.toInt()},${origin.y.toInt()}," +
                 "${coordinates.size.width},${coordinates.size.height}:" +
                 "${clipped.left.toInt()},${clipped.top.toInt()}," +
                 "${clipped.right.toInt()},${clipped.bottom.toInt()}",
         ) { }
     }.drawWithContent {
         drawContent()
-        profileTrace("P48:itemDraw:$region") { }
+        profileTrace("P48:itemDraw:$name") { }
     }
 }

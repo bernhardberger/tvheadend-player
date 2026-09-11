@@ -42,6 +42,32 @@ class SidebarGuideNavigationTest {
     @get:Rule val compose = createAndroidComposeRule<JourneyProfileActivity>()
     private val focusHistory = mutableListOf<String>()
 
+    @Test fun channelViewportSurvivesDrawerRoundTripWithAMiddleRowSelected() {
+        compose.waitForIdle()
+        repeat(2) { key(Key.DirectionDown) }
+        val middleRow = hasText("Offline channel 3", substring = true) and isFocused()
+        val before = compose.onNode(middleRow).fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithText(channelTitleText(1, "Offline channel 1")).assertIsDisplayed()
+        key(Key.DirectionLeft)
+        compose.onNodeWithText("Channels").assertIsFocused()
+        compose.mainClock.autoAdvance = false
+        try {
+            key(Key.DirectionRight)
+            repeat(30) {
+                compose.mainClock.advanceTimeByFrame()
+                val top = compose.onNode(
+                    hasText("Offline channel 3", substring = true) and hasClickAction(),
+                ).fetchSemanticsNode().boundsInRoot.top
+                assertEquals("drawer return frame $it preserves the channel viewport", before.top, top, 1f)
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.onNode(middleRow).assertIsFocused()
+        val after = compose.onNode(middleRow).fetchSemanticsNode().boundsInRoot
+        assertEquals("drawer return preserves the channel viewport", before.top, after.top, 1f)
+    }
+
     @Test fun guideNumbersFollowMetadataAndFilteredScopeWithinTheSameVisit() {
         openGuideSidebar()
         val entries = compose.activity.guideCompositionEntries
