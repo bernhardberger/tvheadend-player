@@ -324,11 +324,13 @@ internal fun SideRail(
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
                                     .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            profileTrace("P48:sidebarFocus:${item.route.name}") { }
+                                        }
                                         if (
                                             drawerValue == DrawerValue.Open &&
                                             focusState.isFocused
                                         ) {
-                                            profileTrace("P48:sidebarFocus:${item.route.name}") { }
                                             requestRoute(item.route)
                                         }
                                     },
