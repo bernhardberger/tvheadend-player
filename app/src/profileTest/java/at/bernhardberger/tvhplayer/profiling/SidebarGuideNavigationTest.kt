@@ -1,6 +1,12 @@
 package at.bernhardberger.tvhplayer.profiling
 
 import android.view.KeyEvent
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.requestFocus
+import java.io.File
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -193,6 +199,83 @@ class SidebarGuideNavigationTest {
         openGuideSidebar()
         key(Key.DirectionRight)
         compose.onNode(hasText("All channels") and isFocused()).assertIsFocused().assertIsSelected()
+    }
+
+    @Test fun guideScopeReversalsRemainCoherentAndDownEntersSelectedScope() =
+        assertBrowseScopeEntry(guide = true, Key.DirectionDown)
+
+    @Test fun guideScopeReversalsRemainCoherentAndOkEntersSelectedScope() =
+        assertBrowseScopeEntry(guide = true, Key.DirectionCenter)
+
+    @Test fun channelsScopeReversalsRemainCoherentAndDownEntersSelectedScope() =
+        assertBrowseScopeEntry(guide = false, Key.DirectionDown)
+
+    @Test fun channelsScopeReversalsRemainCoherentAndOkEntersSelectedScope() =
+        assertBrowseScopeEntry(guide = false, Key.DirectionCenter)
+
+    @Test fun channelsTagFocusCommitsSelectionAcrossRepeatedReversals() {
+        compose.waitUntilAtLeastOneExists(hasText("Offline channel 1", substring = true), 15_000)
+        compose.onNodeWithText("All channels").requestFocus()
+        key(Key.DirectionRight)
+        repeat(10) {
+            compose.waitUntilExactlyOneExists(hasText("Group A") and isFocused() and isSelected(), 5_000)
+            key(Key.DirectionRight)
+            compose.waitUntilExactlyOneExists(hasText("Group B") and isFocused() and isSelected(), 5_000)
+            key(Key.DirectionLeft)
+        }
+        compose.waitUntilExactlyOneExists(hasText("Group A") and isFocused() and isSelected(), 5_000)
+    }
+
+    private fun assertBrowseScopeEntry(guide: Boolean, entryKey: Key) {
+        if (guide) {
+            openGuideSidebar()
+            key(Key.DirectionRight)
+        } else {
+            compose.waitUntilAtLeastOneExists(hasText("Offline channel 1", substring = true), 15_000)
+            compose.onNodeWithText("All channels").requestFocus()
+        }
+        compose.onNode(hasText("All channels") and isFocused()).assertIsSelected()
+        compose.mainClock.autoAdvance = false
+        try {
+            val journey = listOf(
+                Key.DirectionRight to "Group A", Key.DirectionRight to "Group B",
+                Key.DirectionLeft to "Group A", Key.DirectionRight to "Group B",
+                Key.DirectionLeft to "Group A",
+            )
+            journey.forEachIndexed { step, (direction, label) ->
+                compose.onRoot().performKeyInput { keyDown(direction); keyUp(direction) }
+                repeat(4) { frame ->
+                    compose.mainClock.advanceTimeByFrame()
+                    val tab = compose.onNode(hasText(label) and isFocused())
+                    tab.assertIsFocused()
+                    val pixels = tab.captureToImage().toPixelMap()
+                    val pill = pixels[pixels.width / 2, pixels.height / 5]
+                    assertTrue("Focused scope pill must accompany selection at $step/$frame", pill.red > 0.85f && pill.green > 0.85f && pill.blue > 0.85f)
+                    if (frame == 1 || frame == 3) {
+                        val context = InstrumentationRegistry.getInstrumentation().targetContext
+                        val directory = File(context.getExternalFilesDir(null), "p49-guide-motion").apply { mkdirs() }
+                        File(directory, "guide-$guide-entry-$entryKey-step-$step-frame-$frame.png").outputStream().use {
+                            assertTrue(compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it))
+                        }
+                    }
+                }
+                // Focus styling is synchronous; persisted scope selection reaches the
+                // composable through DataStore/Flow. Check that commit independently
+                // without skipping the intermediate focus frames above.
+                compose.mainClock.autoAdvance = true
+                compose.waitUntilExactlyOneExists(hasText(label) and isFocused() and isSelected(), 5_000)
+                compose.mainClock.autoAdvance = false
+            }
+            compose.onRoot().performKeyInput { keyDown(entryKey); keyUp(entryKey) }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        if (guide) {
+            assertTrue("Selected Group A must enter channel 2 programme: ${focusedDescription()}", focusedDescription().startsWith("Offline channel 2,"))
+        } else {
+            compose.onNode(hasText("Offline channel 2", substring = true) and isFocused()).assertIsFocused()
+        }
     }
 
     @Test fun firstGuideRightDuringDrawerOpeningReachesItsSelectedScope() {

@@ -1,11 +1,15 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +20,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -83,6 +89,9 @@ fun ChannelTagSelector(
     )
     TabRow(
         selectedTabIndex = activeIndex,
+        // A travelling pill changes position after Tab has already changed its foreground.
+        // Draw each pill with its label from the same focus state instead.
+        indicator = { _, _ -> },
         modifier = modifier
             .fillMaxWidth()
             .focusRestorer(activeFocusRequester)
@@ -111,8 +120,10 @@ fun ChannelTagSelector(
             ),
     ) {
         scopes.forEachIndexed { index, (tagId, label) ->
+            var focused by remember(tagId) { mutableStateOf(false) }
+            val selected = index == activeIndex
             Tab(
-                selected = index == activeIndex,
+                selected = selected,
                 onFocus = {
                     onTagFocus()
                     edgeFadeState.updateFocusedIndex(index)
@@ -124,6 +135,15 @@ fun ChannelTagSelector(
                 },
                 colors = tabColors,
                 modifier = Modifier
+                    .onFocusChanged { focused = it.isFocused }
+                    .background(
+                        color = when {
+                            focused -> scheme.onSurface
+                            selected -> scheme.secondaryContainer.copy(alpha = 0.4f)
+                            else -> Color.Transparent
+                        },
+                        shape = RoundedCornerShape(50),
+                    )
                     .onGloballyPositioned { coordinates ->
                         edgeFadeState.updateTabBounds(index, coordinates)
                     }
@@ -137,6 +157,11 @@ fun ChannelTagSelector(
             ) {
                 Text(
                     text = label,
+                    color = when {
+                        focused -> scheme.inverseOnSurface
+                        selected -> scheme.onSurface
+                        else -> scheme.onSurface.copy(alpha = TvTextSecondaryAlpha)
+                    },
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

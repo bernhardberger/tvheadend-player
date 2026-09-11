@@ -20,6 +20,8 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -56,9 +58,11 @@ import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
 import coil3.ImageLoader
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -272,6 +276,431 @@ class RecordingsScreenTest {
         dispatchBack()
         composeRule.onNodeWithTag("recording-details-delete").assertIsFocused()
     }
+
+    @Test
+    fun folderReplacementKeepsListOwnershipInProductionDrawer() {
+        val state = RecordingsScreenState()
+        val entries = (1..20).map {
+            recording(id = it, title = "Episode $it", path = "Series/Season/episode-$it.ts")
+        }
+        var drawerActive = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true,
+                    onRootBack = {},
+                    onNavigate = {},
+                ) { padding, active ->
+                    androidx.compose.runtime.SideEffect { drawerActive = active }
+                    TestRecordingsScreen(
+                        entries = entries,
+                        contentPadding = padding,
+                        initialFocusEnabled = !active,
+                        backEnabled = !active,
+                        state = state,
+                    )
+                }
+            }
+        }
+        waitForFocus("recordings-folder-Series")
+        composeRule.mainClock.autoAdvance = false
+        try {
+            for (folder in listOf("Series", "Series/Season")) {
+                captureBrowseFrame(composeRule.onRoot(), "folder-entry-${folder.replace('/', '-')}-start")
+                composeRule.onNodeWithTag("recordings-folder-$folder").pressCenter()
+                repeat(12) { frame ->
+                    composeRule.mainClock.advanceTimeByFrame()
+                    composeRule.runOnIdle { assertFalse("Drawer opened during $folder replacement", drawerActive) }
+                    assertArchiveListOwnsFocus()
+                    if (frame in listOf(0, 2, 5, 11)) {
+                        captureBrowseFrame(composeRule.onRoot(), "folder-entry-${folder.replace('/', '-')}-frame-$frame")
+                    }
+                }
+            }
+            composeRule.runOnIdle { assertEquals(listOf("Series", "Season"), state.archivePath.value) }
+            composeRule.onAllNodes(isFocused()).assertCountEquals(1)
+            dispatchBack()
+            repeat(12) { frame ->
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { assertFalse("Drawer opened during folder Back", drawerActive) }
+                assertArchiveListOwnsFocus()
+                if (frame in listOf(0, 2, 5, 11)) captureBrowseFrame(composeRule.onRoot(), "folder-back-frame-$frame")
+            }
+            composeRule.onNodeWithTag("recordings-folder-Series/Season").assertIsFocused()
+            composeRule.runOnIdle { assertEquals(listOf("Series"), state.archivePath.value) }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun assertArchiveListOwnsFocus() {
+        val focused = composeRule.onAllNodes(isFocused()).fetchSemanticsNodes().single()
+        val list = composeRule.onNodeWithTag("recordings-archive-list").fetchSemanticsNode().boundsInRoot
+        assertTrue("Focus must stay in the archive list or its transition container",
+            focused.boundsInRoot.center.x in list.left..list.right &&
+                focused.boundsInRoot.center.y in list.top..list.bottom)
+    }
+
+    @Test
+    fun archivePagingMotionKeepsDirectionThroughFocusHandoff() = assertArchivePagingMotion(inFolder = false)
+
+    @Test
+    fun scrolledFolderBackRestoresViewportThenRootBackReturnsToDrawer() {
+        val state = RecordingsScreenState()
+        val entries = (1..20).map {
+            recording(id = it, title = "Episode $it", path = "Folder ${it.toString().padStart(2, '0')}/episode.ts")
+        }
+        var drawerActive = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                var shellBack by remember { mutableStateOf<() -> Unit>({}) }
+                androidx.activity.compose.BackHandler { shellBack() }
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onBackHandlerChanged = { shellBack = it },
+                ) { padding, active ->
+                    androidx.compose.runtime.SideEffect { drawerActive = active }
+                    TestRecordingsScreen(entries = entries, contentPadding = padding,
+                        initialFocusEnabled = !active, backEnabled = !active, state = state)
+                }
+            }
+        }
+        waitForFocus("recordings-folder-Folder 01")
+        repeat(14) { composeRule.onAllNodes(isFocused())[0].performKeyInput { pressKey(Key.DirectionDown) } }
+        val folder = composeRule.onNodeWithTag("recordings-folder-Folder 15").assertIsFocused()
+        val beforeTop = folder.fetchSemanticsNode().boundsInRoot.top
+        val beforeIndex = state.archiveScrollPositions["archive:"]
+        val beforeOffset = state.archiveScrollOffsets["archive:"]
+        assertTrue("Fixture must have a scrolled parent", requireNotNull(beforeIndex) > 0)
+        captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-parent-before")
+        folder.pressCenter()
+        waitForFocus("recording-list-entry-15")
+        captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-child")
+        dispatchBack()
+        waitForFocus("recordings-folder-Folder 15")
+        composeRule.runOnIdle {
+            assertFalse(drawerActive)
+            assertEquals(beforeIndex, state.archiveScrollPositions["archive:"])
+            assertEquals(beforeOffset, state.archiveScrollOffsets["archive:"])
+        }
+        assertEquals(beforeTop, folder.fetchSemanticsNode().boundsInRoot.top, 1f)
+        captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-parent-restored")
+        dispatchBack()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertTrue("Root Back retains shell behavior", drawerActive) }
+    }
+
+    @Test
+    fun lastRecordingRemovalKeepsDeterministicLocalFocusInsideDrawer() = assertLastRemovalFocus(drawerOwnsFocus = false)
+
+    @Test
+    fun retainedFolderBackInScheduleReturnsToDrawer() = assertFolderBackInOtherMode(1)
+
+    @Test
+    fun retainedFolderBackInProblemsReturnsToDrawer() = assertFolderBackInOtherMode(2)
+
+    @Test
+    fun queuedFolderBackIsCancelledOnScheduleEntry() = assertFolderBackInOtherMode(1, queueBack = true)
+
+    @Test
+    fun queuedFolderBackIsCancelledOnProblemsEntry() = assertFolderBackInOtherMode(2, queueBack = true)
+
+    private fun assertFolderBackInOtherMode(modeSteps: Int, queueBack: Boolean = false) {
+        val state = RecordingsScreenState()
+        var drawerActive = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                var shellBack by remember { mutableStateOf<() -> Unit>({}) }
+                BackHandler { shellBack() }
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                    onBackHandlerChanged = { shellBack = it },
+                ) { padding, active ->
+                    androidx.compose.runtime.SideEffect { drawerActive = active }
+                    TestRecordingsScreen(
+                        entries = listOf(recording(id = 1, title = "First", path = "Series/Season/first.ts")),
+                        contentPadding = padding, initialFocusEnabled = !active,
+                        backEnabled = !active, state = state,
+                    )
+                }
+            }
+        }
+        waitForFocus("recordings-folder-Series")
+        composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
+        waitForFocus("recordings-folder-Series/Season")
+        composeRule.onNodeWithTag("recordings-folder-Series/Season").pressCenter()
+        waitForFocus("recording-list-entry-1")
+        composeRule.mainClock.autoAdvance = !queueBack
+        try {
+            if (queueBack) dispatchBack()
+            composeRule.onAllNodes(isFocused())[0].performKeyInput {
+                keyDown(Key.DirectionUp); keyUp(Key.DirectionUp)
+                repeat(modeSteps) { keyDown(Key.DirectionRight); keyUp(Key.DirectionRight) }
+            }
+            if (queueBack) repeat(12) { composeRule.mainClock.advanceTimeByFrame() }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.onNodeWithText(if (modeSteps == 1) "Schedule" else "Problems").assertIsFocused()
+        composeRule.runOnIdle {
+            assertFalse(drawerActive)
+            assertEquals(listOf("Series", "Season"), state.archivePath.value)
+        }
+        dispatchBack()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertTrue("Non-Archive Back belongs to the shell", drawerActive) }
+    }
+
+    @Test
+    fun removedChildWhileScheduleActiveReturnsToSurvivingParent() = assertInactiveFolderRemoval(1)
+
+    @Test
+    fun removedChildWhileProblemsActiveReturnsToSurvivingParent() = assertInactiveFolderRemoval(2)
+
+    private fun assertInactiveFolderRemoval(modeSteps: Int) {
+        val remaining = recording(id = 2, title = "Remaining", path = "Series/remaining.ts")
+        val entries = mutableStateOf(listOf(
+            recording(id = 1, title = "First", path = "Series/Season/first.ts"), remaining,
+        ))
+        val state = RecordingsScreenState()
+        var drawerActive = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                ) { padding, active ->
+                    androidx.compose.runtime.SideEffect { drawerActive = active }
+                    TestRecordingsScreen(entries = entries.value, contentPadding = padding,
+                        initialFocusEnabled = !active, backEnabled = !active, state = state)
+                }
+            }
+        }
+        waitForFocus("recordings-folder-Series")
+        composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
+        waitForFocus("recordings-folder-Series/Season")
+        composeRule.onNodeWithTag("recordings-folder-Series/Season").pressCenter()
+        waitForFocus("recording-list-entry-1")
+        composeRule.onAllNodes(isFocused())[0].performKeyInput {
+            pressKey(Key.DirectionUp)
+            repeat(modeSteps) { pressKey(Key.DirectionRight) }
+        }
+        composeRule.onNodeWithText(if (modeSteps == 1) "Schedule" else "Problems").assertIsFocused()
+        composeRule.runOnIdle { entries.value = listOf(remaining) }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertFalse(drawerActive)
+            assertEquals(listOf("Series"), state.archivePath.value)
+        }
+        composeRule.onAllNodes(isFocused())[0].performKeyInput {
+            repeat(modeSteps) { pressKey(Key.DirectionLeft) }
+            pressKey(Key.DirectionDown)
+        }
+        waitForFocus("recording-list-entry-2")
+        dispatchBack()
+        waitForFocus("recordings-folder-Series")
+        composeRule.runOnIdle {
+            assertFalse(drawerActive)
+            assertTrue(state.archivePath.value.isEmpty())
+        }
+    }
+
+    @Test
+    fun lastRecordingRemovalDoesNotStealExistingDrawerFocus() = assertLastRemovalFocus(drawerOwnsFocus = true)
+
+    @Test
+    fun queuedFolderEntrySurvivesLastRecordingRemoval() =
+        assertLastRemovalFocus(drawerOwnsFocus = false, queueFolderEntry = true)
+
+    @Test
+    fun upDuringFolderEntryCancelsHandoffAcrossCatalogueUpdate() {
+        val entries = mutableStateOf(listOf(recording(id = 1, title = "First", path = "Series/first.ts")))
+        val state = RecordingsScreenState()
+        var drawerActive = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                ) { padding, active ->
+                    androidx.compose.runtime.SideEffect { drawerActive = active }
+                    TestRecordingsScreen(entries = entries.value, contentPadding = padding,
+                        initialFocusEnabled = !active, backEnabled = !active, state = state)
+                }
+            }
+        }
+        waitForFocus("recordings-folder-Series")
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
+            composeRule.mainClock.advanceTimeUntil(timeoutMillis = 500) {
+                state.archivePath.value == listOf("Series") && state.selectedKeys["archive:Series"] != null
+            }
+            composeRule.onAllNodes(hasTestTag("recording-list-entry-1") and isFocused()).assertCountEquals(0)
+            composeRule.onAllNodes(isFocused())[0].performKeyInput {
+                keyDown(Key.DirectionUp); keyUp(Key.DirectionUp)
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.onNodeWithText("Archive").assertIsFocused()
+            composeRule.runOnIdle {
+                entries.value += recording(id = 2, title = "Second", path = "Series/second.ts")
+            }
+            repeat(12) { composeRule.mainClock.advanceTimeByFrame() }
+            composeRule.onNodeWithText("Archive").assertIsFocused()
+            composeRule.runOnIdle { assertFalse(drawerActive) }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun assertLastRemovalFocus(drawerOwnsFocus: Boolean, queueFolderEntry: Boolean = false) {
+        val entries = mutableStateOf(listOf(recording(id = 1, title = "Last recording",
+            path = if (queueFolderEntry) "Series/last.ts" else "last.ts")))
+        var drawerActive = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                ) { padding, active ->
+                    androidx.compose.runtime.SideEffect { drawerActive = active }
+                    TestRecordingsScreen(entries = entries.value, contentPadding = padding,
+                        initialFocusEnabled = !active, backEnabled = !active)
+                }
+            }
+        }
+        waitForFocus(if (queueFolderEntry) "recordings-folder-Series" else "recording-list-entry-1")
+        if (drawerOwnsFocus) {
+            composeRule.onAllNodes(isFocused())[0].performKeyInput { pressKey(Key.DirectionLeft) }
+            composeRule.runOnIdle { assertTrue(drawerActive) }
+        }
+        composeRule.mainClock.autoAdvance = !queueFolderEntry
+        try {
+            if (queueFolderEntry) composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
+            composeRule.runOnIdle { entries.value = emptyList() }
+            if (queueFolderEntry) repeat(12) { composeRule.mainClock.advanceTimeByFrame() }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals("Removal must retain the current focus region", drawerOwnsFocus, drawerActive) }
+        if (!drawerOwnsFocus) composeRule.onNodeWithText("Archive").assertIsFocused()
+    }
+
+    @Test
+    fun focusedRecordingRemovalWithinFolderRetainsLocalRemainingRow() = assertFolderRemoval("Series/second.ts")
+
+    @Test
+    fun removedFolderReturnsToSurvivingParentWithLocalFocus() = assertFolderRemoval("second.ts")
+
+    private fun assertFolderRemoval(remainingPath: String) {
+        val remaining = recording(id = 2, title = "Second", path = remainingPath)
+        val entries = mutableStateOf(listOf(recording(id = 1, title = "First", path = "Series/first.ts"), remaining))
+        val state = RecordingsScreenState()
+        var drawerActive = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                ) { padding, active ->
+                    androidx.compose.runtime.SideEffect { drawerActive = active }
+                    TestRecordingsScreen(entries = entries.value, contentPadding = padding,
+                        initialFocusEnabled = !active, backEnabled = !active, state = state)
+                }
+            }
+        }
+        waitForFocus("recordings-folder-Series")
+        composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
+        waitForFocus("recording-list-entry-1")
+        composeRule.runOnIdle { entries.value = listOf(remaining) }
+        waitForFocus("recording-list-entry-2")
+        composeRule.runOnIdle {
+            assertFalse(drawerActive)
+            assertEquals(if (remainingPath.contains('/')) listOf("Series") else emptyList<String>(), state.archivePath.value)
+        }
+    }
+
+    @Test
+    fun childFolderPagingMotionKeepsDirectionThroughFocusHandoff() = assertArchivePagingMotion(inFolder = true)
+
+    private fun assertArchivePagingMotion(inFolder: Boolean) {
+        val entries = (1..23).map {
+            recording(id = it, title = "Episode %02d".format(it), path = "${if (inFolder) "Series/" else ""}episode-$it.ts")
+        }
+        composeRule.setContent {
+            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
+        }
+        if (inFolder) {
+            waitForFocus("recordings-folder-Series")
+            composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            fun page(direction: Int, name: String, frames: Int = 100): Int {
+                var previous = recordingRowTops()
+                captureBrowseFrame(composeRule.onRoot(), "recordings-folder-$inFolder-$name-start")
+                composeRule.onRoot().performKeyInput {
+                    val key = Key(if (direction > 0) KeyEvent.KEYCODE_CHANNEL_DOWN else KeyEvent.KEYCODE_CHANNEL_UP)
+                    keyDown(key)
+                    keyUp(key)
+                }
+                var movingFrames = 0
+                repeat(frames) { frame ->
+                    composeRule.mainClock.advanceTimeByFrame()
+                    val current = recordingRowTops()
+                    val deltas = current.mapNotNull { (id, top) -> previous[id]?.let { top - it } }
+                    assertTrue("folder=$inFolder direction=$direction frame=$frame previous=$previous current=$current", deltas.all { it * direction <= 1f })
+                    if (deltas.any { it * direction < -1f }) movingFrames++
+                    if (frame in listOf(2, 5, 10, 20, frames - 1)) {
+                        captureBrowseFrame(composeRule.onRoot(), "recordings-folder-$inFolder-$name-frame-$frame")
+                    }
+                    previous = current
+                }
+                return movingFrames
+            }
+            fun focusedId() = composeRule.onAllNodes(isFocused()).fetchSemanticsNodes().single()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.TestTag].removePrefix("recording-list-entry-").toInt()
+            val first = focusedId()
+            val last = if (first == 1) 23 else 1
+            for (direction in listOf(1, -1)) {
+                val end = if (direction > 0) last else first
+                var pages = 0
+                var movingPages = 0
+                while (focusedId() != end && pages < 10) {
+                    val before = focusedId()
+                    if (page(direction, "direction-$direction-page-${pages++}") >= 3) movingPages++
+                    assertTrue("Page must advance focus", focusedId() != before)
+                }
+                assertEquals(end, focusedId())
+                assertTrue("Multiple pages must visibly move", movingPages >= 2)
+                if (direction > 0) {
+                    assertTrue("Up must be moving before interruption", page(-1, "interrupted-up", 8) >= 3)
+                    assertTrue("Down reversal must visibly move rows up", page(1, "reverse-down") >= 3)
+                    assertEquals(last, focusedId())
+                }
+            }
+            assertTrue("Down must be moving before interruption", page(1, "interrupted-down", 8) >= 3)
+            assertTrue("Reversal must visibly move upward-page rows down", page(-1, "reverse-up") >= 3)
+            assertEquals(first, focusedId())
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun recordingRowTops(): Map<String, Float> = composeRule
+        .onAllNodes(androidx.compose.ui.test.SemanticsMatcher("recording row") {
+            it.config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.TestTag) { "" }
+                .startsWith("recording-list-entry-")
+        }).fetchSemanticsNodes().filter {
+            composeRule.onNodeWithTag(it.config[androidx.compose.ui.semantics.SemanticsProperties.TestTag]).isDisplayed()
+        }.associate {
+            it.config[androidx.compose.ui.semantics.SemanticsProperties.TestTag] to it.boundsInRoot.top
+        }
 
     @Test
     fun replacementSessionCannotConfirmDeleteAgainstACollidingRecordingId() {

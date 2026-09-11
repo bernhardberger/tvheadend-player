@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import kotlin.math.roundToInt
+
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
@@ -181,6 +184,7 @@ fun ChannelsScreen(
     )
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ChannelsScreenContent(
     contentPadding: PaddingValues = PaddingValues(),
@@ -237,6 +241,7 @@ internal fun ChannelsScreenContent(
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
 
     val listState = rememberLazyListState()
+    val bringIntoViewSpec = LocalBringIntoViewSpec.current
     val coroutineScope = rememberCoroutineScope()
 
     fun cancelRestoration() {
@@ -251,7 +256,11 @@ internal fun ChannelsScreenContent(
     val contentEntryEnabled by rememberUpdatedState(initialFocusEnabled)
     val drawerState = LocalBrowseDrawerState.current
 
-    fun requestChannelFocus(channelId: ChannelId, preserveVisiblePosition: Boolean = false): Boolean {
+    fun requestChannelFocus(
+        channelId: ChannelId,
+        preserveVisiblePosition: Boolean = false,
+        animatePage: Boolean = false,
+    ): Boolean {
         val index = orderedChannelIds.indexOf(channelId)
         val requester = rowFocusRequesters[channelId]
         if (index < 0 || requester == null) {
@@ -274,7 +283,18 @@ internal fun ChannelsScreenContent(
                         channelLazyItemMatches(it.key, channelId)
                     }
                 ) {
-                    listState.scrollToItem(index)
+                    if (animatePage) {
+                        val layout = listState.layoutInfo
+                        val rowSize = layout.visibleItemsInfo.firstOrNull()?.size ?: 0
+                        // Finish at the same position focus will request, rather than animating
+                        // to the top and then visibly scrolling backward to the TV focus pivot.
+                        val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                            offset = layout.beforeContentPadding.toFloat(),
+                            size = rowSize.toFloat(),
+                            containerSize = layout.viewportSize.height.toFloat(),
+                        ).roundToInt()
+                        listState.animateScrollToItem(index, focusOffset)
+                    } else listState.scrollToItem(index)
                 }
                 if (!listState.awaitVisibleChannel(channelId)) return@launch
                 withFrameNanos { }
@@ -334,7 +354,7 @@ internal fun ChannelsScreenContent(
         val targetId = channels[targetIndex].id
         contentFocusOwned = true
         onSelectChannel(targetId)
-        requestChannelFocus(targetId)
+        requestChannelFocus(targetId, animatePage = true)
         return true
     }
 
@@ -514,6 +534,7 @@ internal fun ChannelsScreenContent(
                             contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
                             modifier = Modifier
                                 .weight(1f)
+                                .testTag("channels-list")
                                 .focusGroup()
                                 .focusRestorer()
                                 .onPreviewKeyEvent { event ->

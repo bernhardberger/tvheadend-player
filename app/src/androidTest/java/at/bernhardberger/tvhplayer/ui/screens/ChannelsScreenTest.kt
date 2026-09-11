@@ -1,5 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.ui.test.onRoot
+import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsDisplayed
+
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -17,9 +22,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -178,24 +185,55 @@ class ChannelsScreenTest {
             ),
             tags = listOf(news, sports),
             initialSelectedId = ChannelId(1),
-            initialFocusEnabled = false,
         )
-
-        composeRule.onNodeWithText("News").requestFocus().pressDown()
+        waitForFocus(1)
+        composeRule.onNodeWithText("All channels").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithText("News").assertIsFocused().pressDown()
         waitForFocus(1)
         row(1).pressDown()
         row(2).assertIsFocused()
 
-        composeRule.onNodeWithText("Sports").requestFocus().pressDown()
+        composeRule.onNodeWithText("News").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithText("Sports").assertIsFocused().pressDown()
         waitForFocus(3)
-        composeRule.onNodeWithText("News").requestFocus().pressDown()
+        composeRule.onNodeWithText("Sports").requestFocus().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithText("News").assertIsFocused().pressDown()
 
         waitForFocus(2)
         composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 2")
     }
 
     @Test
-    fun rapidTagDownRequestsOnlyRestoreTheLatestScope() {
+    fun channelScopeReversalFramesKeepFocusSelectionAndVisibleScopeTogether() {
+        val news = tag(1, "News")
+        val sports = tag(2, "Sports")
+        setChannelsContent(channels = listOf(channel(1, news.id), channel(2, sports.id)),
+            tags = listOf(news, sports), initialSelectedId = ChannelId(1))
+        waitForFocus(1)
+        composeRule.onNodeWithText("All channels").requestFocus()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            listOf(Key.DirectionRight to "News", Key.DirectionRight to "Sports", Key.DirectionLeft to "News")
+                .forEachIndexed { step, (direction, label) ->
+                    composeRule.onRoot().performKeyInput { keyDown(direction); keyUp(direction) }
+                    repeat(4) { frame ->
+                        composeRule.mainClock.advanceTimeByFrame()
+                        composeRule.onNodeWithText(label).assertIsFocused().assertIsSelected()
+                        row(if (label == "News") 1 else 2).assertIsDisplayed()
+                    }
+                }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun rapidTagDownRequestsOnlyRestoreTheLatestScope() = assertLatestTagEntry(Key.DirectionDown)
+
+    @Test
+    fun rapidTagOkRequestsOnlyRestoreTheLatestScope() = assertLatestTagEntry(Key.DirectionCenter)
+
+    private fun assertLatestTagEntry(entryKey: Key) {
         val news = tag(1, "News")
         val sports = tag(2, "Sports")
         val selections = mutableListOf<ChannelId>()
@@ -203,15 +241,30 @@ class ChannelsScreenTest {
             channels = listOf(channel(1, news.id), channel(2, sports.id)),
             tags = listOf(news, sports),
             initialSelectedId = ChannelId(1),
-            initialFocusEnabled = false,
             onSelection = selections::add,
         )
-
-        composeRule.onNodeWithText("All channels").requestFocus().performKeyInput {
-            pressKey(Key.DirectionRight)
-            pressKey(Key.DirectionDown)
-            pressKey(Key.DirectionRight)
-            pressKey(Key.DirectionDown)
+        waitForFocus(1)
+        composeRule.onNodeWithText("All channels").requestFocus()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNodeWithText("All channels").performKeyInput {
+                keyDown(Key.DirectionRight)
+                keyUp(Key.DirectionRight)
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.onNodeWithText("News").assertIsFocused().performKeyInput {
+                keyDown(entryKey)
+                keyUp(entryKey)
+                keyDown(Key.DirectionRight)
+                keyUp(Key.DirectionRight)
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.onNodeWithText("Sports").assertIsFocused().performKeyInput {
+                keyDown(entryKey)
+                keyUp(entryKey)
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
         }
 
         waitForFocus(2)
@@ -244,8 +297,10 @@ class ChannelsScreenTest {
     @Test
     fun catalogueRemovalDoesNotStealFocusFromActiveTag() {
         lateinit var updateChannels: (List<Channel>) -> Unit
+        val news = tag(1, "News")
         setChannelsContent(
-            channels = channels(1..3),
+            channels = listOf(channel(1, news.id), channel(2, news.id), channel(3, news.id)),
+            tags = listOf(news),
             initialSelectedId = ChannelId(2),
             onUpdateChannelsReady = { updateChannels = it },
         )
@@ -271,7 +326,7 @@ class ChannelsScreenTest {
         waitForFocus(2)
         composeRule.runOnIdle {
             selections.clear()
-            updateChannels(listOf(channel(3), channel(2), channel(1)))
+            updateChannels(listOf(channel(3, number = 1), channel(2), channel(1, number = 3)))
         }
 
         row(2).assertIsFocused()
@@ -302,14 +357,86 @@ class ChannelsScreenTest {
         }
 
         composeRule.runOnIdle {
-            assertTrue(selections.size >= 2)
-            assertTrue(selections[selections.lastIndex - 1].value < selections.last().value)
+            val transitions = selections.filterIndexed { index, id -> index == 0 || id != selections[index - 1] }
+            assertEquals(2, transitions.size)
+            assertTrue(transitions[0].value < transitions[1].value)
         }
         var finalId = 0L
         composeRule.runOnIdle { finalId = selections.last().value }
         waitForFocus(finalId)
         composeRule.onNodeWithTag("channels-detail-channel")
             .assertTextEquals("Channel $finalId")
+    }
+
+    @Test
+    fun pageMotionMovesRowsUpOnDownAndDownOnUpThroughFocusHandoff() {
+        setChannelsContent(channels = channels(1..23), initialSelectedId = ChannelId(1))
+        waitForFocus(1)
+        composeRule.mainClock.autoAdvance = false
+        try {
+            fun page(direction: Int, name: String, frames: Int = 100): Int {
+                var previous = channelRowTops()
+                captureBrowseFrame(composeRule.onRoot(), "channels-$name-start")
+                composeRule.onRoot().performKeyInput {
+                    val key = Key(if (direction > 0) KeyEvent.KEYCODE_CHANNEL_DOWN else KeyEvent.KEYCODE_CHANNEL_UP)
+                    keyDown(key)
+                    keyUp(key)
+                }
+                var movingFrames = 0
+                repeat(frames) { frame ->
+                    composeRule.mainClock.advanceTimeByFrame()
+                    val current = channelRowTops()
+                    val deltas = current.mapNotNull { (id, top) -> previous[id]?.let { top - it } }
+                    assertTrue("direction=$direction frame=$frame previous=$previous current=$current", deltas.all { it * direction <= 1f })
+                    if (deltas.any { it * direction < -1f }) movingFrames++
+                    if (frame in listOf(2, 5, 10, 20, frames - 1)) {
+                        captureBrowseFrame(composeRule.onRoot(), "channels-$name-frame-$frame")
+                    }
+                    previous = current
+                }
+                return movingFrames
+            }
+            fun focusedId() = composeRule.onAllNodes(isFocused()).fetchSemanticsNodes().single()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.TestTag].removePrefix("channel-row-").toInt()
+            for (direction in listOf(1, -1)) {
+                val end = if (direction > 0) 23 else 1
+                var pages = 0
+                var movingPages = 0
+                while (focusedId() != end && pages < 10) {
+                    val before = focusedId()
+                    if (page(direction, "direction-$direction-page-${pages++}") >= 3) movingPages++
+                    assertTrue("Page must advance focus", (focusedId() - before) * direction > 0)
+                }
+                assertEquals(end, focusedId())
+                assertTrue("Multiple pages must visibly move", movingPages >= 2)
+                if (direction > 0) {
+                    assertTrue("Up must be moving before interruption", page(-1, "interrupted-up", 8) >= 3)
+                    assertTrue("Down reversal must visibly move rows up", page(1, "reverse-down") >= 3)
+                    assertEquals(23, focusedId())
+                }
+            }
+            assertTrue("Down must be moving before interruption", page(1, "interrupted-down", 8) >= 3)
+            assertTrue("Reversal must visibly move upward-page rows down", page(-1, "reverse-up") >= 3)
+            assertEquals(1, focusedId())
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        waitForFocus(1)
+    }
+
+    private fun channelRowTops(): Map<String, Float> {
+        val viewport = composeRule.onNodeWithTag("channels-list").fetchSemanticsNode().boundsInRoot
+        return composeRule
+        .onAllNodes(androidx.compose.ui.test.SemanticsMatcher("channel row") {
+            it.config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.TestTag) { "" }
+                .startsWith("channel-row-")
+        }).fetchSemanticsNodes().filter {
+            it.boundsInRoot.height > 0f && it.boundsInRoot.top >= viewport.top &&
+                it.boundsInRoot.top < viewport.bottom &&
+                composeRule.onNodeWithTag(it.config[androidx.compose.ui.semantics.SemanticsProperties.TestTag]).isDisplayed()
+        }.associate {
+            it.config[androidx.compose.ui.semantics.SemanticsProperties.TestTag] to it.boundsInRoot.top
+        }
     }
 
     @Composable
@@ -397,10 +524,10 @@ class ChannelsScreenTest {
 
     private fun channels(ids: IntRange) = ids.map(::channel)
 
-    private fun channel(id: Int, tagId: ChannelTagId? = null) = Channel.create(
+    private fun channel(id: Int, tagId: ChannelTagId? = null, number: Long = id.toLong()) = Channel.create(
         id = ChannelId(id.toLong()),
         name = "Channel $id",
-        number = id.toLong(),
+        number = number,
         tagIds = tagId?.let(::listOf).orEmpty(),
     )
 

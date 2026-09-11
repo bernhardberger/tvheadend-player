@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import kotlin.math.roundToInt
+
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -198,13 +201,15 @@ internal fun RecordingBrowserSurface(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ArchiveList(
     items: List<ArchiveListItem>,
     selectedKey: String?,
     selectedFocus: FocusRequester,
     initialScrollIndex: Int,
-    onScrollChanged: (Int) -> Unit,
+    initialScrollOffset: Int,
+    onScrollChanged: (Int, Int) -> Unit,
     onFocused: (String) -> Unit,
     onMoveToPreview: () -> Unit,
     onOpenFolder: (DvrArchiveFolder) -> Unit,
@@ -217,14 +222,19 @@ internal fun ArchiveList(
         ModeEmptyState(R.string.recordings_archive_empty)
         return
     }
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialScrollIndex,
+        initialFirstVisibleItemScrollOffset = initialScrollOffset,
+    )
     val scope = rememberCoroutineScope()
+    val bringIntoViewSpec = LocalBringIntoViewSpec.current
     var pageFocusJob by remember { mutableStateOf<Job?>(null) }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
     var pendingPageKey by remember { mutableStateOf<String?>(null) }
     val focusTargetKey = recordingFocusTargetKey(items.map { it.key }, pageTargetKey ?: selectedKey)
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collect(onScrollChanged)
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) -> onScrollChanged(index, offset) }
     }
     LazyColumn(
         state = listState,
@@ -265,7 +275,13 @@ internal fun ArchiveList(
                 }
                 pendingPageKey = items[target].key
                 pageFocusJob = scope.launch {
-                    listState.animateScrollToItem(target)
+                    val layout = listState.layoutInfo
+                    val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                        layout.beforeContentPadding.toFloat(),
+                        (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).toFloat(),
+                        layout.viewportSize.height.toFloat(),
+                    ).roundToInt()
+                    listState.animateScrollToItem(target, focusOffset)
                     pageTargetKey = items[target].key
                 }
                 true
@@ -631,6 +647,7 @@ private fun recordingEpisodeMetadata(entry: DvrEntry): String? {
     }.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun RecordingSchedule(
     groups: List<DvrScheduleSection>,
@@ -656,6 +673,7 @@ internal fun RecordingSchedule(
         pageTargetKey ?: selectedKey,
     )
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
+    val bringIntoViewSpec = LocalBringIntoViewSpec.current
     val scope = rememberCoroutineScope()
     var pageFocusJob by remember { mutableStateOf<Job?>(null) }
     val lazyIndexes = remember(groups) {
@@ -712,7 +730,13 @@ internal fun RecordingSchedule(
                 }
                 pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
                 pageFocusJob = scope.launch {
-                    listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id))
+                    val layout = listState.layoutInfo
+                    val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                        layout.beforeContentPadding.toFloat(),
+                        (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
+                        layout.viewportSize.height.toFloat(),
+                    ).roundToInt()
+                    listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
                     pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
                 }
                 true
@@ -755,6 +779,7 @@ internal fun RecordingSchedule(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun RecordingProblems(
     groups: Map<DvrProblemBucket, List<DvrEntry>>,
@@ -774,6 +799,7 @@ internal fun RecordingProblems(
         return
     }
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
+    val bringIntoViewSpec = LocalBringIntoViewSpec.current
     val scope = rememberCoroutineScope()
     var pageFocusJob by remember { mutableStateOf<Job?>(null) }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
@@ -837,7 +863,13 @@ internal fun RecordingProblems(
                 }
                 pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
                 pageFocusJob = scope.launch {
-                    listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id))
+                    val layout = listState.layoutInfo
+                    val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                        layout.beforeContentPadding.toFloat(),
+                        (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
+                        layout.viewportSize.height.toFloat(),
+                    ).roundToInt()
+                    listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
                     pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
                 }
                 true

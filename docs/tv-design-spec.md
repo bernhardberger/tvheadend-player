@@ -178,6 +178,10 @@ Use the smallest treatment that remains unmistakable at ten feet:
 | Tab | — | — | — | pill | none |
 | Player icon button | 1.10 | — | — | yes | 4dp inset from the safe edge |
 
+Channels and Guide scope tabs keep the focused pill and its foreground together
+on every Left/Right transition and reversal. Selection still commits on focus;
+Down or OK enters the selected scope's content.
+
 **A scale value is only valid together with the room its overflow needs.** A
 1.05 scale on a 176dp card overflows 4.4dp per side; the 8dp reservation absorbs
 it. Never raise a scale without checking the container reserves for it — the
@@ -232,6 +236,17 @@ not form a Back stack, but their saved screen and focus state is restored when
 the viewer returns. Remote key dispatch consumes the complete Back key cycle at
 the nearest focused layer; dispatcher-backed handling remains available for
 accessibility and system Back actions without a focused key target.
+
+Recordings archive folders add a local layer: opening a folder retains list
+focus, and Back returns exactly one level to the parent folder row and its saved
+viewport, including scroll offset. Missing items choose a deterministic remaining
+local row; an empty list uses the local mode or recovery action. At the archive
+root, Back retains the global drawer behavior above.
+
+Channels and Recordings page-down reveal later rows from below as outgoing rows
+move upward; page-up reverses this motion. The focus handoff must not scroll back
+against the requested direction. Partial final pages and interrupted reversals
+retain the latest requested target.
 
 ---
 
