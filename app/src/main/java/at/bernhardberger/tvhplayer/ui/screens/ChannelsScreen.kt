@@ -655,11 +655,15 @@ private fun EmptyChannelsState(
     val actionFocus = remember { FocusRequester() }
     val recoveryAction = state.primaryRecoveryAction()
     val hasPrimaryAction = recoveryAction != ConnectionRecoveryAction.NONE
+    val drawerState = LocalBrowseDrawerState.current
+    val contentEntryEnabled by rememberUpdatedState(initialFocusEnabled)
 
     LaunchedEffect(state, initialFocusEnabled, hasPrimaryAction) {
         if (shouldRequestEmptyChannelsAction(initialFocusEnabled, hasPrimaryAction)) {
             withFrameNanos { }
-            actionFocus.requestFocus()
+            if (contentEntryEnabled && drawerState?.currentValue != DrawerValue.Open) {
+                actionFocus.requestFocus()
+            }
         }
     }
 

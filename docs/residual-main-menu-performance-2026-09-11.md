@@ -122,6 +122,22 @@ Code-30 review and verification do not certify code 31. Its exact-source checks,
 bounded reviews, higher-version install and cold-first remeasurement are separate
 evidence under the private `candidate31` and `live-drawer31` names.
 
+All six code-31 cold-first runs preserved the ordered sidebar destinations, but
+both compilation conditions still missed the declared budgets. APK-only maximum
+owner layout was 1292.372 ms (maximum scheduled CPU 1004.329 ms); normal APK+DM
+maximum owner layout was 388.978 ms (272.377 ms CPU). Fast route callbacks did not
+establish complete content: the profile-assisted last-required-row draw lower
+bounds were 441.919, 800.806 and 566.468 ms. One default Guide result was still
+incomplete before reversal. The private `candidate31-matrix.md` retains all six
+runs, inclusive 100 ms counts, ordered results and the remaining evidence limits.
+
+The bounded review also found the same deferred-focus hazard in Channels' empty
+recovery surface. A failing offline control demonstrated that its action button
+could take drawer focus. Code 32 / 0.2.26 applies the same live-drawer check after
+the frame wait. Its focused test verifies both preserving drawer focus and normal
+action focus after the drawer closes. This does not alter the populated-content
+measurement path or resolve the numeric budget misses.
+
 Remaining cost includes initial Compose construction/text/layout and large
 SDK-derived lookups. The SDK metadata lock itself remains a library concern.
 Retention focus boundaries, current-measure clipping and default versus

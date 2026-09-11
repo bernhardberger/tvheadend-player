@@ -33,6 +33,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -83,6 +84,57 @@ class ChannelsScreenTest {
         composeRule.waitForIdle()
         row(2).assertExists()
         drawer.assertIsFocused()
+    }
+
+    @Test
+    fun pendingRecoveryActionDoesNotOverrideLiveDrawerOwnership() {
+        lateinit var showRecovery: () -> Unit
+        lateinit var settleDrawerFeedback: () -> Unit
+        lateinit var closeDrawer: () -> Unit
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                val drawerState = rememberDrawerState(DrawerValue.Open)
+                var connectionState by remember {
+                    mutableStateOf<ConnectionUiState>(ConnectionUiState.Connecting)
+                }
+                var initialFocusEnabled by remember { mutableStateOf(true) }
+                SideEffect {
+                    showRecovery = { connectionState = ConnectionUiState.NeedsConfiguration }
+                    settleDrawerFeedback = { initialFocusEnabled = false }
+                    closeDrawer = {
+                        drawerState.setValue(DrawerValue.Closed)
+                        initialFocusEnabled = true
+                    }
+                }
+                Column {
+                    Button(onClick = {}) { Text("Drawer focus") }
+                    Box(Modifier.weight(1f)) {
+                        CompositionLocalProvider(LocalBrowseDrawerState provides drawerState) {
+                            TestChannelsContent(
+                                initialChannels = emptyList(),
+                                tags = emptyList(),
+                                initialSelectedId = null,
+                                initialFocusEnabled = initialFocusEnabled,
+                                connectionUiState = connectionState,
+                                onSelection = {},
+                                onUpdateChannelsReady = {},
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        val drawer = composeRule.onNodeWithText("Drawer focus")
+        drawer.requestFocus().assertIsFocused()
+        composeRule.runOnIdle { showRecovery() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.open_connection_settings))
+            .assertExists()
+        drawer.assertIsFocused()
+        composeRule.runOnIdle { settleDrawerFeedback() }
+        composeRule.runOnIdle { closeDrawer() }
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.open_connection_settings))
+            .assertIsFocused()
     }
 
     @Test
@@ -266,6 +318,7 @@ class ChannelsScreenTest {
         tags: List<ChannelTag>,
         initialSelectedId: ChannelId?,
         initialFocusEnabled: Boolean,
+        connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
         onSelection: (ChannelId) -> Unit,
         onUpdateChannelsReady: ((List<Channel>) -> Unit) -> Unit,
     ) {
@@ -293,7 +346,7 @@ class ChannelsScreenTest {
             selectedId = selectedId,
             imageLoader = imageLoader,
             playingChannelId = null,
-            connectionUiState = ConnectionUiState.Ready,
+            connectionUiState = connectionUiState,
             onSelectChannel = {
                 selectedId = it
                 onSelection(it)
