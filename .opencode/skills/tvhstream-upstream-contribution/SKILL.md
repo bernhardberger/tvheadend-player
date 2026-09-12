@@ -55,4 +55,7 @@ exact commit graph and proposed range. Preserve published appliance history.
 8. Summarize behavior, tests, and any Android-device evidence without exposing
    private runtime data.
 
-Publishing a branch or opening a pull request requires explicit user approval.
+Publishing a branch or opening a pull request must be covered by the operator's
+task or applicable standing/package authority and the upstream-ready gate.
+Existing authorization need not be requested again; it does not cover unrelated
+remotes or product/appliance contributions to the predecessor.

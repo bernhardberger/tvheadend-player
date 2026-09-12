@@ -7,7 +7,7 @@ description: Use ONLY as the TVHeadend Player product overlay for Compose UI, Ma
 
 This is a product overlay, not a general Compose implementation guide. Treat
 `docs/tv-design-spec.md` as the normative visual and interaction specification.
-Read its current contents and the TV interaction floor in `AGENTS.md` before
+Read its relevant sections and apply the TV interaction floor in `AGENTS.md` before
 making a UI decision; do not copy token values or mutable screen rules into this
 skill. The dated skills audit is provenance, not mandatory implementation
 context; the durable caveats are stated below.
@@ -18,18 +18,22 @@ Use the following router only for unresolved implementation questions. Read the
 smallest relevant skill, not every skill associated with a touched file:
 
 - Focus movement, requesters, restoration, or key handling:
-  `compose-focus-navigation` and `compose-side-effects`; add
-  `compose-ui-testing-patterns` for changed behavior.
-- State ownership or a screen/content boundary: `compose-state-hoisting`,
-  `compose-state-holder-ui-split`, and `compose-side-effects`.
-- Flow collection or coroutine ownership: `kotlin-flow-state-event-modeling`,
-  `kotlin-coroutines-structured-concurrency`, and `compose-side-effects`.
-- A reusable component API or variable visual region:
-  `compose-modifier-and-layout-style` and `compose-slot-api-pattern`.
+  `compose-focus-navigation`; use `compose-side-effects` for effect-driven requests.
+- State ownership: `compose-state-hoisting`; screen/content wiring and rendering
+  boundaries: `compose-state-holder-ui-split`.
+- Flow state/event semantics: `kotlin-flow-state-event-modeling`; coroutine scope,
+  cancellation or suspend exception handling: `kotlin-coroutines-structured-concurrency`;
+  composable effect lifetimes or collection: `compose-side-effects`.
+- Layout/modifier APIs: `compose-modifier-and-layout-style`; variable visual
+  regions in a reusable component: `compose-slot-api-pattern`.
 - Animation: `compose-animations`; add performance skills only when measurement
   identifies a recomposition or frame-rate problem.
-- Local Compose state, deferred reads, stability, or branching: load the
-  corresponding targeted or diagnostic skill from the audit matrix.
+- Local observable state: `compose-state-authoring`; frame-rate reads:
+  `compose-state-deferred-reads`; parameter stability/compiler reports:
+  `compose-stability-diagnostics`; an undiagnosed recomposition problem:
+  `compose-recomposition-performance`; Kotlin branching: `kotlin-control-flow`.
+- Compose tests, previews, semantics or focus assertions:
+  `compose-ui-testing-patterns`.
 
 Do not mechanically add a `Modifier` parameter to a private one-use composable,
 treat an ordinary calculation variable as persistent state, call a buffered
@@ -80,9 +84,7 @@ Use a focused policy or Compose UI regression for changed behavior; reproducing
 a reported bug before fixing it is useful evidence, not a requirement to invent
 a failing test for a text or token edit. Cover initial focus, lateral entry,
 restoration, Back, same-event propagation, and long-content geometry only where
-affected. Run relevant checks and the repository's required final gate once for
-the final code. Reuse unchanged passing evidence unless a failure or unresolved
-risk justifies another run. Existing admitted gates remain binding.
+affected. Follow the verification and review requirements in `AGENTS.md`.
 
 Use the `android-tv-device-testing` skill for runtime work. A passing build or
 ADB screenshot does not prove SurfaceView visibility, focus feel, overscan,

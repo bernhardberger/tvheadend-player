@@ -3,8 +3,10 @@ description: Run native-integrity, tool-policy, JVM, lint, Android-test compilat
 agent: build
 ---
 
-Run `./tools/verify`. If it fails, stop, preserve the exact error, diagnose the
-root cause, and fix only the current slice. Summarize native provenance
+Load `gradle-run` and run `./tools/verify`. If it fails, preserve the exact error,
+diagnose the root cause, and fix ordinary failures within the authorized task.
+Recheck the affected state; stop only for a genuine authority or evidence blocker.
+Summarize native provenance
 warnings, tool tests, JVM/lint/Android-test results, APK identity/ABI/16 KB
 alignment, and Git status without printing secrets. Do not claim release
 readiness while the native release gate is blocked.

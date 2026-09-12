@@ -36,20 +36,12 @@ explicit user approval.
 
 ## Change behavior safely
 
-1. State the user-visible invariant and classify the change as generic,
-   product-specific, appliance-specific, or mixed.
-2. Locate the existing pure policy and repository boundary before editing UI.
-3. Use a focused JVM policy/repository regression for changed behavior; reproduce
-   a reported failure where practical. Do not add tests merely to mirror low-impact
-   prose/config edits. Add Compose coverage only
-   for focus, semantics, geometry, or interaction that requires it.
-4. Make the minimum implementation change; avoid a new abstraction for a
-   one-screen rule.
-5. If the change touches Media3, HTSP streaming, stream readers, or playback
-   lifecycle, also apply `media3-htsp-playback-safety`.
-6. Run relevant tests and the required final gate without repeating unchanged
-   passing checks. List remaining physical-TV or live-server validation separately;
-   preserve explicitly admitted gates and authorization boundaries.
+Locate the existing pure policy and repository boundary before editing UI.
+Prefer a focused JVM policy/repository regression for changed domain behavior;
+add Compose coverage for focus, semantics, geometry or interaction that needs it.
+Apply `media3-htsp-playback-safety` when streaming or playback lifecycle is affected.
+Follow `AGENTS.md` for implementation, verification and authority; distinguish
+remaining physical-TV or live-server evidence from automated checks.
 
 Use `android-tv-compose-ux` for the presentation and focus layer. Do not replace
 the project's details-first EPG/DVR interaction with a touch-first mobile pattern

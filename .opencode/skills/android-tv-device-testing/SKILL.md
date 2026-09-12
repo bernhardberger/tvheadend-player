@@ -1,6 +1,6 @@
 ---
 name: android-tv-device-testing
-description: Use for TVHeadend Player Android TV or TCL ADB testing, screenshots, test-device credential provisioning, APK installation, playback checks, remote keys, HOME, GUIDE, standby/wake, reboot, and device diagnostics.
+description: Use for physical TV or emulator operations including ADB, device screenshots, test-device credential provisioning, APK installation, playback checks, key injection, HOME, GUIDE, standby/wake, reboot, and device diagnostics. Not for source-only UI or key-handler edits.
 ---
 
 # Android TV Device Testing
@@ -13,9 +13,14 @@ gates. No route permits broad ADB dumps or automatic uninstall/data clearing.
 
 ## Before touching the device
 
-1. Read `AGENTS.md` and `docs/device-targets.md`. Read runtime criteria from
-   `docs/appliance-mode-spec.md` only for an appliance behavior check.
-2. Confirm the source tree is clean or identify the exact uncommitted slice.
+1. Apply `AGENTS.md` (caller-inlined hard requirements for restricted children).
+   Read `docs/device-targets.md` for physical targets; use the emulator procedure
+   in `docs/android-tooling.md` for emulator operations. Read runtime criteria from
+   `docs/appliance-mode-spec.md` only for an appliance behavior check, the credential
+   provisioning document only for provisioning, and `docs/release-process.md`
+   for signed installation/release work.
+2. Identify the exact source/artifact state and attribute any uncommitted work;
+   do not claim a clean checkout or adopt another owner's changes.
 3. Confirm relevant checks and the required final gate passed for the artifact
    being installed. Reuse unchanged verified-artifact evidence rather than
    rerunning the build for every install. Existing admitted gates still apply.

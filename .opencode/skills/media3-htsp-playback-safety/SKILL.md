@@ -7,8 +7,9 @@ description: Use for Media3, ExoPlayer, PlayerSession, PlayerView, HTSP data sou
 
 The accepted custom HTSP-to-Media3 path is a regression boundary. Read the
 relevant current playback decisions selected through `docs/README.md`. Read the
-external SDK's `sdk/decoder-ffmpeg-binary/native-dependencies.json` only when the
-active task or package lists that repository as an allowed source. Read a dated
+external SDK's `sdk/decoder-ffmpeg-binary/native-dependencies.json` only for
+dependency/native provenance work when the active task or package allows that
+repository as a source. Read a dated
 audit or upgrade assessment only when the task names that specific finding or
 upgrade; revalidate it against current source.
 
@@ -70,7 +71,7 @@ required by that gate. Do not repeat unchanged checks or add tests mirroring
 prose/config edits. Existing admitted verification requirements remain binding.
 
 Non-trivial engineering changes retain the independent Astra/Opus pair and
-mandatory pre-dispatch quota guard in `AGENTS.md`; a playback architecture audit
+review routing in `docs/ai-engineering-harness.md`; a playback architecture audit
 does not replace that coverage. Reuse unchanged evidence for targeted follow-ups.
 
 Select device checks according to affected behavior. Broad Media3/decoder/native

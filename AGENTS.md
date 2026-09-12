@@ -10,14 +10,15 @@ upstream history, attribution, and a clean path for generic contributions.
 Before non-trivial work:
 
 1. Run `git status -sb` and inspect the recent log. Preserve every existing
-   worktree change and stop if another writer is active in the same checkout.
+   worktree change and its ownership. Coordinate actual conflicting edits or
+   shared mutations; another writer's disjoint work is not itself a stop condition.
 2. Use `docs/README.md` to select only the documents relevant to the task. Do
    not read the whole documentation tree.
 3. Use the built-in writable `build` primary for both application and repository
    work. The operator's task, any admitted package and repository rules define its scope; no second
    writable project agent exists.
-4. State assumptions before ambiguous or architectural work and implement one
-   small, independently verifiable slice.
+4. State assumptions before ambiguous or architectural work. Use small,
+   independently verifiable changes to complete the authorized outcome end-to-end.
 5. Fetch remotes before upstream synchronization, contribution preparation, or
    commit-range comparison. A local documentation or tooling edit does not need
    a fetch merely to begin.
@@ -45,18 +46,23 @@ assignment names its exact path. A recent timestamp or a filename containing
 
 ## Task routing
 
-Read and load only the matching row:
+Read the relevant sections and load skills only for the actual operation or
+implementation question. A touched file or adjacent topic does not trigger an
+entire skill family. Multiple rows apply only when their concerns are affected.
 
 | Concern | Required authority and workflow |
 |---|---|
-| Compose UI, focus, remote keys, accessibility, TV surfaces | `docs/tv-design-spec.md`; `android-tv-compose-ux`; every focused Kotlin/Compose skill whose trigger matches |
+| Compose UI, focus, remote keys, accessibility, TV surfaces | `docs/tv-design-spec.md`; `android-tv-compose-ux`, whose router selects focused mechanics |
 | Channels, EPG, recordings, DVR | `live-tv-dvr-conventions`; the relevant appliance specification/plan sections only when appliance behavior is involved |
 | Appliance launch, HOME, GUIDE, wake, Simple TV | `docs/appliance-mode-spec.md`, relevant sections of `docs/appliance-mode-plan.md` |
-| Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; when the active task or package allows external SDK reads, its `sdk/decoder-ffmpeg-binary/native-dependencies.json`; dated assessments only when the task names that upgrade/finding |
-| Physical TV, ADB, install, screenshots, remote keys | `docs/device-targets.md`; `android-tv-device-testing` |
+| Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; native provenance references only for dependency/native work; dated assessments only for a named upgrade/finding |
+| SDK adoption or app/SDK contract diagnosis | `tvheadend-sdk-adoption` |
+| Physical TV or emulator operations, ADB, install, device capture or key injection | `android-tv-device-testing`; `docs/device-targets.md` for physical targets |
+| Gradle execution or build/test/lint diagnosis | `gradle-run` |
 | Product identity | `docs/product-identity-plan.md` |
 | Signing, publication, rollback | `docs/release-process.md` |
 | AI harness, agents, skills, commands, OpenCode config | `docs/ai-engineering-harness.md`; `customize-opencode` when that external skill is available |
+| Child dispatch or independent review | Relevant Delegation or Review lifecycle sections of `docs/ai-engineering-harness.md`; inline applicable hard requirements for restricted children |
 | Upstream sync or contribution | `tvhstream-upstream-contribution` |
 
 Focused imported skills are implementation guidance, not authorization for
@@ -86,17 +92,22 @@ repository-local domain overlays, then the focused skill, then local style.
   to run it again. Do not add tests for model names or prompt wording.
 - External review is risk-based, not an automatic approval loop. Non-trivial
   non-UX work needs independent Astra and Opus reviews of the same bounded
-  evidence, subject to the quota fallback below. Follow up only on unresolved
+  evidence, subject to the local review routing below. Follow up only on unresolved
   findings or materially changed behavior, not an automatic third or broad repeat audit. Remediate
   new in-scope blockers autonomously. Never ask the user merely whether to
   continue; interrupt only for a genuine product choice or safety boundary.
   Review economy never waives an unresolved correctness or safety blocker.
 - Review the final diff for secrets, unrelated churn, stale paths, GPLv3
   attribution, and generic/product/appliance boundaries.
-- Do not commit, amend, push, publish, sign, install, or mutate a TV unless the
-  user explicitly requests that operation and its safety requirements pass.
-- Do not run parallel writers in one dirty worktree or concurrent Gradle builds,
-  device operations, Git mutations, signing, publishing, or releases.
+- Commits, amendments, pushes, publication, signing, installation and TV mutation
+  require coverage in the operator's task or applicable standing/package authority
+  and all operation-specific gates. Existing authorization need not be requested
+  again; it never grants unrelated operations or bypasses a human gate.
+- Coordinate actual conflicting edits and serialize shared Gradle, device, Git,
+  signing, publishing and release mutations. For centrally admitted work,
+  repository/resource overlap alone is not a scheduler gate; preserve disjoint
+  work without adopting it or inventing a lock protocol. The writable child's
+  stricter non-concurrent-editing contract remains binding.
 - One primary owns a coherent task end-to-end, including authorized release and
   verification. Split only for a real dependency, ownership boundary or context
   problem—not because implementation, review and release are different stages.
@@ -148,102 +159,32 @@ it does not replace integrated or physical-TV gates.
 
 ## Delegation and evidence
 
-`app-device-operator` is an operational child with Bash, but no repository edits
-or delegation. It may operate devices only for an explicitly authorized task
-after exclusive device ownership is handed over by the primary. All device,
-identity, credential and capture rules still apply. This is the device-operation
-exception to the read-only child restrictions below, not a second code writer.
+Before dispatch, read the relevant **Delegation and context containment** and
+**Review lifecycle and autonomous continuation** sections in
+`docs/ai-engineering-harness.md`. They own role selection, packet construction,
+review routing, fallback and recovery. Model/effort/permission/budget assignments
+remain in OpenCode configuration and agent frontmatter; retired roles stay retired.
 
-Review, analysis, and retrieval children are read-only. `app-implementer` is
-the one writable child: it may edit and run Gradle inside a single delegated
-slice with named paths, tests, and gate, but never mutates Git, devices,
-signing, or publication; the primary reviews its diff, runs the final gate, and
-owns commits. Never run it while the primary or another writer is editing the
-same worktree. Keep implementation on Astra; do not override the implementer to
-Opus or another model. Use its configured effort by default; select Low only for
-explicitly mechanical work and High up front for evident difficult implementation,
-without requiring a lower-effort failure first. Resolve routine choices within
-accepted requirements and writable scope; return consequential product/authority
-gaps or missing load-bearing evidence. Opus review routing remains unchanged.
-The primary owns decomposition and delegation: use
-children whenever they are likely to materially improve correctness, evidence
-coverage, context isolation, turnaround time, or final quality. A roughly 20%
-resource overhead is an acceptable soft target for a meaningful quality gain,
-not a hard accounting threshold. There is no fixed child-count limit; avoid only
-duplicated assignments and unnecessarily verbose returned evidence.
+The primary owns decomposition and integration. Use children when they materially
+improve correctness, evidence coverage, context isolation, turnaround or quality.
+Review, analysis and retrieval children are read-only; only `app-locator` nesting
+is allowed where configured, and depth 2 is terminal. The bounded implementer
+and device-operator exceptions retain their own restrictions, not primary authority.
+Restricted children cannot read project policy: callers must inline applicable
+hard requirements, accepted invariants and exact evidence without redefining the
+role's permissions, output or verdict contract.
 
-Use `app-locator` for mechanical retrieval, `app-explore`
-for bounded multi-file source maps and call traces, `app-planner` for an optional
-planning second opinion for one coherent outcome with interacting decisions and
-directly relevant dependencies, `app-analyze` for one concrete post-plan contradiction,
-and `app-research` for one authoritative external-source question after local
-sources are insufficient. Use `android-reviewer` for a risk-based frozen-packet
-review. Use `tv-evidence-curator` for mechanical screenshot-set validation,
-`tv-ux-brief` for pre-implementation product direction, and `tv-ux-reviewer` for
-final screenshot-first design review. Only `app-locator` children may be
-delegated by read-only children, and depth 2 is terminal. Read-only children
-cannot edit, use shell, run builds or devices, or mutate Git. No child reads
-project instructions, ledgers, handoffs, archives, or broad plans; the packet
-carries the relevant requirements. The planner may inspect directly relevant
-source, tests and call chains within its permissions to establish feasibility;
-it distinguishes binding requirements and settled decisions from caller
-hypotheses/preferences, tests hypotheses, and flags evidence-backed contradictions
-without overriding the primary's final decisions or scope authority. Its
-recommendation and implementation/verification plan stay concise and proportional.
-The analyzer may inspect directly relevant source, tests and call chains within
-its permissions to diagnose its bounded question; the packet defines scope,
-not an exhaustive evidence list. Reviewers retain their frozen evidence limits.
-Their configured model variants and
-step limits do not inherit the writable primary's `medium`, `high`, `xhigh`, or
-`max` effort.
+Non-trivial non-UX work requires independent `android-reviewer` and
+`claude-audit-lead` coverage under the harness routing. Substantial new/redesigned
+TV surfaces require final screenshot-first `tv-ux-reviewer` coverage; use
+`tv-ux-brief` when direction is unresolved. UX review does not replace distinct
+runtime review or physical-TV gates. Low-impact work has no mandatory pair.
 
-Model and effort assignments live in OpenCode configuration, not product policy.
-Retired field-test roles stay retired. Low-impact work has no mandatory pair;
-release ceremony alone does not trigger one. Non-trivial non-UX work needs an
-independent Astra primary reviewer (`android-reviewer`) and an independent Opus
-second (`claude-audit-lead`), neither the implementing primary. Give both the same
-bounded change and evidence; keep the second initial packet blind to the first
-verdict and findings. The primary adjudicates supported in-scope corrections.
-
-For a substantial new or redesigned TV surface, use `tv-ux-brief` if product
-direction is unresolved and obtain a final screenshot-first `tv-ux-reviewer`
-review. The primary can validate its own capture matrix; an evidence curator is
-optional. Add runtime review only when the distinct runtime risk warrants it.
-The implementing primary accepts, modifies or rejects UX recommendations with
-concrete product, remote, accessibility, consistency or feasibility reasons.
-Opus preference is not authority; demonstrated usability defects are not taste.
-Use `tv-ux-astra` for quota fallback, including design briefs, or an optional
-bounded challenge of one consequential unresolved recommendation, never an
-automatic third/full audit. Supplied mocks may establish direction, not final
-implemented UI acceptance. Do not ask routine operator taste questions.
-Dispatch substantive `tv-ux-astra` briefs with Task `reasoning: "xhigh"` and
-`mode=brief`; mode text alone does not select effort. Final `tv-ux-reviewer`
-dispatch is Astra coverage and uses its configured default directly.
-UX roles remain distinct from engineering review. Before EVERY Opus dispatch,
-including UX and follow-ups, run `./review-provider-route.sh select eligible`.
-Only successful stdout `opus` allows dispatch. Never source the guard or its
-credential source, use fixture mode, or reuse cached eligibility for a dispatch.
-Otherwise use an independent Astra fallback (`tv-ux-astra` for UX); record the reason and absent Opus coverage. See
-`docs/ai-engineering-harness.md` for the role mapping. An explicitly
-non-substitutable admitted Opus gate requires central reconciliation, not waiver.
-On actual Opus exhaustion, abort that exact reviewer via the supported session
-API and verify its state. Do not wait for reset, nudge it or repeatedly spawn
-replacements; use the fallback and continue independent authorized work.
-
-Start each child as a fresh session by omitting `task_id`; never resume old child
-history. Supply one self-contained question with accepted invariants, included
-paths, exclusions, relevant evidence, and a stop condition. Do not redefine the
-planner's coherent outcome as an arbitrary single-question limit: supply its
-outcome, hard constraints, hypotheses, entry paths and evidence once, allowing
-directly relevant evidence inspection under its contract. Do not redefine the
-role's permissions, generic policy, output contract or verdict vocabulary in a
-task packet. Supply the actual relevant diff or exact readable changed paths;
-Git identity and gate status are caller-provided evidence for children that
-cannot run commands. A child that reaches
-its terminal budget reports inspected scope and the exact remaining evidence
-gap instead of claiming completion. The writable primary adjudicates and fixes
-in-scope review findings directly; a broad new concern becomes a separately
-authorized package rather than an expanding review loop.
+Before EVERY Opus dispatch, including UX and follow-ups, run
+`./review-provider-route.sh select eligible`; only successful stdout `opus`
+permits it. Follow the harness quota/fallback/abort procedure, never cached
+eligibility or a waived non-substitutable gate. The primary adjudicates and fixes
+supported in-scope findings and continues authorized work.
 
 ## Upstream and repository discipline
 

@@ -31,9 +31,7 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `tools/check-native-libs` | Native AAR integrity, ABI/ELF, corresponding-source, and release-provenance gate |
 | `tools/device` | Role-aware bounded ADB wrapper |
 
-## Primary agents and model assignments
-
-### Imported R8 analysis guidance
+## Imported R8 analysis guidance
 
 `.agents/skills/r8-analyzer/` is the official Google `android/skills` analysis-only
 skill, pinned in `skills-lock.json`. Installation does not authorize optimization
@@ -50,8 +48,10 @@ it has identical guidance/references and still lacks both scripts (and its
 referenced LICENSE.txt). Keep this repository's pinned files and license.
 See `docs/android-tooling.md` for the executed qualification and limitations.
 
-Restart the Player OpenCode instance to refresh skill discovery after installation;
-do not restart the shared backend or unrelated sessions automatically.
+Use the fresh-loading and coordinated activation procedure under Validation after
+installation; saved files do not establish adoption by running sessions.
+
+## Primary agents and model assignments
 
 The built-in `build` is the sole writable primary for application and repository
 work. `AGENTS.md` and the operator's task supply authority; an already admitted
@@ -99,10 +99,24 @@ their specialized contracts. Only `app-locator` children may be delegated by
 read-only children, and depth 2 is terminal. Reviewers may use that capability
 only for exact in-packet retrieval, never to reconstruct missing evidence.
 
+Choose `app-planner` for an optional coherent planning second opinion,
+`app-analyze` for a concrete implementation contradiction, and `app-research`
+for an authoritative external-source question after local sources are insufficient.
+Retired field-test roles stay retired. Role bodies own output and evidence
+contracts; keep those restrictions in each restricted child's loaded prompt,
+not behind a policy read it cannot perform.
+
 Read-only children cannot edit, use shell, run builds or devices, mutate Git, or read
 project instructions, ledgers, handoffs, archives, or broad plans. Start each as
 a fresh session without `task_id` and supply one self-contained question with
-exact evidence and a stop condition. For `app-planner`, supply one coherent
+exact evidence and a stop condition. Inline applicable operator/repository hard
+requirements, accepted invariants, paths and exclusions; do not send restricted
+children to policy documents or redefine their permissions, output contracts or
+verdict labels. Git identity, ancestry and gate status are caller-provided
+evidence for children without shell access. A child reaching its terminal budget
+reports inspected scope and any remaining evidence gap instead of claiming
+completion of uninspected work.
+For `app-planner`, supply one coherent
 planning outcome, hard constraints, hypotheses, entry paths and evidence once;
 interacting decisions and directly relevant dependencies belong together rather
 than being split by an arbitrary single-question limit. The planner remains an
@@ -130,10 +144,14 @@ The built-in writable primary and, inside one delegated slice, the
 packet with exact paths, tests, and gate, may run
 Gradle with the repository rules, and returns changed files, test evidence, and
 open questions; it never touches Git, devices, signing, or publication, and
-never runs concurrently with the primary's own edits. The primary reviews the
-diff, runs the final gate, and commits. Read-only review begins after that
-delta is stable. Writers, Gradle builds, device operations, Git
-mutations, signing, publishing, and release operations may not overlap.
+never runs concurrently with the primary or another writer's edits in the same
+worktree. The primary reviews the diff, runs the final gate, and commits.
+Read-only review begins after that
+delta is stable. This is the writable child's stricter contract. For primary
+work, follow `AGENTS.md`: coordinate actual conflicting edits and serialize
+shared Gradle, device, Git, signing, publishing and release mutations. Disjoint
+work or repository/resource overlap alone is not a central scheduler gate and
+does not require a new lock or approval protocol.
 
 Use the implementer's configured model and effort by default. The caller may
 override effort through Task's `reasoning` parameter: `low` only for explicitly
@@ -189,8 +207,9 @@ otherwise use independent Astra. Engineering uses a separate `android-reviewer`
 session for the second review. For UX, use native `tv-ux-astra` with `mode=brief`,
 `review` or `closure`; do not substitute a source-only runtime review.
 Record the guard reason, actual reviewer/session/model and explicitly absent Opus
-coverage. An explicitly non-substitutable admitted Opus gate requires central
-reconciliation; fallback does not pass it.
+coverage. An explicitly non-substitutable admitted Opus gate requires
+reconciliation with its authority owner (central for centrally admitted work);
+fallback does not pass it.
 
 For substantive `tv-ux-astra` briefs, dispatch `mode=brief` with Task
 `reasoning: "xhigh"`; mode text alone cannot select effort. Other modes use the
@@ -243,16 +262,23 @@ Final review always needs actual production-composable screenshots. The native
 Astra role reuses the existing brief/review contract bodies; runtime review,
 every-Opus quota/abort rules and explicit non-substitutable gates remain separate.
 
-Continue automatically through the current slice, internal checkpoints,
-recoverable test failures, reviewer findings, child-agent errors, and one batched
-technical remediation. Complete a coherent task end-to-end rather than creating
-handoffs for administrative stages. Split for a real dependency or context
-problem. Ask
-one substantive question only when progress requires a product choice, conflicts
+Continue automatically through internal checkpoints, recoverable test failures,
+reviewer findings, child-agent errors and ordinary in-scope remediation. Complete
+a coherent task end-to-end rather than creating handoffs for administrative
+stages. Split for a real dependency or context problem. Ask one substantive
+question only when progress requires a product choice, conflicts
 with current authority, changes accepted scope or capability, cannot preserve
 unrelated worktree changes, crosses an explicit credential/device/signing/release
 boundary, or requires a human physical-TV observation. Never ask merely whether
 to continue.
+
+Existing task or standing/package authorization covers the operations within its
+scope without a new approval for each checkpoint or follow-up commit. Preserve
+all operation-specific and human gates; no authorization grants unrelated remote,
+credential, server, device or release actions. Direct repository work uses these
+local procedures without a coordination workspace. For centrally admitted work,
+use the task-supplied reporting and recovery interface; central owns admission,
+route reconciliation and activation, not routine implementation decisions.
 
 TV design evidence is assignment-allowlisted. The assignment must name every
 exact current and historical path, capture state, and canvas or device. The
@@ -308,8 +334,9 @@ any exact dated or archived document hard-coded into an agent, command, or skill
 this prohibition includes conditional static examples. Assignment arguments,
 which are not hard-coded harness context, remain the only way to introduce an
 exact historical path.
-Use `tools/check-doc-authority` only when changing documentation classification
-or archive-containment rules. Routine product verification does not invoke it.
+Use `tools/check-doc-authority` when changing documentation classification,
+instruction routing or archive-containment rules. Routine product verification
+does not invoke it.
 
 ## Device, native, and release boundaries
 
@@ -363,6 +390,14 @@ treating the change as complete.
 
 OpenCode loads config-time files only at startup. After changing config, an
 agent, skill, command, or plugin, validate saved settings with a fresh loader.
+Use `opencode debug agent <role>` for affected agents, `opencode debug skill`
+for skill discovery/content, and the resolved command templates from
+`opencode debug config` for changed commands. Inspect only relevant fields;
+resolved configuration can contain private global settings. Compare project
+configuration and agent/command frontmatter to the starting revision when the
+task must preserve models, efforts, permissions, budgets and depth. Documentation
+cleanup uses affected static/routing checks, not product builds or prompt-wording
+tests. Reuse successful checks while their relevant state is unchanged.
 Running sessions retain cached settings until a coordinated quit/restart;
 fresh-loader success does not certify live adoption. Central owns activation
 when delivery is centrally coordinated; do not restart the shared backend or

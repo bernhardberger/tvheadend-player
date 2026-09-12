@@ -29,10 +29,11 @@ contract actually resolved by the app, not a remembered version or stale plan.
    evidence. Verify required dependency provenance without bypassing its checks.
 
 If the necessary behavior is absent or defective in the SDK, report the exact
-contract gap and evidence to the existing central owner. Do not edit a sibling
-repository or launch another worker without authority. The central
-`tvheadend-outcome-handoff` skill can route an authorized cross-repository outcome;
-it is not a prerequisite for an already admitted in-scope migration.
+contract gap and evidence to the operator or assigned SDK owner (the existing
+central owner for centrally coordinated work). Do not edit a sibling repository
+or launch another worker without authority. When available,
+`tvheadend-outcome-handoff` can route an authorized cross-repository outcome;
+neither that skill nor a coordination workspace is required for direct Player work.
 
 Finish with the adopted behavior, resolved dependency evidence, verification and
 any remaining runtime limitation. Credential, device, push and release operations

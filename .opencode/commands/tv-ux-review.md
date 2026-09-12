@@ -5,7 +5,8 @@ agent: build
 
 Dispatch the configured Astra `tv-ux-reviewer` directly with its default effort.
 This is Astra coverage and does not satisfy an explicit non-substitutable Opus
-gate; report that gap centrally rather than waiving it. Actual Opus dispatches
+gate; report that gap to its authority owner (central for admitted work) rather
+than waiving it. Actual Opus dispatches
 still require a fresh `./review-provider-route.sh select eligible` result of
 `opus`. Pass the screenshot-first contract below to the reviewer rather than
 performing its review in the implementing primary.

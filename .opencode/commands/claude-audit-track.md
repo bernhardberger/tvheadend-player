@@ -4,7 +4,8 @@ agent: build
 ---
 
 Use `$ARGUMENTS` as a neutral audit contract. It needs a bounded question,
-allowed paths or sources, exclusions, variable evidence, and a stop condition.
+allowed paths or sources, exclusions, variable evidence, caller-inlined hard
+requirements, and a stop condition.
 Do not redefine the agent's role, permissions, generic audit policy, or verdict
 vocabulary.
 
@@ -18,8 +19,9 @@ bounded evidence, not the implementing primary's self-review.
 
 Do not pass another track's analysis or conclusions into this track before both
 independent reports are complete. Neutral product constraints and raw operator
-facts are allowed. Luna may be used only for optional mechanical path lookup;
-do not launch another analytical, research, design, or review child.
+facts are allowed. Within the review child, nesting is limited to optional
+`app-locator` mechanical lookup under its loaded contract; this restriction
+does not prevent the primary from obtaining the required independent pair.
 
 The primary adjudicates supported findings. Follow up only on unresolved findings
 or materially changed behavior, not an automatic third or broad repeat audit.

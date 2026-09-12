@@ -63,8 +63,8 @@ reviews your diff, runs the final gate, and commits.
 - Keep policy in plain Kotlin so JVM tests cover it; every behavior change ships
   with a focused regression test. Do not add tests for model names or prompt
   wording.
-- Load the focused `kotlin-*` and `compose-*` skills whose trigger matches the
-  code you touch.
+- Load focused `kotlin-*` and `compose-*` skills for the actual implementation
+  question, not every skill associated with a touched file.
 
 ## Return format
 
