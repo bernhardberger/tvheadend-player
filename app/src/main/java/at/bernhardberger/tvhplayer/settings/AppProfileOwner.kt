@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.settings
 
-import android.content.Context
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -64,14 +63,10 @@ class AppProfileOwner internal constructor(
     private val playerSettings: PlayerSettingsStore,
     private val ioDispatcher: CoroutineDispatcher,
     private val readProfileForEditing: suspend () -> ServerProfileEditReadResult,
-    private val readLegacyProfile: suspend () -> LegacyServerProfile?,
-    private val clearLegacyProfile: suspend () -> Unit,
 ) : ConnectionProfileEditor {
     internal constructor(
-        context: Context,
         session: TvheadendSession,
         profileStore: TvheadendServerProfileStore,
-        legacyCredentials: LegacyCredentialSource,
         playerSettings: PlayerSettingsStore,
         ioDispatcher: CoroutineDispatcher,
     ) : this(
@@ -80,12 +75,6 @@ class AppProfileOwner internal constructor(
         playerSettings = playerSettings,
         ioDispatcher = ioDispatcher,
         readProfileForEditing = profileStore::loadProfileForEditing,
-        readLegacyProfile = { context.loadLegacyServerProfile(legacyCredentials::loadPassword) },
-        clearLegacyProfile = {
-            legacyCredentials.clearCiphertext()
-            context.clearLegacyServerEndpoint()
-            legacyCredentials.deleteObsoleteKey()
-        },
     )
 
     private val serverMutex = Mutex()
@@ -230,7 +219,6 @@ class AppProfileOwner internal constructor(
         playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.storeAnonymous(host, htspPort)
         check(profile is ServerProfileReadResult.Available)
-        clearLegacyProfileMaterial()
         applyServerProfile(profile)
     }
 
@@ -245,7 +233,6 @@ class AppProfileOwner internal constructor(
         playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.storePassword(host, htspPort, username, password)
         check(profile is ServerProfileReadResult.Available)
-        clearLegacyProfileMaterial()
         applyServerProfile(profile)
     }
 
@@ -255,7 +242,6 @@ class AppProfileOwner internal constructor(
         playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.clearProfile()
         check(profile == ServerProfileReadResult.Missing)
-        clearLegacyProfileMaterial()
         applyServerProfile(profile)
     }
 
@@ -335,7 +321,7 @@ class AppProfileOwner internal constructor(
     private suspend fun initializeServerProfile() {
         try {
             serverMutex.withLock {
-                applyServerProfile(loadOrMigrateServerProfile())
+                applyServerProfile(profileStore.loadProfile())
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -371,37 +357,6 @@ class AppProfileOwner internal constructor(
             // The released profile is still unavailable to the app.
         }
         mutableServerProfile.value = ServerProfileReadResult.Unavailable
-    }
-
-    private suspend fun loadOrMigrateServerProfile(): ServerProfileReadResult {
-        val current = profileStore.loadProfile()
-        if (current is ServerProfileReadResult.Available) {
-            clearLegacyProfileMaterial()
-            return current
-        }
-        if (current == ServerProfileReadResult.Unavailable) return current
-
-        val legacy = readLegacyProfile()
-            ?.normalizedForMigration()
-            ?: return current
-        val migrated = when (val password = legacy.password) {
-            LegacyPassword.Empty -> profileStore.storeAnonymous(legacy.host, legacy.port)
-            is LegacyPassword.Available -> profileStore.storePassword(
-                legacy.host,
-                legacy.port,
-                legacy.username,
-                password.value,
-            )
-            LegacyPassword.Unavailable -> return current
-        }
-        if (migrated.matchesLegacyProfile(legacy)) {
-            clearLegacyProfileMaterial()
-        }
-        return migrated
-    }
-
-    private suspend fun clearLegacyProfileMaterial() {
-        clearLegacyProfile()
     }
 
     private suspend fun applyServerProfile(profile: ServerProfileReadResult) {
@@ -464,26 +419,6 @@ private class ClearServerProfileCommand : ServerProfileCommand()
 private class SelectStreamProfileCommand(
     val profileId: StreamProfileId?,
 ) : ProfileCommand()
-
-internal fun LegacyServerProfile.normalizedForMigration(): LegacyServerProfile? {
-    val normalized = copy(host = host.trim(), username = username.trim())
-    val complete = normalized.host.isNotEmpty() && normalized.port in 1..65_535 && when {
-        normalized.username.isEmpty() -> normalized.password == LegacyPassword.Empty
-        else -> normalized.password is LegacyPassword.Available &&
-            normalized.password.value.isNotBlank()
-    }
-    return normalized.takeIf { complete }
-}
-
-internal fun ServerProfileReadResult.matchesLegacyProfile(legacy: LegacyServerProfile): Boolean =
-    this is ServerProfileReadResult.Available &&
-        host == legacy.host &&
-        port == legacy.port &&
-        authenticationMode == if (legacy.password is LegacyPassword.Available) {
-            ServerProfileAuthenticationMode.PASSWORD
-        } else {
-            ServerProfileAuthenticationMode.ANONYMOUS
-        }
 
 internal fun ServerProfileReadResult.toServerSettings(): ServerSettings = when (this) {
     is ServerProfileReadResult.Available -> serverSettingsForEditing(

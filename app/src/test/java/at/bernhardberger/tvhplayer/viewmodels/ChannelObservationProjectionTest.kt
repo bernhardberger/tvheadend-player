@@ -27,8 +27,8 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
+import at.bernhardberger.tvhplayer.settings.ChannelTagPreferences
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
-import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.dataStore
 import java.io.File
@@ -80,7 +80,7 @@ class ChannelObservationProjectionTest {
         // The Context DataStore delegate is process-wide, including across JVM test classes.
         context.dataStore.edit { it.clear() }
         val settings = ChannelTagSettingsStore(context)
-        settings.selectTag(firstTag.id)
+        settings.save(ChannelTagPreferences(activeTagId = firstTag.id))
         val session = FakeTvheadendSession(observation(ChannelRepositoryState.Stale(catalog)))
         val model = ChannelsViewModel(session, settings)
         models.put("channels", model)
@@ -111,15 +111,11 @@ class ChannelObservationProjectionTest {
         assertEquals(listOf(changedTag, secondTag), model.scope.value.scope.tags)
         assertTrue(model.channels.value.isEmpty())
 
-        session.publish(observation(ChannelRepositoryState.Stale(changedCatalog)))
-        runCurrent()
-        assertFalse(model.scope.value.channelCatalogCurrent)
-        // Change selection while retained, avoiding the separate current-catalog APP10 race.
-        settings.selectTag(secondTag.id)
+        model.selectTag(secondTag.id)
         model.scope.first { it.scope.activeTagId == secondTag.id }
         runCurrent()
         assertEquals(listOf(nine, changedSeven), model.channels.value)
-        settings.setScopeVisible(firstTag.id, false, setOf(firstTag.id, secondTag.id))
+        model.setScopeVisible(firstTag.id, false)
         model.scope.first { it.scope.tags == listOf(secondTag) }
         runCurrent()
         assertEquals(listOf(nine, changedSeven), model.channels.value)
@@ -144,10 +140,8 @@ class ChannelObservationProjectionTest {
         val session = FakeTvheadendSession(observation(ChannelRepositoryState.Current(catalog)))
         val context = contextWithoutAndroidRuntime()
         val owner = AppProfileOwner(
-            context = context,
             session = session,
             profileStore = TvheadendServerProfileStore(context),
-            legacyCredentials = LegacyCredentialSource(context),
             playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
             ioDispatcher = dispatcher,
         )

@@ -84,6 +84,7 @@ internal val LocalBrowseVisibleWidthPx = compositionLocalOf<Int?> { null }
 
 /** Read the widget's current focus ownership at deferred focus-request time. */
 internal val LocalBrowseDrawerState = staticCompositionLocalOf<DrawerState?> { null }
+internal val LocalBrowseNavigationFocus = staticCompositionLocalOf<FocusRequester?> { null }
 
 @Composable
 internal fun SideRail(
@@ -375,7 +376,10 @@ internal fun SideRail(
             },
             content = {
                 BrowseViewport(width = browseWidth) {
-                    CompositionLocalProvider(LocalBrowseDrawerState provides drawerState) {
+                    CompositionLocalProvider(
+                        LocalBrowseDrawerState provides drawerState,
+                        LocalBrowseNavigationFocus provides activeItemFocus,
+                    ) {
                         content(
                             TvScreenPadding,
                             drawerState.currentValue == DrawerValue.Open,
@@ -393,7 +397,6 @@ private val AppDestination.testTag: String
         AppDestination.GUIDE -> "nav-epg"
         AppDestination.RECORDINGS -> "nav-recordings"
         AppDestination.SETTINGS -> "nav-settings"
-        AppDestination.UNLOCK -> "nav-unlock"
         AppDestination.LIVE_PLAYER -> "nav-player"
         AppDestination.RECORDING_PLAYER -> "nav-recording-player"
     }

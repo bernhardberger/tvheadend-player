@@ -15,7 +15,6 @@ internal enum class AppDestination {
     GUIDE,
     RECORDINGS,
     SETTINGS,
-    UNLOCK,
     LIVE_PLAYER,
     RECORDING_PLAYER,
 }
@@ -33,9 +32,6 @@ internal data object RecordingsKey : AppNavKey
 internal data class SettingsKey(
     val section: SettingsSection = SettingsSection.GENERAL,
 ) : AppNavKey
-
-@Serializable
-internal data object UnlockKey : AppNavKey
 
 @Serializable
 internal data class LivePlayerKey(
@@ -78,7 +74,6 @@ internal val AppNavKey.destination: AppDestination
         GuideKey -> AppDestination.GUIDE
         RecordingsKey -> AppDestination.RECORDINGS
         is SettingsKey -> AppDestination.SETTINGS
-        UnlockKey -> AppDestination.UNLOCK
         is LivePlayerKey -> AppDestination.LIVE_PLAYER
         is RecordingPlayerKey -> AppDestination.RECORDING_PLAYER
     }
@@ -120,8 +115,7 @@ internal fun List<AppNavKey>.hasTransientDestinationBelowTop(): Boolean =
 
 internal fun AppNavKey.isTransientDestination(): Boolean = when (this) {
     is LivePlayerKey,
-    is RecordingPlayerKey,
-    UnlockKey -> true
+    is RecordingPlayerKey -> true
     ChannelsKey,
     GuideKey,
     RecordingsKey,

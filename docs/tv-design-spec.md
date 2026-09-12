@@ -178,8 +178,9 @@ Use the smallest treatment that remains unmistakable at ten feet:
 | Tab | — | — | — | pill | none |
 | Player icon button | 1.10 | — | — | yes | 4dp inset from the safe edge |
 
-Channels and Guide scope tabs keep the focused pill and its foreground together
-on every Left/Right transition and reversal. Selection still commits on focus;
+Channels, Guide and Recordings scope tabs share a horizontally travelling pill.
+Its foreground contrast follows the actual moving shape on every Left/Right
+transition and reversal. Selection still commits on focus;
 Down or OK enters the selected scope's content.
 
 **A scale value is only valid together with the room its overflow needs.** A
@@ -226,8 +227,12 @@ commit.
 
 ### 4.4 Back through navigation layers
 
-Back unwinds focus layers before changing top-level destination history. From
-browse content it activates the global drawer on the current destination. From
+Back unwinds focus layers before changing top-level destination history. Channels
+and Guide enter through their active scope tab when arriving from the global
+drawer. Down or OK enters that scope's remembered content; Back from the list or
+grid returns to its active scope tab. With no scope tabs, Channels enters its list
+and Guide uses its header. Back from a scope row activates the global drawer on
+the current destination. Other browse content activates that drawer directly. From
 a non-root drawer destination, the next Back focuses Channels; Back from
 Channels then delegates to the existing warm-player or activity-exit policy. Settings adds one
 local layer: content returns to the current category before category focus

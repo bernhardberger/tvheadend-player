@@ -350,6 +350,7 @@ fun AppRoot(
     val focusManager = LocalFocusManager.current
 
     val appVm: AppConnectionViewModel = koinViewModel()
+    val channelsVm: at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel = koinViewModel()
     val connectionUiState by appVm.uiState.collectAsStateWithLifecycle()
     val connectionState by appVm.connectionState.collectAsStateWithLifecycle()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
@@ -562,11 +563,12 @@ fun AppRoot(
             }
         }
     }
-    BackHandler(
-        enabled = navigationAllowed && !applianceLaunchActive && !showRail,
-        onBack = handleRootBack,
-    )
     val browseBackHandler = remember { mutableStateOf(handleRootBack) }
+    // NavDisplay does not intercept Back for a singleton root. The browse shell
+    // still owns its focus layers before MainActivity's exit fallback may run.
+    BackHandler(enabled = navigationAllowed && !applianceLaunchActive) {
+        if (showRail) browseBackHandler.value() else handleRootBack()
+    }
     val requestLivePlayer: (LivePlaybackSelection, String) -> Unit = { selection, name ->
         playbackSelectionScope.launch {
             val target = playbackOrchestrator.requestLivePlayer(
@@ -604,6 +606,7 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS),
                     ) {
                         ChannelsRouteContent(
+                            channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == ChannelsKey,
@@ -621,6 +624,7 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE),
                     ) {
                         GuideRouteContent(
+                            channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
@@ -655,11 +659,13 @@ fun AppRoot(
                         )
                     }
 
-                    entry<RecordingsKey> {
+                    entry<RecordingsKey>(
+                        metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.RECORDINGS),
+                    ) {
                         RecordingsRouteContent(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
-                            initialFocusEnabled = !drawerActive,
+                            initialFocusEnabled = !drawerActive && currentDestination == RecordingsKey,
                             backEnabled = !applianceLaunchActive,
                             connectionUiState = connectionUiState,
                             onRetry = appVm::reconnectNow,
@@ -686,11 +692,14 @@ fun AppRoot(
                         )
                     }
 
-                    entry<SettingsKey> { destination ->
+                    entry<SettingsKey>(
+                        metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.SETTINGS),
+                    ) { destination ->
                         SettingsRouteContent(
+                            channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             section = destination.section,
-                            initialFocusEnabled = !drawerActive,
+                            initialFocusEnabled = !drawerActive && currentDestination == destination,
                             contentPadding = contentPadding,
                             backEnabled = !applianceLaunchActive,
                             onNavigate = { section ->
@@ -699,13 +708,9 @@ fun AppRoot(
                         )
                     }
 
-                    entry<UnlockKey> {
-                        // A restored navigation stack may still contain the retired route.
-                        LaunchedEffect(Unit) { navigateTopLevel(ChannelsKey) }
-                    }
-
                     entry<LivePlayerKey> { destination ->
                         LivePlayerRouteContent(
+                            channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             channelId = ChannelId(destination.channelId),
                             channelName = destination.channelName,
@@ -814,15 +819,11 @@ fun AppRoot(
                                     activeChannelId = activeChannelId,
                                     activeRecordingId = activeRecordingId,
                                 )
-                                if (destination == AppDestination.UNLOCK) {
-                                    backStack.pushTransient(UnlockKey)
-                                } else {
-                                    navigateTopLevel(
-                                        destination.toTopLevelKey(
-                                            settingsSection = backStack.lastSettingsSection(),
-                                        ),
-                                    )
-                                }
+                                navigateTopLevel(
+                                    destination.toTopLevelKey(
+                                        settingsSection = backStack.lastSettingsSection(),
+                                    ),
+                                )
                             }
                         },
                         content = { contentPadding, drawerActive ->
@@ -853,7 +854,6 @@ private fun AppDestination.toTopLevelKey(
     AppDestination.GUIDE -> GuideKey
     AppDestination.RECORDINGS -> RecordingsKey
     AppDestination.SETTINGS -> SettingsKey(settingsSection ?: SettingsSection.GENERAL)
-    AppDestination.UNLOCK,
     AppDestination.LIVE_PLAYER,
     AppDestination.RECORDING_PLAYER -> error("Transient destination is not top-level")
 }

@@ -452,6 +452,8 @@
     <string name="connection_loading_channels">Loading channels\u2026</string>
     <string name="no_channels_available">No channels are available.</string>
     <string name="retry">Retry</string>
+    <string name="channel_settings_load_failed">Channel preferences could not be loaded.</string>
+    <string name="channel_settings_save_failed">Your channel settings are active but could not be saved.</string>
     <string name="open_connection_settings">Open connection settings</string>
     <string name="connection_settings_short">Connection settings</string>
     <string name="status_connection_failed_authentication">Connection failed: authentication rejected</string>

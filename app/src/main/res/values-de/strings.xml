@@ -359,6 +359,8 @@
     <string name="connection_loading_channels">Sender werden geladen\u2026</string>
     <string name="no_channels_available">Es sind keine Sender verfügbar.</string>
     <string name="retry">Erneut versuchen</string>
+    <string name="channel_settings_load_failed">Die Kanaleinstellungen konnten nicht geladen werden.</string>
+    <string name="channel_settings_save_failed">Deine Kanaleinstellungen sind aktiv, konnten aber nicht gespeichert werden.</string>
     <string name="open_connection_settings">Verbindungseinstellungen öffnen</string>
     <string name="connection_settings_short">Verbindungseinstellungen</string>
     <string name="status_connection_failed_authentication">Verbindung fehlgeschlagen: Anmeldung abgelehnt</string>

@@ -1,15 +1,10 @@
 package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.first
 
 val Context.dataStore by preferencesDataStore(
     name = "tvhplayer_settings",
-    produceMigrations = { listOf(activeTagIdMigration(), simpleTvRetirementMigration()) },
 )
 
 data class ServerSettings(
@@ -105,45 +100,3 @@ internal fun serverSettingsForEditing(
     username = "",
     passwordConfigured = passwordConfigured,
 )
-
-data class LegacyServerProfile(
-    val host: String,
-    val port: Int,
-    val username: String,
-    val password: LegacyPassword,
-) {
-    override fun toString(): String = "LegacyServerProfile(<redacted>)"
-}
-
-sealed interface LegacyPassword {
-    data object Empty : LegacyPassword
-    data class Available(val value: String) : LegacyPassword {
-        override fun toString(): String = "LegacyPassword.Available(<redacted>)"
-    }
-    data object Unavailable : LegacyPassword
-}
-
-private object LegacyServerSettingsKeys {
-    val host = stringPreferencesKey("host")
-    val port = intPreferencesKey("htspPort")
-    val username = stringPreferencesKey("user")
-}
-
-internal suspend fun Context.loadLegacyServerProfile(
-    loadPassword: suspend () -> LegacyPassword,
-): LegacyServerProfile? {
-    val preferences = dataStore.data.first()
-    val host = preferences[LegacyServerSettingsKeys.host]?.trim().orEmpty()
-    val port = preferences[LegacyServerSettingsKeys.port]
-    val username = preferences[LegacyServerSettingsKeys.username]?.trim().orEmpty()
-    if (host.isEmpty() || port == null || port !in 1..65_535) return null
-    return LegacyServerProfile(host, port, username, loadPassword())
-}
-
-internal suspend fun Context.clearLegacyServerEndpoint() {
-    dataStore.edit { preferences ->
-        preferences.remove(LegacyServerSettingsKeys.host)
-        preferences.remove(LegacyServerSettingsKeys.port)
-        preferences.remove(LegacyServerSettingsKeys.username)
-    }
-}

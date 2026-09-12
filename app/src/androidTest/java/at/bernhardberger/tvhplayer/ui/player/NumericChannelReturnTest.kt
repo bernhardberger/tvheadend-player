@@ -23,7 +23,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.ControlledAudioPlayer
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
-import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
@@ -67,11 +66,12 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         repeat(3) { session.scriptLivePlaybackSuccess() }
         val settings = PlayerSettingsStore(context)
         val tags = ChannelTagSettingsStore(context)
-        tags.selectTag(if (tagged) tag.id else null)
+        val originalTags = tags.settings.first()
+        tags.save(originalTags.copy(activeTagId = if (tagged) tag.id else null))
         val profileStore = TvheadendServerProfileStore(context)
         profileStore.storeAnonymous("offline.invalid", 9982)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-        val profiles = AppProfileOwner(context, session, profileStore, LegacyCredentialSource(context), settings, Dispatchers.IO)
+        val profiles = AppProfileOwner(session, profileStore, settings, Dispatchers.IO)
         val profileJob = scope.launch { profiles.run() }
         profiles.serverProfile.filterNotNull().first()
         val models = ViewModelStore()
@@ -120,7 +120,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
             withContext(Dispatchers.Main) { runtime.detach(); controlled.player.release() }
             scope.cancel()
             images.shutdown()
-            tags.selectTag(null)
+            tags.save(originalTags)
             profileStore.clearProfile()
         }
     }

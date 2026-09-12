@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.StreamProfile
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
@@ -28,7 +29,6 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     private object Keys {
         val PROFILE_UUID = stringPreferencesKey("profileUuid")
-        val LEGACY_PROFILE_NAME = stringPreferencesKey("profile")
         val AUDIO_LANGUAGE = stringPreferencesKey("audioLanguage")
         val SUBTITLE_LANGUAGE = stringPreferencesKey("subtitleLanguage")
         val ASPECT_RATIO = stringPreferencesKey("aspectRatio")
@@ -43,34 +43,11 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         discoveredProfiles: List<StreamProfile>,
         observationIsCurrent: () -> Boolean,
     ): StreamProfileId? {
-        var selected: StreamProfileId? = null
-        dataStore.edit { preferences ->
-            if (!observationIsCurrent()) return@edit
-            val persisted = preferences[Keys.PROFILE_UUID]?.takeIf(String::isNotBlank)
-            val resolved = persisted
-                ?.let { value -> runCatching { StreamProfileId(value) }.getOrNull() }
-                ?.takeIf { id -> discoveredProfiles.any { it.id == id } }
-
-            var migrated: StreamProfileId? = null
-            if (persisted == null) {
-                val legacyName = preferences[Keys.LEGACY_PROFILE_NAME]
-                migrated = legacyName
-                    ?.takeIf(String::isNotEmpty)
-                    ?.let { evidence ->
-                        discoveredProfiles.singleOrNull { it.name == evidence }?.id
-                    }
-            }
-            if (!observationIsCurrent()) return@edit
-
-            selected = resolved ?: migrated
-            if (persisted == null) {
-                migrated?.let { preferences[Keys.PROFILE_UUID] = it.value }
-                if (preferences[Keys.PROFILE_UUID].isNullOrBlank()) {
-                    preferences.remove(Keys.PROFILE_UUID)
-                }
-            }
-            preferences.remove(Keys.LEGACY_PROFILE_NAME)
-        }
+        if (!observationIsCurrent()) return null
+        val selected = dataStore.data.first()[Keys.PROFILE_UUID]
+            ?.takeIf(String::isNotBlank)
+            ?.let { value -> runCatching { StreamProfileId(value) }.getOrNull() }
+            ?.takeIf { id -> discoveredProfiles.any { it.id == id } }
         return selected.takeIf { observationIsCurrent() }
     }
 
@@ -81,7 +58,6 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
             } else {
                 preferences[Keys.PROFILE_UUID] = profileId.value
             }
-            preferences.remove(Keys.LEGACY_PROFILE_NAME)
         }
     }
 

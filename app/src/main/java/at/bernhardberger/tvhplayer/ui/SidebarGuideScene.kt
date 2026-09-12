@@ -1,7 +1,10 @@
 package at.bernhardberger.tvhplayer.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -23,7 +26,7 @@ import androidx.navigation3.scene.SceneStrategy
 
 internal const val SIDEBAR_SCENE_DESTINATION = "sidebarSceneDestination"
 
-/** Retain only destinations already shown during this expanded Channels/Guide visit. */
+/** One visual handoff for browse destinations; retain only the visited Channels/Guide pair. */
 @Composable
 internal fun rememberSidebarGuideSceneStrategy(
     drawerActive: Boolean,
@@ -41,13 +44,10 @@ internal fun rememberSidebarGuideSceneStrategy(
     return remember(retainGuide, retainChannels) {
         SceneStrategy { entries ->
             val active = entries.last()
-            val guide = entries.firstOrNull { it.metadata[SIDEBAR_SCENE_DESTINATION] == AppDestination.GUIDE }
-            val channels = entries.firstOrNull {
-                it.metadata[SIDEBAR_SCENE_DESTINATION] == AppDestination.CHANNELS
-            }
-            if (active == guide || active == channels) {
+            val destinations = entries.filter { it.metadata[SIDEBAR_SCENE_DESTINATION] in browseDestinations }
+            if (active in destinations) {
                 SidebarGuideScene(
-                    guide, active, channels, retainGuide, retainChannels,
+                    destinations, active, retainGuide, retainChannels,
                     entries.dropLast(1),
                 )
             } else {
@@ -58,24 +58,37 @@ internal fun rememberSidebarGuideSceneStrategy(
 }
 
 private data class SidebarGuideScene(
-    val guide: NavEntry<AppNavKey>?,
+    val destinations: List<NavEntry<AppNavKey>>,
     val active: NavEntry<AppNavKey>,
-    val channels: NavEntry<AppNavKey>?,
     val retainGuide: Boolean,
     val retainChannels: Boolean,
     override val previousEntries: List<NavEntry<AppNavKey>>,
 ) : Scene<AppNavKey> {
     override val key: Any = ChannelsKey
-    override val entries = listOfNotNull(guide, channels)
+    override val entries = destinations
     override val content: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize()) {
-            SidebarVisitDestination(guide, active == guide, retainGuide)
-            SidebarVisitDestination(channels, active == channels, retainChannels)
+            // Keep the animation slots, not all four screen trees, alive. Even a first
+            // visit starts from alpha zero and gets the same handoff as a retained page.
+            browseDestinations.forEach { destination ->
+                val entry = destinations.lastOrNull { it.metadata[SIDEBAR_SCENE_DESTINATION] == destination }
+                val retained = when (destination) {
+                    AppDestination.GUIDE -> retainGuide
+                    AppDestination.CHANNELS -> retainChannels
+                    else -> false
+                }
+                SidebarVisitDestination(entry, active == entry, retained)
+            }
         }
     }
 }
 
+private val browseDestinations = listOf(
+    AppDestination.CHANNELS, AppDestination.GUIDE, AppDestination.RECORDINGS, AppDestination.SETTINGS,
+)
+
 @Composable
+@OptIn(ExperimentalAnimationApi::class)
 private fun SidebarVisitDestination(entry: NavEntry<AppNavKey>?, visible: Boolean, retained: Boolean) {
     val alpha = animateFloatAsState(
         if (visible) 1f else 0f,
@@ -86,7 +99,24 @@ private fun SidebarVisitDestination(entry: NavEntry<AppNavKey>?, visible: Boolea
     // A destination never visited in this sidebar session is never constructed here.
     if (entry != null && (visible || retained || alpha.value > 0f)) {
         Layout(
-            content = { entry.Content() },
+            content = {
+                // Settings keeps its existing per-category NavEntry/saveable-state owner.
+                // A category change fades within this root slot rather than replacing it.
+                updateTransition(entry, label = "browseEntry").Crossfade(
+                    contentKey = { it.contentKey },
+                    modifier = Modifier.fillMaxSize(),
+                    animationSpec = tween(APP_DESTINATION_CROSSFADE_DURATION_MILLIS, easing = LinearEasing),
+                ) { destinationEntry ->
+                    val current = destinationEntry.contentKey == entry.contentKey
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .then(if (current) Modifier else Modifier.clearAndSetSemantics { })
+                            .focusProperties { onEnter = { if (!current) cancelFocusChange() } }
+                            .focusGroup(),
+                    ) { destinationEntry.Content() }
+                }
+            },
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { this.alpha = alpha.value }

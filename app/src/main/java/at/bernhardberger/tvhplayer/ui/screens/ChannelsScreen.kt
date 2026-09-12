@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import kotlin.math.roundToInt
 
@@ -50,6 +51,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.input.key.KeyEventType
@@ -90,6 +93,7 @@ import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -150,7 +154,7 @@ private suspend fun LazyListState.awaitVisibleChannel(channelId: ChannelId): Boo
 fun ChannelsScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
-    channelViewModel: ChannelsViewModel = koinViewModel(),
+    channelViewModel: ChannelsViewModel,
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     playingChannelId: ChannelId?,
@@ -160,7 +164,7 @@ fun ChannelsScreen(
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit
 ) {
     at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime("channels")
-    val channelScopeState by channelViewModel.scope.collectAsStateWithLifecycle()
+    val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedId by selection.selectedId.collectAsStateWithLifecycle()
@@ -177,6 +181,7 @@ fun ChannelsScreen(
         connectionUiState = connectionUiState,
         onSelectChannel = selection::setSelected,
         onSelectTag = channelViewModel::selectTag,
+        scopeStateProvider = { channelViewModel.scope.value },
         onDismissTagNotice = channelViewModel::dismissUnavailableTagNotice,
         onRetryConnection = onRetryConnection,
         onOpenConnectionSettings = onOpenConnectionSettings,
@@ -190,6 +195,7 @@ internal fun ChannelsScreenContent(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     channelScopeState: ChannelScopeState,
+    scopeStateProvider: () -> ChannelScopeState = { channelScopeState },
     observation: SessionObservation,
     tagNotice: Boolean,
     selectedId: ChannelId?,
@@ -215,6 +221,9 @@ internal fun ChannelsScreenContent(
         layoutDirection = layoutDirection,
     )
     val channelScope = channelScopeState.scope
+    val hasScopeTabs = channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1
+    val scopeFocus = remember { FocusRequester() }
+    var consumeBackRelease by remember { mutableStateOf(false) }
     val currentSession = observation.currentSession
     val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
@@ -229,6 +238,7 @@ internal fun ChannelsScreenContent(
     var didInitialRestore by remember { mutableStateOf(false) }
     var focusedChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var contentFocusOwned by remember { mutableStateOf(false) }
+    var scopeEntryRequested by remember { mutableStateOf(false) }
     val rememberedChannelIds = remember {
         mutableStateMapOf<ChannelTagId?, ChannelId>()
     }
@@ -254,7 +264,14 @@ internal fun ChannelsScreenContent(
     }
 
     val contentEntryEnabled by rememberUpdatedState(initialFocusEnabled)
+    val currentScope by rememberUpdatedState(scopeStateProvider)
+    val latestRenderedScope by rememberUpdatedState(channelScopeState)
+
+    fun matchesRequestedRows(state: ChannelScopeState): Boolean =
+        state.settingsLoaded && state.scope.activeTagId == channelScope.activeTagId &&
+            state.scope.visibleChannels.map { it.id } == orderedChannelIds
     val drawerState = LocalBrowseDrawerState.current
+    val navigationFocus = LocalBrowseNavigationFocus.current
 
     fun requestChannelFocus(
         channelId: ChannelId,
@@ -301,7 +318,9 @@ internal fun ChannelsScreenContent(
                 // Widget focus changes precede composition's drawerActive feedback.
                 // A queued initial restore must not take focus back in that interval.
                 if (drawerState?.currentValue == DrawerValue.Open ||
-                    !contentEntryEnabled || restorationGeneration != generation
+                    !contentEntryEnabled || !matchesRequestedRows(currentScope()) ||
+                    !matchesRequestedRows(latestRenderedScope) ||
+                    restorationGeneration != generation
                 ) return@launch
                 if (runCatching(requester::requestFocus).getOrDefault(false)) {
                     focusedChannelId = channelId
@@ -321,19 +340,33 @@ internal fun ChannelsScreenContent(
     }
 
     fun relinquishContentFocus(clearFocusedChannel: Boolean = false) {
+        scopeEntryRequested = false
         contentFocusOwned = false
         if (clearFocusedChannel) focusedChannelId = null
         cancelRestoration()
     }
 
     fun focusBrowseContent(): Boolean {
+        didInitialRestore = true // Explicit Down/OK intent supersedes cold-start tag entry.
+        scopeEntryRequested = true
+        if (!matchesRequestedRows(scopeStateProvider())) return true
+        scopeEntryRequested = false
         val id = restoredChannelId(
             visibleChannelIds = orderedChannelIds,
             rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
             selectedChannelId = selectedId,
         ) ?: return false
         contentFocusOwned = true
-        return requestChannelFocus(id)
+        return requestChannelFocus(id, preserveVisiblePosition = true)
+    }
+
+    fun focusScope(): Boolean {
+        relinquishContentFocus()
+        return scopeFocus.requestFocus()
+    }
+
+    BackHandler(enabled = initialFocusEnabled && hasScopeTabs && contentFocusOwned) {
+        focusScope()
     }
 
     fun pageChannels(direction: Int): Boolean {
@@ -353,7 +386,6 @@ internal fun ChannelsScreenContent(
 
         val targetId = channels[targetIndex].id
         contentFocusOwned = true
-        onSelectChannel(targetId)
         requestChannelFocus(targetId, animatePage = true)
         return true
     }
@@ -383,17 +415,13 @@ internal fun ChannelsScreenContent(
         }
     }
 
-    LaunchedEffect(channels, selectedId) {
-        val focusId = browsingFocusChannelId(channels, selectedId) ?: return@LaunchedEffect
-        if (focusId != selectedId) onSelectChannel(focusId)
-    }
-
     LaunchedEffect(channelScope.activeTagId, orderedChannelIds, initialFocusEnabled) {
         val pendingId = pendingFocusId?.takeIf {
             pendingFocusTagId == channelScope.activeTagId && it in orderedChannelIds
         }
         cancelRestoration()
         if (!initialFocusEnabled) {
+            scopeEntryRequested = false
             contentFocusOwned = false
             didInitialRestore = false
             return@LaunchedEffect
@@ -404,6 +432,17 @@ internal fun ChannelsScreenContent(
         }
 
         if (!didInitialRestore && initialFocusEnabled) {
+            if (hasScopeTabs) {
+                if (!focusScope()) {
+                    // TabRow subcomposes its focus targets during measurement. A cold
+                    // composition can precede their placement; lateral warm entry does not.
+                    withFrameNanos { }
+                    if (contentEntryEnabled && !didInitialRestore && !contentFocusOwned && matchesRequestedRows(currentScope()) &&
+                        drawerState?.currentValue != DrawerValue.Open
+                    ) scopeFocus.requestFocus()
+                }
+                return@LaunchedEffect
+            }
             didInitialRestore = true
             contentFocusOwned = true
             // A retained destination can receive a newer shared selection from Guide.
@@ -413,7 +452,6 @@ internal fun ChannelsScreenContent(
                 rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
                 selectedChannelId = selectedId,
             ) ?: return@LaunchedEffect
-            if (selectedId != id) onSelectChannel(id)
             requestChannelFocus(id, preserveVisiblePosition = true)
             return@LaunchedEffect
         }
@@ -433,9 +471,25 @@ internal fun ChannelsScreenContent(
         }
     }
 
+    LaunchedEffect(scopeEntryRequested, channelScopeState, initialFocusEnabled) {
+        if (scopeEntryRequested && initialFocusEnabled) focusBrowseContent()
+    }
+
     Column(
         Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.key != Key.Back) return@onPreviewKeyEvent false
+                if (consumeBackRelease) {
+                    if (event.type == KeyEventType.KeyUp) consumeBackRelease = false
+                    return@onPreviewKeyEvent true
+                }
+                if (event.type == KeyEventType.KeyDown && hasScopeTabs && contentFocusOwned) {
+                    consumeBackRelease = true
+                    focusScope()
+                    true
+                } else false
+            }
             .padding(
                 top = contentPadding.calculateTopPadding(),
                 bottom = contentPadding.calculateBottomPadding(),
@@ -445,17 +499,27 @@ internal fun ChannelsScreenContent(
             title = stringResource(R.string.channel_list),
             modifier = Modifier.padding(start = startPadding, end = endPadding),
         )
-        if (channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1) {
+        if (hasScopeTabs) {
             Spacer(Modifier.height(TvSpacing8))
             ChannelTagSelector(
                 tags = channelScope.tags,
                 activeTagId = channelScope.activeTagId,
+                activeFocusRequester = scopeFocus,
                 onSelectTag = {
                     relinquishContentFocus(clearFocusedChannel = true)
                     onSelectTag(it)
                 },
-                onMoveToContent = ::focusBrowseContent,
-                onTagFocus = ::relinquishContentFocus,
+                onMoveToContent = { focusBrowseContent() },
+                onTagFocus = {
+                    // This callback precedes the drawer's composition feedback on Right.
+                    if (!initialFocusEnabled) {
+                        selectedId?.takeIf { it in orderedChannelIds }?.let {
+                            rememberedChannelIds[channelScope.activeTagId] = it
+                        }
+                    }
+                    didInitialRestore = true
+                    relinquishContentFocus()
+                },
                 allChannelsVisible = channelScope.allChannelsVisible,
                 modifier = Modifier
                     .padding(browseViewportPadding)
@@ -535,6 +599,13 @@ internal fun ChannelsScreenContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("channels-list")
+                                .focusProperties {
+                                    onEnter = {
+                                        if (hasScopeTabs && (!didInitialRestore || requestedFocusDirection == FocusDirection.Right)) {
+                                            scopeFocus.requestFocus()
+                                        }
+                                    }
+                                }
                                 .focusGroup()
                                 .focusRestorer()
                                 .onPreviewKeyEvent { event ->
@@ -572,6 +643,13 @@ internal fun ChannelsScreenContent(
                                 ChannelRow(
                                     modifier = Modifier
                                         .focusRequester(rowFocusRequesters.getValue(channelId))
+                                        .focusProperties {
+                                            if (layoutDirection == LayoutDirection.Ltr) {
+                                                left = navigationFocus ?: FocusRequester.Default
+                                            } else {
+                                                right = navigationFocus ?: FocusRequester.Default
+                                            }
+                                        }
                                         .testTag("channel-row-${channelId.value}"),
                                     number = ChannelNavigation.numberForId(
                                         orderedChannelIds,

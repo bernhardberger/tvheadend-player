@@ -15,12 +15,36 @@ entry points are exhausted; avoid asking them to rediscover this table.
 | Recording-player presentation | `app/src/main/java/at/bernhardberger/tvhplayer/ui/player/RecordingPlayerScreen.kt` |
 | Guide grid, programme details, filtering, and Guide-local DVR actions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/EpgGridScreen.kt` |
 | Channel browsing and focus restoration | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ChannelsScreen.kt` |
+| Shared channel-tag selection, scope visibility, hydration and ordered persistence | `app/src/main/java/at/bernhardberger/tvhplayer/viewmodels/ChannelsViewModel.kt`, created once above `NavDisplay` in `AppRoot.kt` and passed to Channels, Guide, Settings and live playback |
 | Recordings browsing and DVR actions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/RecordingsScreen.kt` |
 | Server profile persistence, credential edit lifetime, and stream-profile selection | `app/src/main/java/at/bernhardberger/tvhplayer/settings/AppProfileOwner.kt` |
 | Onboarding and connection editing | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/OnboardingScreen.kt` and `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/settings/SettingsConnection.kt` |
 | Appliance launch, HOME/GUIDE, wake, and Simple TV | Start from `docs/appliance-mode-spec.md`, then `app/src/main/java/at/bernhardberger/tvhplayer/ui/MainActivity.kt`, `app/src/main/java/at/bernhardberger/tvhplayer/accessibility/ApplianceEntryAccessibilityService.kt`, and `app/src/main/java/at/bernhardberger/tvhplayer/core/` |
 | SDK public playback behavior | Owned by `tvheadend-sdk`; the app calls `TvheadendPlaybackCoordinator` through `AppPlaybackRuntime` and must not reproduce SDK state machines |
 | HTSP wire behavior | Owned by `tvheadend-htsp`; do not add an application workaround for an attributed protocol defect |
+
+## Browsing state boundaries
+
+Tag input updates the shared in-memory scope synchronously. DataStore loads it
+once and persists the latest intent in order; completed writes do not feed back
+into active selection. Only current catalog authority may normalize unavailable
+preferences. Screen callbacks validate the scope snapshot that produced their
+rows, rather than comparing two freshly read values around stale rendered rows.
+Channels focus handoffs compare the active tag and ordered channel IDs, so a
+metadata-only refresh cannot cancel a page scroll's pending focus transfer.
+
+Native row/programme focus remains screen-local. The Guide viewport owns arrows
+and bridges native focus while cells are replaced; programme focus acknowledges
+selection and saves the shared browse position. Hidden-screen initialization does
+not write that position. An OK press begun during a handoff stays consumed through
+its release, even when the replacement cell has become ready.
+Channels and Guide enter through their active scope tab; content Back returns to
+that tab before the global drawer. Already-attached Guide neighbours receive
+native focus in the key dispatch, while new windows retain the viewport bridge.
+The browse scene owns the same root crossfade for Channels, Guide, Recordings and
+Settings; Settings categories retain their distinct navigation/saveable-state keys.
+AppRoot also registers browse Back with the activity dispatcher: a singleton
+Channels root cannot rely on NavDisplay's pop handler to unwind focus layers.
 
 ## Tool boundaries
 

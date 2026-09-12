@@ -300,9 +300,12 @@ Do not bundle dependency cleanup into player or navigation refactors.
 ### 14. Locale, identity, and release readiness
 
 - Recount default and German resources and complete user-visible German copy.
-- Decide the pre-SDK credential migration before the first signed release. Keep
-  it only as a documented, dated compatibility requirement; otherwise remove it
-  after confirming the operator no longer needs it.
+- **Operator decision, 2026-09-12:** Backward compatibility with earlier 0.x APIs
+  and stored formats is not required; manual migration or fresh setup is
+  acceptable. The pre-SDK credential importer has been removed in the verified
+  Phase 0 change recorded in `responsive-ui-foundations-plan.md`.
+  The current SDK profile path remains, and the plan records manual
+  setup for installations containing only the old profile format.
 - Prototype release shrinking before publication, then verify Koin,
   serialization restoration, native decoders, licenses, corresponding-source
   obligations, and release-native-library gates.

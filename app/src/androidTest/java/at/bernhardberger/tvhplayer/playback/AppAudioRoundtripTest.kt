@@ -21,7 +21,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
-import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.player.collectTracks
@@ -64,7 +63,7 @@ class AppAudioRoundtripTest {
                 }
             }
             val session = FakeTvheadendSession()
-            val owner = AppProfileOwner(context, session, profileStore, LegacyCredentialSource(context), PlayerSettingsStore(failingStore), Dispatchers.IO)
+            val owner = AppProfileOwner(session, profileStore, PlayerSettingsStore(failingStore), Dispatchers.IO)
             val job = launch { owner.run() }
             try {
                 assertTrue(owner.serverProfile.filterNotNull().first() is at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.Available)
@@ -103,7 +102,7 @@ class AppAudioRoundtripTest {
                     )
                 }))
                 val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-                var profiles = AppProfileOwner(context, session, profileStore, LegacyCredentialSource(context), settings, Dispatchers.IO)
+                var profiles = AppProfileOwner(session, profileStore, settings, Dispatchers.IO)
                 var profileJob = scope.launch { profiles.run() }
                 var controlled = ControlledAudioPlayer()
                 var coordinator = createTvheadendPlaybackCoordinator(controlled.player)
@@ -130,7 +129,7 @@ class AppAudioRoundtripTest {
                     runtime.detach()
                     controlled.player.release()
                     val freshSettings = PlayerSettingsStore(context)
-                    profiles = AppProfileOwner(context, session, TvheadendServerProfileStore(context), LegacyCredentialSource(context), freshSettings, Dispatchers.IO)
+                    profiles = AppProfileOwner(session, TvheadendServerProfileStore(context), freshSettings, Dispatchers.IO)
                     profileJob = scope.launch { profiles.run() }
                     profiles.serverProfile.filterNotNull().first()
                     assertEquals(profileIdentity, profiles.audioProfileId)

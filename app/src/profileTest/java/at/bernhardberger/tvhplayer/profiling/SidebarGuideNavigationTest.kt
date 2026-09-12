@@ -17,6 +17,8 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -48,8 +50,40 @@ class SidebarGuideNavigationTest {
     @get:Rule val compose = createAndroidComposeRule<JourneyProfileActivity>()
     private val focusHistory = mutableListOf<String>()
 
+    @Test fun channelPageFocusSurvivesMetadataPublishedDuringTheScroll() {
+        enterInitialChannelScope()
+        key(Key.DirectionDown)
+        compose.onNode(hasText("Offline channel 1", substring = true) and isFocused()).assertExists()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)) }
+            repeat(2) { compose.mainClock.advanceTimeByFrame() }
+            compose.activityRule.scenario.onActivity { activity ->
+                val source = session(activity)
+                val old = source.observation.value
+                val catalog = checkNotNull(old.channelCatalogForDisplay)
+                source.publish(SessionObservation.create(
+                    sessionState = old.sessionState,
+                    channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
+                        catalog.channels.map { Channel.create(it.id, name = "${it.name} updated", number = it.number, tagIds = it.tagIds) },
+                        catalog.tags,
+                    )),
+                    epgState = old.epgState,
+                    dvrState = old.dvrState,
+                ))
+            }
+            repeat(100) { compose.mainClock.advanceTimeByFrame() }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        val focus = compose.onNode(isFocused()).assertIsDisplayed().fetchSemanticsNode()
+        val id = focus.config.getOrNull(SemanticsProperties.TestTag).orEmpty().removePrefix("channel-row-").toLongOrNull()
+        assertTrue("Paging must transfer visible native focus: $focus", id != null && id > 1)
+    }
+
     @Test fun channelViewportSurvivesDrawerRoundTripWithAMiddleRowSelected() {
-        compose.waitForIdle()
+        enterInitialChannelScope()
+        key(Key.DirectionDown)
         repeat(2) { key(Key.DirectionDown) }
         val middleRow = hasText("Offline channel 3", substring = true) and isFocused()
         val before = compose.onNode(middleRow).fetchSemanticsNode().boundsInRoot
@@ -59,6 +93,7 @@ class SidebarGuideNavigationTest {
         compose.mainClock.autoAdvance = false
         try {
             key(Key.DirectionRight)
+            key(Key.DirectionDown)
             repeat(30) {
                 compose.mainClock.advanceTimeByFrame()
                 val top = compose.onNode(
@@ -157,6 +192,7 @@ class SidebarGuideNavigationTest {
         assertTrue(focusedDescription().startsWith("Offline channel 13,"))
         val restored = focusedDescription()
         back()
+        back()
         key(Key.DirectionUp)
         key(Key.DirectionDown)
         enterProgramme()
@@ -187,7 +223,7 @@ class SidebarGuideNavigationTest {
         val entries = compose.activity.guideCompositionEntries
         assertTrue(entries > 0)
         key(Key.DirectionDown)
-        compose.onNodeWithText("Recordings").assertIsFocused()
+        compose.onNode(hasText("Recordings") and hasClickAction()).assertIsFocused()
         back()
         compose.onNodeWithText("Channels").assertIsFocused()
         compose.runOnIdle { assertEquals(entries, compose.activity.guideCompositionEntries) }
@@ -199,6 +235,53 @@ class SidebarGuideNavigationTest {
         openGuideSidebar()
         key(Key.DirectionRight)
         compose.onNode(hasText("All channels") and isFocused()).assertIsFocused().assertIsSelected()
+    }
+
+    @Test fun channelsEntryStaysOnScopeAndBackUnwindsOneLayer() {
+        compose.waitForIdle()
+        key(Key.DirectionLeft)
+        compose.onNodeWithText("Channels").assertIsFocused()
+        key(Key.DirectionRight)
+        compose.mainClock.advanceTimeBy(500)
+        compose.onNode(hasText("All channels") and isSelected()).assertIsFocused()
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        compose.onNode(hasText("Offline channel 2", substring = true) and isFocused()).assertIsFocused()
+        back()
+        compose.onNode(hasText("Group A") and isSelected()).assertIsFocused()
+        back()
+        compose.onNodeWithText("Channels").assertIsFocused()
+    }
+
+    @Test fun guideBackReturnsToSelectedScopeBeforeDrawer() {
+        openGuideSidebar()
+        key(Key.DirectionRight)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        assertTrue(focusedDescription().startsWith("Offline channel 2,"))
+        back()
+        compose.onNode(hasText("Group A") and isSelected()).assertIsFocused()
+        back()
+        compose.onNode(hasText("Guide") and hasClickAction()).assertIsFocused()
+    }
+
+    @Test fun visibleProgrammeReceivesNativeFocusWithinTheKeyDispatch() {
+        openGuideSidebar()
+        enterProgramme()
+        // Advance away from a clipped window edge before the synchronous-input check.
+        key(Key.DirectionRight)
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle {
+                val before = checkNotNull(compose.activity.guidePosition.position.value).eventId
+                compose.activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+                compose.activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+                val after = checkNotNull(compose.activity.guidePosition.position.value).eventId
+                assertTrue("Native acknowledgement must not wait for recomposition", before != after)
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
     }
 
     @Test fun guideScopeReversalsRemainCoherentAndDownEntersSelectedScope() =
@@ -226,13 +309,161 @@ class SidebarGuideNavigationTest {
         compose.waitUntilExactlyOneExists(hasText("Group A") and isFocused() and isSelected(), 5_000)
     }
 
+    @Test fun channelsImmediateTagEntryUsesLatestIntent() = immediateTagEntry(guide = false)
+
+    @Test fun guideImmediateTagEntryUsesLatestIntent() = immediateTagEntry(guide = true)
+
+    private fun immediateTagEntry(guide: Boolean) {
+        if (guide) {
+            openGuideSidebar()
+            key(Key.DirectionRight)
+        } else {
+            compose.waitForIdle()
+            compose.onNodeWithText("All channels").requestFocus()
+        }
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput {
+                listOf(Key.DirectionRight, Key.DirectionRight, Key.DirectionLeft, Key.DirectionDown)
+                    .forEach { keyDown(it); keyUp(it) }
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        compose.onNode(hasText("Group A") and isSelected()).assertExists()
+        if (guide) {
+            assertTrue("Immediate entry must reach Group A programme: ${focusedDescription()}",
+                focusedDescription().startsWith("Offline channel 2,"))
+        } else {
+            compose.onNode(hasText("Offline channel 2", substring = true) and isFocused()).assertIsFocused()
+        }
+    }
+
+    @Test fun rapidHorizontalNavigationKeepsFocusInsideGuide() {
+        openGuideSidebar()
+        enterProgramme()
+        val initial = focusedDescription()
+        compose.mainClock.autoAdvance = false
+        try {
+            // One rendered frame between keys, including multiple three-hour window edges.
+            for (direction in listOf(Key.DirectionRight, Key.DirectionLeft, Key.DirectionRight)) {
+                repeat(16) { step ->
+                    compose.onRoot().performKeyInput { keyDown(direction); keyUp(direction) }
+                    compose.mainClock.advanceTimeByFrame()
+                    compose.onNode(isFocused() and (hasTestTag("epg-programme-viewport") or
+                        hasAnyAncestor(hasTestTag("epg-programme-viewport")))).assertExists()
+                }
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        assertTrue("The burst must actually navigate", initial != focusedDescription())
+        assertTrue(focusedDescription().startsWith("Offline channel"))
+    }
+
+    @Test fun knownEmptyNextWindowKeepsOriginProgrammeAndBackWorks() {
+        restoreLastProgrammeInWindow(emptyNextWindow = true)
+        openGuideSidebar()
+        enterProgramme()
+        val origin = focusedDescription()
+        repeat(3) { key(Key.DirectionRight) }
+        assertEquals(origin, focusedDescription())
+        back()
+        compose.onNode(hasText("All channels") and isSelected()).assertIsFocused()
+        back()
+        compose.onNode(hasText("Guide") and hasClickAction()).assertIsFocused()
+    }
+
+    @Test fun centerHeldAcrossWindowHandoffDoesNotActivateNewProgramme() {
+        restoreLastProgrammeInWindow(emptyNextWindow = false)
+        openGuideSidebar()
+        enterProgramme()
+        val origin = focusedDescription()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput {
+                keyDown(Key.DirectionRight); keyUp(Key.DirectionRight)
+                keyDown(Key.DirectionCenter)
+            }
+            compose.mainClock.autoAdvance = true
+            compose.waitUntil(5_000) {
+                val focused = focusedDescription()
+                focused.startsWith("Offline channel 1,") && focused != origin
+            }
+            val replacement = focusedDescription()
+            compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+            compose.waitForIdle()
+            assertEquals(replacement, focusedDescription())
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        compose.onNode(isFocused() and hasAnyAncestor(hasTestTag("epg-programme-viewport"))).assertExists()
+    }
+
+    @Test fun interruptedCenterDoesNotSuppressTheNextProgrammeActivation() = interruptedActivation(false)
+
+    @Test fun drawerInterruptedCenterDoesNotSuppressTheNextProgrammeActivation() = interruptedActivation(true)
+
+    private fun interruptedActivation(viaDrawer: Boolean) {
+        restoreLastProgrammeInWindow(emptyNextWindow = false)
+        openGuideSidebar()
+        enterProgramme()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput {
+                keyDown(Key.DirectionRight); keyUp(Key.DirectionRight)
+                keyDown(Key.DirectionCenter)
+            }
+            if (viaDrawer) {
+                compose.mainClock.autoAdvance = true
+                back()
+                back()
+                compose.onNode(hasText("Guide") and hasClickAction()).assertIsFocused()
+            } else {
+                compose.onNodeWithText("All channels").requestFocus()
+            }
+            compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        if (viaDrawer) enterProgramme() else key(Key.DirectionDown)
+        val programme = focusedDescription()
+        assertTrue(programme.startsWith("Offline channel"))
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNode(hasTestTag("programme-details-body")).assertIsFocused()
+        back()
+        assertEquals(programme, focusedDescription())
+    }
+
+    private fun restoreLastProgrammeInWindow(emptyNextWindow: Boolean) {
+        compose.waitForIdle()
+        compose.activityRule.scenario.onActivity { activity ->
+            val source = session(activity)
+            val old = source.observation.value
+            val snapshot = checkNotNull(old.epgSnapshotForDisplay)
+            val start = guideWindowBounds(System.currentTimeMillis() / 1000L, ZoneId.systemDefault()).earliestStartSec
+            val end = start + 3 * 3600L
+            val event = snapshot.events.filter { it.channelId == ChannelId(1) && it.stop.epochSeconds <= end }
+                .maxBy { it.start }
+            activity.guidePosition.save(GuidePosition(ChannelId(1), event.id, event.start.epochSeconds, start, 0))
+            if (emptyNextWindow) source.publish(SessionObservation.create(
+                sessionState = old.sessionState, channelState = old.channelState,
+                epgState = EpgRepositoryState.Current(EpgSnapshot.create(
+                    snapshot.events.filter { it.start.epochSeconds < end }, snapshot.coverages)),
+                dvrState = old.dvrState,
+            ))
+        }
+    }
+
     private fun assertBrowseScopeEntry(guide: Boolean, entryKey: Key) {
         if (guide) {
             openGuideSidebar()
             key(Key.DirectionRight)
         } else {
-            compose.waitUntilAtLeastOneExists(hasText("Offline channel 1", substring = true), 15_000)
-            compose.onNodeWithText("All channels").requestFocus()
+            enterInitialChannelScope()
         }
         compose.onNode(hasText("All channels") and isFocused()).assertIsSelected()
         compose.mainClock.autoAdvance = false
@@ -248,9 +479,6 @@ class SidebarGuideNavigationTest {
                     compose.mainClock.advanceTimeByFrame()
                     val tab = compose.onNode(hasText(label) and isFocused())
                     tab.assertIsFocused()
-                    val pixels = tab.captureToImage().toPixelMap()
-                    val pill = pixels[pixels.width / 2, pixels.height / 5]
-                    assertTrue("Focused scope pill must accompany selection at $step/$frame", pill.red > 0.85f && pill.green > 0.85f && pill.blue > 0.85f)
                     if (frame == 1 || frame == 3) {
                         val context = InstrumentationRegistry.getInstrumentation().targetContext
                         val directory = File(context.getExternalFilesDir(null), "p49-guide-motion").apply { mkdirs() }
@@ -259,8 +487,8 @@ class SidebarGuideNavigationTest {
                         }
                     }
                 }
-                // Focus styling is synchronous; persisted scope selection reaches the
-                // composable through DataStore/Flow. Check that commit independently
+                // Native focus is immediate while the pill travels; scope reaches the
+                // composable through StateFlow. Check that commit independently
                 // without skipping the intermediate focus frames above.
                 compose.mainClock.autoAdvance = true
                 compose.waitUntilExactlyOneExists(hasText(label) and isFocused() and isSelected(), 5_000)
@@ -279,7 +507,7 @@ class SidebarGuideNavigationTest {
     }
 
     @Test fun firstGuideRightDuringDrawerOpeningReachesItsSelectedScope() {
-        compose.waitForIdle()
+        enterInitialChannelScope()
         compose.mainClock.autoAdvance = false
         try {
             compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
@@ -296,7 +524,7 @@ class SidebarGuideNavigationTest {
         }
     }
 
-    @Test fun rightDuringGuideExitEntersTheSelectedChannel() {
+    @Test fun rightDuringGuideExitEntersTheSelectedScope() {
         openGuideSidebar()
         compose.mainClock.autoAdvance = false
         try {
@@ -307,7 +535,7 @@ class SidebarGuideNavigationTest {
             compose.mainClock.autoAdvance = true
         }
         compose.waitForIdle()
-        compose.onNode(hasText("Offline channel 1", substring = true) and isFocused()).assertIsFocused()
+        compose.onNode(hasText("All channels") and isSelected()).assertIsFocused()
     }
 
     @Test fun reopeningDrawerCancelsPendingChannelsEntry() {
@@ -364,17 +592,22 @@ class SidebarGuideNavigationTest {
         val later = focusedDescription()
         assertTrue("Must browse away from initial programme", initial != later)
         back()
+        back()
         compose.onNode(hasText("Guide") and hasClickAction()).assertIsFocused()
         key(Key.DirectionUp)
         key(Key.DirectionDown)
         enterProgramme()
         assertEquals(later, focusedDescription())
         back()
+        back()
         key(Key.DirectionUp)
         val entries = compose.activity.guideCompositionEntries
         key(Key.DirectionRight) // Closing on Channels releases the retained Guide scene.
+        compose.onNodeWithText("All channels").assertIsFocused()
+        key(Key.DirectionDown)
         // Guide and Channels deliberately share browse selection by channel identity.
         compose.onNode(hasText(later.substringBefore(','), substring = true) and isFocused()).assertIsFocused()
+        back()
         back()
         compose.onNodeWithText("Channels").assertIsFocused()
         compose.onNode(hasContentDescription(later)).assertDoesNotExist()
@@ -383,11 +616,23 @@ class SidebarGuideNavigationTest {
     }
 
     private fun openGuideSidebar() {
-        compose.waitUntilAtLeastOneExists(hasText("Offline channel 1", substring = true), 15_000)
+        enterInitialChannelScope()
+        val initialFocus = compose.onNode(isFocused()).fetchSemanticsNode().config
         key(Key.DirectionLeft)
-        compose.onNodeWithText("Channels").assertIsFocused()
+        assertTrue("Left must reach Channels drawer. Initial=$initialFocus; history=$focusHistory",
+            compose.onAllNodes(hasText("Channels") and isFocused()).fetchSemanticsNodes().size == 1)
         key(Key.DirectionDown)
         compose.onNode(hasText("Guide") and hasClickAction()).assertIsFocused()
+    }
+
+    private fun enterInitialChannelScope() {
+        compose.waitUntilAtLeastOneExists(hasText("All channels"), 15_000)
+        compose.waitForIdle()
+        // If the drawer took focus while settings loaded, content must not steal it.
+        // Enter through the same Right key as a viewer, rather than forcing native focus.
+        val drawer = compose.onAllNodes(hasText("Channels") and isFocused()).fetchSemanticsNodes()
+        if (drawer.isNotEmpty()) key(Key.DirectionRight)
+        compose.onNodeWithText("All channels").assertIsFocused()
     }
 
     private fun key(key: Key) {

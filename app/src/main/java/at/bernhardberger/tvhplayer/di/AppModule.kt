@@ -9,13 +9,11 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
 import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
-import at.bernhardberger.tvhplayer.core.removeLegacyCoilCache
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.createPlaybackLoadControl
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
-import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
@@ -32,7 +30,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -48,17 +45,14 @@ val appModule = module {
     single {
         val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val cacheRoot = androidContext().cacheDir
-        applicationScope.launch(Dispatchers.IO) { removeLegacyCoilCache(cacheRoot) }
         val session = createTvheadendSession(
             GUIDE_EPG_COVERAGE_POLICY,
             appMetadataCachePolicy(cacheRoot),
         )
         val playerSettings = get<PlayerSettingsStore>()
         val profileOwner = AppProfileOwner(
-            context = androidContext(),
             session = session,
             profileStore = TvheadendServerProfileStore(androidContext()),
-            legacyCredentials = LegacyCredentialSource(androidContext()),
             playerSettings = playerSettings,
             ioDispatcher = get(qualifier = named("io")),
         )

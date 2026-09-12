@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
+import at.bernhardberger.tvhplayer.ui.components.BrowseTabRow
+import at.bernhardberger.tvhplayer.ui.components.browseTabColors
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import kotlin.math.roundToInt
 
@@ -63,8 +65,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Tab
-import androidx.tv.material3.TabDefaults
-import androidx.tv.material3.TabRow
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -89,8 +89,6 @@ import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
-import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
@@ -129,7 +127,7 @@ internal fun RecordingModeTabs(
     onClick: (DvrLibraryMode) -> Unit,
     onMoveToContent: () -> Unit,
 ) {
-    TabRow(
+    BrowseTabRow(
         selectedTabIndex = selected.ordinal,
         modifier = modifier
             .focusRestorer(selectedFocus)
@@ -139,18 +137,7 @@ internal fun RecordingModeTabs(
                     onMoveToContent().let { true }
             },
     ) {
-        val scheme = MaterialTheme.colorScheme
-        val tabColors = TabDefaults.pillIndicatorTabColors(
-            // Raise unselected contrast so Archive/Schedule/Problems all read as enabled.
-            contentColor = scheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
-            inactiveContentColor = scheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
-            selectedContentColor = scheme.onSurface,
-            focusedContentColor = scheme.inverseOnSurface,
-            focusedSelectedContentColor = scheme.inverseOnSurface,
-            disabledContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
-            disabledInactiveContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
-            disabledSelectedContentColor = scheme.onSurface.copy(alpha = TvTextDisabledAlpha),
-        )
+        val tabColors = browseTabColors()
         DvrLibraryMode.entries.forEach { mode ->
             Tab(
                 selected = selected == mode,

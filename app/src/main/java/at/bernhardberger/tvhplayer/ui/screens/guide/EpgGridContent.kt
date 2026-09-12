@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.key
 import androidx.compose.ui.platform.LocalDensity
@@ -29,11 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -59,9 +55,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
-import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
-import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
@@ -174,7 +168,7 @@ internal fun TimelineChannelRow(
     channel: Channel,
     channelIndex: Int,
     number: Int?,
-    selectedTarget: EpgFocusTarget?,
+    selectedEventId: EventId?,
     eventFocusRequesters: MutableMap<EventId, FocusRequester>,
     windowStartSec: Long,
     windowEndSec: Long,
@@ -189,7 +183,6 @@ internal fun TimelineChannelRow(
     recordingForEvent: (EventId) -> DvrEntry?,
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
-    onMoveFocus: (EpgFocusDirection) -> Boolean,
     visibleRowWidthPx: Int? = null,
 ) {
     val nowSec = nowSecProvider()
@@ -209,7 +202,7 @@ internal fun TimelineChannelRow(
             number = number,
             imageLoader = imageLoader,
             currentSession = currentSession,
-            selected = selectedTarget?.channelIndex == channelIndex,
+            selected = selectedEventId != null,
         )
         Spacer(Modifier.width(4.dp))
         BoxWithConstraints(
@@ -232,8 +225,7 @@ internal fun TimelineChannelRow(
                 ) ?: return@forEach
                 val start = maxWidth * span.startFraction
                 val width = maxWidth * (span.endFraction - span.startFraction)
-                val isFocusTarget = selectedTarget?.channelIndex == channelIndex &&
-                    selectedTarget.eventId == event.id
+                val isFocusTarget = selectedEventId == event.id
                 if (!shouldComposeTimelineCell(
                         startPx = with(density) { start.roundToPx() },
                         widthPx = with(density) { width.roundToPx() },
@@ -242,8 +234,15 @@ internal fun TimelineChannelRow(
                     )
                 ) return@forEach
                 key(event.id) {
-                    val focusRequester = remember(event.id) {
-                        eventFocusRequesters.getOrPut(event.id) { FocusRequester() }
+                    val focusRequester = remember(event.id) { FocusRequester() }
+                    DisposableEffect(event.id, focusRequester, eventFocusRequesters) {
+                        // Synchronous input must only find requesters for committed cells.
+                        eventFocusRequesters[event.id] = focusRequester
+                        onDispose {
+                            if (eventFocusRequesters[event.id] === focusRequester) {
+                                eventFocusRequesters.remove(event.id)
+                            }
+                        }
                     }
                     TimelineProgrammeCell(
                         event = event,
@@ -255,7 +254,6 @@ internal fun TimelineChannelRow(
                         focusRequester = focusRequester,
                         onFocused = { onFocused(event) },
                         onOpenDetails = { onOpenDetails(event) },
-                        onMoveFocus = onMoveFocus,
                         width = width,
                         modifier = Modifier
                             .offset(x = start)
@@ -357,7 +355,6 @@ internal fun TimelineProgrammeCell(
     focusRequester: FocusRequester,
     onFocused: () -> Unit,
     onOpenDetails: () -> Unit,
-    onMoveFocus: (EpgFocusDirection) -> Boolean,
     width: Dp,
     modifier: Modifier,
 ) {
@@ -419,16 +416,6 @@ internal fun TimelineProgrammeCell(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvPanelDenseAlpha))
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
-                .onPreviewKeyEvent { keyEvent ->
-                    if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (keyEvent.key) {
-                        Key.DirectionUp -> onMoveFocus(EpgFocusDirection.UP)
-                        Key.DirectionDown -> onMoveFocus(EpgFocusDirection.DOWN)
-                        Key.DirectionLeft -> onMoveFocus(EpgFocusDirection.LEFT)
-                        Key.DirectionRight -> onMoveFocus(EpgFocusDirection.RIGHT)
-                        else -> false
-                    }
-                }
                 .semantics { contentDescription = description },
         )
         recording?.takeIf {

@@ -4,6 +4,8 @@ import at.bernhardberger.tvhplayer.profiling.profileTrace
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.annotation.MainThread
+import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
@@ -18,10 +20,18 @@ import at.bernhardberger.tvhplayer.core.ChannelBrowsingScope
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import at.bernhardberger.tvhplayer.core.TagScopeFallback
 import at.bernhardberger.tvhplayer.core.resolveChannelScope
+import at.bernhardberger.tvhplayer.core.resolveOrderedChannelScope
+import at.bernhardberger.tvhplayer.core.orderBrowseChannels
+import at.bernhardberger.tvhplayer.core.updateChannelScopeVisibility
+import at.bernhardberger.tvhplayer.settings.ChannelTagPreferences
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
+import java.io.IOException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -30,6 +40,8 @@ import kotlinx.coroutines.launch
 data class ChannelScopeState(
     val scope: ChannelBrowsingScope,
     val channelCatalogCurrent: Boolean,
+    val settingsLoaded: Boolean = true,
+    val visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
 )
 
 class ChannelsViewModel(
@@ -38,79 +50,140 @@ class ChannelsViewModel(
 ) : ViewModel() {
     val observation: StateFlow<SessionObservation> = session.observation
 
-    val scope: StateFlow<ChannelScopeState> = combine(
-        session.observation.map { it.channelState }.distinctUntilChanged(),
-        tagSettings.activeTagId,
-        tagSettings.scopeVisibility,
-    ) { channelState, activeTagId, visibility ->
-        profileTrace("P44:channelScope") {
-            resolveChannelScopeState(channelState, activeTagId, visibility)
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Eagerly,
-        initialValue = resolveChannelScopeState(ChannelRepositoryState.Empty, null),
+    private val mutableScope = MutableStateFlow(
+        resolveChannelScopeState(ChannelRepositoryState.Empty, null).copy(settingsLoaded = false),
     )
+    val scope = mutableScope.asStateFlow()
+    private var preferences: ChannelTagPreferences? = null
+    private var tagSelectedBeforeLoad = false
+    private var initialTagId: ChannelTagId? = null
+    private var catalogChannels: List<Channel>? = null
+    private var orderedChannels: List<Channel> = emptyList()
+    private var unsavedPreferences: ChannelTagPreferences? = null
+    private var saveJob: Job? = null
+    private var loadJob: Job? = null
+    private val mutableSettingsFailure = MutableStateFlow(false)
+    val settingsFailure = mutableSettingsFailure.asStateFlow()
+    private val mutableUnavailableTagNotice = MutableStateFlow(false)
+    val unavailableTagNotice = mutableUnavailableTagNotice.asStateFlow()
 
     val channels = scope.map { it.scope.visibleChannels }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList(),
     )
-    val unavailableTagNotice = tagSettings.unavailableTagNotice
-
     init {
+        loadSettings()
         viewModelScope.launch {
-            combine(scope, tagSettings.activeTagId) { currentState, requestedTagId ->
-                if (
-                    currentState.channelCatalogCurrent &&
-                    currentState.scope.activeTagId != requestedTagId
-                ) {
-                    currentState.scope
-                } else {
-                    null
-                }
-            }.collect { fallbackScope ->
-                fallbackScope ?: return@collect
-                if (fallbackScope.fallback == TagScopeFallback.TAG_UNAVAILABLE) {
-                    tagSettings.fallbackToScope(fallbackScope.activeTagId)
-                } else {
-                    tagSettings.selectTag(fallbackScope.activeTagId)
-                }
-            }
+            observation.map { it.channelState }.distinctUntilChanged().collect { publishScope() }
         }
-        viewModelScope.launch {
-            combine(session.observation, tagSettings.scopeVisibility) { observation, visibility ->
-                val tags = observation.channelCatalogForDisplay?.tags.orEmpty()
-                val metadataReady = observation.channelCatalogAuthority ==
-                    RetainedMetadataAuthority.CURRENT
-                if (
-                    metadataReady &&
-                    visibility.configured &&
-                    !visibility.allChannelsVisible &&
-                    tags.none { visibility.isTagVisible(it.id) }
-                ) {
-                    tags.mapTo(mutableSetOf()) { it.id }
-                } else {
-                    null
-                }
-            }.collect { availableTagIds ->
-                availableTagIds ?: return@collect
-                tagSettings.setScopeVisible(
-                    tagId = null,
-                    visible = true,
-                    availableTagIds = availableTagIds,
-                )
+    }
+
+    private fun loadSettings() {
+        if (loadJob?.isActive == true || preferences != null) return
+        loadJob = viewModelScope.launch {
+            try {
+                val saved = tagSettings.settings.first()
+                preferences = if (tagSelectedBeforeLoad) saved.copy(activeTagId = initialTagId) else saved
+                mutableSettingsFailure.value = false
+                publishScope()
+                if (preferences != saved) enqueueSave()
+            } catch (_: IOException) {
+                mutableSettingsFailure.value = true
             }
         }
     }
 
+    /** UI intent and its resolved scope are published together, before any storage suspension. */
+    @MainThread
     fun selectTag(tagId: ChannelTagId?) {
-        viewModelScope.launch { tagSettings.selectTag(tagId) }
+        mutableUnavailableTagNotice.value = false
+        val current = preferences
+        if (current == null) {
+            tagSelectedBeforeLoad = true
+            initialTagId = tagId
+            return
+        }
+        preferences = current.copy(activeTagId = tagId)
+        publishScope()
+        if (preferences != current) enqueueSave()
+    }
+
+    @MainThread
+    fun toggleScopeVisibility(tagId: ChannelTagId?) {
+        val visibility = preferences?.visibility ?: return
+        setScopeVisible(tagId, if (tagId == null) !visibility.isAllChannelsVisible() else !visibility.isTagVisible(tagId))
+    }
+
+    @MainThread
+    fun setScopeVisible(tagId: ChannelTagId?, visible: Boolean) {
+        val current = preferences ?: return
+        val channelState = observation.value.channelState
+        val tags = channelState.channelCatalogForDisplay?.tags.orEmpty()
+        val availableTagIds = tags.mapTo(mutableSetOf()) { it.id }
+        if (channelState.channelCatalogAuthority != RetainedMetadataAuthority.CURRENT) {
+            availableTagIds += current.visibility.visibleTagIds
+        }
+        preferences = current.copy(visibility = updateChannelScopeVisibility(
+            current.visibility, availableTagIds, tagId, visible,
+        ))
+        publishScope()
+        if (preferences != current) enqueueSave()
+    }
+
+    private fun publishScope() {
+        val requested = preferences ?: return
+        val channelState = observation.value.channelState
+        val catalog = channelState.channelCatalogForDisplay ?: ChannelCatalog.create()
+        if (catalog.channels != catalogChannels) {
+            catalogChannels = catalog.channels
+            orderedChannels = orderBrowseChannels(catalog.channels)
+        }
+        val current = channelState.channelCatalogAuthority == RetainedMetadataAuthority.CURRENT
+        var effective = requested
+        if (current && !requested.visibility.isAllChannelsVisible() &&
+            catalog.tags.none { requested.visibility.isTagVisible(it.id) }
+        ) {
+            effective = requested.copy(visibility = requested.visibility.copy(allChannelsVisible = true))
+        }
+        val resolved = profileTrace("P44:channelScope") {
+            resolveOrderedChannelScope(orderedChannels, catalog.tags, effective.activeTagId, effective.visibility)
+        }
+        if (current && resolved.fallback != null) {
+            effective = effective.copy(activeTagId = resolved.activeTagId)
+            mutableUnavailableTagNotice.value = resolved.fallback == TagScopeFallback.TAG_UNAVAILABLE
+        }
+        preferences = effective
+        mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility)
+        if (effective != requested) enqueueSave()
+    }
+
+    private fun enqueueSave() {
+        unsavedPreferences = preferences
+        if (saveJob?.isActive == true) return
+        saveJob = viewModelScope.launch {
+            while (true) {
+                val saving = unsavedPreferences ?: break
+                try {
+                    tagSettings.save(saving)
+                } catch (_: IOException) {
+                    mutableSettingsFailure.value = true
+                    break
+                }
+                // A completed old write acknowledges only itself, never a newer UI choice.
+                if (unsavedPreferences == saving) unsavedPreferences = null
+                mutableSettingsFailure.value = false
+            }
+        }
+    }
+
+    @MainThread
+    fun retrySettings() {
+        if (preferences == null) loadSettings() else enqueueSave()
     }
 
     fun dismissUnavailableTagNotice() {
-        tagSettings.dismissUnavailableTagNotice()
+        mutableUnavailableTagNotice.value = false
     }
 
     fun nowEvent(channelId: ChannelId, nowSec: Long): EpgEvent? =
@@ -130,5 +203,6 @@ internal fun resolveChannelScopeState(
         scope = resolveChannelScope(catalog.channels, catalog.tags, activeTagId, visibility),
         channelCatalogCurrent = channelState.channelCatalogAuthority ==
             RetainedMetadataAuthority.CURRENT,
+        visibility = visibility,
     )
 }

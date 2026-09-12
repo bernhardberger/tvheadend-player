@@ -37,6 +37,7 @@ import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsPlayer
 
 @Composable
 internal fun SettingsScreen(
+    channelsVm: at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel,
     section: SettingsSection = SettingsSection.GENERAL,
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
@@ -53,7 +54,7 @@ internal fun SettingsScreen(
         when (destination) {
             SettingsSection.GENERAL -> SettingsGeneral(initialFocusRequester)
             SettingsSection.CONNECTION -> SettingsConnection(initialFocusRequester)
-            SettingsSection.CHANNEL_TAGS -> SettingsChannelTags(initialFocusRequester)
+            SettingsSection.CHANNEL_TAGS -> SettingsChannelTags(initialFocusRequester, channelsVm)
             SettingsSection.PLAYER -> SettingsPlayer(initialFocusRequester)
             SettingsSection.APPLIANCE -> SettingsAppliance(
                 initialFocusRequester = initialFocusRequester,
@@ -135,10 +136,7 @@ internal fun SettingsScreenNavigation(
                     .onFocusChanged { contentPaneFocused = it.hasFocus }
                     .focusGroup()
             ) {
-                destinationContent(
-                    currentSection,
-                    contentFocus.getValue(currentSection),
-                )
+                destinationContent(currentSection, contentFocus.getValue(currentSection))
             }
         }
     }

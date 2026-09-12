@@ -10,7 +10,3 @@ internal fun appMetadataCachePolicy(root: File): MetadataCachePolicy = MetadataC
     artworkRetention = 30.days,
     artworkMaxBytes = 64L * 1024 * 1024,
 )
-
-internal fun removeLegacyCoilCache(root: File) {
-    root.resolve("coil_disk_cache").deleteRecursively()
-}

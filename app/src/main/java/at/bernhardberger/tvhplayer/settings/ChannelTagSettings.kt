@@ -1,105 +1,57 @@
 package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
-import androidx.datastore.core.DataMigration
+import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
-import at.bernhardberger.tvhplayer.core.updateChannelScopeVisibility
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 
 private const val ALL_CHANNELS_SCOPE = "all"
 private const val TAG_SCOPE_PREFIX = "tag:"
 private const val SDK_U32_MAX = 0xffff_ffffL
 
-internal val legacyActiveTagKey = intPreferencesKey("activeChannelTagId")
 internal val activeTagKey = longPreferencesKey("activeChannelTagIdLong")
 
 internal fun sdkU32IdOrNull(value: Long): Long? = value.takeIf { it in 0L..SDK_U32_MAX }
 
-internal fun persistedIdToLongOrNull(value: String): Long? {
-    val persisted = value.toLongOrNull() ?: return null
-    val normalized = when {
-        persisted < Int.MIN_VALUE -> return null
-        persisted < 0L -> persisted.toInt().toUInt().toLong()
-        else -> persisted
-    }
-    return sdkU32IdOrNull(normalized)
-}
+internal fun persistedIdToLongOrNull(value: String): Long? =
+    value.toLongOrNull()?.let(::sdkU32IdOrNull)
 
 internal fun persistedTagScope(tagId: ChannelTagId): String = "$TAG_SCOPE_PREFIX${tagId.value}"
 
-internal fun intToLongPreferenceMigration(legacyKey: Preferences.Key<Int>, losslessKey: Preferences.Key<Long>) =
-    object : DataMigration<Preferences> {
-    override suspend fun shouldMigrate(currentData: Preferences) = currentData[legacyKey] != null
-    override suspend fun migrate(currentData: Preferences) = currentData.toMutablePreferences().apply {
-        this[losslessKey] = this[losslessKey] ?: checkNotNull(currentData[legacyKey]).toUInt().toLong()
-        remove(legacyKey)
-    }
-    override suspend fun cleanUp() = Unit
-}
+data class ChannelTagPreferences(
+    val activeTagId: ChannelTagId? = null,
+    val visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
+)
 
-internal fun activeTagIdMigration() = intToLongPreferenceMigration(legacyActiveTagKey, activeTagKey)
-
-class ChannelTagSettingsStore(private val context: Context) {
+class ChannelTagSettingsStore(private val dataStore: DataStore<Preferences>) {
+    constructor(context: Context) : this(context.dataStore)
     private val visibleScopesKey = stringSetPreferencesKey("visibleChannelScopes")
-    private val _unavailableTagNotice = MutableStateFlow(false)
-
-    val activeTagId: Flow<ChannelTagId?> = context.dataStore.data.map {
-        it[activeTagKey]?.let(::sdkU32IdOrNull)?.let(::ChannelTagId)
+    val settings: Flow<ChannelTagPreferences> = dataStore.data.map { preferences ->
+        ChannelTagPreferences(
+            activeTagId = preferences[activeTagKey]?.let(::sdkU32IdOrNull)?.let(::ChannelTagId),
+            visibility = decodeVisibility(preferences[visibleScopesKey]),
+        )
     }
-    val scopeVisibility: Flow<ChannelScopeVisibility> = context.dataStore.data.map { preferences ->
-        decodeVisibility(preferences[visibleScopesKey])
-    }
-    val unavailableTagNotice = _unavailableTagNotice.asStateFlow()
 
-    suspend fun selectTag(tagId: ChannelTagId?) {
-        context.dataStore.edit { preferences ->
-            if (tagId == null) {
+    suspend fun save(settings: ChannelTagPreferences) {
+        dataStore.edit { preferences ->
+            if (settings.activeTagId == null) {
                 preferences.remove(activeTagKey)
             } else {
-                preferences[activeTagKey] = tagId.value
+                preferences[activeTagKey] = settings.activeTagId.value
             }
-        }
-        _unavailableTagNotice.value = false
-    }
-
-    suspend fun fallbackToScope(tagId: ChannelTagId?) {
-        context.dataStore.edit { preferences ->
-            if (tagId == null) {
-                preferences.remove(activeTagKey)
+            if (settings.visibility.configured) {
+                preferences[visibleScopesKey] = encodeVisibility(settings.visibility)
             } else {
-                preferences[activeTagKey] = tagId.value
+                preferences.remove(visibleScopesKey)
             }
         }
-        _unavailableTagNotice.value = true
-    }
-
-    suspend fun setScopeVisible(
-        tagId: ChannelTagId?,
-        visible: Boolean,
-        availableTagIds: Set<ChannelTagId>,
-    ) {
-        context.dataStore.edit { preferences ->
-            val updated = updateChannelScopeVisibility(
-                current = decodeVisibility(preferences[visibleScopesKey]),
-                availableTagIds = availableTagIds,
-                tagId = tagId,
-                visible = visible,
-            )
-            preferences[visibleScopesKey] = encodeVisibility(updated)
-        }
-    }
-
-    fun dismissUnavailableTagNotice() {
-        _unavailableTagNotice.value = false
     }
 
     private fun decodeVisibility(values: Set<String>?): ChannelScopeVisibility {

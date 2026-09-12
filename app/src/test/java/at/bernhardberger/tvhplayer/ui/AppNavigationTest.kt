@@ -16,7 +16,6 @@ class AppNavigationTest {
             GuideKey,
             RecordingsKey,
             SettingsKey(SettingsSection.GENERAL),
-            UnlockKey,
             LivePlayerKey(channelId = 42, channelName = "News"),
             RecordingPlayerKey(
                 recordingId = 7,
@@ -55,7 +54,6 @@ class AppNavigationTest {
             GuideKey,
             RecordingsKey,
             SettingsKey(SettingsSection.PLAYER),
-            UnlockKey,
             LivePlayerKey(channelId = 42, channelName = "News / HD"),
             RecordingPlayerKey(recordingId = 7, start = RecordingStartMode.START_OVER),
         )
@@ -107,7 +105,7 @@ class AppNavigationTest {
             ChannelsKey,
             settings,
             LivePlayerKey(channelId = 42, channelName = "News"),
-            UnlockKey,
+            RecordingPlayerKey(recordingId = 7),
         )
 
         stack.navigateTopLevel(ChannelsKey)
@@ -122,9 +120,10 @@ class AppNavigationTest {
         val player = LivePlayerKey(channelId = 42, channelName = "News")
 
         stack.pushTransient(player)
-        stack.pushTransient(UnlockKey)
+        val recording = RecordingPlayerKey(recordingId = 7)
+        stack.pushTransient(recording)
         assertTrue(stack.hasTransientDestinationBelowTop())
-        assertEquals(UnlockKey, stack.removeLast())
+        assertEquals(recording, stack.removeLast())
         assertEquals(player, stack.removeLast())
 
         stack.replaceRoot(SettingsKey(SettingsSection.CONNECTION))

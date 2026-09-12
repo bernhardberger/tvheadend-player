@@ -186,8 +186,7 @@ class ChannelsScreenTest {
             tags = listOf(news, sports),
             initialSelectedId = ChannelId(1),
         )
-        waitForFocus(1)
-        composeRule.onNodeWithText("All channels").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithText("All channels").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithText("News").assertIsFocused().pressDown()
         waitForFocus(1)
         row(1).pressDown()
@@ -209,8 +208,7 @@ class ChannelsScreenTest {
         val sports = tag(2, "Sports")
         setChannelsContent(channels = listOf(channel(1, news.id), channel(2, sports.id)),
             tags = listOf(news, sports), initialSelectedId = ChannelId(1))
-        waitForFocus(1)
-        composeRule.onNodeWithText("All channels").requestFocus()
+        composeRule.onNodeWithText("All channels").assertIsFocused()
         composeRule.mainClock.autoAdvance = false
         try {
             listOf(Key.DirectionRight to "News", Key.DirectionRight to "Sports", Key.DirectionLeft to "News")
@@ -243,8 +241,7 @@ class ChannelsScreenTest {
             initialSelectedId = ChannelId(1),
             onSelection = selections::add,
         )
-        waitForFocus(1)
-        composeRule.onNodeWithText("All channels").requestFocus()
+        composeRule.onNodeWithText("All channels").assertIsFocused()
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.onNodeWithText("All channels").performKeyInput {
@@ -304,9 +301,11 @@ class ChannelsScreenTest {
             initialSelectedId = ChannelId(2),
             onUpdateChannelsReady = { updateChannels = it },
         )
+        composeRule.onNodeWithText("All channels").assertIsFocused().pressDown()
         waitForFocus(2)
         val allChannels = composeRule.onNodeWithText("All channels")
-        allChannels.requestFocus().assertIsFocused()
+        row(2).performKeyInput { pressKey(Key.Back) }
+        allChannels.assertIsFocused()
 
         composeRule.runOnIdle { updateChannels(listOf(channel(1), channel(3))) }
 
@@ -338,6 +337,47 @@ class ChannelsScreenTest {
     }
 
     @Test
+    fun interruptedPageDoesNotPublishAnUnfocusedChannel() {
+        val news = tag(1, "News")
+        val selections = mutableListOf<ChannelId>()
+        setChannelsContent(
+            channels = (1..30).map { channel(it, news.id) },
+            tags = listOf(news),
+            initialSelectedId = ChannelId(1),
+            onSelection = selections::add,
+        )
+        composeRule.onNodeWithText("All channels").assertIsFocused().pressDown()
+        waitForFocus(1)
+        composeRule.runOnIdle { selections.clear() }
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onRoot().performKeyInput {
+                pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
+                pressKey(Key.Back)
+            }
+            composeRule.mainClock.advanceTimeBy(1_000)
+            composeRule.onNodeWithText("All channels").assertIsFocused()
+            composeRule.runOnIdle {
+                assertTrue("Cancelled paging must not publish a channel that never received focus", selections.isEmpty())
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun aPagePublishesTheChannelThatActuallyReceivesFocus() {
+        val selections = mutableListOf<ChannelId>()
+        setChannelsContent(channels = channels(1..3), initialSelectedId = ChannelId(1), onSelection = selections::add)
+        waitForFocus(1)
+        composeRule.runOnIdle { selections.clear() }
+        row(1).performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)) }
+        waitForFocus(3)
+        row(3).assertIsDisplayed()
+        composeRule.runOnIdle { assertTrue(selections.isNotEmpty() && selections.all { it == ChannelId(3) }) }
+    }
+
+    @Test
     fun rapidPageKeysAdvanceFromLatestRequestedTarget() {
         val selections = mutableListOf<ChannelId>()
         setChannelsContent(
@@ -347,23 +387,34 @@ class ChannelsScreenTest {
         )
         waitForFocus(1)
         composeRule.runOnIdle { selections.clear() }
-
-        row(1).performKeyInput {
-            pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
-            pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
+        row(1).performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)) }
+        composeRule.waitUntil(5_000) { selections.isNotEmpty() }
+        val onePageId = selections.last().value
+        waitForFocus(onePageId)
+        row(onePageId).performKeyInput { pressKey(Key(KeyEvent.KEYCODE_CHANNEL_UP)) }
+        waitForFocus(1)
+        composeRule.runOnIdle { selections.clear() }
+        // Two requests before a rendered frame must advance beyond one page, while
+        // only the acknowledged final row is published. Partial rows can change the
+        // next page size as scrolling begins, so pixel-visible rows are not its input.
+        composeRule.mainClock.autoAdvance = false
+        try {
+            row(1).performKeyInput {
+                pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
+                pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
+            }
+            composeRule.mainClock.advanceTimeBy(2_000)
+        } finally {
+            composeRule.mainClock.autoAdvance = true
         }
-        composeRule.waitUntil(timeoutMillis = 5_000) {
-            selections.size >= 2 && composeRule.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty()
-        }
-
-        composeRule.runOnIdle {
-            val transitions = selections.filterIndexed { index, id -> index == 0 || id != selections[index - 1] }
-            assertEquals(2, transitions.size)
-            assertTrue(transitions[0].value < transitions[1].value)
-        }
-        var finalId = 0L
-        composeRule.runOnIdle { finalId = selections.last().value }
+        composeRule.waitUntil(5_000) { selections.isNotEmpty() }
+        val finalId = selections.last().value
         waitForFocus(finalId)
+        row(finalId).assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertTrue("Two page presses must advance from the pending destination", finalId > onePageId)
+            assertTrue(selections.all { it == ChannelId(finalId) })
+        }
         composeRule.onNodeWithTag("channels-detail-channel")
             .assertTextEquals("Channel $finalId")
     }

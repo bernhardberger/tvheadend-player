@@ -71,13 +71,13 @@ class TimelineEpgPerformanceTest {
                     Box(Modifier.width(794.dp)) {
                         TimelineChannelRow(
                             channel = channel, channelIndex = 0, number = 1,
-                            selectedTarget = selected.value, eventFocusRequesters = focusRequesters,
+                            selectedEventId = selected.value?.takeIf { it.channelIndex == 0 }?.eventId,
+                            eventFocusRequesters = focusRequesters,
                             windowStartSec = 0, windowEndSec = 10800, nowSecProvider = { 0L },
                             imageLoader = imageLoader, currentSession = null, events = events,
                             hasCachedEvents = true, hasMatchingCachedEvents = true,
                             connectionUiState = ConnectionUiState.Ready, coveragePending = false,
                             recordingForEvent = { null }, onFocused = {}, onOpenDetails = {},
-                            onMoveFocus = { false },
                             visibleRowWidthPx = with(LocalDensity.current) { visibleWidth.value.roundToPx() },
                         )
                     }
@@ -113,7 +113,7 @@ class TimelineEpgPerformanceTest {
                     event = programme.value, channel = channel, recording = null,
                     nowSec = 0, selected = false, focusRequester = requester,
                     formattingZone = formattingZone,
-                    onFocused = {}, onOpenDetails = {}, onMoveFocus = { false },
+                    onFocused = {}, onOpenDetails = {},
                     width = 200.dp, modifier = Modifier.width(200.dp).height(76.dp),
                 )
             }
@@ -176,7 +176,6 @@ class TimelineEpgPerformanceTest {
                         focusRequester = selectedFocus,
                         onFocused = {},
                         onOpenDetails = {},
-                        onMoveFocus = { false },
                         width = cardWidth,
                         modifier = Modifier
                             .testTag("first-short-programme")
@@ -193,7 +192,6 @@ class TimelineEpgPerformanceTest {
                         focusRequester = selectedFocus,
                         onFocused = {},
                         onOpenDetails = {},
-                        onMoveFocus = { false },
                         width = cardWidth,
                         modifier = Modifier
                             .testTag("second-short-programme")

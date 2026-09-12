@@ -10,7 +10,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.DisposableEffect
-import androidx.tv.material3.Text
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -31,12 +30,12 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.createPlaybackLoadControl
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
-import at.bernhardberger.tvhplayer.settings.LegacyCredentialSource
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
+import at.bernhardberger.tvhplayer.ui.BrowsingScopeContent
 import at.bernhardberger.tvhplayer.ui.ChannelsKey
 import at.bernhardberger.tvhplayer.ui.GuideKey
 import at.bernhardberger.tvhplayer.ui.RecordingsKey
@@ -50,6 +49,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
+import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import coil3.ImageLoader
@@ -92,14 +92,13 @@ class JourneyProfileActivity : AppCompatActivity() {
             )
             val settings = PlayerSettingsStore(this@JourneyProfileActivity)
             val tags = ChannelTagSettingsStore(this@JourneyProfileActivity)
-            tags.selectTag(null)
+            tags.save(at.bernhardberger.tvhplayer.settings.ChannelTagPreferences())
             val profileStore = TvheadendServerProfileStore(this@JourneyProfileActivity)
             // Only the isolated .profile UID sees this anonymous fixture identity.
             check(profileStore.storeAnonymous("offline.invalid", 9982) is ServerProfileReadResult.Available)
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
             val profiles = AppProfileOwner(
-                this@JourneyProfileActivity, session, profileStore,
-                LegacyCredentialSource(this@JourneyProfileActivity), settings, Dispatchers.IO,
+                session, profileStore, settings, Dispatchers.IO,
             )
             val player = ExoPlayer.Builder(this@JourneyProfileActivity)
                 .setRenderersFactory(createTvheadendRenderersFactory(this@JourneyProfileActivity))
@@ -155,28 +154,34 @@ class JourneyProfileActivity : AppCompatActivity() {
                                         guideCompositionEntries++
                                         onDispose { }
                                     }
-                                    EpgGridScreen(
+                                    BrowsingScopeContent(catalog, !drawerActive && route == GuideKey) { EpgGridScreen(
                                         contentPadding = padding, initialFocusEnabled = !drawerActive && route == GuideKey,
                                         channelViewModel = catalog, selection = selection, session = session,
                                         playerSession = runtime, lastPlayedStore = lastPlayed,
                                         guidePositionStore = guidePosition, imageLoader = imageLoader,
                                         onPlay = { _, _ -> },
-                                    )
+                                    ) }
                                 }
-                                entry<RecordingsKey> {
-                                    Text("Offline recordings destination")
+                                 entry<RecordingsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.RECORDINGS)) {
+                                     RecordingsScreen(
+                                         contentPadding = padding,
+                                         initialFocusEnabled = !drawerActive && route == RecordingsKey,
+                                         backEnabled = !drawerActive && route == RecordingsKey,
+                                         session = session,
+                                         imageLoader = imageLoader,
+                                     )
                                 }
                                 entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
                                     DisposableEffect(Unit) {
                                         channelCompositionEntries++
                                         onDispose { }
                                     }
-                                    ChannelsScreen(
+                                    BrowsingScopeContent(catalog, !drawerActive && route == ChannelsKey) { ChannelsScreen(
                                         contentPadding = padding, initialFocusEnabled = !drawerActive && route == ChannelsKey,
                                         channelViewModel = catalog, selection = selection, imageLoader = imageLoader,
                                         playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
                                         onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> },
-                                    )
+                                    ) }
                                 }
                             },
                         )

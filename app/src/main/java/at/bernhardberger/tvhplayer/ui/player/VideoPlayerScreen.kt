@@ -246,7 +246,7 @@ fun VideoPlayerScreen(
     selection: ChannelSelectionStore = koinInject(),
     lastPlayedChannelStore: LastPlayedChannelStore = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
-    channelsVm: ChannelsViewModel = koinViewModel(),
+    channelsVm: ChannelsViewModel,
     imageLoader: ImageLoader = koinInject(),
     session: TvheadendSession = koinInject(),
     channelId: ChannelId,

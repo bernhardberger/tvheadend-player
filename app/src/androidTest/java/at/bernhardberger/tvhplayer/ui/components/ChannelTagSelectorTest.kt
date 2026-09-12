@@ -48,14 +48,10 @@ class ChannelTagSelectorTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun focusPillAndForegroundStayTogetherOnEveryHorizontalReversalFrame() {
+    fun nativeFocusDoesNotWaitForThePillWhenHorizontalInputReverses() {
         var active by mutableStateOf<ChannelTagId?>(null)
-        var pill = Color.Unspecified
-        var foreground = Color.Unspecified
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                pill = androidx.tv.material3.MaterialTheme.colorScheme.onSurface
-                foreground = androidx.tv.material3.MaterialTheme.colorScheme.inverseOnSurface
                 ChannelTagSelector(
                     tags = listOf(tag(7, "News"), tag(8, "Sports")),
                     activeTagId = active,
@@ -72,28 +68,15 @@ class ChannelTagSelectorTest {
                 Key.DirectionLeft to "News", Key.DirectionLeft to "All channels",
             )) {
                 composeRule.onAllNodes(androidx.compose.ui.test.isFocused())[0].performKeyInput { pressKey(key) }
-                repeat(4) { frame ->
+                repeat(4) {
                     composeRule.mainClock.advanceTimeByFrame()
-                    val node = composeRule.onNodeWithText(label).assertIsFocused()
-                    val pixels = node.captureToImage().toPixelMap()
-                    val background = pixels[pixels.width / 2, pixels.height / 5]
-                    assertTrue("$label frame=$frame background=$background", colorDistance(background, pill) < 0.04f)
-                    var textPixels = 0
-                    for (y in pixels.height / 3 until pixels.height * 2 / 3) {
-                        for (x in pixels.width / 4 until pixels.width * 3 / 4) {
-                            if (colorDistance(pixels[x, y], foreground) < 0.04f) textPixels++
-                        }
-                    }
-                    assertTrue("$label frame=$frame foreground missing", textPixels > 10)
+                    composeRule.onNodeWithText(label).assertIsFocused()
                 }
             }
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
     }
-
-    private fun colorDistance(a: Color, b: Color) =
-        kotlin.math.abs(a.red - b.red) + kotlin.math.abs(a.green - b.green) + kotlin.math.abs(a.blue - b.blue)
 
     @Test
     fun tabsCommitServerTagOnFocus() {

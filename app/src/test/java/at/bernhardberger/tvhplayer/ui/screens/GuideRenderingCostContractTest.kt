@@ -2,9 +2,6 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import java.io.File
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
-import at.bernhardberger.tvhplayer.core.removeLegacyCoilCache
-import org.junit.rules.TemporaryFolder
-import org.junit.Rule
 import kotlin.time.Duration.Companion.days
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -12,19 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GuideRenderingCostContractTest {
-    @get:Rule val temporaryFolder = TemporaryFolder()
-
-    @Test
-    fun legacyCoilCleanupLeavesOtherCachesUntouched() {
-        val root = temporaryFolder.newFolder()
-        val legacy = File(root, "coil_disk_cache").apply { mkdirs() }
-        File(legacy, "old-entry").writeText("unused cache")
-        val other = File(root, "sdk-owned-sentinel").apply { writeText("keep") }
-        removeLegacyCoilCache(root)
-        removeLegacyCoilCache(root)
-        assertFalse(legacy.exists())
-        assertEquals("keep", other.readText())
-    }
     private val repositoryRoot = generateSequence(
         File(requireNotNull(System.getProperty("user.dir"))),
     ) { it.parentFile }.first { File(it, ".git").exists() }
@@ -153,7 +137,6 @@ class GuideRenderingCostContractTest {
         assertTrue(
             guide.contains(
                 """windowStartSec = request.originWindowStartSec
-        selection.setSelected(request.channelId)
         pendingFrontierOrigin = request.toOrigin()"""
             )
         )

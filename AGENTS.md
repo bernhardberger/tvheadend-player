@@ -70,6 +70,14 @@ repository-local domain overlays, then the focused skill, then local style.
 - Do not add compatibility façades, SDK model/result mirrors, protocol-shaped
   test translators, bespoke verification frameworks, or production test seams
   when released APIs and test fakes already own the behavior.
+- During the 0.x development track, backward compatibility with older Player
+  versions, SDK/HTSP library APIs, and stored formats is not required. Prefer one
+  current path; retire obsolete adapters and migrations, update current consumers,
+  and document any manual migration or fresh setup instead of adding compatibility
+  layers. Supported Android/TVHeadend targets, current protocol optionality,
+  recovery behavior and session/permission guards remain separate requirements.
+  This policy does not authorize automatic data clearing or device resets;
+  SDK and HTSP repository changes remain with their respective owners.
 - For behavior changes, add a focused regression test. Keep pure policy outside
   Android UI where practical so JVM tests can cover it.
 - Run focused checks while iterating and `./tools/verify` once for the final code

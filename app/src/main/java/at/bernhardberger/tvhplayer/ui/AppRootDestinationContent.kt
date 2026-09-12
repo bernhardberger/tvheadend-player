@@ -2,6 +2,13 @@ package at.bernhardberger.tvhplayer.ui
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import at.bernhardberger.tvhplayer.ui.components.ChannelSettingsNotice
 import androidx.compose.ui.Modifier
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -38,6 +45,7 @@ internal fun StartupGatedPlayerContent(
 
 @Composable
 internal fun ChannelsRouteContent(
+    channelsVm: ChannelsViewModel,
     contentAllowed: Boolean,
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
@@ -51,7 +59,8 @@ internal fun ChannelsRouteContent(
         contentAllowed = contentAllowed,
     ) {
         ContentContainer(modifier = Modifier.profileLayout("channels")) {
-            ChannelsScreen(
+            BrowsingScopeContent(channelsVm, initialFocusEnabled) { ChannelsScreen(
+                channelViewModel = channelsVm,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
                 playingChannelId = playingChannelId,
@@ -59,13 +68,14 @@ internal fun ChannelsRouteContent(
                 onRetryConnection = onRetryConnection,
                 onOpenConnectionSettings = onOpenConnectionSettings,
                 onPlay = onPlay,
-            )
+            ) }
         }
     }
 }
 
 @Composable
 internal fun GuideRouteContent(
+    channelsVm: ChannelsViewModel,
     contentAllowed: Boolean,
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
@@ -77,7 +87,8 @@ internal fun GuideRouteContent(
 ) {
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("guide")) {
-            EpgGridScreen(
+            BrowsingScopeContent(channelsVm, initialFocusEnabled) { EpgGridScreen(
+                channelViewModel = channelsVm,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
                 connectionUiState = connectionUiState,
@@ -86,7 +97,7 @@ internal fun GuideRouteContent(
                 onClearCategory = {},
                 onPlayRecording = onPlayRecording,
                 onPlay = onPlay,
-            )
+            ) }
         }
     }
 }
@@ -119,6 +130,7 @@ internal fun RecordingsRouteContent(
 
 @Composable
 internal fun SettingsRouteContent(
+    channelsVm: ChannelsViewModel,
     contentAllowed: Boolean,
     section: SettingsSection,
     initialFocusEnabled: Boolean,
@@ -129,6 +141,7 @@ internal fun SettingsRouteContent(
     if (contentAllowed) {
         ContentContainer {
             SettingsScreen(
+                channelsVm = channelsVm,
                 section = section,
                 initialFocusEnabled = initialFocusEnabled,
                 contentPadding = contentPadding,
@@ -141,6 +154,7 @@ internal fun SettingsRouteContent(
 
 @Composable
 internal fun LivePlayerRouteContent(
+    channelsVm: ChannelsViewModel,
     contentAllowed: Boolean,
     channelId: ChannelId,
     channelName: String,
@@ -149,11 +163,31 @@ internal fun LivePlayerRouteContent(
 ) {
     StartupGatedPlayerContent(contentAllowed = contentAllowed) {
         VideoPlayerScreen(
+            channelsVm = channelsVm,
             channelId = channelId,
             channelName = channelName,
             onReconnect = onReconnect,
             onClose = onClose,
         )
+    }
+}
+
+@Composable
+internal fun BrowsingScopeContent(
+    channelsVm: ChannelsViewModel,
+    initialFocusEnabled: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val state by channelsVm.scope.collectAsStateWithLifecycle()
+    val failed by channelsVm.settingsFailure.collectAsStateWithLifecycle()
+    Column(Modifier.fillMaxSize()) {
+        ChannelSettingsNotice(
+            loaded = state.settingsLoaded,
+            failed = failed,
+            onRetry = channelsVm::retrySettings,
+            initialFocusEnabled = initialFocusEnabled,
+        )
+        if (state.settingsLoaded) Box(Modifier.weight(1f)) { content() }
     }
 }
 

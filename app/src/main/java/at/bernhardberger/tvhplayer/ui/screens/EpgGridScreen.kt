@@ -1,9 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.activity.compose.BackHandler
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
@@ -210,7 +214,7 @@ fun EpgGridScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     category: ProgrammeCategory = ProgrammeCategory.ALL,
-    channelViewModel: ChannelsViewModel = koinViewModel(),
+    channelViewModel: ChannelsViewModel,
     selection: ChannelSelectionStore = koinInject(),
     session: TvheadendSession = koinInject(),
     playerSession: AppPlaybackRuntime = koinInject(),
@@ -239,7 +243,9 @@ fun EpgGridScreen(
     val epgSearchActions = remember(session.epgRepository) {
         EpgSearchActions(session.epgRepository)
     }
-    val channelScopeState by channelViewModel.scope.collectAsStateWithLifecycle()
+    // Event callbacks must validate the scope that produced their rows, not a newer
+    // collector value that can arrive before this composition is replaced.
+    val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
     val channelScope = channelScopeState.scope
     val observationState = channelViewModel.observation.collectAsStateWithLifecycle()
     val observation = observationState.value
@@ -304,6 +310,11 @@ fun EpgGridScreen(
     }
     val windowEndSec = windowStartSec + GUIDE_VISIBLE_WINDOW_SEC
     var selectedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
+    var realizedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
+    val gridFocus = remember { FocusRequester() }
+    var scopeEntryRequested by remember { mutableStateOf(false) }
+    var suppressActivationRelease by remember { mutableStateOf(false) }
+    var consumeBackRelease by remember { mutableStateOf(false) }
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
@@ -388,9 +399,14 @@ fun EpgGridScreen(
     }
 
     fun leaveGuideScope(): Boolean {
+        scopeEntryRequested = true
+        if (!channelScopeState.settingsLoaded || channelViewModel.scope.value != channelScopeState ||
+            coverageTagId != channelScope.activeTagId || !initialPositionDone
+        ) return true
         if (frontierRequest != null || pendingFrontierOrigin != null ||
             channelFocusRequest != null || windowFocusRequest != null
         ) return true
+        scopeEntryRequested = false
         programmeFocusOwned = true
         val programmeFocus = selectedTarget?.eventId?.let(eventFocusRequesters::get)
         return when (
@@ -510,13 +526,13 @@ fun EpgGridScreen(
 
     fun deferFrontierOrigin(request: FrontierRequest) {
         windowStartSec = request.originWindowStartSec
-        selection.setSelected(request.channelId)
         pendingFrontierOrigin = request.toOrigin()
         pendingInitialChannelIndex = -1
         selectedTarget = null
     }
 
     fun restoreFrontierOrigin(request: FrontierRequest) {
+        if (windowStartSec == request.originWindowStartSec && selectedTarget?.eventId == request.originEventId) return
         deferFrontierOrigin(request)
     }
 
@@ -595,12 +611,27 @@ fun EpgGridScreen(
     }
 
     fun releaseProgrammeFocus() {
+        suppressActivationRelease = false
+        scopeEntryRequested = false
         programmeFocusOwned = false
         cancelPendingProgrammeNavigation()
     }
 
+    fun focusScopeFromProgramme() {
+        releaseProgrammeFocus()
+        if (hasScopeTabs) scopeFocus.requestFocus() else focusGuideHeader()
+    }
+
+    val programmeBackEnabled = initialFocusEnabled && programmeFocusOwned &&
+        detailsEvent == null && !showSearchDialog && !showJumpDialog &&
+        pendingAction == null && configChoices == null
+    BackHandler(enabled = programmeBackEnabled) { focusScopeFromProgramme() }
+
     LaunchedEffect(initialFocusEnabled) {
-        if (!initialFocusEnabled) cancelPendingProgrammeNavigation()
+        if (!initialFocusEnabled) {
+            scopeEntryRequested = false
+            cancelPendingProgrammeNavigation()
+        }
     }
 
     fun coveragePending(token: GuideCoverageRequestToken): Boolean =
@@ -689,7 +720,6 @@ fun EpgGridScreen(
 
         val targetChannelIndex = target?.channelIndex ?: channelIndex
         pendingInitialChannelIndex = targetChannelIndex
-        selection.setSelected(channels[targetChannelIndex].id)
         requestVisibleWindow(windowStartSec, targetChannelIndex)
         if (target != null) {
             selectedTarget = target
@@ -750,7 +780,6 @@ fun EpgGridScreen(
         if (replacement != null) {
             channelRecoveryPage = null
             pendingInitialChannelIndex = replacement.channelIndex
-            selection.setSelected(channels[replacement.channelIndex].id)
         }
     }
 
@@ -820,7 +849,6 @@ fun EpgGridScreen(
                 windowStartSec = origin.windowStartSec
                 pendingInitialChannelIndex = resolution.target.channelIndex
                 selectedTarget = resolution.target
-                selection.setSelected(origin.channelId)
                 pendingFrontierOrigin = null
             }
         }
@@ -851,6 +879,17 @@ fun EpgGridScreen(
         }
     }
 
+    LaunchedEffect(scopeEntryRequested, channelScopeState, coverageTagId, initialPositionDone,
+        selectedTarget, frontierRequest, pendingFrontierOrigin, channelFocusRequest, windowFocusRequest) {
+        if (scopeEntryRequested && initialFocusEnabled) leaveGuideScope()
+    }
+
+    // The viewport is a native focus target only used as a bridge while its focused
+    // cell is being replaced. Programme cells retain their own TV/accessibility focus.
+    fun retainGridFocus(): Boolean = runCatching { gridFocus.requestFocus() }.getOrDefault(false).also {
+        if (it) realizedTarget = null
+    }
+
     LaunchedEffect(
         selectedTarget,
         windowStartSec,
@@ -875,46 +914,45 @@ fun EpgGridScreen(
             return@LaunchedEffect
         }
         if (!mayFocusProgramme || channelFocusRequest != null) return@LaunchedEffect
-        val channelId = channels.getOrNull(target.channelIndex)?.id
-            ?: return@LaunchedEffect
         val event = focusRows.getOrNull(target.channelIndex)?.events
             ?.firstOrNull { it.id == target.eventId }
             ?: return@LaunchedEffect
-        when {
-            event.start.epochSeconds < windowStartSec -> windowStartSec =
+        val targetWindow = when {
+            event.start.epochSeconds < windowStartSec ->
                 windowBounds.constrain(
                     floorGuideWindowToHour(event.start.epochSeconds, guideZoneId)
                 )
-            event.stop.epochSeconds > windowEndSec -> windowStartSec =
+            event.stop.epochSeconds > windowEndSec ->
                 windowBounds.constrain(
                     floorGuideWindowToHour(
                         max(event.start.epochSeconds - 30 * 60L, 0L),
                         guideZoneId,
                     )
                 )
+            else -> windowStartSec
         }
-        selection.setSelected(channelId)
-        guidePositionStore.save(
-            GuidePosition(
-                channelId = channelId,
-                eventId = event.id,
-                eventStartSec = event.start.epochSeconds,
-                windowStartSec = windowStartSec,
-                firstVisibleColumn = channelListState.firstVisibleItemIndex,
-            )
-        )
+        if (targetWindow != windowStartSec) {
+            if (retainGridFocus()) windowStartSec = targetWindow
+            return@LaunchedEffect
+        }
         val visibleRows = channelListState.layoutInfo.visibleItemsInfo.map { it.index }
         if (visibleRows.isNotEmpty() && target.channelIndex !in visibleRows) {
             channelListState.animateScrollToItem(target.channelIndex)
         }
-        if (mayFocusProgramme) {
+        if (mayFocusProgramme && realizedTarget != target) {
+            // Already attached cells need no artificial one-frame input delay.
+            if (eventFocusRequesters[target.eventId]?.let {
+                    runCatching { it.requestFocus() }.getOrDefault(false)
+                } == true
+            ) return@LaunchedEffect
             withFrameNanos { }
             if (!mayFocusProgramme || channelFocusRequest != null || selectedTarget != target) {
                 return@LaunchedEffect
             }
-            eventFocusRequesters[target.eventId]?.let { requester ->
-                runCatching { requester.requestFocus() }
-            }
+            val focused = eventFocusRequesters[target.eventId]?.let { requester ->
+                runCatching { requester.requestFocus() }.getOrDefault(false)
+            } == true
+            if (!focused) focusGuideHeader()
         }
     }
 
@@ -937,14 +975,23 @@ fun EpgGridScreen(
         val through = KotlinInstant.fromEpochSeconds(request.throughSec)
         val snapshot = epgState.currentEpgSnapshot()
             .takeIf { connectionUiState == ConnectionUiState.Ready }
+        val frontierEvents = withContext(Dispatchers.Default) {
+            snapshot?.events.orEmpty().filter {
+                it.channelId == request.channelId &&
+                    it.stop.epochSeconds > request.throughSec - GUIDE_VISIBLE_WINDOW_SEC &&
+                    it.start.epochSeconds < request.throughSec &&
+                    it.matchesProgrammeCategory(category)
+            }
+        }
+        if (frontierRequest != request) return@LaunchedEffect
         val target = snapshot?.let {
             timelineFrontierFocus(
-                rows = focusRows,
+                rows = listOf(EpgFocusColumn(request.channelId, frontierEvents)),
                 channelId = request.channelId,
                 originEventId = request.originEventId,
                 boundarySec = request.boundarySec,
                 direction = request.direction,
-            )
+            )?.copy(channelIndex = channelIndex)
         }
         val coverageSettled = snapshot?.let { current ->
             guideChannelPageCoverageSettled(
@@ -954,9 +1001,10 @@ fun EpgGridScreen(
             )
         } == true
         if (coverageSettled && target != null) {
+            if (mayFocusProgramme && !retainGridFocus()) return@LaunchedEffect
             pendingInitialChannelIndex = target.channelIndex
+            windowStartSec = request.throughSec - GUIDE_VISIBLE_WINDOW_SEC
             selectedTarget = target
-            selection.setSelected(request.channelId)
         } else if (
             shouldWaitForGuideCoverage(
                 connectionReady = connectionUiState == ConnectionUiState.Ready,
@@ -1023,7 +1071,6 @@ fun EpgGridScreen(
         if (coverageSettled && target != null) {
             pendingInitialChannelIndex = target.channelIndex
             selectedTarget = target
-            selection.setSelected(channels[target.channelIndex].id)
         } else if (
             shouldWaitForGuideCoverage(
                 connectionReady = connectionUiState == ConnectionUiState.Ready,
@@ -1070,10 +1117,6 @@ fun EpgGridScreen(
             is GuideCoverageFocusResolution.Select -> {
                 pendingInitialChannelIndex = resolution.target.channelIndex
                 selectedTarget = resolution.target
-                selection.setSelected(
-                    channels.getOrNull(resolution.target.channelIndex)?.id
-                        ?: request.preferredChannelId
-                )
             }
         }
         completeWindowFocusRequest(request)
@@ -1145,6 +1188,7 @@ fun EpgGridScreen(
     }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
+        if (channelViewModel.scope.value != channelScopeState) return true
         when (guidePendingNavigationAction(
             direction = direction,
             frontierDirection = frontierRequest?.direction,
@@ -1173,7 +1217,7 @@ fun EpgGridScreen(
             }
         }
         programmeFocusOwned = true
-        val current = selectedTarget ?: return false
+        val current = selectedTarget ?: return true
         val visibleIndices = channelListState.layoutInfo.visibleItemsInfo.map { it.index }
         val visibleRange = if (visibleIndices.isEmpty()) {
             current.channelIndex..current.channelIndex
@@ -1231,7 +1275,6 @@ fun EpgGridScreen(
                     coverageRequest = coverageRequest,
                     throughSec = targetWindowStartSec + GUIDE_VISIBLE_WINDOW_SEC,
                 )
-                windowStartSec = targetWindowStartSec
                 return true
             }
             move.target != current -> {
@@ -1244,7 +1287,18 @@ fun EpgGridScreen(
                     requestChannelFocus(current, unsettledIndex, step)
                     return true
                 }
-                selectedTarget = move.target
+                val next = move.target
+                selectedTarget = next
+                val event = focusRows.getOrNull(next.channelIndex)?.events
+                    ?.firstOrNull { it.id == next.eventId }
+                if (mayFocusProgramme && event != null &&
+                    event.start.epochSeconds >= windowStartSec && event.stop.epochSeconds <= windowEndSec &&
+                    channelListState.layoutInfo.visibleItemsInfo.any { it.index == next.channelIndex }
+                ) {
+                    // Attached, visible cells can accept native focus in this key dispatch.
+                    // Window/coverage/virtualized targets retain the effect-driven handoff.
+                    eventFocusRequesters[next.eventId]?.let { runCatching { it.requestFocus() } }
+                }
                 return true
             }
             else -> {
@@ -1322,7 +1376,26 @@ fun EpgGridScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .focusProperties {
+                    onEnter = {
+                        if (requestedFocusDirection == FocusDirection.Right) {
+                            if (hasScopeTabs) scopeFocus.requestFocus() else guideDateFocus.requestFocus()
+                        }
+                    }
+                }
+                .focusGroup()
                 .onPreviewKeyEvent { event ->
+                    if (event.key == Key.Back) {
+                        if (consumeBackRelease) {
+                            if (event.type == KeyEventType.KeyUp) consumeBackRelease = false
+                            return@onPreviewKeyEvent true
+                        }
+                        if (event.type == KeyEventType.KeyDown && programmeBackEnabled) {
+                            consumeBackRelease = true
+                            focusScopeFromProgramme()
+                            return@onPreviewKeyEvent true
+                        }
+                    }
                     if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     ChannelNavigation.pageDirectionForKeyCode(
                         event.nativeKeyEvent.keyCode
@@ -1483,7 +1556,7 @@ fun EpgGridScreen(
                     },
                     allChannelsVisible = channelScope.allChannelsVisible,
                     activeFocusRequester = scopeFocus,
-                    onMoveToContent = ::leaveGuideScope,
+                    onMoveToContent = { leaveGuideScope() },
                     modifier = Modifier
                         .padding(start = startPadding)
                         .onFocusChanged {
@@ -1559,7 +1632,32 @@ fun EpgGridScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .focusGroup()
+                        .focusRequester(gridFocus)
+                        .onPreviewKeyEvent { event ->
+                            if (!initialFocusEnabled || !programmeFocusOwned) return@onPreviewKeyEvent false
+                            val unsettled = realizedTarget != selectedTarget || frontierRequest != null ||
+                                channelFocusRequest != null || windowFocusRequest != null
+                            if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                                if (event.type == KeyEventType.KeyDown) {
+                                    // A new press ends an interrupted sequence; an internal
+                                    // focus handoff or a held-key repeat does not.
+                                    if (event.nativeKeyEvent.repeatCount == 0) suppressActivationRelease = false
+                                    if (unsettled) suppressActivationRelease = true
+                                }
+                                val consume = unsettled || suppressActivationRelease
+                                if (event.type == KeyEventType.KeyUp) suppressActivationRelease = false
+                                return@onPreviewKeyEvent consume
+                            }
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (event.key) {
+                                Key.DirectionLeft -> moveFocus(EpgFocusDirection.LEFT)
+                                Key.DirectionRight -> moveFocus(EpgFocusDirection.RIGHT)
+                                Key.DirectionUp -> moveFocus(EpgFocusDirection.UP)
+                                Key.DirectionDown -> moveFocus(EpgFocusDirection.DOWN)
+                                else -> false
+                            }
+                        }
+                        .focusable()
                         .testTag("epg-programme-viewport"),
                 ) {
                     itemsIndexed(channels, key = { _, channel -> channel.id.value }) {
@@ -1570,7 +1668,7 @@ fun EpgGridScreen(
                             number = ChannelNavigation.numberForId(
                                 orderedChannelIds, channelNumbers, channel.id,
                             ),
-                            selectedTarget = selectedTarget,
+                            selectedEventId = selectedTarget?.takeIf { it.channelIndex == channelIndex }?.eventId,
                             eventFocusRequesters = eventFocusRequesters,
                             windowStartSec = windowStartSec,
                             windowEndSec = windowEndSec,
@@ -1586,15 +1684,26 @@ fun EpgGridScreen(
                                 coverageRequests.isPending(channel.id, windowStartSec)
                             },
                             onFocused = { event ->
+                                if (!initialFocusEnabled || channelViewModel.scope.value != channelScopeState) return@TimelineChannelRow
                                 profileTrace("P44:focus:guide") {
                                     if (BuildConfig.PROFILE_TRACE) {
                                         profileTrace("P48:focus:guide:${channel.id.value}:${event.id.value}") { }
                                     }
+                                    val target = EpgFocusTarget(channelIndex, event.id)
+                                    val settled = realizedTarget == selectedTarget
+                                    realizedTarget = target
+                                    if (settled || !programmeFocusOwned || selectedTarget == null) selectedTarget = target
                                     programmeFocusOwned = true
-                                    selectedTarget = EpgFocusTarget(
-                                        channelIndex,
-                                        event.id,
-                                    )
+                                    if (target == selectedTarget) {
+                                        selection.setSelected(channel.id)
+                                        guidePositionStore.save(GuidePosition(
+                                            channelId = channel.id,
+                                            eventId = event.id,
+                                            eventStartSec = event.start.epochSeconds,
+                                            windowStartSec = windowStartSec,
+                                            firstVisibleColumn = channelListState.firstVisibleItemIndex,
+                                        ))
+                                    }
                                 }
                             },
                             recordingForEvent = { eventId ->
@@ -1603,6 +1712,9 @@ fun EpgGridScreen(
                                 }
                             },
                             onOpenDetails = {
+                                if (realizedTarget != selectedTarget || frontierRequest != null ||
+                                    channelFocusRequest != null || windowFocusRequest != null
+                                ) return@TimelineChannelRow
                                 releaseProgrammeFocus()
                                 selectedTarget = EpgFocusTarget(
                                     channelIndex,
@@ -1614,7 +1726,6 @@ fun EpgGridScreen(
                                 detailsFromSearch = false
                                 actionResult = null
                             },
-                            onMoveFocus = ::moveFocus,
                             visibleRowWidthPx = LocalBrowseVisibleWidthPx.current?.minus(
                                 with(LocalDensity.current) {
                                     timelineContentPadding.calculateStartPadding(layoutDirection).roundToPx()

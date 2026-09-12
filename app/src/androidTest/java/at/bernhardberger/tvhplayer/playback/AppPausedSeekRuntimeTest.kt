@@ -71,13 +71,10 @@ class AppPausedSeekRuntimeTest {
                     transform(data.value).also { data.value = it }
             })
             val profileStore = FakeServerProfileStore()
-            var legacyReads = 0
             val profiles = AppProfileOwner(
                 session = session, profileStore = profileStore, playerSettings = settings,
                 ioDispatcher = Dispatchers.IO,
                 readProfileForEditing = { ServerProfileEditReadResult.Missing },
-                readLegacyProfile = { legacyReads++; null },
-                clearLegacyProfile = { error("Offline missing profile must not perform legacy cleanup") },
             )
             val frames = AtomicInteger()
             val images = AtomicInteger()
@@ -267,7 +264,6 @@ class AppPausedSeekRuntimeTest {
                     "knownPeriodTerminal=${sourceFailure.get()?.message == "Live subscription preparation failed"}", failure.get())
                 assertEquals("Only explicit actions and bounded paused refill", expectedSpeeds, connection.speeds)
                 assertEquals("Only in-memory profile reads", listOf(FakeServerProfileStoreCall.LOAD_PROFILE), profileStore.calls)
-                assertEquals("Only isolated legacy lookup", 1, legacyReads)
             } finally { withContext(NonCancellable) {
                 withContext(Dispatchers.Main) { runtime.detach() }
                 lifetime.shutdown(2.seconds)

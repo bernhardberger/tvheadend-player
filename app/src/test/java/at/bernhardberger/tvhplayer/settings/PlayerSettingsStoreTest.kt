@@ -2,9 +2,12 @@ package at.bernhardberger.tvhplayer.settings
 
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import at.bernhardberger.tvheadend.sdk.core.StreamProfile
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,7 +16,6 @@ import org.junit.Test
 
 class PlayerSettingsStoreTest {
     private val profileUuidKey = stringPreferencesKey("profileUuid")
-    private val legacyProfileNameKey = stringPreferencesKey("profile")
     private val directId = StreamProfileId("11111111111111111111111111111111")
     private val passId = StreamProfileId("22222222222222222222222222222222")
     private val staleId = StreamProfileId("33333333333333333333333333333333")
@@ -40,38 +42,28 @@ class PlayerSettingsStoreTest {
     }
 
     @Test
-    fun oneExactCaseSensitiveLegacyNameMigratesOnceToTheReleasedId() = runTest {
+    fun resolvingThePersistedSelectionIsReadOnly() = runTest {
         val dataStore = InMemoryPreferencesDataStore(
-            preferencesOf(legacyProfileNameKey to "pass"),
+            initial = preferencesOf(profileUuidKey to passId.value),
+            beforeUpdate = { error("Discovery must not rewrite preferences") },
         )
-
         assertEquals(
             passId,
             PlayerSettingsStore(dataStore).resolveStreamProfileSelection(profiles) { true },
         )
-        val persisted = dataStore.data.first()
-        assertEquals(passId.value, persisted[profileUuidKey])
-        assertFalse(persisted.contains(legacyProfileNameKey))
     }
 
     @Test
-    fun duplicateAndNonExactLegacyNamesAreConsumedWithoutSelecting() = runTest {
-        val duplicateData = InMemoryPreferencesDataStore(
-            preferencesOf(legacyProfileNameKey to "pass"),
-        )
-        val duplicates = profiles + StreamProfile(staleId, "pass", "")
-        assertNull(
-            PlayerSettingsStore(duplicateData).resolveStreamProfileSelection(duplicates) { true },
-        )
-        assertFalse(duplicateData.data.first().contains(legacyProfileNameKey))
-
-        val nonExactData = InMemoryPreferencesDataStore(
-            preferencesOf(legacyProfileNameKey to "PASS"),
-        )
-        assertNull(
-            PlayerSettingsStore(nonExactData).resolveStreamProfileSelection(profiles) { true },
-        )
-        assertFalse(nonExactData.data.first().contains(legacyProfileNameKey))
+    fun expiredObservationCannotReturnSelectionAfterARead() = runTest {
+        var current = true
+        val base = InMemoryPreferencesDataStore(preferencesOf(profileUuidKey to passId.value))
+        val data = object : DataStore<Preferences> by base {
+            override val data = flow {
+                current = false
+                emit(base.data.first())
+            }
+        }
+        assertNull(PlayerSettingsStore(data).resolveStreamProfileSelection(profiles) { current })
     }
 
     @Test
@@ -79,7 +71,6 @@ class PlayerSettingsStoreTest {
         val dataStore = InMemoryPreferencesDataStore(
             preferencesOf(
                 profileUuidKey to staleId.value,
-                legacyProfileNameKey to "pass",
             ),
         )
         val store = PlayerSettingsStore(dataStore)
@@ -87,7 +78,6 @@ class PlayerSettingsStoreTest {
         assertNull(store.resolveStreamProfileSelection(profiles) { true })
         val stale = dataStore.data.first()
         assertEquals(staleId.value, stale[profileUuidKey])
-        assertFalse(stale.contains(legacyProfileNameKey))
 
         assertEquals(
             staleId,
