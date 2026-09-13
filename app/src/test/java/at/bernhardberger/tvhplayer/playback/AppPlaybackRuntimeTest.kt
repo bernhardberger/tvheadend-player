@@ -745,6 +745,35 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
+    fun newlyOpenedRecordingStartsPlayingInsteadOfInheritingPause() {
+        val lifecycle = ForegroundPlaybackLifecycle()
+        assertEquals(
+            ForegroundPlaybackAction.ResumeRecording,
+            lifecycle.onTargetStarted(
+                activeTarget = AppPlaybackTarget.Recording(DvrEntryId(19)),
+                activeTargetEpoch = 12L,
+            ),
+        )
+        assertEquals(ForegroundPlaybackAction.None,
+            lifecycle.onTargetStarted(AppPlaybackTarget.Live(ChannelId(7)), 13L))
+    }
+
+    @Test
+    fun recordingOpenedWhileBackgroundedWaitsThenPlaysOnReturn() {
+        val lifecycle = ForegroundPlaybackLifecycle()
+        val target = AppPlaybackTarget.Recording(DvrEntryId(19))
+        lifecycle.onBackgrounded(null, null, recordingPlayWhenReady = false)
+        assertEquals(
+            ForegroundPlaybackAction.PauseRecording,
+            lifecycle.onTargetStarted(target, 12L),
+        )
+        assertEquals(ForegroundPlaybackAction.ResumeRecording,
+            lifecycle.onForegrounded(target, 12L))
+        assertEquals(ForegroundPlaybackAction.None,
+            lifecycle.onForegrounded(target, 12L))
+    }
+
+    @Test
     fun recordingBackgroundPausesAndResumesTheSameTargetInPlace() {
         val lifecycle = ForegroundPlaybackLifecycle()
         val target = AppPlaybackTarget.Recording(DvrEntryId(19))
@@ -796,7 +825,6 @@ class AppPlaybackRuntimeTest {
             lifecycle.onTargetStarted(
                 activeTarget = replacementTarget,
                 activeTargetEpoch = 15L,
-                recordingPlayWhenReady = true,
             ),
         )
 
@@ -845,7 +873,6 @@ class AppPlaybackRuntimeTest {
             lifecycle.onTargetStarted(
                 activeTarget = AppPlaybackTarget.Live(ChannelId(41)),
                 activeTargetEpoch = 18L,
-                recordingPlayWhenReady = true,
             ),
         )
         assertEquals(

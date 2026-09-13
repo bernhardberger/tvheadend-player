@@ -490,14 +490,18 @@ internal class ForegroundPlaybackLifecycle {
     fun onTargetStarted(
         activeTarget: AppPlaybackTarget,
         activeTargetEpoch: Long,
-        recordingPlayWhenReady: Boolean,
     ): ForegroundPlaybackAction = if (foreground) {
-        ForegroundPlaybackAction.None
+        if (activeTarget is AppPlaybackTarget.Recording) {
+            ForegroundPlaybackAction.ResumeRecording
+        } else {
+            ForegroundPlaybackAction.None
+        }
     } else {
         rememberBackgroundedTarget(
             activeTarget = activeTarget,
             activeTargetEpoch = activeTargetEpoch,
-            recordingPlayWhenReady = recordingPlayWhenReady,
+            // Opening a target (including Resume at a saved position) is a new play request.
+            recordingPlayWhenReady = true,
         )
     }
 
@@ -783,7 +787,7 @@ class AppPlaybackRuntime(
                 )
             }
         )
-        if (committed) applyBackgroundPolicyToStartedTarget(result)
+        if (committed) applyPlayIntentToStartedTarget(result)
         return result
     }
 
@@ -898,7 +902,7 @@ class AppPlaybackRuntime(
                 )
             }
         )
-        if (committed) applyBackgroundPolicyToStartedTarget(result)
+        if (committed) applyPlayIntentToStartedTarget(result)
         return result
     }
 
@@ -1283,16 +1287,14 @@ class AppPlaybackRuntime(
         }
     }
 
-    private suspend fun applyBackgroundPolicyToStartedTarget(result: PlaybackTargetResult?) {
+    private suspend fun applyPlayIntentToStartedTarget(result: PlaybackTargetResult?) {
         if (result?.isStarted != true) return
         val target = _activeTarget.value ?: return
         val targetEpoch = activeTargetEpoch ?: return
-        val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady } ?: return
         applyForegroundPlaybackAction(
             foregroundPlaybackLifecycle.onTargetStarted(
                 activeTarget = target,
                 activeTargetEpoch = targetEpoch,
-                recordingPlayWhenReady = recordingPlayWhenReady,
             ),
         )
     }
