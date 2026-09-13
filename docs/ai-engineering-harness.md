@@ -160,7 +160,9 @@ lower-effort failure is required first; `max` is exceptional for a concrete
 unresolved hard case. Resolve routine implementation choices inside accepted
 requirements and writable scope. Return consequential product/authority gaps or
 missing load-bearing evidence to the primary. Keep the model inherited from the
-Astra assignment; do not route implementation to Opus or another model. Existing
+Astra assignment unless the operator explicitly selects another implementation
+model for the task. Explicit model choices retain the implementer's permissions,
+scope boundaries and verification gates. Existing
 Opus review routing is unchanged.
 
 Before implementation, confirm that the dispatched session exposes an editing
