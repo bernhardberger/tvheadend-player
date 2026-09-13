@@ -219,7 +219,7 @@ fun UnavailableTagNotice(
                 text = stringResource(R.string.active_tag_unavailable),
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(onClick = onDismiss) {
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.browseTabFocus()) {
                 Text(stringResource(R.string.dismiss))
             }
         }

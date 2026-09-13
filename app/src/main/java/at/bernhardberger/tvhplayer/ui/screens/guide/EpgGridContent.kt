@@ -64,6 +64,8 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseTabOwner
+import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
@@ -187,6 +189,8 @@ internal fun TimelineChannelRow(
 ) {
     val nowSec = nowSecProvider()
     // Share one zone lookup across the row's cells, refreshed on the existing clock.
+    val owner = LocalBrowseTabOwner.current
+    val active = owner?.isCurrent != false
     val formattingZone = remember(nowSec) { java.time.ZoneId.systemDefault() }
     if (BuildConfig.PROFILE_TRACE) ProfileCompositionLifetime("guideRow:$channelIndex")
 
@@ -235,9 +239,9 @@ internal fun TimelineChannelRow(
                 ) return@forEach
                 key(event.id) {
                     val focusRequester = remember(event.id) { FocusRequester() }
-                    DisposableEffect(event.id, focusRequester, eventFocusRequesters) {
+                    DisposableEffect(event.id, focusRequester, eventFocusRequesters, active) {
                         // Synchronous input must only find requesters for committed cells.
-                        eventFocusRequesters[event.id] = focusRequester
+                        if (active) eventFocusRequesters[event.id] = focusRequester
                         onDispose {
                             if (eventFocusRequesters[event.id] === focusRequester) {
                                 eventFocusRequesters.remove(event.id)
@@ -410,6 +414,7 @@ internal fun TimelineProgrammeCell(
                 focusedSelectedScale = 1f,
             ),
             modifier = Modifier
+                .browseTabFocus()
                 .fillMaxSize()
                 .padding(horizontal = 1.dp, vertical = 2.dp)
                 .clip(MaterialTheme.shapes.small)
@@ -525,7 +530,7 @@ internal fun GuideConnectionRecovery(
             )
             Button(
                 onClick = if (needsSettings) onOpenConnectionSettings else onRetry,
-                modifier = Modifier.focusRequester(focusRequester),
+                modifier = Modifier.browseTabFocus().focusRequester(focusRequester),
             ) {
                 Text(
                     stringResource(
@@ -582,7 +587,7 @@ internal fun GuideEmptyState(
                     } else {
                         onRetry
                     },
-                    modifier = Modifier.focusRequester(retryFocusRequester),
+                    modifier = Modifier.browseTabFocus().focusRequester(retryFocusRequester),
                 ) {
                     Text(
                         stringResource(

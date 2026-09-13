@@ -14,19 +14,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import coil3.ImageLoader
+import at.bernhardberger.tvhplayer.profiling.profileLayout
+import at.bernhardberger.tvhplayer.profiling.profileTrace
+
+internal val ChannelRowVerticalPadding = 3.dp
 
 @Composable
 fun ChannelRow(
@@ -42,13 +49,37 @@ fun ChannelRow(
     playingNow: Boolean = false,
     onFocus: () -> Unit,
     onConfirm: () -> Unit,
-) {
+) = profileTrace("P1:compose:channelRow") {
     var focused by remember { mutableStateOf(false) }
     ListItem(
         selected = playingNow,
         onClick = onConfirm,
         headlineContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            val drawProbe = if (BuildConfig.PROFILE_TRACE) {
+                // The headline inherits the native Surface foreground. Observe it
+                // without replacing its interaction source, colours or focus handling.
+                val contentColor = LocalContentColor.current
+                val colors = ListItemDefaults.colors()
+                val focusColor = if (playingNow) {
+                    colors.focusedSelectedContentColor
+                } else {
+                    colors.focusedContentColor
+                }
+                val unfocusedColor = if (playingNow) colors.selectedContentColor else colors.contentColor
+                val drawLabel = when {
+                    focusColor == unfocusedColor -> "P2:focusedRowDraw:ambiguousColor"
+                    contentColor == focusColor -> "P2:focusedRowDraw:nativeFocusColor"
+                    else -> "P2:focusedRowDraw:otherColor"
+                }
+                Modifier.drawWithContent {
+                    if (focused) {
+                        profileTrace(drawLabel) { drawContent() }
+                    } else {
+                        drawContent()
+                    }
+                }
+            } else Modifier
+            Row(modifier = drawProbe, verticalAlignment = Alignment.CenterVertically) {
                 ChannelTitle(
                     number = number,
                     name = name,
@@ -104,8 +135,9 @@ fun ChannelRow(
             focusedSelectedScale = 1f,
         ),
         modifier = modifier
+            .profileLayout("channels:row")
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 3.dp)
+            .padding(horizontal = 4.dp, vertical = ChannelRowVerticalPadding)
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocus()

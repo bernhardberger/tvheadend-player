@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,8 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseTabOwner
+import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.TvListRow
 import coil3.ImageLoader
@@ -209,6 +212,8 @@ internal fun ArchiveList(
         ModeEmptyState(R.string.recordings_archive_empty)
         return
     }
+    val owner = LocalBrowseTabOwner.current
+    val active = owner?.isCurrent != false
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = initialScrollIndex,
         initialFirstVisibleItemScrollOffset = initialScrollOffset,
@@ -219,12 +224,17 @@ internal fun ArchiveList(
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
     var pendingPageKey by remember { mutableStateOf<String?>(null) }
     val focusTargetKey = recordingFocusTargetKey(items.map { it.key }, pageTargetKey ?: selectedKey)
-    LaunchedEffect(listState) {
+    DisposableEffect(active) {
+        onDispose { pageFocusJob?.cancel() }
+    }
+    LaunchedEffect(listState, active) {
+        if (!active) return@LaunchedEffect
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-            .collect { (index, offset) -> onScrollChanged(index, offset) }
+            .collect { (index, offset) -> if (owner?.isCurrent != false) onScrollChanged(index, offset) }
     }
     LazyColumn(
         state = listState,
+        userScrollEnabled = active,
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
@@ -240,6 +250,7 @@ internal fun ArchiveList(
             .focusRestorer(selectedFocus)
             .testTag("recordings-archive-list")
             .onPreviewKeyEvent { event ->
+                if (owner?.isCurrent == false) return@onPreviewKeyEvent true
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 pageFocusJob?.cancel()
                 pageTargetKey = null
@@ -269,16 +280,17 @@ internal fun ArchiveList(
                         layout.viewportSize.height.toFloat(),
                     ).roundToInt()
                     listState.animateScrollToItem(target, focusOffset)
+                    if (owner?.isCurrent == false) return@launch
                     pageTargetKey = items[target].key
                 }
                 true
             },
     ) {
         items(items, key = { it.key }) { item ->
-            if (pageTargetKey == item.key) {
+            if (active && pageTargetKey == item.key) {
                 // The lazy row must apply its requester before the focus handoff.
                 LaunchedEffect(item.key) {
-                    if (pageTargetKey == item.key) {
+                    if (owner?.isCurrent != false && pageTargetKey == item.key) {
                         runCatching { selectedFocus.requestFocus() }
                         pageTargetKey = null
                         pendingPageKey = null
@@ -286,7 +298,7 @@ internal fun ArchiveList(
                 }
             }
             val selected = item.key == selectedKey
-            val focusTarget = item.key == focusTargetKey
+            val focusTarget = active && item.key == focusTargetKey
             when (item) {
                 is ArchiveListItem.Folder -> FolderListRow(
                     folder = item.folder,
@@ -387,17 +399,21 @@ internal fun FolderMetadataPane(
     onMoveToFolder: () -> Unit,
     onOpenRecording: (DvrEntry) -> Unit,
 ) {
+    val owner = LocalBrowseTabOwner.current
+    val active = owner?.isCurrent != false
     val summary = remember(folder) { summarizeDvrFolder(folder) }
     val focusTargetId = selectedPreviewId
         ?.takeIf { selectedId -> summary.recentRecordings.any { it.id == selectedId } }
         ?: summary.recentRecordings.firstOrNull()?.id
-    LaunchedEffect(focusTargetId) {
+    LaunchedEffect(focusTargetId, active) {
+        if (!active) return@LaunchedEffect
         if (focusTargetId != null && focusTargetId != selectedPreviewId) {
             if (restoreFocus) {
                 withFrameNanos { }
+                if (owner?.isCurrent == false) return@LaunchedEffect
                 previewFocus.requestFocus()
             }
-            onPreviewRecordingFocused(focusTargetId)
+            if (owner?.isCurrent != false) onPreviewRecordingFocused(focusTargetId)
         }
     }
     Column(
@@ -411,6 +427,7 @@ internal fun FolderMetadataPane(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             LazyColumn(
+                userScrollEnabled = active,
                 contentPadding = PaddingValues(bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
@@ -442,7 +459,7 @@ internal fun FolderMetadataPane(
                         modifier = Modifier
                             .testTag("folder-preview-recording-${recordingItemKey(entry.id)}")
                             .then(
-                                if (focusTargetId == entry.id) {
+                                if (active && focusTargetId == entry.id) {
                                     Modifier.focusRequester(previewFocus)
                                 } else {
                                     Modifier
@@ -652,6 +669,8 @@ internal fun RecordingSchedule(
         ModeEmptyState(R.string.recordings_schedule_empty)
         return
     }
+    val owner = LocalBrowseTabOwner.current
+    val active = owner?.isCurrent != false
     val entries = groups.flatMap { it.entries }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
     var pendingPageKey by remember { mutableStateOf<String?>(null) }
@@ -672,11 +691,18 @@ internal fun RecordingSchedule(
             }
         }
     }
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collect(onScrollChanged)
+    DisposableEffect(active) {
+        onDispose { pageFocusJob?.cancel() }
+    }
+    LaunchedEffect(listState, active) {
+        if (!active) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex }.collect {
+            if (owner?.isCurrent != false) onScrollChanged(it)
+        }
     }
     LazyColumn(
         state = listState,
+        userScrollEnabled = active,
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
@@ -692,6 +718,7 @@ internal fun RecordingSchedule(
             .focusRestorer(selectedFocus)
             .testTag("recordings-schedule-list")
             .onPreviewKeyEvent { event ->
+                if (owner?.isCurrent == false) return@onPreviewKeyEvent true
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 pageFocusJob?.cancel()
                 pageTargetKey = null
@@ -724,6 +751,7 @@ internal fun RecordingSchedule(
                         layout.viewportSize.height.toFloat(),
                     ).roundToInt()
                     listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
+                    if (owner?.isCurrent == false) return@launch
                     pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
                 }
                 true
@@ -738,9 +766,9 @@ internal fun RecordingSchedule(
             }
             items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
                 val rowKey = "recording:${recordingItemKey(entry.id)}"
-                if (pageTargetKey == rowKey) {
+                if (active && pageTargetKey == rowKey) {
                     LaunchedEffect(rowKey) {
-                        if (pageTargetKey == rowKey) {
+                        if (owner?.isCurrent != false && pageTargetKey == rowKey) {
                             runCatching { selectedFocus.requestFocus() }
                             pageTargetKey = null
                             pendingPageKey = null
@@ -753,7 +781,7 @@ internal fun RecordingSchedule(
                     imageLoader = imageLoader,
                     currentSession = currentSession,
                     selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
-                    focusTarget = focusTargetKey == "recording:${recordingItemKey(entry.id)}",
+                    focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
                     selectedFocus = selectedFocus,
                     onFocused = {
                         onFocused("recording:${recordingItemKey(entry.id)}")
@@ -785,6 +813,8 @@ internal fun RecordingProblems(
         ModeEmptyState(R.string.recordings_problems_empty)
         return
     }
+    val owner = LocalBrowseTabOwner.current
+    val active = owner?.isCurrent != false
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
     val bringIntoViewSpec = LocalBringIntoViewSpec.current
     val scope = rememberCoroutineScope()
@@ -805,11 +835,18 @@ internal fun RecordingProblems(
             }
         }
     }
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collect(onScrollChanged)
+    DisposableEffect(active) {
+        onDispose { pageFocusJob?.cancel() }
+    }
+    LaunchedEffect(listState, active) {
+        if (!active) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex }.collect {
+            if (owner?.isCurrent != false) onScrollChanged(it)
+        }
     }
     LazyColumn(
         state = listState,
+        userScrollEnabled = active,
         contentPadding = PaddingValues(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
@@ -825,6 +862,7 @@ internal fun RecordingProblems(
             .focusRestorer(selectedFocus)
             .testTag("recordings-problems-list")
             .onPreviewKeyEvent { event ->
+                if (owner?.isCurrent == false) return@onPreviewKeyEvent true
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 pageFocusJob?.cancel()
                 pageTargetKey = null
@@ -857,6 +895,7 @@ internal fun RecordingProblems(
                         layout.viewportSize.height.toFloat(),
                     ).roundToInt()
                     listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
+                    if (owner?.isCurrent == false) return@launch
                     pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
                 }
                 true
@@ -878,9 +917,9 @@ internal fun RecordingProblems(
                 }
                 items(bucketEntries, key = { recordingItemKey(it.id) }) { entry ->
                     val rowKey = "recording:${recordingItemKey(entry.id)}"
-                    if (pageTargetKey == rowKey) {
+                    if (active && pageTargetKey == rowKey) {
                         LaunchedEffect(rowKey) {
-                            if (pageTargetKey == rowKey) {
+                            if (owner?.isCurrent != false && pageTargetKey == rowKey) {
                                 runCatching { selectedFocus.requestFocus() }
                                 pageTargetKey = null
                                 pendingPageKey = null
@@ -894,7 +933,7 @@ internal fun RecordingProblems(
                         currentSession = currentSession,
                         selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
                         focusTarget =
-                            focusTargetKey == "recording:${recordingItemKey(entry.id)}",
+                            active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
                         selectedFocus = selectedFocus,
                         onFocused = {
                             onFocused("recording:${recordingItemKey(entry.id)}")
@@ -1094,6 +1133,7 @@ internal fun RecordingsEmptyState(
             Button(
                 onClick = onRetry,
                 modifier = Modifier
+                    .browseTabFocus()
                     .focusRequester(retryFocus)
                     .focusProperties { up = upFocus },
             ) { Text(stringResource(R.string.retry)) }

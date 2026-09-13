@@ -156,6 +156,35 @@ class RecordingsScreenTest {
     }
 
     @Test
+    fun replacementAuthorityReturnsFromPendingToTheSurvivingRecording() {
+        val observation = mutableStateOf(testSessionObservation(
+            entries = listOf(recording(id = 1, title = "Before reconnect", path = "same.ts")),
+        ))
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.components.SideRail(
+                    currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.RECORDINGS,
+                    showEpgMenu = true, onRootBack = {}, onNavigate = {},
+                ) { padding, active ->
+                    TestRecordingsScreen(sessionObservation = observation.value, contentPadding = padding,
+                        initialFocusEnabled = !active, backEnabled = !active)
+                }
+            }
+        }
+        waitForFocus("recording-list-entry-1")
+        composeRule.runOnIdle {
+            val replacement = testSessionObservation(entries = listOf(
+                recording(id = 1, title = "After reconnect", path = "same.ts"),
+            ))
+            assertTrue(replacement.currentSession !== observation.value.currentSession)
+            observation.value = replacement
+        }
+        composeRule.waitUntilAtLeastOneExists(hasText("After reconnect"), 5_000)
+        waitForFocus("recording-list-entry-1")
+        composeRule.onNodeWithTag("browse-preparing").assertDoesNotExist()
+    }
+
+    @Test
     fun loadingAndNonRetryableEmptyStatesKeepTabsReachable() {
         var connection by mutableStateOf<ConnectionUiState>(ConnectionUiState.Connecting)
         composeRule.setContent {
@@ -1113,6 +1142,57 @@ class RecordingsScreenTest {
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Archive").assertIsFocused()
+    }
+
+    @Test
+    fun changingModesDuringPagingLeavesOnlyTheLatestBodyActive() {
+        val start = System.currentTimeMillis() / 1000L + 3600L
+        val entries = (1..50).map { recording(it, "Saved $it", path = "$it.ts", start = it.toLong()) } +
+            (101..110).map { recording(it, "Scheduled $it", state = DvrEntryState.SCHEDULED, start = start + it, stop = start + 3600) } +
+            (201..210).map { recording(it, "Problem $it", state = DvrEntryState.MISSED, start = start - it, stop = start + 3600) }
+        val state = RecordingsScreenState()
+        composeRule.setContent {
+            TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries, state = state) }
+        }
+        composeRule.onNodeWithTag("recording-list-entry-50").assertIsFocused()
+        val before = recordingRowTops()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onRoot().performKeyInput {
+                keyDown(Key(KeyEvent.KEYCODE_CHANNEL_DOWN)); keyUp(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
+            }
+            composeRule.mainClock.advanceTimeBy(64)
+            composeRule.waitForIdle()
+            val during = recordingRowTops()
+            assertTrue("A real page scroll must be in flight before changing modes",
+                before.keys.intersect(during.keys).any { kotlin.math.abs(before.getValue(it) - during.getValue(it)) > 1f })
+            composeRule.onNodeWithText("Archive").requestFocus()
+            composeRule.onRoot().performKeyInput {
+                keyDown(Key.DirectionRight); keyUp(Key.DirectionRight)
+                keyDown(Key.DirectionDown); keyUp(Key.DirectionDown)
+            }
+            composeRule.mainClock.advanceTimeBy(96)
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("recording-list-entry-101").assertIsFocused()
+            val archivePosition = state.archiveScrollPositions["archive:"] to state.archiveScrollOffsets["archive:"]
+            val archiveSelection = state.selectedKeys["archive:"]
+            composeRule.mainClock.advanceTimeBy(96)
+            composeRule.waitForIdle()
+            assertEquals(archivePosition, state.archiveScrollPositions["archive:"] to state.archiveScrollOffsets["archive:"])
+            assertEquals(archiveSelection, state.selectedKeys["archive:"])
+            composeRule.onNodeWithTag("recording-list-entry-101").assertIsFocused()
+
+            composeRule.onNodeWithText("Schedule").requestFocus()
+            composeRule.onRoot().performKeyInput {
+                keyDown(Key.DirectionRight); keyUp(Key.DirectionRight)
+                keyDown(Key.DirectionDown); keyUp(Key.DirectionDown)
+            }
+            composeRule.mainClock.advanceTimeBy(96)
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("recording-list-entry-201").assertIsFocused()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
     }
 
     @Test

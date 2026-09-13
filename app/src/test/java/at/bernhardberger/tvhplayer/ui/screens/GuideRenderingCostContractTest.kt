@@ -51,18 +51,8 @@ class GuideRenderingCostContractTest {
         )
 
         assertEquals(1, guide.count("indexTimelineEventsByChannel("))
-        assertTrue(guide.contains(
-            """remember(epgSnapshot, category, windowStartSec) {
-            profileTrace("P44:guideIndex") {
-                indexTimelineEventsByChannel(
-                    events = snapshotEvents,
-                    windowStartSec = windowStartSec,
-                    windowEndSec = windowEndSec,
-                    matches = { it.matchesProgrammeCategory(category) },
-                )
-            }
-        }"""
-        ))
+        assertTrue(guide.contains("windowStartSec = input.windowStartSec"))
+        assertTrue(guide.contains("windowEndSec = input.windowEndSec"))
         assertFalse(guide.contains("indexTimelineEventsByChannel(snapshotEvents)"))
         assertFalse(guide.contains("snapshotEvents.filter { it.channelId == channel.id }"))
         assertTrue(

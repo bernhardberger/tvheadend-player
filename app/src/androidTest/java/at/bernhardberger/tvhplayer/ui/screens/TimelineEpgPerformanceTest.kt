@@ -35,6 +35,9 @@ import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.BrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
+import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelHeader
@@ -43,6 +46,8 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineProgrammeCell
 import coil3.ImageLoader
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Instant
@@ -50,6 +55,65 @@ import kotlin.time.Instant
 class TimelineEpgPerformanceTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun departingGuideCellsCannotOwnTheCurrentRequesterRegistry() {
+        val channel = Channel.create(ChannelId(1), name = "Channel", number = 1)
+        val pages = listOf(
+            listOf(event(1, 0, 3600), event(2, 3600, 7200)),
+            listOf(event(2, 3600, 7200), event(3, 7200, 10800)),
+        )
+        val selected = mutableStateOf(0)
+        val requesters = mutableMapOf<EventId, FocusRequester>()
+        val focused = mutableListOf<EventId>()
+        lateinit var motion: BrowseContentMotion
+        composeRule.setContent {
+            val context = LocalContext.current
+            val loader = remember(context) { ImageLoader.Builder(context).build() }
+            TVHeadendPlayerTheme {
+                motion = rememberBrowseContentMotion(selected.value)
+                BrowseTabContent(
+                    motion, selected.value, state = { pages[selected.value] },
+                    modifier = Modifier.width(794.dp).height(76.dp),
+                ) { events, owner ->
+                    TimelineChannelRow(
+                        channel = channel, channelIndex = 0, number = 1, selectedEventId = null,
+                        eventFocusRequesters = requesters, windowStartSec = 0, windowEndSec = 10800,
+                        nowSecProvider = { 0L }, imageLoader = loader, currentSession = null,
+                        events = events, hasCachedEvents = true, hasMatchingCachedEvents = true,
+                        connectionUiState = ConnectionUiState.Ready, coveragePending = false,
+                        recordingForEvent = { null },
+                        onFocused = { if (owner.isCurrent) focused += it.id }, onOpenDetails = {},
+                    )
+                }
+            }
+        }
+        composeRule.runOnIdle { assertEquals(setOf(EventId(1), EventId(2)), requesters.keys) }
+        val old = requesters.getValue(EventId(2))
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.runOnIdle { motion.select(1, listOf(0, 1)); selected.value = 1 }
+            composeRule.mainClock.advanceTimeBy(64)
+            composeRule.waitForIdle()
+            composeRule.runOnIdle {
+                assertEquals(setOf(EventId(2), EventId(3)), requesters.keys)
+                assertNotSame(old, requesters.getValue(EventId(2)))
+                assertFalse(runCatching(old::requestFocus).getOrDefault(false))
+                assertTrue(requesters.getValue(EventId(2)).requestFocus())
+                assertEquals(listOf(EventId(2)), focused)
+            }
+            composeRule.runOnIdle { motion.select(0, listOf(0, 1)); selected.value = 0 }
+            composeRule.mainClock.advanceTimeBy(64)
+            composeRule.waitForIdle()
+            composeRule.runOnIdle {
+                assertEquals(setOf(EventId(1), EventId(2)), requesters.keys)
+                assertNotSame(old, requesters.getValue(EventId(2)))
+                assertFalse(runCatching(old::requestFocus).getOrDefault(false))
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
 
     @Test
     fun clippedTimelineCellsReturnWithoutReflowInLtr() = checkClippedCells(LayoutDirection.Ltr)

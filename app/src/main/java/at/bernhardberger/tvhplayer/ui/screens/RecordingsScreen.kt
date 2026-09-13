@@ -50,8 +50,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
@@ -60,7 +63,10 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
+import at.bernhardberger.tvhplayer.core.DvrLibraryPartition
+import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
+import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.groupDvrProblems
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
@@ -69,6 +75,11 @@ import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
+import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
+import at.bernhardberger.tvhplayer.ui.components.BrowsePreparationPending
+import at.bernhardberger.tvhplayer.ui.components.PreparedBrowseData
+import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
+import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveList
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveListItem
 import at.bernhardberger.tvhplayer.ui.screens.recordings.FolderMetadataPane
@@ -86,12 +97,21 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingItemKey
 import coil3.ImageLoader
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import org.koin.compose.koinInject
 
 private enum class RecordingDetailsReturnTarget {
     CONTENT,
     FOLDER_PREVIEW,
 }
+
+private data class RecordingLibraryPresentation(
+    val library: DvrLibraryPartition,
+    val archive: DvrArchiveFolder,
+    val schedule: List<DvrScheduleSection>,
+    val problems: Map<DvrProblemBucket, List<DvrEntry>>,
+)
 
 class RecordingsScreenState {
     val selectedKeys = mutableStateMapOf<String, String>()
@@ -100,6 +120,27 @@ class RecordingsScreenState {
     val mode = mutableStateOf(DvrLibraryMode.ARCHIVE)
     val archivePath = mutableStateOf<List<String>>(emptyList())
 }
+
+private data class RecordingsTabBody(
+    val mode: DvrLibraryMode,
+    val path: List<String>,
+    val location: String,
+    val empty: Boolean,
+    val connection: ConnectionUiState,
+    val observation: SessionObservation,
+    val channelsById: Map<ChannelId, Channel>,
+    val archiveItems: List<ArchiveListItem>,
+    val archiveSelection: ArchiveListItem?,
+    val recordingSelection: DvrEntry?,
+    val schedule: List<DvrScheduleSection>,
+    val problems: Map<DvrProblemBucket, List<DvrEntry>>,
+    val selectedKey: String?,
+    val scrollIndex: Int,
+    val scrollOffset: Int,
+    val recoveryGeneration: Int,
+    val previewId: DvrEntryId?,
+    val previewFocused: Boolean,
+)
 
 @Composable
 fun RecordingsScreen(
@@ -149,8 +190,10 @@ internal fun RecordingsScreenContent(
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val currentSession = observation.currentSession
     val latestSession by rememberUpdatedState(currentSession)
-    val observedEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
-    var retainedEntries by remember { mutableStateOf(observedEntries) }
+    val preparationAuthority = currentSession ?: observation.dvrSnapshotForDisplay
+    var retainedPreparation by remember(preparationAuthority) {
+        mutableStateOf<PreparedBrowseData<DvrSnapshot?, RecordingLibraryPresentation>?>(null)
+    }
     val channels = observation.channelCatalogForDisplay?.channels.orEmpty()
     val channelsById = remember(channels) { channels.associateBy { it.id } }
     val scope = rememberCoroutineScope()
@@ -190,8 +233,27 @@ internal fun RecordingsScreenContent(
         DvrLibraryMode.SCHEDULE -> "schedule"
         DvrLibraryMode.PROBLEMS -> "problems"
     }
-    val observedLibrary = remember(observedEntries) { partitionDvrLibrary(observedEntries) }
-    val observedArchive = remember(observedLibrary.archive) { buildDvrArchive(observedLibrary.archive) }
+    val prepared = rememberPreparedBrowseData(preparationAuthority, observation.dvrSnapshotForDisplay) { snapshot ->
+        val library = partitionDvrLibrary(snapshot?.entries.orEmpty())
+        currentCoroutineContext().ensureActive()
+        val archive = buildDvrArchive(library.archive)
+        currentCoroutineContext().ensureActive()
+        RecordingLibraryPresentation(
+            library = library,
+            archive = archive,
+            schedule = groupDvrSchedule(library.schedule, System.currentTimeMillis() / 1000L),
+            problems = groupDvrProblems(library.problems),
+        )
+    }
+    Box(Modifier.fillMaxSize()) content@{
+    BrowsePreparationPending(contentPadding, initialFocusEnabled, ready = prepared != null,
+        onReadyFocus = { requestContentFocus = true; true })
+    if (prepared == null) return@content
+    val observedEntries = prepared.input?.entries.orEmpty()
+    val retained = retainedPreparation ?: prepared
+    val retainedEntries = retained.input?.entries.orEmpty()
+    val observedLibrary = prepared.value.library
+    val observedArchive = prepared.value.archive
     val survivingArchivePath = remember(observedArchive, archivePath) {
         var path = archivePath
         while (path.isNotEmpty() && observedArchive.folderAt(path) == null) path = path.dropLast(1)
@@ -206,14 +268,13 @@ internal fun RecordingsScreenContent(
         ((selectedKeys[location] != null && selectedKeys[location] !in observedKeys) ||
             (mode == DvrLibraryMode.ARCHIVE && survivingArchivePath != archivePath))
     val entries = if (removalHandoff) retainedEntries else observedEntries
-    val library = if (removalHandoff) remember(entries) { partitionDvrLibrary(entries) } else observedLibrary
-    val archive = if (removalHandoff) remember(library.archive) { buildDvrArchive(library.archive) } else observedArchive
+    val presentation = if (removalHandoff) retained.value else prepared.value
+    val library = presentation.library
+    val archive = presentation.archive
     val archiveFolder = archive.folderAt(archivePath) ?: archive
     val archiveItems = remember(archiveFolder) { archiveFolder.listItems() }
-    val scheduleGroups = remember(library.schedule) {
-        groupDvrSchedule(library.schedule, System.currentTimeMillis() / 1000L)
-    }
-    val problemGroups = remember(library.problems) { groupDvrProblems(library.problems) }
+    val scheduleGroups = presentation.schedule
+    val problemGroups = presentation.problems
     val itemKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveItems.map { it.key }
         DvrLibraryMode.SCHEDULE -> scheduleGroups.flatMap { it.entries }
@@ -248,7 +309,7 @@ internal fun RecordingsScreenContent(
                 requestContentFocus = observedKeys.isNotEmpty()
             }
         }
-        retainedEntries = observedEntries
+        retainedPreparation = prepared
         archivePath = survivingArchivePath
     }
     LaunchedEffect(pendingFolderPath, mode, initialFocusEnabled, observedArchive) {
@@ -361,6 +422,7 @@ internal fun RecordingsScreenContent(
         }
     }
 
+    val modeMotion = rememberBrowseContentMotion(mode) { screenState.mode.value }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -408,6 +470,7 @@ internal fun RecordingsScreenContent(
                 selected = mode,
                 selectedFocus = modeFocus,
                 onFocused = {
+                    modeMotion.select(it, DvrLibraryMode.entries)
                     if (mode != it) {
                         pendingFolderPath = null
                         contentFocusOwned = false
@@ -416,6 +479,7 @@ internal fun RecordingsScreenContent(
                     mode = it
                 },
                 onClick = {
+                    modeMotion.select(it, DvrLibraryMode.entries)
                     if (mode != it) pendingFolderPath = null
                     mode = it
                     requestContentFocus = true
@@ -428,6 +492,32 @@ internal fun RecordingsScreenContent(
                     .testTag("recordings-mode-tabs"),
             )
         }
+        BrowseTabContent(
+            motion = modeMotion,
+            selectedKey = mode,
+            state = {
+                RecordingsTabBody(
+                    mode, archivePath, location, entries.isEmpty(), connectionUiState,
+                    observation, channelsById, archiveItems, selectedArchiveItem,
+                    selectedRecording, scheduleGroups, problemGroups, selectedKeys[location],
+                    archiveScrollPositions[location] ?: 0,
+                    screenState.archiveScrollOffsets[location] ?: 0,
+                    focusRecoveryGeneration, folderPreviewRecordingId, folderPreviewFocused,
+                )
+            },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) { frame, owner ->
+        val mode = frame.mode
+        val archivePath = frame.path
+        val location = frame.location
+        val observation = frame.observation
+        val currentSession = observation.currentSession
+        val channelsById = frame.channelsById
+        val archiveItems = frame.archiveItems
+        val selectedArchiveItem = frame.archiveSelection
+        val selectedRecording = frame.recordingSelection
+        val scheduleGroups = frame.schedule
+        val problemGroups = frame.problems
         if (mode == DvrLibraryMode.ARCHIVE && archivePath.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -444,11 +534,11 @@ internal fun RecordingsScreenContent(
         }
         Spacer(Modifier.height(TvSpacing16))
 
-        if (entries.isEmpty()) {
+        if (frame.empty) {
             RecordingsEmptyState(
-                connectionUiState = connectionUiState,
-                onRetry = onRetry,
-                retryFocus = contentFocus,
+                connectionUiState = frame.connection,
+                onRetry = { if (owner.isCurrent) onRetry() },
+                retryFocus = if (owner.isCurrent) contentFocus else remember { FocusRequester() },
                 upFocus = modeFocus,
                 modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
@@ -464,36 +554,40 @@ internal fun RecordingsScreenContent(
                         modifier = Modifier
                             .weight(0.46f)
                             .fillMaxHeight()
-                            .focusRequester(folderTransitionFocus)
-                            .focusProperties { canFocus = pendingFolderPath != null }
+                            .then(if (owner.isCurrent) Modifier.focusRequester(folderTransitionFocus) else Modifier)
+                            .focusProperties { canFocus = owner.isCurrent && pendingFolderPath != null }
                             .onFocusChanged {
+                                if (!owner.isCurrent) return@onFocusChanged
                                 contentHasFocus = it.hasFocus
                                 if (it.hasFocus) contentFocusOwned = true
                             }
                             .focusable(),
                     ) {
-                        key(location, focusRecoveryGeneration) {
-                            val generation = focusRecoveryGeneration
+                        key(location, frame.recoveryGeneration) {
+                            val generation = frame.recoveryGeneration
                             ArchiveList(
                                 items = archiveItems,
-                                selectedKey = selectedKeys[location],
+                                selectedKey = frame.selectedKey,
                                 selectedFocus = contentFocus,
-                                initialScrollIndex = archiveScrollPositions[location] ?: 0,
-                                initialScrollOffset = screenState.archiveScrollOffsets[location] ?: 0,
+                                initialScrollIndex = frame.scrollIndex,
+                                initialScrollOffset = frame.scrollOffset,
                                 onScrollChanged = { index, offset ->
-                                    if (generation == focusRecoveryGeneration) {
+                                    if (owner.isCurrent && generation == focusRecoveryGeneration) {
                                         archiveScrollPositions[location] = index
                                         screenState.archiveScrollOffsets[location] = offset
                                     }
                                 },
                                 onFocused = {
+                                    if (!owner.isCurrent) return@ArchiveList
                                     selectedKeys[location] = it
                                     folderPreviewFocused = false
                                 },
                                 onMoveToPreview = {
+                                    if (!owner.isCurrent) return@ArchiveList
                                     runCatching { folderPreviewFocus.requestFocus() }
                                 },
                                 onOpenFolder = { folder ->
+                                    if (!owner.isCurrent) return@ArchiveList
                                     val destination = "archive:${folder.path.joinToString("/")}"
                                     val destinationKeys = folder.listItems().map { it.key }
                                     if (selectedKeys[destination] !in destinationKeys) {
@@ -502,6 +596,7 @@ internal fun RecordingsScreenContent(
                                     pendingFolderPath = folder.path
                                 },
                                 onOpenRecording = {
+                                    if (!owner.isCurrent) return@ArchiveList
                                     contentFocusOwned = false
                                     detailsOpenedFromFolderPreview = false
                                     detailsInitialAction = null
@@ -530,18 +625,21 @@ internal fun RecordingsScreenContent(
                                     entry.channelId?.let(channelsById::get)?.icon
                                 },
                                 previewFocus = folderPreviewFocus,
-                                selectedPreviewId = folderPreviewRecordingId,
-                                restoreFocus = folderPreviewFocused,
+                                selectedPreviewId = frame.previewId,
+                                restoreFocus = owner.isCurrent && frame.previewFocused,
                                 onPreviewFocusChanged = {
+                                    if (!owner.isCurrent) return@FolderMetadataPane
                                     folderPreviewFocused = it
                                     if (it) contentFocusOwned = false
                                 },
-                                onPreviewRecordingFocused = { folderPreviewRecordingId = it },
+                                onPreviewRecordingFocused = { if (owner.isCurrent) folderPreviewRecordingId = it },
                                 onMoveToFolder = {
+                                    if (!owner.isCurrent) return@FolderMetadataPane
                                     folderPreviewFocused = false
                                     runCatching { contentFocus.requestFocus() }
                                 },
                                 onOpenRecording = {
+                                    if (!owner.isCurrent) return@FolderMetadataPane
                                     contentFocusOwned = false
                                     detailsOpenedFromFolderPreview = true
                                     detailsInitialAction = null
@@ -567,18 +665,20 @@ internal fun RecordingsScreenContent(
                         .padding(start = startPadding, end = endPadding)
                         .fillMaxSize()
                         .onFocusChanged {
+                            if (!owner.isCurrent) return@onFocusChanged
                             contentHasFocus = it.hasFocus
                             if (it.hasFocus) contentFocusOwned = true
                         },
                 ) {
-                    key(location, focusRecoveryGeneration) {
-                        val generation = focusRecoveryGeneration
+                    key(location, frame.recoveryGeneration) {
+                        val generation = frame.recoveryGeneration
                         RecordingSchedule(
                             groups = scheduleGroups,
-                            selectedKey = selectedKeys[location],
+                            selectedKey = frame.selectedKey,
                             selectedFocus = contentFocus,
-                            onFocused = { selectedKeys[location] = it },
+                            onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
                             onOpen = {
+                                if (!owner.isCurrent) return@RecordingSchedule
                                 contentFocusOwned = false
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
@@ -592,9 +692,9 @@ internal fun RecordingsScreenContent(
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
-                            initialScrollIndex = archiveScrollPositions[location] ?: 0,
+                            initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {
-                                if (generation == focusRecoveryGeneration) {
+                                if (owner.isCurrent && generation == focusRecoveryGeneration) {
                                     archiveScrollPositions[location] = it
                                 }
                             },
@@ -606,18 +706,20 @@ internal fun RecordingsScreenContent(
                         .padding(start = startPadding, end = endPadding)
                         .fillMaxSize()
                         .onFocusChanged {
+                            if (!owner.isCurrent) return@onFocusChanged
                             contentHasFocus = it.hasFocus
                             if (it.hasFocus) contentFocusOwned = true
                         },
                 ) {
-                    key(location, focusRecoveryGeneration) {
-                        val generation = focusRecoveryGeneration
+                    key(location, frame.recoveryGeneration) {
+                        val generation = frame.recoveryGeneration
                         RecordingProblems(
                             groups = problemGroups,
-                            selectedKey = selectedKeys[location],
+                            selectedKey = frame.selectedKey,
                             selectedFocus = contentFocus,
-                            onFocused = { selectedKeys[location] = it },
+                            onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
                             onOpen = {
+                                if (!owner.isCurrent) return@RecordingProblems
                                 contentFocusOwned = false
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
@@ -631,9 +733,9 @@ internal fun RecordingsScreenContent(
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
-                            initialScrollIndex = archiveScrollPositions[location] ?: 0,
+                            initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {
-                                if (generation == focusRecoveryGeneration) {
+                                if (owner.isCurrent && generation == focusRecoveryGeneration) {
                                     archiveScrollPositions[location] = it
                                 }
                             },
@@ -641,6 +743,7 @@ internal fun RecordingsScreenContent(
                     }
                 }
             }
+        }
         }
     }
 
@@ -761,5 +864,6 @@ internal fun RecordingsScreenContent(
                 }
             },
         )
+    }
     }
 }

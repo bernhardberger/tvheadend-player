@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.requestFocus
 import java.io.File
 import androidx.compose.ui.input.key.Key
@@ -49,6 +52,58 @@ import org.junit.Test
 class SidebarGuideNavigationTest {
     @get:Rule val compose = createAndroidComposeRule<JourneyProfileActivity>()
     private val focusHistory = mutableListOf<String>()
+
+    @Test fun allThreeTabBodiesMoveWhileTheirHeadersAndFocusStayPut() {
+        enterInitialChannelScope()
+        assertTabBodyMoves(
+            compose.onNodeWithTag("channels-list"),
+            compose.onNodeWithText(compose.activity.getString(at.bernhardberger.tvhplayer.R.string.channel_list)),
+            "Group A",
+        )
+        back()
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        assertTabBodyMoves(
+            compose.onNodeWithTag("epg-programme-viewport"),
+            compose.onNode(hasText("Guide") and !hasClickAction()),
+            "Group B",
+        )
+        back()
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        assertTabBodyMoves(
+            compose.onNodeWithText(compose.activity.getString(at.bernhardberger.tvhplayer.R.string.recordings_empty)),
+            compose.onNodeWithTag("recordings-header"),
+            "Schedule",
+        )
+    }
+
+    private fun assertTabBodyMoves(
+        body: SemanticsNodeInteraction,
+        header: SemanticsNodeInteraction,
+        nextTab: String,
+    ) {
+        compose.waitForIdle()
+        val originalX = body.getUnclippedBoundsInRoot().left.value
+        val headerBounds = header.getUnclippedBoundsInRoot()
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onRoot().performKeyInput {
+                keyDown(Key.DirectionRight)
+                keyUp(Key.DirectionRight)
+            }
+            compose.mainClock.advanceTimeBy(32)
+            compose.waitForIdle()
+            compose.onNode(hasText(nextTab) and isSelected()).assertIsFocused()
+            assertTrue("$nextTab must move the actual body", body.getUnclippedBoundsInRoot().left.value > originalX + 1f)
+            assertEquals(headerBounds, header.getUnclippedBoundsInRoot())
+            compose.mainClock.advanceTimeBy(1000)
+            compose.waitForIdle()
+            assertEquals(originalX, body.getUnclippedBoundsInRoot().left.value, 0.5f)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
 
     @Test fun channelPageFocusSurvivesMetadataPublishedDuringTheScroll() {
         enterInitialChannelScope()

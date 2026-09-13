@@ -142,7 +142,7 @@ class ChannelsScreenshotTest(private val scenario: String) {
                             ChannelsScreenContent(
                                 contentPadding = padding, initialFocusEnabled = !drawerActive,
                                 channelScopeState = resolveChannelScopeState(ChannelRepositoryState.Current(catalog), activeTag),
-                                observation = observation, tagNotice = false, selectedId = selectedId,
+                                observation = observation, tagNotice = false, selectedId = { selectedId },
                                 imageLoader = imageLoader,
                                 playingChannelId = if (scenario == "playing-recording") ChannelId(2) else null,
                                 connectionUiState = if (scenario == "reconnecting") ConnectionUiState.Reconnecting else ConnectionUiState.Ready,

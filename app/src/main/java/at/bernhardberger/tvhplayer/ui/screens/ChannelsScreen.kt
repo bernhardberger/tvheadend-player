@@ -6,6 +6,7 @@ import kotlin.math.roundToInt
 
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
+import at.bernhardberger.tvhplayer.profiling.profileLayout
 
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -61,6 +62,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.ImageLoader
+import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
@@ -91,6 +94,12 @@ import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
+import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
+import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
+import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabListState
+import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabReader
+import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.ChannelRowVerticalPadding
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
@@ -167,7 +176,7 @@ fun ChannelsScreen(
     val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
-    val selectedId by selection.selectedId.collectAsStateWithLifecycle()
+    val selectedId = selection.selectedId.collectAsStateWithLifecycle()
 
     ChannelsScreenContent(
         contentPadding = contentPadding,
@@ -175,7 +184,7 @@ fun ChannelsScreen(
         channelScopeState = channelScopeState,
         observation = observation,
         tagNotice = tagNotice,
-        selectedId = selectedId,
+        selectedId = { selectedId.value },
         imageLoader = imageLoader,
         playingChannelId = playingChannelId,
         connectionUiState = connectionUiState,
@@ -198,7 +207,7 @@ internal fun ChannelsScreenContent(
     scopeStateProvider: () -> ChannelScopeState = { channelScopeState },
     observation: SessionObservation,
     tagNotice: Boolean,
-    selectedId: ChannelId?,
+    selectedId: () -> ChannelId?,
     imageLoader: ImageLoader,
     playingChannelId: ChannelId?,
     connectionUiState: ConnectionUiState,
@@ -208,7 +217,7 @@ internal fun ChannelsScreenContent(
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
-) {
+) = profileTrace("P1:compose:channels") {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
@@ -221,6 +230,9 @@ internal fun ChannelsScreenContent(
         layoutDirection = layoutDirection,
     )
     val channelScope = channelScopeState.scope
+    val scopeMotion = rememberBrowseContentMotion(channelScope.activeTagId) {
+        scopeStateProvider().scope.activeTagId
+    }
     val hasScopeTabs = channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1
     val scopeFocus = remember { FocusRequester() }
     var consumeBackRelease by remember { mutableStateOf(false) }
@@ -242,6 +254,9 @@ internal fun ChannelsScreenContent(
     val rememberedChannelIds = remember {
         mutableStateMapOf<ChannelTagId?, ChannelId>()
     }
+    var positionedTagId by remember { mutableStateOf(channelScope.activeTagId) }
+    var awaitingTagChannels by remember { mutableStateOf(false) }
+    var tagResetGeneration by remember { mutableIntStateOf(0) }
     var restorationGeneration by remember { mutableIntStateOf(0) }
     var restorationJob by remember { mutableStateOf<Job?>(null) }
     var pendingFocusId by remember { mutableStateOf<ChannelId?>(null) }
@@ -252,6 +267,7 @@ internal fun ChannelsScreenContent(
 
     val listState = rememberLazyListState()
     val bringIntoViewSpec = LocalBringIntoViewSpec.current
+    val rowFocusInsetPx = with(LocalDensity.current) { ChannelRowVerticalPadding.roundToPx() }
     val coroutineScope = rememberCoroutineScope()
 
     fun cancelRestoration() {
@@ -272,6 +288,25 @@ internal fun ChannelsScreenContent(
             state.scope.visibleChannels.map { it.id } == orderedChannelIds
     val drawerState = LocalBrowseDrawerState.current
     val navigationFocus = LocalBrowseNavigationFocus.current
+
+    fun scopeEntryChannelId(): ChannelId? = restoredChannelId(
+        visibleChannelIds = orderedChannelIds,
+        rememberedChannelId = rememberedChannelIds[channelScope.activeTagId]
+            .takeIf { positionedTagId == channelScope.activeTagId && !awaitingTagChannels },
+        selectedChannelId = if (positionedTagId != channelScope.activeTagId || awaitingTagChannels) {
+            playingChannelId
+        } else selectedId(),
+    )
+
+    fun channelFocusScrollOffset(focusInsetPx: Int = 0): Int {
+        val layout = listState.layoutInfo
+        return bringIntoViewSpec.calculateScrollDistance(
+            offset = (layout.beforeContentPadding + focusInsetPx).toFloat(),
+            size = ((layout.visibleItemsInfo.firstOrNull()?.size ?: 0) - 2 * focusInsetPx)
+                .coerceAtLeast(0).toFloat(),
+            containerSize = layout.viewportSize.height.toFloat(),
+        ).roundToInt()
+    }
 
     fun requestChannelFocus(
         channelId: ChannelId,
@@ -301,16 +336,9 @@ internal fun ChannelsScreenContent(
                     }
                 ) {
                     if (animatePage) {
-                        val layout = listState.layoutInfo
-                        val rowSize = layout.visibleItemsInfo.firstOrNull()?.size ?: 0
                         // Finish at the same position focus will request, rather than animating
                         // to the top and then visibly scrolling backward to the TV focus pivot.
-                        val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                            offset = layout.beforeContentPadding.toFloat(),
-                            size = rowSize.toFloat(),
-                            containerSize = layout.viewportSize.height.toFloat(),
-                        ).roundToInt()
-                        listState.animateScrollToItem(index, focusOffset)
+                        listState.animateScrollToItem(index, channelFocusScrollOffset())
                     } else listState.scrollToItem(index)
                 }
                 if (!listState.awaitVisibleChannel(channelId)) return@launch
@@ -351,11 +379,7 @@ internal fun ChannelsScreenContent(
         scopeEntryRequested = true
         if (!matchesRequestedRows(scopeStateProvider())) return true
         scopeEntryRequested = false
-        val id = restoredChannelId(
-            visibleChannelIds = orderedChannelIds,
-            rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
-            selectedChannelId = selectedId,
-        ) ?: return false
+        val id = scopeEntryChannelId() ?: return false
         contentFocusOwned = true
         return requestChannelFocus(id, preserveVisiblePosition = true)
     }
@@ -373,7 +397,7 @@ internal fun ChannelsScreenContent(
         val currentId = pendingFocusId
             ?.takeIf { pendingFocusTagId == channelScope.activeTagId }
             ?: focusedChannelId?.takeIf(orderedChannelIds::contains)
-            ?: selectedId
+            ?: selectedId()
         val currentIndex = orderedChannelIds.indexOf(currentId)
         val visibleCount = listState.layoutInfo.visibleItemsInfo.size
         val targetIndex = ChannelNavigation.pageTargetIndex(
@@ -390,24 +414,6 @@ internal fun ChannelsScreenContent(
         return true
     }
 
-    val detailChannelId = focusedChannelId?.takeIf(orderedChannelIds::contains)
-        ?: browsingFocusChannelId(channels, selectedId)
-    val focusedChannel = channels.firstOrNull { it.id == detailChannelId }
-    val focusedNow = remember(observation, focusedChannel?.id, nowSec) {
-        focusedChannel?.id?.let {
-            profileTrace("P48:channelsNowLookup") {
-                observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
-            }
-        }
-    }
-    val focusedNext = remember(observation, focusedChannel?.id, nowSec) {
-        focusedChannel?.id?.let {
-            profileTrace("P48:channelsNextLookup") {
-                observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
-            }
-        }
-    }
-
     LaunchedEffect(Unit) {
         while (true) {
             nowSec = System.currentTimeMillis() / 1000L
@@ -415,11 +421,36 @@ internal fun ChannelsScreenContent(
         }
     }
 
-    LaunchedEffect(channelScope.activeTagId, orderedChannelIds, initialFocusEnabled) {
+    LaunchedEffect(
+        channelScope.activeTagId, orderedChannelIds, channelScopeState.settingsLoaded,
+        initialFocusEnabled, tagResetGeneration,
+    ) {
+        val scopeChanged = positionedTagId != channelScope.activeTagId || awaitingTagChannels
+        if (scopeChanged && !matchesRequestedRows(currentScope())) return@LaunchedEffect
         val pendingId = pendingFocusId?.takeIf {
             pendingFocusTagId == channelScope.activeTagId && it in orderedChannelIds
         }
         cancelRestoration()
+        if (scopeChanged) {
+            positionedTagId = channelScope.activeTagId
+            awaitingTagChannels = true
+            focusedChannelId = null
+            rememberedChannelIds.remove(channelScope.activeTagId)
+        }
+        if (awaitingTagChannels) {
+            val entryId = restoredChannelId(orderedChannelIds, null, playingChannelId)
+            if (entryId != null) {
+                rememberedChannelIds[channelScope.activeTagId] = entryId
+                awaitingTagChannels = false
+            }
+            // Override LazyColumn's retained first-item key on a scope change. Merely
+            // changing its items preserves an overlapping channel's old viewport anchor.
+            // Preview the same target/pivot Down will use, without requesting row focus.
+            listState.requestScrollToItem(
+                index = orderedChannelIds.indexOf(entryId).coerceAtLeast(0),
+                scrollOffset = channelFocusScrollOffset(rowFocusInsetPx),
+            )
+        }
         if (!initialFocusEnabled) {
             scopeEntryRequested = false
             contentFocusOwned = false
@@ -447,17 +478,17 @@ internal fun ChannelsScreenContent(
             contentFocusOwned = true
             // A retained destination can receive a newer shared selection from Guide.
             // Re-enter that identity instead of a stale pre-visit Channels focus.
-            val id = selectedId?.takeIf { it in orderedChannelIds } ?: restoredChannelId(
+            val id = selectedId()?.takeIf { it in orderedChannelIds } ?: restoredChannelId(
                 visibleChannelIds = orderedChannelIds,
                 rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
-                selectedChannelId = selectedId,
+                selectedChannelId = selectedId(),
             ) ?: return@LaunchedEffect
             requestChannelFocus(id, preserveVisiblePosition = true)
             return@LaunchedEffect
         }
 
         if (pendingId != null) {
-            requestChannelFocus(pendingId)
+            requestChannelFocus(pendingId, preserveVisiblePosition = scopeChanged)
             return@LaunchedEffect
         }
 
@@ -465,7 +496,7 @@ internal fun ChannelsScreenContent(
             val id = restoredChannelId(
                 visibleChannelIds = orderedChannelIds,
                 rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
-                selectedChannelId = selectedId,
+                selectedChannelId = selectedId(),
             ) ?: return@LaunchedEffect
             requestChannelFocus(id)
         }
@@ -506,6 +537,16 @@ internal fun ChannelsScreenContent(
                 activeTagId = channelScope.activeTagId,
                 activeFocusRequester = scopeFocus,
                 onSelectTag = {
+                    scopeMotion.select(it, buildList {
+                        if (channelScope.allChannelsVisible) add(null)
+                        addAll(channelScope.tags.map { tag -> tag.id })
+                    })
+                    if (it != channelScope.activeTagId) {
+                        // Keep a reset even if A -> B -> A coalesces before composition.
+                        // Selecting the already active tab on Back/re-entry is not a reset.
+                        awaitingTagChannels = true
+                        tagResetGeneration++
+                    }
                     relinquishContentFocus(clearFocusedChannel = true)
                     onSelectTag(it)
                 },
@@ -513,7 +554,7 @@ internal fun ChannelsScreenContent(
                 onTagFocus = {
                     // This callback precedes the drawer's composition feedback on Right.
                     if (!initialFocusEnabled) {
-                        selectedId?.takeIf { it in orderedChannelIds }?.let {
+                        selectedId()?.takeIf { it in orderedChannelIds }?.let {
                             rememberedChannelIds[channelScope.activeTagId] = it
                         }
                     }
@@ -529,6 +570,31 @@ internal fun ChannelsScreenContent(
 
         Spacer(Modifier.height(TvSpacing16))
 
+        BrowseTabContent(
+            motion = scopeMotion,
+            selectedKey = channelScope.activeTagId,
+            state = {
+                ChannelsTabBody(
+                    channelScopeState, observation, connectionUiState, orderedChannelIds,
+                    channelNumbers, playingChannelId, recordingChannelIds, tagNotice,
+                    { focusedChannelId }, ::scopeEntryChannelId, { nowSec }, initialFocusEnabled,
+                )
+            },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) body@{ frame, owner ->
+        val channelScopeState = frame.scope
+        val channelScope = channelScopeState.scope
+        val channels = channelScope.visibleChannels
+        val observation = frame.observation
+        val currentSession = observation.currentSession
+        val connectionUiState = frame.connection
+        val orderedChannelIds = frame.ids
+        val channelNumbers = frame.numbers
+        val playingChannelId = frame.playingId
+        val recordingChannelIds = frame.recordingIds
+        val tagNotice = frame.tagNotice
+        val nowSecProvider = rememberBrowseTabReader(frame.nowSec)
+        val listState = rememberBrowseTabListState(listState)
         if (channels.isEmpty()) {
             if (
                 shouldPresentEmptyTag(
@@ -548,22 +614,22 @@ internal fun ChannelsScreenContent(
                     state = connectionUiState.forEmptyChannelPresentation(
                         channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
                     ),
-                    initialFocusEnabled = initialFocusEnabled,
-                    onRetry = onRetryConnection,
-                    onOpenSettings = onOpenConnectionSettings,
+                    initialFocusEnabled = owner.isCurrent && frame.initialFocusEnabled,
+                    onRetry = { if (owner.isCurrent) onRetryConnection() },
+                    onOpenSettings = { if (owner.isCurrent) onOpenConnectionSettings() },
                     modifier = Modifier
                         .padding(browseViewportPadding)
                         .fillMaxSize(),
                 )
             }
-            return@Column
+            return@body
         }
 
         if (connectionUiState != ConnectionUiState.Ready || !channelScopeState.channelCatalogCurrent) {
             InlineConnectionState(
                 state = if (connectionUiState == ConnectionUiState.Ready) ConnectionUiState.SyncingChannels else connectionUiState,
-                onRetry = onRetryConnection,
-                onOpenSettings = onOpenConnectionSettings,
+                onRetry = { if (owner.isCurrent) onRetryConnection() },
+                onOpenSettings = { if (owner.isCurrent) onOpenConnectionSettings() },
                 modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
             Spacer(Modifier.height(12.dp))
@@ -589,19 +655,22 @@ internal fun ChannelsScreenContent(
                     Column(Modifier.fillMaxSize()) {
                         UnavailableTagNotice(
                             visible = tagNotice,
-                            onDismiss = onDismissTagNotice,
+                            onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
                         )
                         if (tagNotice) Spacer(Modifier.height(8.dp))
 
                         LazyColumn(
                             state = listState,
+                            userScrollEnabled = owner.isCurrent,
                             contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("channels-list")
                                 .focusProperties {
                                     onEnter = {
-                                        if (hasScopeTabs && (!didInitialRestore || requestedFocusDirection == FocusDirection.Right)) {
+                                        if (!owner.isCurrent) {
+                                            cancelFocusChange()
+                                        } else if (hasScopeTabs && (!didInitialRestore || requestedFocusDirection == FocusDirection.Right)) {
                                             scopeFocus.requestFocus()
                                         }
                                     }
@@ -609,6 +678,7 @@ internal fun ChannelsScreenContent(
                                 .focusGroup()
                                 .focusRestorer()
                                 .onPreviewKeyEvent { event ->
+                                    if (!owner.isCurrent) return@onPreviewKeyEvent true
                                     if (event.type != KeyEventType.KeyDown) {
                                         return@onPreviewKeyEvent false
                                     }
@@ -624,6 +694,7 @@ internal fun ChannelsScreenContent(
                         ) {
                             items(channels, key = { ch -> channelLazyItemKey(ch.id) }) { ch ->
                                 val channelId = ch.id
+                                val nowSec = nowSecProvider()
                                 val now =
                                     remember(channelId, observation, nowSec) {
                                         profileTrace("P44:channelProgramme") {
@@ -642,7 +713,8 @@ internal fun ChannelsScreenContent(
 
                                 ChannelRow(
                                     modifier = Modifier
-                                        .focusRequester(rowFocusRequesters.getValue(channelId))
+                                        .then(if (owner.isCurrent) Modifier.focusRequester(rowFocusRequesters.getValue(channelId)) else Modifier)
+                                        .browseTabFocus()
                                         .focusProperties {
                                             if (layoutDirection == LayoutDirection.Ltr) {
                                                 left = navigationFocus ?: FocusRequester.Default
@@ -665,9 +737,10 @@ internal fun ChannelsScreenContent(
                                     recordingNow = status.recordingNow,
                                     playingNow = status.playingNow,
                                     onFocus = {
+                                        if (!owner.isCurrent) return@ChannelRow
                                         profileTrace("P44:focus:channel") {
                                             if (BuildConfig.PROFILE_TRACE) {
-                                                profileTrace("P48:focus:channel:${channelId.value}") { }
+                                                profileTrace("P48:focus:channel") { }
                                             }
                                             focusedChannelId = channelId
                                             rememberedChannelIds[channelScope.activeTagId] = channelId
@@ -681,6 +754,7 @@ internal fun ChannelsScreenContent(
                                         }
                                     },
                                     onConfirm = {
+                                        if (!owner.isCurrent) return@ChannelRow
                                         currentSession?.let {
                                             onPlay(
                                                 LivePlaybackSelection(it, channelId),
@@ -706,22 +780,38 @@ internal fun ChannelsScreenContent(
                     ),
                     modifier = Modifier
                         .weight(0.56f)
+                        .profileLayout("channels:details")
                         .padding(detailPanePadding)
                         .fillMaxHeight(),
                 ) {
-                    EpgDetailPane(
-                        channelName = focusedChannel?.name ?: "—",
-                        now = focusedNow,
-                        nowSec = nowSec,
-                        next = focusedNext,
+                    FocusedChannelDetails(
+                        channels = channels,
+                        focusedChannelId = frame.focusedId,
+                        selectedId = frame.entryId,
+                        observation = observation,
+                        nowSecProvider = nowSecProvider,
                         imageLoader = imageLoader,
-                        currentSession = currentSession,
-                        piconPath = focusedChannel?.icon
                     )
                 }
             }
+        }
     }
 }
+
+private data class ChannelsTabBody(
+    val scope: ChannelScopeState,
+    val observation: SessionObservation,
+    val connection: ConnectionUiState,
+    val ids: List<ChannelId>,
+    val numbers: Map<ChannelId, Int?>,
+    val playingId: ChannelId?,
+    val recordingIds: Set<ChannelId>,
+    val tagNotice: Boolean,
+    val focusedId: () -> ChannelId?,
+    val entryId: () -> ChannelId?,
+    val nowSec: () -> Long,
+    val initialFocusEnabled: Boolean,
+)
 
 @Composable
 private fun EmptyTagState(modifier: Modifier = Modifier) {
@@ -803,6 +893,7 @@ private fun EmptyChannelsState(
                     Button(
                         onClick = onOpenSettings,
                         modifier = Modifier
+                            .browseTabFocus()
                             .padding(top = 24.dp)
                             .focusRequester(actionFocus),
                     ) {
@@ -817,11 +908,11 @@ private fun EmptyChannelsState(
                     ) {
                         Button(
                             onClick = onRetry,
-                            modifier = Modifier.focusRequester(actionFocus),
+                            modifier = Modifier.browseTabFocus().focusRequester(actionFocus),
                         ) {
                             Text(stringResource(R.string.retry))
                         }
-                        OutlinedButton(onClick = onOpenSettings) {
+                        OutlinedButton(onClick = onOpenSettings, modifier = Modifier.browseTabFocus()) {
                             Text(stringResource(R.string.open_connection_settings))
                         }
                     }
@@ -875,12 +966,12 @@ private fun InlineConnectionState(
                 overflow = TextOverflow.Ellipsis,
             )
             if (recoveryAction == ConnectionRecoveryAction.RETRY) {
-                Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
-                OutlinedButton(onClick = onOpenSettings) {
+                Button(onClick = onRetry, modifier = Modifier.browseTabFocus()) { Text(stringResource(R.string.retry)) }
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.browseTabFocus()) {
                     Text(stringResource(R.string.connection_settings_short))
                 }
             } else if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
-                Button(onClick = onOpenSettings) {
+                Button(onClick = onOpenSettings, modifier = Modifier.browseTabFocus()) {
                     Text(stringResource(R.string.connection_settings_short))
                 }
             }
@@ -946,6 +1037,48 @@ private fun connectionMessage(state: ConnectionUiState): String = stringResource
 )
 
 @Composable
+private fun FocusedChannelDetails(
+    channels: List<Channel>,
+    focusedChannelId: () -> ChannelId?,
+    selectedId: () -> ChannelId?,
+    observation: SessionObservation,
+    nowSecProvider: () -> Long,
+    imageLoader: ImageLoader,
+) {
+    // These reads belong to the details composition, not the screen or list.
+    // Keep local native focus ahead of shared selection during restoration.
+    val detailChannelId = rememberBrowseTabReader {
+        focusedChannelId()?.takeIf { id -> channels.any { it.id == id } }
+            ?: browsingFocusChannelId(channels, selectedId())
+    }()
+    val channel = channels.firstOrNull { it.id == detailChannelId }
+    val nowSec = nowSecProvider()
+    val now = remember(observation, channel?.id, nowSec) {
+        channel?.id?.let {
+            profileTrace("P48:channelsNowLookup") {
+                observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+            }
+        }
+    }
+    val next = remember(observation, channel?.id, nowSec) {
+        channel?.id?.let {
+            profileTrace("P48:channelsNextLookup") {
+                observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+            }
+        }
+    }
+    EpgDetailPane(
+        channelName = channel?.name ?: "—",
+        now = now,
+        next = next,
+        nowSec = nowSec,
+        imageLoader = imageLoader,
+        currentSession = observation.currentSession,
+        piconPath = channel?.icon,
+    )
+}
+
+@Composable
 private fun EpgDetailPane(
     channelName: String,
     now: EpgEventEntry?,
@@ -954,7 +1087,7 @@ private fun EpgDetailPane(
     imageLoader: ImageLoader,
     currentSession: at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation?,
     piconPath: String? = null,
-) {
+) = profileTrace("P1:compose:channelDetails") {
     val progress = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
     val summaryText = remember(now) { now?.let { programmeSummaryText(it) } }
     val metadata = remember(now) { now?.let { programmeMetadata(it) } }
