@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Alignment
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.tv.material3.Icon
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -40,6 +37,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
@@ -166,10 +164,10 @@ fun ChannelDrawer(
                                     Text(ChannelNavigation.numberForId(ids, numbers, channel.id)?.toString().orEmpty(),
                                         modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f), maxLines = 1)
-                                    if (channel.id == playingChannelId) Icon(Icons.Filled.PlayArrow,
+                                    if (channel.id == playingChannelId) Icon(painterResource(R.drawable.ic_play_arrow),
                                         contentDescription = stringResource(R.string.player_shelf_playing),
                                         tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                                    if (channel.id in recordingChannelIds) Icon(Icons.Filled.FiberManualRecord,
+                                    if (channel.id in recordingChannelIds) Icon(painterResource(R.drawable.ic_fiber_manual_record),
                                         contentDescription = stringResource(R.string.player_shelf_recording),
                                         tint = at.bernhardberger.tvhplayer.ui.TvRecordingColor, modifier = Modifier.size(16.dp))
                                 }

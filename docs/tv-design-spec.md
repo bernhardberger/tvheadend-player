@@ -693,6 +693,20 @@ and below drawer focus surfaces. This is an optical fade at the seam, not conten
 physically scrolling under a modal drawer; it must not alter measurement, focus,
 Back, or key dispatch.
 
+### 6.6 Icon assets
+
+UI icons are packaged Android vector drawables under
+`app/src/main/res/drawable/ic_*.xml`, rendered through Compose
+`painterResource` and the TV Material `Icon` API. They come from Google's
+Material Symbols Rounded set at the fixed export (weight 400, grade 0, optical
+size 24), each symbol as one `ic_{symbol}` resource. Do not reintroduce the
+Compose `material-icons` dependency as a source of new symbols; add the vector
+asset instead. Icons carry no vector-level `android:tint`, so the caller's
+`tint`/`ColorFilter` remains authoritative, and directional symbols that mirror
+for RTL keep `android:autoMirrored="true"`. Source revision, export choices and
+modifications are recorded in `artwork/material-symbols-LICENSE.txt` and
+`NOTICE.md`.
+
 ---
 
 ## 7. Derived tokens

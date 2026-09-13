@@ -4,9 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -22,6 +19,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -69,7 +67,7 @@ fun TvPasswordField(
         }
     }
 
-    val icon = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility
+    val icon = if (passwordVisible) R.drawable.ic_visibility_off else R.drawable.ic_visibility
     val desc =
         stringResource(if (passwordVisible) R.string.hide_password else R.string.show_password)
 
@@ -153,7 +151,7 @@ fun TvPasswordField(
                         }
                     }
             ) {
-                Icon(imageVector = icon, contentDescription = desc)
+                Icon(painter = painterResource(icon), contentDescription = desc)
             }
         }
     )

@@ -12,8 +12,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.ui.Alignment
 import androidx.tv.material3.Icon
 import androidx.compose.runtime.Composable

@@ -12,10 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +29,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalConfiguration
@@ -226,11 +223,13 @@ internal fun SettingsGeneralContent(
                         )
                     } else {
                         Icon(
-                            imageVector = when (clearState) {
-                                CacheClearState.CLEARED -> Icons.Outlined.CheckCircle
-                                CacheClearState.FAILED -> Icons.Outlined.ErrorOutline
-                                else -> Icons.Outlined.DeleteOutline
-                            },
+                            painter = painterResource(
+                                when (clearState) {
+                                    CacheClearState.CLEARED -> R.drawable.ic_check_circle_outlined
+                                    CacheClearState.FAILED -> R.drawable.ic_error_outlined
+                                    else -> R.drawable.ic_delete_outlined
+                                },
+                            ),
                             contentDescription = null,
                             tint = if (clearState == CacheClearState.FAILED) statusColor else LocalContentColor.current,
                             modifier = Modifier.size(24.dp),

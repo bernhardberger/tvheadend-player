@@ -17,12 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -45,6 +39,7 @@ import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -119,7 +114,7 @@ internal fun SideRail(
             if (AppDestination.CHANNELS in availableDestinations) {
                 add(RailItem(AppDestination.CHANNELS, channelsLabel) {
                     Icon(
-                        Icons.AutoMirrored.Filled.List,
+                        painter = painterResource(R.drawable.ic_list),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -128,7 +123,7 @@ internal fun SideRail(
             if (showEpgMenu && AppDestination.GUIDE in availableDestinations) {
                 add(RailItem(AppDestination.GUIDE, epgLabel) {
                     Icon(
-                        Icons.Filled.Event,
+                        painter = painterResource(R.drawable.ic_event),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -137,7 +132,7 @@ internal fun SideRail(
             if (AppDestination.RECORDINGS in availableDestinations) {
                 add(RailItem(AppDestination.RECORDINGS, recordingsLabel) {
                     Icon(
-                        Icons.Filled.VideoLibrary,
+                        painter = painterResource(R.drawable.ic_video_library),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )
@@ -153,7 +148,7 @@ internal fun SideRail(
             if (AppDestination.SETTINGS in availableDestinations) {
                 add(RailItem(AppDestination.SETTINGS, settingsLabel) {
                     Icon(
-                        Icons.Filled.Settings,
+                        painter = painterResource(R.drawable.ic_settings),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
                     )

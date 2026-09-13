@@ -15,11 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +30,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -243,7 +239,7 @@ internal fun RecordingDetailsPanel(
                         .semantics { contentDescription = accessibleResumeLabel }
                         .testTag("recording-details-resume"),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_play_arrow), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         stringResource(
@@ -273,7 +269,7 @@ internal fun RecordingDetailsPanel(
                         }
                         .testTag("recording-details-beginning"),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_play_arrow), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.recording_play_from_beginning))
                 }
@@ -293,7 +289,7 @@ internal fun RecordingDetailsPanel(
                         }
                         .testTag("recording-details-play"),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_play_arrow), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.play))
                 }
@@ -323,7 +319,7 @@ internal fun RecordingDetailsPanel(
                     }
                     .testTag("recording-details-close"),
             ) {
-                Icon(Icons.Filled.Close, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_close), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.close))
             }
@@ -345,7 +341,7 @@ internal fun RecordingDetailsPanel(
                         }
                         .testTag("recording-details-cancel"),
                 ) {
-                    Icon(Icons.Filled.Stop, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_stop), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.cancel_recording))
                 }
@@ -368,7 +364,7 @@ internal fun RecordingDetailsPanel(
                         }
                         .testTag("recording-details-delete"),
                 ) {
-                    Icon(Icons.Filled.Delete, contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.delete_recording))
                 }

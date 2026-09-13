@@ -11,12 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -27,6 +21,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -127,7 +122,7 @@ private fun rememberSettingsItems(): List<RailItem<SettingsSection>> {
             add(
                 RailItem(SettingsSection.GENERAL, generalLabel) {
                     Icon(
-                        Icons.Filled.Tune,
+                        painter = painterResource(R.drawable.ic_tune),
                         contentDescription = generalLabel,
                         modifier = Modifier.size(24.dp),
                     )
@@ -136,7 +131,7 @@ private fun rememberSettingsItems(): List<RailItem<SettingsSection>> {
             add(
                 RailItem(SettingsSection.CHANNEL_TAGS, channelTagsLabel) {
                     Icon(
-                        Icons.Filled.FilterList,
+                        painter = painterResource(R.drawable.ic_filter_list),
                         contentDescription = channelTagsLabel,
                         modifier = Modifier.size(24.dp),
                     )
@@ -145,7 +140,7 @@ private fun rememberSettingsItems(): List<RailItem<SettingsSection>> {
             add(
                 RailItem(SettingsSection.CONNECTION, connectionLabel) {
                     Icon(
-                        Icons.Filled.Cloud,
+                        painter = painterResource(R.drawable.ic_cloud),
                         contentDescription = connectionLabel,
                         modifier = Modifier.size(24.dp),
                     )
@@ -154,7 +149,7 @@ private fun rememberSettingsItems(): List<RailItem<SettingsSection>> {
             add(
                 RailItem(SettingsSection.PLAYER, playerLabel) {
                     Icon(
-                        Icons.Filled.PlayArrow,
+                        painter = painterResource(R.drawable.ic_play_arrow),
                         contentDescription = playerLabel,
                         modifier = Modifier.size(24.dp),
                     )
@@ -163,7 +158,7 @@ private fun rememberSettingsItems(): List<RailItem<SettingsSection>> {
             add(
                 RailItem(SettingsSection.APPLIANCE, applianceLabel) {
                     Icon(
-                        Icons.Filled.Home,
+                        painter = painterResource(R.drawable.ic_home),
                         contentDescription = applianceLabel,
                         modifier = Modifier.size(24.dp),
                     )

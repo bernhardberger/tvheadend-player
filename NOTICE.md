@@ -20,6 +20,16 @@ weight-550 derivation provenance are recorded in `artwork/README.md`. The full
 license is retained at `artwork/fonts/OFL.txt` and bundled in the APK at
 `assets/licenses/Outfit-OFL.txt`.
 
+The in-app vector icons under `app/src/main/res/drawable/ic_*.xml` (excluding
+the product's `ic_launcher_monochrome.xml`) are derived
+from Google's Material Symbols Rounded set (Apache License 2.0), sourced from
+`google/material-design-icons` revision
+`40a7a292a79d9394157e1ea24f83d52d5e17c556`. The fixed export choices
+(Rounded, weight 400, grade 0, optical size 24) and the project modifications
+(removal of the vector-level tint, selective `autoMirrored`, resource renaming)
+are recorded in `artwork/material-symbols-LICENSE.txt`, which retains the
+upstream Apache License text.
+
 The application uses AndroidX, Jetpack Compose, Compose for TV, Material
 Components, Media3, Kotlin coroutines, Coil, and Koin. Their own copyright and
 license terms continue to apply; dependency coordinates and exact versions are

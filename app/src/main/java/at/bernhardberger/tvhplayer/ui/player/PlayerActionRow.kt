@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,13 +10,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -24,9 +18,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,7 +38,7 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 private data class PlayerAction(
     val tag: String,
     val label: String,
-    val icon: ImageVector,
+    @DrawableRes val icon: Int,
     val onClick: (() -> Unit)?,
     val focus: FocusRequester?,
 )
@@ -74,11 +68,11 @@ internal fun PlayerActionRow(
     val stop = stringResource(R.string.stop_playback)
     val actions = listOf(
         PlayerAction("player-pause", playPause,
-            if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause, onTogglePause, pauseFocus),
-        PlayerAction("player-stop", stop, Icons.Filled.Stop, onStop, null),
-        PlayerAction("player-info", info, Icons.Filled.Info, onInfo, infoFocus),
-        PlayerAction("player-record", record, Icons.Filled.FiberManualRecord, onRecord, recordFocus),
-        PlayerAction("player-settings", settings, Icons.Filled.Settings, onSettings, settingsFocus),
+            if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
+        PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, null),
+        PlayerAction("player-info", info, R.drawable.ic_info, onInfo, infoFocus),
+        PlayerAction("player-record", record, R.drawable.ic_fiber_manual_record, onRecord, recordFocus),
+        PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
     )
     Row(
         modifier = modifier
@@ -107,7 +101,7 @@ internal fun PlayerActionRow(
                             contentPadding = PaddingValues(horizontal = 16.dp),
                         ) {
                             Row(Modifier.fillMaxHeight(), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp).testTag("player-info-icon"))
+                                Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(20.dp).testTag("player-info-icon"))
                                 Spacer(Modifier.width(8.dp))
                                 Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
@@ -121,7 +115,7 @@ internal fun PlayerActionRow(
                             ),
                             scale = IconButtonDefaults.scale(focusedScale = 1f),
                             modifier = actionModifier.size(TvOverlayActionButtonSize),
-                        ) { Icon(icon, contentDescription = label) }
+                        ) { Icon(painterResource(icon), contentDescription = label) }
                     }
                 }
             }

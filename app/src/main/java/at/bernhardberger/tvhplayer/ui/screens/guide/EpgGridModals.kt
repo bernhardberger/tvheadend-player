@@ -34,6 +34,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -74,9 +75,6 @@ import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.ui.screens.label
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FiberManualRecord
-import androidx.compose.material.icons.filled.Stop
 import java.time.ZoneId
 
 @Composable
@@ -547,11 +545,13 @@ internal fun ConfirmProgrammeActionDialog(
             }
             Button(onClick = onConfirm) {
                 Icon(
-                    imageVector = if (action == ProgrammeAction.RECORD) {
-                        Icons.Filled.FiberManualRecord
-                    } else {
-                        Icons.Filled.Stop
-                    },
+                    painter = painterResource(
+                        if (action == ProgrammeAction.RECORD) {
+                            R.drawable.ic_fiber_manual_record
+                        } else {
+                            R.drawable.ic_stop
+                        },
+                    ),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                 )

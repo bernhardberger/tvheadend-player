@@ -15,10 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +36,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -699,7 +696,7 @@ private fun OptionsHeader(
                     .testTag("playback-options-header-back"),
             ) {
                 Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    painter = painterResource(R.drawable.ic_keyboard_arrow_left),
                     contentDescription = stringResource(R.string.back),
                 )
             }
@@ -764,10 +761,10 @@ private fun PlaybackOptionRow(
                     modifier = Modifier.clearAndSetSemantics { },
                 )
                 showChevron -> Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    painterResource(R.drawable.ic_keyboard_arrow_right),
                     contentDescription = null,
                 )
-                selected -> Icon(Icons.Filled.Check, contentDescription = null)
+                selected -> Icon(painterResource(R.drawable.ic_check), contentDescription = null)
             }
         },
         scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),

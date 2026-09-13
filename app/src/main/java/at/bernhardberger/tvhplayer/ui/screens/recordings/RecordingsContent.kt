@@ -23,10 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +50,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -363,7 +360,7 @@ private fun FolderListRow(
         },
         leadingContent = {
             Icon(
-                Icons.Filled.Folder,
+                painter = painterResource(R.drawable.ic_folder),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(32.dp),
@@ -523,7 +520,7 @@ internal fun RecordingMetadataPane(
     if (entry == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(
-                Icons.Filled.VideoLibrary,
+                painter = painterResource(R.drawable.ic_video_library),
                 contentDescription = null,
                 modifier = Modifier.size(44.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1011,7 +1008,7 @@ private fun RecordingListRow(
                 }
                 if (problem) {
                     Icon(
-                        Icons.Filled.Warning,
+                        painter = painterResource(R.drawable.ic_warning),
                         contentDescription = stringResource(R.string.recordings_problem_indicator),
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(22.dp),
