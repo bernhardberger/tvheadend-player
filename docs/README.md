@@ -27,7 +27,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
 | `android-tooling.md` | Standard build and explicit-target offline emulator workflow; qualified Android CLI and R8 payload limits. |
-| `profiling.md` | Nondebuggable offline rail fixture, standard Perfetto workflow, first measurement and physical-TV limits. |
+| `profiling.md` | Offline/configured-server profiling, optional R8 arm, guarded sustained traces, timestamped video and physical-TV limits. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
 | `test-device-credential-provisioning.md` | Test-device credential workflow; provisioning work only. |
@@ -37,7 +37,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 
 | Document | Scope and lifecycle |
 |---|---|
-| `responsive-ui-foundations-plan.md` | Active Channels-first performance foundation: Phase 0 legacy retirement deployed to G10; optimized baseline, Guide/cached-startup boundaries, and physical G10 acceptance gates follow. |
+| `responsive-ui-foundations-plan.md` | Current browse-performance contracts, delivered foundation and remaining navigation, Guide/cached-startup and physical acceptance gates. Optimized 0.2.53 deployed; assessment pending. |
 | `programme-window-prototype.md` | Programme-window Player prototype behavior, interaction checks and current experiment boundaries. |
 | `defect-ledger.md` | Open and closed defects from the post-SDK-refactor player stabilisation. Read when working on live-player performance or interaction defects; close rows only with the named evidence. |
 | `persistent-cache-plan.md` | Approved, unstarted plan for SDK-owned catalog/EPG/picon persistence with app-supplied policy (D16, D19, D23). Depends on SDK 0.8.0; read only when working on that package. |
@@ -50,6 +50,8 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 
 | Document | Evidence boundary |
 |---|---|
+| `responsive-ui-implementation-record.md` | Planning context, experiments, rejected evidence and deployments through 0.2.53. Historical next steps are not current assignments; use the active plan. |
+| `responsive-ui-phase1-results.md` | Initial qualified G10 R8 comparison, compiler workaround and recorded-highlight evidence. Later outcomes are in the implementation record. |
 | `profiling-results-2026-09-10.md` | Bounded G10 and emulator journey timings, source attribution, rejected captures and measurement limits; not motion acceptance or an optimization mandate. |
 | `navigation-startup-profiling-2026-09-10.md` | G10 main-sidebar subtree attribution, repeated channel scrolling, cold/warm startup and operator-identified broadcast tuning; measurements and next experiments, not fixes. |
 | `sidebar-guide-performance-2026-09-10.md` | P46 Guide reconstruction attribution, bounded sidebar retention correction, matched G10 measurements and regression evidence; not cold-entry or universal motion acceptance. |

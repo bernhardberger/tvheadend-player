@@ -27,13 +27,70 @@ require a new attended confirmation; human motion acceptance remains separate.
   debug/release. Install only over a matching signer and non-newer version,
   using official CLI `-r,-t`; never uninstall, downgrade or clear configuration.
 
-Both retain the existing release R8/shrinking settings and native dependencies.
-Only these two variants enable the fixed, content-free `P44:*` trace sections.
-Ordinary debug/release paths do not call Android tracing through this helper.
+Both retain the release native dependencies. R8 is independently selectable for
+both profiling variants with `-Ptvhplayer.profileMinify=true` (default `false`);
+ordinary release minification and resource shrinking remain disabled. The
+method-scoped R8 9.3.16 workaround in `app/proguard-rules.pro` excludes only the
+Guide entry point from optimization. Label optimized measurements accordingly.
+Retain the generated mapping, configuration, seeds, usage and config-analyzer
+artifacts alongside each APK; a dirty HEAD or the current build directory does
+not identify a previously installed binary.
+
+For physical G10 usability judgments, use optimized `profileServer` with
+`-Ptvhplayer.profileMinify=true` as the baseline. The operator found the same-code
+optimized 0.2.50 **much better and usable**, after ordinary debug 0.2.49 was severely
+laggy. Keep unoptimized builds for explicitly identified diagnostic comparisons
+and non-minified emulator fixtures for correctness; neither substitutes for this
+physical baseline. This comparison changed R8, debuggability and instrumentation
+together, so it does not establish an R8-only speedup. See the
+[recorded operator result](responsive-ui-implementation-record.md#optimized-g10-comparison--usable-with-remaining-roughness).
+
+Build the physical performance baseline explicitly:
+
+```bash
+timeout --kill-after=5s 20m ./gradlew :app:assembleProfileServer :app:lintProfileServer :app:verifyExternalSdkConsumption -Ptvhplayer.profileMinify=true --offline --no-daemon --console=plain --no-scan
+```
+
+The output is `app/build/outputs/apk/profileServer/app-profileServer.apk`.
+Archive its exact bytes and R8 outputs before another build; verify its hash
+against the installed package. This command prepares an APK, not permission to
+install or an alternative to the repository's final verification gate.
+
+Only these two variants enable fixed `P44:*` timing sections and `P1:compose:*`
+body attribution. `P48:key:*` records key event uptime and dispatch age. Ordinary
+debug/release paths bypass these helpers. Composition-body measurements include
+nested work; they are neither exclusive costs nor counts of every descendant's
+recomposition.
+
+`P2:focusedRowDraw:*` is a profiling-only headline draw witness in `ChannelRow`.
+It is retained as a supported optional attribution probe, not a product focus
+implementation or a routine acceptance test. Use it only for the question below.
+It reads the existing callback focus state during drawing and compares the
+headline's composition-supplied `LocalContentColor` with the applicable native
+ListItem focused/selected foreground. `nativeFocusColor` means a match,
+`otherColor` a mismatch, and `ambiguousColor` means the theme aliases focused and
+unfocused colours. Restrict this diagnostic to isolated directional inputs.
+It calls `drawContent()` once and does not replace native colours or interactions.
+The additional composition-local and draw-state observations can perturb
+scheduling; compare with uninstrumented evidence rather than assuming zero cost.
+
+Attribute a witness through its enclosing Choreographer frame and matching
+RenderThread/FrameTimeline token, not the nearest timestamp. It establishes an
+observed headline draw with that foreground state, not execution of the ancestor
+background, GPU completion, submitted-buffer contents or physical presentation.
+Cached drawing also makes absence of a witness insufficient to infer unreadiness.
 
 ```bash
 timeout --kill-after=5s 20m ./gradlew :app:assembleProfile :app:assembleProfileServer :app:lintProfile :app:lintProfileServer --offline --no-daemon --console=plain --no-scan
 ```
+
+The command above builds the **unoptimized diagnostic arm**. For a controlled
+comparison, add `-Ptvhplayer.profileMinify=true` for the optimized arm. Preserve the first
+arm's APK and outputs before building the second, use increasing installed
+version codes, compare native ZIP-member hashes, and prepare an ordinary restore
+APK before a device window. The API 36 fixture is not a substitute for testing
+the exact `profileServer` APK on supported targets: see the
+[Phase 1 verifier failure and correction](responsive-ui-phase1-results.md).
 
 The isolated lifecycle regression uses the standard AGP test build type, enabled
 only by `-Ptvhplayer.profileTests=true`. Build with
@@ -45,6 +102,13 @@ ADB exit status alone. The test recreates the activity, checks catalog/session
 identity and dataset size, and verifies exactly one shutdown for each owner.
 The fixture deliberately restarts its activity-owned runtime on recreation and
 clears the corresponding catalog; ordinary debug instrumentation is unchanged.
+
+The current optimized fixture's AndroidJUnitRunner fails before running tests
+because it references a shared `androidx.tracing.Trace` class removed from the
+target by R8. Record this as an unpassed gate. Do not add broad keep rules or
+claim the nonoptimized suite proves the optimized binary. External navigation,
+process-restoration and exact-APK ART verification provide separate, bounded
+evidence; full optimized instrumentation qualification remains open.
 
 Record source HEAD plus any profiling diff, exact APK hash/version/signer,
 installed-byte equality, SDK provenance, dataset epoch, default or explicitly
@@ -64,8 +128,8 @@ Use a separate warm-up rehearsal and a short, reversible sequence that returns t
 its initial focus. The helper accepts only D-pad directions and channel-page keys,
 checks scoped foreground before every injected key, and checks PID continuity.
 These checks add WindowManager work: document that overhead and do not mix guarded
-and unguarded baselines. It records one to three eight-second runs and **force-stops
-only the target package on exit**. This can reveal the launcher or another app
+and unguarded baselines. It records one to three runs, eight seconds by default,
+and **force-stops only the target package on exit**. This can reveal the launcher or another app
 underneath; no further keys are sent there. A new batch needs explicit launch and
 foreground verification again.
 
@@ -75,6 +139,45 @@ For an already prepared Channels first-row focus, for example:
 bash tools/profiling/capture causal "${TVHPLAYER_ADB_SERIAL:?select the authorized device}" at.bernhardberger.tvhplayer "$PRIVATE_OUTPUT" 3 20 20 20 20 19 19 19 19
 python3 tools/profiling/analyze.py --trace-processor "$TRACE_PROCESSOR" --focus-kind channel --focus-count 8 "$PRIVATE_OUTPUT"
 ```
+
+For sustained journeys, `TVHPLAYER_PROFILE_DURATION_SECONDS=30|60` permits up to
+80 keys; more than 12 keys requires a longer recording. The helper streams and
+flushes long Perfetto captures every second without increasing the buffer. Only
+30-second/40-key causal capture has been qualified on G10 so far. Longer atrace
+still uses its existing bounded buffer and requires its own health evidence.
+Use a rehearsed reversible sequence with enough rows, for example ten Down, ten
+Up, repeated twice. Supply all 40 keycodes and `--focus-count 40`; do not infer
+coverage from process success. That sequence alone does not classify which inputs
+move the viewport or establish scroll/page performance. The operator's reported
+Channels lag is tag switching, viewport-moving Down navigation and CH+/CH− paging;
+use the separate journey contracts in
+[the active plan](responsive-ui-foundations-plan.md#acceptance-and-measurement).
+`TVHPLAYER_PROFILE_KEY_DELAY_SECONDS=0|0.1|0.4`
+specifies a sleep between guarded calls, not an actual fixed or physical-remote
+cadence. Inspect recorded input intervals. A device-side deadline prevents late
+injection; a too-long sequence fails instead of becoming a partial success.
+
+`TVHPLAYER_PROFILE_VIDEO=true` adds a separate 1280×720 timestamped recording to
+causal capture. Use it in a dedicated diagnostic run, not the timing-only
+baseline: it adds encoder/virtual-display work. The helper checks the video
+child before every key and waits for both recorders, stopping its owned video
+child on failure. A failed run is not accepted even if a partial file exists.
+Remote failure codes are 42 (foreground/PID guard), 43 (recorder/deadline),
+44 (trace recorder), and 45 (video recorder).
+
+For input-to-recorded-highlight evidence, decode original video frames, verify
+their presentation order, inspect the *actual white target* before and after
+each change, and read the numeric monotonic overlay from those same frames.
+Compare it to `P48:key:*:time:*` uptime, allowing one-millisecond input timestamp
+granularity. Validate the vendor's clock domain and sampled frame/drop counters;
+do not derive timing from a nominal video frame rate or a root draw marker.
+Report last-old/first-new timestamp brackets, sample count and recording overhead.
+This measures mirrored output, not the TV panel or physical remote transmission.
+The first G10 qualification is a four-key visible-row run; it does not establish
+a sustained p95 or quantify video overhead. First/second-row highlight timing is
+not evidence for tag changes, scrolling or page completion. Those recordings must
+show the affected tag/list transition or viewport movement and its completion,
+rather than only a changing white rectangle on stationary rows.
 
 On LXC119, run capture inside the existing `with-adb-tunnel offline-player` lane
 with explicit `emulator-5556` and package `at.bernhardberger.tvhplayer.profile`.

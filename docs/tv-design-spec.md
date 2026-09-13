@@ -229,7 +229,8 @@ commit.
 
 Back unwinds focus layers before changing top-level destination history. Channels
 and Guide enter through their active scope tab when arriving from the global
-drawer. Down or OK enters that scope's remembered content; Back from the list or
+drawer. Down or OK enters that scope's remembered content, except for the fresh
+Channels tag-switch anchor specified in 6.4; Back from the list or
 grid returns to its active scope tab. With no scope tabs, Channels enters its list
 and Guide uses its header. Back from a scope row activates the global drawer on
 the current destination. Other browse content activates that drawer directly. From
@@ -282,13 +283,68 @@ the global drawer does not make the page title, scope selector, or body jump:
   panels, while the denser Guide leaves 8dp before its ruler;
 - Recordings mode tabs are a scope row, not trailing title actions.
 
-Root destinations and nested Settings categories use one explicit 150ms linear
-crossfade. The logical route and visible target update immediately; the existing
-focus owner remains governed by section 4.2, so an open drawer or Settings rail
-keeps focus until the viewer enters content. The fade is only the visual handoff
-and must not debounce or block rapid D-pad navigation. Do not use Navigation
+Browse destination content moves along the navigation axis: vertically for the
+main drawer's destination order and horizontally for the content below Channels,
+Guide and Recordings tabs. A moving tab indicator alone does not satisfy the
+[TV tab-content motion guidance](https://developer.android.com/design/ui/tv/guides/components/tabs).
+The [standard drawer motion example](https://developer.android.com/design/ui/tv/guides/components/navigation-drawer)
+also demonstrates vertical destination movement.
+
+Both the departing and arriving content move and fade, as shown in the
+[tab-page reference](https://developer.android.com/static/design/ui/tv/guides/components/images/tabs/tab-page-transition.mp4)
+and [standard-drawer reference](https://developer.android.com/static/design/ui/tv/guides/components/images/navigation-drawer/standard-navigation-drawer-motion.mp4).
+The replacement candidate uses one third of the content viewport and a critically
+damped spring with stiffness 400, calibrated against those examples. These are
+local implementation parameters, not numeric requirements published by Google;
+physical acceptance remains open. The earlier incoming-only 32dp/150ms candidate
+did not meet the operator's requested appearance.
+
+Headers and tabs stay stationary during tab-body motion. Retain only presentation
+values for the departing body: it must not own input, shared viewport state,
+requester registrations, selection writes, paging jobs or delayed focus effects.
+Screen controllers and command authority stay outside the transition. Direction
+follows displayed tab order, including RTL; rapid changes interrupt motion and
+settle on the latest destination without reactivating an old visit. Metadata
+refresh, same-tab focus and empty-to-populated updates do not replay entry.
+Initial/restored content and external fallback destinations start settled. Nested
+Settings categories retain their separate 150ms crossfade.
+
+**Shared implementation contract:** Page-motion parameters and transforms belong
+to `ui/BrowseMotionPolicy.kt`. Main destinations use the single
+`SidebarGuideScene` navigation owner; replacing tab/section bodies use
+`BrowseTabContent` with `rememberBrowseContentMotion`. Screens supply their order,
+accepted selection and presentation values, not their own page springs or fades.
+`BrowseTabRow` animates only the selector and is not a substitute for the body host.
+The Settings category crossfade above is an explicit separate transition scope.
+
+When adding or changing a destination or section:
+
+- Register main destinations with `SIDEBAR_SCENE_DESTINATION` in the existing root
+  entry provider and include them in the scene's displayed destination order.
+  Extend `BrowseDestinationTransitionTest` to cover the new destination's entry,
+  exit and rapid retargeting. A route using only the generic navigation transition
+  is not a completed main-destination integration.
+- Pair a body-replacing selector with `BrowseTabContent`, keep its header/selector
+  outside that host, and pass the actual rendered presentation into its content
+  slot. Keep controllers and commands outside; outgoing visits must use the shared
+  focus, viewport and deferred-read helpers and guard delayed callbacks by owner.
+- Add the real screen/section to the integrated motion checks, following
+  `SidebarGuideNavigationTest.allThreeTabBodiesMoveWhileTheirHeadersAndFocusStayPut`.
+  Verify outgoing/incoming content, fixed headers, native focus and the latest
+  destination—not merely that a scalar animation value changes.
+- Change shared motion policy once when adjusting page motion. Keep per-frame
+  values in graphics-layer/draw reads; layout and composition should observe only
+  relevant visibility/identity changes. Validate both hosts after a policy change.
+
+These are the standard integration APIs and review/test requirements, not a
+compiler-enforced prohibition on using lower-level Compose animation APIs.
+
+The logical route and visible target update immediately; the existing focus owner
+remains governed by section 4.2, so an open drawer or Settings rail keeps focus
+until the viewer enters content. Motion must not debounce navigation, wait for
+data preparation, or defer Down/OK until completion. Do not use Navigation
 Compose's generic 700ms default. The persistent player surface is owned below
-destination UI and does not participate in this crossfade. Route feedback must
+destination UI and does not participate in destination motion. Route feedback must
 not re-request drawer focus while the drawer is already open; D-pad focus may be
 ahead of an intermediate route update during rapid retargeting. While open, the
 drawer selection and Back policy follow that latest focus intent. If root focus
@@ -586,8 +642,21 @@ Use the component and hierarchy appropriate to the scope.
   TV Material `ListItem`s beside the detail pane. Its width must not change when
   focus crosses between categories and content.
 
-Channel and Guide scope tabs commit on focus. Down or OK enters the restored
-content item when it is ready. While Guide is still resolving a changed scope,
+Channel and Guide scope tabs commit on focus. Rapid Left/Right changes accept the
+latest destination without waiting for an earlier scope to finish preparing.
+Obsolete positioning and focus requests must not win afterward.
+
+On an actual Channels tag change, position the unfocused list at the currently
+playing channel if it belongs to the destination scope, otherwise at the top.
+The detail preview and Down/OK entry use that same anchor; do not retain an
+overlapping channel's old lazy-list key or a prior visit's browse position across
+this switch. Keep native focus on the tag until explicit content entry. Back to
+the tag and re-entry without changing tags still restore the current browse
+position. If the destination has no rows yet, retain tag focus and apply the
+playing-channel-or-top rule when its rows become available.
+
+Down or OK enters the latest scope's appropriate content item when it is ready.
+While Guide is still resolving a changed scope,
 the same key is consumed and focus stays on the scope rather than moving backward
 to the header. Guide Up returns to the last-focused date/Now header control, and
 empty/error entry falls back deterministically to Retry or that header. Settings

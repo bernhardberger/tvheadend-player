@@ -303,7 +303,7 @@ Do not bundle dependency cleanup into player or navigation refactors.
 - **Operator decision, 2026-09-12:** Backward compatibility with earlier 0.x APIs
   and stored formats is not required; manual migration or fresh setup is
   acceptable. The pre-SDK credential importer has been removed in the verified
-  Phase 0 change recorded in `responsive-ui-foundations-plan.md`.
+  Phase 0 change recorded in `responsive-ui-implementation-record.md`.
   The current SDK profile path remains, and the plan records manual
   setup for installations containing only the old profile format.
 - Prototype release shrinking before publication, then verify Koin,

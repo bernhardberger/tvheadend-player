@@ -33,6 +33,18 @@ rows, rather than comparing two freshly read values around stale rendered rows.
 Channels focus handoffs compare the active tag and ordered channel IDs, so a
 metadata-only refresh cannot cancel a page scroll's pending focus transfer.
 
+Channels keeps lifecycle-collected shared selection as a state handle. Its lazy
+provider is read by input/restoration callbacks and the focused-details
+composition, not while composing the screen root. Local focus and clock reads
+also stay inside the details or lazy-item compositions. Ownership, scope and
+metadata changes may still recompose the root; ordinary row focus must not.
+
+An actual Channels tag change explicitly resets the lazy-list viewport to the
+playing channel in that scope, or its first channel. This is a preview anchor,
+not native focus or a playback/selection commit. The details and Down/OK entry
+agree with it; same-tag Back/re-entry preserves the current browse position.
+Tag reversals remain latest-intent-wins and do not wait for prior preparation.
+
 Native row/programme focus remains screen-local. The Guide viewport owns arrows
 and bridges native focus while cells are replaced; programme focus acknowledges
 selection and saves the shared browse position. Hidden-screen initialization does
@@ -41,8 +53,16 @@ its release, even when the replacement cell has become ready.
 Channels and Guide enter through their active scope tab; content Back returns to
 that tab before the global drawer. Already-attached Guide neighbours receive
 native focus in the key dispatch, while new windows retain the viewport bridge.
-The browse scene owns the same root crossfade for Channels, Guide, Recordings and
-Settings; Settings categories retain their distinct navigation/saveable-state keys.
+`SidebarGuideScene.kt` owns vertical slide-and-fade transitions between Channels,
+Guide, Recordings and Settings; Settings categories retain their distinct
+navigation/saveable-state keys and inner crossfade. `BrowseContentMotion.kt`
+supplies horizontal outgoing/incoming motion below Channels, Guide and Recordings
+tabs. Its direction history and retained render values are presentation-only:
+existing scope/mode owners synchronously publish the accepted or fallback key;
+its rows may render later. Only the current rendered visit may
+act; outgoing lists use private viewport state and cannot register shared focus
+requesters, publish selection/scroll state, or finish paging/preview focus work.
+Headers, tabs, screen controllers and dialogs remain outside the moving bodies.
 AppRoot also registers browse Back with the activity dispatcher: a singleton
 Channels root cannot rely on NavDisplay's pop handler to unwind focus layers.
 
