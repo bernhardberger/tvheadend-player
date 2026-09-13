@@ -9,10 +9,11 @@ WITH owned AS (
        AND sc.ts<s.ts+s.dur AND sc.ts+sc.dur>s.ts) AS cpu_ns
   FROM slice s JOIN thread_track tt ON tt.id=s.track_id JOIN thread t USING(utid)
   WHERE t.upid IN (SELECT upid FROM owned) AND s.dur>0
-    AND (s.name GLOB 'P44:*' OR s.name IN
+    AND (s.name GLOB 'P44:*' OR s.name GLOB 'P1:compose:*' OR s.name IN
       ('Recomposer:recompose','AndroidOwner:measureAndLayout','DrawFrame'))
 )
 SELECT name,count(*) AS calls,round(avg(dur)/1e6,3) AS mean_elapsed_ms,
+       round(percentile(dur,95)/1e6,3) AS p95_elapsed_ms,
        round(max(dur)/1e6,3) AS max_elapsed_ms,
        round(avg(cpu_ns)/1e6,3) AS mean_running_ms,
        round(max(cpu_ns)/1e6,3) AS max_running_ms

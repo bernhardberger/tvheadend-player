@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -84,6 +85,7 @@ class ProfilingEvidenceTest(unittest.TestCase):
                 ({"TVHPLAYER_PROFILE_INPUT_TRANSPORT": "cmd; exit 0"}, ["20"]),
                 ({"TVHPLAYER_PROFILE_ALLOW_BACK": "true"}, ["4", "4"]),
                 ({"TVHPLAYER_PROFILE_ALLOW_BACK": "yes"}, ["4"]),
+                ({"TVHPLAYER_PROFILE_VIDEO": "yes"}, ["20"]),
             ):
                 result = subprocess.run(
                     ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "invalid-device",
@@ -92,6 +94,75 @@ class ProfilingEvidenceTest(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 2)
                 self.assertFalse((Path(directory) / "capture").exists())
+
+    def test_long_capture_requires_a_bounded_sufficient_duration_before_adb(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for count, duration in ((81, "60"), (40, "8"), (80, "30"), (40, "61"), (40, "60; exit 0")):
+                with self.subTest(count=count, duration=duration):
+                    result = subprocess.run(
+                        ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "invalid-device",
+                         "at.bernhardberger.tvhplayer", str(Path(directory) / "capture"), "1", *(["20"] * count)],
+                        env={"PATH": directory, "TVHPLAYER_PROFILE_DURATION_SECONDS": duration},
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    self.assertEqual(result.returncode, 2)
+                    self.assertFalse((Path(directory) / "capture").exists())
+
+    def test_video_startup_failure_stops_keys_and_preserves_failure_through_cleanup(self):
+        # Execute the actual generated remote shell in a filesystem sandbox. This
+        # checks process ordering/cleanup, not trace or video validity.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def executable(name, text):
+                path = root / name
+                path.write_text(text)
+                path.chmod(0o700)
+
+            executable("pidof", "#!/bin/sh\nprintf '42\\n'\n")
+            executable("dumpsys", "#!/bin/sh\nprintf 'mCurrentFocus=at.bernhardberger.tvhplayer/MainActivity\\n'\n")
+            executable("perfetto", "#!/bin/sh\nsleep 3\n")
+            executable("screenrecord", "#!/bin/sh\nexit 7\n")
+            executable("cmd", '#!/bin/sh\nprintf "%s\\n" "$*" >> "$SANDBOX/keys"\n')
+            executable("adb", '''#!/usr/bin/python3
+import os, pathlib, subprocess, sys
+root = pathlib.Path(os.environ["SANDBOX"])
+args = sys.argv[3:]
+if args[0] == "push":
+    sys.exit(0)
+if args[0] == "pull":
+    pathlib.Path(args[-1]).write_bytes(b"fixture only")
+    sys.exit(0)
+command = " ".join(args[1:])
+if command == "pidof at.bernhardberger.tvhplayer":
+    print(42)
+    sys.exit(0)
+if command.startswith("pm path "):
+    print("package:/data/app/fixture/base.apk")
+    sys.exit(0)
+if command.startswith("sha256sum "):
+    print("a" * 64 + "  /data/app/fixture/base.apk")
+    sys.exit(0)
+if "am force-stop" in command:
+    (root / "cleanup").write_text(command)
+    sys.exit(0)
+if "getprop" in command:
+    sys.exit(0)
+for prefix in ("/data/local/tmp/", "/data/misc/perfetto-configs/", "/data/misc/perfetto-traces/"):
+    command = command.replace(prefix, str(root) + "/")
+sys.exit(subprocess.run(["/bin/bash", "-c", command]).returncode)
+''')
+            output = root / "capture"
+            result = subprocess.run(
+                ["/bin/bash", str(ROOT / "tools/profiling/capture"), "causal", "fixture-device",
+                 "at.bernhardberger.tvhplayer", str(output), "1", "20", "19"],
+                env={**os.environ, "PATH": f"{root}:{os.defpath}", "SANDBOX": str(root),
+                     "TVHPLAYER_PROFILE_VIDEO": "true", "TVHPLAYER_PROFILE_INPUT_TRANSPORT": "cmd"},
+                cwd=ROOT, capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 45, result.stderr)
+            self.assertFalse((root / "keys").exists())
+            self.assertIn("am force-stop at.bernhardberger.tvhplayer", (root / "cleanup").read_text())
+            self.assertFalse((output / "run-1.mp4").exists())
 
 
 if __name__ == "__main__":

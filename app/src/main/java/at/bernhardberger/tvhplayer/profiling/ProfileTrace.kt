@@ -15,6 +15,7 @@ internal inline fun <T> profileTrace(name: String, block: () -> T): T {
 /** Event age includes input waiting before Activity dispatch; it is not key-to-photon. */
 internal fun profileNavigationInput(event: KeyEvent) {
     if (!BuildConfig.PROFILE_TRACE || event.action != KeyEvent.ACTION_DOWN) return
-    if (event.keyCode !in 19..23 && event.keyCode != KeyEvent.KEYCODE_BACK) return
+    if (event.keyCode !in 19..23 && event.keyCode != KeyEvent.KEYCODE_BACK &&
+        event.keyCode != KeyEvent.KEYCODE_CHANNEL_UP && event.keyCode != KeyEvent.KEYCODE_CHANNEL_DOWN) return
     profileTrace("P48:key:${event.keyCode}:time:${event.eventTime}:age:${SystemClock.uptimeMillis() - event.eventTime}") { }
 }

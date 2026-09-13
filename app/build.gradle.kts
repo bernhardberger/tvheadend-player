@@ -26,8 +26,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 40
-        versionName = "0.2.34"
+        versionCode = 59
+        versionName = "0.2.53"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
@@ -44,6 +44,9 @@ android {
         }
         create("profile") {
             initWith(getByName("release"))
+            // Controlled code-optimization comparison; identical resources and instrumentation.
+            isMinifyEnabled = providers.gradleProperty("tvhplayer.profileMinify")
+                .map { it.toBooleanStrict() }.orElse(false).get()
             isDebuggable = false
             buildConfigField("boolean", "PROFILE_TRACE", "true")
             applicationIdSuffix = ".profile"
