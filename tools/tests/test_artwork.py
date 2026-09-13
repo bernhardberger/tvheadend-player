@@ -61,7 +61,7 @@ class ArtworkTest(unittest.TestCase):
         logo_svg = (ROOT / "artwork/tvheadend-player-logo.svg").read_text()
         self.assertIn('<rect width="100%" height="100%" fill="#0F1014"/>', logo_svg)
         self.assertIn('<path fill="#00BCFA"', logo_svg)
-        self.assertIn('<path fill="#171717"', logo_svg)
+        self.assertNotIn('#171717', logo_svg)
         self.assertNotIn("#0B1B2E", logo_svg.upper())
 
         themes = (ROOT / "app/src/main/res/values/themes.xml").read_text()

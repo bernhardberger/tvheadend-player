@@ -1,7 +1,7 @@
 # Tvheadend Player artwork
 
 The mark is a cyan diamond aperture on a dark neutral field, layered outward
-from the play symbol: orange play, neutral charcoal core, cyan diamond. Cyan is
+from the play symbol: orange play, transparent aperture, cyan diamond. Cyan is
 the complete outer silhouette; there is no redundant dark keyline around it.
 
 The rotated square is a deliberate nod to the diamond at the center of the
@@ -19,8 +19,10 @@ television distance. Expanding cyan to the former keyline boundary preserves the
 mark's launcher footprint without retaining an outline that served only to
 separate cyan from a cyan field.
 
-The orange play symbol never touches cyan directly; the neutral charcoal core
-separates the accents without introducing a blue or navy cast.
+The orange play symbol never touches cyan directly; the transparent aperture
+separates the accents and reveals the underlying surface. The mark has no interior
+fill. Foreground/startup layers preserve this transparency; opaque banner, listing
+and brand plates retain their separate dark background.
 
 Orange is the accent, not a second primary. Measured as a share of the mark's own
 ink it is 13.2%, against 18.9% for the upstream emblem.
@@ -29,7 +31,7 @@ ink it is 13.2%, against 18.9% for the upstream emblem.
 
 - Field: `#0F1014`
 - Diamond: `#00BCFA`
-- Core: `#171717`
+- Aperture: transparent (no interior fill)
 - Play symbol: `#FA7F00`
 - Wordmark: Outfit 550, **Tvheadend** `#E3E3E8`, **Player** `#FA7F00`
 - Separate contextual lockup: **for Android TV** in `#E3E3E8`

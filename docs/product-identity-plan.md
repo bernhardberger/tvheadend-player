@@ -62,15 +62,15 @@ Public copy distinguishes **Tvheadend Player** (this app) from **Tvheadend**
 request-specific failures retain their own meaning.
 
 The mark is a cyan diamond aperture on a dark neutral field, layered outward
-from the play symbol: orange play, neutral charcoal core, cyan diamond. The
+from the play symbol: orange play, transparent aperture, cyan diamond. The
 rotated square is a deliberate nod to the diamond at the center of the Tvheadend
 logo; the four chevrons around that diamond are not reproduced, and no upstream
 path geometry is reused. The colors invert the upstream roles, so orange marks
 playback rather than the source.
 
 Cyan forms the complete outer silhouette without a dark keyline. The dark field
-matches the app and starting splash, while the neutral core separates orange
-from cyan without introducing a navy cast. The mark remains legible at launcher
+matches the app and starting splash, while the transparent opening separates orange
+from cyan and reveals the underlying surface. The mark remains legible at launcher
 scale and reads directly as a live-TV player without implying affiliation or
 endorsement.
 

@@ -26,7 +26,7 @@ import javax.imageio.ImageIO;
  * Reproducible launcher, banner, and brand artwork for Tvheadend Player.
  *
  * Mark: a diamond aperture layered outward from the play symbol — orange play,
- * neutral charcoal core, and cyan diamond on a dark field. The rotated square
+ * transparent aperture, and cyan diamond on a dark field. The rotated square
  * is a deliberate nod to the diamond at the centre of the Tvheadend logo; the
  * chevrons around it are not reproduced. The cyan diamond is the complete outer
  * silhouette, without a redundant dark keyline.
@@ -39,7 +39,6 @@ public final class RenderArtwork {
     private static final Color CYAN = new Color(0x00, 0xBC, 0xFA);
     private static final Color ORANGE = new Color(0xFA, 0x7F, 0x00);
     private static final Color FIELD = new Color(0x0F, 0x10, 0x14);
-    private static final Color CORE = new Color(0x17, 0x17, 0x17);
     private static final Color TEXT = new Color(0xE3, 0xE3, 0xE8);
     private static final Font WORDMARK = loadWordmark();
     private static final FontRenderContext FONT_CONTEXT = new FontRenderContext(null, true, true);
@@ -139,10 +138,16 @@ public final class RenderArtwork {
      * Themed icons and the monochrome layer use this.
      */
     private static Shape markSilhouette(double x, double y, double size) {
-        Area ink = new Area(diamond(x, y, size, OUTER_HALF, OUTER_CORNER));
-        ink.subtract(new Area(diamond(x, y, size, CORE_HALF, CORE_CORNER)));
+        Area ink = new Area(diamondRing(x, y, size));
         ink.add(new Area(playSymbol(x, y, size)));
         return ink;
+    }
+
+    /** A real cutout: the aperture reveals the surface beneath the mark. */
+    private static Shape diamondRing(double x, double y, double size) {
+        Area ring = new Area(diamond(x, y, size, OUTER_HALF, OUTER_CORNER));
+        ring.subtract(new Area(diamond(x, y, size, CORE_HALF, CORE_CORNER)));
+        return ring;
     }
 
     // ---------------------------------------------------------------- painting
@@ -150,9 +155,7 @@ public final class RenderArtwork {
     /** Draws the mark in a square of {@code size} with origin at ({@code x},{@code y}). */
     private static void drawMark(Graphics2D graphics, double x, double y, double size) {
         graphics.setColor(CYAN);
-        graphics.fill(diamond(x, y, size, OUTER_HALF, OUTER_CORNER));
-        graphics.setColor(CORE);
-        graphics.fill(diamond(x, y, size, CORE_HALF, CORE_CORNER));
+        graphics.fill(diamondRing(x, y, size));
         graphics.setColor(ORANGE);
         graphics.fill(playSymbol(x, y, size));
     }
@@ -167,8 +170,7 @@ public final class RenderArtwork {
 
     private static List<Ink> mark(double x, double y, double size) {
         return new ArrayList<>(List.of(
-                new Ink(diamond(x, y, size, OUTER_HALF, OUTER_CORNER), CYAN),
-                new Ink(diamond(x, y, size, CORE_HALF, CORE_CORNER), CORE),
+                new Ink(diamondRing(x, y, size), CYAN),
                 new Ink(playSymbol(x, y, size), ORANGE)));
     }
 
@@ -277,7 +279,13 @@ public final class RenderArtwork {
 
     private static void writeAdaptiveLayers() throws IOException {
         writePng(renderAdaptiveBackground(), Path.of("app/src/main/res/drawable/ic_launcher_background.png"));
-        writePng(renderAdaptiveForeground(), Path.of("app/src/main/res/drawable/ic_launcher_foreground.png"));
+        BufferedImage foreground = renderAdaptiveForeground();
+        // Interior above the play triangle must stay empty, not painted dark.
+        if ((foreground.getRGB(216, 150) >>> 24) != 0
+                || foreground.getRGB(216, 216) != ORANGE.getRGB()) {
+            throw new IllegalStateException("Mark aperture must be transparent and play symbol opaque");
+        }
+        writePng(foreground, Path.of("app/src/main/res/drawable/ic_launcher_foreground.png"));
     }
 
     /**
@@ -420,7 +428,7 @@ public final class RenderArtwork {
                 <p>Settled brand assets · original diamond/play geometry · Outfit 550.<br>
                 Independent GPLv3 client descended from Preclikos/tvhstream. Not affiliated with or endorsed by Tvheadend.</p>
                 <div class="swatches"><span style="--c:#00BCFA">Cyan #00BCFA</span><span style="--c:#FA7F00">Orange #FA7F00</span>
-                <span style="--c:#171717">Core #171717</span><span style="--c:#E3E3E8">Off-white #E3E3E8</span></div>
+                <span style="--c:#E3E3E8">Off-white #E3E3E8</span></div>
                 """);
         String[][] plates = {
                 {"Launcher banner · 320 × 180", "tvheadend-player-banner.png", "320"},
