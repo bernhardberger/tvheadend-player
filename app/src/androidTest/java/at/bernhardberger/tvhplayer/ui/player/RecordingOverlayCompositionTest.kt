@@ -44,6 +44,36 @@ import org.junit.Test
 
 class RecordingOverlayCompositionTest {
     @Test
+    fun growingDisplayAdvanceDoesNotGrantDpadOrAccessibilityForwardSeek() {
+        val displayEnd = mutableStateOf(65_000L)
+        val seeks = mutableListOf<Long>()
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                RecordingOverlayControls(
+                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                    piconPath = null, title = "Growing recording", subtitle = null, channelName = null,
+                    positionMs = 60_000, durationMs = 60_000, displayDurationMs = displayEnd.value,
+                    growing = true, nowSec = 0, canSeek = true, controlsVisible = true, optionsOpen = false,
+                    onTogglePlayPause = {}, onSeek = { seeks += it }, onStopPlayback = {},
+                    onUserInteraction = {}, onOpenOptions = {}, onOpenInfo = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
+        val timeline = composeRule.onNodeWithTag("recording-seekbar")
+        timeline.assertIsFocused()
+        timeline.performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.runOnIdle { displayEnd.value = 66_000L }
+        timeline.assertIsFocused()
+        timeline.performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.runOnIdle { assertTrue(seeks.isEmpty()) }
+        val actions = timeline.fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertEquals(1, actions.size) // Backward only; display-only history is not seekable.
+        timeline.performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.runOnIdle { assertEquals(listOf(-30_000L), seeks) }
+    }
+
+    @Test
     fun recordingTrackKeepsAnchorAcrossFocusedAndHiddenPreviewAtLargeText() {
         val hidden = mutableStateOf(false)
         val previewing = mutableStateOf(false)

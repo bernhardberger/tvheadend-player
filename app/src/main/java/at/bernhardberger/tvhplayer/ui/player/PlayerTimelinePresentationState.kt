@@ -487,7 +487,11 @@ internal class RecordingTimelinePresentationState(
     currentEpochMillis: () -> Long = System::currentTimeMillis,
     private val seekAbsolute: (Long) -> Unit,
     private val feedbackSettled: () -> Boolean,
+    private val currentMonotonicMillis: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
+    private val displayEnd = at.bernhardberger.tvhplayer.core.GrowingRecordingDisplayEnd()
+    var displayDurationMs by mutableLongStateOf(C.TIME_UNSET)
+        private set
     private val currentEpochMillis = currentEpochMillis
     private var seekJob: Job? = null
     private var seekToken = 0
@@ -570,10 +574,11 @@ internal class RecordingTimelinePresentationState(
         cancelPendingSeek()
     }
 
-    suspend fun observePlayback() {
+    suspend fun observePlayback(growing: Boolean = false) {
         while (true) {
             positionMs = pendingTargetMs ?: currentPositionMs().coerceAtLeast(0L)
             durationMs = currentDurationMs()
+            displayDurationMs = displayEnd.update(durationMs, currentMonotonicMillis(), growing)
             isPlaying = currentIsPlaying()
             canSeek = currentCanSeek()
             nowEpochSec = currentEpochMillis() / 1_000L
@@ -600,6 +605,7 @@ internal fun rememberRecordingTimelinePresentationState(
     player: Player,
     session: AppPlaybackRuntime,
     playbackAvailable: Boolean,
+    growing: Boolean,
 ): RecordingTimelinePresentationState {
     val scope = rememberCoroutineScope()
     val state = remember(player, session, scope) {
@@ -624,8 +630,8 @@ internal fun rememberRecordingTimelinePresentationState(
             },
         )
     }
-    LaunchedEffect(state, playbackAvailable) {
-        if (playbackAvailable) state.observePlayback()
+    LaunchedEffect(state, playbackAvailable, growing) {
+        if (playbackAvailable) state.observePlayback(growing)
     }
     DisposableEffect(state) {
         onDispose(state::dispose)

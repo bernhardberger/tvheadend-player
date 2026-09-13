@@ -137,20 +137,26 @@ fun RecordingPlayerScreen(
         RecordingPlaybackAdmission.TargetUnavailable,
         null -> false
     }
-    val growing = admission is RecordingPlaybackAdmission.GrowingStartOverOnly
+    val growing = admission is RecordingPlaybackAdmission.GrowingStartOverOnly &&
+        observation.currentSession === retainedSelection?.currentSession &&
+        observation.dvrEntry(recordingId)?.state == at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING
     val recordingResolved = entry != null ||
         admission != null ||
         playbackState is AppPlaybackState.Failed
     val recordingLoading = !recordingResolved && connectionAvailable
     val initialConnectionFailure = !recordingResolved && !connectionAvailable
     val player = remember { session.player }
-    val timelineState = rememberRecordingTimelinePresentationState(
-        player = player,
-        session = session,
-        playbackAvailable = playbackAvailable,
-    )
+    val timelineState = androidx.compose.runtime.key(recordingId, retainedSelection?.currentSession) {
+        rememberRecordingTimelinePresentationState(
+            player = player,
+            session = session,
+            playbackAvailable = playbackAvailable,
+            growing = growing,
+        )
+    }
     val positionMs = timelineState.positionMs
     val durationMs = timelineState.durationMs
+    val displayDurationMs = timelineState.displayDurationMs
     val nowSec = timelineState.nowEpochSec
     val isPlaying = timelineState.isPlaying
     val rootFocus = remember { FocusRequester() }
@@ -449,6 +455,7 @@ fun RecordingPlayerScreen(
                     channelName = entry.channelName,
                     positionMs = positionMs,
                     durationMs = durationMs,
+                    displayDurationMs = displayDurationMs,
                     growing = growing,
                     nowSec = nowSec,
                     canSeek = timelineState.canSeek,
@@ -518,6 +525,7 @@ fun RecordingPlayerScreen(
                     targetMs = requireNotNull(timelineState.pendingTargetMs),
                     originMs = timelineState.pendingOriginMs,
                     durationMs = durationMs,
+                    displayDurationMs = displayDurationMs,
                     growing = growing,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )

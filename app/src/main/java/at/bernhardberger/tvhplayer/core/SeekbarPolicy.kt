@@ -31,6 +31,8 @@ data class SeekbarRange(
     val displayStartMs: Long = startMs,
     val positionKnown: Boolean = true,
     val positionEstimated: Boolean = false,
+    /** Presentation only. [endMs] remains the sole upper seek bound. */
+    val displayEndMs: Long = endMs,
 ) {
     val durationMs: Long get() = (endMs - startMs).coerceAtLeast(0L)
     val progress: Float
@@ -41,8 +43,8 @@ data class SeekbarRange(
     val availableStartFraction: Float get() = displayFraction(startMs)
 
     private fun displayFraction(position: Long): Float =
-        if (endMs <= displayStartMs) 0f
-        else ((position - displayStartMs).toDouble() / (endMs - displayStartMs))
+        if (displayEndMs <= displayStartMs) 0f
+        else ((position - displayStartMs).toDouble() / (displayEndMs - displayStartMs))
             .toFloat().coerceIn(0f, 1f)
 }
 
@@ -86,13 +88,15 @@ fun programmeAnchoredAxis(
     )
 }
 
-fun recordingSeekbarRange(positionMs: Long, durationMs: Long?): SeekbarRange? {
+fun recordingSeekbarRange(positionMs: Long, durationMs: Long?, displayDurationMs: Long? = durationMs): SeekbarRange? {
     val end = durationMs?.takeIf { it > 0L } ?: return null
+    val displayEnd = maxOf(end, displayDurationMs ?: end)
     return SeekbarRange(
         domain = SeekbarDomain.RECORDING,
         startMs = 0L,
         endMs = end,
-        positionMs = positionMs.coerceIn(0L, end),
+        positionMs = positionMs.coerceIn(0L, displayEnd),
+        displayEndMs = displayEnd,
     )
 }
 
@@ -100,9 +104,10 @@ fun recordingTimelinePresentation(
     positionMs: Long,
     durationMs: Long?,
     growing: Boolean,
+    displayDurationMs: Long? = durationMs,
 ): RecordingTimelinePresentation {
     val elapsedMs = positionMs.coerceAtLeast(0L)
-    val range = recordingSeekbarRange(elapsedMs, durationMs)
+    val range = recordingSeekbarRange(elapsedMs, durationMs, displayDurationMs.takeIf { growing })
     return when {
         range != null -> RecordingTimelinePresentation.Seekable(range)
         growing -> RecordingTimelinePresentation.StillRecording(elapsedMs)

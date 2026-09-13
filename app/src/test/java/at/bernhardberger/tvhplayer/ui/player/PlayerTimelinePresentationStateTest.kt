@@ -32,6 +32,36 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerTimelinePresentationStateTest {
+    @Test fun pausedGrowingDisplayAdvancesButPreviewAndCommitStayAtVerifiedEnd() = runTest {
+        val seeks = mutableListOf<Long>()
+        val state = RecordingTimelinePresentationState(
+            scope = this,
+            currentPositionMs = { 59_000L },
+            currentDurationMs = { 60_000L },
+            currentIsPlaying = { false },
+            currentCanSeek = { true },
+            seekAbsolute = { seeks += it },
+            feedbackSettled = { false },
+            currentMonotonicMillis = { testScheduler.currentTime },
+        )
+        val observation = backgroundScope.launch { state.observePlayback(growing = true) }
+        runCurrent()
+        advanceTimeBy(3_000)
+        runCurrent()
+        assertEquals(63_000L, state.displayDurationMs)
+        assertEquals(60_000L, state.durationMs)
+        state.queueSeek(30_000)
+        assertEquals(60_000L, state.pendingTargetMs)
+        state.commitPendingSeek()
+        assertEquals(listOf(60_000L), seeks)
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(60_000L, state.positionMs)
+        assertFalse(state.isPlaying)
+        state.dispose()
+        observation.cancel()
+    }
+
     @Test
     fun failedBufferingStillDisplaysCommitAdjustedSelection() = runTest {
         val fixture = fixture()

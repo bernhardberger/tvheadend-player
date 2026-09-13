@@ -77,12 +77,13 @@ internal fun RecordingOverlayControls(
     onCommitSeek: () -> Unit = {},
     paused: Boolean = false,
     previewing: Boolean = false,
+    displayDurationMs: Long = durationMs,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
-    val presentation = recordingTimelinePresentation(positionMs, durationMs.takeIf { it != C.TIME_UNSET }, growing)
+    val presentation = recordingTimelinePresentation(positionMs, durationMs.takeIf { it != C.TIME_UNSET }, growing, displayDurationMs)
     val seekable = canSeek && presentation is RecordingTimelinePresentation.Seekable
     var focusInitialized by remember { mutableStateOf(false) }
     var previousSeekable by remember { mutableStateOf(seekable) }
@@ -203,11 +204,13 @@ internal fun RecordingSeekPreview(
     durationMs: Long,
     growing: Boolean,
     modifier: Modifier = Modifier,
+    displayDurationMs: Long = durationMs,
 ) {
     val presentation = recordingTimelinePresentation(
         positionMs = targetMs,
         durationMs = durationMs.takeIf { it != C.TIME_UNSET },
         growing = growing,
+        displayDurationMs = displayDurationMs,
     )
     val elapsed = formatPlaybackDuration(targetMs)
     val target = if (durationMs >= 3_600_000L && targetMs < 3_600_000L) "0:${elapsed.padStart(5, '0')}" else elapsed
@@ -229,11 +232,11 @@ internal fun RecordingSeekPreview(
     ) {
         when (presentation) {
             is RecordingTimelinePresentation.Seekable -> PlayerTimelineBlock(
-                progress = presentation.range.progress,
+                progress = presentation.range.displayProgress,
                 tone = PlayerTimelineTone.PREVIEW,
-                ghostProgress = originMs?.let { (it.toFloat() / presentation.range.endMs).coerceIn(0f, 1f) },
+                ghostProgress = originMs?.let { (it.toFloat() / presentation.range.displayEndMs).coerceIn(0f, 1f) },
                 leadingLabel = target,
-                trailingLabel = formatPlaybackDuration(presentation.range.endMs),
+                trailingLabel = formatPlaybackDuration(presentation.range.displayEndMs),
                 previewLabel = target,
             )
             is RecordingTimelinePresentation.StillRecording -> RecordingDurationStatus(

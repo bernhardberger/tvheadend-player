@@ -83,7 +83,7 @@ fun PlaybackSeekbar(
     val displayedProgress = if (range.domain == SeekbarDomain.TIMESHIFT) {
         range.displayProgress
     } else {
-        programmeAxis?.playbackFraction ?: range.progress
+        programmeAxis?.playbackFraction ?: range.displayProgress
     }
     val timeshiftBoundary = if (range.domain == SeekbarDomain.TIMESHIFT) {
         stringResource(
@@ -112,11 +112,11 @@ fun PlaybackSeekbar(
         range.domain == SeekbarDomain.RECORDING -> stringResource(
             R.string.player_seekbar_recording_description,
             formatPlaybackDuration(range.positionMs),
-            formatPlaybackDuration(range.endMs),
+            formatPlaybackDuration(range.displayEndMs),
         )
         else -> error("Unsupported seekbar domain")
     }
-    val positionDescription = if (range.positionEstimated) {
+    val positionDescription = if (range.positionEstimated || range.displayEndMs > range.endMs) {
         "${stringResource(R.string.player_timing_estimated)}. $description"
     } else description
     val stateDescription = if (paused) "${stringResource(R.string.player_paused)}. $positionDescription" else positionDescription
@@ -137,7 +137,7 @@ fun PlaybackSeekbar(
     }
     val trailingLabel = when {
         timeshiftPosition != null -> null
-        range.domain == SeekbarDomain.RECORDING -> formatPlaybackDuration(range.endMs)
+        range.domain == SeekbarDomain.RECORDING -> formatPlaybackDuration(range.displayEndMs)
         programmePosition != null && programmeDuration != null ->
             formatPlaybackDuration(programmeDuration)
         else -> null

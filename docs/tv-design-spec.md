@@ -492,6 +492,13 @@ Live TV and recordings share one composition: artwork and identity at top left,
 current wall time at top right, and a timeline above the bottom action strip.
 Programme clock endpoints and recording elapsed/duration sit directly below the
 full-width bar, aligned to its ends; long readouts never shorten the track.
+For a currently growing recording, the displayed end advances locally from the
+last verified media duration for at most five seconds without fresh evidence,
+including while paused. This presentation estimate never extends D-pad or
+accessibility seek permissions; previews and commits use verified recorded
+content. Completion, unavailable timing, or a source change discards the estimate.
+Finished recordings retain their fixed media duration. Accessible descriptions
+qualify an extrapolated endpoint as estimated.
 Play/Pause and immediate Stop form the transport group; only Play/Pause has an idle
 filled backing. Transport is left-aligned; Info, neutral Record and Settings form
 one right-aligned utility group on the same band. Info's label is inside its TV Material pill.
