@@ -1,5 +1,5 @@
 ---
-description: Read-only Astra TV design fallback and bounded screenshot-first challenge of a consequential UX recommendation
+description: Astra TV design fallback with Penpot access in brief mode and independent screenshot-first review modes
 mode: subagent
 disable: false
 permission:
@@ -9,10 +9,15 @@ permission:
   task:
     "*": deny
     app-locator: allow
+    penpot-executor: allow
+  'penpot*': allow
   webfetch: deny
   websearch: deny
   todowrite: deny
-  skill: deny
+  skill:
+    '*': deny
+    penpot-design: allow
+    android-tv-compose-ux: allow
   question: deny
   publish_artifact: deny
   compress: deny
@@ -28,9 +33,15 @@ runtime truth; their model labels do not change your configured model:
 - `mode=review`, `mode=closure`, or `mode=challenge`:
   `.opencode/agents/tv-ux-reviewer.md`.
 
-These contract reads are the only exception to the assignment-only evidence rule.
-Never discover screenshots, read other harness files, collect evidence, edit,
+These contract reads and, in brief mode, the Penpot skill/reference reads required
+by the brief contract are exceptions to the assignment-only evidence rule.
+Never discover screenshots, read other harness files, edit repository files,
 run builds or devices, or turn a missing screenshot into a source-only review.
+
+In brief mode, direct Penpot inspection and editing and optional mechanical
+delegation follow the brief contract. Review, closure and challenge retain the
+independent review contract: do not mutate or delegate mutation of reviewed work
+or collect replacement evidence.
 
 For `brief`, supplied mocks and bounded planning material can establish direction,
 not implemented UI acceptance. Final review still requires actual current

@@ -76,6 +76,36 @@ mixed supported models are valid, and changing one is not a product gate.
 
 ## Delegation and context containment
 
+`penpot-executor` is the bounded design-document mutation exception. It uses
+Penpot tools plus scoped read/skill access to the installed `penpot-design`
+guidance and `/root/.penpot-ai-kit`, with its model assignment in
+`.opencode/agents/penpot-executor.md`. The executor and UX designers load the
+integration guidance and relevant recipes themselves; parent-loaded skills are
+not inherited. Reference reads do not authorize repository edits or scope changes.
+The primary supplies the design brief, acceptance criteria, exact document and
+target IDs (or permission to create scratch content), and exclusive document
+ownership. The executor handles API calls, routine repairs and preview exports,
+then returns compact evidence and ownership. The primary retains design judgment
+and final review. This isolates verbose tool loops and unnecessary premium-model
+usage; it does not trade execution quality for minimum token cost.
+Main and UX design agents retain direct Penpot access, including edits within
+their assigned scope. Prefer the executor for mechanical changes and verbose
+construction/repair loops; do not require delegation for every lookup or small
+edit. `tv-ux-brief` and `tv-ux-astra` in brief mode may delegate to it at depth two,
+which is terminal. Independent review modes retain their evidence and non-mutation
+contracts. Do not run competing writers on the same document or substitute
+a provider route. Restart OpenCode after installation to load the role and Task
+allowlist; saved configuration does not update running sessions.
+
+With `opencode-task-model` 1.3.1, dispatch `penpot-executor` and
+`app-device-operator` with `background: false`. Its background dispatcher adds a
+fixed read/search/webfetch sandbox at session level, overriding the selected
+agent's Bash and MCP permissions. Background mode is therefore not equivalent
+to asynchronous execution with the agent's normal capabilities. Do not broaden
+agent permissions to compensate. Before assigning operational work after a
+configuration change, verify an actual harmless tool call in a fresh foreground
+child; a CLI configuration dump alone does not qualify the running server.
+
 `app-device-operator` is the bounded device-operation exception to read-only
 delegation. It has Bash but no repository edits or child delegation. The primary
 hands over exclusive device ownership with an exact authorized target and task,
@@ -83,8 +113,8 @@ then waits for its result before resuming device operations. Review and retrieva
 roles remain read-only; do not dispatch operational work through `general`.
 
 Review and retrieval delegation is read-only and may nest through one additional
-locator level. The implementer and device operator are the bounded exceptions
-described here.
+locator level. The implementer, device operator and Penpot executor are the
+bounded exceptions described here.
 The primary owns decomposition and delegation and may use as many children as it
 judges useful for correctness, evidence coverage, context isolation, turnaround,
 or final quality. A roughly 20% resource overhead is an acceptable soft target
@@ -93,7 +123,8 @@ verbose returns because cheap child output can still enlarge the primary's
 expensive context.
 
 The project Task policy denies every child first, then permits the configured
-roles above. `app-locator` performs mechanical retrieval; `app-explore` maps
+roles above. UX design roles may additionally dispatch `penpot-executor` under
+the design exception above. `app-locator` performs mechanical retrieval; `app-explore` maps
 bounded multi-file flows without diagnosis or design; the remaining roles retain
 their specialized contracts. Only `app-locator` children may be delegated by
 read-only children, and depth 2 is terminal. Reviewers may use that capability

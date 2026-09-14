@@ -93,7 +93,8 @@
       "tv-ux-astra": "allow",
       "claude-audit-lead": "allow",
       "app-implementer": "allow",
-      "app-device-operator": "allow"
+      "app-device-operator": "allow",
+      "penpot-executor": "allow"
     }
   }
 }
