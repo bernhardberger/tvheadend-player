@@ -6,7 +6,7 @@ import org.junit.Test
 
 class GrowingRecordingDisplayEndTest {
     @Test fun displayAdvancesLocallyAcrossVerifiedUpdatesThenStopsWithoutFreshEvidence() {
-        val display = GrowingRecordingDisplayEnd()
+        val display = GrowingTimelineDisplayEnd()
         val values = (0L..12L).map { second ->
             display.update(if (second < 5) 60_000 else 65_000, second * 1_000, true)
         }
@@ -26,7 +26,7 @@ class GrowingRecordingDisplayEndTest {
     }
 
     @Test fun completionUnknownDurationAndSourceResetDiscardExtrapolation() {
-        val display = GrowingRecordingDisplayEnd()
+        val display = GrowingTimelineDisplayEnd()
         display.update(60_000, 0, true)
         assertEquals(65_000L, display.update(60_000, 8_000, true))
         assertEquals(62_000L, display.update(62_000, 9_000, false))

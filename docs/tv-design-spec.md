@@ -393,7 +393,7 @@ are unchanged.
 |---|---|---|
 | Where | player overlays, including passive schedule | cards, channel rows, hero |
 | Interactive | only with known playback timing and seek capability | no |
-| Fill | **orange** playback; `primary` cyan passive schedule | `primary` cyan |
+| Fill | **orange** seekable elapsed playback; off-white noninteractive elapsed | `primary` cyan |
 | Extras | thumb, labels, ghost fill, history boundary tick | none |
 | Component | `PlayerTimeline.kt` | `ProgressStrip` in `ui/components/` |
 
@@ -415,31 +415,53 @@ selected target during preview, using SDK 0.9.0's immutable schedule-grade
 estimate. Scheduled start/end clocks are display edges, not seek permissions.
 Crossing a boundary changes the window without snapping or animation. The nearby
 programme title follows preview; main identity describes sampled committed
-playback. Cross-midnight edges include dates. Solid orange fills from programme
-start to playback position, following the target during seek preview. Buffered
-content ahead is brighter gray; future schedule remains a quiet dark track.
+playback. Cross-midnight edges include dates. Off-white (`onSurface`) fills elapsed
+programme time outside the seekable range. Orange fills only from the available
+timeshift start to playback position, following the target during seek preview.
+Buffered content ahead is brighter gray; future schedule remains a quiet dark track.
+The historical buffer-start boundary retains an SDK wall-clock mapping snapshot
+for its stream segment, so estimate refreshes do not move unchanged buffered
+content. Actual history eviction advances it through that same SDK mapping;
+segment replacement discards the snapshot. Playback/programme identity and the
+buffer-end ghost continue using their current mapping. No app clock mapping or
+seek authority is derived from the retained display snapshot.
+Off-white is drawn only before the history-start boundary, not beneath orange.
+An available sampled playback position may momentarily lead the latest history
+status; its orange fill still reaches that sample without exposing a white sliver
+or extending verified seek bounds. Unavailable preview targets do not gain fill
+beyond verified history.
+Non-timeshiftable schedule progress uses the same off-white, never cyan.
 Rewinding shortens the orange fill, including in completed programmes. The orange
 edge indicates position; a thumb appears only while the seekbar is focused. Only an interior
-timeshift-start boundary gets a thin tick; programme edges and live have no ticks.
+timeshift-start boundary is indicated by the colour change, without a tick;
+programme edges and live also have no ticks.
 The thicker active bar preserves remote focus. The existing
 Go live action remains reachable outside the live window. The estimate has no accuracy
 guarantee. Player owns no server clock machinery.
 
-`-Pplayer.programmeWindowB=false` restores the capacity timeline at build time;
+`-Pplayer.programmeWindowB=false` restores the relative-history timeline at build time;
 there is no public preference. Missing estimates, EPG gaps and out-of-range events
 use the relative-history fallback. Preview retains the SDK mapping snapshot and
 opaque media target, so late EPG/estimate updates and eviction cannot retarget a
 command. Current runtime history alone authorizes dispatch.
 
-The fallback live timeshift seekbar uses capacity for its display span. The
-released SDK's finite positive `grantedPeriod` is preferred; when it
-is unavailable the app's requested period defines only the display span. Expand
-that span to include all observed history if history exceeds the grant/request.
-A changed grant changes display scale, never actual seek permission. Live stays
-at the right edge. Unavailable history is subdued, available history is neutral,
-and orange marks playback position without filling unavailable history. Remote
-and accessibility seek bounds remain the observed buffer start and live edge.
-Recordings retain their elapsed/duration geometry.
+The fallback live timeshift seekbar displays the collected buffer, like a growing
+recording, rather than reserving empty timeshift capacity. Buffer start anchors
+the left edge and live anchors the right; orange fills from available buffer start
+to playback, with neutral buffered content ahead. Growing history updates this
+same full-width axis instead of expanding a narrow region leftwards from live.
+Capacity changes do not rescale it. Remote and accessibility seek bounds remain
+the observed buffer start and live edge. Recordings retain their elapsed/duration
+geometry.
+
+The no-EPG fallback's committed, unpaused Live fill reaches the right endpoint
+using the existing server-shift-aware Live classification; delivery/decode latency
+must not leave a gap beside a Live label. Paused playback and seek previews keep
+their sampled/selected position. Its displayed history end advances on monotonic
+time between verified updates, using the same five-second maximum extrapolation
+budget as growing recordings. Repeated unchanged bounds do not renew that budget.
+Segment replacement or unavailable timing discards the display estimate. This
+estimate never changes observed history, opaque targets or seek permissions.
 
 The supported SDK timeline supplies absolute stream coordinates and opaque,
 segment-scoped selection targets. Player retains the selected target through
@@ -476,7 +498,7 @@ packet coordinates nor local time minus server-reader shift may substitute for
 an unavailable SDK estimate.
 
 Missing, non-finite or contradictory buffer/position measurements are not a
-measured live position. Keep the capacity display and observed history, but omit
+measured live position. Keep the buffer display and observed history, but omit
 the position marker, progress semantics and seek focus/actions until timing is
 known. Show **Playback timing unavailable** without disabling an independently
 available pause capability. Explicitly measured zero is distinct from missing
@@ -486,6 +508,14 @@ timing; relative durations alone do not establish a wall-clock timestamp.
 
 Inline timeline endpoints remain neutral text without cyan filled labels. Focus
 thickens the track and shows a thumb, including in the programme window.
+The focused thumb remains solid white without a coloured focus ring, including
+temporarily unavailable seek targets; their existing error feedback conveys availability.
+Playback fill and thumb share one
+180ms non-overshooting ease-out animation. Animated values are read in layout,
+not in the screen composition. Seek input, target labels and accessibility
+values update immediately; motion never delays commands or changes their bounds.
+Initial/unknown timing and programme-axis changes reset visual motion instead of
+interpolating across unrelated coordinates. System animation scaling applies.
 Unavailable-target feedback has an error-toned surface above the timeline.
 
 Live TV and recordings share one composition: artwork and identity at top left,
@@ -551,7 +581,7 @@ strip opens Channels when channels exist. There is no Channels-down cue below
 the strip. Recordings have no shelf. Restoration uses
 semantic actions and never automatically chooses Stop or steals focus on routine
 timing/metadata updates. Without a timeshift buffer, a current valid EPG event
-supplies a cyan, noninteractive schedule-elapsed strip and schedule endpoints
+supplies an off-white, noninteractive schedule-elapsed strip and schedule endpoints
 in the footer. It has no thumb, focus, or seek actions and is not a playback-position
 estimate. Missing or out-of-date EPG omits the strip rather than inventing progress.
 The header does not add a temporary timeband while tuning or waiting for history.

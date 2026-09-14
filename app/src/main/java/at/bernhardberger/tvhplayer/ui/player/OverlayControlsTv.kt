@@ -325,7 +325,7 @@ fun OverlayControlsTv(
                     (it.stop.epochSeconds - it.start.epochSeconds)).toFloat() },
                 collapsed = channelRailOpen,
                 tone = PlayerTimelineTone.AMBIENT,
-                fillColor = MaterialTheme.colorScheme.primary,
+                fillColor = MaterialTheme.colorScheme.onSurface,
                 showTrack = true,
                 leadingLabel = event?.let { formatClock(it.start.epochSeconds) },
                 trailingLabel = event?.let { formatClock(it.stop.epochSeconds) },

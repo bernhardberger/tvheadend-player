@@ -116,7 +116,7 @@ class ChannelShelfCompositionTest {
         if (rapid) rule.mainClock.autoAdvance = false
         for (invoker in listOf("player-info", "player-settings", "player-stop")) {
             val trackBefore = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            val fillBefore = rule.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val fillBefore = rule.onNodeWithTag("player-timeline-interactive-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             val actionsBefore = rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
             rule.onNodeWithTag(invoker).requestFocus().performKeyInput { pressKey(Key.DirectionDown) }
             if (rapid) rule.mainClock.advanceTimeBy(32)
@@ -131,7 +131,7 @@ class ChannelShelfCompositionTest {
                 rule.onNodeWithTag("player-timeline-labels").assertDoesNotExist()
                 if (pausedGuard) {
                     val trackAfter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                    val fillAfter = rule.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                    val fillAfter = rule.onNodeWithTag("player-timeline-interactive-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                     assertEquals(0.25f, fillBefore.width / trackBefore.width, 0.001f)
                     assertEquals(fillBefore.width / trackBefore.width, fillAfter.width / trackAfter.width, 0.001f)
                     val pauseDescription = rule.onNodeWithTag("player-pause").fetchSemanticsNode().config[

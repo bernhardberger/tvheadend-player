@@ -314,7 +314,10 @@ fun VideoPlayerScreen(
         sampledTimeshiftState = AppTimeshiftState()
         while (true) {
             timelineState.sampleTimeshiftPresentation(videoPlayerViewModel::sampleTimeshiftPresentation)?.let {
-                sampledTimeshiftState = it
+                sampledTimeshiftState = it.copy(
+                    displayLiveEdgeMs = timelineState.displayLiveEdgeMs,
+                    historyStartTimeline = timelineState.historyStartTimeline,
+                )
             }
             delay(250L)
         }

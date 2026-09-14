@@ -32,6 +32,45 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerTimelinePresentationStateTest {
+    @Test fun liveDisplayBridgesBatchedHistoryForPlayingAndPausedWithoutGrantingSeeks() = runTest {
+        for (paused in listOf(false, true)) {
+            val fixture = fixture()
+            val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+            val start = testScheduler.currentTime
+            for (tick in 0L..12L) {
+                val elapsed = tick * 250L
+                if (tick > 0) advanceTimeBy(250)
+                val verifiedGrowth = (elapsed / 1_000) * 1_000
+                fixture.updateHistory(0.seconds, (600_000 + verifiedGrowth).milliseconds)
+                val position = 540_000L + if (paused) 0 else elapsed
+                val raw = fixture.presentation(position).copy(paused = paused)
+                val admitted = owner.sampleTimeshiftPresentation { raw }!!
+                assertEquals(raw, admitted) // Presentation never rewrites the SDK sample/target.
+                assertEquals(600_000L + elapsed, owner.displayLiveEdgeMs)
+                val range = at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange(
+                    admitted.copy(displayLiveEdgeMs = owner.displayLiveEdgeMs),
+                )
+                assertEquals(600_000L + verifiedGrowth, range.endMs)
+                assertEquals(600_000L + elapsed, range.displayEndMs)
+                assertEquals(range.endMs, at.bernhardberger.tvhplayer.core.seekbarScrub(
+                    range.copy(positionMs = range.endMs), 1, 100,
+                ))
+            }
+            advanceTimeBy(10_000)
+            owner.sampleTimeshiftPresentation { fixture.presentation().copy(paused = paused) }
+            assertEquals(608_000L, owner.displayLiveEdgeMs) // No fresh history: stop after five seconds.
+            owner.sampleTimeshiftPresentation { AppTimeshiftState() }
+            assertNull(owner.displayLiveEdgeMs)
+            owner.sampleTimeshiftPresentation { fixture.presentation() }
+            assertEquals(603_000L, owner.displayLiveEdgeMs)
+            advanceTimeBy(250)
+            owner.sampleTimeshiftPresentation { fixture().presentation() }
+            assertEquals(600_000L, owner.displayLiveEdgeMs) // A new segment starts with its own evidence.
+            assertTrue(testScheduler.currentTime > start)
+            owner.dispose()
+        }
+    }
+
     @Test fun pausedGrowingDisplayAdvancesButPreviewAndCommitStayAtVerifiedEnd() = runTest {
         val seeks = mutableListOf<Long>()
         val state = RecordingTimelinePresentationState(

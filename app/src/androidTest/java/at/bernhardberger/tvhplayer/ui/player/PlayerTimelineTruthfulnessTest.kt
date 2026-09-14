@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalConfiguration
@@ -50,6 +51,7 @@ import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.SeekbarDomain
 import at.bernhardberger.tvhplayer.core.SeekbarRange
+import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -72,7 +74,72 @@ class PlayerTimelineTruthfulnessTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun focusedRecordingThumbHasTheSameVisibleRingAsLivePlayback() {
+    fun serverLiveReachesTheEdgeDespiteLatencyButPauseAndPreviewKeepPosition() {
+        var paused by mutableStateOf(false)
+        var previewing by mutableStateOf(false)
+        val state = AppTimeshiftState(available = true, bufferStartMs = 0, positionMs = 2_000,
+            liveEdgeMs = 10_000, serverBehindLiveMs = 0, displayLiveEdgeMs = 11_000)
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.size(400.dp, 100.dp).background(Color.Black)) {
+                    PlaybackSeekbar(range = timeshiftSeekbarRange(state), onSeekTo = {},
+                        paused = paused, previewing = previewing,
+                        timeshiftPosition = at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(state))
+                }
+            }
+        }
+        val orange = android.graphics.Color.rgb(250, 127, 0)
+        fun pixel(fraction: Float): Int {
+            val image = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
+                .captureToImage().asAndroidBitmap()
+            return image.getPixel((image.width * fraction).toInt(), image.height / 2)
+        }
+        assertEquals(orange, pixel(0.95f))
+        composeRule.runOnIdle { paused = true }
+        assertEquals(orange, pixel(0.1f))
+        assertTrue(orange != pixel(0.95f))
+        composeRule.runOnIdle { paused = false; previewing = true }
+        assertTrue(orange != pixel(0.95f))
+        composeRule.runOnIdle { previewing = false }
+        assertEquals(orange, pixel(0.95f))
+    }
+
+    @Test
+    fun noEpgBufferUsesLeftAnchoredElapsedFillAsHistoryGrows() {
+        var state by mutableStateOf(
+            AppTimeshiftState(available = true, bufferStartMs = -60_000L, positionMs = -30_000L),
+        )
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.size(400.dp, 100.dp).background(Color.Black)) {
+                    PlaybackSeekbar(range = timeshiftSeekbarRange(state), onSeekTo = {}, paused = true)
+                }
+            }
+        }
+        val orange = android.graphics.Color.rgb(250, 127, 0)
+        fun pixel(fraction: Float): Int {
+            val image = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
+                .captureToImage().asAndroidBitmap()
+            return image.getPixel((image.width * fraction).toInt(), image.height / 2)
+        }
+        assertEquals(orange, pixel(0.1f))
+        assertEquals(orange, pixel(0.4f))
+        val buffer = pixel(0.8f)
+        assertTrue(buffer != orange)
+        composeRule.runOnIdle {
+            state = state.copy(bufferStartMs = -90_000L, positionMs = -60_000L)
+        }
+        assertEquals(orange, pixel(0.1f))
+        assertEquals(buffer, pixel(0.4f))
+        composeRule.runOnIdle { state = state.copy(positionMs = 0L) }
+        assertEquals(orange, pixel(0.9f))
+        composeRule.runOnIdle { state = state.copy(bufferStartMs = -10_000L, positionMs = -30_000L) }
+        assertTrue(pixel(0.1f) != orange)
+    }
+
+    @Test
+    fun focusedThumbIsSolidWhiteWithoutAColoredFocusRing() {
+        var targetAvailable by mutableStateOf(true)
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 Box(Modifier.size(200.dp, 40.dp).background(Color.Black)) {
@@ -80,15 +147,103 @@ class PlayerTimelineTruthfulnessTest {
                         progress = 0.5f,
                         tone = PlayerTimelineTone.ACTIVE,
                         thumbTestTag = "recording-style-thumb",
+                        programmeTargetAvailable = targetAvailable,
                     )
                 }
             }
         }
-        val image = composeRule.onNodeWithTag("recording-style-thumb", useUnmergedTree = true)
+        for (available in listOf(true, false, true)) {
+            composeRule.runOnIdle { targetAvailable = available }
+            val image = composeRule.onNodeWithTag("recording-style-thumb", useUnmergedTree = true)
+                .captureToImage().asAndroidBitmap()
+            val ringOffsetPx = with(composeRule.density) { 1.dp.toPx() }.toInt().coerceIn(0, image.height / 2 - 1)
+            assertEquals(android.graphics.Color.WHITE, image.getPixel(image.width / 2, ringOffsetPx))
+            assertEquals("Thumb must stay filled when availability changes", android.graphics.Color.WHITE,
+                image.getPixel(image.width / 2, image.height / 2))
+        }
+    }
+
+    @Test
+    fun thumbAndFillAnimateTogetherWhileSemanticsUpdateImmediatelyAndNewAxesSnap() {
+        var progress by mutableStateOf<Float?>(0.2f)
+        var axis by mutableStateOf(1)
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.size(400.dp, 40.dp).background(Color.Black)) {
+                    PlayerTimelineBar(progress = progress, tone = PlayerTimelineTone.ACTIVE,
+                        modifier = Modifier.testTag("motion-track"), thumbTestTag = "motion-thumb", motionKey = axis)
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        fun fraction(): Float {
+            val track = composeRule.onNodeWithTag("motion-track").fetchSemanticsNode().boundsInRoot
+            val fill = composeRule.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val thumb = composeRule.onNodeWithTag("motion-thumb", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            assertEquals(fill.right, thumb.center.x, 1f)
+            return fill.width / track.width
+        }
+        composeRule.runOnIdle { progress = 0.8f }
+        composeRule.mainClock.advanceTimeByFrame()
+        val semantics = composeRule.onNodeWithTag("motion-track").fetchSemanticsNode()
+            .config[SemanticsProperties.ProgressBarRangeInfo]
+        assertEquals(0.8f, semantics.current, 0f)
+        composeRule.mainClock.advanceTimeBy(64)
+        val forward = fraction()
+        assertTrue(forward > 0.2f && forward < 0.8f)
+        composeRule.runOnIdle { progress = 0.1f }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(48)
+        assertTrue(fraction() in 0.1f..forward)
+        composeRule.mainClock.advanceTimeBy(300)
+        assertEquals(0.1f, fraction(), 0.002f)
+        composeRule.runOnIdle { axis = 2; progress = 0.9f }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(0.9f, fraction(), 0.002f)
+        composeRule.runOnIdle { progress = null }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag("motion-thumb", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.runOnIdle { progress = 0.3f }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(0.3f, fraction(), 0.002f)
+    }
+
+    @Test
+    fun programmeOrangeEndpointHasNoWhiteFringeWhenPlaybackLeadsHistoryStatus() {
+        val event = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),
+            start = Instant.fromEpochSeconds(0), stop = Instant.fromEpochSeconds(3600), title = "Programme")
+        var window by mutableStateOf(
+            ProgrammeWindow(event, Instant.fromEpochSeconds(2700), 0.731f, 0.217f, 0.74f, 0.74f, true),
+        )
+        var white = 0
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                white = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
+                Box(Modifier.size(333.dp, 40.dp).background(Color.Black)) {
+                    PlayerTimelineBlock(progress = 0f, tone = PlayerTimelineTone.INTERACTIVE,
+                        programmeWindow = window)
+                }
+            }
+        }
+        val orange = android.graphics.Color.rgb(250, 127, 0)
+        for (progress in listOf(0.731f, 0.742f, 0.749f, 0.757f)) {
+            composeRule.runOnIdle { window = window.copy(positionFraction = progress) }
+            val image = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
+                .captureToImage().asAndroidBitmap()
+            val y = image.height / 2
+            assertEquals(white, image.getPixel((image.width * 0.1f).toInt(), y))
+            assertEquals(orange, image.getPixel((image.width * progress).toInt() - 2, y))
+            // No off-white pixels may leak out beyond the historical prefix, including at
+            // fractional-pixel orange endpoints on either side of the lagging history edge.
+            for (x in (image.width * 0.23f).toInt() until image.width - 2) {
+                assertTrue("White fringe at $x for $progress", image.getPixel(x, y) != white)
+            }
+        }
+        composeRule.runOnIdle { window = window.copy(targetAvailable = false) }
+        val unavailable = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
             .captureToImage().asAndroidBitmap()
-        val ringOffsetPx = with(composeRule.density) { 1.dp.toPx() }.toInt().coerceIn(0, image.height / 2 - 1)
-        assertEquals(android.graphics.Color.rgb(0x00, 0xBC, 0xFA), image.getPixel(image.width / 2, ringOffsetPx))
-        assertEquals(android.graphics.Color.rgb(0xFA, 0x7F, 0x00), image.getPixel(image.width / 2, image.height / 2))
+        assertTrue(orange != unavailable.getPixel((unavailable.width * 0.75f).toInt(), unavailable.height / 2))
     }
 
     @Test
@@ -102,8 +257,10 @@ class PlayerTimelineTruthfulnessTest {
             ProgrammeWindow(event, Instant.fromEpochSeconds(2700), 0.75f, 0.2f, 0.75f, 0.75f, true),
         )
         var tone by mutableStateOf(PlayerTimelineTone.ACTIVE)
+        var nonInteractiveColor = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
+                nonInteractiveColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
                 Box(Modifier.size(400.dp, 40.dp).background(Color.Black)) {
                     PlayerTimelineBlock(
                         progress = 0f, tone = tone,
@@ -120,15 +277,16 @@ class PlayerTimelineTruthfulnessTest {
             val image = composeRule.onNodeWithTag("programme-bar").captureToImage().asAndroidBitmap()
             return image.getPixel((image.width * fraction).toInt(), image.height / 2)
         }
-        assertEquals(orange, pixel(0.1f))
+        assertEquals(nonInteractiveColor, pixel(0.1f))
         assertEquals(orange, pixel(0.3f))
         assertEquals(orange, pixel(0.7f))
         val future = pixel(0.9f)
         composeRule.onNodeWithTag("programme-thumb", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithTag("programme-live", useUnmergedTree = true).assertDoesNotExist()
-        composeRule.onNodeWithTag("programme-history", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("programme-history", useUnmergedTree = true).assertDoesNotExist()
 
         composeRule.runOnIdle { window = window.copy(positionFraction = 0.4f) }
+        assertEquals(nonInteractiveColor, pixel(0.1f))
         assertEquals(orange, pixel(0.3f))
         val buffer = pixel(0.6f)
         assertTrue(android.graphics.Color.red(buffer) > android.graphics.Color.red(future))
@@ -245,7 +403,7 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-boundary",
             useUnmergedTree = true,
-        ).assertExists()
+        ).assertDoesNotExist() // Buffer start is the left endpoint, not an interior capacity tick.
         composeRule.onNodeWithTag("timeshift-preview-live-edge", useUnmergedTree = true)
             .assertDoesNotExist()
         composeRule.onNodeWithTag("timeshift-seek-preview")
@@ -283,7 +441,7 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-boundary",
             useUnmergedTree = true,
-        ).assertExists()
+        ).assertDoesNotExist()
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-overflow",
             useUnmergedTree = true,
@@ -355,7 +513,7 @@ class PlayerTimelineTruthfulnessTest {
         assertEquals(listOf("−30 seconds"), accessibilityActionLabels("boundary-seekbar"))
         val liveProgress = composeRule.onNodeWithTag("boundary-seekbar")
             .fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo]
-        assertEquals(range.progress, liveProgress.current, 0.001f)
+        assertEquals(1f, liveProgress.current, 0.001f) // Live semantics agree with the visible endpoint.
 
         composeRule.runOnIdle { range = range.copy(positionMs = -6_000L) }
         assertEquals(

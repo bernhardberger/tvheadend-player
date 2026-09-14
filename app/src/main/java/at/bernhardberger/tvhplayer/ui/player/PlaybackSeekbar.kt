@@ -80,7 +80,13 @@ fun PlaybackSeekbar(
     var focused by remember { mutableStateOf(false) }
     val programmeDuration = programmeDurationMs?.takeIf { it > 0L }
     val programmePosition = programmePositionMs?.coerceIn(0L, programmeDuration ?: 0L)
-    val displayedProgress = if (range.domain == SeekbarDomain.TIMESHIFT) {
+    // Live status excludes pipeline latency. Only committed, playing fallback chrome pins to
+    // live; pause, previews and programme windows retain their sampled/selected coordinates.
+    val displayAtLiveEdge = range.domain == SeekbarDomain.TIMESHIFT && programmeWindow == null &&
+        !paused && !previewing && timeshiftPosition?.atLiveEdge == true
+    val displayedProgress = if (displayAtLiveEdge) {
+        1f
+    } else if (range.domain == SeekbarDomain.TIMESHIFT) {
         range.displayProgress
     } else {
         programmeAxis?.playbackFraction ?: range.displayProgress
@@ -146,7 +152,9 @@ fun PlaybackSeekbar(
     val seekForwardLabel = stringResource(R.string.seek_forward_30)
     val seekBackTarget = seekbarScrub(range, -1, 0)
     val seekForwardTarget = seekbarScrub(range, 1, 0)
-    val accessibilityProgress = programmeWindow?.positionFraction ?: if (range.domain == SeekbarDomain.TIMESHIFT) {
+    val accessibilityProgress = programmeWindow?.positionFraction ?: if (displayAtLiveEdge) {
+        1f
+    } else if (range.domain == SeekbarDomain.TIMESHIFT) {
         range.progress
     } else {
         displayedProgress

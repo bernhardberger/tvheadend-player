@@ -13,6 +13,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.time.ZoneId
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -27,6 +28,43 @@ class ProgrammeWindowTest {
         updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
     }
     private fun TimeshiftTestFixture.presentation(position: Int = 65) = state.value.toAppPresentation(playbackPosition(position.minutes))
+
+    @Test fun historicalBoundaryIgnoresEstimateWobbleButFollowsEvictionAndSegmentReplacement() = runTest {
+        val fixture = fixture()
+        fixture.updateHistory(80.minutes, 90.minutes, estimatedLiveEdgeTime = live)
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        suspend fun sample(known: Boolean = true, position: Int = 85) = owner.sampleTimeshiftPresentation {
+            fixture.presentation(position).copy(timingKnown = known)
+        }!!.copy(historyStartTimeline = owner.historyStartTimeline)
+        val first = sample()
+        val firstWindow = programmeWindow(first, eventAt = ::lookup)!!
+        assertEquals(20f / 60, firstWindow.availableStartFraction, 0.0001f)
+        fixture.updateHistory(80.minutes, 91.minutes, estimatedLiveEdgeTime = live + 63.seconds)
+        val shifted = sample()
+        val shiftedWindow = programmeWindow(shifted, eventAt = ::lookup)!!
+        assertEquals(firstWindow.availableStartFraction, shiftedWindow.availableStartFraction, 0f)
+        assertNotEquals(firstWindow.availableEndFraction, shiftedWindow.availableEndFraction)
+        assertNotEquals(firstWindow.estimatedPosition, shiftedWindow.estimatedPosition)
+        assertSame(first.historyStartTimeline, sample(known = false).historyStartTimeline)
+        fixture.updateHistory(81.minutes, 92.minutes, estimatedLiveEdgeTime = live + 117.seconds)
+        assertEquals(21f / 60, programmeWindow(sample(), eventAt = ::lookup)!!.availableStartFraction, 0.0001f)
+        val oldest = programmeWindow(sample(position = 81), eventAt = ::lookup)!!
+        assertEquals(oldest.availableStartFraction, oldest.positionFraction, 0f)
+        val evicted = programmeWindow(sample(position = 80), eventAt = ::lookup)!!
+        assertTrue(evicted.positionFraction < evicted.availableStartFraction)
+        assertFalse(evicted.targetAvailable)
+        fixture.updateHistory(95.minutes, 105.minutes, estimatedLiveEdgeTime = live + 903.seconds)
+        val beyondOriginalEdge = sample(position = 100)
+        assertSame(first.historyStartTimeline, beyondOriginalEdge.historyStartTimeline)
+        assertEquals(35f / 60, programmeWindow(beyondOriginalEdge, eventAt = ::lookup)!!.availableStartFraction, 0.0001f)
+        fixture.restartSegment()
+        fixture.updateHistory(81.minutes, 92.minutes, estimatedLiveEdgeTime = live + 117.seconds)
+        val replacement = sample()
+        assertNotSame(first.historyStartTimeline, replacement.historyStartTimeline)
+        val fresh = programmeWindow(replacement.copy(historyStartTimeline = null), eventAt = ::lookup)!!
+        assertEquals(fresh.availableStartFraction, programmeWindow(replacement, eventAt = ::lookup)!!.availableStartFraction, 0f)
+        owner.dispose()
+    }
 
     @Test fun windowsUseScheduleButAvailabilityUsesRuntimeHistory() {
         val fixture = fixture()

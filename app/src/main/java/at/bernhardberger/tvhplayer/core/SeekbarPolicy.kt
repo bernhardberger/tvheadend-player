@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
-import at.bernhardberger.tvhplayer.playback.requestedLiveTimeshiftPeriod
 
 /** Initial D-pad/repeat seek step. */
 const val SEEKBAR_STEP_INITIAL_MS = 30_000L
@@ -123,13 +122,12 @@ fun timeshiftSeekbarRange(state: AppTimeshiftState): SeekbarRange =
         positionMs = state.positionMs,
         positionKnown = state.timingKnown,
         positionEstimated = state.playbackTarget != null,
-        // Capacity is a display span, never permission to seek unavailable history.
-        displayStartMs = state.liveEdgeMs - maxOf(
-            state.capacityMs?.takeIf { it > 0L }
-                ?: requestedLiveTimeshiftPeriod(timeshiftEnabled = true).inWholeMilliseconds,
-            state.liveEdgeMs - state.bufferStartMs,
+        displayEndMs = maxOf(state.liveEdgeMs, state.displayLiveEdgeMs ?: state.liveEdgeMs),
+        // Like a growing recording, display collected content rather than empty capacity.
+        displayStartMs = minOf(
+            state.bufferStartMs,
             // A sampled position can outlive seekable history without making it available.
-            if (state.timingKnown) state.liveEdgeMs - state.positionMs else 0L,
+            if (state.timingKnown) state.positionMs else state.bufferStartMs,
         ),
     )
 

@@ -33,14 +33,24 @@ internal fun programmeWindow(
     val mapping = mappingTimeline.wallClockMapping as? TimeshiftWallClockMapping.Estimate ?: return null
     val position = mapping.estimate(target) ?: return null
     val event = eventAt(position)?.takeIf { it.start <= position && position < it.stop } ?: return null
-    val start = history.select(history.start)?.let(mapping::estimate) ?: return null
+    // Keep the historical boundary anchored to one SDK estimate for the segment. Remapping
+    // unchanged content through every new status estimate makes that boundary wobble.
+    val startMapping = (state.historyStartTimeline
+        ?.takeIf { it.describesSameSegment(history) }
+        ?.wallClockMapping as? TimeshiftWallClockMapping.Estimate) ?: mapping
+    val start = history.select(history.start)?.let(startMapping::estimate) ?: return null
     val end = history.select(history.end)?.let(mapping::estimate) ?: return null
     val span = (event.stop - event.start).inWholeMilliseconds.toDouble()
     if (span <= 0.0) return null
     fun fraction(time: Instant) = ((time - event.start).inWholeMilliseconds / span).toFloat().coerceIn(0f, 1f)
     val targetAvailable = target.position in history.start..history.end ||
         (state.timingKnown && target === state.playbackTarget && target.position >= history.start)
-    return ProgrammeWindow(event, position, fraction(position), fraction(start), fraction(end),
+    // Different SDK estimate snapshots can straddle the oldest coordinate by a few pixels.
+    // An in-history target must not appear before the stable history boundary. Keep genuinely
+    // evicted targets outside, and retain the original estimate for programme identity/clocks.
+    val positionFraction = if (target.position >= history.start) maxOf(fraction(position), fraction(start))
+        else fraction(position)
+    return ProgrammeWindow(event, position, positionFraction, fraction(start), fraction(end),
         fraction(end).takeIf { end >= event.start && end <= event.stop }, targetAvailable)
 }
 

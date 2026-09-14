@@ -154,6 +154,10 @@ data class AppTimeshiftState(
     val timeline: at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline? = null,
     val playbackTarget: at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget? = null,
     val playbackSeek: at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekToken? = null,
+    /** UI-only extrapolated edge. Never used to create or authorize a seek target. */
+    val displayLiveEdgeMs: Long? = null,
+    /** Retained SDK mapping for stable historical-boundary display within one segment. */
+    val historyStartTimeline: at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline? = null,
 )
 
 private val FIXED_LIVE_TIMESHIFT_PERIOD = 2.hours

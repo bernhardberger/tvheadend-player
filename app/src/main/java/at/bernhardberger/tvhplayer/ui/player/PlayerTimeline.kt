@@ -1,7 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +34,8 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.style.TextOverflow
 import at.bernhardberger.tvhplayer.ui.TvOverlayStatusRowHeight
 import androidx.tv.material3.MaterialTheme
@@ -45,6 +50,20 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTrackAlpha
 import kotlin.math.roundToInt
 
 private val PlaybackPositionColor = Color(0xFFFA7F00)
+
+/** Both ends use the same pixel rounding; animation is read only during layout. */
+private fun Modifier.timelineSpan(
+    trackWidth: Dp,
+    start: () -> Float = { 0f },
+    end: () -> Float,
+): Modifier = offset { IntOffset((trackWidth.toPx() * start()).roundToInt(), 0) }
+    .layout { measurable, constraints ->
+        val left = (trackWidth.toPx() * start()).roundToInt()
+        val right = (trackWidth.toPx() * end()).roundToInt()
+        val width = (right - left).coerceIn(0, constraints.maxWidth)
+        val child = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+        layout(child.width, child.height) { child.placeRelative(0, 0) }
+    }
 
 @Composable
 private fun TimelineTargetLabel(label: String, progress: Float, available: Boolean = true) {
@@ -88,8 +107,14 @@ fun PlayerTimelineBar(
     programmeTargetAvailable: Boolean? = null,
     fillColor: Color = PlaybackPositionColor,
     showTrack: Boolean = true,
+    motionKey: Any? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
+    val animatedProgress = key(motionKey, programmeWindow, currentProgress != null, programmeTargetAvailable) {
+        animateFloatAsState(currentProgress ?: 0f,
+            animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+            label = "player-timeline-position")
+    }
     val barHeight = if (tone == PlayerTimelineTone.ACTIVE) {
         TvOverlayTimelineBarFocusedHeight
     } else {
@@ -143,15 +168,32 @@ fun PlayerTimelineBar(
                 )
             }
             if ((programmeWindow || rewindableStartFraction == null) && currentProgress != null) {
+                // White belongs only to elapsed content before the available history. Drawing
+                // it underneath the orange span exposes a rounding fringe at the moving end.
                 Box(
                     Modifier
-                        .fillMaxWidth(currentProgress)
+                        .timelineSpan(maxWidth) {
+                            if (programmeWindow && rewindableStartFraction != null) {
+                                minOf(animatedProgress.value, rewindableStartFraction.coerceIn(0f, 1f))
+                            } else animatedProgress.value
+                        }
                         .height(barHeight)
                         .testTag("player-timeline-fill")
-                        .background(fillColor),
+                        .background(if (programmeWindow) MaterialTheme.colorScheme.onSurface else fillColor),
                 )
+                if (programmeWindow && rewindableStartFraction != null && availableEndFraction != null) {
+                    val start = rewindableStartFraction.coerceIn(0f, 1f)
+                    // A valid sampled position can precede the next history-status update.
+                    // Paint that actual playback position without extending any seek grant.
+                    Box(Modifier.timelineSpan(maxWidth, start = { start }) {
+                            if (programmeTargetAvailable == true) animatedProgress.value.coerceAtLeast(start)
+                            else animatedProgress.value.coerceIn(start, availableEndFraction.coerceIn(start, 1f))
+                        }.height(barHeight)
+                        .testTag("player-timeline-interactive-fill")
+                        .background(fillColor))
+                }
             }
-            rewindableStartFraction?.takeIf { it > 0f && it < 1f }?.let { fraction ->
+            rewindableStartFraction?.takeIf { !programmeWindow && it > 0f && it < 1f }?.let { fraction ->
                 val start = fraction.coerceIn(0f, 1f)
                 if (rewindableStartOverflow) {
                     val markerColor = MaterialTheme.colorScheme.onSurface
@@ -208,11 +250,12 @@ fun PlayerTimelineBar(
                 }
             }
             if (!programmeWindow && rewindableStartFraction != null && currentProgress != null && programmeTargetAvailable != false) {
+                val start = rewindableStartFraction.coerceIn(0f, 1f)
                 Box(
                     Modifier
-                        .offset(x = (maxWidth * currentProgress - 1.dp).coerceAtLeast(0.dp))
-                        .width(2.dp)
+                        .timelineSpan(maxWidth, start = { start }) { animatedProgress.value.coerceAtLeast(start) }
                         .height(barHeight)
+                        .testTag("player-timeline-fill")
                         .background(PlaybackPositionColor),
                 )
             }
@@ -222,11 +265,10 @@ fun PlayerTimelineBar(
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
                 Box(
                     modifier = Modifier
-                        .offset(x = maxWidth * currentProgress - thumbSize / 2)
+                        .offset { IntOffset((maxWidth.toPx() * animatedProgress.value - thumbSize.toPx() / 2).roundToInt(), 0) }
                         .size(thumbSize)
                         .clip(CircleShape)
-                        .background(if (programmeTargetAvailable == false) Color.Transparent else PlaybackPositionColor)
-                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        .background(Color.White)
                         .then(thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier),
                 )
             }
@@ -315,6 +357,7 @@ fun PlayerTimelineBlock(
                 progressSemantics = progressSemantics,
                 fillColor = fillColor,
                 showTrack = showTrack,
+                motionKey = programmeWindow?.event?.let { Triple(it.id, it.start, it.stop) },
             )
             // Endpoint readouts never shorten or move the track, even at large font scales.
             if (!collapsed && (reserveLabelSpace || leadingLabel != null || trailingLabel != null)) {

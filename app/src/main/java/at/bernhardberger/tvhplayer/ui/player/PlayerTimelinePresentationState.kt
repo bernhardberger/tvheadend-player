@@ -76,6 +76,11 @@ private class LiveTimelineSourceGeneration(
     var feedbackIsError by mutableStateOf(false)
     var preview by mutableStateOf<LiveTimeshiftSeekPreview?>(null)
     var feedbackToken by mutableLongStateOf(initialFeedbackToken)
+    var displayTimeline: TimeshiftTimeline? = null
+    var displayOriginMs = 0L
+    var displayEnd = at.bernhardberger.tvhplayer.core.GrowingTimelineDisplayEnd()
+    var displayLiveEdgeMs: Long? = null
+    var historyStartTimeline: TimeshiftTimeline? = null
 }
 
 internal class LiveTimelinePresentationState(
@@ -100,6 +105,10 @@ internal class LiveTimelinePresentationState(
         get() = sourceGeneration.preview
     val feedbackToken: Long
         get() = sourceGeneration.feedbackToken
+    val displayLiveEdgeMs: Long?
+        get() = sourceGeneration.displayLiveEdgeMs
+    val historyStartTimeline: TimeshiftTimeline?
+        get() = sourceGeneration.historyStartTimeline
 
     val seekPending: Boolean
         get() = sourceGeneration.seekQueue.pendingDeltaMs != 0L
@@ -175,6 +184,26 @@ internal class LiveTimelinePresentationState(
         ) {
             // Correlated Player-position evidence, not a decoded/displayed frame acknowledgement.
             clearPreview(generation)
+        }
+        if (!result.available || generation.historyStartTimeline?.describesSameSegment(result.timeline) != true) {
+            generation.historyStartTimeline = result.timeline?.takeIf {
+                result.available && it.wallClockMapping is at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping.Estimate
+            }
+        }
+        if (!result.available || !result.timingKnown || result.timeline == null) {
+            generation.displayTimeline = null
+            generation.displayLiveEdgeMs = null
+        } else {
+            if (generation.displayTimeline?.describesSameSegment(result.timeline) != true) {
+                generation.displayEnd = at.bernhardberger.tvhplayer.core.GrowingTimelineDisplayEnd()
+                generation.displayOriginMs = result.bufferStartMs
+            }
+            generation.displayTimeline = result.timeline
+            generation.displayLiveEdgeMs = generation.displayOriginMs + generation.displayEnd.update(
+                result.liveEdgeMs - generation.displayOriginMs,
+                monotonicTimeMillis(),
+                growing = true,
+            )
         }
         return result
     }
@@ -489,7 +518,7 @@ internal class RecordingTimelinePresentationState(
     private val feedbackSettled: () -> Boolean,
     private val currentMonotonicMillis: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
-    private val displayEnd = at.bernhardberger.tvhplayer.core.GrowingRecordingDisplayEnd()
+    private val displayEnd = at.bernhardberger.tvhplayer.core.GrowingTimelineDisplayEnd()
     var displayDurationMs by mutableLongStateOf(C.TIME_UNSET)
         private set
     private val currentEpochMillis = currentEpochMillis

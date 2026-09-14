@@ -9,7 +9,7 @@ import org.junit.Test
 
 class SeekbarPolicyTest {
     @Test
-    fun capacityScaleDoesNotGrantUncollectedHistory() {
+    fun collectedHistoryFillsTheAxisLikeAGrowingRecording() {
         val state = AppTimeshiftState(
             available = true,
             bufferStartMs = -1_800_000L,
@@ -17,10 +17,10 @@ class SeekbarPolicyTest {
             capacityMs = 7_200_000L,
         )
         val range = timeshiftSeekbarRange(state)
-        assertEquals(-7_200_000L, range.displayStartMs)
+        assertEquals(-1_800_000L, range.displayStartMs)
         assertEquals(-1_800_000L, range.startMs)
-        assertEquals(0.75f, range.availableStartFraction, 0.001f)
-        assertEquals(0.875f, range.displayProgress, 0.001f)
+        assertEquals(0f, range.availableStartFraction, 0.001f)
+        assertEquals(0.5f, range.displayProgress, 0.001f)
         assertEquals(
             -1_800_000L,
             seekbarScrub(range.copy(positionMs = -1_700_000L), -1, 100),
@@ -29,25 +29,43 @@ class SeekbarPolicyTest {
     }
 
     @Test
-    fun unknownCapacityUsesRequestAndNeverClipsObservedHistory() {
+    fun unknownCapacityDoesNotReserveEmptyHistory() {
         val state = AppTimeshiftState(available = true, bufferStartMs = -60_000L)
-        assertEquals(-7_200_000L, timeshiftSeekbarRange(state).displayStartMs)
+        assertEquals(-60_000L, timeshiftSeekbarRange(state).displayStartMs)
         val expanded = timeshiftSeekbarRange(state.copy(bufferStartMs = -10_800_000L))
         assertEquals(-10_800_000L, expanded.displayStartMs)
         assertEquals(0f, expanded.availableStartFraction, 0f)
     }
 
     @Test
-    fun changedGrantChangesOnlyDisplayAndCannotHideHistory() {
+    fun changedGrantDoesNotRescaleCollectedHistory() {
         val state = AppTimeshiftState(
             available = true,
             bufferStartMs = -1_800_000L,
             capacityMs = 3_600_000L,
         )
-        assertEquals(-3_600_000L, timeshiftSeekbarRange(state).displayStartMs)
+        assertEquals(-1_800_000L, timeshiftSeekbarRange(state).displayStartMs)
         val reduced = timeshiftSeekbarRange(state.copy(capacityMs = 600_000L))
         assertEquals(-1_800_000L, reduced.displayStartMs)
         assertEquals(-1_800_000L, reduced.startMs)
+    }
+
+    @Test
+    fun growingBufferUsesElapsedContentWhileExpiredPositionDoesNotGrantHistory() {
+        val initial = AppTimeshiftState(
+            available = true, bufferStartMs = -60_000L, positionMs = -30_000L,
+        )
+        assertEquals(0.5f, timeshiftSeekbarRange(initial).displayProgress, 0.001f)
+        // Thirty seconds pass while paused: the same content stays thirty seconds from start.
+        val grown = timeshiftSeekbarRange(initial.copy(bufferStartMs = -90_000L, positionMs = -60_000L))
+        assertEquals(1f / 3f, grown.displayProgress, 0.001f)
+        assertEquals(0f, grown.availableStartFraction, 0f)
+        val expired = timeshiftSeekbarRange(initial.copy(bufferStartMs = -10_000L))
+        assertEquals(-30_000L, expired.displayStartMs)
+        assertEquals(-10_000L, expired.startMs)
+        assertEquals(0f, expired.displayProgress, 0f)
+        assertTrue(expired.availableStartFraction > expired.displayProgress)
+        assertEquals(-10_000L, seekbarScrub(expired, -1, 0))
     }
 
     @Test
