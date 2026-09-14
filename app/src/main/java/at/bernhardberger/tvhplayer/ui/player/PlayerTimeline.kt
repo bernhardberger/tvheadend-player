@@ -93,6 +93,7 @@ fun PlayerTimelineBar(
     tone: PlayerTimelineTone,
     modifier: Modifier = Modifier,
     ghostProgress: Float? = null,
+    selectedMarkerFraction: Float? = null,
     rewindableStartFraction: Float? = null,
     rewindableStartOverflow: Boolean = false,
     liveEdgeFraction: Float? = null,
@@ -105,6 +106,7 @@ fun PlayerTimelineBar(
     programmeTargetAvailable: Boolean? = null,
     fillColor: Color = MaterialTheme.colorScheme.tertiary,
     showTrack: Boolean = true,
+    markerFractions: List<Float> = emptyList(),
     motionKey: Any? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
@@ -191,6 +193,10 @@ fun PlayerTimelineBar(
                         .background(fillColor))
                 }
             }
+            markerFractions.filter { it > 0f && it < 1f }.forEach { fraction ->
+                Box(Modifier.offset(x = maxWidth * fraction - 0.5.dp).width(1.dp).height(barHeight)
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)).testTag("recording-marker-tick"))
+            }
             rewindableStartFraction?.takeIf { !programmeWindow && it > 0f && it < 1f }?.let { fraction ->
                 val start = fraction.coerceIn(0f, 1f)
                 if (rewindableStartOverflow) {
@@ -258,6 +264,15 @@ fun PlayerTimelineBar(
                 )
             }
         }
+        selectedMarkerFraction?.let { fraction ->
+            BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
+                Box(Modifier
+                    .offset(x = (maxWidth * fraction.coerceIn(0f, 1f) - 0.5.dp).coerceIn(0.dp, maxWidth - 1.dp))
+                    .width(1.dp).height(18.dp)
+                    .background(MaterialTheme.colorScheme.onSurface)
+                    .testTag("recording-selected-marker"))
+            }
+        }
         if (tone == PlayerTimelineTone.ACTIVE && currentProgress != null) {
             val thumbSize = TvOverlayTimelineThumbSize
             BoxWithConstraints(Modifier.fillMaxWidth().align(Alignment.Center)) {
@@ -286,6 +301,7 @@ fun PlayerTimelineBlock(
     leadingLabelTestTag: String? = null,
     trailingLabelTestTag: String? = null,
     ghostProgress: Float? = null,
+    selectedMarkerFraction: Float? = null,
     rewindableStartFraction: Float? = null,
     rewindableStartOverflow: Boolean = false,
     liveEdgeFraction: Float? = null,
@@ -305,6 +321,7 @@ fun PlayerTimelineBlock(
     reserveStatusSpace: Boolean = false,
     statusAction: (@Composable () -> Unit)? = null,
     collapsed: Boolean = false,
+    markerFractions: List<Float> = emptyList(),
 ) {
     Column(modifier.fillMaxWidth()) {
         if (!collapsed && (reserveStatusSpace || feedback != null || statusAction != null || previewLabel != null)) {
@@ -343,6 +360,7 @@ fun PlayerTimelineBlock(
                 tone = tone,
                 modifier = Modifier.testTag("player-timeline-track"),
                 ghostProgress = ghostProgress,
+                selectedMarkerFraction = selectedMarkerFraction,
                 rewindableStartFraction = programmeWindow?.availableStartFraction ?: rewindableStartFraction,
                 rewindableStartOverflow = rewindableStartOverflow,
                 liveEdgeFraction = if (programmeWindow != null) programmeWindow.liveFraction else liveEdgeFraction,
@@ -355,6 +373,7 @@ fun PlayerTimelineBlock(
                 progressSemantics = progressSemantics,
                 fillColor = fillColor,
                 showTrack = showTrack,
+                markerFractions = markerFractions,
                 motionKey = programmeWindow?.event?.let { Triple(it.id, it.start, it.stop) },
             )
             // Endpoint readouts never shorten or move the track, even at large font scales.

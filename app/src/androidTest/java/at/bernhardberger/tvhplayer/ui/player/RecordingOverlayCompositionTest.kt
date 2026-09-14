@@ -2,6 +2,12 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performKeyPress
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.SemanticsActions
 
 import android.content.res.Configuration
@@ -26,6 +32,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -43,6 +51,224 @@ import org.junit.Rule
 import org.junit.Test
 
 class RecordingOverlayCompositionTest {
+    @Test
+    @OptIn(ExperimentalTestApi::class)
+    fun markersConsumeOpeningAndCommitCyclesWithoutMovingTimelineOrTogglingPause() {
+        val markers = mutableStateOf<List<Long>>(emptyList())
+        val markerPosition = mutableStateOf(30_000L)
+        val navigation = RecordingMarkerNavigation()
+        val seeks = mutableListOf<Long>()
+        var toggles = 0
+        var ancestorBacks = 0
+        var autoHides = 0
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
+                TVHeadendPlayerTheme {
+                    PlayerControlsAutoHideEffect(
+                        eligible = !navigation.open, interactionToken = 0, timeoutMillis = 5_000L,
+                        onHide = { autoHides++ },
+                    )
+                    // RecordingPlayerScreen owns Back before its children. Exercise that ordering.
+                    androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()
+                        .onPreviewKeyEvent { event ->
+                            if (navigation.handle(event, markers.value) { seeks += it }) true
+                            else if (event.key == Key.Back) {
+                                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) ancestorBacks++
+                                true
+                            } else false
+                        }) {
+                        RecordingOverlayControls(
+                            imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                            piconPath = null, title = "Recording with scene markers", subtitle = null, channelName = "Channel",
+                            positionMs = 30_000, durationMs = 120_000, growing = false, nowSec = 1800,
+                            canSeek = true, controlsVisible = true, optionsOpen = false, paused = true,
+                            onTogglePlayPause = { toggles++ }, onSeek = { seeks += it }, onStopPlayback = {},
+                            onUserInteraction = {}, onOpenOptions = {}, onOpenInfo = {},
+                            markers = markers.value, markerNavigation = navigation, onSeekMarker = { seeks += it },
+                            markerPositionMs = markerPosition.value,
+                        )
+                    }
+                }
+            }
+        }
+        fun track() = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val ordinaryTrack = track()
+        val ordinaryActions = bounds("recording-actions")
+        captureMarkerState("markers-absent-en-1.5x.png")
+        composeRule.runOnIdle { markers.value = listOf(10_000L, 60_000L, 100_000L) }
+        assertEquals(ordinaryTrack, track())
+        composeRule.onAllNodesWithTag("recording-marker-tick", useUnmergedTree = true).assertCountEquals(3)
+        composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+        captureMarkerState("markers-ticks-en-1.5x.png")
+        fun dispatch(code: Int, action: Int, repeat: Int = 0) {
+            val time = android.os.SystemClock.uptimeMillis()
+            assertTrue(composeRule.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(
+                android.view.KeyEvent(time, time, action, code, repeat),
+            )))
+        }
+        val up = android.view.KeyEvent.KEYCODE_DPAD_UP
+        dispatch(up, android.view.KeyEvent.ACTION_DOWN)
+        composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
+        dispatch(up, android.view.KeyEvent.ACTION_DOWN, 1)
+        dispatch(up, android.view.KeyEvent.ACTION_UP)
+        composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
+        composeRule.onNodeWithText("1:00").assertIsDisplayed()
+        val selectedLabel = bounds("recording-marker-target")
+        assertTrue(kotlin.math.abs(selectedLabel.center.x - ordinaryTrack.center.x) < 2f)
+        assertTrue(selectedLabel.bottom < ordinaryTrack.top)
+        val previewFill = bounds("player-timeline-fill")
+        assertTrue(kotlin.math.abs(previewFill.width - ordinaryTrack.width / 4f) < 2f)
+        val indicator = bounds("recording-selected-marker")
+        assertTrue(kotlin.math.abs(indicator.center.x - ordinaryTrack.center.x) < 2f)
+        composeRule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertDoesNotExist()
+        assertTrue(seeks.isEmpty())
+        val markerActions = composeRule.onNodeWithTag("recording-marker-target")
+            .fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertEquals(listOf("Previous marker", "Next marker", "Close"), markerActions.map { it.label })
+        composeRule.runOnIdle { markerActions[0].action(); markerActions[1].action() }
+        assertTrue(seeks.isEmpty())
+        composeRule.mainClock.advanceTimeBy(6_000L)
+        assertEquals(0, autoHides)
+        assertEquals(ordinaryTrack, track())
+        assertEquals(ordinaryActions, bounds("recording-actions"))
+        captureMarkerState("markers-open-en-1.5x.png")
+        val enter = android.view.KeyEvent.KEYCODE_ENTER
+        dispatch(enter, android.view.KeyEvent.ACTION_DOWN)
+        composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+        dispatch(enter, android.view.KeyEvent.ACTION_DOWN, 1)
+        dispatch(enter, android.view.KeyEvent.ACTION_UP)
+        assertEquals(listOf(60_000L), seeks)
+        assertEquals(0, toggles)
+        for (close in listOf(android.view.KeyEvent.KEYCODE_BACK, android.view.KeyEvent.KEYCODE_DPAD_DOWN)) {
+            composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
+            composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+            dispatch(close, android.view.KeyEvent.ACTION_DOWN)
+            composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+            dispatch(close, android.view.KeyEvent.ACTION_DOWN, 1)
+            dispatch(close, android.view.KeyEvent.ACTION_UP)
+            composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+            composeRule.onNodeWithTag("recording-marker-overlay").assertDoesNotExist()
+        }
+        assertEquals(listOf(60_000L), seeks)
+        assertEquals(0, ancestorBacks)
+        assertEquals(ordinaryTrack, track())
+        assertTrue(kotlin.math.abs(bounds("player-timeline-fill").width - ordinaryTrack.width / 4f) < 2f)
+        composeRule.onNodeWithTag("recording-selected-marker", useUnmergedTree = true).assertDoesNotExist()
+        // Preselection uses the pending scrub target, and a fresh press repairs a lost release.
+        composeRule.runOnIdle { markerPosition.value = 95_000L }
+        dispatch(up, android.view.KeyEvent.ACTION_DOWN)
+        composeRule.onNodeWithText("1:40").assertIsDisplayed()
+        composeRule.runOnIdle { navigation.dismiss() }
+        composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+        dispatch(up, android.view.KeyEvent.ACTION_DOWN)
+        composeRule.onNodeWithText("1:40").assertIsDisplayed()
+        dispatch(up, android.view.KeyEvent.ACTION_UP)
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        assertEquals(listOf(60_000L), seeks)
+        composeRule.onRoot().performKeyInput { pressKey(Key.Back) }
+        assertEquals(1, ancestorBacks)
+        composeRule.runOnIdle { markers.value = listOf(0L, 119_999L); markerPosition.value = 0L }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithText("0:00").assertIsDisplayed()
+        assertTrue(bounds("recording-marker-target").left >= ordinaryTrack.left)
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+        assertTrue(bounds("recording-marker-target").right <= ordinaryTrack.right)
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionLeft); pressKey(Key.Enter) }
+        assertEquals(listOf(60_000L, 0L), seeks)
+    }
+
+    @Test
+    fun markerEntryPrefersStrictlyNextThenFallsBackToLast() {
+        val navigation = RecordingMarkerNavigation()
+        val markers = listOf(0L, 10_000L, 60_000L)
+        for ((position, expected) in listOf(0L to 10_000L, 11_000L to 60_000L,
+            10_000L to 60_000L, 60_000L to 60_000L, 90_000L to 60_000L)) {
+            navigation.show(markers, position)
+            assertEquals(expected, navigation.selectedMs)
+            navigation.dismiss()
+        }
+        navigation.show(emptyList(), 0L)
+        assertEquals(null, navigation.selectedMs)
+    }
+
+    private fun captureMarkerState(name: String) {
+        if (androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("markerCapture") != "true") return
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = java.io.File(context.getExternalFilesDir(null), "recording-marker-captures")
+        assertTrue(directory.isDirectory || directory.mkdirs())
+        java.io.File(directory, name).outputStream().use {
+            assertTrue(composeRule.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+        }
+    }
+
+    @Test
+    fun germanMarkerOverlayRemainsReadableAtLargeText() {
+        composeRule.setContent {
+            val context = LocalContext.current
+            val configuration = Configuration(LocalConfiguration.current).apply { setLocale(Locale.GERMAN) }
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalContext provides context.createConfigurationContext(configuration),
+                LocalConfiguration provides configuration,
+                LocalDensity provides Density(density.density, 1.5f),
+            ) {
+                TVHeadendPlayerTheme {
+                    RecordingOverlayControls(
+                        imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                        piconPath = null, title = "Aufnahme mit echten Szenenmarken", subtitle = null, channelName = "Sender",
+                        positionMs = 60_000, durationMs = 120_000, growing = false, nowSec = 1800,
+                        canSeek = true, controlsVisible = true, optionsOpen = false, paused = true,
+                        onTogglePlayPause = {}, onSeek = {}, onStopPlayback = {},
+                        onUserInteraction = {}, onOpenOptions = {}, onOpenInfo = {},
+                        markers = listOf(10_000L, 60_000L, 100_000L),
+                    )
+                }
+            }
+        }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
+        composeRule.onNodeWithText("1:40").assertIsDisplayed()
+        val overlay = bounds("recording-marker-target")
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue(overlay.left >= root.left && overlay.right <= root.right && overlay.top >= root.top)
+        captureMarkerState("markers-open-de-1.5x.png")
+    }
+
+    @Test
+    fun absentOrRemovedMarkersKeepOrdinarySeekingAndRestoreSafeFocus() {
+        val markers = mutableStateOf<List<Long>>(emptyList())
+        val seeks = mutableListOf<Long>()
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                RecordingOverlayControls(
+                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
+                    piconPath = null, title = "Recording", subtitle = null, channelName = null,
+                    positionMs = 30_000, durationMs = 120_000, growing = false, nowSec = 0,
+                    canSeek = true, controlsVisible = true, optionsOpen = false,
+                    onTogglePlayPause = {}, onSeek = { seeks += it }, onStopPlayback = {},
+                    onUserInteraction = {}, onOpenOptions = {}, onOpenInfo = {}, markers = markers.value,
+                )
+            }
+        }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionRight) }
+        assertEquals(listOf(30_000L), seeks)
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-marker-overlay").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-pause").assertIsFocused()
+        composeRule.runOnIdle { markers.value = listOf(60_000L) }
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-marker-target").assertIsFocused()
+        composeRule.runOnIdle { markers.value = emptyList() }
+        composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+        composeRule.onNodeWithTag("recording-marker-overlay").assertDoesNotExist()
+        assertEquals(listOf(30_000L), seeks)
+    }
+
     @Test
     fun growingDisplayAdvanceDoesNotGrantDpadOrAccessibilityForwardSeek() {
         val displayEnd = mutableStateOf(65_000L)

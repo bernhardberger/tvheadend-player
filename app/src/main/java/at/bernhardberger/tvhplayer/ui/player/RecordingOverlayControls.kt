@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -78,6 +80,11 @@ internal fun RecordingOverlayControls(
     paused: Boolean = false,
     previewing: Boolean = false,
     displayDurationMs: Long = durationMs,
+    markers: List<Long> = emptyList(),
+    markerPositionMs: Long = positionMs,
+    markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
+    markerRevision: Long = 0L,
+    onSeekMarker: (Long) -> Unit = {},
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -90,6 +97,16 @@ internal fun RecordingOverlayControls(
     var lastFocusWasTimeline by remember { mutableStateOf(false) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(markerNavigation.restoration) {
+        if (markerNavigation.restoration > 0 && controlsVisible && !optionsOpen) {
+            if (seekable) timelineFocus.requestFocus() else pauseFocus.requestFocus()
+        }
+    }
+    LaunchedEffect(markers, seekable, controlsVisible, optionsOpen) {
+        if (markerNavigation.selectedMs !in markers || !seekable || !controlsVisible || optionsOpen) {
+            markerNavigation.dismiss()
+        }
+    }
     LaunchedEffect(controlsVisible, optionsOpen, restoreOptionsFocus, restoreInfoFocus, seekable) {
         if (controlsVisible && !optionsOpen) {
             val target = when {
@@ -110,6 +127,9 @@ internal fun RecordingOverlayControls(
             focusInitialized = false
         }
     }
+    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        markerNavigation.handle(event, markers, onSeekMarker)
+    }) {
     PlayerOverlayChrome(modifier = Modifier.onPreviewKeyEvent { event ->
         if (event.key != relocatingKey) false else {
             if (event.type == KeyEventType.KeyUp) relocatingKey = null
@@ -125,12 +145,19 @@ internal fun RecordingOverlayControls(
                 title = "recording-title", support = "recording-subtitle", clock = "recording-clock"),
         )
     }) {
+        Box {
         Column(Modifier.heightIn(min = 48.dp)) {
             when (presentation) {
                 is RecordingTimelinePresentation.Seekable -> if (canSeek) PlaybackSeekbar(
                     range = presentation.range,
                     paused = paused,
                     previewing = previewing,
+                    recordingMarkers = markers,
+                    recordingMarkerPreviewMs = markerNavigation.selectedMs?.takeIf { it in markers },
+                    onOpenRecordingMarkers = {
+                        onCommitSeek(); onUserInteraction()
+                        markerNavigation.show(markers, markerPositionMs, revision = markerRevision)
+                    },
                     onSeekTo = { onUserInteraction(); onSeek(it - positionMs) },
                     modifier = Modifier
                         .testTag("recording-seekbar")
@@ -151,8 +178,13 @@ internal fun RecordingOverlayControls(
                                 Key.DirectionUp, Key.DirectionDown -> {
                                     if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                         onCommitSeek()
-                                        relocatingKey = event.key
-                                        pauseFocus.requestFocus()
+                                        if (event.key == Key.DirectionUp && markers.isNotEmpty()) {
+                                            onUserInteraction()
+                                            markerNavigation.show(markers, markerPositionMs, event.key, markerRevision)
+                                        } else {
+                                            relocatingKey = event.key
+                                            pauseFocus.requestFocus()
+                                        }
                                     }
                                     true
                                 }
@@ -170,6 +202,12 @@ internal fun RecordingOverlayControls(
                     presentation.elapsedMs, stringResource(R.string.recording_duration_unavailable),
                 )
             }
+        }
+        RecordingMarkerOverlay(
+            navigation = markerNavigation, markers = markers, onSeek = onSeekMarker,
+            displayDurationMs = displayDurationMs,
+            modifier = Modifier.matchParentSize(),
+        )
         }
         Spacer(Modifier.height(8.dp))
         PlayerActionRow(
@@ -194,6 +232,7 @@ internal fun RecordingOverlayControls(
                     } else false
                 },
         )
+    }
     }
 }
 

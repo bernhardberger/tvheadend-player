@@ -12,6 +12,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
+import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
+import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -38,14 +41,18 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.job
 import kotlinx.coroutines.sync.Mutex
@@ -533,6 +540,49 @@ internal class ForegroundPlaybackLifecycle {
     }
 }
 
+/** Optional metadata for the installed binding; cancellation alone is not a stale-reply fence. */
+internal class RecordingMarkerQuery {
+    private var binding: PlaybackBinding.Recording? = null
+    private val _revision = MutableStateFlow(0L)
+    val revision = _revision.asStateFlow()
+    private val _cutpoints = MutableStateFlow<List<DvrCutpoint>>(emptyList())
+    val cutpoints = _cutpoints.asStateFlow()
+
+    fun use(value: PlaybackBinding.Recording?) {
+        _revision.value++
+        binding = value
+        _cutpoints.value = emptyList()
+    }
+
+    fun isCurrent(value: PlaybackBinding.Recording): Boolean = binding === value && when (value.admission) {
+        is RecordingPlaybackAdmission.Completed, is RecordingPlaybackAdmission.GrowingStartOverOnly -> true
+        else -> false
+    }
+
+    fun isCurrent(): Boolean = binding?.let(::isCurrent) == true
+
+    fun retire(value: PlaybackBinding.Recording) {
+        if (binding === value) use(null)
+    }
+
+    suspend fun refresh(value: PlaybackBinding.Recording) {
+        if (!isCurrent(value)) return
+        val expectedRevision = revision.value
+        val result = try {
+            value.cutpoints()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Optional metadata must never interrupt playback or expose a raw server error.
+            null
+        }
+        currentCoroutineContext().ensureActive()
+        if (expectedRevision == revision.value && isCurrent(value)) {
+            _cutpoints.value = (result as? DvrCutpointsResult.Available)?.cutpoints.orEmpty()
+        }
+    }
+}
+
 /** App presentation adapter over the released coordinator and app-owned player. */
 class AppPlaybackRuntime(
     val player: ExoPlayer,
@@ -551,6 +601,10 @@ class AppPlaybackRuntime(
     private val _activeTarget = MutableStateFlow<AppPlaybackTarget?>(null)
     private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
     private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
+    private val markerQuery = RecordingMarkerQuery()
+    private var markerJob: Job? = null
+    val recordingCutpoints = markerQuery.cutpoints
+    val recordingMarkerRevision = markerQuery.revision
     private val _diagnostics = MutableStateFlow(AppPlaybackDiagnostics())
     private val _videoPresentation = MutableStateFlow(AppVideoPresentation())
     private var diagnosticsEnabled = false
@@ -777,6 +831,7 @@ class AppPlaybackRuntime(
                     lastLiveChannelId = selection.channelId
                     _recordingSelection.value = null
                     _recordingAdmission.value = null
+                    clearRecordingMarkers()
                     _state.value = AppPlaybackState.Starting
                     if (BuildConfig.PROFILE_TRACE) profileTrace("P44:tune:bound:$epoch") {}
                     beginTargetPresentation(epoch)
@@ -854,6 +909,7 @@ class AppPlaybackRuntime(
             )
         }
         var admission: RecordingPlaybackAdmission? = null
+        var installedBinding: PlaybackBinding.Recording? = null
         var committed = false
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
@@ -867,6 +923,7 @@ class AppPlaybackRuntime(
                 ) {
                     is PlaybackBindingResult.Bound -> {
                         admission = binding.binding.admission
+                        installedBinding = binding.binding
                         if (!targetCommands.isOpen()) {
                             PlaybackTargetResult.SHUT_DOWN
                         } else {
@@ -892,6 +949,7 @@ class AppPlaybackRuntime(
                     _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
+                    observeRecordingMarkers(requireNotNull(installedBinding))
                     _state.value = AppPlaybackState.Starting
                     beginTargetPresentation(epoch)
                     publishInstalledPlayerState()
@@ -949,6 +1007,7 @@ class AppPlaybackRuntime(
 
     private suspend fun stopPlayback(): PlaybackStopResult {
         if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
+        clearRecordingMarkers()
         val epoch = presentationEpoch.begin()
         endTargetPresentation(epoch)
         val currentJob = currentCoroutineContext().job
@@ -1057,6 +1116,49 @@ class AppPlaybackRuntime(
     }
     fun pause() { targetCommands.runIfOpen(player::pause) }
     fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
+    fun seekRecordingMarker(positionMs: Long, expectedRevision: Long) {
+        targetCommands.runIfOpen {
+            if (expectedRevision != recordingMarkerRevision.value ||
+                !markerQuery.isCurrent() || targetInstallationInProgress) return@runIfOpen
+            if (!player.isCurrentMediaItemSeekable ||
+                !player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) return@runIfOpen
+            if (positionMs in at.bernhardberger.tvhplayer.core.recordingMarkerPositions(
+                    recordingCutpoints.value, player.duration,
+                )) {
+                // seekTo does not change playWhenReady: marker navigation preserves pause.
+                player.seekTo(positionMs)
+            }
+        }
+    }
+
+    private fun clearRecordingMarkers() {
+        markerQuery.use(null)
+        markerJob?.cancel()
+        markerJob = null
+    }
+
+    private fun observeRecordingMarkers(binding: PlaybackBinding.Recording) {
+        clearRecordingMarkers()
+        markerQuery.use(binding)
+        markerJob = scope.launch {
+            // Admission changes, not position samples: at most initial + growing completion.
+            var completionFetched = false
+            var initialFetched = false
+            session.observation.map { binding.admission::class }.distinctUntilChanged().collectLatest {
+                when (binding.admission) {
+                    is RecordingPlaybackAdmission.GrowingStartOverOnly -> if (!initialFetched) {
+                        initialFetched = true
+                        markerQuery.refresh(binding)
+                    }
+                    is RecordingPlaybackAdmission.Completed -> if (!completionFetched) {
+                        completionFetched = true
+                        markerQuery.refresh(binding)
+                    }
+                    else -> markerQuery.retire(binding)
+                }
+            }
+        }
+    }
     fun setDiagnosticsEnabled(enabled: Boolean) {
         if (!targetCommands.isOpen()) return
         diagnosticsEnabled = enabled
@@ -1159,6 +1261,9 @@ class AppPlaybackRuntime(
 
     suspend fun detach() {
         if (!targetCommands.close()) return
+        val pendingMarkers = markerJob
+        clearRecordingMarkers()
+        pendingMarkers?.join()
         val pendingRecovery = recoveryJob
         recoveryJob = null
         pendingRecovery?.cancel()
@@ -1277,6 +1382,7 @@ class AppPlaybackRuntime(
             _activeTarget.value = null
             _recordingSelection.value = null
             _recordingAdmission.value = recordingAdmission
+            clearRecordingMarkers()
             _state.value = AppPlaybackState.Failed(reason, targetResult)
             publishDiagnostics()
         }

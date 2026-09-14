@@ -36,6 +36,7 @@ fun PlaybackSeekbar(
     range: SeekbarRange,
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    recordingMarkerPreviewMs: Long? = null,
     paused: Boolean = false,
     programmeAxis: ProgrammeAxis? = null,
     programmePositionMs: Long? = null,
@@ -47,6 +48,8 @@ fun PlaybackSeekbar(
     reserveStatusSpace: Boolean = false,
     statusAction: (@Composable () -> Unit)? = null,
     collapsed: Boolean = false,
+    recordingMarkers: List<Long> = emptyList(),
+    onOpenRecordingMarkers: (() -> Unit)? = null,
     /**
      * Live-edge presentation to label the timeline with. Defaults to the measured
      * distance within [range]; live callers pass the server-shift-aware presentation.
@@ -80,6 +83,9 @@ fun PlaybackSeekbar(
     var focused by remember { mutableStateOf(false) }
     val programmeDuration = programmeDurationMs?.takeIf { it > 0L }
     val programmePosition = programmePositionMs?.coerceIn(0L, programmeDuration ?: 0L)
+    val markerPreview = recordingMarkerPreviewMs?.takeIf {
+        range.domain == SeekbarDomain.RECORDING && it >= range.startMs && it < range.endMs
+    }
     // Live status excludes pipeline latency. Only committed, playing fallback chrome pins to
     // live; pause, previews and programme windows retain their sampled/selected coordinates.
     val displayAtLiveEdge = range.domain == SeekbarDomain.TIMESHIFT && programmeWindow == null &&
@@ -150,6 +156,7 @@ fun PlaybackSeekbar(
     }
     val seekBackLabel = stringResource(R.string.seek_back_30)
     val seekForwardLabel = stringResource(R.string.seek_forward_30)
+    val openMarkersLabel = stringResource(R.string.recording_markers_open)
     val seekBackTarget = seekbarScrub(range, -1, 0)
     val seekForwardTarget = seekbarScrub(range, 1, 0)
     val accessibilityProgress = programmeWindow?.positionFraction ?: if (displayAtLiveEdge) {
@@ -160,6 +167,9 @@ fun PlaybackSeekbar(
         displayedProgress
     }
     val accessibilityActions = buildList {
+        if (recordingMarkers.isNotEmpty() && onOpenRecordingMarkers != null) {
+            add(CustomAccessibilityAction(openMarkersLabel) { onOpenRecordingMarkers(); true })
+        }
         if (seekBackTarget < range.positionMs) {
             add(
                 CustomAccessibilityAction(seekBackLabel) {
@@ -185,6 +195,8 @@ fun PlaybackSeekbar(
     val windowFeedback = feedback ?: programmeWindow?.event?.title?.takeIf { previewing && it.isNotBlank() }
         PlayerTimelineBlock(
             progress = displayedProgress,
+            selectedMarkerFraction = markerPreview?.let { range.copy(positionMs = it).displayProgress },
+            markerFractions = recordingMarkers.map { it.toFloat() / range.displayEndMs },
             collapsed = collapsed,
             tone = if (focused && !collapsed) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
             // The estimate qualifier stays in the accessible description; visibly it is noise.

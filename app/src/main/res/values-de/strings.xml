@@ -371,4 +371,9 @@
     <string name="status_connection_failed_permission">Verbindung fehlgeschlagen: Dieses Konto darf keine Senderdaten lesen</string>
     <string name="status_connection_failed_zero_channels">Verbindung erfolgreich, aber für dieses Konto sind keine Sender sichtbar</string>
     <string name="status_connection_failed_other">Verbindung fehlgeschlagen</string>
+    <string name="recording_marker_label">Marke %1$d · %2$s</string>
+    <string name="recording_markers_open">Aufnahmemarken durchsuchen</string>
+    <string name="recording_marker_previous">Vorherige Marke</string>
+    <string name="recording_marker_start">Anfang der Aufnahme</string>
+    <string name="recording_marker_next">Nächste Marke</string>
 </resources>

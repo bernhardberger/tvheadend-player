@@ -399,6 +399,11 @@
     <string name="recording_timeline_status_description">Elapsed %1$s. %2$s.</string>
     <string name="recording_seek_preview_description">Seek target %1$s. Cumulative change %2$s. %3$s.</string>
     <string name="recording_known_duration">Total %1$s</string>
+    <string name="recording_marker_label">Marker %1$d · %2$s</string>
+    <string name="recording_markers_open">Browse recording markers</string>
+    <string name="recording_marker_previous">Previous marker</string>
+    <string name="recording_marker_start">Beginning of recording</string>
+    <string name="recording_marker_next">Next marker</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 seconds</string>
     <string name="seek_forward_30">+30 seconds</string>

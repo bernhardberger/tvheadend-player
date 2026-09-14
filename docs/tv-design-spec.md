@@ -550,6 +550,26 @@ accessibility seek permissions; previews and commits use verified recorded
 content. Completion, unavailable timing, or a source change discards the estimate.
 Finished recordings retain their fixed media duration. Accessible descriptions
 qualify an extrapolated endpoint as estimated.
+Recordings with real scene markers show thin ticks inside this existing track.
+Only the SDK's `SCENE_MARKER` end coordinates strictly inside verified media
+duration are navigation targets; other cutpoint actions do not create chapters
+or automatic skips. Up from the seekbar shows a single focused timestamp label
+anchored above the selected tick, clamped within the track's horizontal bounds.
+This borrows the Material 3 slider value-label treatment while retaining TV focus
+and D-pad input. There is no instruction panel, reserved space or movement of the
+track, readouts or actions; the seekbar remains continuous rather than snapping
+ordinary seeks to discrete marker steps.
+During marker selection, the orange fill remains at actual playback position.
+A thin, taller line through the track identifies the selected timestamp beneath
+the label. There is no ghost dot or preview thumb. Ordinary ticks are subdued
+1dp lines. Marker navigation also offers the recording's 0:00 boundary, without
+claiming it is a supplied chapter. Selection alone never seeks; OK commits.
+Left/Right selects a timestamped marker; OK seeks while preserving pause.
+Down or Back dismisses and restores seekbar focus without a marker seek.
+The overlay suspends auto-hide and consumes complete opening/closing key cycles.
+Missing or unavailable markers retain ordinary seeking. There are no thumbnails,
+synthetic intervals or coarse-skip controls. Generic labels must not imply
+programme names or commercial boundaries that the metadata does not supply.
 Play/Pause and immediate Stop form the transport group; only Play/Pause has an idle
 filled backing. Transport is left-aligned; Info, neutral Record and Settings form
 one right-aligned utility group on the same band. Info's label is inside its TV Material pill.

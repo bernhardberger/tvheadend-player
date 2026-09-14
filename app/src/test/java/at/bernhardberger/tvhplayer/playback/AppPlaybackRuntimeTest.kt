@@ -45,6 +45,94 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppPlaybackRuntimeTest {
     @Test
+    @OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class)
+    fun successfulMarkerResponsesPublishAndLateResponsesCannotRestoreRetiredMarkers() = runTest {
+        for (retirement in listOf("stop", "reinstall", "generation", "replacement", "cancel")) {
+            val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
+            val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+            val points = listOf(at.bernhardberger.tvheadend.sdk.core.DvrCutpoint(
+                Duration.ZERO, 10.seconds, at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction.SCENE_MARKER,
+            ))
+            var delayed = false
+            val response = CompletableDeferred<Unit>()
+            val entered = CompletableDeferred<Unit>()
+            val binding = (at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory.boundCompletedRecordingPlayback(
+                fake, fake.captureCurrentSession(), entry.id,
+                cutpoints = {
+                    if (delayed) { entered.complete(Unit); response.await() }
+                    at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult.Available.create(points)
+                },
+            ) as at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.Bound).binding
+            val query = RecordingMarkerQuery()
+            query.use(binding)
+            query.refresh(binding)
+            assertEquals(points, query.cutpoints.value)
+            delayed = true
+            val job = launch { query.refresh(binding) }
+            runCurrent()
+            assertTrue(entered.isCompleted)
+            assertFalse(job.isCompleted)
+            query.use(null)
+            assertTrue(query.cutpoints.value.isEmpty())
+            when (retirement) {
+                "reinstall" -> query.use(binding) // Same object is still fenced by installation revision.
+                "generation" -> fake.replaceGeneration(currentObservation(recordings = listOf(entry)))
+                "replacement" -> fake.publish(currentObservation(recordings = listOf(
+                    DvrEntry.create(id = entry.id, state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED, title = "Replacement"),
+                )))
+                "cancel" -> job.cancel()
+            }
+            response.complete(Unit)
+            job.join()
+            assertTrue("Late response after $retirement", query.cutpoints.value.isEmpty())
+        }
+    }
+
+    @Test
+    @OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+    fun markerQueryUsesSdkAdmissionAndClearsOnStopOrReinstallation() = runTest {
+        val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
+        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+        fake.scriptRecordingPlaybackSuccess()
+        val binding = (fake.bindRecordingPlayback(fake.captureCurrentSession(), entry.id) as
+            at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.Bound).binding
+        val query = RecordingMarkerQuery()
+        query.use(binding)
+        val initialRevision = query.revision.value
+        assertTrue(query.isCurrent(binding))
+        query.refresh(binding) // The installed SDK fake supplies NotReady: ordinary seeking remains.
+        assertTrue(query.cutpoints.value.isEmpty())
+        query.use(null)
+        assertFalse(query.isCurrent(binding))
+        query.refresh(binding)
+        assertTrue(query.cutpoints.value.isEmpty())
+        query.use(binding)
+        assertTrue(query.revision.value > initialRevision)
+        fake.replaceGeneration(currentObservation(recordings = listOf(entry)))
+        assertFalse(query.isCurrent(binding))
+        query.refresh(binding)
+        assertTrue(query.cutpoints.value.isEmpty())
+    }
+
+    @Test
+    @OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+    fun markerQueryRejectsSameIdReplacementInTheSameSession() = runTest {
+        val entry = DvrEntry.create(id = DvrEntryId(4), state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED)
+        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(currentObservation(recordings = listOf(entry)))
+        fake.scriptRecordingPlaybackSuccess()
+        val binding = (fake.bindRecordingPlayback(fake.captureCurrentSession(), entry.id) as
+            at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult.Bound).binding
+        val query = RecordingMarkerQuery()
+        query.use(binding)
+        fake.publish(currentObservation(recordings = listOf(
+            DvrEntry.create(id = entry.id, state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED, title = "Replacement"),
+        )))
+        assertFalse(query.isCurrent(binding))
+        query.refresh(binding)
+        assertTrue(query.cutpoints.value.isEmpty())
+    }
+
+    @Test
     fun missingOrContradictoryTimingIsNotAMeasuredLivePosition() {
         val measurements = listOf(
             null to null,

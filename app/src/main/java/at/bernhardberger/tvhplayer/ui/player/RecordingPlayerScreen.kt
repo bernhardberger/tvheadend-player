@@ -92,6 +92,8 @@ fun RecordingPlayerScreen(
     val playbackState by session.state.collectAsStateWithLifecycle()
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
+    val cutpoints by session.recordingCutpoints.collectAsStateWithLifecycle()
+    val markerRevision by session.recordingMarkerRevision.collectAsStateWithLifecycle()
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     val routeSelection = currentRecordingPlaybackSelection(observation, recordingId)
@@ -157,6 +159,17 @@ fun RecordingPlayerScreen(
     val positionMs = timelineState.positionMs
     val durationMs = timelineState.durationMs
     val displayDurationMs = timelineState.displayDurationMs
+    val markers = remember(cutpoints, durationMs, timelineState.canSeek, retainedSelection, currentSession) {
+        if (timelineState.canSeek && retainedSelection != null && retainedSelection.currentSession === currentSession) {
+            at.bernhardberger.tvhplayer.core.recordingMarkerPositions(cutpoints, durationMs)
+        } else emptyList()
+    }
+    val markerNavigation = remember { RecordingMarkerNavigation() }
+    LaunchedEffect(markerRevision, recordingId, currentSession) { markerNavigation.dismiss() }
+    fun seekMarker(targetMs: Long) {
+        timelineState.cancelPendingSeek()
+        session.seekRecordingMarker(targetMs, markerNavigation.ownerRevision)
+    }
     val nowSec = timelineState.nowEpochSec
     val isPlaying = timelineState.isPlaying
     val rootFocus = remember { FocusRequester() }
@@ -264,7 +277,7 @@ fun RecordingPlayerScreen(
             playbackStable = playbackAvailable &&
                 playbackState is AppPlaybackState.Playing,
             seekPending = timelineState.seekPending,
-            modalVisible = optionsPage != null || infoOpen,
+            modalVisible = optionsPage != null || infoOpen || markerNavigation.open,
             recoveryVisible = playbackState is AppPlaybackState.Recovering,
             actionableErrorVisible = initialConnectionFailure ||
                 (recordingResolved &&
@@ -298,6 +311,9 @@ fun RecordingPlayerScreen(
     val foregroundContext = currentPlayerForegroundContext()
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    LaunchedEffect(foregroundLayer) {
+        if (foregroundLayer != PlayerForegroundLayer.CONTROLS) markerNavigation.dismiss()
+    }
     val failureReason = (playbackState as? AppPlaybackState.Failed)?.reason
     val retryTargetAvailable =
         initialConnectionFailure ||
@@ -325,7 +341,10 @@ fun RecordingPlayerScreen(
     }
 
     val handlePlaybackBack: () -> Unit = {
-        when (
+        if (markerNavigation.open) {
+            markerNavigation.dismiss()
+            interactionToken++
+        } else when (
             playerBackAction(
                 seekPreviewPhase = timelineState.seekPreviewPhase(controlsVisible),
                 surface = PlayerSurface.RECORDING,
@@ -363,6 +382,10 @@ fun RecordingPlayerScreen(
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
+                if (markerNavigation.handle(event, markers, ::seekMarker)) {
+                    interactionToken++
+                    return@onPreviewKeyEvent true
+                }
                 if (recordingPlaybackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
                     return@onPreviewKeyEvent true
@@ -456,6 +479,11 @@ fun RecordingPlayerScreen(
                     positionMs = positionMs,
                     durationMs = durationMs,
                     displayDurationMs = displayDurationMs,
+                    markers = markers,
+                    markerPositionMs = timelineState.pendingTargetMs ?: positionMs,
+                    markerNavigation = markerNavigation,
+                    markerRevision = markerRevision,
+                    onSeekMarker = ::seekMarker,
                     growing = growing,
                     nowSec = nowSec,
                     canSeek = timelineState.canSeek,
