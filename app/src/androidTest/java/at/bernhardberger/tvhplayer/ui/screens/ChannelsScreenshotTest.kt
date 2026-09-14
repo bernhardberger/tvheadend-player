@@ -154,6 +154,8 @@ class ChannelsScreenshotTest(private val scenario: String) {
                 }
             }
             composeRule.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
+            composeRule.waitUntilExactlyOneExists(hasText("All channels") and isFocused(), 5_000)
+            composeRule.onNodeWithText("All channels").performKeyInput { pressKey(Key.DirectionDown) }
             composeRule.waitUntilExactlyOneExists(hasTestTag("channel-row-2") and isFocused(), 5_000)
             val focus = when (scenario) {
                 "tags-overflow" -> {
@@ -175,7 +177,8 @@ class ChannelsScreenshotTest(private val scenario: String) {
                 composeRule.onNodeWithTag("channel-row-2").assertDoesNotExist()
                 composeRule.onNodeWithText(instrumentation.targetContext.getString(R.string.empty_channel_tag)).assertIsDisplayed()
             } else {
-                composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals(channels[1].name!!)
+                val detailChannel = if (scenario == "tags-overflow") channels.first() else channels[1]
+                composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals(detailChannel.name!!)
             }
             if (scenario == "playing-recording") {
                 focus.assertIsSelected().assertContentDescriptionEquals("Currently playing", "Recording now")
