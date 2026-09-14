@@ -29,7 +29,7 @@ internal fun ChannelNumberOverlay(number: String, modifier: Modifier = Modifier)
             Surface(
                 colors = SurfaceDefaults.colors(
                     containerColor = Color.Black.copy(alpha = 0.78f),
-                    contentColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
                 shape = MaterialTheme.shapes.large,
             ) {

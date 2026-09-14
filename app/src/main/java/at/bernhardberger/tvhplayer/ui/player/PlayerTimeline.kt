@@ -49,8 +49,6 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineThumbSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayTrackAlpha
 import kotlin.math.roundToInt
 
-private val PlaybackPositionColor = Color(0xFFFA7F00)
-
 /** Both ends use the same pixel rounding; animation is read only during layout. */
 private fun Modifier.timelineSpan(
     trackWidth: Dp,
@@ -105,7 +103,7 @@ fun PlayerTimelineBar(
     availableEndFraction: Float? = liveEdgeFraction,
     programmeWindow: Boolean = false,
     programmeTargetAvailable: Boolean? = null,
-    fillColor: Color = PlaybackPositionColor,
+    fillColor: Color = MaterialTheme.colorScheme.tertiary,
     showTrack: Boolean = true,
     motionKey: Any? = null,
 ) {
@@ -256,7 +254,7 @@ fun PlayerTimelineBar(
                         .timelineSpan(maxWidth, start = { start }) { animatedProgress.value.coerceAtLeast(start) }
                         .height(barHeight)
                         .testTag("player-timeline-fill")
-                        .background(PlaybackPositionColor),
+                        .background(MaterialTheme.colorScheme.tertiary),
                 )
             }
         }
@@ -268,7 +266,7 @@ fun PlayerTimelineBar(
                         .offset { IntOffset((maxWidth.toPx() * animatedProgress.value - thumbSize.toPx() / 2).roundToInt(), 0) }
                         .size(thumbSize)
                         .clip(CircleShape)
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.onSurface)
                         .then(thumbTestTag?.let { Modifier.testTag(it) } ?: Modifier),
                 )
             }
@@ -298,7 +296,7 @@ fun PlayerTimelineBlock(
     programmeWindow: ProgrammeWindow? = null,
     reserveLabelSpace: Boolean = false,
     previewLabel: String? = null,
-    fillColor: Color = PlaybackPositionColor,
+    fillColor: Color = MaterialTheme.colorScheme.tertiary,
     showTrack: Boolean = true,
     timelineModifier: Modifier = Modifier,
     feedback: String? = null,

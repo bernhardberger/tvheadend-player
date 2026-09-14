@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import kotlin.math.roundToInt
@@ -643,7 +645,7 @@ internal fun ChannelsScreenContent(
                 Surface(
                     shape = MaterialTheme.shapes.medium,
                     colors = SurfaceDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(
+                        containerColor = TvSurfaceColors.container.copy(
                             alpha = TvPanelBrowseAlpha
                         ),
                         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -773,7 +775,7 @@ internal fun ChannelsScreenContent(
                 Surface(
                     shape = MaterialTheme.shapes.medium,
                     colors = SurfaceDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(
+                        containerColor = TvSurfaceColors.container.copy(
                             alpha = TvPanelBrowseAlpha
                         ),
                         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -818,7 +820,7 @@ private fun EmptyTagState(modifier: Modifier = Modifier) {
     Surface(
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelBrowseAlpha),
+            containerColor = TvSurfaceColors.container.copy(alpha = TvPanelBrowseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         modifier = modifier,
@@ -859,7 +861,7 @@ private fun EmptyChannelsState(
     Surface(
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelBrowseAlpha),
+            containerColor = TvSurfaceColors.container.copy(alpha = TvPanelBrowseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         modifier = modifier,
@@ -935,7 +937,7 @@ private fun InlineConnectionState(
     Surface(
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = TvSurfaceColors.containerHigh,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
         modifier = modifier.fillMaxWidth(),

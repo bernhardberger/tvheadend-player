@@ -13,7 +13,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -26,6 +25,7 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_FADE_IN_MS
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 internal const val compactTuningSurfaceAlpha = TvPanelBrowseAlpha
 
@@ -47,7 +47,7 @@ internal fun CompactTuningStatus(
                 .testTag("compact-tuning-surface"),
             shape = MaterialTheme.shapes.medium,
             colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(
+                containerColor = TvSurfaceColors.container.copy(
                     alpha = compactTuningSurfaceAlpha,
                 ),
                 contentColor = MaterialTheme.colorScheme.onSurface,
@@ -62,13 +62,13 @@ internal fun CompactTuningStatus(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CircularProgressIndicator(
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     strokeWidth = 2.dp,
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
                     text = label,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,7 +29,7 @@ fun SettingsPane(
         modifier = modifier.fillMaxSize(),
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
+            containerColor = TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {

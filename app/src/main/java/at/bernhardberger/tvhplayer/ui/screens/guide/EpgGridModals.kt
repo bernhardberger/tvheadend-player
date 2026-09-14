@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
@@ -627,7 +629,7 @@ private fun DialogScrim(
                 },
                 shape = MaterialTheme.shapes.large,
                 colors = SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = TvSurfaceColors.containerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             ) {

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -65,7 +67,7 @@ internal fun SettingsSubRail(
             .fillMaxHeight()
             .clip(MaterialTheme.shapes.medium)
             .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)
+                TvSurfaceColors.containerLow.copy(alpha = TvPanelDenseAlpha)
             )
             .padding(TvSpacing8)
             .verticalScroll(rememberScrollState())

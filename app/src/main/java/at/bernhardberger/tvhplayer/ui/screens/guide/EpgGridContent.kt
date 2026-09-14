@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 import at.bernhardberger.tvhplayer.profiling.profileViewportItem
@@ -95,7 +97,7 @@ internal fun TimelineTimeRuler(
                 .fillMaxHeight(),
             shape = MaterialTheme.shapes.small,
             colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
+                containerColor = TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha),
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
         ) {
@@ -113,7 +115,7 @@ internal fun TimelineTimeRuler(
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
+                .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha)),
         ) {
             repeat(6) { markerIndex ->
                 val markerOffset = maxWidth * (markerIndex / 6f)
@@ -214,7 +216,7 @@ internal fun TimelineChannelRow(
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)),
+                .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha)),
         ) {
             val density = LocalDensity.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
@@ -313,9 +315,9 @@ internal fun TimelineChannelHeader(
             .fillMaxHeight(),
         colors = SurfaceDefaults.colors(
             containerColor = if (selected) {
-                MaterialTheme.colorScheme.surfaceVariant
+                TvSurfaceColors.containerHighest
             } else {
-                MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha)
+                TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha)
             },
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
@@ -418,7 +420,7 @@ internal fun TimelineProgrammeCell(
                 .fillMaxSize()
                 .padding(horizontal = 1.dp, vertical = 2.dp)
                 .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvPanelDenseAlpha))
+                .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha))
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
                 .semantics { contentDescription = description },
@@ -479,7 +481,7 @@ internal fun GuidePassiveNotice(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = TvSurfaceColors.containerHigh,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {
@@ -504,7 +506,7 @@ internal fun GuideConnectionRecovery(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = TvSurfaceColors.containerHigh,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {
@@ -570,7 +572,7 @@ internal fun GuideEmptyState(
             .fillMaxSize()
             .testTag("guide-empty-state"),
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
+            containerColor = TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {

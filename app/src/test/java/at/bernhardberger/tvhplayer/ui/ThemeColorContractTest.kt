@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.tv.material3.darkColorScheme
@@ -15,10 +16,55 @@ class ThemeColorContractTest {
 
         assertEquals(expectedTvRoles, actual)
         assertContrast(actual.getValue("primary"), actual.getValue("onPrimary"))
+        assertContrast(actual.getValue("tertiary"), actual.getValue("onTertiary"))
+        assertContrast(actual.getValue("onTertiaryContainer"), actual.getValue("tertiaryContainer"))
         assertContrast(actual.getValue("onSurface"), actual.getValue("surface"))
         assertContrast(actual.getValue("inverseOnSurface"), actual.getValue("inverseSurface"))
         assertContrast(actual.getValue("error"), actual.getValue("surface"))
+        assertContrast(actual.getValue("onErrorContainer"), actual.getValue("errorContainer"))
         assertContrast("FFFF5449", actual.getValue("surface"))
+    }
+
+    @Test
+    fun panelForegroundsRemainReadableOverBrightVideo() {
+        listOf(
+            TvSurfaceColors.container.copy(alpha = TvPanelBrowseAlpha),
+            TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha),
+            TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha),
+        ).forEach { panel ->
+            val background = panel.compositeOver(Color.White)
+            assertContrast(TvDarkColors.onSurfaceVariant.argb(), background.argb())
+            assertContrast(
+                TvDarkColors.onSurface.copy(alpha = TvTextTertiaryAlpha)
+                    .compositeOver(background).argb(),
+                background.argb(),
+            )
+        }
+    }
+
+    @Test
+    fun neutralSurfaceHierarchyAndTvFocusKeepReadableForegrounds() {
+        val surfaces = listOf(
+            TvSurfaceColors.containerLowest, TvDarkColors.surface,
+            TvSurfaceColors.containerLow, TvSurfaceColors.container,
+            TvSurfaceColors.containerHigh, TvSurfaceColors.containerHighest,
+            TvSurfaceColors.bright,
+        )
+        surfaces.zipWithNext().forEach { (lower, higher) ->
+            assertTrue(lower.luminance() < higher.luminance())
+        }
+        surfaces.forEach { surface ->
+            assertContrast(TvDarkColors.onSurface.argb(), surface.argb())
+            assertContrast(TvDarkColors.onSurfaceVariant.argb(), surface.argb())
+        }
+        assertContrast(TvDarkColors.inverseOnSurface.argb(), TvDarkColors.onSurface.argb())
+        assertEquals(TvSurfaceColors.containerLowest, MobileDarkColors.surfaceContainerLowest)
+        assertEquals(TvSurfaceColors.containerLow, MobileDarkColors.surfaceContainerLow)
+        assertEquals(TvSurfaceColors.container, MobileDarkColors.surfaceContainer)
+        assertEquals(TvSurfaceColors.containerHigh, MobileDarkColors.surfaceContainerHigh)
+        assertEquals(TvSurfaceColors.containerHighest, MobileDarkColors.surfaceContainerHighest)
+        assertEquals(TvSurfaceColors.bright, MobileDarkColors.surfaceBright)
+        assertEquals(TvDarkColors.surface, MobileDarkColors.surfaceDim)
     }
 
     @Test
@@ -133,20 +179,20 @@ class ThemeColorContractTest {
 
     private companion object {
         val expectedTvRoles = mapOf(
-            "primary" to "FF00BCFA", "onPrimary" to "FF00344B",
-            "primaryContainer" to "FF003E55", "onPrimaryContainer" to "FFC3E8FF",
-            "inversePrimary" to "FF6750A4", "secondary" to "FFC4E8FE",
-            "onSecondary" to "FF0D3446", "secondaryContainer" to "FF274B5D",
-            "onSecondaryContainer" to "FFC4E8FE", "tertiary" to "FFEFB8C8",
-            "onTertiary" to "FF492532", "tertiaryContainer" to "FF633B48",
-            "onTertiaryContainer" to "FFFFD8E4", "background" to "FF0F1014",
-            "onBackground" to "FFE3E3E8", "surface" to "FF17181D",
-            "onSurface" to "FFE3E3E8", "surfaceVariant" to "FF23242A",
-            "onSurfaceVariant" to "FFC4C6D0", "surfaceTint" to "FF00BCFA",
-            "inverseSurface" to "FFE6E1E5", "inverseOnSurface" to "FF313033",
-            "error" to "FFF2B8B5", "onError" to "FF601410",
-            "errorContainer" to "FF8C1D18", "onErrorContainer" to "FFF9DEDC",
-            "border" to "FF8E9099", "borderVariant" to "FF44464E", "scrim" to "FF000000",
+            "primary" to "FF79D1FF", "onPrimary" to "FF003549",
+            "primaryContainer" to "FF004C68", "onPrimaryContainer" to "FFC3E8FF",
+            "inversePrimary" to "FF006689", "secondary" to "FFB5C9D7",
+            "onSecondary" to "FF20333D", "secondaryContainer" to "FF364955",
+            "onSecondaryContainer" to "FFD1E5F4", "tertiary" to "FFFF8E32",
+            "onTertiary" to "FF502400", "tertiaryContainer" to "FF723600",
+            "onTertiaryContainer" to "FFFFDCC6", "background" to "FF111416",
+            "onBackground" to "FFE1E2E5", "surface" to "FF111416",
+            "onSurface" to "FFE1E2E5", "surfaceVariant" to "FF41484D",
+            "onSurfaceVariant" to "FFC0C7CD", "surfaceTint" to "FF79D1FF",
+            "inverseSurface" to "FFE1E2E5", "inverseOnSurface" to "FF2E3133",
+            "error" to "FFFFB4AB", "onError" to "FF690005",
+            "errorContainer" to "FF93000A", "onErrorContainer" to "FFFFDAD6",
+            "border" to "FF8A9297", "borderVariant" to "FF41484D", "scrim" to "FF000000",
         )
     }
 }

@@ -70,7 +70,7 @@ fun TvRecoveryOverlay(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(if (opaque) Color.Black else Color.Black.copy(alpha = 0.86f))
+                .background(if (opaque) MaterialTheme.colorScheme.background else Color.Black.copy(alpha = 0.86f))
                 .padding(48.dp)
                 .focusGroup()
                 .semantics {
@@ -84,11 +84,11 @@ fun TvRecoveryOverlay(
             verticalArrangement = Arrangement.Center,
         ) {
             if (!primaryVisible) {
-                CircularProgressIndicator(color = Color.White)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
             }
             Text(
                 text = message,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
@@ -99,7 +99,7 @@ fun TvRecoveryOverlay(
             if (detail != null) {
                 Text(
                     text = detail,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
@@ -112,7 +112,7 @@ fun TvRecoveryOverlay(
             if (hint != null) {
                 Text(
                     text = hint,
-                    color = Color.White.copy(alpha = 0.72f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     modifier = Modifier

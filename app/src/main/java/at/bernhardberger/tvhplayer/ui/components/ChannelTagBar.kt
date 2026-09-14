@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -207,7 +209,7 @@ fun UnavailableTagNotice(
     Surface(
         modifier = modifier.fillMaxWidth(),
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = TvSurfaceColors.containerHigh,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {

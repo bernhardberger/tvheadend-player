@@ -47,7 +47,7 @@ internal fun PlaybackStatsOverlay(
             .testTag("playback-stats-overlay"),
         colors = SurfaceDefaults.colors(
             containerColor = Color.Black.copy(alpha = 0.86f),
-            contentColor = Color.White,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         shape = MaterialTheme.shapes.medium,
     ) {
@@ -274,7 +274,7 @@ private fun StatLine(label: String, value: String) {
     ) {
         Text(
             text = label,
-            color = Color.White.copy(alpha = 0.68f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.weight(0.38f),
             maxLines = 1,

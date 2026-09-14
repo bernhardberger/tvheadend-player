@@ -1286,13 +1286,13 @@ fun VideoPlayerScreen(
                 Text(
                     text = stringResource(currentSubscriptionFailure?.messageResource() ?: R.string.player_playback_failed),
                     style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (failureDetail.isNotEmpty()) {
                     Text(
                         text = failureDetail,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }

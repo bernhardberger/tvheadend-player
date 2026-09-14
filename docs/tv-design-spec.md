@@ -21,60 +21,81 @@ answer.
 
 ### 1.1 Scheme
 
-The product is dark-only; it exposes no light scheme. `primary` is the product's
-own cyan. Every Material for TV role is explicitly pinned so a dependency update
-cannot silently repaint inherited roles; `surfaceTint` is product cyan.
+The product is dark-only with a static, brand-derived scheme. Every Material for
+TV role is explicitly pinned so a dependency update cannot silently repaint
+inherited roles. UI primary is generated cyan T80; brand artwork retains its seed.
 
 | Role | Value | Notes |
 |---|---|---|
-| `primary` | `#00BCFA` | Product cyan. L\* 71.5, 8.7:1 on background |
-| `onPrimary` | `#00344B` | **Must be dark.** White on cyan is 2.19:1 and fails |
-| `primaryContainer` | `#003E55` | Cyan hue at the existing container tone/chroma relationship |
-| `onPrimaryContainer` | `#C3E8FF` | Cyan hue at the existing on-container tone/chroma relationship |
-| `secondary` | `#C4E8FE` | Lower-chroma cyan at the existing secondary tone |
-| `onSecondary` | `#0D3446` | Lower-chroma cyan at the existing on-secondary tone |
-| `secondaryContainer` | `#274B5D` | Lower-chroma cyan at the existing secondary-container tone |
-| `onSecondaryContainer` | `#C4E8FE` | Lower-chroma cyan at the existing on-container tone |
-| `background` | `#0F1014` | unchanged |
-| `surface` | `#17181D` | unchanged |
-| `onSurface` | `#E3E3E8` | unchanged |
-| `error` | `#F2B8B5` | unchanged; see 1.3 |
+| `primary` / `surfaceTint` | `#79D1FF` | Cyan T80 from brand seed `#00BCFA` |
+| `onPrimary` | `#003549` | Dark text/icons on primary |
+| `primaryContainer` | `#004C68` | Cyan T30 |
+| `onPrimaryContainer` | `#C3E8FF` | Cyan T90 |
+| `secondary` | `#B5C9D7` | Lower-chroma cyan T80 |
+| `onSecondary` | `#20333D` | Lower-chroma cyan T20 |
+| `secondaryContainer` | `#364955` | Lower-chroma cyan T30 |
+| `onSecondaryContainer` | `#D1E5F4` | Lower-chroma cyan T90 |
+| `background` / `surface` | `#111416` | Neutral T6 |
+| `onSurface` / `onBackground` | `#E1E2E5` | Neutral T90; focused button fill |
+| `inverseOnSurface` | `#2E3133` | Neutral T20; focused button content |
+| `surfaceVariant` / `borderVariant` | `#41484D` | Neutral variant T30 |
+| `onSurfaceVariant` | `#C0C7CD` | Neutral variant T80 |
+| `error` | `#FFB4AB` | Error T80; see 1.3 |
 
-`primaryContainer`, `secondary` and their `on*` pairs are re-derived from cyan in
-the same tonal relationship the blue scheme used. The parallel mobile scheme in
-`Theme.kt` mirrors the TV scheme and must be kept aligned; it exists only so the
-permitted mobile primitives inherit the right colours.
+`Theme.kt` uses Material Color Utilities 0.3.0 palettes and explicit role tones,
+matching the Penpot static dark theme sheet. Its mobile scheme mirrors the TV
+roles, plus the surface-container ladder, for permitted mobile primitives.
 
-### 1.2 One colour, one job
+`TvSurfaceColors` supplies the roles not exposed by TV Material: lowest `#0C0F10`,
+low `#191C1E`, container `#1D2022`, high `#282A2C`, highest `#323537`, bright
+`#37393B`. Browse/settings/guide panels use container; settings sub-navigation
+uses low; dialogs, notices and guide cells use high; selected guide channel
+headers use highest. Apply existing video opacity tiers separately. Native TV
+controls retain their role-based defaults; do not add elevation tint to explicitly
+chosen container tones.
 
-Every colour below has exactly one meaning. A colour that means two things means
-neither at ten feet.
+### 1.2 Cyan-led static theme and selective orange emphasis
+
+Accepted colour direction (2026-09-14): use one static, brand-derived dark
+Material scheme. Cyan leads the product; orange is the tertiary accent, available
+for selective emphasis rather than restricted to the seekbar. This supersedes
+the earlier orange-only-for-playback guidance. The app theme and the Penpot
+static dark theme sheet use the family below.
+
+The target tertiary family is `tertiary` T70 `#FF8E32`, `onTertiary` `#502400`,
+`tertiaryContainer` `#723600`, and `onTertiaryContainer` `#FFDCC6`. Preserve the
+exact brand orange `#FA7F00` in artwork; UI uses palette tone 70 rather than
+the pastel tone 80 (`#FFB786`).
+Playback-position tokens reference tertiary; supporting orange roles use their
+paired foregrounds. Validate contrast in the actual composition.
+Dark orange foreground/container roles remain available, but ordinary panels,
+cards and buttons use neutral surfaces. Do not give every available colour role
+equal visual prominence; use tertiary containers only for intentional tonal accents.
+
+Use neutral Material for TV focus defaults for ordinary buttons: `onSurface`
+container and `inverseOnSurface` content. Primary does not imply a cyan-filled
+focused button. A separate orange-primary player theme is not the selected
+direction. Keep generated tonal ramps as reference tokens; screen design uses
+semantic roles, including tone-based surface containers. Surface tone and
+video-overlay opacity are separate decisions.
 
 | Colour | Means | Appears on |
 |---|---|---|
-| `primary` cyan | structure and focus | focus indication, selection, active navigation, ambient progress |
-| **orange `#FA7F00`** | **playback position** | **the player seekbar, and nothing else** |
+| `primary` cyan | leading product accent | selected/active navigation, ambient progress, selective emphasis |
+| `tertiary` orange T70 `#FF8E32` | contrasting accent | playback position and selective secondary emphasis |
 | recording red | a recording exists or is running | REC badges and indicators |
 | `error` | a failure the user must act on | error text, failed-recording state |
 
-**Orange is reserved.** It is the most saturated colour in the palette and it
-appears in exactly one component. This mirrors how the product mark is built —
-cyan is the frame, orange is the play symbol — and it is why the seekbar reads as
-the most important thing on screen when the overlay is up.
-
-Consequences that follow, and are not negotiable once orange is reserved:
-
-- Ambient progress strips on cards and rows are **not** orange. They are not
-  seekbars (see 6.2). Making them orange would put orange beside a red REC mark
-  in the same tile, 29° apart in hue, which is the hardest discrimination at
-  viewing distance.
-- Orange never carries "live", "new", or any other state. State differences are
-  carried by shape and label, with colour as reinforcement only.
+Keep orange sparse enough that the interface remains cyan-led. Ambient progress
+strips on cards and rows remain cyan (see 6.2); allowing other tertiary uses is
+not a reason to recolour every active element. Check orange emphasis beside red
+REC indicators at viewing distance. State differences use shape and label, with
+colour as reinforcement rather than their only signal.
 
 ### 1.3 One recording red
 
 There are two warm roles: `TvRecordingColor` `#FF5449` for recording state and
-`error` `#F2B8B5` for actionable failures:
+`error` `#FFB4AB` for actionable failures:
 
 - **Recording** — `TvRecordingColor`, used by every REC badge, dot, scheduled
   label and "recording now" label.
@@ -110,8 +131,8 @@ control points are scoped visual curves, not additional reusable panel tiers.
 | `TvTrackAlpha` | **0.20** | progress and seekbar track |
 | `TvGhostFillAlpha` | 0.40 | ghost/rewindable regions |
 
-`TvTrackAlpha` drops from 0.24 to 0.20. Orange separates from the old track at
-only 3.46:1; cyan at 4.09:1. Both need the track darker.
+The track remains at 0.20 opacity so progress separates from its neutral backing.
+Contrast over video must be checked after compositing, not from token values alone.
 
 The collapsed navigation darkening scrim uses one continuous black curve across
 the closed drawer width plus a 32dp runout: `0%/0.78`, `25%/0.72`, `55%/0.55`,

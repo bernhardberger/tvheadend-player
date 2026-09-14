@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import androidx.compose.foundation.background
+
 import at.bernhardberger.tvhplayer.ui.components.BrowseTabRow
 import at.bernhardberger.tvhplayer.ui.components.browseTabColors
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -179,7 +182,7 @@ internal fun RecordingBrowserSurface(
     Surface(
         modifier = modifier,
         colors = SurfaceDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = TvPanelDenseAlpha),
+            containerColor = TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         shape = MaterialTheme.shapes.medium,
@@ -362,7 +365,7 @@ private fun FolderListRow(
             Icon(
                 painter = painterResource(R.drawable.ic_folder),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = androidx.tv.material3.LocalContentColor.current,
                 modifier = Modifier.size(32.dp),
             )
         },
@@ -989,7 +992,7 @@ private fun RecordingListRow(
                 } else metadata,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (problem) MaterialTheme.colorScheme.error else Color.Unspecified,
+                color = Color.Unspecified,
             )
         },
         leadingContent = {
@@ -1010,8 +1013,11 @@ private fun RecordingListRow(
                     Icon(
                         painter = painterResource(R.drawable.ic_warning),
                         contentDescription = stringResource(R.string.recordings_problem_indicator),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(22.dp).background(
+                            MaterialTheme.colorScheme.errorContainer,
+                            MaterialTheme.shapes.extraSmall,
+                        ),
                     )
                 }
                 PiconBox(

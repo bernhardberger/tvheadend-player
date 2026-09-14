@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -358,7 +360,7 @@ internal fun PlaybackOptionsOverlayFrame(
                     },
                 shape = androidx.compose.ui.graphics.RectangleShape,
                 colors = SurfaceDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(
+                    containerColor = TvSurfaceColors.containerHigh.copy(
                         alpha = TvPanelDenseAlpha
                     ),
                     contentColor = MaterialTheme.colorScheme.onSurface,
@@ -573,7 +575,7 @@ private fun TrackOptionsPage(
                         unavailableLabel
                     },
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = TvTextTertiaryAlpha),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = TvSpacing16, vertical = TvSpacing12)
@@ -715,7 +717,7 @@ private fun OptionsHeader(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = TvTextTertiaryAlpha),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
