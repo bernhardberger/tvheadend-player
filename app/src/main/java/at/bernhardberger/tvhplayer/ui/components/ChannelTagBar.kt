@@ -69,7 +69,6 @@ fun ChannelTagSelector(
     val activeIndex = scopes.indexOfFirst { it.first == activeTagId }.coerceAtLeast(0)
     val layoutDirection = LocalLayoutDirection.current
     val edgeFadeState = remember(scopes) { TabEdgeFadeState() }
-    val tabColors = browseTabColors()
     BrowseTabRow(
         selectedTabIndex = activeIndex,
         modifier = modifier
@@ -112,7 +111,6 @@ fun ChannelTagSelector(
                     onSelectTag(tagId)
                     onMoveToContent()
                 },
-                colors = tabColors,
                 modifier = Modifier
                     .onGloballyPositioned { coordinates ->
                         edgeFadeState.updateTabBounds(index, coordinates)

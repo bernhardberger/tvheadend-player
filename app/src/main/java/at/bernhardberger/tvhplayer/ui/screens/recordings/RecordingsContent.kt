@@ -4,7 +4,6 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import androidx.compose.foundation.background
 
 import at.bernhardberger.tvhplayer.ui.components.BrowseTabRow
-import at.bernhardberger.tvhplayer.ui.components.browseTabColors
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import kotlin.math.roundToInt
 
@@ -140,13 +139,11 @@ internal fun RecordingModeTabs(
                     onMoveToContent().let { true }
             },
     ) {
-        val tabColors = browseTabColors()
         DvrLibraryMode.entries.forEach { mode ->
             Tab(
                 selected = selected == mode,
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
-                colors = tabColors,
                 modifier = if (selected == mode) {
                     Modifier.focusRequester(selectedFocus)
                 } else {
