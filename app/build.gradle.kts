@@ -26,8 +26,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 69
-        versionName = "0.2.63"
+        versionCode = 70
+        versionName = "0.2.64"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
@@ -62,6 +62,7 @@ android {
         buildConfig = true
         compose = true
     }
+    testOptions.unitTests.isIncludeAndroidResources = true
     sourceSets.getByName("profile").kotlin.srcDir("src/release/java")
     sourceSets.getByName("profileServer").kotlin.srcDir("src/release/java")
     if (testBuildType == "profile") {
@@ -140,6 +141,9 @@ dependencies {
     implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.tvheadend.sdk.testing) {

@@ -5,6 +5,11 @@ fun shouldMountPersistentPlayerSurface(
     isPlayerRoute: Boolean,
 ): Boolean = hasActivePlayback || isPlayerRoute
 
+fun shouldShowWarmPlaybackScrim(
+    hasActivePlayback: Boolean,
+    isPlayerRoute: Boolean,
+): Boolean = hasActivePlayback && !isPlayerRoute
+
 fun shouldKeepPlaybackScreenOn(
     isForeground: Boolean,
     isVideoVisible: Boolean,

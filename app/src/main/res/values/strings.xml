@@ -1,13 +1,24 @@
 <resources>
+    <string name="edit_connection">Edit connection</string>
+    <string name="edit_connection_description">Server address, ports and credentials</string>
+    <string name="connection_overview_status">Status</string>
+    <string name="connection_overview_server">Server</string>
+    <string name="connection_overview_connected">Connected</string>
+    <string name="connection_overview_connecting">Connecting…</string>
+    <string name="connection_overview_synchronizing">Synchronizing…</string>
+    <string name="connection_overview_loading">Loading…</string>
+    <string name="connection_overview_not_configured">Not configured</string>
+    <string name="connection_overview_unavailable">Unavailable</string>
+    <string name="cache_notice_cleared">Cache cleared</string>
+    <string name="cache_notice_failed">Couldn’t clear cache. Try Clear cache again.</string>
+    <string name="settings_app_language">App language</string>
+    <string name="cache_usage">%1$s MB</string>
+    <string name="settings_unavailable">Settings unavailable</string>
     <string name="timeshift_seek_waiting">Seek requested. Waiting for playback position</string>
     <string name="connection_refreshing_channels">Refreshing channel information…</string>
     <string name="settings_storage">Storage</string>
     <string name="clear_cache">Clear cache</string>
-    <string name="cache_statistics">%1$s MB, %2$d images</string>
-    <string name="cache_clear_description">Removes cached listings and images; connection settings stay.</string>
     <string name="cache_clearing">Clearing cache…</string>
-    <string name="cache_cleared">Cache cleared. Listings and images refresh as needed.</string>
-    <string name="cache_clear_failed">Could not clear cache. Press OK to try again.</string>
     <string name="app_name" translatable="false">Tvheadend Player</string>
 
     <string name="channel_list">Channel List</string>
@@ -59,7 +70,7 @@
     <string name="show_epg_menu_enabled">Show Guide menu: On</string>
     <string name="show_epg_menu_disabled">Show Guide menu: Off</string>
     <string name="host">Host</string>
-    <string name="port_htsp">Htsp Port</string>
+    <string name="port_htsp">HTSP port</string>
     <string name="port_http">Http Port</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
@@ -457,6 +468,7 @@
     <string name="connection_loading_channels">Loading channels\u2026</string>
     <string name="no_channels_available">No channels are available.</string>
     <string name="retry">Retry</string>
+    <string name="settings_channel_groups_loading">Loading channel groups…</string>
     <string name="channel_settings_load_failed">Channel preferences could not be loaded.</string>
     <string name="channel_settings_save_failed">Your channel settings are active but could not be saved.</string>
     <string name="open_connection_settings">Open connection settings</string>

@@ -36,6 +36,9 @@ import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
+import at.bernhardberger.tvhplayer.ui.screens.settingsRootLevel
+import at.bernhardberger.tvhplayer.ui.screens.SETTINGS_ROOT
+import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
 import java.util.Locale
 import org.junit.Assert.assertEquals
@@ -96,11 +99,8 @@ class SettingsPlayerTest(private val language: String) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.size(960.dp, 540.dp)) {
                         SettingsScreenNavigation(
-                            currentSection = SettingsSection.PLAYER,
-                            onNavigate = { navigations += it },
-                        ) { _, requester ->
-                            SettingsPlayerContent(
-                                initialFocusRequester = requester,
+                            navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name),
+                            levels = listOf(settingsRootLevel(), settingsPlayerLevel(
                                 ui = ui,
                                 onTimeshiftEnabledChanged = { switchCalls++ },
                                 onRefreshRateMatchingEnabledChanged = { switchCalls++ },
@@ -108,8 +108,8 @@ class SettingsPlayerTest(private val language: String) {
                                     selections += it
                                     ui = ui.copy(selectedProfileId = it)
                                 },
-                            )
-                        }
+                            )),
+                        )
                     }
                 }
             }
@@ -117,8 +117,8 @@ class SettingsPlayerTest(private val language: String) {
 
         val categoryNode = composeRule.onNode(hasText(category) and hasClickAction())
         val heading = composeRule.onNode(hasText(player) and !hasClickAction())
-        val headingBounds = heading.fetchSemanticsNode().boundsInRoot
         categoryNode.assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        val headingBounds = heading.fetchSemanticsNode().boundsInRoot
         composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
         composeRule.onNodeWithText(profiles.last().name).assertIsNotDisplayed()
         press(Key.DirectionDown)

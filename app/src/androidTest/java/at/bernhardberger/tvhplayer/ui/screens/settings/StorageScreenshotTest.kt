@@ -35,6 +35,9 @@ import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
+import at.bernhardberger.tvhplayer.ui.screens.settingsRootLevel
+import at.bernhardberger.tvhplayer.ui.screens.SETTINGS_ROOT
+import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.viewmodels.CacheClearState
 import java.io.File
 import java.util.Locale
@@ -59,7 +62,7 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
         }
         val localizedContext = composeRule.activity.createConfigurationContext(configuration)
         val general = localizedContext.getString(R.string.settings_general)
-        val languageRow = localizedContext.getString(R.string.language_follow_system)
+        val languageRow = localizedContext.getString(R.string.settings_app_language)
         val clear = localizedContext.getString(R.string.clear_cache)
         var clearCalls = 0
         var shellBackCalls = 0
@@ -72,9 +75,9 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
                 TVHeadendPlayerTheme {
                     BackHandler { shellBackCalls++ }
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        SettingsScreenNavigation(currentSection = SettingsSection.GENERAL, onNavigate = {}) { _, requester ->
-                            SettingsGeneralContent(
-                                initialFocusRequester = requester,
+                        SettingsScreenNavigation(
+                            navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name),
+                            levels = listOf(settingsRootLevel()) + settingsGeneralLevels(
                                 settings = UiSettings(),
                                 selectedLanguage = AppLanguage.SYSTEM,
                                 onSelectLanguage = {},
@@ -82,8 +85,8 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
                                 statistics = if (state == CacheClearState.CLEARED) CacheStatistics.EMPTY else CacheStatistics(500_000, 12_000_000, 340),
                                 clearState = state,
                                 onClearCache = { clearCalls++ },
-                            )
-                        }
+                            ),
+                        )
                     }
                 }
             }
@@ -92,7 +95,7 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
             pressKey(Key.DirectionCenter)
         }
         composeRule.onNodeWithText(languageRow).assertIsFocused()
-        composeRule.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionDown) } }
+        composeRule.onRoot().performKeyInput { repeat(2) { pressKey(Key.DirectionDown) } }
         composeRule.onNodeWithText(clear).assertIsFocused().assertIsDisplayed()
         composeRule.onNodeWithText(clear).performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.runOnIdle { assertEquals(if (state == CacheClearState.CLEARING) 0 else 1, clearCalls) }
@@ -106,9 +109,9 @@ class StorageScreenshotTest(private val language: String, private val scale: Flo
         File(directory, "$language-$scale-${state.name.lowercase()}.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
-        composeRule.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionUp) } }
+        composeRule.onRoot().performKeyInput { repeat(2) { pressKey(Key.DirectionUp) } }
         composeRule.onNodeWithText(languageRow).assertIsFocused().assertIsDisplayed()
-        composeRule.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionDown) } }
+        composeRule.onRoot().performKeyInput { repeat(2) { pressKey(Key.DirectionDown) } }
         composeRule.onNodeWithText(clear).assertIsFocused().assertIsDisplayed()
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.onNode(hasText(general) and hasClickAction()).assertIsFocused()

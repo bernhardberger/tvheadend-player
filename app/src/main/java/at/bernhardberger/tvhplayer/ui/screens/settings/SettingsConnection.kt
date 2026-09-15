@@ -4,6 +4,8 @@ import android.view.Window
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthKeyCycle
+import android.view.KeyEvent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
@@ -97,6 +103,8 @@ internal fun SettingsConnection(
     initialFocusRequester: FocusRequester,
     settingsStore: ConnectionProfileEditor = koinInject<AppProfileOwner>(),
     form: ConnectionFormState = rememberConnectionFormState(),
+    onNavigateLeft: (KeyEvent) -> Boolean = { false },
+    onSaved: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val activity = LocalActivity.current
@@ -108,6 +116,7 @@ internal fun SettingsConnection(
     }
 
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
+    val keyCycles = remember { DepthKeyCycle() }
 
     LaunchedEffect(settingsStore, form) {
         form.loadFrom(settingsStore)
@@ -117,10 +126,33 @@ internal fun SettingsConnection(
         onDispose(form::clearCredentials)
     }
 
-    SettingsPane(title = stringResource(R.string.settings_server)) {
+    SettingsPane(title = stringResource(R.string.settings_server), modifier = Modifier.onPreviewKeyEvent { event ->
+        val native = event.nativeKeyEvent
+        if (native.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && editingId == null) {
+            return@onPreviewKeyEvent onNavigateLeft(native)
+        }
+        if (native.keyCode != KeyEvent.KEYCODE_BACK) {
+            return@onPreviewKeyEvent false
+        }
+        keyCycles.handle(native.keyCode, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
+            when {
+                native.keyCode == KeyEvent.KEYCODE_BACK && editingId != null -> { editingId = null; true }
+                else -> false
+            }
+        }
+    }.onKeyEvent { event ->
+        // Text input gets cursor movement first; an unhandled Left at its edge still
+        // belongs to the editor. Otherwise the persistent host searches local controls
+        // and owns the complete exit cycle across this pane's disposal.
+        editingId != null && event.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+    }) {
+        // Preserve the existing form layout while keeping Save reachable on short or
+        // enlarged-text viewports. Only the editor body scrolls, not its heading.
         Column(
             modifier = Modifier
                 .width(560.dp)
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
                 .focusGroup()
         ) {
 
@@ -173,36 +205,37 @@ internal fun SettingsConnection(
             )
 
             Spacer(Modifier.height(12.dp))
-        }
 
-        if (form.feedback == ConnectionFormFeedback.SAVE_FAILED) {
-            Text(
-                text = stringResource(R.string.credential_save_failed),
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                enabled = form.canSubmit,
-                onClick = {
-                    scope.launch {
-                        form.submit(settingsStore) {
-                            ConnectionSecureWindow.acquire(window)
-                        }
-                    }
-                },
-            ) {
-                Text(stringResource(R.string.save))
+            if (form.feedback == ConnectionFormFeedback.SAVE_FAILED) {
+                Text(
+                    text = stringResource(R.string.credential_save_failed),
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    enabled = form.canSubmit,
+                    onClick = {
+                        scope.launch {
+                            val result = form.submit(settingsStore) {
+                                ConnectionSecureWindow.acquire(window)
+                            }
+                            if (result == ConnectionFormFeedback.SAVED) onSaved()
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.save))
+                }
 
-            OutlinedButton(
-                onClick = {
-                    scope.launch {
-                        form.clearSavedPassword(settingsStore)
-                    }
-                },
-            ) {
-                Text(stringResource(R.string.clear_saved_password))
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            form.clearSavedPassword(settingsStore)
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.clear_saved_password))
+                }
             }
         }
     }

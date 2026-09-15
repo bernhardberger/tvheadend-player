@@ -54,8 +54,10 @@ Channels and Guide enter through their active scope tab; content Back returns to
 that tab before the global drawer. Already-attached Guide neighbours receive
 native focus in the key dispatch, while new windows retain the viewport bridge.
 `SidebarGuideScene.kt` owns vertical slide-and-fade transitions between Channels,
-Guide, Recordings and Settings; Settings categories retain their distinct
-navigation/saveable-state keys and inner crossfade. `BrowseContentMotion.kt`
+Guide, Recordings and Settings. Settings owns a saveable arbitrary-depth stack in
+`ui/components/depth/DepthNavigation.kt` / `DepthStack.kt`; its product levels live
+in `ui/screens/settings/`, including the dedicated Connection-editor exception.
+`BrowseContentMotion.kt`
 supplies horizontal outgoing/incoming motion below Channels, Guide and Recordings
 tabs. Its direction history and retained render values are presentation-only:
 existing scope/mode owners synchronously publish the accepted or fallback key;

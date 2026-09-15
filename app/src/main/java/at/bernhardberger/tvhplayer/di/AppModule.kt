@@ -41,6 +41,15 @@ val appModule = module {
     single { PlayerSettingsStore(androidContext()) }
     single { ChannelTagSettingsStore(androidContext()) }
     single { UiSettingsStore(androidContext()) }
+    single {
+        val owner = get<AppProfileOwner>()
+        val session = get<SdkRuntimeOwner>().session
+        at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue(android.os.SystemClock::elapsedRealtime) {
+            at.bernhardberger.tvhplayer.ui.notifications.AppNoticeContext(
+                owner.configurationGeneration.value, session.observation.value.currentSession,
+            )
+        }
+    }
 
     single {
         val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -109,7 +118,7 @@ val appModule = module {
     }
     viewModel { VideoPlayerViewModel(playbackRuntime = get(), session = get()) }
     viewModel { ChannelsViewModel(session = get(), tagSettings = get()) }
-    viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache) }
+    viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache, get()) }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),

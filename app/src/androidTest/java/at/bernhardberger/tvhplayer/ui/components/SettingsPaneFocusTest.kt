@@ -1,171 +1,70 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isSelected
+import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.unit.dp
-import androidx.tv.material3.ListItem
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.SettingsSection
+import at.bernhardberger.tvhplayer.ui.components.depth.*
+import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsRow
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
-import org.junit.Assert.assertEquals
 
-@OptIn(ExperimentalTestApi::class)
+/** Device checks for the C active pane, preserving the existing acceptance entry point. */
 class SettingsPaneFocusTest {
-    @get:Rule
-    val composeTestRule = createComposeRule()
+    @get:Rule val compose = createComposeRule()
 
-    @Test
-    fun okFromPlayerCategoryEntersFirstSettingBeforeNestedProfileGroup() {
-        composeTestRule.setContent {
-            val contentFocus = remember { FocusRequester() }
-            val contentFocusRequesters = remember {
-                SettingsSection.entries.associateWith { route ->
-                    if (route == SettingsSection.PLAYER) contentFocus else FocusRequester()
-                }
-            }
-            val categoryFocusRequesters = remember {
-                contentFocusRequesters.keys.associateWith { FocusRequester() }
-            }
+    @Test fun fourNestedLevelsRestoreParentFocusAndViewport() {
+        lateinit var state: DepthNavigationState
+        compose.setContent {
             TVHeadendPlayerTheme {
-                Row(Modifier.fillMaxSize()) {
-                    SettingsSubRail(
-                        currentRoute = SettingsSection.PLAYER,
-                        categoryFocusRequesters = categoryFocusRequesters,
-                        contentFocusRequesters = contentFocusRequesters,
-                        onNavigate = {},
-                    )
-                    Spacer(Modifier.width(32.dp))
-                    SettingsPane(title = "Player") {
-                        SettingsSwitchRow(
-                            label = "Timeshift",
-                            checked = false,
-                            onClick = {},
-                            modifier = Modifier.focusRequester(contentFocus),
-                        )
-                        SettingsSwitchRow(
-                            label = "Match content frame rate",
-                            checked = true,
-                            onClick = {},
-                        )
-                        Column {
-                            ListItem(
-                                selected = false,
-                                onClick = {},
-                                headlineContent = { Text("Direct streaming") },
-                            )
-                            ListItem(
-                                selected = false,
-                                onClick = {},
-                                headlineContent = { Text("Pass") },
-                            )
-                        }
-                    }
-                }
+                state = rememberDepthNavigationState("level-0")
+                SettingsScreenNavigation(state, (0..3).map { depth ->
+                    settingsLevel("level-$depth", "Level $depth", (0..19).map { index ->
+                        settingsRow("row-$index", "$depth item $index", child = if (depth < 3) "level-${depth + 1}" else null)
+                    })
+                })
             }
         }
-
-        val playerCategory = composeTestRule.onNode(
-            hasText("Player") and hasClickAction() and isSelected(),
-        )
-        playerCategory.assertIsFocused()
-        val contentLeftWithCategoryFocus = composeTestRule.onNodeWithText("Timeshift")
-            .fetchSemanticsNode().boundsInRoot.left
-        playerCategory.performKeyInput {
-            pressKey(Key.DirectionCenter)
+        val parents = mutableListOf<DepthFrame>()
+        repeat(3) { depth ->
+            repeat(12) { key(Key.DirectionDown) }
+            compose.onNodeWithText("$depth item 12").assertIsFocused()
+            compose.runOnIdle { parents += state.stack.active }
+            key(Key.DirectionRight)
         }
-        composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
-        composeTestRule.onNodeWithText("General").assertIsDisplayed()
-        val contentLeftWithContentFocus = composeTestRule.onNodeWithText("Timeshift")
-            .fetchSemanticsNode().boundsInRoot.left
-        assertEquals(contentLeftWithCategoryFocus, contentLeftWithContentFocus, 0.5f)
-        composeTestRule.onNodeWithText("Timeshift").performKeyInput {
-            pressKey(Key.DirectionDown)
+        assertEquals(4, state.stack.frames.size)
+        parents.asReversed().forEachIndexed { index, parent ->
+            key(Key.Back)
+            compose.onNodeWithText("${2 - index} item 12").assertIsFocused()
+            compose.runOnIdle { assertEquals(parent, state.stack.active) }
         }
-        composeTestRule.onNodeWithText("Match content frame rate").assertIsFocused()
-        composeTestRule.onNodeWithText("Match content frame rate").performKeyInput {
-            pressKey(Key.DirectionDown)
-        }
-        composeTestRule.onNodeWithText("Direct streaming").assertIsFocused()
-        composeTestRule.onNodeWithText("Direct streaming").performKeyInput {
-            pressKey(Key.DirectionUp)
-        }
-        composeTestRule.onNodeWithText("Match content frame rate").assertIsFocused()
-        composeTestRule.onNodeWithText("Match content frame rate").performKeyInput {
-            pressKey(Key.DirectionUp)
-        }
-        composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
-        composeTestRule.onNodeWithText("Timeshift").performKeyInput {
-            pressKey(Key.DirectionLeft)
-        }
-        playerCategory.assertIsFocused()
-        playerCategory.performKeyInput {
-            pressKey(Key.DirectionRight)
-        }
-        composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
     }
 
-    @Test
-    fun changingSelectedCategoryDoesNotStealDetailFocus() {
-        var currentRoute by mutableStateOf(SettingsSection.PLAYER)
-        composeTestRule.setContent {
-            val contentFocus = remember { FocusRequester() }
-            val routes = remember { SettingsSection.entries }
-            val categoryFocusRequesters = remember {
-                routes.associateWith { FocusRequester() }
-            }
-            val contentFocusRequesters = remember {
-                routes.associateWith { route ->
-                    if (route == SettingsSection.PLAYER) contentFocus else FocusRequester()
-                }
-            }
+    @Test fun previewIsInertAndRightOnLeafDoesNotCommit() {
+        var actions = 0
+        compose.setContent {
             TVHeadendPlayerTheme {
-                Row(Modifier.fillMaxSize()) {
-                    SettingsSubRail(
-                        currentRoute = currentRoute,
-                        categoryFocusRequesters = categoryFocusRequesters,
-                        contentFocusRequesters = contentFocusRequesters,
-                        onNavigate = {},
-                    )
-                    SettingsSwitchRow(
-                        label = "Timeshift",
-                        checked = false,
-                        onClick = {},
-                        modifier = Modifier.focusRequester(contentFocus),
-                    )
-                }
+                SettingsScreenNavigation(rememberDepthNavigationState("root"), listOf(
+                    settingsLevel("root", "Settings", listOf(
+                        settingsRow("submenu", "Submenu", child = "child"),
+                        settingsRow("leaf", "Leaf", onClick = { actions++ }),
+                    )),
+                    settingsLevel("child", "Child", listOf(settingsRow("danger", "Preview action", onClick = { actions++ }))),
+                ))
             }
         }
-
-        composeTestRule.onNode(
-            hasText("Player") and hasClickAction() and isSelected(),
-        ).performKeyInput {
-            pressKey(Key.DirectionCenter)
-        }
-        composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
-        composeTestRule.runOnIdle { currentRoute = SettingsSection.APPLIANCE }
-        composeTestRule.onNodeWithText("Timeshift").assertIsFocused()
+        compose.onNodeWithText("Preview action").assertDoesNotExist()
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Leaf").assertIsFocused()
+        assertEquals(0, actions)
+        key(Key.DirectionCenter)
+        assertEquals(1, actions)
     }
+
+    private fun key(key: Key) = compose.onRoot().performKeyInput { pressKey(key) }
 }

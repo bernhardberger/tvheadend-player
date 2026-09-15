@@ -5,6 +5,8 @@ import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvheadend.sdk.core.SessionCache
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.cacheSizeMegabytes
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
 import java.io.IOException
 import java.util.Locale
 import kotlinx.coroutines.CompletableDeferred
@@ -34,7 +36,8 @@ class SettingsStorageViewModelTest {
                     sdkCache.clear()
                 }
             }
-            val model = SettingsStorageViewModel(cache)
+            val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
+            val model = SettingsStorageViewModel(cache, notices)
             val store = ViewModelStore().apply { put("storage", model) }
             model.clearCache()
             runCurrent()
@@ -42,6 +45,7 @@ class SettingsStorageViewModelTest {
             release.complete(Unit)
             runCurrent()
             assertEquals(CacheStatistics.EMPTY, sdkCache.statistics.value)
+            assertEquals(AppNoticeKind.SUCCESS, notices.state.value.pending.single().kind)
         } finally {
             Dispatchers.resetMain()
         }
@@ -61,13 +65,15 @@ class SettingsStorageViewModelTest {
         try {
             val cache = FakeTvheadendSession().cache
             cache.scriptStatistics(CacheStatistics(500_000, 12_000_000, 340))
-            val model = SettingsStorageViewModel(cache)
+            val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
+            val model = SettingsStorageViewModel(cache, notices)
             assertEquals(340, model.statistics.value.artworkEntryCount)
             model.clearCache()
             assertEquals(CacheClearState.CLEARING, model.clearState.value)
             runCurrent()
             assertEquals(CacheStatistics.EMPTY, model.statistics.value)
             assertEquals(CacheClearState.CLEARED, model.clearState.value)
+            assertEquals(1, notices.state.value.pending.size)
             advanceTimeBy(4_000)
             runCurrent()
             assertEquals(CacheClearState.IDLE, model.clearState.value)
@@ -93,7 +99,8 @@ class SettingsStorageViewModelTest {
                     sdkCache.clear()
                 }
             }
-            val model = SettingsStorageViewModel(cache)
+            val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
+            val model = SettingsStorageViewModel(cache, notices)
             model.clearCache()
             runCurrent()
             model.clearCache()
@@ -101,6 +108,11 @@ class SettingsStorageViewModelTest {
             release.complete(Unit)
             runCurrent()
             assertEquals(CacheClearState.FAILED, model.clearState.value)
+            assertEquals(AppNoticeKind.FAILURE, notices.state.value.pending.single().kind)
+            advanceTimeBy(31_000)
+            notices.prune()
+            assertEquals(CacheClearState.FAILED, model.clearState.value)
+            assertEquals(0, notices.state.value.pending.size)
             model.clearCache()
             runCurrent()
             assertEquals(2, calls)

@@ -1,12 +1,19 @@
-Material Symbols Rounded icon assets
-====================================
+Material Symbols icon assets
+===========================
 
 The vector drawables under `app/src/main/res/drawable/ic_*.xml` (excluding
 the product's `ic_launcher_monochrome.xml`) are derived from
-Google's Material Symbols Rounded icon set.
+Google's Material Symbols icon set, primarily Rounded with the Outlined
+exception specified below.
 
 Source repository: https://github.com/google/material-design-icons
 Source revision: 40a7a292a79d9394157e1ea24f83d52d5e17c556
+The additional `ic_settings_accessibility.xml` uses Material Symbols Outlined,
+FILL0, weight400, grade0, optical size24 from this same revision:
+  symbols/android/settings_accessibility/materialsymbolsoutlined/settings_accessibility_24px.xml
+`ic_edit.xml` uses the Rounded unfilled export at the same revision. Both retain
+24dp dimensions and theme-controlled tint; no vector-level tint is retained.
+
 Source paths:
   symbols/android/{symbol}/materialsymbolsrounded/{symbol}_fill1_24px.xml (filled)
   symbols/android/{symbol}/materialsymbolsrounded/{symbol}_24px.xml (unfilled)

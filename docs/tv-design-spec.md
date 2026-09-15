@@ -50,7 +50,10 @@ roles, plus the surface-container ladder, for permitted mobile primitives.
 low `#191C1E`, container `#1D2022`, high `#282A2C`, highest `#323537`, bright
 `#37393B`. Browse/settings/guide panels use container; settings sub-navigation
 uses low; dialogs, notices and guide cells use high; selected guide channel
-headers use highest. Apply existing video opacity tiers separately. Native TV
+headers use highest. Settings C uses transparent lists over either the stationary
+warm-playback scrim specified in 5.2 or the normal themed app background; its
+dedicated Connection editor retains its existing surface. Apply existing video
+opacity tiers separately. Native TV
 controls retain their role-based defaults; do not add elevation tint to explicitly
 chosen container tones.
 
@@ -126,7 +129,7 @@ control points are scoped visual curves, not additional reusable panel tiers.
 | `TvTextDisabledAlpha` | 0.38 | disabled |
 | `TvPanelBrowseAlpha` | 0.84 | browse panels over video |
 | `TvPanelDenseAlpha` | 0.92 | guide and settings — denser content, more opaque |
-| `TvScrimNavigationAlpha` | 0.50 | rail scrim over video |
+| `WarmPlaybackScrimAlpha` | 0.76 | global scrim over warm playback behind ordinary destinations |
 | `TvScrimModalAlpha` | 0.76 | dialogs and confirmations |
 | `TvTrackAlpha` | **0.20** | progress and seekbar track |
 | `TvGhostFillAlpha` | 0.40 | ghost/rewindable regions |
@@ -256,9 +259,10 @@ grid returns to its active scope tab. With no scope tabs, Channels enters its li
 and Guide uses its header. Back from a scope row activates the global drawer on
 the current destination. Other browse content activates that drawer directly. From
 a non-root drawer destination, the next Back focuses Channels; Back from
-Channels then delegates to the existing warm-player or activity-exit policy. Settings adds one
-local layer: content returns to the current category before category focus
-returns to the global drawer on Settings. Focus-previewed drawer destinations do
+Channels then delegates to the existing warm-player or activity-exit policy. Settings
+adds an arbitrary-depth local stack: each Back/Left returns one level and restores
+the invoking item and exact parent viewport. At its root, focus returns to the
+global drawer on Settings. Focus-previewed drawer destinations do
 not form a Back stack, but their saved screen and focus state is restored when
 the viewer returns. Remote key dispatch consumes the complete Back key cycle at
 the nearest focused layer; dispatcher-backed handling remains available for
@@ -327,8 +331,8 @@ Screen controllers and command authority stay outside the transition. Direction
 follows displayed tab order, including RTL; rapid changes interrupt motion and
 settle on the latest destination without reactivating an old visit. Metadata
 refresh, same-tab focus and empty-to-populated updates do not replay entry.
-Initial/restored content and external fallback destinations start settled. Nested
-Settings categories retain their separate 150ms crossfade.
+Initial/restored content and external fallback destinations start settled. Settings
+depth transitions have their own owner and parameters in 5.2.
 
 **Shared implementation contract:** Page-motion parameters and transforms belong
 to `ui/BrowseMotionPolicy.kt`. Main destinations use the single
@@ -336,7 +340,7 @@ to `ui/BrowseMotionPolicy.kt`. Main destinations use the single
 `BrowseTabContent` with `rememberBrowseContentMotion`. Screens supply their order,
 accepted selection and presentation values, not their own page springs or fades.
 `BrowseTabRow` animates only the selector and is not a substitute for the body host.
-The Settings category crossfade above is an explicit separate transition scope.
+Settings depth navigation is an explicit separate transition scope.
 
 When adding or changing a destination or section:
 
@@ -361,7 +365,7 @@ These are the standard integration APIs and review/test requirements, not a
 compiler-enforced prohibition on using lower-level Compose animation APIs.
 
 The logical route and visible target update immediately; the existing focus owner
-remains governed by section 4.2, so an open drawer or Settings rail keeps focus
+remains governed by section 4.2, so an open drawer or active Settings level keeps focus
 until the viewer enters content. Motion must not debounce navigation, wait for
 data preparation, or defer Down/OK until completion. Do not use Navigation
 Compose's generic 700ms default. The persistent player surface is owned below
@@ -372,24 +376,125 @@ drawer selection and Back policy follow that latest focus intent. If root focus
 is already requested but route feedback has not converged, Back is consumed
 rather than escaping to player or app-exit policy.
 
-Settings is intentionally exempt. Its fixed category rail and detail pane are a
-local master-detail hierarchy whose outer panels begin at the shell's top inset;
-do not add a redundant top-level Settings header above them.
+Settings is exempt from the browse title/tab rhythm. Its active level has its own
+heading, replaced together with that level, without a duplicate page header.
 
-### 5.2 General storage
+### 5.2 Settings Variant C
 
-General places Storage after Navigation, with one TV Material "Clear cache"
-action. Support copy shows combined metadata/artwork usage in decimal MB and
-the artwork count, without paths or server identity. Clearing does not change
-connection settings, active playback or the in-memory catalog. Current metadata
-may be written again immediately; images refresh on demand.
+Accepted design authority: Penpot Settings page `411cd6b7-a446-8042-8008-a3866b9562cf`
+in app file `8aa8c9a5-d7b1-8076-8008-a1e6cc530f69`, contract board
+`622ff396-eb20-80fd-8008-a3b20fa5b114`, plugin data `variant-c-contract-v1`.
+Root/General, General/language and language-choice boards respectively:
+`622ff396-eb20-80fd-8008-a3ac05f58e99`,
+`622ff396-eb20-80fd-8008-a3acb318666a`,
+`622ff396-eb20-80fd-8008-a3acb4033b66`.
+Host: `https://penpot.int.leoville.at`. The connected product-owned
+`tvheadend-player-design-kit` supplies semantic roles and typography. Broadcast
+art in the study is reference imagery, not a production asset.
 
-General retains first entry on Follow system. Down reaches Storage after the
-language choices and Guide-menu switch; the action remains focusable while
-clearing and ignores repeated activation until completion. Completion is an
-in-row transient confirmation; failure stays actionable for retry. Back returns
-to the General category, then to the existing shell owner. Enlarged English and
-German text wraps inside the scrolling pane rather than truncating the action.
+- One active column and an inert, subdued child preview; the reusable depth owner
+  supports any number of levels with stable level/item identities. Settings owns
+  its content, actions and permission/session guards. Recordings are only a future
+  possible consumer, not part of this implementation.
+- Use standard unscaled TV Material list rows, meaningful root-category icons,
+  concise titles and section headings. Deeper icons need a meaningful purpose.
+  Supporting text gives current values/status, not prose inventories. Use
+  `headlineMedium` (Roboto Regular 28), `titleMedium` (Medium 16) and `bodyMedium`
+  (Regular 14). Focus uses `inverseSurface` / `inverseOnSurface`; no 16.8sp kit
+  typography or focused row scaling.
+- Reference geometry on 960×540: active x164, width352; preview x588, a 424 step
+  and 72 gap. Implement these as logical layout dimensions through the shell's
+  inset, never device pixels. Keep the active slot/width at every depth. Preview
+  may overflow the active container to the screen edge.
+- Entering replaces the active level and takes its parent wholly offscreen.
+  Warm playback and its single full-viewport black scrim (alpha .76) stay
+  stationary behind Settings. The shell draws this scrim only when active playback
+  is mounted behind an ordinary non-player destination; without warm playback,
+  Settings uses the normal themed app background and no full-screen video scrim.
+  Player routes do not use this layer. Preview alpha is .8. The existing global
+  push drawer is independent and retains
+  its current widths and optical scrim; expanding it does not resize columns.
+- Up/Down changes focus and previews children. Right/OK enters a submenu;
+  Right on a leaf does not commit. OK activates a leaf or switch. Focus alone
+  never changes settings or starts playback. Left/Back pops one local level,
+  restoring the exact parent item and viewport; missing items choose a stable
+  nearest remaining row, empty/error/loading states retain local recovery.
+  Consume complete relocation key cycles, including repeats and release. Stale
+  outgoing/preview visits cannot act, steal focus or publish viewport state.
+- General starts on App language. Language is a third-level radio-choice list;
+  OK applies the locale and returns to App language with the updated value.
+  Save the parent stack before locale recreation. Switches act in place.
+- General places Storage after Navigation. Clear cache is one row action with
+  a trailing trash icon, decimal-MB supporting text (such as `0.0 MB`),
+  and no independently focusable icon button. It remains focusable while clearing,
+   ignores repeated activation until completion, and uses the global passive
+   snackbar for completion/error results. Retain existing storage/session guards. Clearing
+  does not change connection settings, active playback or the in-memory catalog.
+   Support is usage only in every state. A guarded in-progress indicator replaces
+   the trailing icon while clearing; row geometry stays stable. Completion/error
+   feedback and its accessible announcement are separate from the row. Notification
+   expiry never clears the domain failure state or removes the Clear cache retry action.
+- Appliance's full accessibility disclosure stays on the page in a separate
+  reading region below the concise service-status/action row, not inside its
+  focused container. Down enters that region; Up/Down scroll long text and Up at
+  its start returns to the action. Use the existing Info reading treatment with
+  a focus outline and scroll-edge fades. All disclosure text remains available
+  to accessibility. The action still opens system settings directly; no new
+  disclosure dialog or confirmation step is introduced.
+- Connection enters a normal second-level overview: Status (current state),
+  Server (host only), HTSP port, then Edit connection. Only Edit is interactive
+  and receives initial/restored focus. It has a trailing Material edit/pencil
+  icon, not a chevron: OK opens the dedicated secure editor; Right does not.
+  The root preview shows the same safe overview inertly, never editor state.
+  Username was explicitly removed: SDK 0.15.0 has no safe username accessor.
+  Do not decrypt/read editor credentials for the overview, add authentication
+  summaries, diagnostics or connection commands. Captures use artificial values.
+  Reference board `622ff396-eb20-80fd-8008-a4331e718ea3` contains an earlier
+  Username row; the later operator removal supersedes that part of the sketch.
+  Reuse the existing editor presentation and preserve draft/validation, explicit Save,
+  clear-saved-password, unsaved-edit, keyboard and Back behavior. The existing
+  form body scrolls when necessary to keep its actions reachable; its heading
+  stays fixed. Left first traverses the editor's own controls, then pops at its
+  boundary using the surviving depth owner's complete key-cycle guard. Successful
+  Save and cancel/Back return to the overview's Edit action and viewport; failed
+  Save remains in the editor. Back from the overview restores root Connection.
+  The dedicated editor has an independently supplied sanitized outgoing label,
+  with no credentials or editor-state collection. On exit, replace the
+  live editor with that sanitized presentation immediately. Dedicated editor
+  styling/placement is pending design; “wizard” does not authorize a new Activity
+  or multistep state machine.
+
+Single-line Settings rows use a 48dp minimum when supporting content is absent;
+the native leading-icon and two-line minimums remain authoritative. In TV Material
+1.1.0 `ListItem.kt`, `BaseListItem` centers headline/trailing content in its internal
+minimum-height Row. The former app-only 56dp switch minimum enlarged the Surface
+without that Row: measured label/switch centers24.5/24dp versus surface center28dp.
+The unmodified default centers24.5/24dp in48dp, as does the corrected app row.
+No compensating Text/Switch offset or component fork is used. Regression evidence
+compares the installed default, explicit56dp and production row, retaining a real
+two-line case. Source: Google's Maven `androidx.tv:tv-material:1.1.0:sources`,
+`androidx/tv/material3/ListItem.kt` and `Switch.kt`.
+
+Implementation choices, not design-approved motion measurements: 220ms
+FastOutSlowIn non-overshooting horizontal transitions, immediate logical target
+publication and focus handoff once the target row is attached. Interrupted input
+retargets the current visit without waiting for animation completion. The operator
+waived the Penpot interactive prototype and separate design-stage motion validation
+after the contract was written. Those are not implementation blockers. Runtime
+regressions, screenshot-first review and honest physical-TV gates remain required;
+static captures do not accept motion, remote feel or readability over real video.
+Compare locales using matched content, focus, viewport, backdrop and font scale:
+English/German at 1.0, with separately labelled matched 1.3 stress evidence.
+Penpot comparisons show the actual source export alongside the actual Compose
+capture and name remaining differences. The abstract debug backdrop is geometry
+evidence, not equivalent broadcast-backed visual evidence. Approved comparison
+stills remain test-only local assets, never production resources. Reviewer
+readiness is not operator acceptance.
+
+AOSP TvSettings `TwoPanelSettingsLib/TwoPanelSettingsFragment.java` and
+`TwoPanelListPreferenceDialogFragment.java` are navigation inspiration, not a
+claim of equivalence to all Google TV versions. Its dedicated Wi-Fi connection
+activity is precedent for a leaf editor, not an architecture requirement here.
 
 ---
 
@@ -627,10 +732,12 @@ in the footer. It has no thumb, focus, or seek actions and is not a playback-pos
 estimate. Missing or out-of-date EPG omits the strip rather than inventing progress.
 The header does not add a temporary timeband while tuning or waiting for history.
 
-Settings and Programme/Recording Info use one full-height, edge-attached right
-panel with a deliberate video scrim and no competing chrome/focus. Settings has
+The player's in-playback Settings overlay and Programme/Recording Info use one
+full-height, edge-attached right panel with a deliberate video scrim and no
+competing chrome/focus. This compact playback Settings overlay has
 at most a category root and one choices/details level, using TV Material list
 rows with current values, explicit selection and unavailable/loading states.
+It is separate from the full Settings destination governed by Variant C in 5.2.
 Info retains existing recording actions and confirmations, not Settings
 diagnostics. Back returns through panel levels and restores the invoking action.
 Programme-backed Info and Recording Info initially focus a scrollable reading
@@ -715,10 +822,8 @@ Use the component and hierarchy appropriate to the scope.
 - An unfocused tab leaving the leading edge may pass through a coordinated
   foreground veil, but the focused/selected pill and its indication must always
   be fully visible beyond that veil.
-- Settings categories are local master-detail navigation, not a second app
-  drawer. Keep one fixed-width, focus-restoring, vertically scrollable column of
-  TV Material `ListItem`s beside the detail pane. Its width must not change when
-  focus crosses between categories and content.
+- Settings uses the recursive C hierarchy in 5.2, not a second app drawer or a
+  permanently visible parent category rail.
 
 Channel and Guide scope tabs commit on focus. Rapid Left/Right changes accept the
 latest destination without waiting for an earlier scope to finish preparing.
@@ -738,8 +843,7 @@ While Guide is still resolving a changed scope,
 the same key is consumed and focus stays on the scope rather than moving backward
 to the header. Guide Up returns to the last-focused date/Now header control, and
 empty/error entry falls back deterministically to Retry or that header. Settings
-category focus previews/commits the category, while Right or OK enters its
-first/last-restored control.
+focus previews a child without committing or entering it; Right/OK enters.
 
 ### 6.5 Navigation drawer
 
@@ -762,7 +866,7 @@ viewport position while preserving its closed width; the trailing edge clips
 rather than remeasuring each destination narrower. The shell passes the safe
 content inset and keeps navigation and content as adjacent planes. Settings
 remains in this global shell, so entering its content collapses the drawer to the
-icon rail instead of removing it. Its local category pane remains fixed and must
+icon rail instead of removing it. Its depth-column width remains fixed and must
 not introduce another collapsing drawer.
 
 The adjacent-plane model does not permit a bare hard seam. The shell overlays a
@@ -784,6 +888,56 @@ asset instead. Icons carry no vector-level `android:tint`, so the caller's
 for RTL keep `android:autoMirrored="true"`. Source revision, export choices and
 modifications are recorded in `artwork/material-symbols-LICENSE.txt` and
 `NOTICE.md`.
+
+The explicit exception is Open accessibility settings: Material Symbols Outlined
+`settings_accessibility`, FILL0, weight400, grade0, optical size24, rendered at24dp
+with the current Material tint. Its source revision is recorded with the other
+vectors. Do not substitute a generic person or settings icon.
+
+---
+
+### 6.7 Global passive snackbar
+
+One app-shell host renders above ordinary destination navigation, including
+playback. Cache clearing is its first producer; recording-started/completed and
+scheduled-recording integrations remain future scope. Producers retain operation
+and result authority. Emit from the accepted operation's outcome, never by
+collecting a restored UI result state. Navigation does not invalidate notices.
+Connection/account replacement and SDK session replacement invalidate old context.
+
+Use the product kit's plain Snackbar reference in file
+`8aa8c9a5-d7b1-8076-8008-a23201c2b02c`, board
+`fb586898-078b-5bc5-b73a-1a3ac624c854`: component
+`d168f29c-8fe0-569d-b4d0-1a7fd6185e9c`, main-instance shape
+`bbde9ddc-d8bb-596c-8e20-52626464d01f`. The installed TV Material 1.1.0 has
+no Snackbar API; compose its non-interactive `Surface` and `Text` primitives.
+Use `inverseSurface` / `inverseOnSurface`, 12dp corners, `labelLarge` (Roboto
+14 Medium), and 16dp horizontal / 12dp vertical internal padding. The plain
+variant has a 44dp minimum height and grows for wrapping/enlarged text.
+
+The final operator placement is **bottom center**, inside the existing full-screen
+safe margins (bottom32, sides48). Width wraps content up to 324dp, constrained by
+the viewport, with natural localized/enlarged text wrapping. No focus target,
+action, close button, key interception, list reflow, route allowlist, collision
+solver, subtitle exclusion zone or automatic relocation. This supersedes the
+earlier right-side and measured-avoidance proposals. A snackbar may temporarily
+overlap underlying content, including player controls or positioned subtitles;
+this is a known consequence of the chosen stable anchor, not a universal safety
+claim that physical testing could establish. Playback rendering remains unchanged.
+
+Initial implementation parameters: one visible notice plus two pending; coalesce
+pending notices by producer/event key, evict oldest overflow, and expire unshown
+notices after 30 seconds of monotonic time. Display success for 4 seconds and failure
+for 6 seconds, extended by the accessibility recommended timeout. Once shown, its
+pending deadline no longer applies. Retain one identity and the original display
+deadline across navigation and locale recreation; never restart or re-enqueue it.
+No process-restored inbox or OS notification is created.
+
+Present only in a resumed, focused app window with the IME hidden. Existing
+window focus handles separate modal windows. A temporarily hidden visible notice
+keeps its original deadline; an unshown notice keeps its original pending expiry.
+Use a polite accessible live region. Notification expiry must not alter domain
+state or erase durable recovery/disclosure content.
 
 ---
 

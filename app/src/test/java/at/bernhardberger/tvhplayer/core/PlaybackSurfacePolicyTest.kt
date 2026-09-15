@@ -84,4 +84,11 @@ class PlaybackSurfacePolicyTest {
             )
         )
     }
+
+    @Test
+    fun `only warm playback behind an ordinary route gets the global scrim`() {
+        assertTrue(shouldShowWarmPlaybackScrim(hasActivePlayback = true, isPlayerRoute = false))
+        assertFalse(shouldShowWarmPlaybackScrim(hasActivePlayback = false, isPlayerRoute = false))
+        assertFalse(shouldShowWarmPlaybackScrim(hasActivePlayback = true, isPlayerRoute = true))
+    }
 }

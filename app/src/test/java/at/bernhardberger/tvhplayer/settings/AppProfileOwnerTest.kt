@@ -168,6 +168,7 @@ class AppProfileOwnerTest {
         assertFalse(save.isCompleted)
         save.cancelAndJoin()
         assertEquals(1, leaseReleases)
+        assertEquals(0L, owner.configurationGeneration.value) // An unaccepted command did not replace context.
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -199,6 +200,7 @@ class AppProfileOwnerTest {
 
         assertTrue(result.isFailure)
         assertEquals(1, leaseReleases)
+        assertEquals(1L, owner.configurationGeneration.value) // Accepted replacement invalidates old notices even on failure.
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

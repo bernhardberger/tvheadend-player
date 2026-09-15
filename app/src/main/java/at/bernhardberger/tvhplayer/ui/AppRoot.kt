@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
+import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
@@ -46,6 +48,7 @@ import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
+import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
@@ -116,8 +119,10 @@ internal fun MainStartupComposition(
     onAction: (MainStartupActionId) -> Unit,
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit),
     modifier: Modifier = Modifier,
+    showWarmPlaybackScrim: Boolean = false,
     persistentSurface: @Composable BoxScope.() -> Unit = {},
     navigation: @Composable BoxScope.(AppNavKey, Boolean) -> Unit = { _, _ -> },
+    notices: @Composable BoxScope.() -> Unit = {},
 ) {
     val renderedPresentation = when (state.presentation) {
         is MainStartupPresentation.Enter -> MainStartupPresentation.Passive(
@@ -140,8 +145,9 @@ internal fun MainStartupComposition(
         onDispose(unregister)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         persistentSurface()
+        if (showWarmPlaybackScrim) WarmPlaybackScrim()
         val startDestination = state.navigationStartDestination
         if (state.navigationAllowed && startDestination != null) {
             navigation(
@@ -157,12 +163,19 @@ internal fun MainStartupComposition(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+        notices()
     }
 
     BackHandler(
         enabled = renderedPresentation != MainStartupPresentation.Inactive,
         onBack = onBack,
     )
+}
+
+@Composable
+internal fun WarmPlaybackScrim(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = WarmPlaybackScrimAlpha))
+        .testTag("warm-playback-scrim"))
 }
 
 internal fun cancelStartupAndSelectRoot(
@@ -699,12 +712,10 @@ fun AppRoot(
                             channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             section = destination.section,
+                            isCurrent = currentDestination == destination,
                             initialFocusEnabled = !drawerActive && currentDestination == destination,
                             contentPadding = contentPadding,
                             backEnabled = !applianceLaunchActive,
-                            onNavigate = { section ->
-                                navigateTopLevel(SettingsKey(section))
-                            },
                         )
                     }
 
@@ -769,6 +780,11 @@ fun AppRoot(
         onBack = startupBack,
         onAction = startupAction,
         registerActivityKeyContract = registerActivityKeyContract,
+        showWarmPlaybackScrim = shouldShowWarmPlaybackScrim(
+            hasActivePlayback = playbackState !is AppPlaybackState.Idle,
+            isPlayerRoute = isPlayer,
+        ),
+        notices = { at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost() },
         persistentSurface = {
             if (shouldMountPersistentPlayerSurface(
                     hasActivePlayback = playbackState !is AppPlaybackState.Idle,
@@ -782,13 +798,6 @@ fun AppRoot(
                     debugVideoBackdropVisible = debugVideoBackdropVisible,
                     modifier = Modifier.fillMaxSize(),
                 )
-                if (navigationAllowed && showRail) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = TvScrimNavigationAlpha))
-                    )
-                }
             }
         },
         navigation = { _, contentAllowed ->

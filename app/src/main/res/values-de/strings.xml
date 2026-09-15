@@ -1,13 +1,24 @@
 <resources>
+    <string name="edit_connection">Verbindung bearbeiten</string>
+    <string name="edit_connection_description">Serveradresse, Ports und Zugangsdaten</string>
+    <string name="connection_overview_status">Status</string>
+    <string name="connection_overview_server">Server</string>
+    <string name="connection_overview_connected">Verbunden</string>
+    <string name="connection_overview_connecting">Verbinden…</string>
+    <string name="connection_overview_synchronizing">Synchronisieren…</string>
+    <string name="connection_overview_loading">Laden…</string>
+    <string name="connection_overview_not_configured">Nicht eingerichtet</string>
+    <string name="connection_overview_unavailable">Nicht verfügbar</string>
+    <string name="cache_notice_cleared">Cache geleert</string>
+    <string name="cache_notice_failed">Cache konnte nicht geleert werden. Erneut „Cache leeren“ wählen.</string>
+    <string name="settings_app_language">App-Sprache</string>
+    <string name="cache_usage">%1$s MB</string>
+    <string name="settings_unavailable">Einstellungen nicht verfügbar</string>
     <string name="timeshift_seek_waiting">Sprung angefordert. Warten auf die Wiedergabeposition</string>
     <string name="connection_refreshing_channels">Senderinformationen werden aktualisiert…</string>
     <string name="settings_storage">Speicher</string>
     <string name="clear_cache">Cache leeren</string>
-    <string name="cache_statistics">%1$s MB, %2$d Bilder</string>
-    <string name="cache_clear_description">Entfernt gespeicherte Programmdaten und Bilder. Verbindungseinstellungen bleiben erhalten.</string>
     <string name="cache_clearing">Cache wird geleert…</string>
-    <string name="cache_cleared">Cache geleert. Programmdaten und Bilder werden bei Bedarf neu geladen.</string>
-    <string name="cache_clear_failed">Cache konnte nicht geleert werden. Mit OK erneut versuchen.</string>
     <string name="channel_list">Senderliste</string>
     <string name="all_channels">Alle Sender</string>
     <string name="choose_channel_tag">Sendergruppe wählen</string>
@@ -43,7 +54,7 @@
     <string name="settings_channel_tags_description">Wählen Sie, welche Sendergruppen auf diesem Fernseher unter Sender und Programmführer verfügbar sind.</string>
     <string name="settings_channel_tags_required">Mindestens eine Sendergruppe muss aktiviert bleiben.</string>
     <string name="settings_channel_tags_last_enabled">Erforderlich – mindestens eine Gruppe muss aktiv bleiben.</string>
-    <string name="show_epg_menu">Programmführer-Menü anzeigen</string>
+    <string name="show_epg_menu">Programmführer-Menü</string>
     <string name="show_epg_menu_description">Programmführer in der Hauptnavigation anzeigen.</string>
     <string name="player_info">Info</string>
     <string name="player_shelf_playing">Wiedergabe</string>
@@ -359,6 +370,7 @@
     <string name="connection_loading_channels">Sender werden geladen\u2026</string>
     <string name="no_channels_available">Es sind keine Sender verfügbar.</string>
     <string name="retry">Erneut versuchen</string>
+    <string name="settings_channel_groups_loading">Sendergruppen werden geladen…</string>
     <string name="channel_settings_load_failed">Die Kanaleinstellungen konnten nicht geladen werden.</string>
     <string name="channel_settings_save_failed">Deine Kanaleinstellungen sind aktiv, konnten aber nicht gespeichert werden.</string>
     <string name="open_connection_settings">Verbindungseinstellungen öffnen</string>

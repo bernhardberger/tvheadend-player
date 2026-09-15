@@ -1,289 +1,133 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performKeyInput
-import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import androidx.navigation3.ui.NavDisplay
-import at.bernhardberger.tvhplayer.core.MainStartupActionId
-import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
-import at.bernhardberger.tvhplayer.core.MainStartupPresentation
-import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.UiSettingsStore
-import at.bernhardberger.tvhplayer.ui.MainStartupComposition
-import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
-import at.bernhardberger.tvhplayer.ui.AppNavKey
-import at.bernhardberger.tvhplayer.ui.ChannelsKey
-import at.bernhardberger.tvhplayer.ui.SettingsKey
-import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.navigateTopLevel
-import at.bernhardberger.tvhplayer.ui.popNavigation
-import at.bernhardberger.tvhplayer.ui.rememberAppNavBackStack
-import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsAppliance
-import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsGeneral
-import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
-import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
-import org.junit.Assert.assertEquals
+import at.bernhardberger.tvhplayer.ui.components.depth.*
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsLevel
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsRow
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 
-@OptIn(ExperimentalTestApi::class)
+/** Retains the device navigation acceptance entry point for the recursive Settings owner. */
 class SettingsStartupEntryTest {
-    @get:Rule
-    val composeRule = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val compose = createComposeRule()
 
-    @Test
-    fun ordinaryEntryStartsGeneralAndFocusesItsSemanticCategory() {
-        composeRule.setContent {
+    @Test fun startupDefersAutomaticFocusUntilContentIsAdmitted() {
+        var enabled by mutableStateOf(false)
+        compose.setContent {
             TVHeadendPlayerTheme {
-                SettingsScreenNavigation(
-                    currentSection = SettingsSection.GENERAL,
-                    initialFocusEnabled = true,
-                    onNavigate = {},
-                ) { route, focusRequester ->
-                    Button(
-                        onClick = {},
-                        modifier = Modifier.focusRequester(focusRequester),
-                    ) {
-                        Text("Content $route")
-                    }
-                }
+                SettingsScreenNavigation(rememberDepthNavigationState("root"),
+                    listOf(settingsLevel("root", "Settings", listOf(settingsRow("general", "General")))),
+                    initialFocusEnabled = enabled)
             }
         }
-
-        composeRule.onNodeWithText("General").assertIsSelected().assertIsFocused()
-        composeRule.onNodeWithText("Content ${SettingsSection.GENERAL}").assertExists()
-        composeRule.onNodeWithText("Content ${SettingsSection.CONNECTION}").assertDoesNotExist()
+        compose.onNodeWithText("General").assertIsNotFocused()
+        compose.runOnIdle { enabled = true }
+        compose.onNodeWithText("General").assertIsFocused()
     }
 
-    @Test
-    fun generalCategoryEntersProductionFirstLanguageControl() {
-        val settingsStore = UiSettingsStore(composeRule.activity.applicationContext)
-        val storageViewModel = SettingsStorageViewModel(FakeTvheadendSession().cache)
-        composeRule.setContent {
+    @Test fun enteringKeyReleaseCannotActivateReplacementLeaf() {
+        var actions = 0
+        compose.setContent {
             TVHeadendPlayerTheme {
-                SettingsScreenNavigation(
-                    currentSection = SettingsSection.GENERAL,
-                    onNavigate = {},
-                ) { _, focusRequester ->
-                    SettingsGeneral(
-                        initialFocusRequester = focusRequester,
-                        settingsStore = settingsStore,
-                        storageViewModel = storageViewModel,
-                    )
-                }
+                SettingsScreenNavigation(rememberDepthNavigationState("root"), listOf(
+                    settingsLevel("root", "Settings", listOf(settingsRow("general", "General", child = "general"))),
+                    settingsLevel("general", "General", listOf(settingsRow("action", "Action", onClick = { actions++ }))),
+                ))
             }
         }
-
-        composeRule.onNode(hasText("General") and hasClickAction()).performKeyInput {
-            pressKey(Key.DirectionCenter)
-        }
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.language_follow_system)
-        ).assertIsFocused()
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+        compose.onNodeWithText("Action").assertIsFocused()
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        assertEquals(0, actions)
+        key(Key.DirectionCenter)
+        assertEquals(1, actions)
     }
 
-    @Test
-    fun applianceCategoryEntersAutoStartAndReachesAccessibilitySettings() {
-        val context = composeRule.activity.applicationContext
-        val settingsStore = UiSettingsStore(context)
-        composeRule.setContent {
+    @Test fun localBackRestoresInvokingItemBeforeRootBack() {
+        lateinit var state: DepthNavigationState
+        compose.setContent {
             TVHeadendPlayerTheme {
-                SettingsScreenNavigation(
-                    currentSection = SettingsSection.APPLIANCE,
-                    onNavigate = {},
-                ) { _, focusRequester ->
-                    SettingsAppliance(
-                        initialFocusRequester = focusRequester,
-                        settingsStore = settingsStore,
-                    )
-                }
+                state = rememberDepthNavigationState("root", "second")
+                SettingsScreenNavigation(state, listOf(
+                    settingsLevel("root", "Settings", listOf(settingsRow("first", "First"), settingsRow("second", "Second", child = "child"))),
+                    settingsLevel("child", "Child", listOf(settingsRow("action", "Action"))),
+                ))
             }
         }
-
-        composeRule.onNode(hasText("Appliance") and hasClickAction()).performKeyInput {
-            pressKey(Key.DirectionCenter)
-        }
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.auto_start_playback)
-        ).assertIsFocused()
-
-        composeRule.onRoot().performKeyInput {
-            repeat(12) { pressKey(Key.DirectionDown) }
-        }
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.open_accessibility_settings)
-        ).assertIsFocused()
+        key(Key.DirectionRight)
+        key(Key.Back)
+        compose.onNodeWithText("Second").assertIsFocused()
+        assertEquals(1, state.stack.frames.size)
     }
 
-    @Test
-    fun startupEntryStartsConnectionAndOpeningActivationCannotInvokeItsFirstControl() {
-        var settingsVisible by mutableStateOf(false)
-        var startupActions = 0
-        var firstConnectionControlInvocations = 0
-        composeRule.setContent {
+    @Test fun localeLikeRecreationKeepsPoppedParentAndUpdatedValue() {
+        val restoration = StateRestorationTester(compose)
+        lateinit var state: DepthNavigationState
+        restoration.setContent {
             TVHeadendPlayerTheme {
-                if (settingsVisible) {
-                    SettingsScreenNavigation(
-                        currentSection = SettingsSection.CONNECTION,
-                        initialFocusEnabled = true,
-                        onNavigate = {},
-                    ) { route, focusRequester ->
-                        Button(
-                            onClick = {
-                                if (route == SettingsSection.CONNECTION) {
-                                    firstConnectionControlInvocations++
-                                }
-                            },
-                            modifier = Modifier.focusRequester(focusRequester),
-                        ) {
-                            Text("First control $route")
-                        }
-                    }
-                } else {
-                    MainStartupComposition(
-                        state = MainStartupCompositionState(
-                            presentation = MainStartupPresentation.Actionable(
-                                messageKind = MainStartupMessageKind.CONFIGURATION_REQUIRED,
-                                actions = listOf(MainStartupActionId.CONNECTION_SETTINGS),
-                            ),
-                            navigationStartDestination = null,
-                            navigationAllowed = false,
-                        ),
-                        onBack = {},
-                        onAction = { action ->
-                            if (action == MainStartupActionId.CONNECTION_SETTINGS) {
-                                startupActions++
-                                settingsVisible = true
-                            }
-                        },
-                        registerActivityKeyContract = { {} },
-                    )
-                }
+                var value by rememberSaveable { mutableStateOf("Follow system") }
+                state = rememberDepthNavigationState("general")
+                SettingsScreenNavigation(state, listOf(
+                    settingsLevel("general", "General", listOf(settingsRow("language", "App language", value, child = "languages"))),
+                    settingsLevel("languages", "Language", listOf(settingsRow("de", "German", onClick = { state.pop(); value = "German" }))),
+                ))
             }
         }
-
-        composeRule.onNodeWithText("Connection settings").performKeyInput {
-            pressKey(Key.Enter)
-        }
-
-        composeRule.onNodeWithText("Connection").assertIsSelected().assertIsFocused()
-        composeRule.onNodeWithText("First control ${SettingsSection.CONNECTION}").assertExists()
-        composeRule.onNodeWithText("First control ${SettingsSection.GENERAL}").assertDoesNotExist()
-        composeRule.runOnIdle {
-            assertEquals(1, startupActions)
-            assertEquals(0, firstConnectionControlInvocations)
-        }
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("App language").assertIsFocused()
+        compose.onNodeWithText("German").assertExists()
+        assertEquals("general", state.stack.active.levelId)
     }
 
-    @Test
-    fun backReturnsFromSettingsContentBeforeDelegatingToTheShell() {
-        var shellBackCount = 0
-        composeRule.setContent {
+    @Test fun dedicatedEditorIsNotMountedByPreviewAndIsRemovedOnDeparture() {
+        var mounted = 0
+        var current by mutableStateOf(true)
+        compose.setContent {
             TVHeadendPlayerTheme {
-                BackHandler { shellBackCount++ }
-                SettingsScreenNavigation(
-                    currentSection = SettingsSection.GENERAL,
-                    onNavigate = {},
-                ) { route, focusRequester ->
-                    Button(
-                        onClick = {},
-                        modifier = Modifier.focusRequester(focusRequester),
-                    ) {
-                        Text("Content $route")
-                    }
-                }
+                SettingsScreenNavigation(rememberDepthNavigationState("root"), listOf(
+                    settingsLevel("root", "Settings", listOf(settingsRow("connection", "Connection", child = "editor"))),
+                    settingsLevel("editor", "Connection", listOf(settingsRow("safe", "Open connection settings")),
+                        activeContent = { requester, _ ->
+                            DisposableEffect(Unit) { mounted++; onDispose { mounted-- } }
+                            Button(onClick = {}, modifier = Modifier.focusRequester(requester)) { Text("Editor") }
+                        }),
+                ), isCurrent = current)
             }
         }
-
-        composeRule.onNodeWithText("General").assertIsFocused().performKeyInput {
-            pressKey(Key.DirectionCenter)
-        }
-        composeRule.onNodeWithText("Content ${SettingsSection.GENERAL}").assertIsFocused()
-
-        dispatchBack()
-        composeRule.onNodeWithText("General").assertIsFocused()
-        composeRule.runOnIdle { assertEquals(0, shellBackCount) }
-
-        dispatchBack()
-        composeRule.runOnIdle { assertEquals(1, shellBackCount) }
+        assertEquals(0, mounted)
+        key(Key.DirectionCenter)
+        compose.waitForIdle()
+        assertEquals(1, mounted)
+        compose.runOnIdle { current = false }
+        compose.waitForIdle()
+        assertEquals(0, mounted)
     }
 
-    @Test
-    fun playerSettingsContentFocusRestoresAfterVisitingAnotherDestination() {
-        lateinit var backStack: MutableList<AppNavKey>
-        composeRule.setContent {
-            backStack = rememberAppNavBackStack(SettingsKey(SettingsSection.PLAYER))
-            NavDisplay(
-                backStack = backStack,
-                onBack = { backStack.popNavigation() },
-                entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
-                entryProvider = entryProvider {
-                    entry<SettingsKey> { key ->
-                        SettingsScreenNavigation(
-                            currentSection = key.section,
-                            onNavigate = { backStack.navigateTopLevel(SettingsKey(it)) },
-                        ) { section, focusRequester ->
-                            Button(
-                                onClick = {},
-                                modifier = Modifier.focusRequester(focusRequester),
-                            ) {
-                                Text("Content $section")
-                            }
-                        }
-                    }
-                    entry<ChannelsKey> {
-                        val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-                        LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
-                        Button(
-                            onClick = {},
-                            modifier = Modifier.focusRequester(focusRequester),
-                        ) {
-                            Text("Channels destination")
-                        }
-                    }
-                },
-            )
+    @Test fun missingActiveItemFallsBackToNearestRemainingRow() {
+        var rows by mutableStateOf(listOf("A", "B", "C"))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(rememberDepthNavigationState("root", "B"),
+                    listOf(settingsLevel("root", "Settings", rows.map { settingsRow(it, it) })))
+            }
         }
-
-        composeRule.onNodeWithText("Player").assertIsFocused().performKeyInput {
-            pressKey(Key.DirectionCenter)
-        }
-        composeRule.onNodeWithText("Content ${SettingsSection.PLAYER}").assertIsFocused()
-
-        composeRule.runOnIdle { backStack.navigateTopLevel(ChannelsKey) }
-        composeRule.onNodeWithText("Channels destination").assertIsFocused()
-        composeRule.runOnIdle {
-            backStack.navigateTopLevel(SettingsKey(SettingsSection.PLAYER))
-        }
-
-        composeRule.onNodeWithText("Content ${SettingsSection.PLAYER}").assertIsFocused()
+        compose.onNodeWithText("B").assertIsFocused()
+        compose.runOnIdle { rows = listOf("A", "C") }
+        compose.onNodeWithText("C").assertIsFocused()
     }
 
-    private fun dispatchBack() {
-        composeRule.runOnIdle {
-            composeRule.activity.onBackPressedDispatcher.onBackPressed()
-        }
-    }
+    private fun key(key: Key) = compose.onRoot().performKeyInput { pressKey(key) }
 }

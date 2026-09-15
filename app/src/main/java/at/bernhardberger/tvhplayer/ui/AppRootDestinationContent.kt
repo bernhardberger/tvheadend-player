@@ -136,7 +136,7 @@ internal fun SettingsRouteContent(
     initialFocusEnabled: Boolean,
     contentPadding: PaddingValues,
     backEnabled: Boolean,
-    onNavigate: (SettingsSection) -> Unit,
+    isCurrent: Boolean,
 ) {
     if (contentAllowed) {
         ContentContainer {
@@ -146,7 +146,7 @@ internal fun SettingsRouteContent(
                 initialFocusEnabled = initialFocusEnabled,
                 contentPadding = contentPadding,
                 backEnabled = backEnabled,
-                onNavigate = onNavigate,
+                isCurrent = isCurrent,
             )
         }
     }

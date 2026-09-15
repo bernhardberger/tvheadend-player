@@ -32,7 +32,7 @@ const val TvNavigationDrawerGradientStartAlpha = 0.92f
 const val TvNavigationDrawerGradientEarlyAlpha = 0.88f
 const val TvNavigationDrawerGradientMiddleAlpha = 0.72f
 const val TvNavigationDrawerGradientLateAlpha = 0.35f
-const val TvScrimNavigationAlpha = 0.50f
+const val WarmPlaybackScrimAlpha = 0.76f
 const val TvScrimModalAlpha = 0.76f
 const val TvTrackAlpha = 0.20f
 const val TvGhostFillAlpha = 0.40f
@@ -69,8 +69,11 @@ val ChannelScopeItemMaxWidth = 196.dp
 /** Softens the collapsed navigation plane into the browse content gutter. */
 val TvNavigationRailGradientRunout = TvSpacing32
 
-/** Stable master-detail width for the local Settings category pane. */
-val SettingsCategoryPaneWidth = 268.dp
+/** Settings C logical geometry. Shell inset and drawer translation are separate. */
+val SettingsDepthColumnWidth = 352.dp
+val SettingsDepthColumnGap = 72.dp
+val SettingsDepthHeadingHeight = 60.dp
+val SettingsDepthRowMinHeight = 56.dp
 
 /** Non-interactive programme progress on browse cards, rows, and detail panes. */
 val TvProgressStripHeight = 4.dp

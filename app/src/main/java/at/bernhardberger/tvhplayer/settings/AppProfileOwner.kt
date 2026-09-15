@@ -83,6 +83,8 @@ class AppProfileOwner internal constructor(
         onUndeliveredElement = ProfileCommand::releaseSensitiveMaterial,
     )
     private val mutableServerProfile = MutableStateFlow<ServerProfileReadResult?>(null)
+    private val mutableConfigurationGeneration = MutableStateFlow(0L)
+    val configurationGeneration: StateFlow<Long> = mutableConfigurationGeneration.asStateFlow()
     private val mutableStreamProfiles =
         MutableStateFlow<StreamProfilesResult>(StreamProfilesResult.NotReady)
     private val mutableSelectedStreamProfileId = MutableStateFlow<StreamProfileId?>(null)
@@ -214,6 +216,7 @@ class AppProfileOwner internal constructor(
     }
 
     private suspend fun commitServer(host: String, htspPort: Int) = serverMutex.withLock {
+        mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
         playerSettings.audioChoices.profileIdentity(replace = true)
@@ -228,6 +231,7 @@ class AppProfileOwner internal constructor(
         username: String,
         password: String,
     ) = serverMutex.withLock {
+        mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
         playerSettings.audioChoices.profileIdentity(replace = true)
@@ -237,6 +241,7 @@ class AppProfileOwner internal constructor(
     }
 
     private suspend fun clearServerProfile() = serverMutex.withLock {
+        mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
         playerSettings.audioChoices.profileIdentity(replace = true)

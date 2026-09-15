@@ -24,7 +24,12 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.screens.settings.SettingsChannelTags
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsChannelTagsLevel
+import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
+import at.bernhardberger.tvhplayer.ui.screens.settingsRootLevel
+import at.bernhardberger.tvhplayer.ui.screens.SETTINGS_ROOT
+import at.bernhardberger.tvhplayer.ui.SettingsSection
+import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flow
@@ -59,20 +64,17 @@ class ChannelSettingsEntryTest {
             activity.viewModelStore.put("settings-entry-test", model)
             activity.setContent {
                 TVHeadendPlayerTheme {
-                    Row {
-                        Button(onClick = { contentFocus.requestFocus() },
-                            modifier = Modifier.focusRequester(categoryFocus)) { Text("Enter settings") }
-                        Box(Modifier.weight(1f)) { SettingsChannelTags(contentFocus, model) }
-                    }
+                    SettingsScreenNavigation(
+                        rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CHANNEL_TAGS.name),
+                        listOf(settingsRootLevel(), settingsChannelTagsLevel(model)),
+                    )
                 }
             }
         }
-        compose.onNodeWithText("Enter settings").requestFocus()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithText("Enter settings").assertIsFocused()
+        // Loading owns a deterministic inert row in the active level.
         readGate.complete(Unit)
         compose.waitForIdle()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithText(if (failRead) "Retry" else "All channels").assertIsFocused()
     }
 }
