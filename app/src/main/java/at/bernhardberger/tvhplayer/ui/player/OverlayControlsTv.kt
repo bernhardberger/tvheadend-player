@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.draw.alpha
 import androidx.tv.material3.Button
-import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.compose.ui.Alignment
 import androidx.tv.material3.Icon
@@ -206,7 +205,6 @@ fun OverlayControlsTv(
                 } else if (atLive == false) {
                     Button(
                         onClick = { onUserInteraction(); onGoLive() },
-                        scale = ButtonDefaults.scale(focusedScale = 1f),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
                         modifier = Modifier
                             .height(at.bernhardberger.tvhplayer.ui.TvOverlayStatusRowHeight)
@@ -223,14 +221,6 @@ fun OverlayControlsTv(
                             }
                              .onPreviewKeyEvent { event ->
                                  when (event.key) {
-                                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                                            relocatingKey = event.key
-                                            onUserInteraction()
-                                            onGoLive()
-                                        }
-                                        true
-                                    }
                                     Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight -> {
                                         if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                             relocatingKey = event.key

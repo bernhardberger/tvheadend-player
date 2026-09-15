@@ -186,33 +186,35 @@ things screens import.
 
 ### 4.1 Indication
 
-The guidance offers four indications — scale, border, glow, and colour — that
-can be mixed by context. It does not require multiple simultaneous indications.
-Use the smallest treatment that remains unmistakable at ten feet:
+Focus, pressed, selected and disabled indication comes from the TV Material
+components themselves: `ListItem`, `Button`, `IconButton`, `Card`,
+`NavigationDrawerItem`, `Tab`, `Surface` and their `*Defaults` (scale, colour,
+border, glow, shape). The app uses the library defaults. Call sites do not
+pass `scale(...)`, `border(...)`, `glow(...)` or `shape(...)` overrides, do not
+force `focusedScale = 1f`, and do not substitute hand-drawn borders, outlines
+or colour changes for the component's own indication.
 
-| Container | Scale | Border | Glow | Colour | Room the container must reserve |
-|---|---|---|---|---|---|
-| Card in a lazy row or grid | 1.05 | — | yes | — | 8dp `contentPadding` on the cross axis |
-| List row in a lazy column | — | — | — | strong focused container | none |
-| Drawer / rail item | — | — | — | yes + active indicator | none |
-| Tab | — | — | — | pill | none |
-| Player icon button | 1.10 | — | — | yes | 4dp inset from the safe edge |
+If the product ever needs a different treatment, it is decided here and applied
+once for the whole app (a shared defaults helper or theme-level decision), never
+per screen. Until then there is no such decision: any per-call-site override is
+a defect, not a customization.
+
+Library motion depends on the reserved room around the scaled component. A
+`ListItem` scales 1.05 and a card, button or icon button 1.1; containers
+reserve the overflow (cross-axis `contentPadding` in lazy lists, inset from
+the safe edge for overlay controls) rather than clipping it or cancelling the
+scale.
 
 Channels, Guide and Recordings scope tabs share a horizontally travelling pill.
 Its foreground contrast follows the actual moving shape on every Left/Right
 transition and reversal. Selection still commits on focus;
 Down or OK enters the selected scope's content.
 
-**A scale value is only valid together with the room its overflow needs.** A
-1.05 scale on a 176dp card overflows 4.4dp per side; the 8dp reservation absorbs
-it. Never raise a scale without checking the container reserves for it — the
-prior review already reported focused cards clipping at a container edge.
-
-List rows deliberately stay unscaled to avoid clipping. Their high-contrast
-focused container is sufficient and matches the official JetStream Profile
-pattern (`focusedScale = 1f` plus `inverseSurface`); do not add a redundant
-outline merely to combine indication types. A subtle colour-only change would
-still be unacceptable.
+Pressed feedback requires the component to receive the key. A parent key
+handler must not consume OK/DPAD_CENTER/ENTER on KeyDown and perform the
+activation itself; the focused component's own `onClick` commits so the
+library press state runs. Parents may still own direction keys, Back and
+key-cycle relocation.
 
 ### 4.2 Entry
 
@@ -392,7 +394,7 @@ art in the study is reference imagery, not a production asset.
   supports any number of levels with stable level/item identities. Settings owns
   its content, actions and permission/session guards. Recordings are only a future
   possible consumer, not part of this implementation.
-- Use standard unscaled TV Material list rows, meaningful root-category icons,
+- Use standard TV Material list rows with library defaults, meaningful root-category icons,
   concise titles and section headings. Deeper icons need a meaningful purpose.
   Supporting text gives current values/status, not prose inventories. Use
   `headlineMedium` (Roboto Regular 28), `titleMedium` (Medium 16) and `bodyMedium`

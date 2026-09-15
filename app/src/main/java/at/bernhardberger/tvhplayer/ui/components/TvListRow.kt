@@ -54,10 +54,6 @@ fun TvListRow(
             pressedSelectedContainerColor = listItemColors.pressedSelectedContainerColor,
             pressedSelectedContentColor = listItemColors.pressedSelectedContentColor,
         ),
-        scale = SelectableSurfaceDefaults.scale(
-            focusedScale = 1f,
-            focusedSelectedScale = 1f,
-        ),
         modifier = Modifier.browseTabFocus().then(modifier).height(TvListRowHeight),
     ) {
         Row(

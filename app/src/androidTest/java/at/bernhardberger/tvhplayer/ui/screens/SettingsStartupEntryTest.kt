@@ -47,8 +47,9 @@ class SettingsStartupEntryTest {
             }
         }
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
-        compose.onNodeWithText("Action").assertIsFocused()
+        compose.onNodeWithText("General").assertIsFocused() // press alone never enters
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        compose.onNodeWithText("Action").assertIsFocused()
         assertEquals(0, actions)
         key(Key.DirectionCenter)
         assertEquals(1, actions)

@@ -46,19 +46,19 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         assertEquals(0, editor.loads)
         assertFalse(secure())
-        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
-        compose.waitForIdle()
+        press(Key.DirectionCenter)
         compose.onNodeWithText("Edit connection").assertIsFocused()
         assertFalse(secure())
         assertEquals(0, editor.loads)
-        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
         assertEquals(0, editor.loads)
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         compose.waitForIdle()
+        assertFalse(secure()) // press alone never enters
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        compose.waitForIdle()
         assertTrue(secure())
         assertEquals(1, editor.loads)
-        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0) // entry release must not edit Host
         press(Key.DirectionCenter)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)

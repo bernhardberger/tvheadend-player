@@ -129,16 +129,6 @@ fun ChannelDrawer(
             items(channels, key = { it.id.value }) { channel ->
                 Card(
                     onClick = { onPickChannel(channel) },
-                    colors = androidx.tv.material3.CardDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f),
-                        focusedContentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    border = androidx.tv.material3.CardDefaults.border(
-                        focusedBorder = androidx.tv.material3.Border(
-                            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface),
-                        ),
-                    ),
-                    scale = androidx.tv.material3.CardDefaults.scale(focusedScale = 1f),
                     modifier = Modifier
                         .width(288.dp)
                         .heightIn(min = cardHeight)

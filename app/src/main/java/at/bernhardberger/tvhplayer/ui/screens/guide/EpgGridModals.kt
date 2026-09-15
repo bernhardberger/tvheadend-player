@@ -47,7 +47,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
@@ -301,7 +300,6 @@ internal fun EpgSearchDialog(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         },
-                        scale = ListItemDefaults.scale(focusedScale = 1f),
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(resultFocusRequesters.getValue(event.id))

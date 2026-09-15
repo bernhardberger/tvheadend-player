@@ -14,6 +14,10 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -55,6 +59,34 @@ class SettingsDepthNavigationTest {
     private fun press(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
+    }
+
+    /**
+     * OK reaches the focused library row itself: the depth host must not consume
+     * DPAD_CENTER in preview, so the row's press state and onClick run. Leaf
+     * activation comes from that onClick, exactly once per press.
+     */
+    @Test fun okIsDeliveredToTheFocusedRowNotConsumedByTheHost() {
+        var leafCalls = 0
+        var hostSawCenterUp = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.onKeyEvent { event ->
+                    if (event.key == Key.DirectionCenter && event.type == KeyEventType.KeyUp) hostSawCenterUp = true
+                    false
+                }) {
+                    SettingsScreenNavigation(rememberDepthNavigationState("root"), listOf(
+                        settingsLevel("root", "Settings", listOf(settingsRow("leaf", "Leaf", onClick = { leafCalls++ }))),
+                    ))
+                }
+            }
+        }
+        compose.onNodeWithText("Leaf").assertIsFocused()
+        compose.onNodeWithText("Leaf").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
+        assertEquals(1, leafCalls)
+        // Row consumed the click on release; the outer host never had to.
+        assertFalse(hostSawCenterUp)
     }
 
     @Test fun dedicatedLeafWithoutPreviewRowsStillReceivesInitialFocus() {
@@ -151,10 +183,14 @@ class SettingsDepthNavigationTest {
         }
         repeat(12) { press(Key.DirectionDown) }
         val parentBounds = compose.onNodeWithText("Level 0 item 12").fetchSemanticsNode().boundsInRoot
+        // The focused row's own onClick commits on key release, so the library
+        // press state can run; the press itself must not enter.
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         compose.waitForIdle()
-        compose.onNodeWithText("Level 1 item 0").assertIsFocused()
+        assertEquals(1, navigation.stack.frames.size)
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Level 1 item 0").assertIsFocused()
         assertEquals(2, navigation.stack.frames.size)
         press(Key.DirectionCenter)
         press(Key.DirectionCenter)

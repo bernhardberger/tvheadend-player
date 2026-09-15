@@ -161,9 +161,8 @@ fun DepthNavigation(
         val native = event.nativeKeyEvent
         val code = native.keyCode
         val back = code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_DPAD_LEFT
-        val enter = code == KeyEvent.KEYCODE_DPAD_RIGHT || code == KeyEvent.KEYCODE_DPAD_CENTER ||
-            code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER
-        if (!back && !enter) return@onPreviewKeyEvent false
+        val right = code == KeyEvent.KEYCODE_DPAD_RIGHT
+        if (!back && !right) return@onPreviewKeyEvent false
         val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
             when {
                 level.activeContent != null -> false // The editor/IME owns input before local Back.
@@ -177,11 +176,6 @@ fun DepthNavigation(
                     level.rows.firstOrNull { it.item.id == state.stack.active.focusedItemId }
                         ?.let { activate(it, stack.visit, enterOnly = true) }
                     true // Right on a leaf never commits and cannot reach the preview.
-                }
-                enter -> {
-                    level.rows.firstOrNull { it.item.id == state.stack.active.focusedItemId }
-                        ?.let { activate(it, stack.visit) }
-                    true
                 }
                 else -> false
             }
@@ -273,7 +267,12 @@ fun DepthNavigation(
                     rendered.heading(depth > 1)
                     LazyColumn(
                         state = list,
-                        contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+                        // Reserve the ListItem focus-scale overflow at the viewport's scroll
+                        // edges instead of letting the container clip the focused row.
+                        contentPadding = PaddingValues(
+                            top = 4.dp,
+                            bottom = contentPadding.calculateBottomPadding(),
+                        ),
                         modifier = Modifier.fillMaxSize().testTag("depth-active")
                             .focusProperties {
                                 onEnter = {
@@ -313,7 +312,14 @@ fun DepthNavigation(
                             .clearAndSetSemantics { }
                             .padding(top = contentPadding.calculateTopPadding()).testTag("depth-preview")) {
                             preview.heading(false)
-                            LazyColumn(contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding())) {
+                            LazyColumn(
+                                // Same top reservation as the active column so preview rows
+                                // stay aligned with the rows they mirror.
+                                contentPadding = PaddingValues(
+                                    top = 4.dp,
+                                    bottom = contentPadding.calculateBottomPadding(),
+                                ),
+                            ) {
                                 itemsIndexed(preview.rows, key = { _, row -> row.item.id }) { _, row ->
                                     row.content(Modifier.focusProperties { canFocus = false }) { }
                                 }

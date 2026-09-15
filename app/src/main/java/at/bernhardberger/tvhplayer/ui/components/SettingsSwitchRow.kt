@@ -9,7 +9,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 
@@ -41,10 +40,6 @@ fun SettingsSwitchRow(
                 onCheckedChange = null,
             )
         },
-        scale = ListItemDefaults.scale(
-            focusedScale = 1f,
-            focusedSelectedScale = 1f,
-        ),
         modifier = modifier
             .fillMaxWidth()
             .semantics {

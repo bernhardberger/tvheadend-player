@@ -83,7 +83,6 @@ private fun ConnectionValueRow(title: String, value: String) {
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = { Text(value, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
         modifier = Modifier.fillMaxWidth().padding(bottom = TvSpacing8)
             .focusProperties { canFocus = false }
             .clearAndSetSemantics { text = AnnotatedString("$title\n$value") },

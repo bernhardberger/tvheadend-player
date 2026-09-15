@@ -96,7 +96,6 @@ internal fun PlayerActionRow(
                         Button(
                             onClick = { onInteraction(); action() },
                             modifier = actionModifier.height(TvOverlayActionButtonSize),
-                            scale = ButtonDefaults.scale(focusedScale = 1f),
                             colors = ButtonDefaults.colors(containerColor = Color.Transparent),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                         ) {
@@ -113,7 +112,6 @@ internal fun PlayerActionRow(
                                 containerColor = if (tag == "player-pause") MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
                             ),
-                            scale = IconButtonDefaults.scale(focusedScale = 1f),
                             modifier = actionModifier.size(TvOverlayActionButtonSize),
                         ) { Icon(painterResource(icon), contentDescription = label) }
                     }

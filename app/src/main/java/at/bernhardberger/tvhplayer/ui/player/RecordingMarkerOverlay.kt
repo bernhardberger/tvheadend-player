@@ -28,7 +28,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
-import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
@@ -115,7 +114,6 @@ internal fun RecordingMarkerOverlay(
     Layout(modifier = modifier, content = {
         Button(
             onClick = { onSeek(selected); navigation.dismiss() },
-            scale = ButtonDefaults.scale(focusedScale = 1f),
             modifier = Modifier.focusRequester(focus).testTag("recording-marker-target")
                  .semantics {
                     contentDescription = description

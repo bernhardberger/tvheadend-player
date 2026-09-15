@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.Button
 import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -215,8 +214,9 @@ internal fun TimelineChannelRow(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .clip(MaterialTheme.shapes.small)
-                .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha)),
+                // Drawn, not clipped: a clip at the track edge would cut the focused
+                // cell's library scale for the first and last programme of the row.
+                .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small),
         ) {
             val density = LocalDensity.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
@@ -411,16 +411,13 @@ internal fun TimelineProgrammeCell(
             } else {
                 null
             },
-            scale = ListItemDefaults.scale(
-                focusedScale = 1f,
-                focusedSelectedScale = 1f,
-            ),
             modifier = Modifier
                 .browseTabFocus()
                 .fillMaxSize()
                 .padding(horizontal = 1.dp, vertical = 2.dp)
-                .clip(MaterialTheme.shapes.small)
-                .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha))
+                // The panel shape is drawn, not clipped: a clip here would cancel the
+                // library focus scale the surface applies outside this modifier.
+                .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
                 .semantics { contentDescription = description },

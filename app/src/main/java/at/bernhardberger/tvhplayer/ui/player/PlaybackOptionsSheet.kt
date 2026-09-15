@@ -5,6 +5,7 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -58,7 +59,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -526,6 +526,9 @@ private fun TrackOptionsPage(
     LazyColumn(
         state = listState,
         verticalArrangement = Arrangement.spacedBy(TvSpacing8),
+        // Reserve the ListItem focus-scale overflow so the scroll container does
+        // not clip the focused row at its edges.
+        contentPadding = PaddingValues(horizontal = TvSpacing8, vertical = 4.dp),
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(max = PlaybackOptionsTrackListMaxHeight)
@@ -769,7 +772,6 @@ private fun PlaybackOptionRow(
                 selected -> Icon(painterResource(R.drawable.ic_check), contentDescription = null)
             }
         },
-        scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
         modifier = modifier
             .fillMaxWidth()
             .onPreviewKeyEvent { event ->

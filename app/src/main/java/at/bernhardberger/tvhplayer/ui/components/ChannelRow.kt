@@ -130,10 +130,6 @@ fun ChannelRow(
                     .height(40.dp),
             )
         },
-        scale = ListItemDefaults.scale(
-            focusedScale = 1f,
-            focusedSelectedScale = 1f,
-        ),
         modifier = modifier
             .profileLayout("channels:row")
             .fillMaxWidth()

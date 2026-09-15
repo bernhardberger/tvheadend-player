@@ -83,7 +83,6 @@ internal fun settingsRow(
                 focusedSelectedContainerColor = MaterialTheme.colorScheme.inverseSurface,
                 focusedSelectedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
             ),
-            scale = ListItemDefaults.scale(focusedScale = 1f, focusedSelectedScale = 1f),
             modifier = modifier.fillMaxWidth().padding(bottom = TvSpacing8)
                 .heightIn(min = if (supporting == null) 48.dp else SettingsDepthRowMinHeight).semantics {
                 if (!enabled) disabled()
