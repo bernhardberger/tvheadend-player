@@ -137,16 +137,12 @@ control points are scoped visual curves, not additional reusable panel tiers.
 The track remains at 0.20 opacity so progress separates from its neutral backing.
 Contrast over video must be checked after compositing, not from token values alone.
 
-The collapsed navigation darkening scrim uses one continuous black curve across
-the closed drawer width plus a 32dp runout: `0%/0.78`, `25%/0.72`, `55%/0.55`,
-`78%/0.25`, and `100%/0.00` (position/alpha). The expanded drawer uses a
-stronger full-width black curve so labels retain a stable foundation while the
-player emerges at the content boundary: `0%/0.92`, `35%/0.88`, `70%/0.72`,
-`90%/0.35`, and `100%/0.00`. Opaque browse content requires this optical curve
-to be rendered as coordinated drawer backing and a foreground veil on the
-leading edge of the adjacent browse plane; a shell background alone does not
-soften a scrolling viewport's hard clip. These are curve controls rather than
-surface tiers.
+The navigation drawer owns no scrim in either state. Material for TV gives the
+standard push drawer no scrim of its own — that belongs to the modal variant —
+so the collapsed rail and the expanded drawer are the themed background with
+library-default items. `WarmPlaybackScrimAlpha` is the only darkening applied
+over warm playback behind ordinary destinations; do not add a drawer gradient,
+seam veil, divider, blur, or per-destination darkening in its place.
 
 ---
 
@@ -402,7 +398,7 @@ art in the study is reference imagery, not a production asset.
   `headlineMedium` (Roboto Regular 28), `titleMedium` (Medium 16) and `bodyMedium`
   (Regular 14). Focus uses `inverseSurface` / `inverseOnSurface`; no 16.8sp kit
   typography or focused row scaling.
-- Reference geometry on 960×540: active x164, width352; preview x588, a 424 step
+- Reference geometry on 960×540: active x128, width352; preview x588 (108 gap), a 460 step
   and 72 gap. Implement these as logical layout dimensions through the shell's
   inset, never device pixels. Keep the active slot/width at every depth. Preview
   may overflow the active container to the screen edge.
@@ -411,9 +407,9 @@ art in the study is reference imagery, not a production asset.
   stationary behind Settings. The shell draws this scrim only when active playback
   is mounted behind an ordinary non-player destination; without warm playback,
   Settings uses the normal themed app background and no full-screen video scrim.
-  Player routes do not use this layer. Preview alpha is .8. The existing global
-  push drawer is independent and retains
-  its current widths and optical scrim; expanding it does not resize columns.
+  Player routes do not use this layer. Preview alpha is .8. The global push
+  drawer is independent and keeps its 80/280dp widths and its own absence of a
+  scrim (section 6.5); expanding it does not resize columns.
 - Up/Down changes focus and previews children. Right/OK enters a submenu;
   Right on a leaf does not commit. OK activates a leaf or switch. Focus alone
   never changes settings or starts playback. Left/Back pops one local level,
@@ -847,19 +843,31 @@ focus previews a child without committing or entering it; Right/OK enters.
 
 ### 6.5 Navigation drawer
 
-The drawer starts with its destinations and keeps Settings and contextual owner
-actions in the bottom section. Material for TV does not require a brand header;
-do not spend the top safe region on a decorative product mark. A top action may
-be added later only for a real product capability such as search or profile
-selection.
+The drawer follows the Material for TV / TV Design Kit anatomy: a top section,
+the destinations, and Settings with contextual owner actions in the bottom
+section. Leading and trailing padding are 12dp each, so the closed rail is
+12 + `CollapsedDrawerItemWidth` (56) + 12 = **80dp** and the expanded drawer is
+12 + `ExpandedDrawerItemWidth` (256) + 12 = **280dp**. Vertically the drawer
+follows the kit too: 12dp on the top and bottom edges, a 56dp top section, the
+destination block **centred between the top and bottom sections**, and the
+bottom section, with a 12dp gap between items. Both states share the same row
+positions so nothing moves vertically when the drawer expands. Items keep the
+library defaults: one-line 48dp height, pill shape, 24dp icons, and
+`NavigationDrawerItemDefaults.colors()`.
 
-Use the stronger continuous nonlinear black curve from section 1.5 behind the
-expanded focusable items, preserving the darkest region through the icon and
-label area before fading at the content boundary. In the collapsed state, use
-its narrower companion curve across the complete rail and 32dp runout. Both
-states must read like cinematic text scrims rather than grey panels with a
-trailing dropoff. Do not add a hard divider, blur, or a second full-screen
-navigation scrim.
+The top section carries the product mark and nothing else: the transparent
+diamond symbol at the item icon position, plus the branded wordmark when the
+drawer is expanded. The mark steps between the collapsed and expanded icon
+columns exactly as the library item icon does; it is not tweened separately,
+so the mark and the icons never drift against each other during the transition. It has no product capability such as search or profile
+selection, so it is **non-focusable and non-interactive** — never a focus target,
+never the first focus on drawer entry, without click semantics, and outside Back
+handling. The symbol is decorative and the wordmark carries the app name once.
+The wordmark is drawn artwork, so it keeps its proportions across locales and
+font scales.
+
+Neither drawer state paints a scrim, gradient, or seam veil of its own; see
+section 1.5.
 
 Use the **standard push drawer**. Expanding the drawer changes the browse
 viewport position while preserving its closed width; the trailing edge clips
@@ -869,11 +877,11 @@ remains in this global shell, so entering its content collapses the drawer to th
 icon rail instead of removing it. Its depth-column width remains fixed and must
 not introduce another collapsing drawer.
 
-The adjacent-plane model does not permit a bare hard seam. The shell overlays a
-non-focusable, semantics-free leading-edge veil above departing browse content
-and below drawer focus surfaces. This is an optical fade at the seam, not content
-physically scrolling under a modal drawer; it must not alter measurement, focus,
-Back, or key dispatch.
+Settings is the destination re-aligned to the 80dp shell: its active depth column
+stays at x=128 with width 352 and its preview at x=588 (108dp gap) on the 960x540 logical
+canvas. Channels, Guide, Recordings, and the player start 12dp further left than
+before and are pending their own re-alignment; do not tune them opportunistically
+ahead of that redesign.
 
 ### 6.6 Icon assets
 

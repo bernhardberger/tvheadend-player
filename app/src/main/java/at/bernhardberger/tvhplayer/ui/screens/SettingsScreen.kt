@@ -54,9 +54,10 @@ internal fun SettingsScreenNavigation(
     val rootFocus = LocalBrowseNavigationFocus.current
     val unavailable = stringResource(R.string.settings_unavailable)
     val layoutDirection = LocalLayoutDirection.current
-    // Shell coordinates, in dp: reference x164 is closed drawer92 + safe24 + local48.
-    // Drawer expansion pushes this unchanged viewport; it never measures columns narrower.
-    val inset = contentPadding.calculateStartPadding(layoutDirection) + TvSpacing48
+    // Shell coordinates, in dp: reference x128 is closed drawer80 + safe24 + local24,
+    // a 48dp gap from the 12dp-padded rail. Drawer expansion pushes this unchanged
+    // viewport; it never measures columns narrower.
+    val inset = contentPadding.calculateStartPadding(layoutDirection) + TvSpacing24
     DepthNavigation(
         state = navigation,
         levels = levels.associateBy { it.id },

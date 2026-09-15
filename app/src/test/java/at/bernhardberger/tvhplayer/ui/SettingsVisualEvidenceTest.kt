@@ -104,6 +104,10 @@ class SettingsVisualEvidenceTest {
         capture("$prefix-connection-overview")
         press(Key.Back)
         compose.runOnIdle { navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.GENERAL.name)), visit = navigation.stack.visit + 1)) }
+        // Accepted Settings C geometry on the 80dp Material for TV drawer shell.
+        val activeColumn = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
+        assertEquals(128f, activeColumn.left, .5f)
+        assertEquals(352f, activeColumn.width, .5f)
         capture("$prefix-root")
         press(Key.DirectionCenter)
         capture("$prefix-general")

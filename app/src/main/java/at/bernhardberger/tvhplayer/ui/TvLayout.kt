@@ -24,14 +24,6 @@ const val TvTextTertiaryAlpha = 0.72f
 const val TvTextDisabledAlpha = 0.38f
 const val TvPanelBrowseAlpha = 0.84f
 const val TvPanelDenseAlpha = 0.92f
-const val TvNavigationRailGradientStartAlpha = 0.78f
-const val TvNavigationRailGradientQuarterAlpha = 0.72f
-const val TvNavigationRailGradientMiddleAlpha = 0.55f
-const val TvNavigationRailGradientLateAlpha = 0.25f
-const val TvNavigationDrawerGradientStartAlpha = 0.92f
-const val TvNavigationDrawerGradientEarlyAlpha = 0.88f
-const val TvNavigationDrawerGradientMiddleAlpha = 0.72f
-const val TvNavigationDrawerGradientLateAlpha = 0.35f
 const val WarmPlaybackScrimAlpha = 0.76f
 const val TvScrimModalAlpha = 0.76f
 const val TvTrackAlpha = 0.20f
@@ -66,12 +58,12 @@ val TvPlaybackPadding = PaddingValues(
 /** Keeps a long channel-scope label from consuming the browse header. */
 val ChannelScopeItemMaxWidth = 196.dp
 
-/** Softens the collapsed navigation plane into the browse content gutter. */
+/** Channel-scope fade width where the browse plane meets the navigation rail. */
 val TvNavigationRailGradientRunout = TvSpacing32
 
 /** Settings C logical geometry. Shell inset and drawer translation are separate. */
 val SettingsDepthColumnWidth = 352.dp
-val SettingsDepthColumnGap = 72.dp
+val SettingsDepthColumnGap = 108.dp
 val SettingsDepthHeadingHeight = 60.dp
 val SettingsDepthRowMinHeight = 56.dp
 

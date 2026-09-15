@@ -9,6 +9,7 @@ import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
+import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.font.FontRenderContext;
 import java.awt.image.BufferedImage;
@@ -206,6 +207,8 @@ public final class RenderArtwork {
         // vertically to retain the existing 960x300 family export canvas.
         List<Ink> family = transformed(marquee, 3, 0, -120);
         export("tvheadend-player-logo", 960, 300, family, 1, 2);
+        // The drawer top section reuses this lockup's type, without field or mark.
+        writeDrawerWordmark(family.subList(2, family.size()));
         List<Ink> contextual = new ArrayList<>(family);
         text(contextual, "for Android TV", 24, 231.375f, 230, TEXT);
         export("tvheadend-player-android-tv", 960, 300, contextual, 1, 2);
@@ -380,6 +383,91 @@ public final class RenderArtwork {
                 Path.of("app/src/main/res/drawable/ic_launcher_monochrome.xml"),
                 xml,
                 StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Drawer wordmark: the family lockup's type only, tightly framed so the
+     * drawer can place it at a fixed 18dp height beside the collapsed rail mark.
+     */
+    private static void writeDrawerWordmark(List<Ink> type) throws IOException {
+        Rectangle2D bounds = tightBounds(type);
+        double height = 18;
+        StringBuilder xml = new StringBuilder("""
+                <?xml version="1.0" encoding="utf-8"?>
+                <!-- Family lockup type, tightly framed for the navigation drawer. -->
+                <vector xmlns:android="http://schemas.android.com/apk/res/android"
+                    android:width="%sdp" android:height="%sdp"
+                    android:viewportWidth="%s" android:viewportHeight="%s">
+                    <group android:translateX="%s" android:translateY="%s">
+                """.formatted(
+                number(height * bounds.getWidth() / bounds.getHeight()),
+                number(height),
+                number(bounds.getWidth()),
+                number(bounds.getHeight()),
+                number(-bounds.getX()),
+                number(-bounds.getY())));
+        for (Ink item : type) {
+            xml.append("        <path android:fillColor=\"")
+                    .append(String.format(Locale.ROOT, "#%06X", item.color().getRGB() & 0xFFFFFF))
+                    .append("\" android:pathData=\"").append(toPathData(item.shape())).append("\"/>\n");
+        }
+        xml.append("    </group>\n</vector>\n");
+        Path drawable = Path.of("app/src/main/res/drawable/brand_wordmark.xml");
+        Files.createDirectories(drawable.getParent());
+        Files.writeString(drawable, xml, StandardCharsets.UTF_8);
+    }
+
+    /** Ink bounds from the curves themselves, not the looser control-point box. */
+    private static Rectangle2D tightBounds(List<Ink> ink) {
+        double[] box = {Double.MAX_VALUE, Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
+        for (Ink item : ink) {
+            PathIterator iterator = item.shape().getPathIterator(null);
+            double[] coordinates = new double[6];
+            double x = 0;
+            double y = 0;
+            while (!iterator.isDone()) {
+                switch (iterator.currentSegment(coordinates)) {
+                    case PathIterator.SEG_MOVETO, PathIterator.SEG_LINETO -> {
+                        x = coordinates[0];
+                        y = coordinates[1];
+                        extend(box, x, y);
+                    }
+                    case PathIterator.SEG_QUADTO -> {
+                        extend(box, coordinates[2], coordinates[3]);
+                        extendQuadratic(box, 0, x, coordinates[0], coordinates[2]);
+                        extendQuadratic(box, 1, y, coordinates[1], coordinates[3]);
+                        x = coordinates[2];
+                        y = coordinates[3];
+                    }
+                    case PathIterator.SEG_CLOSE -> { }
+                    default -> throw new IllegalStateException("Unexpected wordmark segment");
+                }
+                iterator.next();
+            }
+        }
+        return new Rectangle2D.Double(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+    }
+
+    private static void extend(double[] box, double x, double y) {
+        box[0] = Math.min(box[0], x);
+        box[1] = Math.min(box[1], y);
+        box[2] = Math.max(box[2], x);
+        box[3] = Math.max(box[3], y);
+    }
+
+    /** Adds a quadratic segment's own extreme on one axis (0 = x, 1 = y). */
+    private static void extendQuadratic(double[] box, int axis, double p0, double p1, double p2) {
+        double denominator = p0 - 2 * p1 + p2;
+        if (denominator == 0) {
+            return;
+        }
+        double t = (p0 - p1) / denominator;
+        if (t <= 0 || t >= 1) {
+            return;
+        }
+        double value = (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * p1 + t * t * p2;
+        box[axis] = Math.min(box[axis], value);
+        box[axis + 2] = Math.max(box[axis + 2], value);
     }
 
     private static void writePng(BufferedImage image, Path path) throws IOException {

@@ -34,8 +34,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.isNotFocusable
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performKeyInput
@@ -75,7 +78,7 @@ class SideRailSemanticsTest {
     }
 
     @Test
-    fun collapsedRailAndExpandedDrawerUseContinuousScrims() {
+    fun standardDrawerPaintsNoScrimAndKeepsTheBrandSectionOutOfFocusOrder() {
         val contentFocus = FocusRequester()
         composeRule.setContent {
             Box(Modifier.fillMaxSize().background(Color.Red)) {
@@ -103,41 +106,82 @@ class SideRailSemanticsTest {
             }
         }
 
+        // 12dp + CollapsedDrawerItemWidth + 12dp, with no drawer-owned darkening.
+        assertEquals(80f, drawerWidthDp(), 0.5f)
+        val sampleY = itemFreeSampleY()
         val shellPixels = composeRule.onNodeWithTag("global-navigation-shell")
             .captureToImage()
             .toPixelMap()
-        val sampleY = shellPixels.height / 2
-        fun redAt(x: Int): Float {
+        val shellRow = localRow("global-navigation-shell", sampleY)
+        fun shellColorAt(x: Int): Color {
             val sampleX = with(composeRule.density) { x.dp.roundToPx() }
-            return shellPixels[sampleX, sampleY].red
+            return shellPixels[sampleX, shellRow]
         }
 
-        assertEquals(0.22f, redAt(1), 0.06f)
-        assertEquals(0.28f, redAt(31), 0.06f)
-        assertEquals(0.45f, redAt(68), 0.06f)
-        assertEquals(0.75f, redAt(97), 0.06f)
-        assertEquals(1f, redAt(124), 0.06f)
+        listOf(1, 31, 68, 97, 124).forEach {
+            assertEquals("closed rail at ${it}dp", Color.Red, shellColorAt(it))
+        }
+
+        composeRule.onNodeWithTag("global-drawer-brand").assert(isNotFocusable())
+        composeRule.onNodeWithTag("global-drawer-brand")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
 
         composeRule.onNodeWithTag("rail-surface-test-content")
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.waitForIdle()
 
+        // Drawer entry focuses a destination; the brand section is not reachable.
+        composeRule.onNodeWithTag("nav-channels")
+            .assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("nav-channels").assertIsFocused()
+
+        assertEquals(280f, drawerWidthDp(), 0.5f)
+        // The destination rows keep their place, so both states sample one line.
+        assertEquals("item rows moved between drawer states", sampleY, itemFreeSampleY())
         val expandedPixels = composeRule.onNodeWithTag("global-drawer-surface")
             .captureToImage()
             .toPixelMap()
-        val expandedSampleY = expandedPixels.height / 2
-        fun expandedRedAt(fraction: Float): Float {
+        val expandedRow = localRow("global-drawer-surface", sampleY)
+        fun expandedColorAt(fraction: Float): Color {
             val sampleX = (expandedPixels.width * fraction).toInt()
                 .coerceIn(0, expandedPixels.width - 1)
-            return expandedPixels[sampleX, expandedSampleY].red
+            return expandedPixels[sampleX, expandedRow]
         }
 
-        assertEquals(0.08f, expandedRedAt(0.01f), 0.06f)
-        assertEquals(0.12f, expandedRedAt(0.35f), 0.06f)
-        assertEquals(0.28f, expandedRedAt(0.70f), 0.06f)
-        assertEquals(0.65f, expandedRedAt(0.90f), 0.06f)
-        assertEquals(0.96f, expandedRedAt(0.99f), 0.06f)
+        listOf(0.01f, 0.35f, 0.70f, 0.90f, 0.99f).forEach {
+            assertEquals("expanded drawer at $it", Color.Red, expandedColorAt(it))
+        }
+    }
+
+    private fun drawerWidthDp(): Float {
+        val widthPx = composeRule.onNodeWithTag("global-drawer-surface")
+            .fetchSemanticsNode().boundsInRoot.width
+        return with(composeRule.density) { widthPx.toDp().value }
+    }
+
+    /**
+     * Root-pixel midpoint of the spacer between the last main destination and the
+     * footer item. Deriving it from the drawn rows keeps the scrim samples off
+     * item ink on a short canvas, where half the shell height can land on a row.
+     */
+    private fun itemFreeSampleY(): Int {
+        val lastMain = composeRule.onNodeWithTag("nav-recordings")
+            .fetchSemanticsNode().boundsInRoot
+        val footer = composeRule.onNodeWithTag("nav-settings")
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "No item-free band between ${lastMain.bottom} and ${footer.top}",
+            footer.top - lastMain.bottom > 2f,
+        )
+        return ((lastMain.bottom + footer.top) / 2f).toInt()
+    }
+
+    /** Converts a root pixel row into the captured node's own pixel row. */
+    private fun localRow(tag: String, rootY: Int): Int {
+        val bounds = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        return (rootY - bounds.top).toInt()
     }
 
     @Test

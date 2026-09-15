@@ -44,11 +44,16 @@ GENERATED_PNG_DIMENSIONS = {
 DETERMINISTIC_VECTOR_ARTWORK = (
     "app/src/main/res/drawable/ic_launcher_monochrome.xml",
     "app/src/main/res/drawable/startup_brand_symbol.xml",
+    "app/src/main/res/drawable/brand_wordmark.xml",
     "artwork/tvheadend-player-logo.svg",
     "artwork/tvheadend-player-banner.svg",
     "artwork/tvheadend-player-android-tv.svg",
     "artwork/tvheadend-player-symbol.svg",
     "artwork/github-social-preview.svg",
+)
+
+PORTABLE_SVG_ARTWORK = tuple(
+    path for path in DETERMINISTIC_VECTOR_ARTWORK if path.endswith(".svg")
 )
 
 
@@ -86,6 +91,19 @@ class ArtworkTest(unittest.TestCase):
             [(p.attrib["fill"], p.attrib["d"]) for p in symbol.findall("{http://www.w3.org/2000/svg}path")],
             [(p.attrib[android + "fillColor"], p.attrib[android + "pathData"]) for p in startup_symbol.findall(".//path")],
         )
+
+        logo = ElementTree.parse(ROOT / "artwork/tvheadend-player-logo.svg").getroot()
+        wordmark = ElementTree.parse(ROOT / "app/src/main/res/drawable/brand_wordmark.xml")
+        logo_paths = [(p.attrib["fill"], p.attrib["d"])
+                      for p in logo.findall("{http://www.w3.org/2000/svg}path")]
+        # The drawer carries the lockup's type only: no dark field, no mark, no tint.
+        self.assertEqual(
+            logo_paths[2:],
+            [(p.attrib[android + "fillColor"], p.attrib[android + "pathData"])
+             for p in wordmark.findall(".//path")],
+        )
+        self.assertNotIn("#0F1014", ElementTree.tostring(wordmark.getroot(), "unicode"))
+        self.assertIsNone(wordmark.getroot().attrib.get(android + "tint"))
 
         readme = (ROOT / "README.md").read_text()
         self.assertIn("![Tvheadend Player](artwork/tvheadend-player-logo.png)", readme)
@@ -145,7 +163,7 @@ class ArtworkTest(unittest.TestCase):
                          (ROOT / "app/src/main/res/font/outfit_550.ttf").read_bytes())
         self.assertEqual((ROOT / "artwork/fonts/OFL.txt").read_bytes(),
                          (ROOT / "app/src/main/assets/licenses/Outfit-OFL.txt").read_bytes())
-        for relative_path in DETERMINISTIC_VECTOR_ARTWORK[2:]:
+        for relative_path in PORTABLE_SVG_ARTWORK:
             svg = ElementTree.parse(ROOT / relative_path).getroot()
             self.assertFalse(svg.findall(".//{http://www.w3.org/2000/svg}text"))
             self.assertFalse(svg.findall(".//{http://www.w3.org/2000/svg}image"))

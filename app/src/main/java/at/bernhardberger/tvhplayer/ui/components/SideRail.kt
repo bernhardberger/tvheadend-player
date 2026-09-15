@@ -4,7 +4,8 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,8 +15,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -28,16 +33,15 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -58,21 +62,25 @@ import at.bernhardberger.tvhplayer.core.BrowseShellBackAction
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
 import at.bernhardberger.tvhplayer.models.RailItem
 import at.bernhardberger.tvhplayer.ui.AppDestination
-import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientEarlyAlpha
-import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientLateAlpha
-import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientMiddleAlpha
-import at.bernhardberger.tvhplayer.ui.TvNavigationDrawerGradientStartAlpha
-import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientLateAlpha
-import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientMiddleAlpha
-import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientQuarterAlpha
-import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientStartAlpha
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 
-private val DrawerStartPadding = 24.dp
+// Material for TV drawer padding: 12dp on both edges of the item column.
+private val DrawerStartPadding = 12.dp
 private val DrawerEndPadding = 12.dp
 private val ClosedDrawerWidth =
     DrawerStartPadding + NavigationDrawerItemDefaults.CollapsedDrawerItemWidth + DrawerEndPadding
+
+/** Drawer top section: the kit's 56dp mark box above the first destination. */
+private val BrandHeaderHeight = 56.dp
+private val BrandSymbolSize = 32.dp
+private val BrandWordmarkHeight = 18.dp
+
+// Measured from the tv-material drawer item itself: its 24dp icon box sits at
+// 16..40 while collapsed and at 20..44 once expanded, and the label starts at 56.
+// The mark follows that axis so it never drifts off the icon column.
+private val CollapsedItemIconCenter = 28.dp
+private val ExpandedItemIconCenter = 32.dp
+private val ExpandedItemLabelStart = 56.dp
 
 /** Current measure's visible extent from the browse content's logical leading edge. */
 internal val LocalBrowseVisibleWidthPx = compositionLocalOf<Int?> { null }
@@ -215,37 +223,11 @@ internal fun SideRail(
         modifier = modifier.fillMaxSize(),
     ) {
         val browseWidth = (maxWidth - ClosedDrawerWidth).coerceAtLeast(0.dp)
-        val railGradientWidth = ClosedDrawerWidth + TvNavigationRailGradientRunout
-        val railGradientEndPx = with(LocalDensity.current) { railGradientWidth.toPx() }
-        val collapsedRailBrush = Brush.horizontalGradient(
-            colorStops = arrayOf(
-                0f to Color.Black.copy(alpha = TvNavigationRailGradientStartAlpha),
-                0.25f to Color.Black.copy(alpha = TvNavigationRailGradientQuarterAlpha),
-                0.55f to Color.Black.copy(alpha = TvNavigationRailGradientMiddleAlpha),
-                0.78f to Color.Black.copy(alpha = TvNavigationRailGradientLateAlpha),
-                1f to Color.Transparent,
-            ),
-            endX = railGradientEndPx,
-        )
-        val expandedDrawerBrush = Brush.horizontalGradient(
-            colorStops = arrayOf(
-                0f to Color.Black.copy(alpha = TvNavigationDrawerGradientStartAlpha),
-                0.35f to Color.Black.copy(alpha = TvNavigationDrawerGradientEarlyAlpha),
-                0.70f to Color.Black.copy(alpha = TvNavigationDrawerGradientMiddleAlpha),
-                0.90f to Color.Black.copy(alpha = TvNavigationDrawerGradientLateAlpha),
-                1f to Color.Transparent,
-            ),
-        )
+        // The standard push drawer owns no scrim of its own: readability over warm
+        // playback belongs to the single global WarmPlaybackScrimAlpha layer.
         NavigationDrawer(
             modifier = Modifier
                 .fillMaxSize()
-                .then(
-                    if (drawerState.currentValue == DrawerValue.Closed) {
-                        Modifier.background(collapsedRailBrush)
-                    } else {
-                        Modifier
-                    }
-                )
                 .testTag("global-navigation-shell"),
             drawerState = drawerState,
             drawerContent = { drawerValue ->
@@ -293,21 +275,11 @@ internal fun SideRail(
                     modifier = Modifier
                         .profileLayout("sidebar")
                         .fillMaxHeight()
-                        .then(
-                            if (drawerValue == DrawerValue.Open) {
-                                Modifier.background(expandedDrawerBrush)
-                            } else {
-                                Modifier
-                            }
-                        )
                         .testTag("global-drawer-surface")
                         // The surface reaches the edge; content retains the same safe inset.
-                        .padding(
-                            start = DrawerStartPadding,
-                            end = DrawerEndPadding,
-                            top = 32.dp,
-                            bottom = 32.dp,
-                        )
+                        // Kit drawer: 12dp on every edge; header and footer are 56dp
+                        // sections and the destination block is centred between them.
+                        .padding(DrawerStartPadding)
                         .then(
                             activeItemFocus?.let { Modifier.focusRestorer(it) } ?: Modifier
                         )
@@ -315,6 +287,10 @@ internal fun SideRail(
                         .selectableGroup(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    DrawerBrandHeader(drawerValue)
+
+                    Spacer(Modifier.weight(1f))
+
                     mainItems.forEach { item ->
                         key(item.route) {
                             NavigationDrawerItem(
@@ -382,6 +358,56 @@ internal fun SideRail(
                     }
                 }
             },
+        )
+    }
+}
+
+/**
+ * Drawer top section carrying the product mark. It is not a focus target, has no
+ * click action, and never changes first focus or Back; the app name is announced
+ * once by the wordmark. Its width animates between the same two drawer item
+ * widths on `animateDpAsState`'s default spring, as the library item does, so the
+ * mark reveals with the sheet instead of widening it ahead of the items.
+ */
+@Composable
+private fun DrawerBrandHeader(drawerValue: DrawerValue) {
+    val expanded = drawerValue == DrawerValue.Open
+    val headerWidth by animateDpAsState(
+        targetValue = if (expanded) {
+            NavigationDrawerItemDefaults.ExpandedDrawerItemWidth
+        } else {
+            NavigationDrawerItemDefaults.CollapsedDrawerItemWidth
+        },
+        label = "drawerBrandHeaderWidth",
+    )
+    // The library item moves its icon column 16..40 -> 20..44 as a step, not a
+    // tween; the mark takes the same step so it never drifts against the icons.
+    val symbolCenter = if (expanded) ExpandedItemIconCenter else CollapsedItemIconCenter
+    Box(
+        modifier = Modifier
+            .width(headerWidth)
+            .height(BrandHeaderHeight)
+            .clipToBounds()
+            .testTag("global-drawer-brand"),
+    ) {
+        Image(
+            painter = painterResource(R.drawable.startup_brand_symbol),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = symbolCenter - BrandSymbolSize / 2)
+                .size(BrandSymbolSize),
+        )
+        Image(
+            painter = painterResource(R.drawable.brand_wordmark),
+            contentDescription = stringResource(R.string.app_name),
+            // A logo keeps its drawn proportions instead of following font scale.
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = ExpandedItemLabelStart)
+                .wrapContentWidth(align = Alignment.Start, unbounded = true)
+                .requiredHeight(BrandWordmarkHeight)
+                .testTag("global-drawer-wordmark"),
         )
     }
 }
