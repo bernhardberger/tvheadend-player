@@ -191,21 +191,37 @@ class NavigationShellEvidenceTest {
     }
 
     /**
-     * The library moves its item icon 4dp right when the drawer expands. The mark
-     * follows that axis, so it never reads as drifting off the icon column, and
-     * the wordmark shares the item label's origin.
+     * Kit anatomy: the icon column stays at 12 + 16 + 12 = 40dp in both states and
+     * the mark shares it, so nothing in the rail moves horizontally when it
+     * expands (the library alone would nudge its icon 4dp right). The wordmark
+     * shares the item label's origin, and the mark is dimmed like the inactive
+     * items while the drawer is closed.
      */
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun brandMarkSharesTheItemIconAxisAndLabelOriginInBothStates() {
+    fun nothingInTheRailMovesHorizontallyWhenTheDrawerExpands() {
         settingsShell(1f)
 
-        assertEquals("collapsed icon axis", itemIconCenter(), symbolCenter(), 1f)
+        val iconAxis = 12f + 16f + 12f
+        assertEquals("collapsed icon axis", iconAxis, itemIconCenter(), 1f)
+        assertEquals("collapsed mark axis", iconAxis, symbolCenter(), 1f)
+        val dimmed = symbolPeakBlue()
 
         openDrawer()
 
-        assertEquals("expanded icon axis", itemIconCenter(), symbolCenter(), 1f)
+        assertEquals("expanded icon axis", iconAxis, itemIconCenter(), 1f)
+        assertEquals("expanded mark axis", iconAxis, symbolCenter(), 1f)
         assertEquals("wordmark on the label origin", labelInkLeft(), bounds("global-drawer-wordmark").left, 1f)
+        assertTrue("mark brightens when the drawer is active ($dimmed -> ${symbolPeakBlue()})", symbolPeakBlue() > dimmed + 0.3f)
+    }
+
+    /** Strongest blue channel inside the brand box, as drawn. */
+    private fun symbolPeakBlue(): Float {
+        val bitmap = drawShell()
+        val brand = bounds("global-drawer-brand")
+        return (0..70).maxOf { x ->
+            (brand.top.toInt()..brand.bottom.toInt()).maxOf { y -> Color(bitmap.getPixel(x, y)).blue }
+        }
     }
 
     /** Horizontal centre of the first destination's icon ink, as drawn. */

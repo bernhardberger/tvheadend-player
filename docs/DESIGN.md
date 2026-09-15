@@ -122,8 +122,13 @@ Anatomy per Material for TV / design kit:
   non-interactive, never first focus, outside Back. The wordmark announces the
   app name once and reveals/hides with the same transitions as item labels.
 - Destinations (Channels, Guide, Recordings) are centred between the top section
-  and the bottom section; Settings is the bottom section. Row positions are
-  identical in both states; the brand mark moves with the item icons.
+  and the bottom section; Settings is the bottom section. Nothing in the rail
+  moves when it expands: rows keep their positions and icons and the brand mark
+  stay on the kit's fixed icon column (12 + 16dp; the library's 4dp leading-slot
+  growth is cancelled). Only the sheet widens and labels/wordmark reveal.
+- Inactive drawer (focus elsewhere) is dimmed: unselected items use the library's
+  0.4 inactive content colour and the brand mark uses the same alpha; the
+  selected item stays full. Everything is full opacity while the drawer is active.
 - Items are library defaults: 48dp one-line, pill, 24dp icons,
   `NavigationDrawerItemDefaults.colors()`.
 - Drawer entry focuses the current destination. Focus preview changes the
@@ -161,8 +166,13 @@ Accepted 2026-09-15; static design in Penpot page
   parent fully off-screen. The container supports arbitrary depth and is
   reusable (recording folders are a candidate consumer; not designed yet).
 - Geometry on the 80dp shell: active column x128, width 352; preview x588
-  (108dp gap), 460dp step. Preview opacity 0.8. Playback and the warm scrim stay
-  stationary; only columns move.
+  (108dp gap), 460dp step. Playback and the warm scrim stay stationary; only
+  columns move.
+- Motion and emphasis follow AOSP TvSettings' two-panel transition: preview
+  opacity 0.6; the slide is a long decelerating tween (1000ms, cubic-bezier
+  0.18, 1, 0.22, 1); the column entering the active slot brightens 0.6 → 1 over
+  200ms while the outgoing one dims. Headings are identical in the active and
+  preview slots (no back chevron), so a column changing role never shifts text.
 - Level 1 uses standard TV list rows with meaningful icons; deeper levels use
   icons only when meaningful; second lines carry values/status, never
   descriptions of a submenu. Section headings group rows.

@@ -3,7 +3,10 @@ package at.bernhardberger.tvhplayer.ui.components.depth
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -75,6 +78,16 @@ fun rememberDepthNavigationState(rootId: String, initialItemId: String? = null):
     }
 
 /**
+ * Depth motion follows AOSP TvSettings' two-panel transition: a long, decelerating
+ * slide (`easing_browse`) with a short alpha crossfade, and a 0.6 preview dim.
+ */
+internal const val DepthPreviewAlpha = 0.6f
+internal const val DepthSlideMillis = 1000
+internal const val DepthAlphaMillis = 200
+private val DepthBrowseEasing = CubicBezierEasing(0.18f, 1f, 0.22f, 1f)
+private fun depthSlideSpec() = tween<IntOffset>(DepthSlideMillis, easing = DepthBrowseEasing)
+
+/**
  * One active slot at every depth, plus an inert child preview. Only the current visit
  * can publish focus/scroll or act. Outgoing compositions are presentation snapshots.
  * The shell owns the stationary background and the global navigation layer.
@@ -91,7 +104,7 @@ fun DepthNavigation(
     initialFocusEnabled: Boolean = true,
     backEnabled: Boolean = true,
     onRootBack: (() -> Unit)? = null,
-    previewAlpha: Float = .8f,
+    previewAlpha: Float = DepthPreviewAlpha,
     isCurrent: Boolean = true,
 ) {
     val stack = state.stack
@@ -200,9 +213,9 @@ fun DepthNavigation(
             targetState = stack.frames.size to stack.visit,
             transitionSpec = {
                 val entering = targetState.first >= initialState.first
-                (slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) {
+                (slideInHorizontally(depthSlideSpec()) {
                     if (entering) stepPixels * direction else -it * direction
-                }).togetherWith(slideOutHorizontally(tween(220, easing = FastOutSlowInEasing)) {
+                }).togetherWith(slideOutHorizontally(depthSlideSpec()) {
                     // Child enters from the preview slot; parent exits wholly offscreen.
                     if (entering) -it * direction else stepPixels * direction
                 })
@@ -211,6 +224,12 @@ fun DepthNavigation(
             label = "depth-navigation",
         ) { (depth, visit) ->
             val active = visit == state.stack.visit && isCurrent
+            // The column entering the active slot brightens from the preview dim to full;
+            // the outgoing one dims on the same short fade while the slide carries it away.
+            val columnAlpha by transition.animateFloat(
+                transitionSpec = { tween(DepthAlphaMillis) },
+                label = "depth-column-alpha",
+            ) { if (it == EnterExitState.Visible) 1f else previewAlpha }
             val retained = remember(visit) { DepthPresentation(level, reconciled.active) }
             SideEffect {
                 if (active && state.stack.visit == visit) {
@@ -263,7 +282,9 @@ fun DepthNavigation(
                         rendered.activeContent.invoke(editorFocus, ::editorLeft)
                     }
                 } else {
-                Column(Modifier.width(columnWidth).fillMaxHeight().padding(top = contentPadding.calculateTopPadding())) {
+                Column(Modifier.width(columnWidth).fillMaxHeight()
+                    .graphicsLayer { alpha = columnAlpha }
+                    .padding(top = contentPadding.calculateTopPadding())) {
                     rendered.heading(depth > 1)
                     LazyColumn(
                         state = list,

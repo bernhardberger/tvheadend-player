@@ -1,9 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import at.bernhardberger.tvhplayer.BuildConfig
-import at.bernhardberger.tvhplayer.profiling.profileLayout
-import at.bernhardberger.tvhplayer.profiling.profileTrace
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
@@ -17,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
@@ -25,33 +22,37 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRestorer
-import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.DrawerState
+import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.NavigationDrawer
@@ -59,10 +60,13 @@ import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.NavigationDrawerItemDefaults
 import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseShellBackAction
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
 import at.bernhardberger.tvhplayer.models.RailItem
+import at.bernhardberger.tvhplayer.profiling.profileLayout
+import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 
@@ -80,18 +84,31 @@ private val BrandWordmarkHeight = 18.dp
 // tv-material's drawer item is a ListItem with 16dp content padding whose leading
 // slot is a 32dp minimum box holding the 24dp icon. Collapsed (56dp) only 24dp
 // remain for that slot, so the icon sits at 16..40; as the item widens past 64dp
-// the slot regains its 32dp and the icon settles at 20..44, with the label at 56.
-// The mark derives its centre from the same animated width so it moves in
-// lockstep with the item icons instead of stepping ahead of them.
+// the slot regains its 32dp and the library nudges the icon to 20..44. The kit
+// keeps the icon at x16 in both states, so the icon is pinned there and the mark
+// shares that fixed axis: nothing in the rail moves horizontally when it expands.
 private val ItemContentPadding = 16.dp
 private val ExpandedItemLabelStart = 56.dp
+private val ItemIconCenter = ItemContentPadding + NavigationDrawerItemDefaults.IconSize / 2
 
-private fun itemIconCenter(itemWidth: Dp): Dp {
-    val available = itemWidth - ItemContentPadding * 2
-    val leadingSlot = available
-        .coerceAtLeast(NavigationDrawerItemDefaults.IconSize)
-        .coerceAtMost(ListItemDefaults.IconSize)
-    return ItemContentPadding + leadingSlot / 2
+/** Dim applied to the decorative mark while the drawer is inactive, matching the
+ *  library's inactive content colour for unselected items. */
+private const val InactiveBrandAlpha = 0.4f
+
+/**
+ * Cancels the library's leading-slot growth so the icon stays on the kit's fixed
+ * axis while the item width animates.
+ */
+@Composable
+private fun PinnedRailIcon(itemWidthPx: () -> Int, icon: @Composable () -> Unit) {
+    Box(
+        Modifier.offset {
+            val padding = ItemContentPadding.roundToPx()
+            val slot = (itemWidthPx() - padding * 2)
+                .coerceIn(NavigationDrawerItemDefaults.IconSize.roundToPx(), ListItemDefaults.IconSize.roundToPx())
+            IntOffset(-(slot - NavigationDrawerItemDefaults.IconSize.roundToPx()) / 2, 0)
+        },
+    ) { icon() }
 }
 
 /** Current measure's visible extent from the browse content's logical leading edge. */
@@ -305,11 +322,13 @@ internal fun SideRail(
 
                     mainItems.forEach { item ->
                         key(item.route) {
+                            val itemWidth = remember { mutableIntStateOf(0) }
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
-                                leadingContent = item.icon,
+                                leadingContent = { PinnedRailIcon({ itemWidth.intValue }, item.icon) },
                                 modifier = Modifier
+                                    .onSizeChanged { itemWidth.intValue = it.width }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
@@ -334,11 +353,13 @@ internal fun SideRail(
 
                     footerItems.forEach { item ->
                         key(item.route) {
+                            val itemWidth = remember { mutableIntStateOf(0) }
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
-                                leadingContent = item.icon,
+                                leadingContent = { PinnedRailIcon({ itemWidth.intValue }, item.icon) },
                                 modifier = Modifier
+                                    .onSizeChanged { itemWidth.intValue = it.width }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
@@ -379,7 +400,8 @@ internal fun SideRail(
  * click action, and never changes first focus or Back; the app name is announced
  * once by the wordmark. Its width animates between the same two drawer item
  * widths on `animateDpAsState`'s default spring, as the library item does, so the
- * mark reveals with the sheet instead of widening it ahead of the items.
+ * mark reveals with the sheet instead of widening it ahead of the items. The mark
+ * itself never moves; while the drawer is inactive it is dimmed like the items.
  */
 @Composable
 private fun DrawerBrandHeader(drawerValue: DrawerValue) {
@@ -392,7 +414,6 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
         },
         label = "drawerBrandHeaderWidth",
     )
-    val symbolCenter = itemIconCenter(headerWidth)
     Box(
         modifier = Modifier
             .width(headerWidth)
@@ -405,8 +426,9 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
             contentDescription = null,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = symbolCenter - BrandSymbolSize / 2)
-                .size(BrandSymbolSize),
+                .padding(start = ItemIconCenter - BrandSymbolSize / 2)
+                .size(BrandSymbolSize)
+                .graphicsLayer { alpha = if (expanded) 1f else InactiveBrandAlpha },
         )
         // The wordmark reveals and hides with the same transitions the library
         // applies to the drawer items' labels.

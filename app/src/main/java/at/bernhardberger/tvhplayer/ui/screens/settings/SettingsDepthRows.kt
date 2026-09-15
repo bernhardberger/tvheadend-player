@@ -23,13 +23,11 @@ internal fun settingsLevel(
     rows: List<DepthRow>,
     activeContent: (@Composable (androidx.compose.ui.focus.FocusRequester, (android.view.KeyEvent) -> Boolean) -> Unit)? = null,
     initialItemId: String? = null,
-) = DepthLevel(id, rows, heading = { back ->
+) = DepthLevel(id, rows, heading = { _ ->
+    // Same heading in the active and preview slots (AOSP TvSettings parity): no
+    // back chevron, so the title never shifts when a column changes role.
     Row(Modifier.fillMaxWidth().heightIn(min = SettingsDepthHeadingHeight).padding(bottom = TvSpacing24),
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        if (back) {
-            Icon(painterResource(R.drawable.ic_keyboard_arrow_left), null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurface)
-            Spacer(Modifier.width(TvSpacing8))
-        }
         Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.semantics { heading() })
     }
