@@ -4,6 +4,7 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusGroup
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.DrawerState
 import androidx.tv.material3.Icon
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.NavigationDrawerItemDefaults
@@ -75,12 +77,22 @@ private val BrandHeaderHeight = 56.dp
 private val BrandSymbolSize = 32.dp
 private val BrandWordmarkHeight = 18.dp
 
-// Measured from the tv-material drawer item itself: its 24dp icon box sits at
-// 16..40 while collapsed and at 20..44 once expanded, and the label starts at 56.
-// The mark follows that axis so it never drifts off the icon column.
-private val CollapsedItemIconCenter = 28.dp
-private val ExpandedItemIconCenter = 32.dp
+// tv-material's drawer item is a ListItem with 16dp content padding whose leading
+// slot is a 32dp minimum box holding the 24dp icon. Collapsed (56dp) only 24dp
+// remain for that slot, so the icon sits at 16..40; as the item widens past 64dp
+// the slot regains its 32dp and the icon settles at 20..44, with the label at 56.
+// The mark derives its centre from the same animated width so it moves in
+// lockstep with the item icons instead of stepping ahead of them.
+private val ItemContentPadding = 16.dp
 private val ExpandedItemLabelStart = 56.dp
+
+private fun itemIconCenter(itemWidth: Dp): Dp {
+    val available = itemWidth - ItemContentPadding * 2
+    val leadingSlot = available
+        .coerceAtLeast(NavigationDrawerItemDefaults.IconSize)
+        .coerceAtMost(ListItemDefaults.IconSize)
+    return ItemContentPadding + leadingSlot / 2
+}
 
 /** Current measure's visible extent from the browse content's logical leading edge. */
 internal val LocalBrowseVisibleWidthPx = compositionLocalOf<Int?> { null }
@@ -380,9 +392,7 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
         },
         label = "drawerBrandHeaderWidth",
     )
-    // The library item moves its icon column 16..40 -> 20..44 as a step, not a
-    // tween; the mark takes the same step so it never drifts against the icons.
-    val symbolCenter = if (expanded) ExpandedItemIconCenter else CollapsedItemIconCenter
+    val symbolCenter = itemIconCenter(headerWidth)
     Box(
         modifier = Modifier
             .width(headerWidth)
@@ -398,17 +408,26 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
                 .padding(start = symbolCenter - BrandSymbolSize / 2)
                 .size(BrandSymbolSize),
         )
-        Image(
-            painter = painterResource(R.drawable.brand_wordmark),
-            contentDescription = stringResource(R.string.app_name),
-            // A logo keeps its drawn proportions instead of following font scale.
+        // The wordmark reveals and hides with the same transitions the library
+        // applies to the drawer items' labels.
+        AnimatedVisibility(
+            visible = expanded,
+            enter = NavigationDrawerItemDefaults.ContentAnimationEnter,
+            exit = NavigationDrawerItemDefaults.ContentAnimationExit,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = ExpandedItemLabelStart)
-                .wrapContentWidth(align = Alignment.Start, unbounded = true)
-                .requiredHeight(BrandWordmarkHeight)
-                .testTag("global-drawer-wordmark"),
-        )
+                .padding(start = ExpandedItemLabelStart),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.brand_wordmark),
+                contentDescription = stringResource(R.string.app_name),
+                // A logo keeps its drawn proportions instead of following font scale.
+                modifier = Modifier
+                    .wrapContentWidth(align = Alignment.Start, unbounded = true)
+                    .requiredHeight(BrandWordmarkHeight)
+                    .testTag("global-drawer-wordmark"),
+            )
+        }
     }
 }
 

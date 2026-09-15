@@ -123,13 +123,16 @@ class NavigationShellEvidenceTest {
         compose.onNodeWithTag("global-drawer-brand").assert(isNotFocusable())
         compose.onNodeWithTag("global-drawer-brand")
             .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-        compose.onNodeWithTag("global-drawer-wordmark")
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-        compose.onAllNodesWithContentDescription(appName).assertCountEquals(1)
+        // Like the item labels, the wordmark is only composed while expanded.
+        compose.onNodeWithTag("global-drawer-wordmark").assertDoesNotExist()
+        compose.onAllNodesWithContentDescription(appName).assertCountEquals(0)
 
         openDrawer()
         // Drawer entry still lands on the current destination, not on the mark.
         compose.onNodeWithTag("nav-settings").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-wordmark")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        compose.onAllNodesWithContentDescription(appName).assertCountEquals(1)
 
         compose.onNodeWithTag("nav-channels")
             .performSemanticsAction(SemanticsActions.RequestFocus) { it() }
