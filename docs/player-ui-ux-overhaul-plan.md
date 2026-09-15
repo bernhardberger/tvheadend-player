@@ -21,7 +21,7 @@ Before implementation read `AGENTS.md`, use `docs/README.md`, then read:
 
 - this plan;
 - `docs/current-player-ui-ux-2026-07-29.md`;
-- `docs/tv-design-spec.md`;
+- `docs/DESIGN.md`;
 - only the relevant playback/DVR/appliance sections of
   `docs/appliance-mode-spec.md` and `docs/appliance-mode-plan.md`.
 

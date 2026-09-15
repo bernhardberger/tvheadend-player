@@ -37,7 +37,7 @@ focus/navigation, cached startup and synchronization presentation. Keep the
 accepted SDK/HTSP/Media3 playback path, decoder selection, native libraries,
 product identity and appliance boundaries intact.
 
-Use [the TV design specification](tv-design-spec.md) for the interaction and
+Use [the TV design specification](DESIGN.md) for the interaction and
 accessibility floor, [code ownership](code-ownership.md) for application
 boundaries, and [the profiling workflow](profiling.md) for measurement. Align
 changes to accepted production behavior with the specification as they land.

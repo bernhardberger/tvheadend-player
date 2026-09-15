@@ -31,7 +31,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
 | `test-device-credential-provisioning.md` | Test-device credential workflow; provisioning work only. |
-| `tv-design-spec.md` | Current TV visual and interaction rules; Compose UI or UX work. |
+| `DESIGN.md` | Current TV visual and interaction rules; Compose UI or UX work. |
 
 ## Active plans
 
@@ -61,7 +61,8 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `codebase-audit-2026-07-23.md` | Point-in-time hardening audit with later updates. Use only for a specifically identified finding, then verify current source. |
 | `current-player-ui-ux-2026-07-29.md` | Revision-bound fullscreen-player baseline and exact replacement G10 screenshot manifest used by the completed overhaul. Revalidate every claim against current source. |
 | `media3-upgrade-assessment-2026-07-28.md` | Evidence and remaining gate for the named Media3 upgrade only. |
-| `tv-design-audit-2026-07-27.md` | Historical rationale for `tv-design-spec.md`; the specification is authoritative. |
+| `tv-design-audit-2026-07-27.md` | Historical rationale for `DESIGN.md`; the specification is authoritative. |
+| `archive/tv-design-spec-2026-09.md` | Superseded long-form specification; historical only. |
 
 ## Historical and local material
 

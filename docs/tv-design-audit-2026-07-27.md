@@ -1,7 +1,7 @@
 # TV design system audit
 
 Date: 2026-07-27
-Status: dated historical rationale. `docs/tv-design-spec.md` is authoritative.
+Status: dated historical rationale. `docs/DESIGN.md` is authoritative.
 Audited head: `6fb8d4d` (`Prepare 0.1.3 release`)
 Worktree at audit: `docs/appliance-mode-plan.md`, `tools/device`,
 `tools/tests/test_device.py` modified and unrelated to this work.
@@ -526,7 +526,7 @@ lines since those were written.
 
 1. ~~**Colour direction**~~ — **decided 2026-07-28: cyan as primary.** `primary`
    becomes `#00BCFA`, and orange `#FA7F00` is reserved to the player seekbar
-   alone. Recorded normatively in `docs/tv-design-spec.md` §1. Two knock-ons are
+   alone. Recorded normatively in `docs/DESIGN.md` §1. Two knock-ons are
    folded into that spec: `TvTrackAlpha` drops to 0.20 because orange separates
    from the old track at only 3.46:1, and the app's three warm reds collapse to
    one recording token so orange is not confusable with a REC mark.

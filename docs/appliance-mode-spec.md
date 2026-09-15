@@ -151,7 +151,7 @@ fun adjacentChannelId(
   full available EPG metadata, and recording status/action. Back remains the
   canonical dismiss action even when an explicit Close action is also present.
 - The Player composition and remote/focus grammar are specified in
-  `tv-design-spec.md`. Identity and committed-programme Now/Next remain at top
+  `DESIGN.md`. Identity and committed-programme Now/Next remain at top
   left with start/end times and separate programme progress; the current wall
   clock remains at top right. Stable Info, Settings, neutral Record and immediate
   Stop icons sit above the capacity-based timeline with a reserved Live/Go live

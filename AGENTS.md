@@ -52,7 +52,7 @@ entire skill family. Multiple rows apply only when their concerns are affected.
 
 | Concern | Required authority and workflow |
 |---|---|
-| Compose UI, focus, remote keys, accessibility, TV surfaces | `docs/tv-design-spec.md`; `android-tv-compose-ux`, whose router selects focused mechanics |
+| Compose UI, focus, remote keys, accessibility, TV surfaces | `docs/DESIGN.md`; `android-tv-compose-ux`, whose router selects focused mechanics |
 | Channels, EPG, recordings, DVR | `live-tv-dvr-conventions`; the relevant appliance specification/plan sections only when appliance behavior is involved |
 | Appliance launch, HOME, GUIDE, wake, Simple TV | `docs/appliance-mode-spec.md`, relevant sections of `docs/appliance-mode-plan.md` |
 | Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; native provenance references only for dependency/native work; dated assessments only for a named upgrade/finding |

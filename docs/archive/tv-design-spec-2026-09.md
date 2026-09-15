@@ -1,3 +1,5 @@
+> Superseded 2026-09-15 by `docs/DESIGN.md`. Historical, mixed authority; not normative.
+
 # TV design specification
 
 Status: normative from 2026-07-28. Supersedes ad-hoc values in `ui/`.

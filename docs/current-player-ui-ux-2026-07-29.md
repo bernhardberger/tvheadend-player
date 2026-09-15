@@ -4,7 +4,7 @@
 session was performed on 2026-07-29 against `90f7178c0592-dirty`; the complete
 inventory was revalidated and a replacement screenshot set was captured on
 2026-07-30 against `51a4f3abb2d6-dirty`.  Current source, tests,
-`docs/tv-design-spec.md`, and the matching normative specification take
+`docs/DESIGN.md`, and the matching normative specification take
 precedence.
 
 **Scope:** Fullscreen Live TV, timeshift, and recording playback.  This is

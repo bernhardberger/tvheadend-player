@@ -19,7 +19,7 @@
 Make remote navigation responsive and sustained browsing fluid before expanding
 the planned Channels/Guide redesign. Preserve the accepted SDK/HTSP/Media3
 playback path, decoder selection, native libraries, product identity and appliance
-boundaries. Follow the [TV specification](tv-design-spec.md),
+boundaries. Follow the [TV specification](DESIGN.md),
 [code ownership](code-ownership.md) and [profiling workflow](profiling.md).
 
 Completed experiments, source/build hashes, rejected measurements and deployment

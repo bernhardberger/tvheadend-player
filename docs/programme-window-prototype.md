@@ -1,7 +1,7 @@
 # Programme-window B prototype
 
 Status: reversible product experiment using published SDK 0.9.0. Normative
-presentation rules are in `tv-design-spec.md`, section 6.2. Disable the experiment
+presentation rules are in `DESIGN.md` §9 and §10. Disable the experiment
 with `-Pplayer.programmeWindowB=false`; no public setting is introduced.
 
 The SDK estimate is schedule-grade, not a precise broadcast timestamp. Network,

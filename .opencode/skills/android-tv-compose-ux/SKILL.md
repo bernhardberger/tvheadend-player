@@ -6,7 +6,7 @@ description: Use ONLY as the TVHeadend Player product overlay for Compose UI, Ma
 # Android TV Compose UX
 
 This is a product overlay, not a general Compose implementation guide. Treat
-`docs/tv-design-spec.md` as the normative visual and interaction specification.
+`docs/DESIGN.md` as the normative visual and interaction specification.
 Read its relevant sections and apply the TV interaction floor in `AGENTS.md` before
 making a UI decision; do not copy token values or mutable screen rules into this
 skill. The dated skills audit is provenance, not mandatory implementation
@@ -53,7 +53,7 @@ for an unchanged interaction:
 5. Loading, empty, unavailable, reconnecting, error, and destructive states.
 
 Focus may preview content without committing it. Use the commit model specified
-for the component in `docs/tv-design-spec.md`; do not persist or trigger a domain
+for the component in `docs/DESIGN.md`; do not persist or trigger a domain
 action from incidental focus unless the specification explicitly says focus is
 the commit.
 
