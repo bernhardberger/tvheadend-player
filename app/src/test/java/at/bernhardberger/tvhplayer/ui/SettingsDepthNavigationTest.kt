@@ -89,6 +89,180 @@ class SettingsDepthNavigationTest {
         assertFalse(hostSawCenterUp)
     }
 
+    /**
+     * Enter/Back before the fade or before the slide settles must keep focus and
+     * activation on the latest visit. Outgoing copies cannot commit.
+     */
+    @Test fun interruptedPushAndPopFocusLatestAndDropStaleActivation() {
+        var activations = 0
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                navigation = rememberDepthNavigationState("root")
+                SettingsScreenNavigation(navigation, listOf(
+                    settingsLevel("root", "Root", listOf(
+                        settingsRow("child", "Open child", child = "child"),
+                        settingsRow("leaf", "Leaf", onClick = { activations++ }),
+                    )),
+                    settingsLevel("child", "Child", listOf(
+                        settingsRow("inner", "Inner", onClick = { activations++ }),
+                    )),
+                ))
+            }
+        }
+        compose.onNodeWithText("Open child").assertIsFocused()
+        for (delay in listOf(100L, 400L)) {
+            compose.mainClock.autoAdvance = false
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.mainClock.advanceTimeBy(delay)
+            compose.onRoot().performKeyInput { pressKey(Key.Back) }
+            compose.mainClock.advanceTimeBy(delay)
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.mainClock.autoAdvance = true
+            compose.waitForIdle()
+            assertEquals("stale activation after interrupt $delay", 0, activations)
+            assertEquals(2, navigation.stack.frames.size)
+            compose.onNodeWithText("Inner").assertIsFocused()
+            compose.mainClock.autoAdvance = false
+            compose.onRoot().performKeyInput { pressKey(Key.Back) }
+            compose.mainClock.advanceTimeBy(delay)
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.mainClock.autoAdvance = true
+            compose.waitForIdle()
+            assertEquals("stale inner activation after pop-push $delay", 0, activations)
+            assertEquals(2, navigation.stack.frames.size)
+            compose.onNodeWithText("Inner").assertIsFocused()
+            press(Key.Back)
+            compose.onNodeWithText("Open child").assertIsFocused()
+        }
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        assertEquals(1, activations)
+    }
+
+    /**
+     * Path reuse updates the live row callback on recomposition. The activate
+     * lambda from the first visit must stay inert after leave + re-enter of the
+     * same path — invoking that retained original, not a later outgoing copy.
+     */
+    @Test fun retainedActivateFromEarlierVisitDoesNotCommitAfterReentry() {
+        var activations = 0
+        var retainedActivate: (() -> Unit)? = null
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                navigation = rememberDepthNavigationState("root")
+                SettingsScreenNavigation(navigation, listOf(
+                    settingsLevel("root", "Root", listOf(
+                        settingsRow("child", "Open child", child = "child"),
+                        DepthRow(DepthItem("leaf"), { activations++ }) { modifier, activate ->
+                            SideEffect { if (retainedActivate == null) retainedActivate = activate }
+                            Button(onClick = activate, modifier = modifier) { Text("Leaf") }
+                        },
+                    )),
+                    settingsLevel("child", "Child", listOf(
+                        settingsRow("inner", "Inner"),
+                    )),
+                ))
+            }
+        }
+        compose.waitForIdle()
+        val original = retainedActivate
+        assertNotNull("original active callback was never captured", original)
+        val firstVisit = navigation.stack.visit
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Inner").assertIsFocused()
+        assertTrue(navigation.stack.visit > firstVisit)
+        press(Key.Back)
+        compose.onNodeWithText("Open child").assertIsFocused()
+        val returnedVisit = navigation.stack.visit
+        assertTrue("re-entry must be a new visit", returnedVisit > firstVisit)
+        assertEquals(1, navigation.stack.frames.size)
+        original!!.invoke()
+        compose.waitForIdle()
+        assertEquals("retained first-visit activate committed after re-entry", 0, activations)
+        assertEquals(returnedVisit, navigation.stack.visit)
+        assertEquals(1, navigation.stack.frames.size)
+        compose.onNodeWithText("Open child").assertIsFocused()
+    }
+
+    /**
+     * isCurrent can drop without a new visit. The first-visit activate lambda must
+     * read latest ownership, not the captured active flag.
+     */
+    @Test fun retainedActivateDoesNotCommitAfterOwnerLosesCurrentWithoutNewVisit() {
+        var activations = 0
+        var retainedActivate: (() -> Unit)? = null
+        var current by mutableStateOf(true)
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                navigation = rememberDepthNavigationState("root")
+                SettingsScreenNavigation(
+                    navigation,
+                    listOf(
+                        settingsLevel("root", "Root", listOf(
+                            settingsRow("child", "Open child", child = "child"),
+                            DepthRow(DepthItem("leaf"), { activations++ }) { modifier, activate ->
+                                SideEffect { if (retainedActivate == null) retainedActivate = activate }
+                                Button(onClick = activate, modifier = modifier) { Text("Leaf") }
+                            },
+                        )),
+                        settingsLevel("child", "Child", listOf(settingsRow("inner", "Inner"))),
+                    ),
+                    isCurrent = current,
+                )
+            }
+        }
+        compose.waitForIdle()
+        val original = retainedActivate
+        assertNotNull(original)
+        compose.onNodeWithText("Open child").assertIsFocused()
+        val visit = navigation.stack.visit
+        val frames = navigation.stack.frames.size
+        compose.runOnIdle { current = false }
+        compose.waitForIdle()
+        assertEquals(visit, navigation.stack.visit)
+        original!!.invoke()
+        compose.waitForIdle()
+        assertEquals(0, activations)
+        assertEquals(visit, navigation.stack.visit)
+        assertEquals(frames, navigation.stack.frames.size)
+        assertEquals("child", navigation.stack.active.focusedItemId)
+    }
+
+    /**
+     * Off-screen restore must not request the captured item after a newer focus
+     * lands before the suspended restore finishes.
+     */
+    @Test fun offscreenRestoreDoesNotStealNewerFocus() {
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                navigation = rememberDepthNavigationState("root")
+                SettingsScreenNavigation(navigation, listOf(
+                    settingsLevel("root", "Root", (0..18).map { index ->
+                        settingsRow("row-$index", "Item $index", child = "child")
+                    }),
+                    settingsLevel("child", "Child", listOf(settingsRow("inner", "Inner"))),
+                ))
+            }
+        }
+        repeat(12) { press(Key.DirectionDown) }
+        compose.onNodeWithText("Item 12").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Inner").assertIsFocused()
+        val items = (0..18).map { DepthItem("row-$it", "child") }
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.Back) }
+        compose.mainClock.advanceTimeBy(16)
+        compose.runOnIdle { navigation.update(navigation.stack.focus("row-11", items)) }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertEquals("row-11", navigation.stack.active.focusedItemId)
+        assertEquals(1, navigation.stack.frames.size)
+    }
+
     @Test fun dedicatedLeafWithoutPreviewRowsStillReceivesInitialFocus() {
         compose.setContent {
             TVHeadendPlayerTheme {

@@ -173,6 +173,10 @@ Accepted 2026-09-15; static design in Penpot page
   0.18, 1, 0.22, 1); the column entering the active slot brightens 0.6 → 1 over
   200ms while the outgoing one dims. Headings are identical in the active and
   preview slots (no back chevron), so a column changing role never shifts text.
+  Settled sibling preview switches crossfade different siblings overlapping at the
+  preview slot (AnimatedContent fadeIn/fadeOut over config_longAnimTime, enter
+  0.12,1,0.40,1 / exit 0.40,1,0.12,1, separate from the slide); push/pop never
+  draws the same level twice.
 - Level 1 uses standard TV list rows with meaningful icons; deeper levels use
   icons only when meaningful; second lines carry values/status, never
   descriptions of a submenu. Section headings group rows.

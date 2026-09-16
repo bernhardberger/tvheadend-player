@@ -23,6 +23,8 @@ data class DepthStack(val frames: List<DepthFrame>, val visit: Long = 0, val pre
     init { require(frames.isNotEmpty()) }
     val active: DepthFrame get() = frames.last()
     val canPop: Boolean get() = frames.size > 1
+    /** Root-to-active level ids. Visit is not part of this visual identity. */
+    val path: List<String> get() = frames.map { it.levelId }
 
     fun focus(itemId: String, items: List<DepthItem>): DepthStack {
         val index = items.indexOfFirst { it.id == itemId }
