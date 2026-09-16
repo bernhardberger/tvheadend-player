@@ -20,7 +20,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -151,7 +150,9 @@ internal fun <T> BrowseTabContent(
         AnimatedContent(
             targetState = target,
             contentKey = { it.destination },
-            modifier = modifier.clipToBounds(),
+            // The shell owns screen-edge clipping and the drawer backing. A
+            // local clip here would cut scope transitions off before the rail.
+            modifier = modifier,
             transitionSpec = {
                 val direction = change?.takeIf { it.destination == targetState.destination }?.direction
                 val sign = direction?.takeUnless { initialState.destination == targetState.destination }?.times(rtlSign)

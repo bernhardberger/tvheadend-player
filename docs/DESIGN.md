@@ -103,12 +103,22 @@ rapid changes interrupt toward the latest target. Headers stay stationary.
 - One `SideRail` hosts the standard **push** drawer; content translates and
   clips at its trailing edge, it does not reflow.
 - **Warm playback**: when live playback continues behind an ordinary
-  destination, one global black scrim at **0.76** sits above the video and below
-  navigation, content and notices — for every ordinary destination. Without
+  destination, one global black scrim sits above the video and below
+  navigation, content and notices at **0.84** across ordinary destinations.
+  The shell animates changes to the target using
+  Compose `animateFloatAsState` with a 300ms default-easing tween; both opacity
+  and timing are product choices, not Material requirements. Without
   playback there is no full-screen scrim; the normal themed background shows.
   The player route is excluded; player chrome owns its own gradients. Screens
   never draw their own video scrim.
-- The drawer paints no scrim, gradient or seam veil in either state.
+- **Shared drawer overlap (accepted on G10):** departing depth columns may draw beneath the rail;
+  clipping is at the screen edge. A shell-owned black gradient protects the
+  navigation, continuously from 0.95 at the leading screen edge to transparent
+  128dp beyond the drawer edge, without a stop at the drawer boundary. The drawer remains
+  above it and retains standard push behaviour. These are product values, not
+  Material requirements. The backing applies to every browse destination;
+  the shared sidebar scene and scope-tab transitions do not clip at the drawer
+  edge. Each scrolling list still owns its vertical viewport clipping.
 
 ## 5. Navigation drawer
 

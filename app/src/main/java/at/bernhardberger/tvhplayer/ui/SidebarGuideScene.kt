@@ -18,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
@@ -74,7 +73,9 @@ private data class SidebarGuideScene(
             browseDestinations.indexOf(active.metadata[SIDEBAR_SCENE_DESTINATION]),
             label = "browseDestination",
         )
-        Box(Modifier.fillMaxSize().clipToBounds()) {
+        // The shell clips at the screen edge. Clipping this narrower scene would
+        // cut departing content off at the drawer boundary before its backing.
+        Box(Modifier.fillMaxSize()) {
             // The slots exist before a first visit, so incoming and outgoing pages
             // follow the drawer's vertical order without constructing hidden screens.
             browseDestinations.forEachIndexed { index, destination ->

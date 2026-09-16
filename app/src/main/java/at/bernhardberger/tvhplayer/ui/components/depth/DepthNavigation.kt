@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -249,7 +248,7 @@ fun DepthNavigation(
     }
     val displayed = if (moving) unionStrip(held, desired) else desired
 
-    Box(modifier.clipToBounds().onPreviewKeyEvent { event ->
+    Box(modifier.onPreviewKeyEvent { event ->
         if (!isCurrent) return@onPreviewKeyEvent false
         val native = event.nativeKeyEvent
         val code = native.keyCode

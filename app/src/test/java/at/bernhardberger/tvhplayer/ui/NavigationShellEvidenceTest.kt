@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
@@ -81,6 +82,27 @@ import java.io.File
 @Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class NavigationShellEvidenceTest {
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun scopeTabContentDoesNotReclipLeadingOverflow() {
+        compose.setContent {
+            view = LocalView.current
+            Box(Modifier.fillMaxSize().background(Color.Black).padding(start = 80.dp)) {
+                at.bernhardberger.tvhplayer.ui.components.BrowseTabContent(
+                    motion = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion("scope"),
+                    selectedKey = "scope",
+                    state = { Unit },
+                    modifier = Modifier.fillMaxSize(),
+                ) { _, _ ->
+                    Box(Modifier.fillMaxSize().drawBehind {
+                        drawRect(Color.Red, topLeft = androidx.compose.ui.geometry.Offset(-80.dp.toPx(), 0f))
+                    })
+                }
+            }
+        }
+        compose.waitForIdle()
+        assertEquals("scope wrapper must allow content beneath the rail", Color.Red.toArgb(), drawShell().getPixel(40, 400))
+    }
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
 
@@ -145,12 +167,12 @@ class NavigationShellEvidenceTest {
     }
 
     /**
-     * Pixel evidence that neither drawer state paints a scrim, gradient or seam
-     * veil of its own: a solid field behind the shell stays untouched.
+     * The shared overlap backing falls off gradually in either drawer state,
+     * and leaves the rest of the content untouched.
      */
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun neitherDrawerStatePaintsItsOwnDarkening() {
+    fun sharedDrawerBackingHasSoftFalloffInBothStates() {
         val contentFocus = FocusRequester()
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -326,7 +348,7 @@ class NavigationShellEvidenceTest {
         val row = bounds("nav-channels")
         val rows = row.top.toInt()..row.bottom.toInt()
         val columns = (12..64).filter { x ->
-            rows.any { y -> bitmap.getPixel(x, y) != bitmap.getPixel(2, 300) }
+            rows.any { y -> channelDistance(Color(bitmap.getPixel(x, y)), Color(bitmap.getPixel(x, 400))) > 0.03f }
         }
         check(columns.isNotEmpty()) { "no icon ink in rows $rows of ${bitmap.width}x${bitmap.height}; brand=${bounds("global-drawer-brand")}" }
         return (columns.first() + columns.last()) / 2f
@@ -380,14 +402,17 @@ class NavigationShellEvidenceTest {
         val row = bounds("nav-channels")
         val rows = row.top.toInt()..row.bottom.toInt()
         return (60..260).first { x ->
-            rows.any { y -> bitmap.getPixel(x, y) != bitmap.getPixel(2, 300) }
+            rows.any { y -> channelDistance(Color(bitmap.getPixel(x, y)), Color(bitmap.getPixel(x, 400))) > 0.03f }
         }.toFloat()
     }
 
     private fun assertUntouchedField(state: String) {
         val bitmap = drawShell()
-        val darkened = (0..455).filter { bitmap.getPixel(it, 400) != Color.Red.toArgb() }
-        assertTrue("Drawer state $state darkened the field at x=$darkened", darkened.isEmpty())
+        val end = drawerWidth().toInt() + 128
+        val red = (0..end).map { Color(bitmap.getPixel(it, 400)).red }
+        assertTrue("$state backing should be translucent", red.first() in 0.03f..0.07f)
+        assertTrue("$state backing must have no hard edge", red.zipWithNext().all { (a, b) -> kotlin.math.abs(b - a) < 0.02f })
+        assertEquals("$state content beyond the fade", Color.Red.toArgb(), bitmap.getPixel(end + 8, 400))
     }
 
     /** EN/DE at 1.0 and 1.3, drawer closed and open, over no playback and warm playback. */

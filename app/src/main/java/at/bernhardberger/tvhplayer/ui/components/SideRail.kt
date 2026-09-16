@@ -33,6 +33,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -288,11 +295,11 @@ internal fun SideRail(
         modifier = modifier.fillMaxSize(),
     ) {
         val browseWidth = (maxWidth - ClosedDrawerWidth).coerceAtLeast(0.dp)
-        // The standard push drawer owns no scrim of its own: readability over warm
-        // playback belongs to the single global WarmPlaybackScrimAlpha layer.
+        // Clip at the screen edge, not at the moving content's leading edge.
         NavigationDrawer(
             modifier = Modifier
                 .fillMaxSize()
+                .clipToBounds()
                 .testTag("global-navigation-shell"),
             drawerState = drawerState,
             drawerContent = { drawerValue ->
@@ -505,7 +512,28 @@ private fun BrowseViewport(
     content: @Composable () -> Unit,
 ) {
     SubcomposeLayout(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().zIndex(-1f).drawWithContent {
+            drawContent()
+            run {
+                // Shared overlap trial: a continuous, light falloff without a
+                // second stop at the drawer edge that reads as a vertical seam.
+                val railWidth = (width.toPx() + ClosedDrawerWidth.toPx() - size.width)
+                    .coerceAtLeast(0f)
+                val runout = 128.dp.toPx()
+                val rtl = layoutDirection == LayoutDirection.Rtl
+                val start = if (rtl) size.width + railWidth else -railWidth
+                val end = if (rtl) size.width - runout else runout
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        0f to Color.Black.copy(alpha = 0.95f),
+                        1f to Color.Transparent,
+                        startX = start, endX = end,
+                    ),
+                    topLeft = Offset(if (rtl) end else start, 0f),
+                    size = Size(railWidth + runout, size.height),
+                )
+            }
+        },
     ) { constraints ->
         val fixedWidth = width.roundToPx()
         val placeable = subcompose(Unit) {

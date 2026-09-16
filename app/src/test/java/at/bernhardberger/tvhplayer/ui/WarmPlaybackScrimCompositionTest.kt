@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -22,6 +23,7 @@ import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,9 +38,9 @@ import java.io.File
 class WarmPlaybackScrimCompositionTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun warmPlaybackBehindOrdinaryRouteHasOneScrimAtPointSevenSixAlpha() {
+    @Test fun warmPlaybackBehindOrdinaryRouteHasOneScrimAtPointEightFourAlpha() {
         verify(hasActivePlayback = true, isPlayerRoute = false,
-            expectedPixel = Color.Black.copy(alpha = 0.76f).compositeOver(Color.White).toArgb(),
+            expectedPixel = Color.Black.copy(alpha = 0.84f).compositeOver(Color.White).toArgb(),
             expectedScrims = 1, captureName = "shell-warm-ordinary")
     }
 
@@ -52,6 +54,40 @@ class WarmPlaybackScrimCompositionTest {
         verify(hasActivePlayback = true, isPlayerRoute = true,
             expectedPixel = Color.White.toArgb(), expectedScrims = 0,
             captureName = "shell-player-route")
+    }
+
+    @Test fun scrimSoftlyDarkensAndCanReverseBeforeSettling() {
+        val target = mutableStateOf(0.76f)
+        lateinit var view: View
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            view = LocalView.current
+            Box(Modifier.fillMaxSize().background(Color.White)) {
+                WarmPlaybackScrim(targetAlpha = target.value)
+            }
+        }
+        fun brightness(): Int {
+            val bitmap = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            return android.graphics.Color.red(bitmap.getPixel(480, 270))
+        }
+        val initial = brightness()
+        compose.runOnIdle { target.value = 0.84f }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(96)
+        val intermediate = brightness()
+        assertTrue("must fade, not snap ($initial -> $intermediate)", intermediate in 42 until initial)
+        compose.runOnIdle { target.value = 0.76f }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(400)
+        assertEquals(initial, brightness())
+        compose.runOnIdle { target.value = 0.84f }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(400)
+        assertEquals(41, brightness())
     }
 
     private fun verify(

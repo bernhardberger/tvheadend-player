@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -120,6 +121,7 @@ internal fun MainStartupComposition(
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit),
     modifier: Modifier = Modifier,
     showWarmPlaybackScrim: Boolean = false,
+    warmPlaybackScrimAlpha: Float = WarmPlaybackScrimAlpha,
     persistentSurface: @Composable BoxScope.() -> Unit = {},
     navigation: @Composable BoxScope.(AppNavKey, Boolean) -> Unit = { _, _ -> },
     notices: @Composable BoxScope.() -> Unit = {},
@@ -147,7 +149,7 @@ internal fun MainStartupComposition(
 
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         persistentSurface()
-        if (showWarmPlaybackScrim) WarmPlaybackScrim()
+        if (showWarmPlaybackScrim) WarmPlaybackScrim(targetAlpha = warmPlaybackScrimAlpha)
         val startDestination = state.navigationStartDestination
         if (state.navigationAllowed && startDestination != null) {
             navigation(
@@ -173,8 +175,16 @@ internal fun MainStartupComposition(
 }
 
 @Composable
-internal fun WarmPlaybackScrim(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = WarmPlaybackScrimAlpha))
+internal fun WarmPlaybackScrim(
+    modifier: Modifier = Modifier,
+    targetAlpha: Float = WarmPlaybackScrimAlpha,
+) {
+    val alpha = androidx.compose.animation.core.animateFloatAsState(
+        targetValue = targetAlpha,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300),
+        label = "warmPlaybackScrimAlpha",
+    )
+    Box(modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = alpha.value)) }
         .testTag("warm-playback-scrim"))
 }
 

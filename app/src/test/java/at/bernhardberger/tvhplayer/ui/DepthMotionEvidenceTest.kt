@@ -32,6 +32,8 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.UiSettings
@@ -134,27 +136,37 @@ class DepthMotionEvidenceTest {
     }
 
     /**
-     * Depth columns belong to the browse viewport. A column that slides out of the
-     * active slot must disappear at the viewport's edge instead of travelling across
-     * the drawer, and the drawer must be drawn identically in every frame of both a
-     * push and a pop.
+     * The overlap trial lets departing columns remain visible beneath the rail.
+     * The protective gradient must dim them, and navigation remains on top.
      */
     @Test
-    fun depthMotionNeverPaintsOverTheDrawer() {
+    fun depthMotionPassesBeneathProtectedDrawer() {
         shell()
         assertEquals(128f, bounds("depth-active").left, .5f)
-        val rail = drawerPixels(draw())
+        val reference = draw()
+        var sawOverflow = false
+        fun checkOverlap(frame: Bitmap, label: String) {
+            // Below the header and above the first nav icon: only departing
+            // Settings rows can contribute ink here, never a drawer item.
+            for (x in 16..70) for (y in 120..170) {
+                val pixel = Color(frame.getPixel(x, y))
+                if (frame.getPixel(x, y) != reference.getPixel(x, y)) sawOverflow = true
+                assertTrue("overflow must be subdued at $label", pixel.red < 0.7f)
+            }
+            write("drawer-overlap-$label", frame)
+        }
 
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        depthFrames("push") { frame, label -> assertRailUntouched(rail, frame, label) }
+        depthFrames("push") { frame, label -> checkOverlap(frame, label) }
         settle()
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.Back) }
-        depthFrames("pop") { frame, label -> assertRailUntouched(rail, frame, label) }
+        depthFrames("pop") { frame, label -> checkOverlap(frame, label) }
         settle()
 
         assertEquals(128f, bounds("depth-active").left, .5f)
+        assertTrue("departing content must remain visible beneath the rail", sawOverflow)
     }
 
     /**
@@ -776,25 +788,6 @@ class DepthMotionEvidenceTest {
         compose.waitForIdle()
     }
 
-    private fun assertRailUntouched(reference: List<Int>, frame: Bitmap, label: String) {
-        val drawn = drawerPixels(frame)
-        val differing = reference.indices.filter { reference[it] != drawn[it] }
-        assertTrue(
-            "depth motion painted ${differing.size} drawer pixels at $label," +
-                " first at x=${differing.firstOrNull()?.rem(RAIL_WIDTH)}",
-            differing.isEmpty(),
-        )
-    }
-
-    /** Every pixel of the closed drawer's own column. */
-    private fun drawerPixels(bitmap: Bitmap): List<Int> {
-        val out = ArrayList<Int>(RAIL_WIDTH * bitmap.height / 2)
-        for (y in 0 until bitmap.height step 2) {
-            for (x in 0 until RAIL_WIDTH) out.add(bitmap.getPixel(x, y))
-        }
-        return out
-    }
-
     /** Horizontal ink spans on one row of the canvas, merged across letter gaps. */
     private fun runs(bitmap: Bitmap, y: Int): List<IntRange> {
         val background = bitmap.getPixel(bitmap.width - 4, y)
@@ -870,7 +863,18 @@ class DepthMotionEvidenceTest {
                             showEpgMenu = true,
                             onRootBack = {},
                             onNavigate = {},
-                        ) { padding, drawerActive ->
+                         ) { padding, drawerActive ->
+                            NavDisplay(
+                                backStack = listOf<AppNavKey>(SettingsKey(SettingsSection.GENERAL)),
+                                onBack = {},
+                                sceneStrategies = listOf(rememberSidebarGuideSceneStrategy(
+                                    drawerActive, SettingsKey(SettingsSection.GENERAL),
+                                )),
+                                transitionSpec = { appDestinationContentTransform() },
+                                entryProvider = entryProvider {
+                                    entry<SettingsKey>(metadata = mapOf(
+                                        SIDEBAR_SCENE_DESTINATION to AppDestination.SETTINGS,
+                                    )) {
                             SettingsScreenNavigation(
                                 navigation,
                                 listOf(settingsRootLevel()) + settingsGeneralLevels(
@@ -879,6 +883,9 @@ class DepthMotionEvidenceTest {
                                 ),
                                 initialFocusEnabled = !drawerActive,
                                 contentPadding = padding,
+                            )
+                                    }
+                                },
                             )
                         }
                     }
