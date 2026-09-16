@@ -33,7 +33,11 @@ class GradleEnvironmentTest(unittest.TestCase):
                 deadline = time.monotonic() + 2
                 while time.monotonic() < deadline:
                     status = Path(f"/proc/{pid}/stat")
-                    if not status.exists() or status.read_text().rpartition(") ")[2].split()[0] == "Z":
+                    try:
+                        state = status.read_text().rpartition(") ")[2].split()[0]
+                    except (FileNotFoundError, ProcessLookupError):
+                        break  # The descendant exited before or during the read.
+                    if state == "Z":
                         break
                     time.sleep(0.01)
                 else:
@@ -60,7 +64,11 @@ class GradleEnvironmentTest(unittest.TestCase):
             deadline = time.monotonic() + 2
             while time.monotonic() < deadline:
                 status = Path(f"/proc/{pid}/stat")
-                if not status.exists() or status.read_text().rpartition(") ")[2].split()[0] == "Z":
+                try:
+                    state = status.read_text().rpartition(") ")[2].split()[0]
+                except (FileNotFoundError, ProcessLookupError):
+                    break  # The descendant exited before or during the read.
+                if state == "Z":
                     break
                 time.sleep(0.01)
             else:
