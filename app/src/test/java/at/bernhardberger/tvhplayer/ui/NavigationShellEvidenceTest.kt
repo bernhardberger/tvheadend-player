@@ -215,13 +215,109 @@ class NavigationShellEvidenceTest {
         assertTrue("mark brightens when the drawer is active ($dimmed -> ${symbolPeakBlue()})", symbolPeakBlue() > dimmed + 0.3f)
     }
 
+    /**
+     * The collapsed-rail dim is the library's own: `NavigationDrawerScope.hasFocus`
+     * is `drawerState.currentValue == DrawerValue.Open`, so a closed drawer renders
+     * unselected items with `inactiveContentColor` while the selected destination
+     * keeps its full colour and container — the rail still reports where you are.
+     * The brand mark is not an item, so it follows the same ratio explicitly.
+     *
+     * The selected container is asserted against the library value on the closed
+     * capture only: opening the drawer also focuses that destination, so the open
+     * capture samples the focus container and cannot witness a selected-state dim.
+     */
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun collapsedDrawerDimsUnselectedContentAndKeepsTheSelectedDestinationFull() {
+        settingsShell(1f)
+        val closed = drawShell()
+        val iconClosed = destinationIconPeak(closed)
+        val brandClosed = brandPeakBlue(closed)
+        val indicatorClosed = selectedIndicator(closed)
+
+        openDrawer()
+        val open = drawShell()
+        val iconOpen = destinationIconPeak(open)
+        val brandOpen = brandPeakBlue(open)
+
+        assertInactiveAlpha("unselected destination icon", iconClosed, iconOpen)
+        assertInactiveAlpha("brand mark", brandClosed, brandOpen)
+
+        val expectedIndicator = overlay(
+            TvDarkColors.secondaryContainer,
+            0.4f,
+            TvDarkColors.background,
+        )
+        assertTrue(
+            "closed selected indicator $indicatorClosed should be the library selected " +
+                "container (expected $expectedIndicator), undimmed by any app-owned rail alpha",
+            channelDistance(indicatorClosed, expectedIndicator) < 0.04f,
+        )
+    }
+
     /** Strongest blue channel inside the brand box, as drawn. */
-    private fun symbolPeakBlue(): Float {
-        val bitmap = drawShell()
+    private fun symbolPeakBlue(): Float = brandPeakBlue(drawShell())
+
+    private fun brandPeakBlue(bitmap: Bitmap): Float {
         val brand = bounds("global-drawer-brand")
         return (0..70).maxOf { x ->
             (brand.top.toInt()..brand.bottom.toInt()).maxOf { y -> Color(bitmap.getPixel(x, y)).blue }
         }
+    }
+
+    /**
+     * Strongest channel of the unselected Channels icon. Settings is the selected
+     * destination in [settingsShell], so this ink is ordinary item content.
+     */
+    private fun destinationIconPeak(bitmap: Bitmap): Float {
+        val row = bounds("nav-channels")
+        val background = bitmap.getPixel(2, 300)
+        var peak = 0f
+        for (x in 12..64) {
+            for (y in row.top.toInt()..row.bottom.toInt()) {
+                val pixel = bitmap.getPixel(x, y)
+                if (pixel == background) continue
+                val color = Color(pixel)
+                peak = maxOf(peak, color.red, color.green, color.blue)
+            }
+        }
+        check(peak > 0f) { "no destination icon ink in ${row}" }
+        return peak
+    }
+
+    /** Trailing interior of the selected Settings item — the pill, not the icon. */
+    private fun selectedIndicator(bitmap: Bitmap): Color {
+        val row = bounds("nav-settings")
+        val x = (row.right - 8f).toInt()
+        val y = ((row.top + row.bottom) / 2f).toInt()
+        return Color(bitmap.getPixel(x, y))
+    }
+
+    /** graphicsLayer alpha over an opaque colour on [TvDarkColors.background]. */
+    private fun overlay(source: Color, alpha: Float, background: Color) = Color(
+        red = source.red * alpha + background.red * (1f - alpha),
+        green = source.green * alpha + background.green * (1f - alpha),
+        blue = source.blue * alpha + background.blue * (1f - alpha),
+    )
+
+    private fun channelDistance(a: Color, b: Color) = maxOf(
+        kotlin.math.abs(a.red - b.red),
+        kotlin.math.abs(a.green - b.green),
+        kotlin.math.abs(a.blue - b.blue),
+    )
+
+    /**
+     * Content drawn at the library's `inactiveContentColor` over the dark
+     * background lands near 0.4 of the active peak, not full opacity.
+     */
+    private fun assertInactiveAlpha(label: String, inactive: Float, active: Float) {
+        val ratio = inactive / active
+        assertTrue("$label must brighten when the drawer is active ($inactive -> $active)", active > inactive + 0.08f)
+        assertTrue(
+            "$label inactive/active peak $ratio ($inactive / $active) should be the library " +
+                "inactive content colour, not full opacity or an app-owned rail alpha",
+            ratio in 0.33f..0.50f,
+        )
     }
 
     /** Horizontal centre of the first destination's icon ink, as drawn. */

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
@@ -27,7 +26,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,24 +37,26 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerState
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.Icon
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.NavigationDrawerItemColors
 import androidx.tv.material3.NavigationDrawerItemDefaults
 import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
@@ -69,6 +69,7 @@ import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
+import kotlin.math.roundToInt
 
 // Material for TV drawer padding: 12dp on both edges of the item column.
 private val DrawerStartPadding = 12.dp
@@ -91,24 +92,59 @@ private val ItemContentPadding = 16.dp
 private val ExpandedItemLabelStart = 56.dp
 private val ItemIconCenter = ItemContentPadding + NavigationDrawerItemDefaults.IconSize / 2
 
-/** Dim applied to the decorative mark while the drawer is inactive, matching the
- *  library's inactive content colour for unselected items. */
-private const val InactiveBrandAlpha = 0.4f
-
 /**
- * Cancels the library's leading-slot growth so the icon stays on the kit's fixed
- * axis while the item width animates.
+ * The library owns the collapsed-rail dim. `NavigationDrawerScope.hasFocus` is
+ * `drawerState.currentValue == DrawerValue.Open`, and a closed drawer renders
+ * unselected items with `inactiveContentColor`; the selected destination keeps
+ * its full colour so the rail still reports where you are.
+ *
+ * That dim cannot reach an icon-only rail as shipped. `ListItem` publishes its
+ * leading slot as `LocalContentColor.current.copy(alpha = 0.8f)`, and `copy`
+ * replaces the alpha rather than scaling it, so the library's own
+ * `onSurface.copy(alpha = 0.4f)` arrives at the icon as `onSurface` at 0.8 --
+ * pixel-identical to the active state. Compositing the library's inactive colour
+ * against the surface it is drawn on carries the same 0.4 ratio in a form the
+ * fixed slot alpha preserves. Every other colour, including the untouched
+ * selected pair, stays with the library.
  */
 @Composable
-private fun PinnedRailIcon(itemWidthPx: () -> Int, icon: @Composable () -> Unit) {
-    Box(
-        Modifier.offset {
-            val padding = ItemContentPadding.roundToPx()
-            val slot = (itemWidthPx() - padding * 2)
-                .coerceIn(NavigationDrawerItemDefaults.IconSize.roundToPx(), ListItemDefaults.IconSize.roundToPx())
-            IntOffset(-(slot - NavigationDrawerItemDefaults.IconSize.roundToPx()) / 2, 0)
-        },
-    ) { icon() }
+private fun drawerItemColors(): NavigationDrawerItemColors {
+    val defaults = NavigationDrawerItemDefaults.colors()
+    val surface = MaterialTheme.colorScheme.surface
+    return NavigationDrawerItemDefaults.colors(
+        inactiveContentColor = defaults.inactiveContentColor.compositeOver(surface),
+        disabledInactiveContentColor =
+            defaults.disabledInactiveContentColor.compositeOver(surface),
+    )
+}
+
+/** The library's own unselected-to-selected ratio, for the mark that is not an item. */
+@Composable
+private fun inactiveContentAlpha(): Float {
+    val colors = NavigationDrawerItemDefaults.colors()
+    return colors.inactiveContentColor.alpha / colors.contentColor.alpha
+}
+
+/**
+ * Keeps the icon on the kit's fixed axis while the item width animates.
+ *
+ * tv-material centres its 24dp leading box in a slot that grows from 24dp to 32dp as
+ * the item widens, which would carry the icon 4dp right. The icon reads that
+ * displacement where the library decides it — from its own parent's placement, in the
+ * same layout pass — and cancels it. Nothing is measured into state and read back a
+ * frame later, so no frame can show the library's position without this correction.
+ */
+@Composable
+private fun PinnedRailIcon(icon: @Composable () -> Unit) {
+    Layout(content = icon) { measurables, constraints ->
+        val placeable = measurables.single().measure(constraints)
+        layout(placeable.width, placeable.height) {
+            val slotOffset = coordinates?.parentLayoutCoordinates?.positionInParent()?.x ?: 0f
+            // Physical cancellation of the slot's placement; placeRelative mirrors
+            // that same offset in RTL so the leading axis stays pinned.
+            placeable.placeRelative(-slotOffset.roundToInt(), 0)
+        }
+    }
 }
 
 /** Current measure's visible extent from the browse content's logical leading edge. */
@@ -300,6 +336,7 @@ internal fun SideRail(
                         itemFocus[targetRoute]?.requestFocus()
                     }
                 }
+                val drawerColors = drawerItemColors()
                 Column(
                     modifier = Modifier
                         .profileLayout("sidebar")
@@ -322,13 +359,12 @@ internal fun SideRail(
 
                     mainItems.forEach { item ->
                         key(item.route) {
-                            val itemWidth = remember { mutableIntStateOf(0) }
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
-                                leadingContent = { PinnedRailIcon({ itemWidth.intValue }, item.icon) },
+                                leadingContent = { PinnedRailIcon(item.icon) },
+                                colors = drawerColors,
                                 modifier = Modifier
-                                    .onSizeChanged { itemWidth.intValue = it.width }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
@@ -353,13 +389,12 @@ internal fun SideRail(
 
                     footerItems.forEach { item ->
                         key(item.route) {
-                            val itemWidth = remember { mutableIntStateOf(0) }
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
-                                leadingContent = { PinnedRailIcon({ itemWidth.intValue }, item.icon) },
+                                leadingContent = { PinnedRailIcon(item.icon) },
+                                colors = drawerColors,
                                 modifier = Modifier
-                                    .onSizeChanged { itemWidth.intValue = it.width }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
@@ -414,11 +449,13 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
         },
         label = "drawerBrandHeaderWidth",
     )
+    val inactiveAlpha = inactiveContentAlpha()
     Box(
         modifier = Modifier
             .width(headerWidth)
             .height(BrandHeaderHeight)
             .clipToBounds()
+            .graphicsLayer { alpha = if (expanded) 1f else inactiveAlpha }
             .testTag("global-drawer-brand"),
     ) {
         Image(
@@ -427,8 +464,7 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .padding(start = ItemIconCenter - BrandSymbolSize / 2)
-                .size(BrandSymbolSize)
-                .graphicsLayer { alpha = if (expanded) 1f else InactiveBrandAlpha },
+                .size(BrandSymbolSize),
         )
         // The wordmark reveals and hides with the same transitions the library
         // applies to the drawer items' labels.

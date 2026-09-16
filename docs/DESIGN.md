@@ -126,11 +126,23 @@ Anatomy per Material for TV / design kit:
   moves when it expands: rows keep their positions and icons and the brand mark
   stay on the kit's fixed icon column (12 + 16dp; the library's 4dp leading-slot
   growth is cancelled). Only the sheet widens and labels/wordmark reveal.
-- Inactive drawer (focus elsewhere) is dimmed: unselected items use the library's
-  0.4 inactive content colour and the brand mark uses the same alpha; the
-  selected item stays full. Everything is full opacity while the drawer is active.
-- Items are library defaults: 48dp one-line, pill, 24dp icons,
-  `NavigationDrawerItemDefaults.colors()`.
+- A collapsed drawer dims its **unselected** destinations and the brand mark;
+  the **selected** destination keeps its full content and container so the rail
+  still reports where you are. Expanding restores full emphasis. This is TV
+  Material's own behaviour: `NavigationDrawerScope.hasFocus` means
+  "drawer is open", and a closed drawer resolves items to
+  `inactiveContentColor` (`onSurface` @ 0.4) while passing the selected pair
+  through untouched.
+  One deviation is required to make it visible. `ListItem` publishes its leading
+  slot as `LocalContentColor.current.copy(alpha = 0.8f)`, and `copy` *replaces*
+  alpha instead of scaling it, so an alpha-based inactive colour reaches an
+  icon-only rail as `onSurface` @ 0.8 — pixel-identical to the active state.
+  The drawer therefore composites the library's own inactive colour against the
+  surface, preserving the 0.4 ratio in a form the fixed slot alpha cannot erase.
+  No app-owned alpha constant and no whole-rail overlay: focus, press, selected
+  container and every other colour stay with the library.
+- Items are library primitives: 48dp one-line, pill, 24dp icons, with that
+  shared `NavigationDrawerItemDefaults.colors()` configuration.
 - Drawer entry focuses the current destination. Focus preview changes the
   destination but does not form a Back stack; the previewed screen's saved
   state is restored on return.
