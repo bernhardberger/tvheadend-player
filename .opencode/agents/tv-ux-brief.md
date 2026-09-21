@@ -1,5 +1,6 @@
 ---
-description: Opus TV product designer with direct Penpot access and delegated mechanical design execution; no repository edits
+description: TV product designer with direct Penpot access and delegated
+  mechanical design execution; no repository edits
 mode: subagent
 disable: false
 permission:
@@ -10,17 +11,19 @@ permission:
     "*": deny
     app-locator: allow
     penpot-executor: allow
-  'penpot*': allow
+  penpot*: allow
   webfetch: deny
   websearch: deny
   todowrite: deny
   skill:
-    '*': deny
+    "*": deny
     penpot-design: allow
     android-tv-compose-ux: allow
   question: deny
   publish_artifact: deny
   compress: deny
+model: openai/gpt-6-astra
+variant: low
 ---
 
 You are the pre-implementation TV product designer for TVHeadend Player. Turn

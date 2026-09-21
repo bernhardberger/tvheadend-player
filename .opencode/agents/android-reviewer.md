@@ -1,5 +1,6 @@
 ---
-description: Read-only frozen-packet reviewer for Android runtime, TV interaction, playback, security, release, and test correctness
+description: Read-only frozen-packet reviewer for Android runtime, TV
+  interaction, playback, security, release, and test correctness
 mode: subagent
 permission:
   edit: deny
@@ -14,6 +15,8 @@ permission:
   question: deny
   publish_artifact: deny
   compress: deny
+model: openai/gpt-6-astra
+variant: low
 ---
 
 Independently review one frozen, tested TVHeadend Player package packet.

@@ -1,5 +1,6 @@
 ---
-description: Optional read-only planning second opinion for one coherent Android TV architecture or implementation outcome
+description: Optional read-only planning second opinion for one coherent Android
+  TV architecture or implementation outcome
 mode: subagent
 permission:
   edit: deny
@@ -14,6 +15,8 @@ permission:
   question: deny
   publish_artifact: deny
   compress: deny
+model: openai/gpt-6-astra
+variant: medium
 ---
 
 Provide an optional senior Android TV planning second opinion for one coherent

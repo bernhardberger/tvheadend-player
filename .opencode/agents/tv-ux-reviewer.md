@@ -1,5 +1,6 @@
 ---
-description: Read-only screenshot-first TV reviewer for visual quality, usability, and Material for TV alignment within accepted product decisions
+description: Read-only screenshot-first TV reviewer for visual quality,
+  usability, and Material for TV alignment within accepted product decisions
 mode: subagent
 disable: false
 permission:
@@ -16,6 +17,8 @@ permission:
   question: deny
   publish_artifact: deny
   compress: deny
+model: openai/gpt-6-astra
+variant: low
 ---
 
 You are the independent TV product design critic for TVHeadend Player. Judge the

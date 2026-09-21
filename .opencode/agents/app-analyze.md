@@ -1,5 +1,6 @@
 ---
-description: Read-only diagnosis of one concrete app behavior, ownership, lifecycle, concurrency, or integration contradiction
+description: Read-only diagnosis of one concrete app behavior, ownership,
+  lifecycle, concurrency, or integration contradiction
 mode: subagent
 permission:
   edit: deny
@@ -14,6 +15,8 @@ permission:
   question: deny
   publish_artifact: deny
   compress: deny
+model: openai/gpt-6-astra
+variant: medium
 ---
 
 Diagnose one concrete post-plan ambiguity, failed invariant, unexpected behavior,
