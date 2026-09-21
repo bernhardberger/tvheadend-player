@@ -17,7 +17,7 @@ CHECKER = runpy.run_path(str(CHECKER_PATH), run_name="native_checker_test")
 
 class NativePublicationEvidenceTest(unittest.TestCase):
     def test_public_release_bytes_and_corresponding_sources_are_pinned(self) -> None:
-        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.15.0")
+        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.15.1")
         self.assertEqual(
             CHECKER["EXPECTED_AAR_SHA256"],
             "41ca722e0ce18175e34c91dec4c3cd2e5f4a39b49ce7963378fa26fcd25bc133",
@@ -30,13 +30,13 @@ class NativePublicationEvidenceTest(unittest.TestCase):
         self.assertEqual(
             CHECKER["EXPECTED_STANDARD_SOURCE_SHA256"],
             {
-                "sdk-android-0.15.0-sources.jar":
+                "sdk-android-0.15.1-sources.jar":
                     "605da05e61b13fb4b5c18a87a9009e3ac95503cb72e66b25f3dcbfc9142f5695",
-                "sdk-core-0.15.0-sources.jar":
-                    "bde60b7df041e2910b2393b1058309c735bbd83859708c0cf960a3981af30323",
-                "sdk-media3-0.15.0-sources.jar":
+                "sdk-core-0.15.1-sources.jar":
+                    "b2a92e52282d1a52f440144d9e2034d731ca74e9b8c6a390b919194f6cdfd6c9",
+                "sdk-media3-0.15.1-sources.jar":
                     "31453c898125e848ffba3e84aea38748645efc24de9fdc1c96a535aab57c891a",
-                "sdk-playback-0.15.0-sources.jar":
+                "sdk-playback-0.15.1-sources.jar":
                     "477ee5a89d400228c3675d30b13ba09f940b07b346d439bdf35f7ba54b15e6f5",
             },
         )
