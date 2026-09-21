@@ -79,6 +79,12 @@ Any different treatment is a **global** decision recorded here and applied once
 (theme or shared defaults helper), never per screen. Until then, a per-call-site
 override is a defect.
 
+Embedded-progress cards use the shared `embeddedProgressCardBorder` treatment
+(operator correction 2026-09-21): retain the native 3dp focus/pressed outline,
+colour, shape and scale, but move its path 2dp **outside** the card. The bottom
+progress strip remains in its designed flush, full-width slot; the outline must
+not paint over it. Layout reserves the additional outer extent.
+
 Component commit model is set by the component:
 
 | Component | Commits on |
@@ -240,6 +246,26 @@ Player chrome owns its gradients. Play/Pause and seek semantics, programme
 window, timeshift and scene-marker behaviour are specified in
 `docs/player-ui-ux-overhaul-plan.md` and the playback safety skill; only the
 colour and indication rules above apply here. Remote keys follow §6.
+
+### Quick-zap cards (accepted 2026-09-21)
+
+- Use the Penpot compact channel-card anatomy: 196×110dp at default font scale,
+  centered picon above channel identity, one current-programme line with start
+  time and minutes remaining, and a 2dp cyan progress strip. Use TV Material
+  `CompactCard` indication; card height grows with localized text scale.
+- While player controls are visible, the upper 24dp of the cards peeks above the
+  bottom screen edge. The peek is passive; Down opens the tray and focuses the
+  playing channel (or a deterministic available fallback).
+- Opening slides the cards into the bottom third while player chrome slides up
+  and fades away in the same transition. Closing reverses it. Invisible chrome
+  and peeking cards cannot own focus or accessibility actions.
+- The row viewport spans the screen width. Horizontal safe insets are **content
+  padding**, not a clipping container: neighboring cards remain partially visible
+  at either screen edge, while focused cards stay inside the safe area with room
+  for native focus scale.
+- Selecting another channel keeps the tray, focused card and scroll position.
+  Back, Up, or selecting the confirmed playing channel returns to player controls
+  and restores the invoking action. The tray does not auto-hide during zapping.
 
 ## 11. Icons
 

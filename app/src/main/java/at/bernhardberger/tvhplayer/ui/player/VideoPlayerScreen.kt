@@ -514,7 +514,7 @@ fun VideoPlayerScreen(
 
         val pickAction = channelPickAction(confirmedPlayingChannelId, channelId)
         if (pickAction == ChannelPickAction.CLOSE_DRAWER) {
-            layerState.closeChannelDrawer()
+            layerState.dismissChannelDrawer()
             return true
         }
 
@@ -530,8 +530,7 @@ fun VideoPlayerScreen(
         currentChannelName = channel.name.orEmpty()
         timelineState.clearFeedback()
 
-        layerState.closeChannelDrawer()
-        layerState.showControls()
+        layerState.onChannelTuneRequested()
         return true
     }
 
@@ -657,7 +656,7 @@ fun VideoPlayerScreen(
     LaunchedEffect(channelUnavailable) {
         if (channelUnavailable) {
             timelineState.invalidateForSourceChange()
-            layerState.showControls()
+            layerState.onChannelTuneRequested()
         }
     }
     fun currentPlayerForegroundContext() =
@@ -1057,7 +1056,7 @@ fun VideoPlayerScreen(
                         playingChannelId = confirmedPlayingChannelId,
                         recordingChannelIds = recordingChannelIds,
                         nowEvent = { channelsVm.nowEvent(it, nowSec) },
-                        nextEvent = { channelsVm.nextEvent(it, nowSec) },
+                        nowSec = nowSec,
                         imageLoader = imageLoader,
                         currentSession = currentSession,
                         onFocusChannel = { selectedId = it },
@@ -1269,7 +1268,7 @@ fun VideoPlayerScreen(
                 .padding(48.dp),
         )
 
-        if (channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE)) {
+        if (channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)) {
             val failedState = playbackState as? AppPlaybackState.Failed
             val failureDetail = listOfNotNull(
                 failedState?.recoveryReason?.name,

@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.ui.TvProgressStripHeight
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
@@ -20,11 +21,12 @@ fun ProgressStrip(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary,
     trackColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTrackAlpha),
+    height: Dp = TvProgressStripHeight,
 ) {
     val boundedProgress = progress.coerceIn(0f, 1f)
     Box(
         modifier = modifier
-            .height(TvProgressStripHeight)
+            .height(height)
             .clip(MaterialTheme.shapes.extraSmall)
             .background(trackColor)
             .progressSemantics(boundedProgress),

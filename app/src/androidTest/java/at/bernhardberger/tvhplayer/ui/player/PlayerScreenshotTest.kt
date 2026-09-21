@@ -168,9 +168,8 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                     Channel.create(id = ChannelId(it + 1L), icon = "imagecache/${it + 1}", name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
                                 },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
-                             nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") }, nextEvent = { if (scenario == "shelf-missing") null else EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
-                                 start = Instant.fromEpochSeconds(1_783_022_400L), stop = Instant.fromEpochSeconds(1_783_024_200L),
-                                 title = "The world beneath the ice") }, imageLoader = imageLoader,
+                             nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") },
+                                 nowSec = 1_783_020_600L, imageLoader = imageLoader,
                                  onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {}, currentSession = currentSession,
                             )
                         })

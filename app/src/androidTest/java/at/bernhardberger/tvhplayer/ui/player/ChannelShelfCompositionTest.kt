@@ -100,7 +100,7 @@ class ChannelShelfCompositionTest {
                                     active = layers.channelDrawerOpen,
                                     channels = if (empty) emptyList() else listOf(Channel.create(id = ChannelId(1), name = "Channel")),
                                     selectedId = ChannelId(1), playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
-                                    nowEvent = { null }, nextEvent = { null }, imageLoader = loader,
+                                    nowEvent = { null }, imageLoader = loader,
                                     onFocusChannel = {}, onPickChannel = { activations++ }, onCloseDrawer = { code ->
                                         if (code != null) layers.beginOpeningKeyCycle(code)
                                         layers.dismissChannelDrawer()
@@ -121,7 +121,7 @@ class ChannelShelfCompositionTest {
             rule.onNodeWithTag(invoker).requestFocus().performKeyInput { pressKey(Key.DirectionDown) }
             if (rapid) rule.mainClock.advanceTimeBy(32)
             rule.onNodeWithTag(if (empty) "player-shelf-close" else "player-channel-card-1").assertIsFocused()
-            rule.onNodeWithTag("player-actions").assertExists()
+            rule.onNodeWithTag("player-actions").assertDoesNotExist()
             if (!rapid) {
                 rule.mainClock.advanceTimeBy(500)
                 // Neither lateral rail edge may escape into the retained controls.
@@ -129,16 +129,6 @@ class ChannelShelfCompositionTest {
                 rule.onNodeWithTag(if (empty) "player-shelf-close" else "player-channel-card-1").assertIsFocused()
                 rule.onNodeWithTag("player-timeline-status").assertDoesNotExist()
                 rule.onNodeWithTag("player-timeline-labels").assertDoesNotExist()
-                if (pausedGuard) {
-                    val trackAfter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                    val fillAfter = rule.onNodeWithTag("player-timeline-interactive-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                    assertEquals(0.25f, fillBefore.width / trackBefore.width, 0.001f)
-                    assertEquals(fillBefore.width / trackBefore.width, fillAfter.width / trackAfter.width, 0.001f)
-                    val pauseDescription = rule.onNodeWithTag("player-pause").fetchSemanticsNode().config[
-                        androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
-                    assertTrue(pauseDescription.contains("Play"))
-                    assertTrue(rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top < actionsBefore.top)
-                }
             }
             rule.onRoot().performKeyInput { keyDown(closeKey) }
             if (rapid) rule.mainClock.advanceTimeBy(48)
@@ -151,6 +141,15 @@ class ChannelShelfCompositionTest {
             rule.onRoot().performKeyInput { keyUp(closeKey) }
             rule.onNodeWithTag(restored).assertIsFocused()
             assertTrue(layers.controlsVisible)
+            if (pausedGuard) {
+                val trackAfter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val fillAfter = rule.onNodeWithTag("player-timeline-interactive-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertEquals(0.25f, fillBefore.width / trackBefore.width, 0.001f)
+                assertEquals(fillBefore.width / trackBefore.width, fillAfter.width / trackAfter.width, 0.001f)
+                val pauseDescription = rule.onNodeWithTag("player-pause").fetchSemanticsNode().config[
+                    androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
+                assertTrue(pauseDescription.contains("Play"))
+            }
             assertEquals(0, activations)
         }
         rule.onRoot().performKeyInput { pressKey(Key.Back) }
@@ -172,7 +171,7 @@ class ChannelShelfCompositionTest {
                         selectedId = ChannelId(2), playingChannelId = ChannelId(1),
                         recordingChannelIds = emptySet(),
                         nowEvent = { if (it == ChannelId(1)) event("A long programme about mountains and wildlife") else null },
-                        nextEvent = { if (it == ChannelId(1)) event("Another long programme about the natural world") else null },
+                        nowSec = 900,
                         imageLoader = ImageLoader.Builder(LocalContext.current).build(),
                         onFocusChannel = {}, onPickChannel = { picks++ }, onCloseDrawer = { closes++ },
                     )
@@ -181,17 +180,16 @@ class ChannelShelfCompositionTest {
         }
         val first = rule.onNodeWithTag("player-channel-card-1").assertIsFocused()
         val now = rule.onNodeWithTag("player-channel-1-now", useUnmergedTree = true)
-        val next = rule.onNodeWithTag("player-channel-1-next", useUnmergedTree = true)
-        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-        next.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertEquals(1, layouts.single().lineCount)
-        assertTrue(now.fetchSemanticsNode().boundsInRoot.height > next.fetchSemanticsNode().boundsInRoot.height)
         val firstBounds = first.fetchSemanticsNode().boundsInRoot
-        assertEquals(with(rule.density) { 288.dp.toPx() }, firstBounds.width, 1f)
-        assertTrue(firstBounds.height <= with(rule.density) { 248.dp.toPx() })
+        val unfocusedBounds = rule.onNodeWithTag("player-channel-card-2").fetchSemanticsNode().boundsInRoot
+        assertEquals(with(rule.density) { 196.dp.toPx() }, unfocusedBounds.width, 1f)
+        assertTrue(firstBounds.height <= with(rule.density) { 140.dp.toPx() })
         val picon = rule.onNodeWithTag("player-channel-1-picon", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals(with(rule.density) { 96.dp.toPx() }, picon.width, 1f)
-        assertEquals(with(rule.density) { 64.dp.toPx() }, picon.height, 1f)
+        // The card node reports layout bounds; its descendants include the native focus scale.
+        val focusScale = picon.width / with(rule.density) { 100.dp.toPx() }
+        assertEquals(1.1f, focusScale, .01f)
+        assertEquals(with(rule.density) { 100.dp.toPx() } * focusScale, picon.width, 1f)
+        assertEquals(with(rule.density) { 45.dp.toPx() } * focusScale, picon.height, 1f)
         val identityLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         rule.onNodeWithTag("player-channel-1-identity", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(identityLayouts) }
@@ -202,18 +200,15 @@ class ChannelShelfCompositionTest {
         assertEquals(1, identityLayout.lineCount)
         assertEquals(1, nowLayouts.single().lineCount)
         assertTrue(identityLayout.getLineBottom(0) <= identityLayout.size.height)
-        assertTrue(next.fetchSemanticsNode().boundsInRoot.bottom <= firstBounds.bottom - with(rule.density) { 12.dp.toPx() })
+        assertTrue(now.fetchSemanticsNode().boundsInRoot.bottom <= firstBounds.bottom)
         val shelf = rule.onNodeWithTag("player-channel-shelf").fetchSemanticsNode().boundsInRoot
         assertTrue(shelf.height - firstBounds.height <= with(rule.density) { 56.dp.toPx() } + 1f)
-        val nextDescription = next.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
-        assertTrue(nextDescription.contains(at.bernhardberger.tvhplayer.ui.common.formatClock(3600)))
         first.performKeyInput { pressKey(Key.DirectionRight) }
         val second = rule.onNodeWithTag("player-channel-card-2").assertIsFocused()
         val secondBounds = second.fetchSemanticsNode().boundsInRoot
         assertEquals(firstBounds.height, secondBounds.height, 1f)
         assertEquals(firstBounds.width, secondBounds.width, 1f)
         rule.onNodeWithTag("player-channel-2-now", useUnmergedTree = true).assertTextEquals("No EPG")
-        rule.onNodeWithTag("player-channel-2-next", useUnmergedTree = true).assertTextEquals("No EPG")
         assertEquals(0, picks)
         second.performKeyInput { pressKey(Key.DirectionLeft) }
         first.assertIsFocused().performKeyInput { pressKey(Key.Enter) }

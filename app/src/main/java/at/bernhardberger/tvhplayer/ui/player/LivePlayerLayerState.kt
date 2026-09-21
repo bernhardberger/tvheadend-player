@@ -68,6 +68,11 @@ internal class LivePlayerLayerState(
         showControls()
     }
 
+    fun onChannelTuneRequested() {
+        // Quick-zap owns focus until explicitly dismissed, including a failed tune.
+        if (!channelDrawerOpen) showControls()
+    }
+
     fun showControls() {
         controlsVisible = true
         channelDrawerOpen = false

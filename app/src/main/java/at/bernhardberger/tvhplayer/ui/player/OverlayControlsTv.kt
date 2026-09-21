@@ -169,6 +169,11 @@ fun OverlayControlsTv(
             focusInitialized = false
         }
     }
+    QuickZapPresentation(
+        expanded = channelRailOpen,
+        channelsAvailable = channelsAvailable,
+        channelContent = channelRailContent,
+    ) {
     PlayerOverlayChrome(modifier = Modifier.onPreviewKeyEvent { event ->
         if (event.key != relocatingKey) false else {
             if (event.type == KeyEventType.KeyUp) relocatingKey = null
@@ -285,7 +290,7 @@ fun OverlayControlsTv(
                 timeshiftPosition = timelinePosition,
                 programmeWindow = programmeWindow,
                 previewing = previewing,
-                collapsed = channelRailOpen,
+                collapsed = false,
                 reserveStatusSpace = true,
                 statusAction = statusAction,
                 feedback = when {
@@ -313,7 +318,7 @@ fun OverlayControlsTv(
             PlayerTimelineBlock(
                 progress = event?.let { ((nowSec - it.start.epochSeconds).toDouble() /
                     (it.stop.epochSeconds - it.start.epochSeconds)).toFloat() },
-                collapsed = channelRailOpen,
+                collapsed = false,
                 tone = PlayerTimelineTone.AMBIENT,
                 fillColor = MaterialTheme.colorScheme.onSurface,
                 showTrack = true,
@@ -372,10 +377,6 @@ fun OverlayControlsTv(
                     }
                 },
         )
-        androidx.compose.animation.AnimatedVisibility(
-            visible = channelRailOpen,
-            enter = androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(LIVE_PLAYER_LAYER_TRANSITION_MS), expandFrom = Alignment.Bottom),
-            exit = androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(LIVE_PLAYER_LAYER_TRANSITION_MS), shrinkTowards = Alignment.Bottom),
-        ) { channelRailContent() }
+    }
     }
 }

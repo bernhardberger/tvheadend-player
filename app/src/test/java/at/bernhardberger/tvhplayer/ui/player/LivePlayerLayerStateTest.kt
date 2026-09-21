@@ -16,6 +16,27 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LivePlayerLayerStateTest {
     @Test
+    fun quickZapKeepsTheTrayUntilExplicitDismissalAndDoesNotAutoHide() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        state.showControls()
+        state.onActionFocused("player-info")
+        state.openChannelDrawer()
+        state.updateAutoHideEligibility(false)
+        repeat(3) { state.onChannelTuneRequested() }
+        advanceTimeBy(20_000L)
+        runCurrent()
+        assertTrue(state.channelDrawerOpen)
+        assertFalse(state.controlsVisible)
+        state.dismissChannelDrawer()
+        assertFalse(state.channelDrawerOpen)
+        assertTrue(state.controlsVisible)
+        assertEquals("player-info", state.restoreChannelAction)
+        state.hideControls()
+        state.onChannelTuneRequested()
+        assertTrue(state.controlsVisible)
+    }
+
+    @Test
     fun shelfDismissalRestoresInvokerWithoutChangingTuneCloseBehavior() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         for (action in listOf("player-pause", "player-info", "player-record", "player-settings", "player-stop")) {
