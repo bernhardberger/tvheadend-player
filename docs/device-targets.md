@@ -1,22 +1,27 @@
-# Household TV device targets
+# TV device targets
 
-> **Last verified**: 2026-07-29
+> **Last verified**: 2026-08-16
 
-This repository has two assigned TCL televisions with different lifecycle
-roles. Do not treat “Mum's TV” or “the household TV” as an unambiguous target.
+This repository has several assigned Android TV targets with different lifecycle
+roles. Do not treat a generic model name as an unambiguous target.
 
 | Role | Location | Device/product | Runtime baseline | Allowed use |
 |---|---|---|---|---|
-| **Current development target** | Mum's dining room | TCL C655 / `G10` / `G10_4K_GB` | V548, Android TV 12/API 31, 32-bit ARMv7 | Debug and release-candidate installs, bounded ADB diagnostics, synthetic remote keys, playback and appliance regression tests |
-| **Temporary deployment target** | Owner-controlled | NVIDIA SHIELD Android TV / `darcy` | Android TV 11, ARM64 with ARMv7 compatibility | Debug and signed release-candidate installs, bounded ADB diagnostics, and remote-first product checks while the G10 handover is pending |
-| **Production appliance** | Mum's bedroom | TCL Smart TV Pro / `G08` / `G08_4K_GB` | V655, Android TV 14/API 34, 32-bit ARMv7 | Production-signed updates and bounded read-only maintenance only |
+| **Current development target** | Development site | TCL C655 / `G10` / `G10_4K_GB` | V548, Android TV 12/API 31, 32-bit ARMv7 | Debug and release-candidate installs, bounded ADB diagnostics, synthetic remote keys, playback and appliance regression tests |
+| **Temporary deployment target** | Temporary test site | NVIDIA SHIELD Android TV / `darcy` | Android TV 11, ARM64 with ARMv7 compatibility | Debug and signed release-candidate installs, bounded ADB diagnostics, and remote-first product checks while the G10 handover is pending |
+| **Additional deployment target** | Additional test site | Sony Bravia 8 / `BRAVIA_AE2` / `BRAVIA_AE2_EU` | Android TV 14/API 34, 32-bit ARMv7 | Debug and signed release-candidate installs, bounded ADB diagnostics, remote keys, and playback checks |
+| **Production appliance** | Production site | TCL Smart TV Pro / `G08` / `G08_4K_GB` | V655, Android TV 14/API 34, 32-bit ARMv7 | Production-signed updates and bounded read-only maintenance only |
 
 ## Required target behavior
 
-- The dining-room G10 remains the household acceptance target. The NVIDIA Shield
+- The G10 remains the acceptance target. The NVIDIA Shield
   may be selected in ignored local configuration with role `test` as a temporary
   deployment target while the G10 handover is pending.
-- The bedroom G08 has been handed over. Keep its local role `production`; do not
+- The Sony Bravia 8 may be selected with target name `sony-bravia-8` and role
+  `test`. It uses paired Android Wireless debugging with a dynamic connection
+  port, so refresh its ignored local `serial` from the TV's current **IP address
+  & port** before use.
+- The G08 has been handed over. Keep its local role `production`; do not
   use it for debug installs, key injection, smoke tests, signing experiments, or
   routine development.
 - Before mutation, confirm the intended serial, role, manufacturer/model and
