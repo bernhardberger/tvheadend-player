@@ -1,5 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
+
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 import androidx.activity.compose.BackHandler
@@ -179,6 +185,14 @@ fun ChannelsScreen(
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedId = selection.selectedId.collectAsStateWithLifecycle()
+    val playbackRuntime: AppPlaybackRuntime = koinInject()
+    val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
+    val playbackTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
+    val playWhenReady by rememberPlaybackIntent(playbackRuntime.player)
+    val playbackChannelId = (playbackTarget as? AppPlaybackTarget.Live)?.channelId
+    val playbackIndicator = playbackChannelId?.let {
+        channelPlaybackIndicator(it, playbackTarget, playbackState, playWhenReady)
+    } ?: ChannelPlaybackIndicator.NONE
 
     ChannelsScreenContent(
         contentPadding = contentPadding,
@@ -189,6 +203,8 @@ fun ChannelsScreen(
         selectedId = { selectedId.value },
         imageLoader = imageLoader,
         playingChannelId = playingChannelId,
+        playbackChannelId = playbackChannelId,
+        playbackIndicator = playbackIndicator,
         connectionUiState = connectionUiState,
         onSelectChannel = selection::setSelected,
         onSelectTag = channelViewModel::selectTag,
@@ -212,6 +228,8 @@ internal fun ChannelsScreenContent(
     selectedId: () -> ChannelId?,
     imageLoader: ImageLoader,
     playingChannelId: ChannelId?,
+    playbackChannelId: ChannelId? = playingChannelId,
+    playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     connectionUiState: ConnectionUiState,
     onSelectChannel: (ChannelId) -> Unit,
     onSelectTag: (ChannelTagId?) -> Unit,
@@ -580,6 +598,7 @@ internal fun ChannelsScreenContent(
                     channelScopeState, observation, connectionUiState, orderedChannelIds,
                     channelNumbers, playingChannelId, recordingChannelIds, tagNotice,
                     { focusedChannelId }, ::scopeEntryChannelId, { nowSec }, initialFocusEnabled,
+                    playbackChannelId, playbackIndicator,
                 )
             },
             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -738,6 +757,9 @@ internal fun ChannelsScreenContent(
                                     piconPath = ch.icon,
                                     recordingNow = status.recordingNow,
                                     playingNow = status.playingNow,
+                                    playbackIndicator = frame.playbackIndicator.takeIf {
+                                        channelId == frame.playbackChannelId
+                                    } ?: ChannelPlaybackIndicator.NONE,
                                     onFocus = {
                                         if (!owner.isCurrent) return@ChannelRow
                                         profileTrace("P44:focus:channel") {
@@ -813,6 +835,8 @@ private data class ChannelsTabBody(
     val entryId: () -> ChannelId?,
     val nowSec: () -> Long,
     val initialFocusEnabled: Boolean,
+    val playbackChannelId: ChannelId?,
+    val playbackIndicator: ChannelPlaybackIndicator,
 )
 
 @Composable

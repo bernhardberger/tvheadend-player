@@ -41,10 +41,11 @@ class PlayerOverlayCompositionTest {
     @Test
     fun upCommitsPreviewBeforeFocusingGoLiveInStatusBand() {
         val preview = mutableStateOf(false)
+        var commits = 0
         val state = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0)
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                ModernLiveFixture(state, previewing = preview.value, onCommitSeek = { preview.value = false })
+                ModernLiveFixture(state, previewing = preview.value, onCommitSeek = { commits++ })
             }
         }
         composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
@@ -52,6 +53,8 @@ class PlayerOverlayCompositionTest {
         composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
         composeRule.onNodeWithTag("player-seekbar").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("player-go-live").assertIsFocused()
+        assertTrue(preview.value)
+        assertEquals(1, commits)
     }
 
     @Test
@@ -78,16 +81,33 @@ class PlayerOverlayCompositionTest {
                 }
             }
         }
-        fun anchors() = listOf("player-timeline-status", "player-timeline-track", "player-timeline-labels", "player-actions")
+        fun anchors() = listOf("player-timeline-labels", "player-actions")
             .map { composeRule.onNodeWithTag(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot }
+        fun track() = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        fun status() = composeRule.onAllNodesWithTag("player-timeline-status", useUnmergedTree = true)
+            .fetchSemanticsNodes().map { it.boundsInRoot }
         for (fontScale in listOf(1f, 1.5f)) {
             composeRule.runOnIdle { scale.value = fontScale }
             val baseline = anchors()
+            val statusWhenPresent = status().single()
+            val trackTop = track().top
+            val trackBottom = track().bottom
             for (epg in listOf(event(1, 0, 3600, "Programme"), null, event(2, 3600, 7200, "Future"))) {
                 composeRule.runOnIdle { current.value = epg }
                 for (candidate in listOf(buffered, buffered.copy(timingKnown = false), AppTimeshiftState())) {
                     composeRule.runOnIdle { state.value = candidate }
                     assertEquals(baseline, anchors())
+                    assertEquals(trackTop, track().top, 1f)
+                    assertEquals(trackBottom, track().bottom, 1f)
+                    if (candidate.available && !candidate.timingKnown) {
+                        assertTrue(status().isEmpty())
+                    } else {
+                        assertEquals(listOf(statusWhenPresent), status())
+                    }
+                    val labels = composeRule.onNodeWithTag("player-timeline-labels", useUnmergedTree = true)
+                        .fetchSemanticsNode().boundsInRoot
+                    assertTrue(labels.top <= track().center.y && labels.bottom >= track().center.y)
                     if (!candidate.timingKnown || !candidate.available) {
                         composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
                         if (candidate.available) {
@@ -204,7 +224,8 @@ class PlayerOverlayCompositionTest {
             composeRule.runOnIdle { window.value = candidate }
             for (seeking in listOf(true, false, true, false)) {
                 composeRule.runOnIdle { preview.value = seeking }
-                assertEquals(track, bounds("player-timeline-track"))
+                assertEquals(track.top, bounds("player-timeline-track").top, 1f)
+                assertEquals(track.bottom, bounds("player-timeline-track").bottom, 1f)
                 if (seeking) composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
                 else assertEquals(goLive, bounds("player-go-live"))
                 assertEquals(status, bounds("player-timeline-status"))
@@ -393,8 +414,11 @@ class PlayerOverlayCompositionTest {
         fun track() = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val resting = track()
         val actions = composeRule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
-        assertEquals(actions.left, resting.left, 1f)
-        assertEquals(actions.right, resting.right, 1f)
+        val labels = composeRule.onNodeWithTag("player-timeline-labels", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertEquals(actions.left, labels.left, 1f)
+        assertEquals(actions.right, labels.right, 1f)
+        assertTrue(resting.left >= labels.left && resting.right <= labels.right)
         composeRule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
         composeRule.onNodeWithTag("player-pause").performKeyInput { pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("player-seekbar").assertIsFocused()

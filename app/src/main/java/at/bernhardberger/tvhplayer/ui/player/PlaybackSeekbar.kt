@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,14 +46,14 @@ fun PlaybackSeekbar(
     previewing: Boolean = false,
     feedback: String? = null,
     feedbackIsError: Boolean = feedback != null,
-    reserveStatusSpace: Boolean = false,
     statusAction: (@Composable () -> Unit)? = null,
     collapsed: Boolean = false,
     recordingMarkers: List<Long> = emptyList(),
     onOpenRecordingMarkers: (() -> Unit)? = null,
+    trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
     /**
-     * Live-edge presentation to label the timeline with. Defaults to the measured
-     * distance within [range]; live callers pass the server-shift-aware presentation.
+     * Enables timeshift labels. Timeline geometry and positional labels use the sampled
+     * range; server-shift-aware Live status belongs to the passive player clock only.
      */
     timeshiftPosition: TimeshiftPositionPresentation? = if (range.domain == SeekbarDomain.TIMESHIFT) {
         timeshiftPositionPresentation(range.positionMs, range.endMs)
@@ -61,8 +62,8 @@ fun PlaybackSeekbar(
     },
 ) {
     if (!range.positionKnown) {
-        val unavailable = (if (paused) "${stringResource(R.string.player_paused)}. " else "") +
-            stringResource(R.string.player_timing_unavailable)
+        val unavailable = stringResource(R.string.player_timing_unavailable)
+        val description = (if (paused) "${stringResource(R.string.player_paused)}. " else "") + unavailable
         PlayerTimelineBlock(
             progress = null,
             collapsed = collapsed,
@@ -72,11 +73,10 @@ fun PlaybackSeekbar(
             liveEdgeFraction = 1f,
             progressSemantics = false,
             reserveLabelSpace = true,
-            reserveStatusSpace = reserveStatusSpace,
             statusAction = statusAction,
             feedback = feedback,
             feedbackIsError = feedbackIsError,
-            timelineModifier = modifier.semantics { contentDescription = unavailable },
+            timelineModifier = modifier.semantics { contentDescription = description },
         )
         return
     }
@@ -86,13 +86,10 @@ fun PlaybackSeekbar(
     val markerPreview = recordingMarkerPreviewMs?.takeIf {
         range.domain == SeekbarDomain.RECORDING && it >= range.startMs && it < range.endMs
     }
-    // Live status excludes pipeline latency. Only committed, playing fallback chrome pins to
-    // live; pause, previews and programme windows retain their sampled/selected coordinates.
-    val displayAtLiveEdge = range.domain == SeekbarDomain.TIMESHIFT && programmeWindow == null &&
-        !paused && !previewing && timeshiftPosition?.atLiveEdge == true
-    val displayedProgress = if (displayAtLiveEdge) {
-        1f
-    } else if (range.domain == SeekbarDomain.TIMESHIFT) {
+    val sampledPosition = timeshiftPosition?.let {
+        timeshiftPositionPresentation(range.positionMs, if (programmeWindow == null) range.displayEndMs else range.endMs)
+    }
+    val displayedProgress = if (range.domain == SeekbarDomain.TIMESHIFT) {
         range.displayProgress
     } else {
         programmeAxis?.playbackFraction ?: range.displayProgress
@@ -106,13 +103,13 @@ fun PlaybackSeekbar(
         null
     }
     val description = when {
-        timeshiftPosition?.atLiveEdge == true -> stringResource(
+        sampledPosition?.atLiveEdge == true -> stringResource(
             R.string.player_seekbar_timeshift_live_description,
             requireNotNull(timeshiftBoundary),
         )
-        timeshiftPosition != null -> stringResource(
+        sampledPosition != null -> stringResource(
             R.string.player_seekbar_timeshift_description,
-            formatPlaybackDuration(timeshiftPosition.behindLiveMs),
+            formatPlaybackDuration(sampledPosition.behindLiveMs),
             requireNotNull(timeshiftBoundary),
         )
         programmeAxis != null && programmePosition != null && programmeDuration != null ->
@@ -133,11 +130,8 @@ fun PlaybackSeekbar(
     } else description
     val stateDescription = if (paused) "${stringResource(R.string.player_paused)}. $positionDescription" else positionDescription
     val positionLabel = when {
-        // The status above the track already says Live; a distance adds nothing.
-        timeshiftPosition?.atLiveEdge == true -> null
-        timeshiftPosition != null -> stringResource(
-            R.string.timeshift_behind_live,
-            formatPlaybackDuration(timeshiftPosition.behindLiveMs),
+        sampledPosition != null -> timeshiftEndpointLabel(
+            false, (range.displayEndMs - range.displayStartMs).coerceAtLeast(0),
         )
         range.domain == SeekbarDomain.RECORDING -> {
             val elapsed = formatPlaybackDuration(range.positionMs)
@@ -148,7 +142,7 @@ fun PlaybackSeekbar(
         else -> null
     }
     val trailingLabel = when {
-        timeshiftPosition != null -> null
+        sampledPosition != null -> formatPlaybackDuration(0)
         range.domain == SeekbarDomain.RECORDING -> formatPlaybackDuration(range.displayEndMs)
         programmePosition != null && programmeDuration != null ->
             formatPlaybackDuration(programmeDuration)
@@ -159,10 +153,8 @@ fun PlaybackSeekbar(
     val openMarkersLabel = stringResource(R.string.recording_markers_open)
     val seekBackTarget = seekbarScrub(range, -1, 0)
     val seekForwardTarget = seekbarScrub(range, 1, 0)
-    val accessibilityProgress = programmeWindow?.positionFraction ?: if (displayAtLiveEdge) {
-        1f
-    } else if (range.domain == SeekbarDomain.TIMESHIFT) {
-        range.progress
+    val accessibilityProgress = programmeWindow?.positionFraction ?: if (range.domain == SeekbarDomain.TIMESHIFT) {
+        range.displayProgress
     } else {
         displayedProgress
     }
@@ -180,7 +172,7 @@ fun PlaybackSeekbar(
         }
         if (
             seekForwardTarget > range.positionMs &&
-            timeshiftPosition?.atLiveEdge != true
+            sampledPosition?.atLiveEdge != true
         ) {
             add(
                 CustomAccessibilityAction(seekForwardLabel) {
@@ -198,12 +190,13 @@ fun PlaybackSeekbar(
             selectedMarkerFraction = markerPreview?.let { range.copy(positionMs = it).displayProgress },
             markerFractions = recordingMarkers.map { it.toFloat() / range.displayEndMs },
             collapsed = collapsed,
-            tone = if (focused && !collapsed) PlayerTimelineTone.ACTIVE else PlayerTimelineTone.INTERACTIVE,
+            tone = when {
+                focused && !collapsed -> PlayerTimelineTone.ACTIVE
+                previewing -> PlayerTimelineTone.PREVIEW
+                else -> PlayerTimelineTone.INTERACTIVE
+            },
             // The estimate qualifier stays in the accessible description; visibly it is noise.
-            leadingLabel = clockLabels?.first ?: listOfNotNull(
-                stringResource(R.string.player_paused).takeIf { paused },
-                positionLabel,
-            ).joinToString(" / ").takeIf { it.isNotBlank() },
+            leadingLabel = clockLabels?.first ?: positionLabel,
             trailingLabel = clockLabels?.second ?: trailingLabel,
             trailingLabelTestTag = "player-window-end".takeIf { programmeWindow != null },
             leadingLabelTestTag = if (programmeWindow != null) "player-window-start" else "player-programme-progress".takeIf {
@@ -217,13 +210,14 @@ fun PlaybackSeekbar(
             progressSemantics = false,
             programmeWindow = programmeWindow,
             reserveLabelSpace = true,
-            reserveStatusSpace = reserveStatusSpace,
+            trackOverlay = trackOverlay,
             statusAction = statusAction,
             feedback = windowFeedback,
             feedbackIsError = feedbackIsError,
-            previewLabel = if (previewing && timeshiftPosition != null) {
-                if (timeshiftPosition.atLiveEdge) stringResource(R.string.timeshift_live)
-                else "−${formatPlaybackDuration(timeshiftPosition.behindLiveMs)}"
+            previewLabel = if (previewing && sampledPosition != null) {
+                if (programmeWindow == null) timeshiftEndpointLabel(sampledPosition.atLiveEdge, sampledPosition.behindLiveMs)
+                else if (sampledPosition.atLiveEdge) stringResource(R.string.timeshift_live)
+                else "−${formatPlaybackDuration(sampledPosition.behindLiveMs)}"
             } else if (previewing && range.domain == SeekbarDomain.RECORDING) positionLabel else null,
             timelineModifier = modifier
                 .fillMaxWidth()
@@ -255,3 +249,8 @@ fun PlaybackSeekbar(
                 .then(if (collapsed) Modifier else Modifier.focusable()),
         )
 }
+
+/** Numeric fallback when no programme clock axis exists; never announce state here. */
+internal fun timeshiftEndpointLabel(atLiveEdge: Boolean, behindLiveMs: Long): String =
+    if (atLiveEdge || behindLiveMs < 1_000) formatPlaybackDuration(0)
+    else "−${formatPlaybackDuration(behindLiveMs)}"

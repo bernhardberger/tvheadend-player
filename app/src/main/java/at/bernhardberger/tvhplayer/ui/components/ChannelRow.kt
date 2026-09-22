@@ -47,6 +47,7 @@ fun ChannelRow(
     piconPath: String?,
     recordingNow: Boolean = false,
     playingNow: Boolean = false,
+    playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     onFocus: () -> Unit,
     onConfirm: () -> Unit,
 ) = profileTrace("P1:compose:channelRow") {
@@ -85,11 +86,12 @@ fun ChannelRow(
                     name = name,
                     modifier = Modifier.weight(1f),
                 )
-                if (playingNow || recordingNow) {
+                if (playbackIndicator != ChannelPlaybackIndicator.NONE || recordingNow) {
                     Spacer(Modifier.width(TvSpacing8))
                     ChannelNowIndicators(
                         playingNow = playingNow,
                         recordingNow = recordingNow,
+                        playbackIndicator = playbackIndicator,
                     )
                 }
             }

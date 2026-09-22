@@ -73,11 +73,11 @@ val TvProgressStripHeight = 4.dp
 // ---- Player overlay geometry ----
 val TvOverlaySidePadding = TvSpacing56
 val TvOverlayTopPadding = TvSpacing32
-val TvOverlayBottomPadding = TvSpacing32
+val TvOverlayBottomPadding = 36.dp
 
 /** Gradient run-out, not content spacing. Do not unify with the paddings. */
 val TvOverlayHeaderGradientRunout = 72.dp
-val TvOverlayFooterGradientRunout = 80.dp
+val TvOverlayFooterGradientRunout = 56.dp
 
 val TvOverlayHeaderMinHeight = 72.dp
 /** First-baseline anchor for both header columns. Must exceed the clock's ascent. */
@@ -103,6 +103,7 @@ val TvOverlayTimelineLabelGap = TvSpacing12
 val TvOverlayTimelineBlockGap = TvSpacing24
 
 val TvOverlayActionButtonSize = 48.dp
+val TvOverlayTimelineActionGap = 4.dp
 val TvOverlayActionGap = TvSpacing8
 val TvOverlayActionGroupGap = TvSpacing24
 /** Separation before the terminal Stop action. */

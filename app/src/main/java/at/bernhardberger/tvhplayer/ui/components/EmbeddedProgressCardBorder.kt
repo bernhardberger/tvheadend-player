@@ -13,9 +13,13 @@ import androidx.tv.material3.MaterialTheme
 @Composable
 internal fun embeddedProgressCardBorder(): CardBorder = CardDefaults.border(
     focusedBorder = Border(
-        border = BorderStroke(3.dp, MaterialTheme.colorScheme.border),
+        // Match TV Material ButtonDefaults' focused container.
+        border = BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface),
         // TV Material expands the outline by this distance; the 3dp stroke is centered on it.
         inset = 2.dp,
-        shape = RoundedCornerShape(8.dp),
+        // TV Material 1.1.0 Card.kt pins the private native shape to 8dp.
+        // SurfaceBorder expands bounds, not radii: add the 2dp outward inset
+        // to keep concentric corners and a 0.5dp gap inside the centered stroke.
+        shape = RoundedCornerShape(8.dp + 2.dp),
     ),
 )

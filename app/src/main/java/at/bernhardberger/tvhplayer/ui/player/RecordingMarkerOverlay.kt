@@ -111,6 +111,8 @@ internal fun RecordingMarkerOverlay(
     val description = if (selected == 0L) stringResource(R.string.recording_marker_start)
         else stringResource(R.string.recording_marker_label,
             index + if (markers.firstOrNull() == 0L) 0 else 1, formatPlaybackDuration(selected))
+    // The timeline's track slot supplies the measured width after endpoint insets.
+    // Position in that coordinate space; no endpoint measurement or UI-state feedback.
     Layout(modifier = modifier, content = {
         Button(
             onClick = { onSeek(selected); navigation.dismiss() },

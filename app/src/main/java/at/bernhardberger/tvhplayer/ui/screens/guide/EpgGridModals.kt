@@ -355,6 +355,7 @@ internal fun ProgrammeDetailsPanel(
     actionResult: DvrMutationFeedback?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
+    liveProgrammeActions: Boolean = true,
 ) {
     val nowSec = nowSecProvider()
     val actions = programmeActions(
@@ -364,7 +365,7 @@ internal fun ProgrammeDetailsPanel(
         // Stream-coordinate history cannot establish a programme-time target.
         serverTimeshiftCoversEvent = false,
         canModifyRecordings = canModifyRecordings,
-    )
+    ).filter { liveProgrammeActions || it !in setOf(ProgrammeAction.WATCH, ProgrammeAction.RECORD) }
     val actionFocus = remember { ProgrammeAction.entries.associateWith { FocusRequester() } }
     val closeFocus = remember { FocusRequester() }
     var focusedAction by remember(event.id) { mutableStateOf(actions.firstOrNull()) }

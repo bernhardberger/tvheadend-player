@@ -109,7 +109,7 @@ internal fun PlayerActionRow(
                         IconButton(
                             onClick = { onInteraction(); action() },
                             colors = IconButtonDefaults.colors(
-                                containerColor = if (tag == "player-pause") MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                                containerColor = Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
                             ),
                             modifier = actionModifier.size(TvOverlayActionButtonSize),

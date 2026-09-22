@@ -14,6 +14,31 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 class GuideWindowPolicyTest {
+    @Test fun retainedPastNavigationAndReplacementUseSdkSnapshotArchive() {
+        fun event(id: Long, channel: Long, start: Long, stop: Long) = EpgEvent.create(
+            id = EventId(id), channelId = ChannelId(channel), start = Instant.fromEpochSeconds(start),
+            stop = Instant.fromEpochSeconds(stop), title = "Programme $id")
+        val a = event(1, 1, 0, 3600)
+        val b = event(2, 1, 3600, 7200)
+        val other = event(3, 2, 0, 3600)
+        val snapshot = at.bernhardberger.tvheadend.sdk.core.EpgSnapshot.create(
+            events = listOf(b), historicalEvents = listOf(a, other))
+        val events = guideDisplayEvents(snapshot)
+        val rows = listOf(1L, 2L).map { channel -> EpgFocusColumn(ChannelId(channel), events.filter { it.channelId == ChannelId(channel) }) }
+        val now = initialTimelineEpgFocus(rows, 0, 4000)!!
+        assertEquals(b.id, now.eventId)
+        val past = moveTimelineEpgFocus(rows, now, EpgFocusDirection.LEFT).target
+        assertEquals(a.id, past.eventId)
+        val down = moveTimelineEpgFocus(rows, past, EpgFocusDirection.DOWN).target
+        assertEquals(other.id, down.eventId)
+        assertEquals(past, moveTimelineEpgFocus(rows, down, EpgFocusDirection.UP).target)
+        assertEquals(now, moveTimelineEpgFocus(rows, past, EpgFocusDirection.RIGHT).target)
+        assertEquals(now, initialTimelineEpgFocus(rows, 0, 4000))
+        val replaced = listOf(EpgFocusColumn(ChannelId(1), guideDisplayEvents(
+            at.bernhardberger.tvheadend.sdk.core.EpgSnapshot.create(events = listOf(b)))))
+        assertEquals(b.id, reconcileTimelineEpgFocus(replaced, past, 0, 4000)!!.eventId)
+        assertTrue(guideDisplayEvents(null).isEmpty())
+    }
     @Test
     fun frontierReverseRestoresOriginWithoutWaitingForCoverageTimeout() {
         assertEquals(GuidePendingNavigationAction.RESTORE_ORIGIN,
@@ -60,7 +85,7 @@ class GuideWindowPolicyTest {
 
         val bounds = guideWindowBounds(openedAtSec, zone)
 
-        assertEquals(openedAtSec, bounds.earliestStartSec)
+        assertEquals(openedAtSec - 6 * 3600L, bounds.earliestStartSec)
         assertEquals(
             openedAtSec + 7.days.inWholeSeconds - GUIDE_VISIBLE_WINDOW_SEC,
             bounds.latestStartSec,

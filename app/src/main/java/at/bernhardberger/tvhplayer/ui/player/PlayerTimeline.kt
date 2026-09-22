@@ -6,6 +6,7 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,20 +18,24 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -49,6 +54,30 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineThumbSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayTrackAlpha
 import kotlin.math.roundToInt
 
+/** Plain status text sits in the light end of the footer gradient, so it needs its own backing. */
+@Composable
+internal fun Modifier.playerStatusScrim(): Modifier = background(
+    Color.Black.copy(alpha = 0.78f),
+    MaterialTheme.shapes.small,
+).padding(horizontal = 8.dp)
+
+/** Draws into the run-out above without adding to the track's measured height. */
+private fun Modifier.paintAbove(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    layout(placeable.width, 0) {
+        placeable.placeRelative(0, -placeable.height)
+    }
+}
+
+/** Gap between an inline endpoint label and the track. Matches on the preview row. */
+private val InlineEndpointGap = 8.dp
+
+/**
+ * Caps a sentence stuffed into an endpoint slot so the track, and the seek label
+ * aligned to it, keep a usable width. Clock and duration labels fit inside this.
+ */
+private val InlineEndpointLabelMaxWidth = 240.dp
+
 /** Both ends use the same pixel rounding; animation is read only during layout. */
 private fun Modifier.timelineSpan(
     trackWidth: Dp,
@@ -64,7 +93,11 @@ private fun Modifier.timelineSpan(
     }
 
 @Composable
-private fun TimelineTargetLabel(label: String, progress: Float, available: Boolean = true) {
+private fun TimelineTargetLabel(
+    label: String,
+    progress: Float,
+    available: Boolean = true,
+) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelLarge,
@@ -81,8 +114,62 @@ private fun TimelineTargetLabel(label: String, progress: Float, available: Boole
                     )
                 }
             }
+            .playerStatusScrim()
             .testTag("timeshift-preview-target"),
     )
+}
+
+@Composable
+private fun TimelineEndpointLabel(
+    text: String,
+    color: Color,
+    testTag: String?,
+    visible: Boolean,
+    emphasis: State<Float>,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = if (visible) color else Color.Transparent,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .widthIn(max = InlineEndpointLabelMaxWidth)
+            .graphicsLayer { alpha = emphasis.value }
+            .then(if (visible) Modifier else Modifier.clearAndSetSemantics { })
+            .then(if (visible && testTag != null) Modifier.testTag(testTag) else Modifier),
+    )
+}
+
+/**
+ * Same label widths and gaps as the inline track row, so a seek label measured in
+ * [center] uses the track's coordinates and is not clipped by the inset.
+ */
+@Composable
+private fun TimelineEndpointRow(
+    leading: String?,
+    trailing: String?,
+    leadingColor: Color,
+    trailingColor: Color,
+    leadingTag: String?,
+    trailingTag: String?,
+    labelsVisible: Boolean,
+    emphasis: State<Float>,
+    modifier: Modifier = Modifier,
+    center: @Composable () -> Unit,
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (leading != null) {
+            TimelineEndpointLabel(leading, leadingColor, leadingTag, labelsVisible, emphasis)
+            Spacer(Modifier.width(InlineEndpointGap))
+        }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { center() }
+        if (trailing != null) {
+            Spacer(Modifier.width(InlineEndpointGap))
+            TimelineEndpointLabel(trailing, trailingColor, trailingTag, labelsVisible, emphasis)
+        }
+    }
 }
 
 enum class PlayerTimelineTone { AMBIENT, INTERACTIVE, ACTIVE, PREVIEW }
@@ -318,43 +405,30 @@ fun PlayerTimelineBlock(
     feedback: String? = null,
     feedbackIsError: Boolean = false,
     feedbackTestTag: String = "player-window-title",
-    reserveStatusSpace: Boolean = false,
     statusAction: (@Composable () -> Unit)? = null,
     collapsed: Boolean = false,
     markerFractions: List<Float> = emptyList(),
+    trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
 ) {
-    Column(modifier.fillMaxWidth()) {
-        if (!collapsed && (reserveStatusSpace || feedback != null || statusAction != null || previewLabel != null)) {
-            Box(Modifier.fillMaxWidth().height(TvOverlayStatusRowHeight).testTag("player-timeline-status"),
-                contentAlignment = Alignment.Center) {
-                if (previewLabel != null) {
-                    TimelineTargetLabel(previewLabel, programmeWindow?.positionFraction ?: progress ?: 0f,
-                        programmeWindow?.targetAvailable != false)
-                } else {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (feedback != null) {
-                            Text(
-                                feedback,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (feedbackIsError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f).padding(end = 24.dp)
-                                    .wrapContentWidth(Alignment.Start)
-                                    .then(if (feedbackIsError) Modifier.background(MaterialTheme.colorScheme.errorContainer,
-                                        MaterialTheme.shapes.small).padding(horizontal = 8.dp) else Modifier)
-                                    .testTag(feedbackTestTag),
-                            )
-                        } else Spacer(Modifier.weight(1f))
-                        statusAction?.invoke()
-                    }
-                }
-            }
-        }
-        Column(timelineModifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    val statusHeight = TvOverlayStatusRowHeight
+    val showStatus = !collapsed && (
+        feedback != null || statusAction != null || previewLabel != null
+        )
+    val previewProgress = programmeWindow?.positionFraction ?: progress ?: 0f
+    val previewAvailable = programmeWindow?.targetAvailable != false
+    val endpointColor = MaterialTheme.colorScheme.onSurface
+    val endpointEmphasis = animateFloatAsState(
+        if (tone == PlayerTimelineTone.ACTIVE || tone == PlayerTimelineTone.PREVIEW) 1f else TvOverlayTextTertiaryAlpha,
+        animationSpec = tween(180), label = "player-endpoint-emphasis",
+    )
+    val leadingColor = leadingLabelColor ?: endpointColor
+    val trailingColor = trailingLabelColor ?: endpointColor
+    val inlineLabels = !collapsed &&
+        (reserveLabelSpace || leadingLabel != null || trailingLabel != null)
+    val labelLineHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
+    @Composable
+    fun Track() {
+        Box(Modifier.fillMaxWidth()) {
             PlayerTimelineBar(
                 progress = programmeWindow?.positionFraction ?: progress,
                 tone = tone,
@@ -376,29 +450,134 @@ fun PlayerTimelineBlock(
                 markerFractions = markerFractions,
                 motionKey = programmeWindow?.event?.let { Triple(it.id, it.start, it.stop) },
             )
-            // Endpoint readouts never shorten or move the track, even at large font scales.
-            if (!collapsed && (reserveLabelSpace || leadingLabel != null || trailingLabel != null)) {
-                val labelHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
-                Row(Modifier.fillMaxWidth().height(labelHeight).testTag("player-timeline-labels"), verticalAlignment = Alignment.CenterVertically) {
-                    leadingLabel?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = leadingLabelColor ?: MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
-                            modifier = leadingLabelTestTag?.let(Modifier::testTag) ?: Modifier,
-                        )
-                    }
-                    Spacer(Modifier.weight(1f))
-                    trailingLabel?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = trailingLabelColor ?: MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
-                            modifier = trailingLabelTestTag?.let(Modifier::testTag) ?: Modifier,
-                        )
-                    }
-                }
+            trackOverlay?.invoke(this)
+        }
+    }
+    Box(modifier.fillMaxWidth()) {
+        Column(timelineModifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            if (inlineLabels) {
+                TimelineEndpointRow(
+                    leading = leadingLabel,
+                    trailing = trailingLabel,
+                    leadingColor = leadingColor,
+                    trailingColor = trailingColor,
+                    leadingTag = leadingLabelTestTag,
+                    trailingTag = trailingLabelTestTag,
+                    labelsVisible = true,
+                    emphasis = endpointEmphasis,
+                    modifier = Modifier
+                        .height(maxOf(TvOverlayTimelineRowHeight, labelLineHeight))
+                        .testTag("player-timeline-labels"),
+                ) { Track() }
+            } else {
+                Track()
             }
+        }
+        if (showStatus) {
+            // Measured height stays with the track. The slot paints into the run-out above.
+            TimelineStatusSlot(
+                statusHeight = statusHeight,
+                previewLabel = previewLabel,
+                previewProgress = previewProgress,
+                previewAvailable = previewAvailable,
+                feedback = feedback,
+                feedbackIsError = feedbackIsError,
+                feedbackTestTag = feedbackTestTag,
+                statusAction = statusAction,
+                inlinePreview = inlineLabels,
+                leadingLabel = leadingLabel,
+                trailingLabel = trailingLabel,
+                leadingColor = leadingColor,
+                trailingColor = trailingColor,
+                endpointEmphasis = endpointEmphasis,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .paintAbove()
+                    .fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimelineStatusSlot(
+    statusHeight: Dp,
+    previewLabel: String?,
+    previewProgress: Float,
+    previewAvailable: Boolean,
+    feedback: String?,
+    feedbackIsError: Boolean,
+    feedbackTestTag: String,
+    statusAction: (@Composable () -> Unit)?,
+    inlinePreview: Boolean,
+    leadingLabel: String?,
+    trailingLabel: String?,
+    leadingColor: Color,
+    trailingColor: Color,
+    endpointEmphasis: State<Float>,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier.fillMaxWidth().height(statusHeight).testTag("player-timeline-status"),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (previewLabel != null) {
+            if (inlinePreview) {
+                TimelineEndpointRow(
+                    leading = leadingLabel,
+                    trailing = trailingLabel,
+                    leadingColor = leadingColor,
+                    trailingColor = trailingColor,
+                    leadingTag = null,
+                    trailingTag = null,
+                    labelsVisible = false,
+                    emphasis = endpointEmphasis,
+                ) {
+                    TimelineTargetLabel(previewLabel, previewProgress, previewAvailable)
+                }
+            } else {
+                TimelineTargetLabel(previewLabel, previewProgress, previewAvailable)
+            }
+        }
+        // Keep the explicit Up destination mounted while the target label is shown.
+        // Its focus immediately restores the status row, including during a pending seek.
+        Row(Modifier.fillMaxWidth()
+            .graphicsLayer { alpha = if (previewLabel == null) 1f else 0f }
+            .then(if (previewLabel != null) Modifier.clearAndSetSemantics { } else Modifier),
+            verticalAlignment = Alignment.CenterVertically) {
+                if (feedback != null) {
+                    Text(
+                        feedback,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (feedbackIsError) {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 24.dp)
+                            .wrapContentWidth(Alignment.Start)
+                            .then(
+                                if (feedbackIsError) {
+                                    Modifier
+                                        .background(
+                                            MaterialTheme.colorScheme.errorContainer,
+                                            MaterialTheme.shapes.small,
+                                        )
+                                        .padding(horizontal = 8.dp)
+                                } else {
+                                    Modifier.playerStatusScrim()
+                                },
+                            )
+                            .testTag(feedbackTestTag),
+                    )
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                statusAction?.invoke()
         }
     }
 }

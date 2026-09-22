@@ -22,6 +22,10 @@ import kotlin.time.Instant
 internal const val GUIDE_VISIBLE_WINDOW_SEC = 3 * 3600L
 internal val GUIDE_EPG_COVERAGE_POLICY = EpgCoveragePolicy.create(7.days)
 
+/** Display-only archive is merged once by the Guide snapshot owner. Live identity wins. */
+internal fun guideDisplayEvents(snapshot: EpgSnapshot?): List<EpgEventEntry> =
+    if (snapshot == null) emptyList() else (snapshot.events + snapshot.historicalEvents).distinctBy { it.id }
+
 internal data class GuideWindowBounds(
     val earliestStartSec: Long,
     val latestStartSec: Long,
@@ -34,7 +38,7 @@ internal data class GuideWindowBounds(
 }
 
 internal fun guideWindowBounds(openedAtSec: Long, zoneId: ZoneId): GuideWindowBounds {
-    val earliestStartSec = floorGuideWindowToHour(openedAtSec, zoneId)
+    val earliestStartSec = floorGuideWindowToHour(openedAtSec, zoneId) - 6 * 3600L
     val latestStartSec = floorGuideWindowToHour(
         openedAtSec + GUIDE_EPG_COVERAGE_POLICY.futureHorizon.inWholeSeconds -
             GUIDE_VISIBLE_WINDOW_SEC,

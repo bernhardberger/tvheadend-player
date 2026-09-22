@@ -129,7 +129,6 @@ class EpgSearchObservationPolicyTest {
         val opened = observation()
         val replacement = observation()
         val openedSession = requireNotNull(opened.currentSession)
-        val replacementSession = requireNotNull(replacement.currentSession)
         val mutation = DvrMutationAction.Cancel(openedSession, DvrEntryId(31))
         var dispatchCount = 0
         val actions = DvrMutationActions(
@@ -147,9 +146,9 @@ class EpgSearchObservationPolicyTest {
             },
         )
 
-        assertSame(mutation, currentDvrMutation(mutation, opened, openedSession))
+        assertSame(mutation, currentDvrMutation(mutation, opened, opened))
         val feedback = actions.execute(
-            currentDvrMutation(mutation, opened, replacementSession)
+            currentDvrMutation(mutation, opened, replacement)
         )
 
         assertEquals(DvrMutationFeedback.CONNECTION_UNAVAILABLE, feedback)

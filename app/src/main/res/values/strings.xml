@@ -1,4 +1,13 @@
 <resources>
+    <string name="player_programme_ended_at">Ended at %1$s</string>
+    <string name="player_status_recording_playback">Recording in progress</string>
+    <string name="player_status_recording_now">Recording now</string>
+    <string name="player_status_rec">REC</string>
+    <string name="player_status_playing">Playing</string>
+    <string name="player_status_hour">h</string>
+    <string name="player_status_minute">m</string>
+    <string name="player_status_second">s</string>
+    <string name="player_buffering">Buffering…</string>
     <string name="edit_connection">Edit connection</string>
     <string name="edit_connection_description">Server address, ports and credentials</string>
     <string name="connection_overview_status">Status</string>

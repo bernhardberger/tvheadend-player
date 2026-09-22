@@ -4,15 +4,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.draw.alpha
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.compose.ui.Alignment
-import androidx.tv.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -39,9 +32,11 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
+import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import coil3.ImageLoader
@@ -81,6 +76,7 @@ fun OverlayControlsTv(
     nextScheduled: Boolean = false,
     paused: Boolean = false,
     committedTimeshiftState: AppTimeshiftState = timeshiftState,
+    playbackPresented: Boolean = true,
     committedWindow: ProgrammeWindow? = null,
     programmeWindow: ProgrammeWindow? = null,
     previewing: Boolean = false,
@@ -112,24 +108,20 @@ fun OverlayControlsTv(
         }
     }
     val initialFocus = if (pausable) pauseFocus else infoFocus
-    val programmeTimeKnown = committedWindow != null || programmeTimingDescribesPlayback(committedTimeshiftState)
-    val programmeTitle = nowEvent?.takeIf { programmeTimeKnown }?.title.orEmpty()
+    val displayedEvent = displayedProgrammeEvent(previewing, programmeWindow, committedWindow, committedTimeshiftState, nowEvent)
+    val programmeTimeKnown = displayedEvent != null
+    val programmeTitle = displayedEvent?.title.orEmpty()
     var focusInitialized by remember { mutableStateOf(false) }
     var lastFocusedControl by remember { mutableStateOf<String?>(null) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
-    var restoreGoLiveAfterPreview by remember { mutableStateOf(false) }
+    val chromeAlpha = rememberPlayerChromeAlpha(timelineFocused, previewing)
+    val chromeHidden = timelineFocused && previewing
     val atLive = when {
         !liveAvailable -> null
         !timeshiftState.available -> true
         seekable -> timelinePosition.atLiveEdge
         else -> null
-    }
-    LaunchedEffect(previewing, restoreGoLiveAfterPreview, controlsVisible) {
-        if (restoreGoLiveAfterPreview && !previewing) {
-            if (controlsVisible && atLive == false) goLiveFocus.requestFocus()
-            restoreGoLiveAfterPreview = false
-        }
     }
     // Capture ownership before removing focus nodes. Compose may automatically focus a
     // surviving action during apply; that must not erase the disappearing node's fallback.
@@ -172,9 +164,11 @@ fun OverlayControlsTv(
     QuickZapPresentation(
         expanded = channelRailOpen,
         channelsAvailable = channelsAvailable,
+        peekAlpha = { chromeAlpha.value },
         channelContent = channelRailContent,
     ) {
-    PlayerOverlayChrome(modifier = Modifier.onPreviewKeyEvent { event ->
+    PlayerOverlayChrome(
+        modifier = Modifier.onPreviewKeyEvent { event ->
         if (event.key != relocatingKey) false else {
             if (event.type == KeyEventType.KeyUp) relocatingKey = null
             true
@@ -182,32 +176,32 @@ fun OverlayControlsTv(
     }, headerContent = { modifier ->
         PlayerIdentityHeader(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
-            eyebrow = channelTitleText(channelNumber, channelName) +
-                if (channelRecordingNow) " / " + stringResource(R.string.player_shelf_recording) else "",
+            eyebrow = channelTitleText(channelNumber, channelName),
             title = programmeTitle,
             support = if (!programmeTimeKnown) stringResource(R.string.player_programme_timing_unavailable)
-            else if (programmeTitle.isBlank()) stringResource(R.string.player_info_unavailable_title) else nextEvent?.let {
+            else if (programmeTitle.isBlank()) stringResource(R.string.player_info_unavailable_title)
+            else endedProgrammeSupport(displayedEvent, nowSec) ?: if (previewing) displayedEvent?.let { programmeWindowClockLabels(it).let { (start, end) -> "$start - $end" } }
+            else nextEvent?.let {
                 stringResource(R.string.player_next_event_with_range,
                     "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}", it.title.orEmpty()) +
                     if (nextScheduled) " / " + stringResource(R.string.recording_state_scheduled) else ""
             },
             clock = formatClock(nowSec), clockSupport = null,
+            clockStatus = { PlayerStatusTags(paused, timeshift = committedTimeshiftState,
+                recordingNow = channelRecordingNow, playbackPresented = playbackPresented && liveAvailable) },
             tags = PlayerHeaderTags(picon = "player-picon", eyebrow = "player-channel-identity",
-                title = "player-programme-title", support = "player-next-programme", clock = "player-clock"),
-            modifier = modifier.alpha(if (previewing || timelineFocused) 0.45f else 1f),
+                title = "player-programme-title", support = "player-next-programme", clock = "player-clock",
+                clockSupport = "player-clock-status"),
+            modifier = modifier,
         )
     }) {
         val previewFeedback = timeshiftFeedback ?: if (previewing) {
             if (programmeWindow?.targetAvailable == false) stringResource(R.string.timeshift_target_expired)
             else programmeWindow?.event?.title
         } else null
-        val statusAction: @Composable () -> Unit = {
-                if (atLive == true) {
-                    Text(stringResource(R.string.timeshift_live),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.testTag("player-live-status"))
-                } else if (atLive == false) {
+        val statusAction: (@Composable () -> Unit)? = if (atLive != false) null else {
+            {
+                if (atLive == false) {
                     Button(
                         onClick = { onUserInteraction(); onGoLive() },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
@@ -242,6 +236,7 @@ fun OverlayControlsTv(
                             },
                     ) { Text(stringResource(R.string.timeshift_go_live), maxLines = 1) }
                 }
+            }
         }
         val timelineModifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
                     .focusProperties { canFocus = !channelRailOpen }
@@ -272,10 +267,7 @@ fun OverlayControlsTv(
                                     onCommitSeek()
                                     relocatingKey = event.key
                                      if (event.key == Key.DirectionDown) initialFocus.requestFocus()
-                                      else if (atLive == false) {
-                                          if (previewing) restoreGoLiveAfterPreview = true
-                                          else goLiveFocus.requestFocus()
-                                      }
+                                      else if (atLive == false) goLiveFocus.requestFocus()
                                 }
                                 true
                             }
@@ -289,9 +281,10 @@ fun OverlayControlsTv(
                 },
                 timeshiftPosition = timelinePosition,
                 programmeWindow = programmeWindow,
-                previewing = previewing,
+                // Go live shares the status band with the seek target. Its explicit
+                // focus takes precedence over a still-pending asynchronous preview.
+                previewing = previewing && lastFocusedControl != "player-go-live",
                 collapsed = false,
-                reserveStatusSpace = true,
                 statusAction = statusAction,
                 feedback = when {
                     timeshiftFeedbackIsError -> timeshiftFeedback
@@ -307,7 +300,7 @@ fun OverlayControlsTv(
         } else {
             // Schedule elapsed time is informational, never a playback coordinate or seek grant.
             val showTimingUnavailable = pausable && timingUnavailable
-            val event = nowEvent?.takeIf {
+            val event = displayedProgrammeEvent(false, null, committedWindow, committedTimeshiftState, nowEvent)?.takeIf {
                 it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds
             }
             val description = listOfNotNull(
@@ -325,7 +318,6 @@ fun OverlayControlsTv(
                 leadingLabel = event?.let { formatClock(it.start.epochSeconds) },
                 trailingLabel = event?.let { formatClock(it.stop.epochSeconds) },
                 reserveLabelSpace = true,
-                reserveStatusSpace = true,
                 statusAction = statusAction,
                 feedback = if (showTimingUnavailable && !timeshiftFeedbackIsError) {
                     stringResource(R.string.player_timing_unavailable)
@@ -340,7 +332,7 @@ fun OverlayControlsTv(
                     .then(if (pausable) Modifier.focusable() else Modifier),
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(TvOverlayTimelineActionGap))
         PlayerActionRow(
             infoFocus = infoFocus, settingsFocus = settingsFocus,
             onInfo = onOpenInfo, onSettings = onOpenOptions, onRecord = onOpenRecord,
@@ -352,7 +344,7 @@ fun OverlayControlsTv(
             onTogglePause = { onToggleTimeshiftPause() }.takeIf { pausable },
             paused = paused, pauseFocus = pauseFocus,
             modifier = Modifier
-                .alpha(if (previewing || timelineFocused) 0.55f else 1f)
+                .playerChromeEmphasis(chromeAlpha, chromeHidden, focusOverflow = 8.dp)
                 .testTag("player-actions")
                 .focusProperties {
                     canFocus = !channelRailOpen

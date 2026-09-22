@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -31,11 +29,13 @@ internal fun TimeshiftSeekPreview(
     channelsAvailable: Boolean = true,
     feedback: String? = null,
     feedbackIsError: Boolean = feedback != null,
+    headerContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
     val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
-    val positionPresentation = timeshiftPositionPresentation(targetState)
+    val positionPresentation = if (programmeWindow == null) timeshiftPositionPresentation(range.positionMs, range.displayEndMs)
+        else timeshiftPositionPresentation(targetState)
     val liveLabel = stringResource(R.string.timeshift_live)
     val behindLiveLabel = if (positionPresentation.atLiveEdge) {
         liveLabel
@@ -45,7 +45,9 @@ internal fun TimeshiftSeekPreview(
             formatPlaybackDuration(positionPresentation.behindLiveMs),
         )
     }
-    val targetLabel = if (
+    val targetLabel = if (programmeWindow == null) {
+        timeshiftEndpointLabel(positionPresentation.atLiveEdge, positionPresentation.behindLiveMs)
+    } else if (
         positionPresentation.atLiveEdge
     ) {
         liveLabel
@@ -68,25 +70,24 @@ internal fun TimeshiftSeekPreview(
     )
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
 
-    androidx.compose.foundation.layout.Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(bottomGradient)
-            .padding(
+    PlayerOverlayChrome(
+        modifier = modifier,
+        headerContent = { headerContent?.invoke(it) },
+        footerPadding = androidx.compose.foundation.layout.PaddingValues(
                 start = TvOverlaySidePadding,
                 end = TvOverlaySidePadding,
                 top = TvOverlayFooterGradientRunout,
                 bottom = playerSeekPreviewBottomPadding(channelsAvailable),
-            )
-            .testTag("timeshift-seek-preview")
+            ),
+    ) {
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().testTag("timeshift-seek-preview")
             .clearAndSetSemantics {
                 contentDescription = (programmeWindow?.let {
                     "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $description" +
                         if (!it.targetAvailable) " $unavailableTarget" else ""
                 } ?: description) + feedback?.let { ". $it" }.orEmpty()
                 liveRegion = LiveRegionMode.Polite
-            },
-    ) {
+            }) {
         PlayerTimelineBlock(
             progress = range.displayProgress,
             tone = PlayerTimelineTone.PREVIEW,
@@ -98,15 +99,17 @@ internal fun TimeshiftSeekPreview(
             progressSemantics = false,
             programmeWindow = programmeWindow,
             reserveLabelSpace = true,
-            leadingLabel = clockLabels?.first ?: behindLiveLabel.takeUnless { positionPresentation.atLiveEdge },
-            trailingLabel = clockLabels?.second,
+            leadingLabel = clockLabels?.first ?: timeshiftEndpointLabel(
+                false, (range.displayEndMs - range.displayStartMs).coerceAtLeast(0),
+            ).takeIf { range.positionKnown },
+            trailingLabel = clockLabels?.second ?: formatPlaybackDuration(0).takeIf { range.positionKnown },
             leadingLabelTestTag = "timeshift-preview-buffer-start",
             trailingLabelTestTag = "timeshift-preview-position",
             previewLabel = targetLabel,
-            reserveStatusSpace = true,
             feedback = feedback ?: programmeWindow?.let { if (it.targetAvailable) it.event.title.orEmpty() else unavailableTarget },
             feedbackIsError = if (feedback != null) feedbackIsError else programmeWindow?.targetAvailable == false,
             feedbackTestTag = "timeshift-preview-programme",
         )
+        }
     }
 }

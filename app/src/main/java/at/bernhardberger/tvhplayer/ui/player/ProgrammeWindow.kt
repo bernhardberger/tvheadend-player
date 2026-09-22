@@ -1,10 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftTimeline
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.time.Instant
@@ -19,6 +21,26 @@ data class ProgrammeWindow(
     val liveFraction: Float?,
     val targetAvailable: Boolean,
 )
+
+/** Timestamp lookup includes display-only history; command selection must use live metadata. */
+internal fun currentProgrammeEvent(observation: SessionObservation, displayed: EpgEvent?): EpgEvent? =
+    displayed?.takeIf { observation.event(it.id) == it }
+
+/** A preview with missing metadata must never borrow the committed/current broadcast title. */
+internal fun displayedProgrammeEvent(
+    previewing: Boolean,
+    displayedWindow: ProgrammeWindow?,
+    committedWindow: ProgrammeWindow?,
+    committedState: AppTimeshiftState,
+    currentBroadcast: EpgEvent?,
+): EpgEvent? = if (previewing) {
+    displayedWindow?.event
+} else {
+    committedWindow?.event ?: currentBroadcast.takeIf {
+        (!committedState.available || committedState.timingKnown) &&
+            committedState.playbackTarget == null && programmeTimingDescribesPlayback(committedState)
+    }
+}
 
 internal fun programmeWindow(
     state: AppTimeshiftState,

@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -70,6 +73,8 @@ fun ChannelDrawer(
     channels: List<Channel>,
     selectedId: ChannelId?,
     playingChannelId: ChannelId?,
+    playbackChannelId: ChannelId? = playingChannelId,
+    playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     recordingChannelIds: Set<ChannelId>,
     nowEvent: (ChannelId) -> EpgEvent?,
     imageLoader: ImageLoader,
@@ -86,6 +91,9 @@ fun ChannelDrawer(
     val listState = rememberLazyListState()
     var focusedId by remember { mutableStateOf(playingChannelId ?: selectedId) }
     var entered by remember { mutableStateOf(false) }
+    var focusedCatalog by remember { mutableStateOf(emptyList<ChannelId>()) }
+    var observedPlayingId by remember { mutableStateOf(playingChannelId) }
+    var pendingPickId by remember { mutableStateOf<ChannelId?>(null) }
     val emptyFocus = remember { FocusRequester() }
     // 48dp screen-safe space plus native card enlargement/outline overflow.
     val edgeInset = 64.dp
@@ -100,28 +108,49 @@ fun ChannelDrawer(
         }
     }
     LaunchedEffect(ids, active, playingChannelId) {
+        if (playingChannelId != observedPlayingId) {
+            // Null means awaiting presentation, not a different channel selection.
+            // Preserve the local pick until a non-null confirmation resolves it.
+            if (playingChannelId != null) {
+                // A delayed confirmation of our own pick is not an external channel change.
+                if (!active && playingChannelId != pendingPickId) focusedId = playingChannelId
+                pendingPickId = null
+            }
+            observedPlayingId = playingChannelId
+        }
+        if (!active) entered = false
         if (ids.isEmpty()) {
+            entered = false
             if (active) {
                 withFrameNanos { }
                 emptyFocus.requestFocus()
             }
             return@LaunchedEffect
         }
-        if (entered && focusedId in ids) {
-            if (!active) entered = false
-            return@LaunchedEffect
-        }
-        val target = (if (!entered) playingChannelId else focusedId)?.takeIf { it in ids }
+        if (entered && focusedId in ids && focusedCatalog == ids) return@LaunchedEffect
+        val target = focusedId?.takeIf { it in ids }
+            ?: playingChannelId?.takeIf { it in ids }
             ?: selectedId?.takeIf { it in ids } ?: ids.first()
         focusedId = target
-        listState.scrollToItem(ids.indexOf(target))
-        if (!active) {
-            entered = false
-            return@LaunchedEffect
+        // Keep the persistent viewport when the anchor is already composed. Focus's
+        // safe-edge BringIntoViewSpec handles partially visible cards without left-snapping.
+        withFrameNanos { }
+        val layout = snapshotFlow { listState.layoutInfo }
+            .first { it.totalItemsCount == ids.size && it.visibleItemsInfo.isNotEmpty() }
+        if (layout.visibleItemsInfo.none { it.key == target.value }) {
+            val index = ids.indexOf(target)
+            val lastVisible = layout.visibleItemsInfo.last()
+            val offset = if (index > lastVisible.index) {
+                // Enter from the nearest (right) safe edge, not the left edge.
+                -(layout.viewportEndOffset - layout.afterContentPadding - lastVisible.size).coerceAtLeast(0)
+            } else 0
+            listState.scrollToItem(index, offset)
         }
+        if (!active) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == target.value } }.first { it }
         withFrameNanos { }
         requesters.getValue(target).requestFocus()
+        focusedCatalog = ids
         entered = true
     }
     Column(
@@ -158,11 +187,16 @@ fun ChannelDrawer(
                     number = ChannelNavigation.numberForId(ids, numbers, channel.id),
                     event = nowEvent(channel.id),
                     nowSec = nowSec,
-                    playing = channel.id == playingChannelId,
+                    playbackIndicator = playbackIndicator.takeIf { channel.id == playbackChannelId } ?: ChannelPlaybackIndicator.NONE,
                     recording = channel.id in recordingChannelIds,
                     imageLoader = imageLoader,
                     currentSession = currentSession,
-                    onClick = { if (active) onPickChannel(channel) },
+                    onClick = {
+                        if (active) {
+                            if (channel.id != playingChannelId) pendingPickId = channel.id
+                            onPickChannel(channel)
+                        }
+                    },
                     modifier = Modifier
                         .focusProperties { canFocus = active }
                         .testTag("player-channel-card-${channel.id.value}")
@@ -188,7 +222,7 @@ private fun CompactZapCard(
     number: Int?,
     event: EpgEvent?,
     nowSec: Long,
-    playing: Boolean,
+    playbackIndicator: ChannelPlaybackIndicator,
     recording: Boolean,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
@@ -220,9 +254,7 @@ private fun CompactZapCard(
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).testTag("player-channel-${channel.id.value}-identity"),
                 )
-                if (playing) Icon(painterResource(R.drawable.ic_play_arrow),
-                    contentDescription = stringResource(R.string.player_shelf_playing),
-                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                ChannelPlaybackMarker(playbackIndicator, size = 16.dp)
                 if (recording) Icon(painterResource(R.drawable.ic_fiber_manual_record),
                     contentDescription = stringResource(R.string.player_shelf_recording),
                     tint = TvRecordingColor, modifier = Modifier.size(12.dp))

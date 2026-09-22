@@ -80,8 +80,11 @@ Any different treatment is a **global** decision recorded here and applied once
 override is a defect.
 
 Embedded-progress cards use the shared `embeddedProgressCardBorder` treatment
-(operator correction 2026-09-21): retain the native 3dp focus/pressed outline,
-colour, shape and scale, but move its path 2dp **outside** the card. The bottom
+(revised 2026-09-22): retain the native 3dp focused outline, shape and scale,
+use `onSurface` for its colour to match native focused buttons, and move its path
+2dp **outside** the card. The outline radius includes that offset: TV Material
+1.1.0's native 8dp card radius becomes 10dp on the expanded path, keeping the
+corners concentric. Native pressed behaviour remains unchanged. The bottom
 progress strip remains in its designed flush, full-width slot; the outline must
 not paint over it. Layout reserves the additional outer extent.
 
@@ -247,6 +250,83 @@ window, timeshift and scene-marker behaviour are specified in
 `docs/player-ui-ux-overhaul-plan.md` and the playback safety skill; only the
 colour and indication rules above apply here. Remote keys follow §6.
 
+### Shared compact player footer (revised 2026-09-22)
+
+- Live TV and recordings use the same timeline and seek-preview layout. Endpoint
+  labels sit inline on either side of the track; their values retain the domain's
+  clock-time or elapsed/duration meaning. Recording scene-marker targets use the
+  actual inset track coordinates. Pause is announced accessibly, never prefixed
+  to a visible time endpoint; live fallback offsets remain numeric. Without EPG,
+  endpoints describe the displayed buffer axis (oldest offset to `0:00`), while
+  the floating seek label describes the selected position on that same axis.
+  Server Live status must not override the sampled track fill.
+- One compact, right-aligned passive status row sits beneath the wall clock,
+  with subtle muted dark filled tags (tight padding, small corners, no outline or
+  focus). Blue identifies “Live”; amber identifies explicit localized behind-live
+  time (for example “3m 23s behind live”). A 14dp play/pause icon follows playback
+  intent; durations use localized units.
+  Status reflects committed playback, not a seek preview. Unavailable timing
+  must not claim Live, and enabling timeshift alone does not imply behind-live.
+  A separate red dot + “REC” tag on the same row independently indicates active
+  recording of the current live channel. Completed recording playback has no status.
+  Growing recording playback uses amber play/pause + “Recording in progress” alone, only while
+  current-session DVR state confirms recording. Accessibility retains full intent,
+  behind-live and “Recording now” descriptions without duplicate announcements.
+- Empty status content reserves no row. Go live, seek-target labels
+  and feedback occupy the gradient run-out above the timeline without moving the
+  timeline or action-row anchors. Go live remains above the timeline, reachable
+  from it with Up; it is not an action-row item.
+- Both footer gradients have a 56dp run-out. Plain status text has a local backing
+  for contrast over bright video. Action controls remain 48dp; a 4dp timeline/action
+  gap and 36dp bottom inset move the actions upward without moving the timeline.
+  Standalone seek previews use the same timeline anchor.
+- Pause has a transparent idle container, like the other icon actions. Native
+  focused and pressed indication remains intact. The fading action layer reserves
+  8dp of rendering overflow so native focus growth is not cropped mid-animation;
+  measured control positions stay fixed.
+- Channels rows and quick-zap cards share neutral content-colour play/pause
+  markers. An indeterminate spinner occupies the same slot during an owned
+  channel tune. Presented buffering is not a new tune; pause follows playback
+  intent. Recording indicators remain independent.
+- Timeline focus brightens endpoint labels to full emphasis and fades surrounding
+  actions and the passive channel peek to 0.55 over 180ms. The expanded
+  channel tray stays fully visible. Identity-header and quick-zap geometry remain
+  unchanged.
+- While actively seeking with timeline focus, actions and the passive channel
+  peek fade out fully. The top programme header and clock remain visible in both
+  full controls and standalone previews. Programme identity and schedule endpoints
+  follow the preview target; passive Live/behind-live status remains committed.
+   Ended programmes show “Ended at HH:mm” beneath the title, based on the current
+   server clock, in both full controls and standalone previews; timeline endpoint
+   labels retain their original meaning. Cancelling restores the actual playback
+   programme. Missing historical metadata
+  uses an unavailable-programme presentation and numeric buffer axis, never the
+  current broadcast's title or schedule. Leaving timeline focus restores the destination even if the seek is
+  still pending; hidden content exposes no accessibility actions. Back retains
+  the existing preview-cancel/dismiss and controls-hide sequence. Physical-TV
+  judgment of this treatment is still pending.
+- An uninterrupted playback stall shows the existing compact tuning-style spinner
+  with “Buffering…” after one second, for live and recording playback. Initial
+  tuning retains its own status. Pause, inactive playback and recovery/error
+  presentation suppress buffering feedback; target changes reset its delay. It
+  neither takes focus nor moves controls.
+
+### Retained programme history (revised 2026-09-22)
+
+- Guide opens near Now and permits navigation into the preceding six hours of
+  retained programme metadata. Left/Right navigate programmes; Up/Down preserve
+  the time anchor; Now returns to the current schedule.
+- Past programmes use SDK-owned display history. No historical coverage request
+  or fabricated event fills missing data. History accumulates from received EPG;
+  a cold start or new session may have none.
+- Timeshift programme lookup includes that history, so an expired live-schedule
+  event can still label buffered playback. Programme metadata alone does not
+  establish that video remains rewindable.
+- Historical-only events cannot authorize programme recording or live watch
+  actions. An independently available DVR entry may still provide recording
+  playback. Pending recording confirmation/configuration is revalidated against
+  current live metadata, and old-session details close when ownership changes.
+
 ### Quick-zap cards (accepted 2026-09-21)
 
 - Use the Penpot compact channel-card anatomy: 196×110dp at default font scale,
@@ -254,8 +334,16 @@ colour and indication rules above apply here. Remote keys follow §6.
   time and minutes remaining, and a 2dp cyan progress strip. Use TV Material
   `CompactCard` indication; card height grows with localized text scale.
 - While player controls are visible, the upper 24dp of the cards peeks above the
-  bottom screen edge. The peek is passive; Down opens the tray and focuses the
-  playing channel (or a deterministic available fallback).
+  bottom screen edge. The peek is passive; Down opens the tray. First entry
+  focuses the playing channel (or a deterministic available fallback).
+- Re-entry restores the last browsed card and persistent viewport, keeping a
+  middle/right card in its screen position rather than snapping it left. Scroll
+  only enough to bring an offscreen target into the safe area. An external channel
+  change while closed reanchors to the confirmed playing channel; a delayed
+  confirmation of the rail's own pick does not erase subsequent browse focus.
+  Temporary loss of playback confirmation preserves both browse and local-pick
+  identity. Missing anchors fall back to playing, selected, then first available
+  channel; focus alone never tunes.
 - Opening slides the cards into the bottom third while player chrome slides up
   and fades away in the same transition. Closing reverses it. Invisible chrome
   and peeking cards cannot own focus or accessibility actions.

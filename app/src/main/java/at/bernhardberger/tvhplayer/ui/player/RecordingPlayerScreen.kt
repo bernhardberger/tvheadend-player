@@ -60,12 +60,14 @@ import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
+import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 import coil3.ImageLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -90,6 +92,7 @@ fun RecordingPlayerScreen(
     val connectionAvailable = connectionState is ConnectionState.Connected
     val scope = rememberCoroutineScope()
     val playbackState by session.state.collectAsStateWithLifecycle()
+    val activeTarget by session.activeTarget.collectAsStateWithLifecycle()
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
     val cutpoints by session.recordingCutpoints.collectAsStateWithLifecycle()
@@ -140,14 +143,14 @@ fun RecordingPlayerScreen(
         null -> false
     }
     val growing = admission is RecordingPlaybackAdmission.GrowingStartOverOnly &&
-        observation.currentSession === retainedSelection?.currentSession &&
-        observation.dvrEntry(recordingId)?.state == at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING
+        currentRecordingIsGrowing(observation, retainedSelection)
     val recordingResolved = entry != null ||
         admission != null ||
         playbackState is AppPlaybackState.Failed
     val recordingLoading = !recordingResolved && connectionAvailable
     val initialConnectionFailure = !recordingResolved && !connectionAvailable
     val player = remember { session.player }
+    val playWhenReady by rememberPlaybackIntent(player)
     val timelineState = androidx.compose.runtime.key(recordingId, retainedSelection?.currentSession) {
         rememberRecordingTimelinePresentationState(
             player = player,
@@ -487,7 +490,8 @@ fun RecordingPlayerScreen(
                     growing = growing,
                     nowSec = nowSec,
                     canSeek = timelineState.canSeek,
-                    paused = !player.playWhenReady,
+                    paused = !playWhenReady,
+                    playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering,
                     previewing = timelineState.pendingTargetMs != null,
                     controlsVisible = controlsVisible,
                     optionsOpen = optionsPage != null,
@@ -560,6 +564,18 @@ fun RecordingPlayerScreen(
             }
 
         }
+        CompactBufferingStatus(
+            state = playbackState,
+            playWhenReady = playWhenReady,
+            target = activeTarget,
+            expectedTarget = AppPlaybackTarget.Recording(recordingId),
+            generation = retainedSelection,
+            screenActive = playbackAvailable && retainedSelection != null &&
+                retainedSelection.currentSession === currentSession,
+            foregroundBlocked = recordingLoading || foregroundContext.recoveryVisible ||
+                foregroundContext.terminalErrorVisible,
+            modifier = Modifier.align(Alignment.Center).padding(horizontal = 56.dp),
+        )
         TvRecoveryOverlay(
             visible = recordingLoading,
             message = stringResource(R.string.recording_loading),

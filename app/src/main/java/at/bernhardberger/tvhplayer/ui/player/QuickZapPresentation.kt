@@ -23,6 +23,7 @@ internal fun QuickZapPresentation(
     expanded: Boolean,
     channelsAvailable: Boolean,
     channelContent: @Composable () -> Unit,
+    peekAlpha: () -> Float = { 1f },
     controls: @Composable () -> Unit,
 ) {
     val expansion = animateFloatAsState(
@@ -45,6 +46,7 @@ internal fun QuickZapPresentation(
             Box(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .graphicsLayer {
+                        alpha = if (expanded) 1f else peekAlpha()
                         // 12dp focus reserve + 24dp of actual card remains at the bottom.
                         translationY = (size.height - 36.dp.toPx()) * (1f - expansion.value)
                     }

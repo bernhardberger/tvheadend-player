@@ -102,6 +102,7 @@ import at.bernhardberger.tvhplayer.core.guideChannelPageCoverageSettled
 import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.guideWindowBounds
+import at.bernhardberger.tvhplayer.core.guideDisplayEvents
 import at.bernhardberger.tvhplayer.core.indexTimelineEventsByChannel
 import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
@@ -234,6 +235,7 @@ private data class GuideSearchRequest(
 
 private data class GuideIndexInput(
     val snapshot: EpgSnapshot?,
+    val events: List<EpgEventEntry>,
     val state: EpgRepositoryState,
     val category: ProgrammeCategory,
     val windowStartSec: Long,
@@ -357,7 +359,7 @@ fun EpgGridScreen(
     val channelListState = rememberLazyListState(initialFirstVisibleItemIndex = initialViewportIndex)
     var windowStartSec by remember {
         mutableLongStateOf(
-            restoredTimelinePosition?.windowStartSec ?: windowBounds.earliestStartSec
+            restoredTimelinePosition?.windowStartSec ?: floorGuideWindowToHour(openedAtSec, guideZoneId)
         )
     }
     val windowEndSec = windowStartSec + GUIDE_VISIBLE_WINDOW_SEC
@@ -416,8 +418,9 @@ fun EpgGridScreen(
             pendingAction == null && configChoices == null && channelFocusRequest == null
     )
 
+    val displayEvents = remember(observation.epgSnapshotForDisplay) { guideDisplayEvents(observation.epgSnapshotForDisplay) }
     val indexInput = GuideIndexInput(
-        observation.epgSnapshotForDisplay, observation.epgState, category, windowStartSec, windowEndSec,
+        observation.epgSnapshotForDisplay, displayEvents, observation.epgState, category, windowStartSec, windowEndSec,
     )
     val preparationAuthority = currentSession ?: observation.epgSnapshotForDisplay
     val indexAuthority = remember(preparationAuthority, category, windowStartSec) { Any() }
@@ -425,7 +428,7 @@ fun EpgGridScreen(
         val preparationContext = currentCoroutineContext()
         val index = profileTrace("P44:guideIndex") {
             indexTimelineEventsByChannel(
-                events = input.snapshot?.events.orEmpty(),
+                events = input.events,
                 windowStartSec = input.windowStartSec,
                 windowEndSec = input.windowEndSec,
                 matches = {
@@ -568,6 +571,7 @@ fun EpgGridScreen(
         val ids = channelPageIds(channelIndex)
         if (ids.isEmpty()) return null
         val boundedAnchorSec = windowBounds.constrain(anchorSec)
+        if (boundedAnchorSec + GUIDE_VISIBLE_WINDOW_SEC <= nowSecProvider()) return null
         val through = KotlinInstant.fromEpochSeconds(
             boundedAnchorSec + GUIDE_VISIBLE_WINDOW_SEC
         )
@@ -702,6 +706,7 @@ fun EpgGridScreen(
 
     fun pageCoverageSettled(channelIndex: Int): Boolean {
         val snapshot = observation.epgState.currentEpgSnapshot() ?: return false
+        if (windowEndSec <= nowSecProvider()) return true // Local retained data, not claimed server coverage.
         return guideChannelPageCoverageSettled(
             channelIds = channelPageIds(channelIndex),
             coverages = snapshot.coverages,
@@ -1045,7 +1050,7 @@ fun EpgGridScreen(
         val snapshot = epgState.currentEpgSnapshot()
             .takeIf { connectionUiState == ConnectionUiState.Ready }
         val frontierEvents = withContext(Dispatchers.Default) {
-            snapshot?.events.orEmpty().filter {
+            displayEvents.filter {
                 it.channelId == request.channelId &&
                     it.stop.epochSeconds > request.throughSec - GUIDE_VISIBLE_WINDOW_SEC &&
                     it.start.epochSeconds < request.throughSec &&
@@ -1342,6 +1347,21 @@ fun EpgGridScreen(
                     currentEvent.start.epochSeconds
                 }
                 val originWindowStartSec = windowStartSec
+                if (targetWindowStartSec + GUIDE_VISIBLE_WINDOW_SEC <= nowSecProvider()) {
+                    val channelId = channels[current.channelIndex].id
+                    val pastEvents = displayEvents.filter { it.channelId == channelId &&
+                        it.stop.epochSeconds > targetWindowStartSec &&
+                        it.start.epochSeconds < targetWindowStartSec + GUIDE_VISIBLE_WINDOW_SEC &&
+                        it.matchesProgrammeCategory(category) }
+                    val target = timelineFrontierFocus(
+                        rows = listOf(EpgFocusColumn(channelId, pastEvents)), channelId = channelId,
+                        originEventId = current.eventId, boundarySec = boundarySec,
+                        direction = move.timeFrontierDirection,
+                    ) ?: return true
+                    windowStartSec = targetWindowStartSec
+                    selectedTarget = target.copy(channelIndex = current.channelIndex)
+                    return true
+                }
                 val coverageRequest = requestVisibleWindow(
                     targetWindowStartSec,
                     current.channelIndex,
@@ -1947,12 +1967,26 @@ fun EpgGridScreen(
 
         detailsEvent?.let { openingEvent ->
             val openingObservation = detailsObservation ?: return@let
+            LaunchedEffect(openingObservation.currentSession, currentSession) {
+                if (openingObservation.currentSession == null || openingObservation.currentSession !== currentSession) {
+                    pendingAction = null
+                    pendingMutation = null
+                    pendingRecordingTarget = null
+                    configChoices = null
+                    closeDetails()
+                    closeSearch()
+                }
+            }
             val selectedObservation = searchResultObservation(openingObservation, observation)
-                ?: openingObservation
-            val event = selectedObservation.epgSnapshotForDisplay?.events
+                ?: return@let
+            val detailEvents = remember(selectedObservation.epgSnapshotForDisplay) {
+                guideDisplayEvents(selectedObservation.epgSnapshotForDisplay)
+            }
+            val event = detailEvents
                 ?.firstOrNull { it.id == openingEvent.id } ?: openingEvent
             val selectedCapability = selectedObservation.currentSession
                 ?.takeIf { observation.currentSession === it }
+            val liveEvent = selectedObservation.event(event.id)?.takeIf { it == event }
             val eventChannelId = event.channelId
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForProgramme(event)
@@ -1962,7 +1996,8 @@ fun EpgGridScreen(
                 channel = channel,
                 recording = recording,
                 nowSecProvider = nowSecProvider,
-                canModifyRecordings = selectedCapability != null,
+                canModifyRecordings = selectedCapability != null && (liveEvent != null || recording != null),
+                liveProgrammeActions = liveEvent != null,
                 actionResult = actionResult,
                 onAction = actionHandler@{ action ->
                     if (
@@ -1975,7 +2010,7 @@ fun EpgGridScreen(
                     }
                     when (action) {
                         ProgrammeAction.WATCH -> {
-                            if (selectedCapability != null && channel != null) {
+                            if (liveEvent != null && selectedCapability != null && channel != null) {
                                 detailsEvent = null
                                 detailsObservation = null
                                 detailsOpening = null
@@ -1996,7 +2031,7 @@ fun EpgGridScreen(
                                 )
                             }
                         }
-                        ProgrammeAction.RECORD -> if (selectedCapability != null) {
+                        ProgrammeAction.RECORD -> if (selectedCapability != null && liveEvent != null) {
                             when (
                                 val choice = chooseDvrConfig(
                                     selectedObservation.currentDvrConfigurations()
@@ -2037,12 +2072,13 @@ fun EpgGridScreen(
         val confirmationMutation = currentDvrMutation(
             pendingMutation,
             detailsObservation,
-            currentSession,
+            observation,
         )
-        LaunchedEffect(confirmationAction, confirmationMutation, configChoices, currentSession) {
+        val recordingTargetCurrent = currentGuideRecordingTarget(pendingRecordingTarget, observation) != null
+        LaunchedEffect(confirmationAction, confirmationMutation, configChoices, currentSession, recordingTargetCurrent) {
             if (
                 confirmationAction != null && confirmationMutation == null ||
-                configChoices != null && (currentSession == null ||
+                configChoices != null && (!recordingTargetCurrent || currentSession == null ||
                     detailsObservation?.currentSession !== currentSession)
             ) {
                 pendingAction = null
@@ -2069,7 +2105,7 @@ fun EpgGridScreen(
                     val mutation = currentDvrMutation(
                         pendingMutation,
                         detailsObservation,
-                        observationState.value.currentSession,
+                        observationState.value,
                     )
                     pendingMutation = null
                     pendingRecordingTarget = null
@@ -2077,7 +2113,9 @@ fun EpgGridScreen(
                         val opening = detailsOpening
                         val openingObservation = detailsObservation
                         coroutineScope.launch {
-                            val feedback = dvrMutationActions.execute(mutation)
+                            val currentMutation = currentDvrMutation(mutation, openingObservation, observationState.value)
+                                ?: return@launch
+                            val feedback = dvrMutationActions.execute(currentMutation)
                             if (guideDetailsFeedbackIsCurrent(
                                 opening, detailsOpening, openingObservation, observationState.value,
                             )) {
@@ -2089,16 +2127,16 @@ fun EpgGridScreen(
             )
         }
 
-        configChoices?.let { configs ->
+        configChoices?.takeIf { recordingTargetCurrent }?.let { configs ->
             DvrConfigDialog(
                 configs = configs,
                 onDismiss = { configChoices = null },
                 onSelect = { config ->
                     configChoices = null
-                    pendingMutation = pendingRecordingTarget?.let { target ->
+                    pendingMutation = currentGuideRecordingTarget(pendingRecordingTarget, observationState.value)?.let { target ->
                         DvrMutationAction.CreateProgramme(target, config.id)
                     }
-                    pendingAction = ProgrammeAction.RECORD
+                    pendingAction = ProgrammeAction.RECORD.takeIf { pendingMutation != null }
                 },
             )
         }
@@ -2138,10 +2176,17 @@ internal fun searchResultObservation(
 internal fun currentDvrMutation(
     mutation: DvrMutationAction?,
     sourceObservation: SessionObservation?,
-    currentSession: CurrentSessionObservation?,
+    currentObservation: SessionObservation,
 ): DvrMutationAction? = mutation?.takeIf {
-    currentSession != null && sourceObservation?.currentSession === currentSession
+    currentObservation.currentSession != null && sourceObservation?.currentSession === currentObservation.currentSession &&
+        (it !is DvrMutationAction.CreateProgramme || currentGuideRecordingTarget(it.target, currentObservation) != null)
 }
+
+internal fun currentGuideRecordingTarget(target: ProgrammeRecordingTarget?, observation: SessionObservation): ProgrammeRecordingTarget? =
+    target?.takeIf { selected ->
+        observation.currentSession === selected.currentSession &&
+            observation.event(selected.eventId)?.programmeRecordingTarget(selected.currentSession) == selected
+    }
 
 internal fun guideDetailsFeedbackIsCurrent(
     opening: Any?,

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -44,8 +42,9 @@ import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.recordingTimelinePresentation
-import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
+import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
+import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -78,6 +77,7 @@ internal fun RecordingOverlayControls(
     onInfoFocusRestored: () -> Unit = {},
     onCommitSeek: () -> Unit = {},
     paused: Boolean = false,
+    playbackPresented: Boolean = true,
     previewing: Boolean = false,
     displayDurationMs: Long = durationMs,
     markers: List<Long> = emptyList(),
@@ -97,6 +97,8 @@ internal fun RecordingOverlayControls(
     var lastFocusWasTimeline by remember { mutableStateOf(false) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
+    val chromeAlpha = rememberPlayerChromeAlpha(timelineFocused, previewing)
+    val chromeHidden = timelineFocused && previewing
     LaunchedEffect(markerNavigation.restoration) {
         if (markerNavigation.restoration > 0 && controlsVisible && !optionsOpen) {
             if (seekable) timelineFocus.requestFocus() else pauseFocus.requestFocus()
@@ -140,23 +142,30 @@ internal fun RecordingOverlayControls(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
             eyebrow = channelName, title = title, support = subtitle,
             clock = formatClock(nowSec), clockSupport = null,
-            modifier = modifier.alpha(if (previewing || timelineFocused) 0.45f else 1f),
+            clockStatus = { PlayerStatusTags(paused, recordingPlayback = true, growing = growing, playbackPresented = playbackPresented) },
+            modifier = modifier,
             tags = PlayerHeaderTags(picon = "recording-picon", eyebrow = "recording-channel-identity",
                 title = "recording-title", support = "recording-subtitle", clock = "recording-clock"),
         )
     }) {
-        Box {
-        Column(Modifier.heightIn(min = 48.dp)) {
+        Column {
             when (presentation) {
                 is RecordingTimelinePresentation.Seekable -> if (canSeek) PlaybackSeekbar(
                     range = presentation.range,
                     paused = paused,
-                    previewing = previewing,
+                    previewing = previewing && !markerNavigation.open,
                     recordingMarkers = markers,
                     recordingMarkerPreviewMs = markerNavigation.selectedMs?.takeIf { it in markers },
                     onOpenRecordingMarkers = {
                         onCommitSeek(); onUserInteraction()
                         markerNavigation.show(markers, markerPositionMs, revision = markerRevision)
+                    },
+                    trackOverlay = {
+                        RecordingMarkerOverlay(
+                            navigation = markerNavigation, markers = markers, onSeek = onSeekMarker,
+                            displayDurationMs = displayDurationMs,
+                            modifier = Modifier.matchParentSize(),
+                        )
                     },
                     onSeekTo = { onUserInteraction(); onSeek(it - positionMs) },
                     modifier = Modifier
@@ -203,20 +212,14 @@ internal fun RecordingOverlayControls(
                 )
             }
         }
-        RecordingMarkerOverlay(
-            navigation = markerNavigation, markers = markers, onSeek = onSeekMarker,
-            displayDurationMs = displayDurationMs,
-            modifier = Modifier.matchParentSize(),
-        )
-        }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(TvOverlayTimelineActionGap))
         PlayerActionRow(
             infoFocus = infoFocus, settingsFocus = settingsFocus,
             onInfo = onOpenInfo, onSettings = onOpenOptions, onStop = onStopPlayback,
             onInteraction = { lastFocusWasTimeline = false; onUserInteraction() },
             onTogglePause = onTogglePlayPause, paused = paused, pauseFocus = pauseFocus,
             modifier = Modifier
-                .alpha(if (timelineFocused) 0.55f else 1f)
+                .playerChromeEmphasis(chromeAlpha, chromeHidden, focusOverflow = 8.dp)
                 .testTag("recording-actions")
                 .focusProperties {
                     up = if (seekable) timelineFocus else FocusRequester.Cancel

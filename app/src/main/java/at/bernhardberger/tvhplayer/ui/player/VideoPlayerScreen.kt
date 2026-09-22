@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
+
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -263,6 +266,7 @@ fun VideoPlayerScreen(
 
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
+    val activeTarget by videoPlayerViewModel.activeTarget.collectAsStateWithLifecycle()
     val playingLiveChannelId by
         videoPlayerViewModel.playingLiveChannelId.collectAsStateWithLifecycle()
     val livePlaybackObservation by
@@ -305,6 +309,13 @@ fun VideoPlayerScreen(
         it == currentChannelId && playbackState.presented
     }
     val player = remember { videoPlayerViewModel.getPlayerInstance() }
+    val playWhenReady by rememberPlaybackIntent(player)
+    val channelIndicator = channelPlaybackIndicator(
+        currentChannelId,
+        playingLiveChannelId?.let { at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(it) },
+        playbackState,
+        playWhenReady,
+    )
     val timelineState = rememberLiveTimelinePresentationState(player)
     var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }
     // Key on the identity of the live target, not on the observation value. The observation
@@ -591,9 +602,7 @@ fun VideoPlayerScreen(
         observation.channel(currentChannelId)
     }
     val committedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-        programmeWindow(effectiveTimeshiftState,
-            mappingTimeline = visibleSeekPreview?.mappingTimeline ?: effectiveTimeshiftState.timeline,
-        ) { observation.eventAt(currentChannelId, it) }
+        programmeWindow(effectiveTimeshiftState) { observation.eventAt(currentChannelId, it) }
     } else null
     val displayedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
         visibleSeekPreview?.let { preview ->
@@ -602,9 +611,10 @@ fun VideoPlayerScreen(
             }
         } ?: committedWindow.takeIf { visibleSeekPreview == null }
     } else null
-    val displayedNextEvent = if (committedWindow != null) {
-        observation.nextEvent(currentChannelId, committedWindow.estimatedPosition)
-    } else nextEvent
+    val displayedNextEvent = if (displayedWindow != null) {
+        observation.nextEvent(currentChannelId, displayedWindow.estimatedPosition)
+    } else nextEvent.takeIf { visibleSeekPreview == null &&
+        at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback(effectiveTimeshiftState) }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,
@@ -612,11 +622,14 @@ fun VideoPlayerScreen(
             currentChannelId,
         )
     }
-    val currentRecording = remember(observation, nowEvent?.id) {
-        nowEvent?.let { observation.dvrEntryForEvent(it.id) }
+    val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
+        committedWindow, effectiveTimeshiftState, nowEvent)
+    val actionableInfoEvent = currentProgrammeEvent(observation, infoEvent)
+    val currentRecording = remember(observation, infoEvent?.id) {
+        infoEvent?.let { observation.dvrEntryForEvent(it.id) }
     }
     val currentRecordingTarget = currentSession?.let { capability ->
-        nowEvent?.programmeRecordingTarget(capability)
+        actionableInfoEvent?.programmeRecordingTarget(capability)
     }
     val optimisticRecordingTarget = when (val state = infoRecordingState) {
         is LiveInfoRecordingState.Dispatching -> state.target
@@ -629,6 +642,7 @@ fun VideoPlayerScreen(
         optimisticRecordingTarget == currentRecordingTarget
     val infoRecordingScheduled = currentRecording != null || optimisticRecordingMatchesCurrent
     val canRecordFromInfo = canModifyRecordings &&
+        actionableInfoEvent?.let { it.stop.epochSeconds > nowSec } == true &&
         infoRecordingState !is LiveInfoRecordingState.Dispatching &&
         !(infoRecordingState is LiveInfoRecordingState.Succeeded &&
             optimisticRecordingMatchesCurrent)
@@ -722,7 +736,7 @@ fun VideoPlayerScreen(
 
     LiveInfoRecordingValidityEffect(
         state = infoRecordingState,
-        currentEvent = nowEvent,
+        currentEvent = actionableInfoEvent,
         actionEligible = recordActionEligible,
         confirmationVisible = layerState.recordingConfirmationVisible,
         onInvalidated = {
@@ -736,7 +750,7 @@ fun VideoPlayerScreen(
         when (
             val decision = liveInfoRecordingDecision(
                 state = infoRecordingState,
-                currentEvent = nowEvent,
+                currentEvent = actionableInfoEvent,
                 actionEligible = recordActionEligible,
             )
         ) {
@@ -1054,6 +1068,8 @@ fun VideoPlayerScreen(
                         channels = channels,
                         selectedId = selectedId,
                         playingChannelId = confirmedPlayingChannelId,
+                        playbackChannelId = currentChannelId,
+                        playbackIndicator = channelIndicator,
                         recordingChannelIds = recordingChannelIds,
                         nowEvent = { channelsVm.nowEvent(it, nowSec) },
                         nowSec = nowSec,
@@ -1075,7 +1091,8 @@ fun VideoPlayerScreen(
                 channelNumber = currentChannelNumber,
                 channelName = currentChannelName,
                 piconPath = currentChannel?.icon,
-                nowEvent = (committedWindow?.event ?: nowEvent).takeUnless { channelUnavailable },
+                nowEvent = displayedProgrammeEvent(false, null, committedWindow, effectiveTimeshiftState, nowEvent)
+                    .takeUnless { channelUnavailable },
                 nextEvent = displayedNextEvent.takeUnless { channelUnavailable },
                 committedTimeshiftState = effectiveTimeshiftState,
                 committedWindow = committedWindow,
@@ -1111,12 +1128,13 @@ fun VideoPlayerScreen(
                     projectedTimeshiftState(effectiveTimeshiftState, it.decision.targetMs)
                 } ?: effectiveTimeshiftState,
                 liveAvailable = !channelUnavailable,
+                playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering,
                 channelRecordingNow = currentChannelId in recordingChannelIds,
                 nextScheduled = displayedNextEvent?.let { observation.dvrEntryForEvent(it.id) }?.state ==
                     at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
                 timeshiftFeedback = timelineState.feedback,
                 timeshiftFeedbackIsError = timelineState.feedbackIsError,
-                paused = !player.playWhenReady,
+                paused = !playWhenReady,
                 onToggleTimeshiftPause = {
                     if (!player.playWhenReady) {
                         videoPlayerViewModel.play()
@@ -1188,6 +1206,22 @@ fun VideoPlayerScreen(
                 programmeWindow = displayedWindow,
                 channelsAvailable = channels.isNotEmpty(),
                 modifier = Modifier.align(Alignment.BottomCenter),
+                headerContent = { modifier ->
+                    PlayerIdentityHeader(
+                        imageLoader = imageLoader, currentSession = currentSession, piconPath = currentChannel?.icon,
+                        eyebrow = at.bernhardberger.tvhplayer.ui.components.channelTitleText(currentChannelNumber, currentChannelName),
+                        title = displayedWindow?.event?.title.orEmpty(),
+                        support = endedProgrammeSupport(displayedWindow?.event, nowSec)
+                            ?: displayedWindow?.let { programmeWindowClockLabels(it.event).let { (start, end) -> "$start - $end" } }
+                            ?: stringResource(R.string.player_programme_timing_unavailable),
+                        clock = at.bernhardberger.tvhplayer.ui.common.formatClock(nowSec), clockSupport = null,
+                        clockStatus = { PlayerStatusTags(!playWhenReady, timeshift = effectiveTimeshiftState,
+                            recordingNow = currentChannelId in recordingChannelIds,
+                            playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering) },
+                        modifier = modifier,
+                        tags = PlayerHeaderTags(title = "player-programme-title"),
+                    )
+                },
             )
         }
 
@@ -1197,7 +1231,7 @@ fun VideoPlayerScreen(
                 foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
         ) {
             LiveProgrammeInfoOverlay(
-                event = nowEvent,
+                event = infoEvent,
                 channelIdentity = buildString {
                     currentChannelNumber?.let { number -> append("$number • ") }
                     append(currentChannelName)
@@ -1209,7 +1243,7 @@ fun VideoPlayerScreen(
                 confirmationVisible = confirmationVisible,
                 restoreRecordFocus = restoreRecordFocus,
                 onRecord = {
-                    val event = nowEvent ?: return@LiveProgrammeInfoOverlay
+                    val event = actionableInfoEvent ?: return@LiveProgrammeInfoOverlay
                     val capability = currentSession ?: return@LiveProgrammeInfoOverlay
                     infoRecordingState = LiveInfoRecordingState.Confirming(
                         event.programmeRecordingTarget(capability)
@@ -1304,6 +1338,17 @@ fun VideoPlayerScreen(
                 .align(Alignment.Center)
                 .padding(horizontal = 56.dp)
                 .testTag("player-tuning-status"),
+        )
+
+        CompactBufferingStatus(
+            state = playbackState,
+            playWhenReady = playWhenReady,
+            target = activeTarget,
+            expectedTarget = AppPlaybackTarget.Live(currentChannelId),
+            generation = currentSession to liveRequestToken,
+            screenActive = screenActive && currentSession != null && activeLivePlayback != null,
+            foregroundBlocked = statusPresentation != PlaybackStatusPresentation.NONE || compactTuningVisible,
+            modifier = Modifier.align(Alignment.Center).padding(horizontal = 56.dp),
         )
 
         TvRecoveryOverlay(

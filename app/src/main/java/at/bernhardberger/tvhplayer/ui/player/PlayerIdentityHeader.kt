@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.paddingFrom
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,6 +58,7 @@ fun PlayerIdentityHeader(
     currentSession: CurrentSessionObservation? = null,
     tags: PlayerHeaderTags = PlayerHeaderTags(),
     compact: Boolean = false,
+    clockStatus: (@Composable () -> Unit)? = null,
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     Row(
@@ -112,7 +117,11 @@ fun PlayerIdentityHeader(
                     .optionalTestTag(tags.clock)
                     .paddingFrom(FirstBaseline, before = TvOverlayHeaderFirstBaseline)
             )
-            clockSupport?.let {
+            clockStatus?.let {
+                Spacer(Modifier.height(6.dp))
+                it()
+            }
+            clockSupport?.takeIf { clockStatus == null }?.let {
                 Text(
                     text = it,
                     color = onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
@@ -127,6 +136,12 @@ fun PlayerIdentityHeader(
 }
 
 private enum class HeaderTextStyle { EYEBROW, TITLE, SUPPORT }
+
+@Composable
+internal fun endedProgrammeSupport(event: EpgEvent?, serverNowSec: Long): String? =
+    event?.takeIf { it.stop.epochSeconds <= serverNowSec }?.let {
+        stringResource(R.string.player_programme_ended_at, formatClock(it.stop.epochSeconds))
+    }
 
 @Composable
 private fun HeaderText(
