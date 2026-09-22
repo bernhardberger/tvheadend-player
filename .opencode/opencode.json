@@ -13,12 +13,12 @@
       "variant": "medium"
     },
     "app-locator": {
-      "model": "openai/gpt-5.6-luna",
+      "model": "openai/gpt-6-luna",
       "variant": "low",
       "steps": 20
     },
     "app-explore": {
-      "model": "openai/gpt-5.6-terra",
+      "model": "openai/gpt-6-sol",
       "variant": "medium",
       "steps": 30
     },
@@ -48,12 +48,12 @@
       "steps": 45
     },
     "tv-evidence-curator": {
-      "model": "openai/gpt-5.6-terra",
+      "model": "openai/gpt-6-sol",
       "variant": "medium",
       "steps": 25
     },
     "tv-ux-brief": {
-      "model": "anthropic/claude-opus-5",
+      "model": "anthropic/claude-opus-5-5",
       "variant": "high",
       "steps": 35
     },
@@ -66,11 +66,6 @@
       "model": "openai/gpt-6-astra",
       "variant": "high",
       "steps": 40
-    },
-    "claude-audit-lead": {
-      "model": "anthropic/claude-opus-5",
-      "variant": "high",
-      "steps": 45
     }
   },
   "permission": {
@@ -91,7 +86,6 @@
       "tv-ux-brief": "allow",
       "tv-ux-reviewer": "allow",
       "tv-ux-astra": "allow",
-      "claude-audit-lead": "allow",
       "app-implementer": "allow",
       "app-device-operator": "allow",
       "penpot-executor": "allow"

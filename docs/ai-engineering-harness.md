@@ -211,7 +211,7 @@ risk:
 | Change | Independent review |
 |---|---|
 | Documentation, tests, or mechanical work with no production behavior change | Normally none |
-| Non-trivial non-UX change, including security/runtime/lifecycle/concurrency | Independent Astra `android-reviewer` plus independent Opus `claude-audit-lead`, subject to the quota fallback below |
+| Non-trivial non-UX change, including security/runtime/lifecycle/concurrency | Independent Astra `android-reviewer` plus an independent Opus pass (second `android-reviewer` dispatch with task override `model: anthropic/claude-opus-5-5`, `reasoning: high`; no named Opus agent), subject to the quota fallback below |
 | Ordinary release using the existing release path | No additional model approval; retain release artifact and authorization checks |
 | Unresolved visual direction for a substantial new or redesigned TV surface | Optional `tv-ux-brief` against supplied requirements and baseline images |
 | Screenshot-set coverage, metadata, duplication, staleness, or privacy | Primary checks it; optional `tv-evidence-curator` for useful independent work |

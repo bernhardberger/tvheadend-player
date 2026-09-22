@@ -1,7 +1,7 @@
 ---
 description: Operates an explicitly authorized test TV with official CLI-first install/capture and bounded device operations; no repository edits
 mode: subagent
-model: openai/gpt-5.6-terra
+model: openai/gpt-6-sol
 variant: medium
 steps: 40
 permission:

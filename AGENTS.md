@@ -177,8 +177,10 @@ Restricted children cannot read project policy: callers must inline applicable
 hard requirements, accepted invariants and exact evidence without redefining the
 role's permissions, output or verdict contract.
 
-Non-trivial non-UX work requires independent `android-reviewer` and
-`claude-audit-lead` coverage under the harness routing. Substantial new/redesigned
+Non-trivial non-UX work requires independent Astra `android-reviewer` coverage
+plus an Opus pass: a second `android-reviewer` dispatch with task override
+`model: anthropic/claude-opus-5-5`, `reasoning: high` (no named Opus agent),
+under the harness routing. Substantial new/redesigned
 TV surfaces require final screenshot-first `tv-ux-reviewer` coverage; use
 `tv-ux-brief` when direction is unresolved. UX review does not replace distinct
 runtime review or physical-TV gates. Low-impact work has no mandatory pair.
