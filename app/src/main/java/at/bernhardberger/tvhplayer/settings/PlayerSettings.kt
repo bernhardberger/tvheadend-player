@@ -20,6 +20,7 @@ data class PlayerSettings(
     val aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
     val timeshiftEnabled: Boolean = true,
     val refreshRateMatchingEnabled: Boolean = true,
+    val audioPassthroughEnabled: Boolean = true,
 )
 
 class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
@@ -34,6 +35,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val ASPECT_RATIO = stringPreferencesKey("aspectRatio")
         val TIMESHIFT_ENABLED = booleanPreferencesKey("timeshiftEnabled")
         val REFRESH_RATE_MATCHING_ENABLED = booleanPreferencesKey("refreshRateMatchingEnabled")
+        val AUDIO_PASSTHROUGH_ENABLED = booleanPreferencesKey("audioPassthroughEnabled")
     }
 
     val playerSettings: Flow<PlayerSettings> =
@@ -79,6 +81,10 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    suspend fun setAudioPassthroughEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.AUDIO_PASSTHROUGH_ENABLED] = enabled }
+    }
+
     internal companion object {
         fun decodePlayerSettings(p: Preferences): PlayerSettings {
             val ar = p[Keys.ASPECT_RATIO]
@@ -91,6 +97,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
                 aspectRatio = aspect,
                 timeshiftEnabled = p[Keys.TIMESHIFT_ENABLED] ?: true,
                 refreshRateMatchingEnabled = p[Keys.REFRESH_RATE_MATCHING_ENABLED] ?: true,
+                audioPassthroughEnabled = p[Keys.AUDIO_PASSTHROUGH_ENABLED] ?: true,
             )
         }
 

@@ -19,6 +19,8 @@ data class SettingsPlayerUiState(
     val selectedProfileId: StreamProfileId? = null,
     val timeshiftEnabled: Boolean = true,
     val refreshRateMatchingEnabled: Boolean = true,
+    val audioPassthroughEnabled: Boolean = true,
+    val audioPassthroughChangeFailed: Boolean = false,
 )
 
 class SettingsPlayerViewModel(
@@ -32,13 +34,16 @@ class SettingsPlayerViewModel(
         session.observation,
         profileOwner.streamProfiles,
         profileOwner.selectedStreamProfileId,
-    ) { settings, observation, profiles, selectedProfileId ->
+        playbackRuntime.audioPassthroughChangeFailed,
+    ) { settings, observation, profiles, selectedProfileId, audioPassthroughChangeFailed ->
         SettingsPlayerUiState(
             connected = observation.currentSession != null,
             profiles = profiles,
             selectedProfileId = selectedProfileId,
             timeshiftEnabled = settings.timeshiftEnabled,
             refreshRateMatchingEnabled = settings.refreshRateMatchingEnabled,
+            audioPassthroughEnabled = settings.audioPassthroughEnabled,
+            audioPassthroughChangeFailed = audioPassthroughChangeFailed,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsPlayerUiState())
 
@@ -59,5 +64,9 @@ class SettingsPlayerViewModel(
             settingsStore.setRefreshRateMatchingEnabled(enabled)
             playbackRuntime.setRefreshRateMatchingEnabled(enabled)
         }
+    }
+
+    fun onAudioPassthroughEnabledChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setAudioPassthroughEnabled(enabled) }
     }
 }

@@ -7,6 +7,7 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
 import at.bernhardberger.tvhplayer.images.buildImageLoader
@@ -65,8 +66,9 @@ val appModule = module {
             playerSettings = playerSettings,
             ioDispatcher = get(qualifier = named("io")),
         )
+        val audioOutput = TvheadendAudioOutputProvider(androidContext())
         val player = ExoPlayer.Builder(androidContext())
-            .setRenderersFactory(createTvheadendRenderersFactory(androidContext()))
+            .setRenderersFactory(createTvheadendRenderersFactory(androidContext(), audioOutput))
             .setLoadControl(createPlaybackLoadControl())
             .build()
         lateinit var playbackRuntime: AppPlaybackRuntime
@@ -81,6 +83,7 @@ val appModule = module {
             settings = playerSettings,
             profileOwner = profileOwner,
             scope = applicationScope,
+            audioOutput = audioOutput,
         )
         SdkRuntimeOwner.create(
             session = session,

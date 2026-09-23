@@ -79,7 +79,8 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         val coordinator = createTvheadendPlaybackCoordinator(controlled.player)
         val lifetime = coordinator.launchIn(scope)
         val runtime = withContext(Dispatchers.Main) {
-            AppPlaybackRuntime(controlled.player, session, coordinator, settings, profiles, scope)
+            AppPlaybackRuntime(controlled.player, session, coordinator, settings, profiles, scope,
+                at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context))
         }
         val video = withContext(Dispatchers.Main) { VideoPlayerViewModel(runtime, session) }
         val catalog = withContext(Dispatchers.Main) { ChannelsViewModel(session, tags) }

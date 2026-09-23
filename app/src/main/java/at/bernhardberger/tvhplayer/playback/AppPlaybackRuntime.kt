@@ -29,6 +29,7 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.BuildConfig
@@ -591,10 +592,15 @@ class AppPlaybackRuntime(
     private val settings: PlayerSettingsStore,
     private val profileOwner: AppProfileOwner,
     private val scope: CoroutineScope,
+    private val audioOutput: TvheadendAudioOutputProvider,
 ) {
     private val targetCommands = PlaybackTargetCommandSerialization()
     private val foregroundPlaybackLifecycle = ForegroundPlaybackLifecycle()
     private val audioSelection = SessionAudioSelection()
+    private var audioOutputConfigured = false
+    private var audioOutputChanging = false
+    private val _audioPassthroughChangeFailed = MutableStateFlow(false)
+    val audioPassthroughChangeFailed = _audioPassthroughChangeFailed.asStateFlow()
     private var audioWriteJob: Job? = null
     private val presentationEpoch = PlaybackPresentationEpoch()
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
@@ -627,7 +633,13 @@ class AppPlaybackRuntime(
     internal val videoPresentation = _videoPresentation.asStateFlow()
 
     private val settingsJob = scope.launch {
-        settings.playerSettings.distinctUntilChanged().collect(::applyPlayerSettings)
+        settings.playerSettings.distinctUntilChanged().collect {
+            targetCommands.serialize(onClosed = {}) {
+                val latest = settings.playerSettings.first()
+                applyPlayerSettings(latest)
+                applyAudioPassthrough(latest.audioPassthroughEnabled)
+            }
+        }
     }
 
     private val livePlaybackObservationJob = scope.launch {
@@ -686,7 +698,7 @@ class AppPlaybackRuntime(
         }
 
         override fun onTracksChanged(tracks: Tracks) {
-            if (targetInstallationInProgress || !targetCommands.isOpen()) return
+            if (targetInstallationInProgress || audioOutputChanging || !targetCommands.isOpen()) return
             audioSelection.useProfile(profileOwner.serverProfile.value, player)
             audioSelection.restore(player)
         }
@@ -742,6 +754,7 @@ class AppPlaybackRuntime(
         }
         val playerSettings = settings.playerSettings.first()
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        configureAudioOutputBeforeFirstTarget(playerSettings)
         val profileSelection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (profileSelection == null) {
             return completeUnavailableTarget(
@@ -886,6 +899,9 @@ class AppPlaybackRuntime(
         start: RecordingPlaybackStart,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        val playerSettings = settings.playerSettings.first()
+        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        configureAudioOutputBeforeFirstTarget(playerSettings)
         val expectedPresentationEpoch = presentationEpoch.snapshot()
         lastRecordingRequest = recordingId to start
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
@@ -1448,6 +1464,32 @@ class AppPlaybackRuntime(
             targetFrameListener?.let(player::removeListener)
             targetFrameListener = null
             _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
+        }
+    }
+
+    private fun configureAudioOutputBeforeFirstTarget(value: PlayerSettings) {
+        targetCommands.runIfOpen {
+            if (!audioOutputConfigured) {
+                audioOutput.configurePassthrough(value.audioPassthroughEnabled)
+                audioOutputConfigured = true
+            }
+        }
+    }
+
+    private suspend fun applyAudioPassthrough(enabled: Boolean) {
+        if (!targetCommands.isOpen() || !audioOutputConfigured) return
+        if (audioOutput.isPassthroughEnabled == enabled) {
+            _audioPassthroughChangeFailed.value = false
+            return
+        }
+        audioOutputChanging = true
+        try {
+            val applied = audioOutput.setPassthroughEnabled(player, enabled)
+            if (targetCommands.isOpen()) _audioPassthroughChangeFailed.value = !applied
+        } finally {
+            audioOutputChanging = false
+            // onTracksChanged restores the remembered choice using NEW mode capabilities.
+            // currentTracks here can still describe the old mode and must not reapply an override.
         }
     }
 

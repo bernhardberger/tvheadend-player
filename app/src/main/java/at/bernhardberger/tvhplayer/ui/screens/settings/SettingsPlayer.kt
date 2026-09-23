@@ -17,7 +17,8 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 internal fun settingsPlayerLevel(vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    return settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onRefreshRateMatchingEnabledChanged, vm::onProfileSelected)
+    return settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onRefreshRateMatchingEnabledChanged,
+        vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged)
 }
 
 @Composable
@@ -26,6 +27,7 @@ internal fun settingsPlayerLevel(
     onTimeshiftEnabledChanged: (Boolean) -> Unit,
     onRefreshRateMatchingEnabledChanged: (Boolean) -> Unit,
     onProfileSelected: (StreamProfileId?) -> Unit,
+    onAudioPassthroughEnabledChanged: (Boolean) -> Unit,
 ): DepthLevel {
     val direct = stringResource(R.string.profile_direct_streaming)
     val profileSection = stringResource(R.string.profile)
@@ -34,6 +36,10 @@ internal fun settingsPlayerLevel(
             onClick = { onTimeshiftEnabledChanged(!ui.timeshiftEnabled) }))
         add(settingsRow("refresh-rate", stringResource(R.string.refresh_rate_matching_setting), checked = ui.refreshRateMatchingEnabled,
             onClick = { onRefreshRateMatchingEnabledChanged(!ui.refreshRateMatchingEnabled) }))
+        add(settingsRow("audio-passthrough", stringResource(R.string.audio_passthrough_setting),
+            supporting = if (ui.audioPassthroughChangeFailed) stringResource(R.string.audio_passthrough_failed)
+                else stringResource(R.string.audio_passthrough_description), checked = ui.audioPassthroughEnabled,
+            onClick = { onAudioPassthroughEnabledChanged(!ui.audioPassthroughEnabled) }))
         when (val profiles = ui.profiles) {
             StreamProfilesResult.NotReady -> add(settingsRow("profiles-status",
                 stringResource(if (ui.connected) R.string.loading_wait else R.string.not_connected), section = profileSection))

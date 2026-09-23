@@ -12,9 +12,21 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlayerSettingsStoreTest {
+    @Test
+    fun audioPassthroughDefaultsOnAndPersistsBothChoices() = runTest {
+        val dataStore = InMemoryPreferencesDataStore()
+        val store = PlayerSettingsStore(dataStore)
+        assertTrue(store.playerSettings.first().audioPassthroughEnabled)
+        store.setAudioPassthroughEnabled(false)
+        assertFalse(PlayerSettingsStore(dataStore).playerSettings.first().audioPassthroughEnabled)
+        store.setAudioPassthroughEnabled(true)
+        assertTrue(PlayerSettingsStore(dataStore).playerSettings.first().audioPassthroughEnabled)
+    }
+
     private val profileUuidKey = stringPreferencesKey("profileUuid")
     private val directId = StreamProfileId("11111111111111111111111111111111")
     private val passId = StreamProfileId("22222222222222222222222222222222")

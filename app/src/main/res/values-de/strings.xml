@@ -361,6 +361,9 @@
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Tvheadend Player erlauben, für Live-TV einen Timeshift-Puffer von Ihrem Server anzufordern.</string>
     <string name="refresh_rate_matching_setting">Bildwiederholrate anpassen</string>
+    <string name="audio_passthrough_setting">Audio-Passthrough</string>
+    <string name="audio_passthrough_description">Kann den Ton kurz unterbrechen.</string>
+    <string name="audio_passthrough_failed">Modus konnte nicht übernommen werden.</string>
     <string name="refresh_rate_matching_setting_description">Android darf die Bildwiederholrate des Displays an das Video anpassen, wenn dies unterstützt wird.</string>
     <string name="play">Abspielen</string>
 

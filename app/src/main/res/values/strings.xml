@@ -458,6 +458,9 @@
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Allow Tvheadend Player to request a live TV timeshift buffer from your server.</string>
     <string name="refresh_rate_matching_setting">Match content frame rate</string>
+    <string name="audio_passthrough_setting">Audio passthrough</string>
+    <string name="audio_passthrough_description">May briefly interrupt audio.</string>
+    <string name="audio_passthrough_failed">Couldn’t apply this mode.</string>
     <string name="refresh_rate_matching_setting_description">Let Android match the display refresh rate to the video when supported.</string>
 
     <string name="play">Play</string>

@@ -90,8 +90,9 @@ class AppPausedSeekRuntimeTest {
             val surface = Surface(texture.surfaceTexture)
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
             val profileJob = scope.launch { profiles.run() }
+            val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context)
             val player = withContext(Dispatchers.Main) {
-                ExoPlayer.Builder(context, createTvheadendRenderersFactory(context))
+                ExoPlayer.Builder(context, createTvheadendRenderersFactory(context, audioOutput))
                     .setLoadControl(createPlaybackLoadControl())
                     .build().apply {
                         volume = 0f
@@ -108,7 +109,7 @@ class AppPausedSeekRuntimeTest {
             }
             val coordinator = withContext(Dispatchers.Main) { createTvheadendPlaybackCoordinator(player) }
             val lifetime = coordinator.launchIn(scope)
-            val runtime = withContext(Dispatchers.Main) { AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope) }
+            val runtime = withContext(Dispatchers.Main) { AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput) }
             suspend fun await(message: String, predicate: suspend () -> Boolean) {
                 withTimeout(15.seconds) {
                     while (!predicate()) {

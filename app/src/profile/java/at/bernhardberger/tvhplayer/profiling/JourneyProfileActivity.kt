@@ -100,12 +100,13 @@ class JourneyProfileActivity : AppCompatActivity() {
             val profiles = AppProfileOwner(
                 session, profileStore, settings, Dispatchers.IO,
             )
+            val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(this@JourneyProfileActivity)
             val player = ExoPlayer.Builder(this@JourneyProfileActivity)
-                .setRenderersFactory(createTvheadendRenderersFactory(this@JourneyProfileActivity))
+                .setRenderersFactory(createTvheadendRenderersFactory(this@JourneyProfileActivity, audioOutput))
                 .setLoadControl(createPlaybackLoadControl())
                 .build()
             val coordinator = createTvheadendPlaybackCoordinator(player)
-            val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope)
+            val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput)
             runtimeOwner = SdkRuntimeOwner.create(session, runtime, profiles, coordinator, player, scope)
             withTimeout(5_000) { profiles.serverProfile.filterNotNull().first() }
             session.publish(observation)

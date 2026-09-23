@@ -65,6 +65,7 @@ class SettingsPlayerTest(private val language: String) {
         val category = context.getString(R.string.settings_player_nav)
         val timeshift = context.getString(R.string.timeshift_setting)
         val refreshRate = context.getString(R.string.refresh_rate_matching_setting)
+        val passthrough = context.getString(R.string.audio_passthrough_setting)
         val serverDefault = context.getString(R.string.profile_server_default)
         val profiles = List(24) { index ->
             StreamProfile(
@@ -104,6 +105,7 @@ class SettingsPlayerTest(private val language: String) {
                                 ui = ui,
                                 onTimeshiftEnabledChanged = { switchCalls++ },
                                 onRefreshRateMatchingEnabledChanged = { switchCalls++ },
+                                onAudioPassthroughEnabledChanged = { switchCalls++ },
                                 onProfileSelected = {
                                     selections += it
                                     ui = ui.copy(selectedProfileId = it)
@@ -123,6 +125,8 @@ class SettingsPlayerTest(private val language: String) {
         composeRule.onNodeWithText(profiles.last().name).assertIsNotDisplayed()
         press(Key.DirectionDown)
         composeRule.onNodeWithText(refreshRate).assertIsFocused().assertIsDisplayed()
+        press(Key.DirectionDown)
+        composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionDown)
         composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsNotSelected()
 
@@ -149,12 +153,14 @@ class SettingsPlayerTest(private val language: String) {
         press(Key.DirectionUp)
         composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionUp)
+        composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
+        press(Key.DirectionUp)
         composeRule.onNodeWithText(refreshRate).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionUp)
         composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
 
         // Left must also leave the scrolled bottom through the existing category owner.
-        repeat(profiles.size + 2) { press(Key.DirectionDown) }
+        repeat(profiles.size + 3) { press(Key.DirectionDown) }
         composeRule.onNodeWithText(profiles.last().name)
             .assertIsFocused().assertIsDisplayed().assertIsSelected()
         press(Key.DirectionLeft)

@@ -491,7 +491,7 @@ class SettingsDepthNavigationTest {
                             settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), loaded, failed,
                                 { retries++ }, { toggles++ }),
                             settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.AccessDenied),
-                                { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
+                                { settingsActions++ }, { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
                             settingsApplianceLevel(false, false, { settingsActions++ }, { settingsActions++ }),
                         ), initialFocusEnabled = ready && !drawerActive, contentPadding = padding)
                     }

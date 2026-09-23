@@ -94,7 +94,8 @@ class GuideHistoryScreenTest {
         models.put("channels", model)
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player)
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope)
+        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+            at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context))
         val selection = ChannelSelectionStore()
         val position = GuidePositionStore()
         val lastPlayed = LastPlayedChannelStore(context)
@@ -166,8 +167,10 @@ class GuideHistoryScreenTest {
             File(directory, "$locale-font$scale-full-past-guide.txt").writeText("canvas=960x540\ndensity=1\nlocale=$locale\nfontScale=$scale\nzone=UTC\nfocus=Channel 1 hour -1\nfull EpgGridScreen; real runtime/ExoPlayer/coordinator; SDK fake session\n")
             bitmap.recycle()
         }
-        repeat(5) { key(Key.DirectionLeft) }
-        focused("Channel 1 hour -6")
+        for (hour in 2..6) {
+            key(Key.DirectionLeft)
+            focused("Channel 1 hour -$hour")
+        }
         key(Key.DirectionLeft)
         focused("Channel 1 hour -6")
         assertEquals("earliest past window stays local", calls, session.calls.size)
