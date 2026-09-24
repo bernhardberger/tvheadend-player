@@ -23,6 +23,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.AppDestination
@@ -80,7 +81,7 @@ class ChannelsScreenshotTest(private val scenario: String) {
                 Channel.create(
                     id = ChannelId(index + 1L), number = index + 1L,
                     name = if (longText && index == 1) "International Documentary and Natural History Television HD" else name,
-                    icon = if (longText && index % 2 == 0) null else "imagecache/${index + 1}",
+                    icon = if (longText && index % 2 == 0) null else ArtworkId(index + 1),
                     tagIds = tags.filter { it.name != "Empty filter" }.map { it.id },
                 )
             }

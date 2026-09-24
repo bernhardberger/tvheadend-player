@@ -38,6 +38,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -492,7 +493,7 @@ class ChannelsStandardLayoutEvidenceTest {
                 id = ChannelId(n.toLong()),
                 name = name(n),
                 number = n.toLong(),
-                icon = "imagecache/${(n - 1) % 3 + 1}",
+                icon = ArtworkId((n - 1) % 3 + 1),
                 tagIds = buildList {
                     if (n <= 6) add(ChannelTagId(1))
                     if (n in 7..10) add(ChannelTagId(2))
@@ -601,7 +602,7 @@ class ChannelsStandardLayoutEvidenceTest {
 
     private class PiconBytesMapper : Mapper<AppArtworkSource, ByteArray> {
         override fun map(data: AppArtworkSource, options: Options): ByteArray {
-            val variant = data.selector.removePrefix("imagecache/").toInt()
+            val variant = data.id.value
             val (width, height, tint) = when (variant) {
                 1 -> Triple(120, 72, 0xFFE8F1F5.toInt())
                 2 -> Triple(72, 72, 0xFFF6C453.toInt())

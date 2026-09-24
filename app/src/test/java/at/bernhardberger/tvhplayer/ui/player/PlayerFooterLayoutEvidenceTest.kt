@@ -45,6 +45,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -1084,7 +1085,7 @@ class PlayerFooterLayoutEvidenceTest {
                         textSize = 64f
                         isFakeBoldText = true
                     }
-                    Canvas(bitmap).drawText("TV ${data.selector.substringAfterLast('/')}", 12f, 68f, paint)
+                    Canvas(bitmap).drawText("TV ${data.id.value}", 12f, 68f, paint)
                     return ByteArrayOutputStream().also {
                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
                     }.toByteArray()
@@ -1109,7 +1110,7 @@ class PlayerFooterLayoutEvidenceTest {
             id = ChannelId(it),
             number = it,
             name = if (it == 4L) "Dokumentation und Zeitgeschichte HD" else "Channel $it",
-            icon = if (it == 5L) null else "imagecache/$it",
+            icon = if (it == 5L) null else ArtworkId(it.toInt()),
         )
     }
 

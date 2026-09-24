@@ -18,6 +18,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
@@ -58,7 +59,7 @@ class PiconBoxTest {
             compose.setContent {
                 TVHeadendPlayerTheme {
                     Column {
-                        PiconBox(loader, "imagecache/1", bounds("subject"), current,
+                        PiconBox(loader, ArtworkId(1), bounds("subject"), current,
                             contentScale = ContentScale.Crop)
                         // The former subcomposition propagated its fixed minimum constraints
                         // to the icon. Preserve that full, centred square for load/error states.
@@ -103,7 +104,7 @@ class PiconBoxTest {
             .components {
                 add(Interceptor { chain ->
                     val source = chain.request.data as AppArtworkSource
-                    assertEquals("imagecache/1", source.selector)
+                    assertEquals(ArtworkId(1), source.id)
                     if (source.currentSession === first) {
                         started.complete(Unit)
                         // Exercise a late completion even after Coil cancels the old request.
@@ -119,7 +120,7 @@ class PiconBoxTest {
         try {
             compose.setContent {
                 TVHeadendPlayerTheme {
-                    PiconBox(loader, "imagecache/1", bounds("subject"), current.value)
+                    PiconBox(loader, ArtworkId(1), bounds("subject"), current.value)
                 }
             }
             compose.waitUntil(5_000) { started.isCompleted }

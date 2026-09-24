@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.RecordingTimelinePresentation
@@ -54,7 +55,7 @@ import coil3.ImageLoader
 internal fun RecordingOverlayControls(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     title: String,
     subtitle: String?,
     channelName: String?,

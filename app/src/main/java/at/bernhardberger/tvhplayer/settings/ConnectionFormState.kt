@@ -7,10 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
-
-internal const val DEFAULT_HTSP_PORT = "9982"
 
 internal enum class ConnectionFormFeedback {
     SAVED,
@@ -21,7 +20,7 @@ internal enum class ConnectionFormFeedback {
 @Stable
 internal class ConnectionFormState(
     host: String = "",
-    port: String = DEFAULT_HTSP_PORT,
+    port: String = DEFAULT_HTSP_PORT.toString(),
     username: String = "",
     password: String = "",
 ) {

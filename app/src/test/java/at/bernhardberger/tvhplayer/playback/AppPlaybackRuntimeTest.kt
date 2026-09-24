@@ -17,12 +17,14 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionSource
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -691,6 +693,30 @@ class AppPlaybackRuntimeTest {
         assertSame(result, state.targetResult)
         assertTrue(requireNotNull(state.targetResult).isTransient)
         assertTrue(requireNotNull(state.targetResult).isUnsupported)
+    }
+
+    @Test
+    fun exhaustedRecoveryReportsTheIssueReturnedByStoppingTheRetiredTarget() {
+        val state = recoveryExhaustedState(
+            PlaybackStopResult.Stopped(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
+            PlaybackRecoveryReason.LIVE_ENDED,
+        )
+
+        assertEquals(AppPlaybackFailureReason.OTHER, state.reason)
+        assertSame(SubscriptionIssue.NO_FREE_ADAPTER, state.subscriptionIssue)
+        assertEquals(PlaybackRecoveryReason.LIVE_ENDED, state.recoveryReason)
+        assertNull(
+            recoveryExhaustedState(
+                PlaybackStopResult.Stopped(finalSubscriptionIssue = null),
+                PlaybackRecoveryReason.LIVE_ENDED,
+            ).subscriptionIssue,
+        )
+        assertNull(
+            recoveryExhaustedState(
+                PlaybackStopResult.AlreadyStopped,
+                PlaybackRecoveryReason.LIVE_ENDED,
+            ).subscriptionIssue,
+        )
     }
 
     @Test

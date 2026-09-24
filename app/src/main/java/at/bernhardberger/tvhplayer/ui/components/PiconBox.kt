@@ -16,26 +16,25 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
 @Composable
 fun PiconBox(
     imageLoader: ImageLoader,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     modifier: Modifier = Modifier,
     currentSession: CurrentSessionObservation? = null,
-    serverTag: String = "default",
     contentScale: ContentScale = ContentScale.Fit,
 ) = profileTrace("P1:compose:picon") {
-    val piconUrl = remember(currentSession, serverTag, piconPath) {
-        currentSession?.let {
-            at.bernhardberger.tvhplayer.core.resolvePiconModel(it, serverTag, piconPath)
-        }
+    val piconUrl = remember(currentSession, piconPath) {
+        currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
     }
 
     Box(

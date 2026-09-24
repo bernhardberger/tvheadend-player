@@ -23,6 +23,7 @@ import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ProvideTextStyle
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
@@ -70,7 +71,7 @@ fun ChannelRow(
     progress: Float?,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     programStartSec: Long? = null,
     recordingNow: Boolean = false,
     playingNow: Boolean = false,

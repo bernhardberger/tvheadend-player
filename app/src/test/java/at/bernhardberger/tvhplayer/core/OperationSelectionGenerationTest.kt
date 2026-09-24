@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -39,7 +40,7 @@ class OperationSelectionGenerationTest {
         )
         val livePlayback = LivePlaybackSelection(capabilityA, channelId)
         val recordingPlayback = RecordingPlaybackSelection(capabilityA, recordingId)
-        val artwork = AppArtworkSource(capabilityA, "imagecache/7")
+        val artwork = AppArtworkSource(capabilityA, ArtworkId(7))
 
         observations.publish(currentObservation())
         val capabilityB = observations.captureCurrentSession()

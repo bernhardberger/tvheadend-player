@@ -12,8 +12,8 @@ import coil3.request.Options
 private class AppArtworkMapper(
     private val session: TvheadendSession,
 ) : Mapper<AppArtworkSource, TvheadendArtwork> {
-    override fun map(data: AppArtworkSource, options: Options): TvheadendArtwork? =
-        TvheadendArtwork.create(session, data.currentSession, data.selector)
+    override fun map(data: AppArtworkSource, options: Options): TvheadendArtwork =
+        TvheadendArtwork.create(session, data.currentSession, data.id)
 }
 
 fun buildImageLoader(context: Context, session: TvheadendSession): ImageLoader =

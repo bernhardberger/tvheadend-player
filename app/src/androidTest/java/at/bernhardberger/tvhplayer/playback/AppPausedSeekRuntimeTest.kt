@@ -23,6 +23,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult
+import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
 import at.bernhardberger.tvheadend.sdk.playback.*
@@ -93,7 +94,7 @@ class AppPausedSeekRuntimeTest {
             val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context)
             val player = withContext(Dispatchers.Main) {
                 ExoPlayer.Builder(context, createTvheadendRenderersFactory(context, audioOutput))
-                    .setLoadControl(createPlaybackLoadControl())
+                    .setLoadControl(createTvheadendLoadControl())
                     .build().apply {
                         volume = 0f
                         setVideoSurface(surface)

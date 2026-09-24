@@ -41,6 +41,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.requestFocus
 import androidx.test.platform.app.InstrumentationRegistry
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -82,7 +83,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                 ImageLoader.Builder(context).components {
                     add(object : Mapper<AppArtworkSource, Bitmap> {
                         override fun map(data: AppArtworkSource, options: Options): Bitmap {
-                            val id = data.selector.substringAfterLast('/').toInt()
+                            val id = data.id.value
                             val width = if (id % 2 == 0) 240 else 96
                             return Bitmap.createBitmap(width, 96, Bitmap.Config.ARGB_8888).apply {
                                 Canvas(this).apply {
@@ -154,7 +155,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             if (scenario == "shelf-paused") 0.25f else 0.5f, 0f, 0.5f, 0.5f, true)
                         OverlayControlsTv(
                             imageLoader = imageLoader, currentSession = currentSession,
-                            channelNumber = 12, channelName = "Documentary 12", piconPath = "imagecache/12",
+                            channelNumber = 12, channelName = "Documentary 12", piconPath = ArtworkId(12),
                             nowEvent = programme(long = large), nextEvent = null, nowSec = 1_783_020_600L,
                             controlsVisible = false, optionsOpen = false, onOpenChannels = {}, onStopPlayback = {},
                             onUserInteraction = {}, onOpenOptions = {},
@@ -165,7 +166,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             channelRailOpen = true, channelRailContent = {
                             ChannelDrawer(
                                 channels = if (scenario == "shelf-empty") emptyList() else List(15) {
-                                    Channel.create(id = ChannelId(it + 1L), icon = "imagecache/${it + 1}", name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
+                                    Channel.create(id = ChannelId(it + 1L), icon = ArtworkId(it + 1), name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
                                 },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
                              nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") },
@@ -175,7 +176,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                         })
                     } else if (scenario.startsWith("recording")) {
                         RecordingOverlayControls(
-                            imageLoader = imageLoader, piconPath = "imagecache/13", currentSession = currentSession,
+                            imageLoader = imageLoader, piconPath = ArtworkId(13), currentSession = currentSession,
                             title = "A journey through the Alps", subtitle = "The high mountains",
                             channelName = "Documentary HD", positionMs = 1_200_000L,
                             durationMs = if (scenario == "recording-unknown") androidx.media3.common.C.TIME_UNSET else 5_400_000L,
@@ -187,7 +188,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                     } else {
                         OverlayControlsTv(
                             imageLoader = imageLoader, channelNumber = 1, channelName = "Documentary HD",
-                            piconPath = "imagecache/12", currentSession = currentSession,
+                            piconPath = ArtworkId(12), currentSession = currentSession,
                              nowEvent = if (scenario == "missing" || scenario.endsWith("-missing")) null else programme(long = large),
                             nextEvent = EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
                                 start = Instant.fromEpochSeconds(1_783_022_400L),

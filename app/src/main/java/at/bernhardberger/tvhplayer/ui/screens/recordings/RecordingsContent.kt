@@ -66,6 +66,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Tab
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -83,7 +84,6 @@ import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
-import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
@@ -203,7 +203,7 @@ internal fun ArchiveList(
     onOpenRecording: (DvrEntry) -> Unit,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
-    piconForEntry: (DvrEntry) -> String?,
+    piconForEntry: (DvrEntry) -> ArtworkId?,
 ) {
     if (items.isEmpty()) {
         ModeEmptyState(R.string.recordings_archive_empty)
@@ -387,7 +387,7 @@ internal fun FolderMetadataPane(
     folder: DvrArchiveFolder,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
-    piconForEntry: (DvrEntry) -> String?,
+    piconForEntry: (DvrEntry) -> ArtworkId?,
     previewFocus: FocusRequester,
     selectedPreviewId: DvrEntryId?,
     restoreFocus: Boolean,
@@ -478,7 +478,7 @@ private fun FolderRecentRecordingRow(
     entry: DvrEntry,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     selected: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
@@ -513,7 +513,7 @@ private fun FolderRecentRecordingRow(
 @Composable
 internal fun RecordingMetadataPane(
     entry: DvrEntry?,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
 ) {
@@ -535,11 +535,7 @@ internal fun RecordingMetadataPane(
             .testTag("recording-metadata-pane"),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val artworkPath = (entry.image ?: entry.fanartImage)?.takeIf {
-            currentSession?.let { capability ->
-                resolvePiconModel(capability, "default", it)
-            } != null
-        }
+        val artworkPath = currentSession?.let { ArtworkId.parse(entry.image ?: entry.fanartImage) }
         PiconBox(
             imageLoader = imageLoader,
             currentSession = currentSession,
@@ -658,7 +654,7 @@ internal fun RecordingSchedule(
     onOpen: (DvrEntry) -> Unit,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
-    piconForEntry: (DvrEntry) -> String?,
+    piconForEntry: (DvrEntry) -> ArtworkId?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
 ) {
@@ -801,7 +797,7 @@ internal fun RecordingProblems(
     onOpen: (DvrEntry) -> Unit,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
-    piconForEntry: (DvrEntry) -> String?,
+    piconForEntry: (DvrEntry) -> ArtworkId?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
 ) {
@@ -953,7 +949,7 @@ private enum class RecordingRowKind {
 @Composable
 private fun RecordingListRow(
     entry: DvrEntry,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     selected: Boolean,

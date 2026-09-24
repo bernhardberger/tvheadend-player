@@ -22,12 +22,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.EpgCoverageAcquisitionResult
+import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
-import at.bernhardberger.tvhplayer.playback.createPlaybackLoadControl
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -103,7 +103,7 @@ class JourneyProfileActivity : AppCompatActivity() {
             val audioOutput = at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(this@JourneyProfileActivity)
             val player = ExoPlayer.Builder(this@JourneyProfileActivity)
                 .setRenderersFactory(createTvheadendRenderersFactory(this@JourneyProfileActivity, audioOutput))
-                .setLoadControl(createPlaybackLoadControl())
+                .setLoadControl(createTvheadendLoadControl())
                 .build()
             val coordinator = createTvheadendPlaybackCoordinator(player)
             val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput)

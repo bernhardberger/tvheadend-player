@@ -12,10 +12,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
-import at.bernhardberger.tvhplayer.core.resolvePiconModel
 import at.bernhardberger.tvhplayer.core.selectAccentRgb
 import coil3.ImageLoader
 import coil3.request.ImageRequest
@@ -37,20 +38,18 @@ private val accentCache = ConcurrentHashMap<ChannelId, Int>()
  * The channel's own brand colour, taken from its picon.
  *
  * Returns the neutral tint immediately and crossfades to the sampled colour when it
- * arrives, so cards never pop. Channels with no picon — or an `http(s)` icon, which this
- * HTSP-only client does not fetch — keep the neutral tint.
+ * arrives, so cards never pop. Channels without an image-cache icon keep the neutral tint.
  */
 @Composable
 fun rememberChannelAccent(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     channelId: ChannelId,
-    serverTag: String = "default",
 ): Color {
     val context = LocalContext.current
-    val model = remember(currentSession, serverTag, piconPath) {
-        currentSession?.let { resolvePiconModel(it, serverTag, piconPath) }
+    val model = remember(currentSession, piconPath) {
+        currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
     }
     var rgb by remember(channelId) {
         mutableIntStateOf(accentCache[channelId] ?: NEUTRAL_ACCENT_RGB)

@@ -9,8 +9,12 @@ import org.junit.Test
 
 class RecordingMarkerPolicyTest {
     @Test
-    fun sceneMarkersUseEndCoordinatesOfActualTvheadendIntervals() {
+    fun sceneMarkersUseTheSdkSceneBoundaryOfActualTvheadendIntervals() {
         val points = listOf(marker(0, 10_000), marker(10_000, 90_000))
+        assertEquals(
+            listOf(0L) + points.map { requireNotNull(it.sceneBoundary).inWholeMilliseconds },
+            recordingMarkerPositions(points, 100_000),
+        )
         assertEquals(listOf(0L, 10_000L, 90_000L), recordingMarkerPositions(points, 100_000))
     }
 

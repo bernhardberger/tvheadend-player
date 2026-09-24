@@ -1,14 +1,12 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
-import at.bernhardberger.tvheadend.sdk.core.DvrCutpointAction
 
-/** TVHeadend scene-marker intervals end at the boundary, not at their start. */
+/** Chapter positions from the SDK's scene boundaries inside the verified recording duration. */
 fun recordingMarkerPositions(cutpoints: List<DvrCutpoint>, verifiedDurationMs: Long): List<Long> {
     if (verifiedDurationMs <= 0L) return emptyList()
     val markers = cutpoints.asSequence()
-        .filter { it.action == DvrCutpointAction.SCENE_MARKER }
-        .map { it.end.inWholeMilliseconds }
+        .mapNotNull { it.sceneBoundary?.inWholeMilliseconds }
         .filter { it > 0L && it < verifiedDurationMs }
         .distinct()
         .sorted()

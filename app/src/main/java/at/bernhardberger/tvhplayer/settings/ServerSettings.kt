@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.settings
 
 import android.content.Context
 import androidx.datastore.preferences.preferencesDataStore
+import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
 
 val Context.dataStore by preferencesDataStore(
     name = "tvhplayer_settings",
@@ -9,7 +10,7 @@ val Context.dataStore by preferencesDataStore(
 
 data class ServerSettings(
     val host: String = "",
-    val htspPort: Int = 9982,
+    val htspPort: Int = DEFAULT_HTSP_PORT,
     val username: String = "",
     val passwordConfigured: Boolean = false,
 )

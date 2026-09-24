@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.paddingFrom
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -48,7 +49,7 @@ data class PlayerHeaderTags(
 @Composable
 fun PlayerIdentityHeader(
     imageLoader: ImageLoader,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     eyebrow: String?,
     title: String,
     support: String?,

@@ -39,6 +39,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -164,7 +165,7 @@ class QuickZapPresentationTest {
     }
     private val channels = (1L..12L).map {
         Channel.create(id = ChannelId(it), number = it, name = if (it == 4L) "Dokumentation und Zeitgeschichte HD" else "Channel $it",
-            icon = if (it == 5L) null else "imagecache/$it")
+            icon = if (it == 5L) null else ArtworkId(it.toInt()))
     }
     private var catalog by mutableStateOf(channels)
 
@@ -624,7 +625,7 @@ class QuickZapPresentationTest {
                             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                                 color = 0xFF79D1FF.toInt(); textSize = 64f; isFakeBoldText = true
                             }
-                            Canvas(bitmap).drawText("TV ${data.selector.substringAfterLast('/')}", 12f, 68f, paint)
+                            Canvas(bitmap).drawText("TV ${data.id.value}", 12f, 68f, paint)
                             return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
                         }
                     }) }
@@ -656,7 +657,7 @@ class QuickZapPresentationTest {
                         }) {
                         OverlayControlsTv(
                             imageLoader = loader, currentSession = session, channelNumber = playing?.value?.toInt(), channelName = playing?.let { "Channel ${it.value}" }.orEmpty(),
-                            piconPath = playing?.let { "imagecache/${it.value}" }, nowEvent = playing?.let(::event), nextEvent = null, nowSec = 900,
+                            piconPath = playing?.let { ArtworkId(it.value.toInt()) }, nowEvent = playing?.let(::event), nextEvent = null, nowSec = 900,
                             controlsVisible = layers.controlsVisible, optionsOpen = false,
                             onOpenChannels = {
                                 layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)

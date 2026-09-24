@@ -180,7 +180,7 @@ class ConnectionFormStateTest {
         form.loadFrom(FakeConnectionProfileEditor(available = false))
 
         assertEquals("", form.host)
-        assertEquals(DEFAULT_HTSP_PORT, form.port)
+        assertEquals("9982", form.port)
         assertEquals("", form.username)
         assertEquals("", form.password)
     }

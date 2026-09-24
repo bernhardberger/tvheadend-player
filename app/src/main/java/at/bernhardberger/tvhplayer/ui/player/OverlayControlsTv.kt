@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
@@ -47,7 +48,7 @@ fun OverlayControlsTv(
     currentSession: CurrentSessionObservation? = null,
     channelNumber: Int?,
     channelName: String,
-    piconPath: String?,
+    piconPath: ArtworkId?,
     nowEvent: EpgEvent?,
     nextEvent: EpgEvent?,
     nowSec: Long,

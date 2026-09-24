@@ -341,6 +341,16 @@ internal fun playerStateAfterRecoveryResolution(
         isPlaying = isPlaying,
     )
 
+/** Failure published after recovery gave up; the issue is the one the retired target last reported. */
+internal fun recoveryExhaustedState(
+    stopResult: PlaybackStopResult,
+    recoveryReason: PlaybackRecoveryReason,
+): AppPlaybackState.Failed = AppPlaybackState.Failed(
+    reason = AppPlaybackFailureReason.OTHER,
+    subscriptionIssue = (stopResult as? PlaybackStopResult.Stopped)?.finalSubscriptionIssue,
+    recoveryReason = recoveryReason,
+)
+
 internal suspend fun executeForegroundPlaybackAction(
     action: ForegroundPlaybackAction,
     stopLive: suspend () -> Unit,
@@ -985,7 +995,7 @@ class AppPlaybackRuntime(
     }
 
     suspend fun stop(): PlaybackStopResult = targetCommands.serialize(
-        onClosed = { PlaybackStopResult.SHUT_DOWN },
+        onClosed = { PlaybackStopResult.ShutDown },
     ) {
         foregroundPlaybackLifecycle.onExplicitStop()
         recoveryBackoff.reset()
@@ -1022,7 +1032,7 @@ class AppPlaybackRuntime(
     }
 
     private suspend fun stopPlayback(): PlaybackStopResult {
-        if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
+        if (!targetCommands.isOpen()) return PlaybackStopResult.ShutDown
         clearRecordingMarkers()
         val epoch = presentationEpoch.begin()
         endTargetPresentation(epoch)
@@ -1030,7 +1040,7 @@ class AppPlaybackRuntime(
         recoveryJob?.takeUnless { it === currentJob }?.cancel()
         recoveryJob = null
         val result = coordinator.stop()
-        if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
+        if (!targetCommands.isOpen()) return PlaybackStopResult.ShutDown
         presentationEpoch.publishIfCurrent(epoch) {
             _activeTarget.value = null
             _recordingSelection.value = null
@@ -1260,15 +1270,9 @@ class AppPlaybackRuntime(
      * tuner. Surfacing a failure lets the user choose, instead of retuning forever.
      */
     private suspend fun publishRecoveryExhausted(recoveryReason: PlaybackRecoveryReason) {
-        // Read the issue before stopping: the observation leaves Active with the subscription.
-        val issue = lastSubscriptionIssue()
-        stopPlayback()
+        val stopResult = stopPlayback()
         if (!targetCommands.isOpen()) return
-        _state.value = AppPlaybackState.Failed(
-            reason = AppPlaybackFailureReason.OTHER,
-            subscriptionIssue = issue,
-            recoveryReason = recoveryReason,
-        )
+        _state.value = recoveryExhaustedState(stopResult, recoveryReason)
         publishDiagnostics()
     }
 
