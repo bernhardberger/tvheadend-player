@@ -13,7 +13,6 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-  compress: deny
 ---
 
 Answer one bounded retrieval question about TVHeadend Player: where a symbol is

@@ -13,7 +13,6 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-  compress: deny
 ---
 
 Research one exact external-source question only after repository source, exact

@@ -19,7 +19,6 @@ permission:
   websearch: deny
   question: deny
   publish_artifact: deny
-  compress: deny
 ---
 
 Implement exactly one delegated slice of the TVHeadend Player Android TV app

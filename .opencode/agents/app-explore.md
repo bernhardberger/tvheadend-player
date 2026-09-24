@@ -13,7 +13,6 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-  compress: deny
 ---
 
 Map one bounded TVHeadend Player concern across multiple local source and test

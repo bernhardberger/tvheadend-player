@@ -21,7 +21,6 @@ permission:
     android-tv-compose-ux: allow
   question: deny
   publish_artifact: deny
-  compress: deny
 model: openai/gpt-6-astra
 variant: low
 ---

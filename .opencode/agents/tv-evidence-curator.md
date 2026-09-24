@@ -15,7 +15,6 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-  compress: deny
 ---
 
 Curate one exact, caller-supplied TVHeadend Player visual evidence set for a
