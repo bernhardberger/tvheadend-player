@@ -902,7 +902,16 @@ class DepthMotionEvidenceTest {
         const val RAIL_WIDTH = 80
         const val FRAME_MILLIS = 16L
         const val DRAWER_FRAMES = 34
-        const val BAND = 240
+        /**
+     * Sampling scanline. It must cross a control that *translates* between the two
+     * settled states — a static element would make the assertion vacuous — and it
+     * must never cross text: glyphs break into several pixel runs, which reads as a
+     * duplicate representation and says nothing about the transition. 240 used to
+     * qualify, then landed on the General group subheader once that label took its
+     * 12sp kit styling and split into four runs. Re-derive with a scan of every
+     * scanline holding exactly one run in both settled states if layout shifts again.
+     */
+    const val BAND = 300
         const val ACTIVE_LEFT = 128
         const val ACTIVE_RIGHT = 128 + 352
         const val PREVIEW_LEFT = 588

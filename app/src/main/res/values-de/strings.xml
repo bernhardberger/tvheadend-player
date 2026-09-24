@@ -54,14 +54,10 @@
     <string name="epg_time_duration">Zeit: %1$s – %2$s • Dauer: %3$d Min.</string>
 
     <string name="settings_server">Verbindung</string>
-    <string name="settings_language">Sprache</string>
     <string name="settings_general">Allgemein</string>
     <string name="settings_general_nav">Allgemein</string>
     <string name="settings_navigation">Navigation</string>
     <string name="settings_channel_tags_nav">Sendergruppen</string>
-    <string name="settings_channel_tags">Sendergruppen</string>
-    <string name="settings_channel_tags_description">Wählen Sie, welche Sendergruppen auf diesem Fernseher unter Sender und Programmführer verfügbar sind.</string>
-    <string name="settings_channel_tags_required">Mindestens eine Sendergruppe muss aktiviert bleiben.</string>
     <string name="settings_channel_tags_last_enabled">Erforderlich – mindestens eine Gruppe muss aktiv bleiben.</string>
     <string name="show_epg_menu">Programmführer-Menü</string>
     <string name="show_epg_menu_description">Programmführer in der Hauptnavigation anzeigen.</string>

@@ -15,6 +15,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.SettingsDepthHeadingHeight
 import at.bernhardberger.tvhplayer.ui.SettingsDepthRowMinHeight
+import androidx.compose.ui.platform.LocalConfiguration
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 
 internal fun settingsLevel(
@@ -50,8 +51,18 @@ internal fun settingsRow(
 ) = DepthRow(DepthItem(id, child), { if (enabled) onClick() }) { modifier, activate ->
     Column {
         if (section != null) {
-            Text(section, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = TvSpacing8, bottom = TvSpacing8).semantics { heading() })
+            // Group subheader: the design kit's "List / Subheader" type (12sp medium,
+            // uppercase, at the row's own 16dp content inset), but not its colour or its
+            // symmetric 8dp box. That board was authored standalone, so it carries the
+            // kit's flat neutral and no notion of neighbours; dropped into a real list it
+            // read as a competing row title floating between two groups. onSurfaceVariant
+            // seats it below the titles, and 16dp above with none below beats the
+            // ListItem's own 12dp padding into a clear bias toward the group it heads.
+            // Announce the untransformed label so TalkBack is unaffected by the casing.
+            Text(section.uppercase(LocalConfiguration.current.locales[0]),
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = TvSpacing16, top = TvSpacing16)
+                    .semantics { heading(); contentDescription = section })
         }
         ListItem(
             selected = selected == true,

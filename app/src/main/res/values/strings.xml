@@ -58,14 +58,10 @@
 
     <!-- Settings screen -->
     <string name="settings_server">Connection</string>
-    <string name="settings_language">Language</string>
     <string name="settings_general">General</string>
     <string name="settings_general_nav">General</string>
     <string name="settings_navigation">Navigation</string>
     <string name="settings_channel_tags_nav">Channel groups</string>
-    <string name="settings_channel_tags">Channel groups</string>
-    <string name="settings_channel_tags_description">Choose which channel groups are available in Channels and Guide on this TV.</string>
-    <string name="settings_channel_tags_required">At least one channel group must remain enabled.</string>
     <string name="settings_channel_tags_last_enabled">Required — at least one group must stay on.</string>
     <string name="show_epg_menu">Show Guide menu</string>
     <string name="show_epg_menu_description">Show Guide in the main navigation rail.</string>
