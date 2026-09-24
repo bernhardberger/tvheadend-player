@@ -341,13 +341,25 @@ internal fun playerStateAfterRecoveryResolution(
         isPlaying = isPlaying,
     )
 
-/** Failure published after recovery gave up; the issue is the one the retired target last reported. */
+/**
+ * Failure published after recovery gave up. The issue is the one the retired live target last
+ * reported, carried by [PlaybackStopResult.Stopped] or, when player cleanup failed after the
+ * target was retired, by [PlaybackStopResult.PlayerUnavailable]; results that retired nothing
+ * report no issue.
+ */
 internal fun recoveryExhaustedState(
     stopResult: PlaybackStopResult,
     recoveryReason: PlaybackRecoveryReason,
 ): AppPlaybackState.Failed = AppPlaybackState.Failed(
     reason = AppPlaybackFailureReason.OTHER,
-    subscriptionIssue = (stopResult as? PlaybackStopResult.Stopped)?.finalSubscriptionIssue,
+    subscriptionIssue = when (stopResult) {
+        is PlaybackStopResult.Stopped -> stopResult.finalSubscriptionIssue
+        is PlaybackStopResult.PlayerUnavailable -> stopResult.finalSubscriptionIssue
+        PlaybackStopResult.AlreadyStopped,
+        PlaybackStopResult.NotRunning,
+        PlaybackStopResult.ShutDown,
+        -> null
+    },
     recoveryReason = recoveryReason,
 )
 

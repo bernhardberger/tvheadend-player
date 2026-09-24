@@ -720,6 +720,24 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
+    fun exhaustedRecoveryReportsTheRetiredTargetIssueWhenPlayerCleanupFailed() {
+        val state = recoveryExhaustedState(
+            PlaybackStopResult.PlayerUnavailable(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
+            PlaybackRecoveryReason.LIVE_ENDED,
+        )
+
+        assertEquals(AppPlaybackFailureReason.OTHER, state.reason)
+        assertSame(SubscriptionIssue.NO_FREE_ADAPTER, state.subscriptionIssue)
+        assertEquals(PlaybackRecoveryReason.LIVE_ENDED, state.recoveryReason)
+        assertNull(
+            recoveryExhaustedState(
+                PlaybackStopResult.PlayerUnavailable(finalSubscriptionIssue = null),
+                PlaybackRecoveryReason.LIVE_ENDED,
+            ).subscriptionIssue,
+        )
+    }
+
+    @Test
     fun orderedServerPauseReconcilesOnlyAnActiveLiveTarget() {
         val liveTarget = AppPlaybackTarget.Live(ChannelId(23))
 
