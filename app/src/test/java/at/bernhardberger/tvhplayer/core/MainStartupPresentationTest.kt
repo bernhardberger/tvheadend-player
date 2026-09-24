@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -221,15 +220,6 @@ class MainStartupPresentationTest {
                 ),
             ),
         )
-        SubscriptionFailureKind.entries.forEach { kind ->
-            assertEquals(
-                MainStartupPresentation.Actionable(
-                    MainStartupMessageKind.RETRYABLE_FAILURE,
-                    normalActions,
-                ),
-                presentation(connectionState = ConnectionUiState.SubscriptionError(kind)),
-            )
-        }
     }
 
 

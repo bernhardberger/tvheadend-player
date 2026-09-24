@@ -59,7 +59,7 @@ class SessionAudioSelectionTest {
             }
             choose(65)
             assertNull(store.read("profile", ChannelId(1)))
-            assertEquals("alternate", store.read("profile", ChannelId(2))?.id)
+            assertEquals("en", store.read("profile", ChannelId(2))?.language)
         } finally {
             job.cancelAndJoin()
             file.delete()

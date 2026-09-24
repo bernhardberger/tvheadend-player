@@ -2262,7 +2262,6 @@ internal fun guideEmptyMessageRes(
     } else {
         R.string.epg_server_failure
     }
-    is ConnectionUiState.SubscriptionError -> R.string.epg_server_failure
     ConnectionUiState.NeedsConfiguration -> R.string.connection_configuration_required
     ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
     ConnectionUiState.Ready -> when {

@@ -386,7 +386,6 @@
     <string name="open_connection_settings">Verbindungseinstellungen öffnen</string>
     <string name="connection_settings_short">Verbindungseinstellungen</string>
     <string name="status_connection_failed_authentication">Verbindung fehlgeschlagen: Anmeldung abgelehnt</string>
-    <string name="status_connection_failed_dns">Verbindung fehlgeschlagen: Servername nicht gefunden</string>
     <string name="status_connection_failed_unreachable">Verbindung fehlgeschlagen: Server nicht erreichbar</string>
     <string name="status_connection_failed_timeout">Verbindung fehlgeschlagen: Zeitüberschreitung beim Server</string>
     <string name="status_connection_failed_incompatible">Verbindung fehlgeschlagen: Diese Tvheadend-Serverversion wird nicht unterstützt</string>

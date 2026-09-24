@@ -108,7 +108,6 @@ import at.bernhardberger.tvhplayer.core.programmeSummaryText
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.subscriptionFailureMessageResource
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
 import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
@@ -1075,7 +1074,6 @@ private fun ConnectionUiState.isConnectionProgress(): Boolean =
 
 private fun ConnectionUiState.isError(): Boolean =
     this is ConnectionUiState.Error ||
-        this is ConnectionUiState.SubscriptionError ||
         this == ConnectionUiState.CredentialUnavailable
 
 @Composable
@@ -1089,7 +1087,6 @@ private fun connectionMessage(state: ConnectionUiState): String = stringResource
         ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
         is ConnectionUiState.Error -> when (state.kind) {
             ConnectionFailureKind.AUTHENTICATION -> R.string.status_connection_failed_authentication
-            ConnectionFailureKind.DNS -> R.string.status_connection_failed_dns
             ConnectionFailureKind.UNREACHABLE -> R.string.status_connection_failed_unreachable
             ConnectionFailureKind.TIMEOUT -> R.string.status_connection_failed_timeout
             ConnectionFailureKind.INCOMPATIBLE_SERVER ->
@@ -1099,8 +1096,6 @@ private fun connectionMessage(state: ConnectionUiState): String = stringResource
             ConnectionFailureKind.ZERO_CHANNELS -> R.string.status_connection_failed_zero_channels
             ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
         }
-        is ConnectionUiState.SubscriptionError ->
-            subscriptionFailureMessageResource(state.kind)
     }
 )
 

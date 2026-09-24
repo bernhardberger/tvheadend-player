@@ -9,7 +9,6 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -80,18 +79,6 @@ class EpgColumnStatePolicyTest {
                 connectionState = ConnectionUiState.Ready,
                 coveragePending = true,
                 hasCachedEvents = true,
-            ),
-        )
-        assertEquals(
-            EpgColumnDataState.SERVER_FAILURE,
-            epgColumnDataState(
-                visibleEvents = emptyList(),
-                windowStartSec = 0,
-                windowEndSec = 100,
-                connectionState = ConnectionUiState.SubscriptionError(
-                    SubscriptionFailureKind.NO_INPUT
-                ),
-                coveragePending = true,
             ),
         )
         assertEquals(

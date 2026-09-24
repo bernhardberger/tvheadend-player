@@ -10,7 +10,7 @@ import at.bernhardberger.tvhplayer.settings.AudioTrackChoice
 /** One configured profile, at most 64 explicit channel choices, and no retained track groups. */
 internal class SessionAudioSelection {
     private fun choice(format: Format) = AudioTrackChoice(
-        format.id, format.language, format.sampleMimeType,
+        format.language, format.sampleMimeType,
         format.roleFlags, format.channelCount, format.sampleRate,
     )
 

@@ -66,11 +66,12 @@ fun timeshiftPositionPresentation(state: AppTimeshiftState): TimeshiftPositionPr
 /**
  * Whether wall-clock Now/Next describes what the viewer is watching.
  *
- * The SDK provides no programme wall-clock mapping for timeshifted playback, so
- * the header must not claim that the current broadcast describes historical
- * content. That only holds while playback is actually behind the live edge (or
- * its position is unknown), not merely because a timeshift buffer exists: on
- * TVHeadend a live subscription essentially always has one.
+ * Wall-clock Now/Next reflects the live broadcast, so while playback is behind
+ * live the header must not claim that the current broadcast describes the
+ * historical content on screen. That only holds while playback is actually
+ * behind the live edge (or its position is unknown), not merely because a
+ * timeshift buffer exists: on TVHeadend a live subscription essentially always
+ * has one.
  */
 fun programmeTimingDescribesPlayback(state: AppTimeshiftState): Boolean =
     !state.available || timeshiftPositionPresentation(state).atLiveEdge

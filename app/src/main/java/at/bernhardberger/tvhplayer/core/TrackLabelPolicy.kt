@@ -83,8 +83,8 @@ fun humanCodecName(sampleMimeType: String?): String? {
     val mime = sampleMimeType?.trim().orEmpty()
     if (mime.isEmpty()) return null
     return when {
-        mime.contains("ac3", ignoreCase = true) -> "Dolby Digital"
         mime.contains("eac3", ignoreCase = true) -> "Dolby Digital Plus"
+        mime.contains("ac3", ignoreCase = true) -> "Dolby Digital"
         mime.contains("ac4", ignoreCase = true) -> "Dolby AC-4"
         mime.contains("mpeg-L2", ignoreCase = true) ||
             mime.contains("mpeg-l2", ignoreCase = true) -> "MPEG-1 Layer II"

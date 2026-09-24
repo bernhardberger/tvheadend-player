@@ -14,7 +14,6 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 internal data class AudioTrackChoice(
-    val id: String?,
     val language: String?,
     val mimeType: String?,
     val roleFlags: Int,

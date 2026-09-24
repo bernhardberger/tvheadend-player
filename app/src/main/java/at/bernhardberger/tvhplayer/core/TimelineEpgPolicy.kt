@@ -493,8 +493,7 @@ fun epgColumnDataState(
     connectionState is ConnectionUiState.Error &&
         connectionState.kind == ConnectionFailureKind.PERMISSION_DENIED ->
         EpgColumnDataState.PERMISSION_DENIED
-    connectionState is ConnectionUiState.Error ||
-        connectionState is ConnectionUiState.SubscriptionError ->
+    connectionState is ConnectionUiState.Error ->
         EpgColumnDataState.SERVER_FAILURE
     connectionState == ConnectionUiState.Reconnecting && hasCachedEvents ->
         EpgColumnDataState.STALE

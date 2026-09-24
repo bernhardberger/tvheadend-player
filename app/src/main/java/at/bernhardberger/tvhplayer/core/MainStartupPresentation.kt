@@ -87,9 +87,6 @@ fun mainStartupPresentation(
             ConnectionRecoveryAction.NONE ->
                 MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING)
         }
-        is ConnectionUiState.SubscriptionError -> actionableFailure(
-            normalMessageKind = MainStartupMessageKind.RETRYABLE_FAILURE,
-        )
     }
 }
 

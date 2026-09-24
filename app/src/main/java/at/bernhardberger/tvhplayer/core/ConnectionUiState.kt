@@ -6,7 +6,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
-import at.bernhardberger.tvhplayer.data.SubscriptionFailureKind
 
 sealed interface ConnectionUiState {
     data object NeedsConfiguration : ConnectionUiState
@@ -19,7 +18,6 @@ sealed interface ConnectionUiState {
         val kind: ConnectionFailureKind,
         val recoveryDisposition: SessionRecoveryDisposition,
     ) : ConnectionUiState
-    data class SubscriptionError(val kind: SubscriptionFailureKind) : ConnectionUiState
 }
 
 enum class ConnectionRecoveryAction {
@@ -37,7 +35,6 @@ fun ConnectionUiState.primaryRecoveryAction(): ConnectionRecoveryAction = when (
             ConnectionRecoveryAction.SETTINGS
         else -> ConnectionRecoveryAction.NONE
     }
-    is ConnectionUiState.SubscriptionError -> ConnectionRecoveryAction.RETRY
     ConnectionUiState.NeedsConfiguration,
     ConnectionUiState.CredentialUnavailable -> ConnectionRecoveryAction.SETTINGS
     ConnectionUiState.Connecting,

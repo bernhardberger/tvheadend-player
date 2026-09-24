@@ -32,6 +32,12 @@ class TrackLabelPolicyTest {
     }
 
     @Test
+    fun enhancedAc3IsNotLabelledAsPlainDolbyDigital() {
+        assertEquals("Dolby Digital Plus", humanCodecName("audio/eac3"))
+        assertEquals("Dolby Digital", humanCodecName("audio/ac3"))
+    }
+
+    @Test
     fun primaryLabelPrefersLanguageAndLayoutOverCodec() {
         val label = humanTrackLabel(
             languageCode = "de",

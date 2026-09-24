@@ -485,7 +485,6 @@
     <string name="open_connection_settings">Open connection settings</string>
     <string name="connection_settings_short">Connection settings</string>
     <string name="status_connection_failed_authentication">Connection failed: authentication rejected</string>
-    <string name="status_connection_failed_dns">Connection failed: server name not found</string>
     <string name="status_connection_failed_unreachable">Connection failed: server unreachable</string>
     <string name="status_connection_failed_timeout">Connection failed: server timed out</string>
     <string name="status_connection_failed_incompatible">Connection failed: this Tvheadend server version is not supported</string>

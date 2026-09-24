@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.settings
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +19,7 @@ import org.junit.rules.TemporaryFolder
 
 class AudioChoiceStoreTest {
     @get:Rule val temporary = TemporaryFolder()
-    private val alternate = AudioTrackChoice("alternate", "de", "audio/mpeg", 0, 2, 48000)
+    private val alternate = AudioTrackChoice("de", "audio/mpeg", 0, 2, 48000)
 
     @Test
     fun profileIdentitySurvivesStoreReconstructionButReplacementCannotInheritChoices() = runTest {
@@ -58,6 +60,19 @@ class AudioChoiceStoreTest {
         } finally {
             secondJob.cancelAndJoin()
         }
+    }
+
+    @Test
+    fun previouslyStoredEntriesWithAFormatIdReadAsNoChoiceInsteadOfFailing() = runTest {
+        val data = InMemoryPreferencesDataStore()
+        data.edit {
+            it[stringPreferencesKey("explicit_audio_choices_v1")] =
+                """[{"profile":"p","channel":1,"choice":{"id":"0","language":"de","mimeType":"audio/ac3","roleFlags":0,"channelCount":2,"sampleRate":48000}}]"""
+        }
+        val store = AudioChoiceStore(data)
+        assertNull(store.read("p", ChannelId(1)))
+        store.write("p", ChannelId(1), alternate)
+        assertEquals(alternate, store.read("p", ChannelId(1)))
     }
 
     @Test

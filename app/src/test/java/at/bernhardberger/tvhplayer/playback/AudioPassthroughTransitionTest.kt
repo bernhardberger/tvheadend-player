@@ -156,6 +156,31 @@ class AudioPassthroughTransitionTest {
         assertFalse(C.TRACK_TYPE_AUDIO in fixture.parameters.disabledTrackTypes)
         assertEquals(2, fixture.resets)
     }
+
+    @Test fun `remembered audio choice restores when the same stream arrives with a different format id`() = runTest {
+        val fixture = TransitionPlayer()
+        fun audio(id: String, language: String) = TrackGroup(Format.Builder().setId(id).setLanguage(language)
+            .setSampleMimeType(MimeTypes.AUDIO_AC3).setChannelCount(6).setSampleRate(48_000).build())
+        fun tracks(vararg groups: TrackGroup) = Tracks(groups.map {
+            Tracks.Group(it, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))
+        })
+        val selection = SessionAudioSelection()
+        selection.useProfile(Any(), fixture.player)
+        selection.activate(ChannelId(1), fixture.player)
+        val chosen = audio(id = "0", language = "de")
+        fixture.tracks = tracks(chosen)
+        fixture.player.trackSelectionParameters = fixture.parameters.buildUpon()
+            .addOverride(TrackSelectionOverride(chosen, listOf(0))).build()
+        assertNotNull(selection.rememberExplicitChoice(fixture.player))
+
+        selection.onMediaItemTransition(fixture.player)
+        val shifted = audio(id = "1", language = "de")
+        fixture.tracks = tracks(audio(id = "0", language = "en"), shifted)
+        selection.activate(ChannelId(1), fixture.player)
+        val restored = fixture.parameters.overrides.values.single()
+        assertSame(shifted, restored.mediaTrackGroup)
+        assertEquals(listOf(0), restored.trackIndices)
+    }
 }
 
 /** Models the pinned Media3 queue ordering; any source, seek or play-intent call fails this fake. */
