@@ -64,6 +64,7 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
+import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupScreen
@@ -401,6 +402,14 @@ fun AppRoot(
     )
 
     val currentDestination = backStack.lastOrNull()
+    // Live player Back targets the browse destination it returned to, once.
+    var livePlayerReturn by remember { mutableStateOf<Pair<AppNavKey, PlayerReturnFocus>?>(null) }
+    LaunchedEffect(currentDestination) {
+        if (livePlayerReturn?.first != currentDestination) livePlayerReturn = null
+    }
+    val playerReturnFor = { destination: AppNavKey ->
+        livePlayerReturn?.takeIf { it.first == destination }?.second
+    }
     val showRail = shouldShowMainNavigationRail(
         currentDestination = currentDestination,
         navigationStartDestination = navigationStartDestination,
@@ -634,6 +643,7 @@ fun AppRoot(
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == ChannelsKey,
                             playingChannelId = activeChannelId,
+                            playerReturn = playerReturnFor(ChannelsKey),
                             connectionUiState = connectionUiState,
                             onRetryConnection = appVm::reconnectNow,
                             onOpenConnectionSettings = {
@@ -651,6 +661,7 @@ fun AppRoot(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
+                            playerReturn = playerReturnFor(GuideKey),
                             connectionUiState = connectionUiState,
                             onRetry = appVm::reconnectNow,
                             onOpenConnectionSettings = {
@@ -737,10 +748,16 @@ fun AppRoot(
                             channelName = destination.channelName,
                             onReconnect = appVm::reconnectNow,
                             onClose = {
+                                val originId = ChannelId(destination.channelId)
+                                val playingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)
+                                    ?.channelId ?: originId
                                 closeNormalLivePlayer(
                                     popBackStack = backStack::popNavigation,
                                     selectRoot = selectRoot,
                                 )
+                                livePlayerReturn = backStack.lastOrNull()?.let {
+                                    it to PlayerReturnFocus(playingId, originId)
+                                }
                             },
                         )
                     }

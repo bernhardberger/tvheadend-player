@@ -23,6 +23,7 @@ import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
 import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
+import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
@@ -50,6 +51,7 @@ internal fun ChannelsRouteContent(
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
     playingChannelId: ChannelId?,
+    playerReturn: PlayerReturnFocus?,
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
@@ -64,6 +66,7 @@ internal fun ChannelsRouteContent(
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
                 playingChannelId = playingChannelId,
+                playerReturn = playerReturn,
                 connectionUiState = connectionUiState,
                 onRetryConnection = onRetryConnection,
                 onOpenConnectionSettings = onOpenConnectionSettings,
@@ -79,6 +82,7 @@ internal fun GuideRouteContent(
     contentAllowed: Boolean,
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
+    playerReturn: PlayerReturnFocus?,
     connectionUiState: ConnectionUiState,
     onRetry: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
@@ -92,6 +96,7 @@ internal fun GuideRouteContent(
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
                 connectionUiState = connectionUiState,
+                playerReturn = playerReturn,
                 onRetry = onRetry,
                 onOpenConnectionSettings = onOpenConnectionSettings,
                 onClearCategory = {},

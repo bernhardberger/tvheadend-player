@@ -157,6 +157,15 @@ internal fun channelLazyItemKey(channelId: ChannelId): Long = channelId.value
 internal fun channelLazyItemMatches(key: Any?, channelId: ChannelId): Boolean =
     key == channelLazyItemKey(channelId)
 
+/**
+ * Browse focus requested by Back from the live player: the channel playing when the
+ * player closed, and the channel whose row opened it (the previously focused row).
+ */
+data class PlayerReturnFocus(
+    val playingChannelId: ChannelId,
+    val originChannelId: ChannelId,
+)
+
 internal fun restoredChannelId(
     visibleChannelIds: List<ChannelId>,
     rememberedChannelId: ChannelId?,
@@ -185,6 +194,7 @@ fun ChannelsScreen(
     selection: ChannelSelectionStore = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     playingChannelId: ChannelId?,
+    playerReturn: PlayerReturnFocus? = null,
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
@@ -213,6 +223,7 @@ fun ChannelsScreen(
         selectedId = { selectedId.value },
         imageLoader = imageLoader,
         playingChannelId = playingChannelId,
+        playerReturn = playerReturn,
         playbackChannelId = playbackChannelId,
         playbackIndicator = playbackIndicator,
         connectionUiState = connectionUiState,
@@ -238,6 +249,7 @@ internal fun ChannelsScreenContent(
     selectedId: () -> ChannelId?,
     imageLoader: ImageLoader,
     playingChannelId: ChannelId?,
+    playerReturn: PlayerReturnFocus? = null,
     playbackChannelId: ChannelId? = playingChannelId,
     playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     connectionUiState: ConnectionUiState,
@@ -278,6 +290,8 @@ internal fun ChannelsScreenContent(
         channels.associate { it.id to it.number?.toInt() }
     }
     var didInitialRestore by remember { mutableStateOf(false) }
+    // One-shot per player return; AppRoot clears the request when the destination changes.
+    var playerReturnPending by remember(playerReturn) { mutableStateOf(playerReturn != null) }
     var focusedChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var contentFocusOwned by remember { mutableStateOf(false) }
     var scopeEntryRequested by remember { mutableStateOf(false) }
@@ -503,7 +517,12 @@ internal fun ChannelsScreenContent(
         }
 
         if (!didInitialRestore && initialFocusEnabled) {
-            if (hasScopeTabs) {
+            // Player Back re-enters the list, not the first-entry scope tabs.
+            val playerReturnId = playerReturn?.takeIf { playerReturnPending }?.let {
+                restoredChannelId(orderedChannelIds, it.playingChannelId, it.originChannelId)
+            }
+            playerReturnPending = false
+            if (hasScopeTabs && playerReturnId == null) {
                 if (!focusScope()) {
                     // TabRow subcomposes its focus targets during measurement. A cold
                     // composition can precede their placement; lateral warm entry does not.
@@ -518,7 +537,7 @@ internal fun ChannelsScreenContent(
             contentFocusOwned = true
             // A retained destination can receive a newer shared selection from Guide.
             // Re-enter that identity instead of a stale pre-visit Channels focus.
-            val id = selectedId()?.takeIf { it in orderedChannelIds } ?: restoredChannelId(
+            val id = playerReturnId ?: selectedId()?.takeIf { it in orderedChannelIds } ?: restoredChannelId(
                 visibleChannelIds = orderedChannelIds,
                 rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
                 selectedChannelId = selectedId(),

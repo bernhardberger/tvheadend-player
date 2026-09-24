@@ -94,6 +94,8 @@ fun ChannelDrawer(
     var focusedCatalog by remember { mutableStateOf(emptyList<ChannelId>()) }
     var observedPlayingId by remember { mutableStateOf(playingChannelId) }
     var pendingPickId by remember { mutableStateOf<ChannelId?>(null) }
+    var confirmedId by remember { mutableStateOf(playingChannelId) }
+    var reanchorId by remember { mutableStateOf<ChannelId?>(null) }
     val emptyFocus = remember { FocusRequester() }
     // 48dp screen-safe space plus native card enlargement/outline overflow.
     val edgeInset = 64.dp
@@ -112,13 +114,26 @@ fun ChannelDrawer(
             // Null means awaiting presentation, not a different channel selection.
             // Preserve the local pick until a non-null confirmation resolves it.
             if (playingChannelId != null) {
-                // A delayed confirmation of our own pick is not an external channel change.
-                if (!active && playingChannelId != pendingPickId) focusedId = playingChannelId
+                // A delayed confirmation of our own pick is not an external channel change,
+                // nor is re-confirming the same channel after a failed or recovering tune.
+                // An external change while open must not steal browse focus; it re-anchors
+                // the rail when it closes.
+                if (playingChannelId != pendingPickId && playingChannelId != confirmedId) {
+                    if (active) reanchorId = playingChannelId else {
+                        focusedId = playingChannelId
+                        reanchorId = null
+                    }
+                }
                 pendingPickId = null
+                confirmedId = playingChannelId
             }
             observedPlayingId = playingChannelId
         }
-        if (!active) entered = false
+        if (!active) {
+            entered = false
+            reanchorId?.let { focusedId = it }
+            reanchorId = null
+        }
         if (ids.isEmpty()) {
             entered = false
             if (active) {
@@ -194,6 +209,7 @@ fun ChannelDrawer(
                     onClick = {
                         if (active) {
                             if (channel.id != playingChannelId) pendingPickId = channel.id
+                            reanchorId = null
                             onPickChannel(channel)
                         }
                     },

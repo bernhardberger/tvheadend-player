@@ -389,7 +389,62 @@ class QuickZapPresentationTest {
         assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
         key(Key.Back)
         key(Key.DirectionDown)
+        // The confirmed external change re-anchors the rail once it has closed.
+        card(8).assertIsFocused()
+        assertEquals(0, picks)
+    }
+
+    @Test fun confirmedTuneWhileOpenReanchorsOnlyAfterClose() {
+        content()
+        key(Key.DirectionDown)
+        repeat(2) { key(Key.DirectionRight) }
+        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
+        // A completed numeric tune: awaiting presentation, then confirmed.
+        compose.runOnIdle { playing = null }
+        compose.runOnIdle { playing = ChannelId(8) }
         card(4).assertIsFocused()
+        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
+        key(Key.DirectionRight)
+        card(5).assertIsFocused()
+        key(Key.Back)
+        compose.onNodeWithTag("player-info").assertIsFocused()
+        key(Key.DirectionDown)
+        val anchored = card(8).assertIsFocused().fetchSemanticsNode().boundsInRoot
+        // Without a further change, reopening keeps the re-anchored card and viewport.
+        key(Key.Back)
+        key(Key.DirectionDown)
+        card(8).assertIsFocused()
+        assertEquals(anchored, card(8).fetchSemanticsNode().boundsInRoot)
+        assertEquals(0, picks)
+    }
+
+    @Test fun unconfirmedOrFailedTuneKeepsBrowseAndConfirmedChannelUpReanchors() {
+        content()
+        key(Key.DirectionDown)
+        repeat(2) { key(Key.DirectionRight) }
+        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
+        key(Key.Back)
+        // A tune that never confirms, then the previous channel re-confirmed.
+        compose.runOnIdle { playing = null }
+        key(Key.DirectionDown)
+        card(4).assertIsFocused()
+        key(Key.Back)
+        compose.runOnIdle { playing = ChannelId(2) }
+        key(Key.DirectionDown)
+        card(4).assertIsFocused()
+        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
+        // The same failure while the rail is open does not re-anchor on close either.
+        compose.runOnIdle { playing = null }
+        compose.runOnIdle { playing = ChannelId(2) }
+        key(Key.Back)
+        key(Key.DirectionDown)
+        card(4).assertIsFocused()
+        // CH+ while closed: awaiting presentation, then the next channel confirmed.
+        key(Key.Back)
+        compose.runOnIdle { playing = null }
+        compose.runOnIdle { playing = ChannelId(3) }
+        key(Key.DirectionDown)
+        card(3).assertIsFocused()
         assertEquals(0, picks)
     }
 

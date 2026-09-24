@@ -399,6 +399,16 @@ colour and indication rules above apply here. Remote keys follow §6.
 - Selecting another channel keeps the tray, focused card and scroll position.
   Back, Up, or selecting the confirmed playing channel returns to player controls
   and restores the invoking action. The tray does not auto-hide during zapping.
+- A confirmed external change while the tray is open (a completed numeric tune)
+  never moves browse focus; it reanchors the tray when it closes. Digits,
+  unconfirmed tunes and re-confirmation of the same channel do not reanchor.
+- Back from a live player opened from Channels focuses the playing channel's row
+  (after CH+/CH-, numeric or tray changes), skipping the first-entry scope tabs.
+  Back to the Guide focuses the programme airing now on the playing channel, in
+  a window at the current hour, not the programme used to open playback; a
+  channel without current EPG uses the guide's nearest-row entry rule. Neither
+  changes the selected group: outside it, Channels falls back to the row that
+  opened the player, then the first row, and the Guide keeps its prior position.
 
 ## 11. Icons
 
