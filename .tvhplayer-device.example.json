@@ -21,6 +21,16 @@
       "expected_product": "darcy",
       "credential_file": ".tvhplayer-credentials.json"
     },
+    "sony-bravia-8": {
+      "serial": "replace-with-current-sony-wireless-adb-endpoint",
+      "package": "at.bernhardberger.tvhplayer",
+      "role": "test",
+      "expected_manufacturer": "Sony",
+      "expected_model": "BRAVIA 4K AE2",
+      "expected_device": "BRAVIA_AE2",
+      "expected_product": "BRAVIA_AE2_EU",
+      "credential_file": ".tvhplayer-credentials.json"
+    },
     "g08": {
       "serial": "replace-with-g08-adb-serial",
       "package": "at.bernhardberger.tvhplayer",
