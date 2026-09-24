@@ -169,8 +169,7 @@ The primary owns decomposition and integration. Use children when they materiall
 improve correctness, evidence coverage, context isolation, turnaround or quality.
 Review, analysis and retrieval children are read-only; only `app-locator` nesting
 is allowed where configured, and depth 2 is terminal. UX design roles also retain
-direct Penpot access and may delegate mechanical design work to `penpot-executor`
-at depth 2 under the harness design exception; independent review remains
+direct Penpot access within their assigned scope; independent review remains
 non-mutating. The bounded implementer
 and device-operator exceptions retain their own restrictions, not primary authority.
 Restricted children cannot read project policy: callers must inline applicable

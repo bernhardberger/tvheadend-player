@@ -21,7 +21,6 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `.opencode/agents/tv-evidence-curator.md` | Optional validator for exact screenshot evidence sets |
 | `.opencode/agents/tv-ux-brief.md` | TV product design specialist when direction is unresolved |
 | `.opencode/agents/tv-ux-reviewer.md` | Final screenshot-first visual-quality reviewer |
-| `.opencode/agents/tv-ux-astra.md` | Native Astra UX fallback, brief, or bounded consequential recommendation challenge; reuses the existing role contracts |
 | `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
 | `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
 | `.opencode/commands/` | Verification, device, reviewer, UX, and upstream shortcuts |
@@ -76,29 +75,15 @@ mixed supported models are valid, and changing one is not a product gate.
 
 ## Delegation and context containment
 
-`penpot-executor` is the bounded design-document mutation exception. It uses
-Penpot tools plus scoped read/skill access to the installed `penpot-design`
-guidance and `/root/.penpot-ai-kit`, with its model assignment in
-`.opencode/agents/penpot-executor.md`. The executor and UX designers load the
-integration guidance and relevant recipes themselves; parent-loaded skills are
-not inherited. Reference reads do not authorize repository edits or scope changes.
-The primary supplies the design brief, acceptance criteria, exact document and
-target IDs (or permission to create scratch content), and exclusive document
-ownership. The executor handles API calls, routine repairs and preview exports,
-then returns compact evidence and ownership. The primary retains design judgment
-and final review. This isolates verbose tool loops and unnecessary premium-model
-usage; it does not trade execution quality for minimum token cost.
-Main and UX design agents retain direct Penpot access, including edits within
-their assigned scope. Prefer the executor for mechanical changes and verbose
-construction/repair loops; do not require delegation for every lookup or small
-edit. `tv-ux-brief` and `tv-ux-astra` in brief mode may delegate to it at depth two,
-which is terminal. Independent review modes retain their evidence and non-mutation
-contracts. Do not run competing writers on the same document or substitute
-a provider route. Restart OpenCode after installation to load the role and Task
-allowlist; saved configuration does not update running sessions.
+UX design roles retain direct Penpot access, including edits within their
+assigned scope; they load the `penpot-design` integration guidance and relevant
+recipes themselves, because parent-loaded skills are not inherited. Reference
+reads do not authorize repository edits or scope changes. Independent review
+modes retain their evidence and non-mutation contracts. Do not run competing
+writers on the same document or substitute a provider route.
 
-With `opencode-task-model` 1.3.1, dispatch `penpot-executor` and
-`app-device-operator` with `background: false`. Its background dispatcher adds a
+With `opencode-task-model` 1.3.1, dispatch `app-device-operator` with
+`background: false`. Its background dispatcher adds a
 fixed read/search/webfetch sandbox at session level, overriding the selected
 agent's Bash and MCP permissions. Background mode is therefore not equivalent
 to asynchronous execution with the agent's normal capabilities. Do not broaden
@@ -113,8 +98,8 @@ then waits for its result before resuming device operations. Review and retrieva
 roles remain read-only; do not dispatch operational work through `general`.
 
 Review and retrieval delegation is read-only and may nest through one additional
-locator level. The implementer, device operator and Penpot executor are the
-bounded exceptions described here.
+locator level. The implementer and device operator are the bounded exceptions
+described here.
 The primary owns decomposition and delegation and may use as many children as it
 judges useful for correctness, evidence coverage, context isolation, turnaround,
 or final quality. A roughly 20% resource overhead is an acceptable soft target
@@ -123,8 +108,7 @@ verbose returns because cheap child output can still enlarge the primary's
 expensive context.
 
 The project Task policy denies every child first, then permits the configured
-roles above. UX design roles may additionally dispatch `penpot-executor` under
-the design exception above. `app-locator` performs mechanical retrieval; `app-explore` maps
+roles above. `app-locator` performs mechanical retrieval; `app-explore` maps
 bounded multi-file flows without diagnosis or design; the remaining roles retain
 their specialized contracts. Only `app-locator` children may be delegated by
 read-only children, and depth 2 is terminal. Reviewers may use that capability
@@ -237,16 +221,15 @@ by this existing guard, not duplicated in prompts.
 
 The guard returns `opus` or `astra`. Use Opus only on successful `opus` output;
 otherwise use independent Astra. Engineering uses a separate `android-reviewer`
-session for the second review. For UX, use native `tv-ux-astra` with `mode=brief`,
-`review` or `closure`; do not substitute a source-only runtime review.
+session for the second review. For a UX brief, dispatch the same `tv-ux-brief`
+role with an Astra model override (`openai/gpt-6-astra#xhigh`); do not
+substitute a source-only runtime review.
 Record the guard reason, actual reviewer/session/model and explicitly absent Opus
 coverage. An explicitly non-substitutable admitted Opus gate requires
 reconciliation with its authority owner (central for centrally admitted work);
 fallback does not pass it.
 
-For substantive `tv-ux-astra` briefs, dispatch `mode=brief` with Task
-`reasoning: "xhigh"`; mode text alone cannot select effort. Other modes use the
-configured default. Final `tv-ux-reviewer` is Astra and dispatches directly at its
+Final `tv-ux-reviewer` is Astra and dispatches directly at its
 configured default without an Opus quota probe; it provides no Opus coverage.
 
 On actual Opus exhaustion, use the supported authenticated session API
@@ -287,13 +270,9 @@ The implementing primary accepts, modifies or rejects the independent UX opinion
 with concrete product, remote, accessibility, consistency or feasibility reasons.
 Opus preference is not authority, but demonstrated usability defects cannot be
 dismissed as taste. Routine design choices do not need operator arbitration.
-Optionally use `tv-ux-astra` in `mode=challenge` for one consequential unresolved
-recommendation and exact associated screenshots, never an automatic third/full
-audit. For solo design-planning fallback, `mode=brief` can use supplied mocks and
-bounded planning material to establish direction, never implemented acceptance.
-Final review always needs actual production-composable screenshots. The native
-Astra role reuses the existing brief/review contract bodies; runtime review,
-every-Opus quota/abort rules and explicit non-substitutable gates remain separate.
+Final review always needs actual production-composable screenshots; runtime
+review, every-Opus quota/abort rules and explicit non-substitutable gates remain
+separate.
 
 Continue automatically through internal checkpoints, recoverable test failures,
 reviewer findings, child-agent errors and ordinary in-scope remediation. Complete

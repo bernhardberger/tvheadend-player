@@ -5,10 +5,9 @@ agent: build
 
 Before dispatching `tv-ux-brief`, run
 `./review-provider-route.sh select eligible`. Only successful stdout `opus`
-permits Opus. Otherwise use the native `tv-ux-astra` fallback documented in
+permits its configured Opus model. Otherwise dispatch the same `tv-ux-brief`
+role with an Astra model override (`openai/gpt-6-astra#xhigh`) as documented in
 `docs/ai-engineering-harness.md`; preserve any explicit non-substitutable gate.
-For a substantive Astra fallback brief, dispatch `tv-ux-astra` with `mode=brief`
-and Task `reasoning: "xhigh"`; mode text alone does not select effort.
 Pass the design contract below to that read-only role.
 
 Use `$ARGUMENTS` as the complete design-brief contract. It must name the exact
