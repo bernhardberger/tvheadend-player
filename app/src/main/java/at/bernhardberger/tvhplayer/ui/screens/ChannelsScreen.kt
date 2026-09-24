@@ -16,6 +16,13 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +53,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -107,14 +115,11 @@ import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabListState
 import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabReader
 import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
-import at.bernhardberger.tvhplayer.ui.components.ChannelRowVerticalPadding
+import at.bernhardberger.tvhplayer.ui.components.ChannelRowEdgeInset
+import at.bernhardberger.tvhplayer.ui.components.ChannelRowGap
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
-import at.bernhardberger.tvhplayer.ui.TvSpacing16
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
@@ -135,11 +140,16 @@ internal fun channelsBrowseViewportPadding(
     end = 0.dp,
 )
 
+/**
+ * The details column keeps the trailing and bottom safe insets; the list column beside
+ * it deliberately runs to the screen bottom beneath its fade.
+ */
 internal fun channelsDetailPanePadding(
     contentPadding: PaddingValues,
     layoutDirection: LayoutDirection,
 ): PaddingValues = PaddingValues(
     end = contentPadding.calculateEndPadding(layoutDirection),
+    bottom = contentPadding.calculateBottomPadding(),
 )
 
 internal fun channelLazyItemKey(channelId: ChannelId): Long = channelId.value
@@ -286,8 +296,19 @@ internal fun ChannelsScreenContent(
     var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
 
     val listState = rememberLazyListState()
-    val bringIntoViewSpec = LocalBringIntoViewSpec.current
-    val rowFocusInsetPx = with(LocalDensity.current) { ChannelRowVerticalPadding.roundToPx() }
+    // Native focus scrolling and the explicit preview anchor share one viewport policy:
+    // the readable band between the list's top reserve and its bottom fade.
+    val platformBringIntoViewSpec = LocalBringIntoViewSpec.current
+    val density = LocalDensity.current
+    val bringIntoViewSpec = remember(platformBringIntoViewSpec, density) {
+        with(density) {
+            InsetBringIntoViewSpec(
+                delegate = platformBringIntoViewSpec,
+                topInsetPx = ChannelsListTopReserve.toPx(),
+                bottomInsetPx = ChannelsListBottomReserve.toPx(),
+            )
+        }
+    }
     val coroutineScope = rememberCoroutineScope()
 
     fun cancelRestoration() {
@@ -318,12 +339,11 @@ internal fun ChannelsScreenContent(
         } else selectedId(),
     )
 
-    fun channelFocusScrollOffset(focusInsetPx: Int = 0): Int {
+    fun channelFocusScrollOffset(): Int {
         val layout = listState.layoutInfo
         return bringIntoViewSpec.calculateScrollDistance(
-            offset = (layout.beforeContentPadding + focusInsetPx).toFloat(),
-            size = ((layout.visibleItemsInfo.firstOrNull()?.size ?: 0) - 2 * focusInsetPx)
-                .coerceAtLeast(0).toFloat(),
+            offset = layout.beforeContentPadding.toFloat(),
+            size = (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).coerceAtLeast(0).toFloat(),
             containerSize = layout.viewportSize.height.toFloat(),
         ).roundToInt()
     }
@@ -468,7 +488,7 @@ internal fun ChannelsScreenContent(
             // Preview the same target/pivot Down will use, without requesting row focus.
             listState.requestScrollToItem(
                 index = orderedChannelIds.indexOf(entryId).coerceAtLeast(0),
-                scrollOffset = channelFocusScrollOffset(rowFocusInsetPx),
+                scrollOffset = channelFocusScrollOffset(),
             )
         }
         if (!initialFocusEnabled) {
@@ -541,18 +561,21 @@ internal fun ChannelsScreenContent(
                     true
                 } else false
             }
-            .padding(
-                top = contentPadding.calculateTopPadding(),
-                bottom = contentPadding.calculateBottomPadding(),
-            )
+            // The list column runs to the screen bottom beneath its fade; the details
+            // column re-applies the bottom inset itself.
+            .padding(top = contentPadding.calculateTopPadding())
     ) {
-        TopLevelBrowseHeader(
-            title = stringResource(R.string.channel_list),
-            modifier = Modifier.padding(start = startPadding, end = endPadding),
-        )
-        if (hasScopeTabs) {
-            Spacer(Modifier.height(TvSpacing8))
-            ChannelTagSelector(
+        // No destination headline: the tag row is the top of the immersive surface, on
+        // the same leading axis as the rows. The band keeps the list at one position
+        // whether or not a scope row is shown.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(ChannelsTagSectionHeight)
+                .padding(start = startPadding + ChannelRowEdgeInset),
+            contentAlignment = Alignment.TopStart,
+        ) {
+            if (hasScopeTabs) ChannelTagSelector(
                 tags = channelScope.tags,
                 activeTagId = channelScope.activeTagId,
                 activeFocusRequester = scopeFocus,
@@ -582,13 +605,9 @@ internal fun ChannelsScreenContent(
                     relinquishContentFocus()
                 },
                 allChannelsVisible = channelScope.allChannelsVisible,
-                modifier = Modifier
-                    .padding(browseViewportPadding)
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-
-        Spacer(Modifier.height(TvSpacing16))
 
         BrowseTabContent(
             motion = scopeMotion,
@@ -628,6 +647,7 @@ internal fun ChannelsScreenContent(
                 EmptyTagState(
                     Modifier
                         .padding(browseViewportPadding)
+                        .padding(detailPanePadding)
                         .fillMaxSize(),
                 )
             } else {
@@ -640,6 +660,7 @@ internal fun ChannelsScreenContent(
                     onOpenSettings = { if (owner.isCurrent) onOpenConnectionSettings() },
                     modifier = Modifier
                         .padding(browseViewportPadding)
+                        .padding(detailPanePadding)
                         .fillMaxSize(),
                 )
             }
@@ -661,31 +682,36 @@ internal fun ChannelsScreenContent(
                     .padding(browseViewportPadding)
                     .fillMaxSize(),
             ) {
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    colors = SurfaceDefaults.colors(
-                        containerColor = TvSurfaceColors.container.copy(
-                            alpha = TvPanelBrowseAlpha
-                        ),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    modifier = Modifier
+                // Standard list column: 12dp focus-scale reserve, 340dp rows, run-out to the
+                // screen bottom under a 48dp fade. Focus stays above the fade (see
+                // InsetBringIntoViewSpec); scrolled-out rows may pass beneath it.
+                Column(
+                    Modifier
+                        .width(ChannelsListColumnWidth)
                         .fillMaxHeight()
-                        .weight(0.44f)
+                        .testTag("channels-list-column"),
                 ) {
-                    Column(Modifier.fillMaxSize()) {
-                        UnavailableTagNotice(
-                            visible = tagNotice,
-                            onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
-                        )
-                        if (tagNotice) Spacer(Modifier.height(8.dp))
+                    UnavailableTagNotice(
+                        visible = tagNotice,
+                        onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
+                        modifier = Modifier.padding(horizontal = ChannelRowEdgeInset),
+                    )
+                    if (tagNotice) Spacer(Modifier.height(8.dp))
 
+                    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
                         LazyColumn(
                             state = listState,
                             userScrollEnabled = owner.isCurrent,
-                            contentPadding = PaddingValues(vertical = 8.dp, horizontal = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(ChannelRowGap),
+                            contentPadding = PaddingValues(
+                                start = ChannelRowEdgeInset,
+                                end = ChannelRowEdgeInset,
+                                top = ChannelsListTopReserve,
+                                bottom = ChannelsListBottomReserve,
+                            ),
                             modifier = Modifier
                                 .weight(1f)
+                                .bottomEdgeFadeMask(ChannelsListFadeHeight)
                                 .testTag("channels-list")
                                 .focusProperties {
                                     onEnter = {
@@ -755,6 +781,7 @@ internal fun ChannelsScreenContent(
                                     imageLoader = imageLoader,
                                     currentSession = currentSession,
                                     piconPath = ch.icon,
+                                    programStartSec = now?.start?.epochSeconds,
                                     recordingNow = status.recordingNow,
                                     playingNow = status.playingNow,
                                     playbackIndicator = frame.playbackIndicator.takeIf {
@@ -792,21 +819,18 @@ internal fun ChannelsScreenContent(
                     }
                 }
 
-                Spacer(Modifier.width(24.dp))
+                Spacer(Modifier.width(ChannelsListToDetailsGap))
 
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    colors = SurfaceDefaults.colors(
-                        containerColor = TvSurfaceColors.container.copy(
-                            alpha = TvPanelBrowseAlpha
-                        ),
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
+                // Focused-programme details: immersive text anchored to the bottom safe
+                // inset, no panel. Non-focusable; Right from a row stays on the row.
+                Box(
                     modifier = Modifier
-                        .weight(0.56f)
+                        .weight(1f)
                         .profileLayout("channels:details")
                         .padding(detailPanePadding)
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .testTag("channels-details"),
+                    contentAlignment = Alignment.BottomStart,
                 ) {
                     FocusedChannelDetails(
                         channels = channels,
@@ -814,7 +838,6 @@ internal fun ChannelsScreenContent(
                         selectedId = frame.entryId,
                         observation = observation,
                         nowSecProvider = nowSecProvider,
-                        imageLoader = imageLoader,
                     )
                 }
             }
@@ -1069,7 +1092,6 @@ private fun FocusedChannelDetails(
     selectedId: () -> ChannelId?,
     observation: SessionObservation,
     nowSecProvider: () -> Long,
-    imageLoader: ImageLoader,
 ) {
     // These reads belong to the details composition, not the screen or list.
     // Keep local native focus ahead of shared selection during restoration.
@@ -1077,139 +1099,136 @@ private fun FocusedChannelDetails(
         focusedChannelId()?.takeIf { id -> channels.any { it.id == id } }
             ?: browsingFocusChannelId(channels, selectedId())
     }()
-    val channel = channels.firstOrNull { it.id == detailChannelId }
-    val nowSec = nowSecProvider()
-    val now = remember(observation, channel?.id, nowSec) {
-        channel?.id?.let {
-            profileTrace("P48:channelsNowLookup") {
-                observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+    // The details are informational and never focusable, so the column can dissolve
+    // between programmes instead of hard-cutting as the browsed row changes. Each
+    // state resolves its own EPG inside the transition, so the outgoing copy keeps
+    // showing the channel it was written for. The block is bottom-anchored and
+    // unequal in height, so the size snaps and the taller copy is left unclipped
+    // rather than animating the text baselines around.
+    AnimatedContent(
+        targetState = detailChannelId,
+        transitionSpec = {
+            fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith
+                fadeOut(tween(ChannelsDetailCrossfadeMillis)) using
+                SizeTransform(clip = false) { _, _ -> snap() }
+        },
+        contentAlignment = Alignment.BottomStart,
+        label = "channelsDetails",
+    ) { id ->
+        val channel = channels.firstOrNull { it.id == id }
+        val nowSec = nowSecProvider()
+        val now = remember(observation, channel?.id, nowSec) {
+            channel?.id?.let {
+                profileTrace("P48:channelsNowLookup") {
+                    observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+                }
             }
         }
-    }
-    val next = remember(observation, channel?.id, nowSec) {
-        channel?.id?.let {
-            profileTrace("P48:channelsNextLookup") {
-                observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+        val next = remember(observation, channel?.id, nowSec) {
+            channel?.id?.let {
+                profileTrace("P48:channelsNextLookup") {
+                    observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
+                }
             }
         }
+        EpgDetailPane(
+            channelName = channel?.name ?: "—",
+            now = now,
+            next = next,
+            nowSec = nowSec,
+        )
     }
-    EpgDetailPane(
-        channelName = channel?.name ?: "—",
-        now = now,
-        next = next,
-        nowSec = nowSec,
-        imageLoader = imageLoader,
-        currentSession = observation.currentSession,
-        piconPath = channel?.icon,
-    )
 }
 
+/** Focused-programme dissolve. Short enough to keep row-to-row browsing responsive. */
+internal const val ChannelsDetailCrossfadeMillis = 160
+
+/** Description line height relative to its 14sp body size (accepted C3b: 1.45). */
+private const val DetailDescriptionLineHeight = 1.45f
+
+/**
+ * Immersive focused-programme text (C3c): channel label, title, timing/meta, 4dp
+ * progress, bounded description and the next programme. Every line is bounded so
+ * long runtime text grows the block upward from its bottom anchor without overlap.
+ */
 @Composable
 private fun EpgDetailPane(
     channelName: String,
     now: EpgEventEntry?,
     next: EpgEventEntry?,
     nowSec: Long,
-    imageLoader: ImageLoader,
-    currentSession: at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation?,
-    piconPath: String? = null,
 ) = profileTrace("P1:compose:channelDetails") {
     val progress = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
     val summaryText = remember(now) { now?.let { programmeSummaryText(it) } }
     val metadata = remember(now) { now?.let { programmeMetadata(it) } }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-    ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = channelName,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.testTag("channels-detail-channel"),
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = now?.title ?: stringResource(R.string.no_epg),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .width(92.dp)
-                    .height(64.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                PiconBox(
-                    imageLoader = imageLoader,
-                    currentSession = currentSession,
-                    piconPath = piconPath,
-                    modifier = Modifier.width(92.dp).height(64.dp),
-                )
-            }
-        }
-
-        Spacer(Modifier.height(10.dp))
+    val body = MaterialTheme.typography.bodyMedium
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = channelName,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("channels-detail-channel"),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = now?.title ?: stringResource(R.string.no_epg),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("channels-detail-title"),
+        )
 
         if (now != null) {
             val start = now.start.epochSeconds
             val end = now.stop.epochSeconds
             val durMin = ((end - start) / 60).coerceAtLeast(0)
-            Text(
-                text = stringResource(
-                    R.string.epg_time_duration,
-                    formatHm(start),
-                    formatHm(end),
-                    durMin.toInt(),
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            val timing = stringResource(
+                R.string.channel_details_timing,
+                formatHm(start),
+                formatHm(end),
+                durMin.toInt(),
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (metadata != null) "$timing · $metadata" else timing,
+                style = body,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("channels-detail-timing"),
+            )
             ProgressStrip(
                 progress = progress,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("channels-detail-progress"),
             )
-            if (metadata != null) {
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = metadata,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             if (summaryText != null) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text = summaryText,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = body.copy(lineHeight = body.fontSize * DetailDescriptionLineHeight),
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 8,
+                    maxLines = 5,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("channels-detail-description"),
                 )
             }
         }
 
-        Spacer(Modifier.weight(1f))
-
         if (next != null) {
+            Spacer(Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.epg_next, formatHm(next.start.epochSeconds)),
+                text = stringResource(R.string.epg_next, formatHm(next.start.epochSeconds)) +
+                    next.title?.takeIf(String::isNotBlank)?.let { " · $it" }.orEmpty(),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = next.title.orEmpty(),
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.testTag("channels-detail-next"),
             )
         }
     }

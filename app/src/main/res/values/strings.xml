@@ -56,6 +56,9 @@
     <!-- EPG detail line -->
     <string name="epg_time_duration">Time: %1$s – %2$s • Duration: %3$d min</string>
 
+    <!-- Channels dense row and focused details (C3b) -->
+    <string name="channel_details_timing">%1$s – %2$s · %3$d min</string>
+
     <!-- Settings screen -->
     <string name="settings_server">Connection</string>
     <string name="settings_general">General</string>

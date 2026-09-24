@@ -31,14 +31,24 @@ class ChannelsViewportPaddingTest {
         assertEquals(0.dp, padding.calculateEndPadding(LayoutDirection.Rtl))
     }
 
+    /** The list column runs to the screen bottom under its fade; only details keep the inset. */
     @Test
-    fun detailPanelRetainsTheTrailingSafeInsetInsideTheViewport() {
+    fun detailPanelRetainsTheTrailingAndBottomSafeInsetsInsideTheViewport() {
         val padding = channelsDetailPanePadding(
-            contentPadding = PaddingValues(start = 24.dp, end = 48.dp),
+            contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 48.dp, bottom = 32.dp),
             layoutDirection = LayoutDirection.Ltr,
         )
 
         assertEquals(0.dp, padding.calculateStartPadding(LayoutDirection.Ltr))
         assertEquals(48.dp, padding.calculateEndPadding(LayoutDirection.Ltr))
+        assertEquals(0.dp, padding.calculateTopPadding())
+        assertEquals(32.dp, padding.calculateBottomPadding())
+        assertEquals(
+            0.dp,
+            channelsBrowseViewportPadding(
+                contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 48.dp, bottom = 32.dp),
+                layoutDirection = LayoutDirection.Ltr,
+            ).calculateBottomPadding(),
+        )
     }
 }

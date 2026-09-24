@@ -97,7 +97,12 @@ internal fun rememberBrowseTabListState(current: LazyListState): LazyListState {
     }
 }
 
-private data class TabBody<T>(val destination: Any?, val owner: BrowseTabOwner, val state: T)
+// AnimatedContent's size bookkeeping is keyed by targetState, not contentKey.
+// A fresh target per metadata revision retains obsolete snapshots for the lifetime
+// of the mounted tab. Keep one identity per visit and update only its presentation.
+private class TabBody<T>(val destination: Any?, val owner: BrowseTabOwner, initialState: T) {
+    var state by mutableStateOf(initialState)
+}
 private class DisplayedTabState<T>(var value: T)
 
 private class TabValueReader<T>(private val owner: BrowseTabOwner, private val source: () -> T) {
@@ -141,15 +146,21 @@ internal fun <T> BrowseTabContent(
     // Selection callbacks may clear live focus before the new scope is rendered.
     // Keep that departing page's last committed presentation in the meantime.
     val presentation = if (owner.isCurrent) state() else displayed.value
-    SideEffect { if (owner.isCurrent) displayed.value = presentation }
-    val target = TabBody(selectedKey, owner, presentation)
+    val target = remember(visit) { TabBody(selectedKey, owner, presentation) }
+    SideEffect {
+        if (owner.isCurrent) {
+            displayed.value = presentation
+            target.state = presentation
+        }
+    }
     val change = motion.change
     val rtlSign = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
     // An external replacement must not resurrect a still-exiting old slot.
     key(generation) {
         AnimatedContent(
             targetState = target,
-            contentKey = { it.destination },
+            // A returning destination is a new visit, including during an interrupted exit.
+            contentKey = { it },
             // The shell owns screen-edge clipping and the drawer backing. A
             // local clip here would cut scope transitions off before the rail.
             modifier = modifier,

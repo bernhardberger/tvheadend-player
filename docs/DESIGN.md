@@ -243,6 +243,51 @@ state or removes durable recovery content. Cache clearing is the first producer.
 - Unknown timing is shown as unknown; never interpolate across unrelated
   coordinates or imply seekability that is not verified.
 
+### Channels · standard immersive browse
+
+Revised by operator acceptance 2026-09-19 after G10 viewing: standard rows replace
+the dense version; the implemented picon/content/marker arrangement is retained
+rather than restoring the earlier Penpot anatomy. Static design in Penpot page
+`411cd6b7-a446-8042-8008-a3866b9562cf`, board C3c
+`baab38e6-8768-8070-8008-a9c62d36a24c`. C3b
+`baab38e6-8768-8070-8008-a9c12c3a31a7` is the superseded dense variant.
+
+- Channels is **immersive**: no destination headline, live video visible behind
+  the content, and readability comes from the shell-owned warm-playback scrim in
+  §4. There is no duplicate content-local scrim and no rail/list boundary seam.
+- Scope tabs sit at the list's leading axis (x116 on the 960×540 canvas: the
+   shell's 24dp inset plus the list's 12dp focus reserve) at y32. The standard list
+  starts at y80, is 340dp wide, and runs to the bottom of the screen behind a
+  48dp fade. Rows scroll out under the fade; **focus never enters it** — the
+  list's bring-into-view policy shortens the viewport by the fade plus breathing
+  room so a focused row is never clipped by it or by its focus scale.
+- Rows are the library's standard `ListItem`: native padding, height and growth
+   at 1.3× fonts, with a 60×36 bare picon in the leading slot (aspect preserved,
+   no logo box or background), native 16sp headline and Material 14sp `bodyMedium` supporting text,
+   indication and focus scale. Rows are 4dp apart. The
+  row is one D-pad target; the title is `[number]  [name]`.
+- The supporting line is `HH:MM · programme title` for the **current** programme;
+   there is no minutes-left label. Start time keeps its natural width and only
+   the title ellipsizes, from real text layout. Unknown EPG shows the no-EPG label
+  with no timing and no progress.
+- Passive progress is a 2dp strip under the supporting line, spanning the text
+  column, identical on focused, unfocused, playing and recording rows.
+- Playing and recording markers sit beside the title and appear only when they
+  apply; no slot is reserved for an absent state. They are decorative and
+  non-focusable, and they shorten only the title.
+- Focused-programme detail is immersive text, not a panel: bottom-anchored at
+  x492, 420dp wide, with channel label, title, timing and metadata, a 4dp
+   progress strip, a description of up to five actual lines and the next programme.
+   The block grows upward above the next line, including at 1.3× font scale;
+   bounded text cannot overlap. It holds no focus target and no
+  artwork; there is no poster or fanart API in this composition.
+- Because the block holds no focus, it **crossfades** rather than hard-cutting as
+  the browsed row changes: a 160ms dissolve, short enough that fast row-to-row
+  browsing still feels immediate. Each state resolves its own EPG, so the
+  outgoing copy keeps the channel it was written for. Height differs between
+  programmes, so the size snaps and the taller copy is left unclipped instead of
+  animating text baselines against the bottom anchor.
+
 ## 10. Player
 
 Player chrome owns its gradients. Play/Pause and seek semantics, programme

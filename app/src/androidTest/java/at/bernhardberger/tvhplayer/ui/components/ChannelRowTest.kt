@@ -104,8 +104,9 @@ class ChannelRowTest {
             }
         }
 
+        // Standard native row: the bare picon sits on the row's 16dp edge inset.
         composeTestRule.onAllNodesWithTag("channel-picon", useUnmergedTree = true)[0]
-            .assertLeftPositionInRootIsEqualTo(20.dp)
+            .assertLeftPositionInRootIsEqualTo(16.dp)
         composeTestRule.onAllNodesWithTag(
             "channel-playing-indicator",
             useUnmergedTree = true,
