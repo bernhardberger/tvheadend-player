@@ -10,7 +10,7 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `AGENTS.md` | Sole automatic project instruction; concise safety, routing, and workflow floor |
 | `docs/README.md` | Documentation authority and lifecycle index used for task-specific reads |
 | `docs/archive/README.md` | Historical-document containment and successor map |
-| `.opencode/opencode.json` | Built-in Build default, read-only child assignments, sharing policy, permissions, and depth-2 child allowlist |
+| `.opencode/opencode.json` | Built-in Build default, read-only child assignments, sharing policy, and permissions; the primary may dispatch any child |
 | `.opencode/commands/continue-app.md` | Concise task execution contract for the built-in Build primary |
 | `.opencode/agents/app-locator.md` | Mechanical repository locator |
 | `.opencode/agents/app-explore.md` | Bounded multi-file source and behavior mapper |
@@ -61,8 +61,9 @@ Like the SDK workspace, the trusted writable primary receives edit, Bash, web
 fetch, and external-directory capabilities directly from server-side project
 configuration. Operator authority, any admitted package, and `AGENTS.md` define what it may
 do; there is no per-command approval relay or duplicated command deny list.
-Read-only children retain their own explicit restrictions and the exact Task
-allowlist remains deny-by-default.
+The primary has no child allowlist and may dispatch any available subagent;
+read-only children retain their own explicit restrictions, including their own
+subagent rules.
 
 Model, effort and step assignments live only in `.opencode/opencode.json` and
 agent frontmatter, with mode-specific overrides in caller dispatch guidance. Edit

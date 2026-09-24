@@ -62,20 +62,6 @@
     "edit": "allow",
     "shell": "allow",
     "webfetch": "allow",
-    "external_directory": "allow",
-    "subagent": {
-      "*": "deny",
-      "app-locator": "allow",
-      "app-explore": "allow",
-      "app-planner": "allow",
-      "app-analyze": "allow",
-      "app-research": "allow",
-      "android-reviewer": "allow",
-      "tv-evidence-curator": "allow",
-      "tv-ux-brief": "allow",
-      "tv-ux-reviewer": "allow",
-      "app-implementer": "allow",
-      "app-device-operator": "allow"
-    }
+    "external_directory": "allow"
   }
 }
