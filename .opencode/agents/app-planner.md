@@ -4,8 +4,8 @@ description: Optional read-only planning second opinion for one coherent Android
 mode: subagent
 permission:
   edit: deny
-  bash: deny
-  task:
+  shell: deny
+  subagent:
     "*": deny
     app-locator: allow
   webfetch: deny

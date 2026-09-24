@@ -4,8 +4,8 @@ description: Read-only diagnosis of one concrete app behavior, ownership,
 mode: subagent
 permission:
   edit: deny
-  bash: deny
-  task:
+  shell: deny
+  subagent:
     "*": deny
     app-locator: allow
   webfetch: deny

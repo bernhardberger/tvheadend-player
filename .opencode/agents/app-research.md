@@ -3,8 +3,8 @@ description: Read-only authoritative external research after exact local app and
 mode: subagent
 permission:
   edit: deny
-  bash: deny
-  task:
+  shell: deny
+  subagent:
     "*": deny
     app-locator: allow
   webfetch: allow

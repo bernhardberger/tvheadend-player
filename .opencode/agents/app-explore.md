@@ -3,8 +3,8 @@ description: Read-only Terra mapper for bounded multi-file app flows, call trace
 mode: subagent
 permission:
   edit: deny
-  bash: deny
-  task:
+  shell: deny
+  subagent:
     "*": deny
     app-locator: allow
   webfetch: deny

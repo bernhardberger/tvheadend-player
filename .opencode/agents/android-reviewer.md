@@ -4,8 +4,8 @@ description: Read-only frozen-packet reviewer for Android runtime, TV
 mode: subagent
 permission:
   edit: deny
-  bash: deny
-  task:
+  shell: deny
+  subagent:
     "*": deny
     app-locator: allow
   webfetch: deny

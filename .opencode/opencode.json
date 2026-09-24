@@ -60,10 +60,10 @@
   },
   "permission": {
     "edit": "allow",
-    "bash": "allow",
+    "shell": "allow",
     "webfetch": "allow",
     "external_directory": "allow",
-    "task": {
+    "subagent": {
       "*": "deny",
       "app-locator": "allow",
       "app-explore": "allow",

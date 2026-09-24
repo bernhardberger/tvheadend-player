@@ -6,12 +6,12 @@ variant: medium
 steps: 40
 permission:
   edit: deny
-  bash: allow
+  shell: allow
   read: allow
   glob: allow
   grep: allow
   skill: allow
-  task: deny
+  subagent: deny
   publish_artifact: deny
   external_directory: deny
 ---

@@ -4,11 +4,11 @@ mode: subagent
 disable: false
 permission:
   edit: deny
-  bash: deny
+  shell: deny
   glob: deny
   grep: deny
   list: deny
-  task: deny
+  subagent: deny
   webfetch: deny
   websearch: deny
   todowrite: deny

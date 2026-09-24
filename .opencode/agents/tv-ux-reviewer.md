@@ -5,9 +5,9 @@ mode: subagent
 disable: false
 permission:
   edit: deny
-  bash: deny
+  shell: deny
   glob: deny
-  task:
+  subagent:
     "*": deny
     app-locator: allow
   webfetch: deny
