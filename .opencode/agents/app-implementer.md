@@ -14,6 +14,7 @@ permission:
     "*": deny
     "/root/.gradle/**": allow
     "/tmp/opencode/**": allow
+    "/root/projects/.worktrees/**": allow
     "/root/projects/tvheadend-sdk/build/local-maven/**": allow
   webfetch: deny
   websearch: deny
