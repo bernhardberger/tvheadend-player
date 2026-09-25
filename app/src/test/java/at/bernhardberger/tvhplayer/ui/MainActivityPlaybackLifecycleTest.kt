@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -17,6 +18,7 @@ class MainActivityPlaybackLifecycleTest {
     fun activityStartAndStopDelegateToTargetAwarePlaybackOwner() {
         val events = mutableListOf<String>()
         val lifecycle = MainActivityPlaybackLifecycle(
+            owners = MainActivityPlaybackOwners(),
             onAppForegrounded = { events += "foreground" },
             onAppBackgrounded = { events += "background" },
             stopPlayback = { events += "stop" },
@@ -24,9 +26,64 @@ class MainActivityPlaybackLifecycleTest {
         )
 
         lifecycle.onActivityStarted()
+        lifecycle.onActivityStarted()
+        lifecycle.onActivityStopped()
+        lifecycle.onActivityStopped()
+        lifecycle.onActivityStarted()
         lifecycle.onActivityStopped()
 
-        assertEquals(listOf("foreground", "background"), events)
+        assertEquals(listOf("foreground", "background", "foreground", "background"), events)
+    }
+
+    @Test
+    fun overlappingActivitiesKeepPlaybackForegroundUntilLastOwnerStops() {
+        val owners = MainActivityPlaybackOwners()
+        val events = mutableListOf<String>()
+        var foreground = false
+        fun lifecycle(name: String) = MainActivityPlaybackLifecycle(
+            owners = owners,
+            onAppForegrounded = { foreground = true; events += "foreground:$name" },
+            onAppBackgrounded = { foreground = false; events += "background:$name" },
+            stopPlayback = { events += "stop:$name" },
+            finishActivity = { events += "finish:$name" },
+        )
+        val a = lifecycle("A")
+        val b = lifecycle("B")
+
+        a.onActivityStarted()
+        b.onActivityStarted()
+        a.onActivityStopped()
+        assertTrue(foreground)
+        assertEquals(listOf("foreground:A"), events)
+
+        b.onActivityStopped()
+        assertFalse(foreground)
+        assertEquals(listOf("foreground:A", "background:B"), events)
+    }
+
+    @Test
+    fun rootExitStillStopsAndFinishesWithAnotherStartedOwner() = runTest {
+        val owners = MainActivityPlaybackOwners()
+        val events = mutableListOf<String>()
+        fun lifecycle(name: String) = MainActivityPlaybackLifecycle(
+            owners = owners,
+            onAppForegrounded = { events += "foreground:$name" },
+            onAppBackgrounded = { events += "background:$name" },
+            stopPlayback = { events += "stop:$name" },
+            finishActivity = { events += "finish:$name" },
+        )
+        val a = lifecycle("A")
+        val b = lifecycle("B")
+        a.onActivityStarted()
+        b.onActivityStarted()
+
+        a.onRootExitRequested(readyState())
+        a.onRootExitRequested(readyState())
+        a.onActivityStopped()
+        assertEquals(listOf("foreground:A", "stop:A", "finish:A"), events)
+
+        b.onActivityStopped()
+        assertEquals(listOf("foreground:A", "stop:A", "finish:A", "background:B"), events)
     }
 
     @Test
@@ -35,6 +92,7 @@ class MainActivityPlaybackLifecycleTest {
         val releaseStop = CompletableDeferred<Unit>()
         val events = mutableListOf<String>()
         val lifecycle = MainActivityPlaybackLifecycle(
+            owners = MainActivityPlaybackOwners(),
             onAppForegrounded = { events += "foreground" },
             onAppBackgrounded = { events += "background" },
             stopPlayback = {
@@ -71,6 +129,7 @@ class MainActivityPlaybackLifecycleTest {
     fun unresolvedStartupBackDoesNotStopPlaybackOrFinishActivity() = runTest {
         val events = mutableListOf<String>()
         val lifecycle = MainActivityPlaybackLifecycle(
+            owners = MainActivityPlaybackOwners(),
             onAppForegrounded = {},
             onAppBackgrounded = {},
             stopPlayback = { events += "stop" },

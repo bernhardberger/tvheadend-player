@@ -1344,22 +1344,28 @@ class AppPlaybackRuntime(
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
                 if (epoch == null || epoch != activeTargetEpoch) return@serialize
-                // Video is still playing after a no-timeshift interruption. Its next toggle
-                // is an explicit request to restore sound, not a pause of the pushed source.
-                if (interruptionMuted) playWithAudioFocus()
-                else {
-                    resumeAfterInterruption = false
-                    player.pause()
-                }
+                pauseLocallyOrRestoreSound()
             }
         }
     }
+
+    /** Returns true only when a local pause was applied, not when restoring muted sound. */
+    private suspend fun pauseLocallyOrRestoreSound(): Boolean {
+        if (interruptionMuted) {
+            playWithAudioFocus()
+            return false
+        }
+        resumeAfterInterruption = false
+        player.pause()
+        return true
+    }
+
     /** System controls use the same local/server intent as the player keys, atomically. */
-    fun setSessionPlayWhenReady(playWhenReady: Boolean): Job {
+    fun setSessionPlayWhenReady(playWhenReady: Boolean, isAttached: () -> Boolean): Job {
         val epoch = activeTargetEpoch
         return scope.launch {
             targetCommands.serialize(onClosed = {}) {
-                if (!foreground || epoch == null || epoch != activeTargetEpoch) return@serialize
+                if (!isAttached() || !foreground || epoch == null || epoch != activeTargetEpoch) return@serialize
                 val timeshift = currentInterruptionContent() == AudioInterruptionContent.LIVE_TIMESHIFT
                 if (_activeTarget.value is AppPlaybackTarget.Live && !timeshift) return@serialize
                 if (playWhenReady) {
@@ -1369,15 +1375,9 @@ class AppPlaybackRuntime(
                     if (timeshift && interruption == null && result != TimeshiftCommandResult.ACCEPTED) {
                         player.pause()
                     }
-                } else if (interruptionMuted) {
-                    // Match pause(): the explicit toggle restores sound rather than holding
-                    // the pushed source. Do not send a pause while interruption-muted.
-                    playWithAudioFocus()
                 } else {
-                    resumeAfterInterruption = false
                     val wasPlaying = player.playWhenReady
-                    player.pause()
-                    if (timeshift && !interruptionPaused &&
+                    if (pauseLocallyOrRestoreSound() && timeshift && !interruptionPaused &&
                         coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED) {
                         player.playWhenReady = wasPlaying
                     }
@@ -1386,11 +1386,11 @@ class AppPlaybackRuntime(
         }
     }
 
-    fun seekRecordingFromSession(positionMs: Long): Job {
+    fun seekRecordingFromSession(positionMs: Long, isAttached: () -> Boolean): Job {
         val epoch = activeTargetEpoch
         return scope.launch {
             targetCommands.serialize(onClosed = {}) {
-                if (!foreground || epoch == null || epoch != activeTargetEpoch ||
+                if (!isAttached() || !foreground || epoch == null || epoch != activeTargetEpoch ||
                     _activeTarget.value !is AppPlaybackTarget.Recording) return@serialize
                 if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) &&
                     player.isCurrentMediaItemSeekable) player.seekTo(positionMs)

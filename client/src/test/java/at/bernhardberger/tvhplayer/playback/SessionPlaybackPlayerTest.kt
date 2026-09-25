@@ -78,11 +78,19 @@ class SessionPlaybackPlayerTest {
     @Test fun rejectedTimeshiftPauseRollsBackLocalIntent() = exercise {
         live(true)
         connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        var localPauseBeforeServerCommand = false
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady) localPauseBeforeServerCommand = connection.speeds.isEmpty()
+            }
+        })
         wrapper.pause()
         await { connection.speeds == listOf(0) }
         settle()
         assertTrue(player.playWhenReady)
         assertTrue(wrapper.playWhenReady)
+        assertTrue(localPauseBeforeServerCommand)
+        assertEquals(1, focusRequests)
     }
 
     @Test fun deniedFocusDoesNotResumeServerWhenRejectedHoldKeepsMutedVideoRunning() = exercise {
@@ -191,6 +199,54 @@ class SessionPlaybackPlayerTest {
         settle()
         assertEquals(2, focusRequests)
         assertTrue(connection.speeds.isEmpty())
+    }
+
+    @Test fun queuedPlayAfterCloseDoesNotRequestFocusOrResumeWhileRuntimeIsForeground() = exercise {
+        live(true)
+        wrapper.pause()
+        await { connection.speeds == listOf(0) && !player.playWhenReady }
+        whileCommandsBlocked {
+            wrapper.play()
+            settle()
+            observation.cancel()
+            wrapper.close()
+        }
+        settle()
+        assertEquals(1, focusRequests)
+        assertFalse(player.playWhenReady)
+        assertEquals(listOf(0), connection.speeds)
+    }
+
+    @Test fun queuedPauseAfterCloseDoesNotPauseWhileRuntimeIsForeground() = exercise {
+        live(true)
+        whileCommandsBlocked {
+            wrapper.pause()
+            settle()
+            observation.cancel()
+            wrapper.close()
+        }
+        settle()
+        assertTrue(player.playWhenReady)
+        assertTrue(connection.speeds.isEmpty())
+        assertEquals(1, focusRequests)
+    }
+
+    @Test fun queuedSeekAfterCloseDoesNotMoveRecordingWhileRuntimeIsForeground() = exercise {
+        recording()
+        player.setMediaSource(SilenceMediaSource.Factory().setDurationUs(60_000_000).createMediaSource())
+        player.prepare()
+        player.pause()
+        await { wrapper.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) }
+        val position = player.currentPosition
+        whileCommandsBlocked {
+            wrapper.seekTo(12_000)
+            settle()
+            observation.cancel()
+            wrapper.close()
+        }
+        settle()
+        assertEquals(position, player.currentPosition)
+        assertEquals(1, focusRequests)
     }
 
     @Test fun recordingSeekUsesSerializedRuntimeCommandAndRequiresSeekableTimeline() = exercise {
@@ -331,6 +387,29 @@ class SessionPlaybackPlayerTest {
             await { install.isCompleted }
             assertTrue(install.await()?.isStarted == true)
             settle()
+        }
+
+        suspend fun whileCommandsBlocked(block: suspend () -> Unit) {
+            // Hold the existing serializer, as in AutomaticAudioRuntimeTest; no runtime test seam.
+            val commands = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {
+                it.isAccessible = true
+                it.get(runtime) as PlaybackTargetCommandSerialization
+            }
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val blocker = scope.launch {
+                commands.serialize(onClosed = {}) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+            }
+            entered.await()
+            try { block() } finally {
+                release.complete(Unit)
+                blocker.join()
+            }
+            // Drain commands queued by the wrapper before checking their effects.
+            commands.serialize(onClosed = {}) {}
         }
 
         suspend fun await(predicate: () -> Boolean) {

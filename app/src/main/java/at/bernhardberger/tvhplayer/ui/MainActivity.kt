@@ -115,6 +115,7 @@ class MainActivity : AppCompatActivity() {
     private val tvheadendSession: TvheadendSession by inject()
     private val mediaSessionLifecycle = ActivityMediaSessionLifecycle()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
+        owners = playbackOwners,
         onAppForegrounded = { playbackRuntime.onAppForegrounded() },
         onAppBackgrounded = { playbackRuntime.onAppBackgrounded(getSystemService(PowerManager::class.java).isInteractive) },
         stopPlayback = { playbackRuntime.stop() },
@@ -262,6 +263,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private companion object {
+        // Process-wide started owners; sessions themselves remain activity-local.
+        val playbackOwners = MainActivityPlaybackOwners()
         const val MAX_PLATFORM_SPLASH_HOLD_MILLIS = 1_000L
         const val ACTION_DEBUG_VIDEO_BACKDROP =
             "at.bernhardberger.tvhplayer.action.DEBUG_VIDEO_BACKDROP"
@@ -295,6 +298,7 @@ internal class ActivityMediaSessionLifecycle {
 }
 
 internal class MainActivityPlaybackLifecycle(
+    private val owners: MainActivityPlaybackOwners,
     private val onAppForegrounded: () -> Unit,
     private val onAppBackgrounded: () -> Unit,
     private val stopPlayback: suspend () -> Unit,
@@ -302,10 +306,19 @@ internal class MainActivityPlaybackLifecycle(
 ) {
     private val rootExitMutex = Mutex()
     private var rootExitStarted = false
+    private var started = false
 
-    fun onActivityStarted() = onAppForegrounded()
+    fun onActivityStarted() {
+        if (started) return
+        started = true
+        owners.onStarted(onAppForegrounded)
+    }
 
-    fun onActivityStopped() = onAppBackgrounded()
+    fun onActivityStopped() {
+        if (!started) return
+        started = false
+        owners.onStopped(onAppBackgrounded)
+    }
 
     suspend fun onRootExitRequested(
         startupState: MainStartupState,
@@ -319,5 +332,21 @@ internal class MainActivityPlaybackLifecycle(
                 closePlayer = finishActivity,
             )
         }
+    }
+}
+
+/** Main-thread activity callbacks only; retains no activity or runtime references. */
+internal class MainActivityPlaybackOwners {
+    private var startedOwners = 0
+
+    fun onStarted(onFirstOwner: () -> Unit) {
+        startedOwners++
+        if (startedOwners == 1) onFirstOwner()
+    }
+
+    fun onStopped(onLastOwner: () -> Unit) {
+        check(startedOwners > 0)
+        startedOwners--
+        if (startedOwners == 0) onLastOwner()
     }
 }

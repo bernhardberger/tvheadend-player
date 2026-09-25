@@ -107,10 +107,10 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
     }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> =
-        awaitCommand(runtime.setSessionPlayWhenReady(playWhenReady))
+        awaitCommand(runtime.setSessionPlayWhenReady(playWhenReady) { !closed })
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> =
-        awaitCommand(runtime.seekRecordingFromSession(positionMs))
+        awaitCommand(runtime.seekRecordingFromSession(positionMs) { !closed })
 
     private fun awaitCommand(job: Job): ListenableFuture<*> {
         val result = SettableFuture.create<Void>()
