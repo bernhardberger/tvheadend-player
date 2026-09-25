@@ -56,6 +56,9 @@ import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
+import at.bernhardberger.tvhplayer.core.PlaybackOptionsKeyOutcome
+import at.bernhardberger.tvhplayer.core.playbackOptionsKeyOutcome
+import at.bernhardberger.tvhplayer.core.playbackOptionsKeyRequest
 import at.bernhardberger.tvhplayer.core.recordingKeyActionStartsOpeningCycle
 import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
@@ -96,6 +99,7 @@ fun RecordingPlayerScreen(
     val scope = rememberCoroutineScope()
     val playbackState by session.state.collectAsStateWithLifecycle()
     val activeTarget by session.activeTarget.collectAsStateWithLifecycle()
+    val videoPresentation by session.videoPresentation.collectAsStateWithLifecycle()
     val recordingSelection by session.recordingSelection.collectAsStateWithLifecycle()
     val recordingAdmission by session.recordingAdmission.collectAsStateWithLifecycle()
     val cutpoints by session.recordingCutpoints.collectAsStateWithLifecycle()
@@ -183,7 +187,12 @@ fun RecordingPlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var interactionToken by remember { mutableIntStateOf(0) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
+    var optionsQuickList by remember { mutableStateOf(false) }
+    val quickList = remember { PlaybackQuickListSignals() }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
+    var lastFocusedControl by remember { mutableStateOf("player-pause") }
+    var quickListReturnControl by remember { mutableStateOf<String?>(null) }
+    var restoreQuickListControl by remember { mutableStateOf<String?>(null) }
     var restoreInfoActionFocus by remember { mutableStateOf(false) }
     var statsVisible by remember { mutableStateOf(false) }
     var infoOpen by remember { mutableStateOf(false) }
@@ -235,8 +244,42 @@ fun RecordingPlayerScreen(
         timelineState.queueSeek(deltaMs)
     }
 
+    fun openOptionsFromKey(keyCode: Int): Boolean {
+        val outcome = playbackOptionsKeyOutcome(
+            keyCode = keyCode,
+            quickListPage = optionsPage.takeIf { optionsQuickList },
+        ) ?: return false
+        if (timelineState.seekPending) timelineState.commitPendingSeek()
+        infoOpen = false
+        restoreOptionsFocus = false
+        when (outcome) {
+            PlaybackOptionsKeyOutcome.OpenMenu -> {
+                optionsQuickList = false
+                optionsPage = PlaybackOptionsPage.ROOT
+                controlsVisible = true
+            }
+            PlaybackOptionsKeyOutcome.MoveDown -> quickList.moveDown()
+            // The short list leaves the controls as they are underneath.
+            is PlaybackOptionsKeyOutcome.OpenQuickList -> {
+                if (!optionsQuickList) quickListReturnControl = lastFocusedControl.takeIf { controlsVisible }
+                optionsQuickList = true
+                optionsPage = outcome.page
+            }
+        }
+        return true
+    }
+
+    fun closeQuickList() {
+        restoreQuickListControl = quickListReturnControl.takeIf { controlsVisible }
+        quickListReturnControl = null
+        optionsPage = null
+        optionsQuickList = false
+        interactionToken++
+    }
+
     fun applyKeyAction(
         action: RecordingPlaybackKeyAction,
+        keyCode: Int,
         repeatCount: Int = 0,
     ): Boolean = when (action) {
         RecordingPlaybackKeyAction.PASS_THROUGH -> false
@@ -266,6 +309,7 @@ fun RecordingPlayerScreen(
             infoOpen = true
             true
         }
+        RecordingPlaybackKeyAction.OPEN_OPTIONS -> openOptionsFromKey(keyCode)
         RecordingPlaybackKeyAction.SEEK_BACK -> {
             seekBy(-seekStepMs(repeatCount))
             true
@@ -303,6 +347,7 @@ fun RecordingPlayerScreen(
             confirmationVisible = false,
             infoVisible = infoOpen && entry != null && playbackAvailable,
             optionsPage = optionsPage,
+            optionsQuickList = optionsQuickList && optionsPage != null,
             numberEntryVisible = false,
             channelDrawerVisible = false,
             recoveryVisible = playbackState is AppPlaybackState.Recovering,
@@ -359,9 +404,14 @@ fun RecordingPlayerScreen(
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> Unit
             PlayerBackAction.CLOSE_INFO -> closeInfo()
+            PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
+                quickList.restoreStart()
+                closeQuickList()
+            }
             PlayerBackAction.RETURN_TO_OPTIONS_ROOT -> optionsPage = PlaybackOptionsPage.ROOT
             PlayerBackAction.CLOSE_OPTIONS -> {
                 optionsPage = null
+                optionsQuickList = false
                 restoreOptionsFocus = true
                 interactionToken++
             }
@@ -388,6 +438,9 @@ fun RecordingPlayerScreen(
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
+                if (event.type == KeyEventType.KeyDown && optionsQuickList && optionsPage != null) {
+                    quickList.onKeyDown()
+                }
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
                     interactionToken++
                     return@onPreviewKeyEvent true
@@ -411,6 +464,19 @@ fun RecordingPlayerScreen(
                     foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR
                 ) {
                     return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
+                }
+
+                if (playbackOptionsKeyRequest(keyCode) != null) {
+                    // Menu, audio-track and captions keys reach the options from Info or
+                    // another options page as well as from plain playback.
+                    val optionsKeyAction = recordingPlaybackKeyAction(
+                        controlsVisible = controlsVisible,
+                        keyCode = keyCode,
+                    )
+                    if (recordingKeyActionStartsOpeningCycle(optionsKeyAction)) {
+                        revealingKeyCode = keyCode
+                    }
+                    return@onPreviewKeyEvent applyKeyAction(optionsKeyAction, keyCode)
                 }
 
                 if (infoOpen || optionsPage != null) {
@@ -461,6 +527,7 @@ fun RecordingPlayerScreen(
                 }
                 applyKeyAction(
                     action = keyAction,
+                    keyCode = keyCode,
                     repeatCount = event.nativeKeyEvent.repeatCount,
                 )
             }
@@ -504,6 +571,7 @@ fun RecordingPlayerScreen(
                     onUserInteraction = { interactionToken++ },
                     onOpenOptions = {
                         restoreOptionsFocus = false
+                        optionsQuickList = false
                         optionsPage = PlaybackOptionsPage.ROOT
                         controlsVisible = true
                     },
@@ -512,6 +580,9 @@ fun RecordingPlayerScreen(
                         infoOpen = true
                     },
                     restoreOptionsFocus = restoreOptionsFocus,
+                    restoreQuickListControl = restoreQuickListControl,
+                    onQuickListFocusRestored = { restoreQuickListControl = null },
+                    onControlFocused = { lastFocusedControl = it },
                     restoreInfoFocus = restoreInfoActionFocus,
                     onInfoFocusRestored = { restoreInfoActionFocus = false },
                     onCommitSeek = timelineState::commitPendingSeek,
@@ -657,7 +728,17 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
-                onPageChange = { optionsPage = it },
+                onPageChange = {
+                    optionsQuickList = false
+                    optionsPage = it
+                },
+                quickList = quickList.takeIf { optionsQuickList },
+                onQuickListClose = ::closeQuickList,
+                quickListTargetEpoch = videoPresentation.epoch,
+                quickListAvailable = playbackAvailable && activeTarget == AppPlaybackTarget.Recording(recordingId),
+                isQuickListTargetCurrent = session::isQuickListTargetCurrent,
+                onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
+                recording = true,
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
                     scope.launch { settingsStore.setAspectRatio(mode) }

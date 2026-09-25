@@ -131,6 +131,8 @@ class MainStartupKeyCycleOwner {
         KeyEvent.KEYCODE_TV_CONTENTS_MENU,
         KeyEvent.KEYCODE_TV_MEDIA_CONTEXT_MENU,
         KeyEvent.KEYCODE_MENU,
+        KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+        KeyEvent.KEYCODE_CAPTIONS,
         KeyEvent.KEYCODE_GUIDE,
         KeyEvent.KEYCODE_TV_NUMBER_ENTRY,
         KeyEvent.KEYCODE_BOOKMARK -> true

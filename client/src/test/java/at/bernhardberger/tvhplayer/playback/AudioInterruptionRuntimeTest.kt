@@ -10,6 +10,11 @@ import android.app.Application
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
@@ -503,6 +508,76 @@ class AudioInterruptionRuntimeTest {
         assertEquals(listOf(0), connection.speeds)
     }
 
+    @Test fun queuedAutomaticPreviewThenBackRestoresExactManualAndRememberedChoice() = exercise {
+        live(timeshift = false)
+        val manual = installManualAudio()
+        val release = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        val blocker = scope.launch { commands.serialize(onClosed = {}) { entered.complete(Unit); release.await() } }
+        entered.await()
+        val epoch = runtime.videoPresentation.value.epoch
+        val preview = runtime.selectQuickListAudio(epoch, null)
+        val back = runtime.selectQuickListAudio(epoch, manual)
+        settle()
+        assertFalse(preview.isCompleted)
+        release.complete(Unit)
+        blocker.join(); preview.join(); back.join()
+        settle()
+        assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
+        assertNotNull(settings.audioChoices.read("test-profile", ChannelId(1)))
+        // Retain the session choice, not just the immediate player parameters.
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
+        audioSelection.restore(runtimePlayer)
+        assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
+    }
+
+    @Test fun queuedAutomaticFromPredecessorCannotClearSuccessorManualChoice() = exercise {
+        live(timeshift = false)
+        val manual = installManualAudio()
+        settle()
+        settings.audioChoices.write("test-profile", ChannelId(2), requireNotNull(settings.audioChoices.read("test-profile", ChannelId(1))))
+        val oldEpoch = runtime.videoPresentation.value.epoch
+        val release = CompletableDeferred<Unit>()
+        val entered = CompletableDeferred<Unit>()
+        val blocker = scope.launch { commands.serialize(onClosed = {}) { entered.complete(Unit); release.await() } }
+        entered.await()
+        val replacement = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+            markReady()
+        }
+        settle()
+        val stalePreview = runtime.selectQuickListAudio(oldEpoch, null)
+        settle()
+        assertFalse(stalePreview.isCompleted)
+        release.complete(Unit)
+        blocker.join(); replacement.await(); stalePreview.join()
+        settle()
+        assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
+        assertNotNull(settings.audioChoices.read("test-profile", ChannelId(2)))
+        assertFalse(runtime.isQuickListTargetCurrent(oldEpoch))
+        val epoch = runtime.videoPresentation.value.epoch
+        assertTrue(runtime.isQuickListTargetCurrent(epoch))
+        live(timeshift = false, channel = 2)
+        assertFalse(runtime.isQuickListTargetCurrent(epoch))
+    }
+
+    @Test fun audioBackAfterFocusGainKeepsAudioEnabledAndAutomaticBackForgetsPreview() = exercise {
+        live(timeshift = false)
+        val manual = installManualAudio()
+        val epoch = runtime.videoPresentation.value.epoch
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { audioDisabled() }
+        focus.send(AudioInterruption.GAIN)
+        await { !audioDisabled() }
+        runtime.selectQuickListAudio(epoch, manual).join()
+        assertFalse(audioDisabled())
+        runtime.selectQuickListAudio(epoch, null).join()
+        settle()
+        audioSelection.restore(runtimePlayer)
+        assertTrue(player.trackSelectionParameters.overrides.isEmpty())
+        assertNull(settings.audioChoices.read("test-profile", ChannelId(1)))
+    }
+
     private fun exercise(granted: Boolean = true, block: suspend Fixture.() -> Unit) = runBlocking {
         val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), granted)
         try { withTimeout(15_000) { fixture.block() } }
@@ -570,7 +645,11 @@ class AudioInterruptionRuntimeTest {
         }
         /** Runtime listeners, so tests can drive STATE_READY, which the fake stream never reaches. */
         private val playerListeners = mutableListOf<Player.Listener>()
-        val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
+        var audioTracks: Tracks? = null
+        var reportedPlaybackState: Int? = null
+        val runtimePlayer = object : ExoPlayer by player {
+            override fun getCurrentTracks(): Tracks = audioTracks ?: player.currentTracks
+            override fun getPlaybackState(): Int = reportedPlaybackState ?: player.playbackState
             override fun addListener(listener: Player.Listener) {
                 playerListeners += listener
                 player.addListener(listener)
@@ -579,8 +658,31 @@ class AudioInterruptionRuntimeTest {
                 playerListeners -= listener
                 player.removeListener(listener)
             }
-        }, runtimeSession, coordinator, settings, profiles, scope, output, focus,
+        }
+        val runtime = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
             PlaybackRuntimePolicy.fromPlayerSettings())
+        val commands: PlaybackTargetCommandSerialization get() = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {
+            it.isAccessible = true; it.get(runtime) as PlaybackTargetCommandSerialization
+        }
+        val audioSelection: SessionAudioSelection get() = AppPlaybackRuntime::class.java.getDeclaredField("audioSelection").let {
+            it.isAccessible = true; it.get(runtime) as SessionAudioSelection
+        }
+        fun installManualAudio(channel: Long = 1): TrackSelectionOverride {
+            // The fake stream has no frames; expose a ready target with the test track groups.
+            reportedPlaybackState = Player.STATE_READY
+            markReady()
+            // An opaque storage identity avoids any server address or credentials in this fixture.
+            AppProfileOwner::class.java.getDeclaredField("audioProfileId").apply {
+                isAccessible = true; set(profiles, "test-profile")
+            }
+            val group = TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).setLanguage("de").build())
+            audioTracks = Tracks(listOf(Tracks.Group(group, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true))))
+            audioSelection.useProfile(requireNotNull(profiles.serverProfile.value), runtimePlayer)
+            audioSelection.activate(ChannelId(channel), runtimePlayer)
+            return TrackSelectionOverride(group, listOf(0)).also {
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().addOverride(it).build()
+            }
+        }
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
         fun audioDisabled() = C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes
@@ -606,8 +708,10 @@ class AudioInterruptionRuntimeTest {
                     ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
             }
             // The first picture is ready: a server pause is only sent after it.
-            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
+            markReady()
         }
+
+        fun markReady() { playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) } }
 
         suspend fun recording() {
             val install = scope.async {

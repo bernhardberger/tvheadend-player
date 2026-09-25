@@ -38,10 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -85,11 +83,9 @@ import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.compactTuningVisibilityAction
 import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
-import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
-import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.LiveMediaKeyAction
@@ -288,6 +284,7 @@ fun VideoPlayerScreen(
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
     val activeTarget by videoPlayerViewModel.activeTarget.collectAsStateWithLifecycle()
+    val videoPresentation by playbackRuntime.videoPresentation.collectAsStateWithLifecycle()
     val playingLiveChannelId by
         videoPlayerViewModel.playingLiveChannelId.collectAsStateWithLifecycle()
     val livePlaybackObservation by
@@ -550,6 +547,18 @@ fun VideoPlayerScreen(
         layerState.closeInfo()
         restoreInfoFocus = !infoOpenedFromRecord
         restoreRecordActionFocus = infoOpenedFromRecord
+    }
+
+    /**
+     * An options key opened the options: commit a pending seek, drop a number entry,
+     * settle the recording state of a replaced Info panel and focus the page as the
+     * gear does.
+     */
+    fun optionsOpenedFromKey(infoWasOpen: Boolean) {
+        if (timelineState.seekPending) timelineState.commitPendingSeek()
+        channelNumberInput = ""
+        if (infoWasOpen) infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
+        restoreOptionsFocus = false
     }
 
     fun openChannelDrawer() {
@@ -891,6 +900,10 @@ fun VideoPlayerScreen(
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
             PlayerBackAction.CLOSE_INFO -> closeInfo()
+            PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
+                layerState.quickList.restoreStart()
+                layerState.closeQuickList()
+            }
             PlayerBackAction.RETURN_TO_OPTIONS_ROOT ->
                 layerState.showOptionsPage(PlaybackOptionsPage.ROOT)
             PlayerBackAction.CLOSE_OPTIONS -> {
@@ -914,34 +927,27 @@ fun VideoPlayerScreen(
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
-                if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
-                    if (event.type == KeyEventType.KeyUp) {
-                        layerState.endOpeningKeyCycle(keyCode)
-                    }
-                    return@onPreviewKeyEvent true
-                }
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
-                    // A focused Compose target swallows the Back key cycle on the TV before the
-                    // activity can track it, so the BackHandler never fires. Decide Back here,
-                    // where Left already works, and let the matching KeyUp be consumed above.
-                    if (event.nativeKeyEvent.repeatCount == 0) {
-                        layerState.beginOpeningKeyCycle(keyCode)
-                        handlePlaybackBack()
-                    }
-                    return@onPreviewKeyEvent true
-                }
-                if (foregroundLayer == PlayerForegroundLayer.RECOVERY) {
-                    return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
-                }
-                if (layerState.infoOpen || layerState.optionsPage != null) {
-                    if (event.key == Key.DirectionLeft && foregroundLayer != PlayerForegroundLayer.CONFIRMATION) {
-                        layerState.beginOpeningKeyCycle(keyCode)
-                        handlePlaybackBack()
-                        return@onPreviewKeyEvent true
-                    }
-                    return@onPreviewKeyEvent false
-                }
+                val keyContext = PlayerKeyContext(
+                    surface = PlayerSurface.LIVE,
+                    controlsVisible = layerState.controlsVisible,
+                    seekbarFocused = false,
+                    timeshiftAvailable = effectiveTimeshiftState.available,
+                    optionsOpen = layerState.optionsPage != null,
+                    statsOpen = layerState.statsVisible,
+                    infoOpen = layerState.infoOpen,
+                    drawerOpen = showDrawer,
+                    confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
+                    livePause = livePauseAvailability,
+                )
+                layerState.handleOverlayKey(
+                    event = event,
+                    keyContext = keyContext,
+                    foregroundLayer = foregroundLayer,
+                    quickListAvailable = playingLiveChannelId == currentChannelId && !channelUnavailable &&
+                        playbackRuntime.isQuickListTargetCurrent(videoPresentation.epoch),
+                    onBack = handlePlaybackBack,
+                    onOptionsOpened = ::optionsOpenedFromKey,
+                )?.let { return@onPreviewKeyEvent it }
 
                 val mediaAction = mediaPlaybackAction(
                     keyCode = event.nativeKeyEvent.keyCode,
@@ -1005,20 +1011,7 @@ fun VideoPlayerScreen(
                     return@onPreviewKeyEvent false
                 }
 
-                val keyAction = playerKeyAction(
-                    PlayerKeyContext(
-                        surface = PlayerSurface.LIVE,
-                        controlsVisible = layerState.controlsVisible,
-                        seekbarFocused = false,
-                        timeshiftAvailable = effectiveTimeshiftState.available,
-                        optionsOpen = layerState.optionsPage != null,
-                        statsOpen = layerState.statsVisible,
-                        infoOpen = layerState.infoOpen,
-                        drawerOpen = showDrawer,
-                        livePause = livePauseAvailability,
-                    ),
-                    keyCode = keyCode,
-                )
+                val keyAction = playerKeyAction(keyContext, keyCode = keyCode)
                 if (playerKeyActionStartsOpeningCycle(keyAction)) {
                     layerState.beginOpeningKeyCycle(keyCode)
                 }
@@ -1057,6 +1050,8 @@ fun VideoPlayerScreen(
                         openInfo()
                         return@onPreviewKeyEvent true
                     }
+                    // Options keys are decided before the overlays above can claim them.
+                    PlayerKeyAction.OPEN_OPTIONS -> Unit
                     PlayerKeyAction.SEEK_BACK -> {
                         queueTimeshiftSeek(-seekStepMs(event.nativeKeyEvent.repeatCount))
                         return@onPreviewKeyEvent true
@@ -1306,6 +1301,15 @@ fun VideoPlayerScreen(
                 aspectRatio = aspectRatio,
                 statsVisible = layerState.statsVisible,
                 onPageChange = layerState::showOptionsPage,
+                quickList = layerState.quickList.takeIf { layerState.optionsQuickList },
+                onQuickListClose = layerState::closeQuickList,
+                quickListTargetEpoch = videoPresentation.epoch,
+                quickListAvailable = !channelUnavailable && playingLiveChannelId == currentChannelId,
+                isQuickListTargetCurrent = { epoch ->
+                    playbackRuntime.isQuickListTargetCurrent(epoch) &&
+                        videoPlayerViewModel.playingLiveChannelId.value == currentChannelId
+                },
+                onQuickAudioSelection = { epoch, override -> playbackRuntime.selectQuickListAudio(epoch, override) },
                 onAspectRatioChange = { mode ->
                     aspectRatio = mode
                     scope.launch { settingsStore.setAspectRatio(mode) }

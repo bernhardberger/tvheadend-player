@@ -1540,19 +1540,44 @@ class AppPlaybackRuntime(
     // A committed UI choice outlives the options sheet, including while another command holds the lock.
     fun useAutomaticAudio() = scope.launch {
         targetCommands.serialize(onClosed = {}) {
-            audioSelection.useProfile(profileOwner.serverProfile.value, player)
-            val channel = audioSelection.useAutomatic(player)
-            val profileId = profileOwner.audioProfileId
-            if (channel != null && profileId != null) {
-                // A pending explicit-choice write must finish before its removal is persisted.
-                val previous = audioWriteJob
-                audioWriteJob = scope.launch {
-                    previous?.join()
-                    try {
-                        settings.audioChoices.remove(profileId, channel)
-                    } catch (_: java.io.IOException) {
-                        // Storage failure must not interrupt playback; the session choice is still forgotten.
-                    }
+            applyAutomaticAudio()
+        }
+    }
+
+    /** Installed and presented target, including same-channel retunes; never pending/stale tracks. */
+    fun isQuickListTargetCurrent(epoch: Long): Boolean =
+        targetCommands.isOpen() && !targetInstallationInProgress && activeTargetEpoch == epoch &&
+            _state.value.presented
+
+    /** Preview and Back use the same queue. A retired target cannot change its successor's choice. */
+    fun selectQuickListAudio(epoch: Long, override: androidx.media3.common.TrackSelectionOverride?) = scope.launch {
+        targetCommands.serialize(onClosed = {}) {
+            if (!isQuickListTargetCurrent(epoch)) return@serialize
+            if (override == null) {
+                applyAutomaticAudio()
+            } else {
+                // Keep the exact group identity for SessionAudioSelection's explicit-choice listener.
+                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                    .addOverride(override)
+                    .build()
+            }
+        }
+    }
+
+    private fun applyAutomaticAudio() {
+        audioSelection.useProfile(profileOwner.serverProfile.value, player)
+        val channel = audioSelection.useAutomatic(player)
+        val profileId = profileOwner.audioProfileId
+        if (channel != null && profileId != null) {
+            // A pending explicit-choice write must finish before its removal is persisted.
+            val previous = audioWriteJob
+            audioWriteJob = scope.launch {
+                previous?.join()
+                try {
+                    settings.audioChoices.remove(profileId, channel)
+                } catch (_: java.io.IOException) {
+                    // Storage failure must not interrupt playback; the session choice is still forgotten.
                 }
             }
         }

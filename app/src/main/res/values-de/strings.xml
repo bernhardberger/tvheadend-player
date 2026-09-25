@@ -7,6 +7,8 @@
     <string name="audio_language_none">Keine</string>
     <string name="audio_automatic">Automatisch</string>
     <string name="audio_automatic_help">Verwendet deine Audioeinstellungen</string>
+    <string name="audio_automatic_playing">Wiedergabe: %1$s</string>
+    <string name="audio_quick_list">Audio</string>
     <string name="audio_format">Audioformat</string>
     <string name="audio_format_dolby">Dolby Digital bevorzugen</string>
     <string name="audio_format_stereo">Stereo bevorzugen</string>
@@ -172,6 +174,8 @@
     <string name="subtitles">Untertitel</string>
     <string name="subtitles_off">Aus</string>
     <string name="no_subtitles">Keine Untertitel verfügbar.</string>
+    <string name="no_subtitles_channel">Keine Untertitel auf diesem Sender</string>
+    <string name="no_subtitles_recording">Keine Untertitel in dieser Aufnahme</string>
     <string name="close">Schließen</string>
     <string name="stop_playback">Wiedergabe beenden</string>
     <string name="playback_options">Wiedergabeoptionen</string>

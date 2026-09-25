@@ -7,6 +7,8 @@
     <string name="audio_language_none">None</string>
     <string name="audio_automatic">Automatic</string>
     <string name="audio_automatic_help">Uses your audio preferences</string>
+    <string name="audio_automatic_playing">Playing: %1$s</string>
+    <string name="audio_quick_list">Audio</string>
     <string name="audio_format">Audio format</string>
     <string name="audio_format_dolby">Prefer Dolby Digital</string>
     <string name="audio_format_stereo">Prefer stereo</string>
@@ -183,6 +185,8 @@
     <string name="subtitles">Subtitles</string>
     <string name="subtitles_off">Off</string>
     <string name="no_subtitles">No subtitles available.</string>
+    <string name="no_subtitles_channel">No subtitles on this channel</string>
+    <string name="no_subtitles_recording">No subtitles in this recording</string>
 
     <!-- Common -->
     <string name="close">Close</string>

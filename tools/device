@@ -99,6 +99,10 @@ KEY_EVENTS = {
     "play-pause": "KEYCODE_MEDIA_PLAY_PAUSE",
     "play": "KEYCODE_MEDIA_PLAY",
     "pause": "KEYCODE_MEDIA_PAUSE",
+    "menu": "KEYCODE_MENU",
+    "audio-track": "KEYCODE_MEDIA_AUDIO_TRACK",
+    "captions": "KEYCODE_CAPTIONS",
+    "info": "KEYCODE_INFO",
     **{str(digit): f"KEYCODE_{digit}" for digit in range(10)},
 }
 DEFAULT_KEY_DELAY_MS = 300

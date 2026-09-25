@@ -7,6 +7,7 @@ enum class RecordingPlaybackKeyAction {
     HIDE_CONTROLS,
     CLOSE,
     OPEN_INFO,
+    OPEN_OPTIONS,
     SEEK_BACK,
     SEEK_FORWARD,
 }
@@ -39,6 +40,7 @@ fun recordingPlaybackKeyAction(
         PlayerKeyAction.CLOSE_PLAYER,
         PlayerKeyAction.DISMISS_OVERLAY_ONLY -> RecordingPlaybackKeyAction.CLOSE
         PlayerKeyAction.OPEN_INFO -> RecordingPlaybackKeyAction.OPEN_INFO
+        PlayerKeyAction.OPEN_OPTIONS -> RecordingPlaybackKeyAction.OPEN_OPTIONS
         PlayerKeyAction.SEEK_BACK -> RecordingPlaybackKeyAction.SEEK_BACK
         PlayerKeyAction.SEEK_FORWARD -> RecordingPlaybackKeyAction.SEEK_FORWARD
         PlayerKeyAction.OPEN_CHANNELS -> RecordingPlaybackKeyAction.PASS_THROUGH
@@ -54,7 +56,8 @@ fun recordingKeyActionStartsOpeningCycle(action: RecordingPlaybackKeyAction): Bo
     when (action) {
         RecordingPlaybackKeyAction.REVEAL_CONTROLS,
         RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE,
-        RecordingPlaybackKeyAction.OPEN_INFO -> true
+        RecordingPlaybackKeyAction.OPEN_INFO,
+        RecordingPlaybackKeyAction.OPEN_OPTIONS -> true
         RecordingPlaybackKeyAction.PASS_THROUGH,
         RecordingPlaybackKeyAction.HIDE_CONTROLS,
         RecordingPlaybackKeyAction.CLOSE,

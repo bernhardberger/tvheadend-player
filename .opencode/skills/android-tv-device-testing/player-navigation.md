@@ -29,6 +29,18 @@ subtitles.
   Right seeks forward with timeshift.
 - Channel up/down tune the adjacent channel. Media play/pause pauses and resumes
   timeshift.
+- Direct keys, with the controls hidden or shown: `key audio-track --screenshot
+  audio` opens a short Audio list (only the audio rows, no way up to the options
+  list) with focus on the playing row. Focus resting on a row about 300 ms
+  switches the sound; `key audio-track` again moves focus down one row and wraps;
+  Center keeps the focused row and closes; Back puts back what played when the
+  list opened and closes. The list closes on its own 5 s after the last key and
+  keeps what plays, so screenshot within 5 s. `key captions` does the same with
+  Off and the subtitle tracks; without subtitles it shows only Off and why. The
+  controls stay as they were. `key menu` opens the full options list, which works
+  as after the gear (focus applies nothing, Back goes up). `key info` opens the
+  Info panel. These keys replace an open Info panel, shelf or options list, and do
+  nothing while a confirmation is open.
 - Digits tune by channel number: `keys 1` for channel 1, `keys 1 0` for 10. Player
   tunes 250 ms after the last digit once the number has as many digits as the
   highest channel number, otherwise after 1.5 s.
@@ -47,7 +59,8 @@ subtitles.
   the Center in the same `keys` call, for example `keys up right right right right
   --screenshot gear`, then after 6 s `keys up right right right right center center
   --screenshot audio`. After hiding, the controls open again with focus on
-  Pause/Play.
+  Pause/Play. Prefer the direct `key audio-track`, `key captions`, `key menu` and
+  `key info` above; this controls path is the fallback when a key has no effect.
 - Action row, left to right: Pause/Play, **Stop**, Info, Record, Settings (gear).
   Focus starts on Pause/Play. Without timeshift Pause/Play is dimmed; Center on it
   only shows why in the timeline line.
@@ -76,6 +89,8 @@ subtitles.
 ## Recording player
 
 - Center pauses or resumes and shows the controls; Left/Right seek.
+- `key audio-track`, `key captions`, `key menu` and `key info` work as in the
+  live player; without subtitles the short list says so for the recording.
 - Action row: Pause/Play, Stop, Info, Settings (no Record). No channel shelf and no
   "Go live". The playback options and the Back order match the live player.
 

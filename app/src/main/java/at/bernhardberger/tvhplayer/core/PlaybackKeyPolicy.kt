@@ -39,6 +39,8 @@ enum class PlayerKeyAction {
     HIDE_CONTROLS,
     OPEN_CHANNELS,
     OPEN_INFO,
+    /** Opens the playback options; [playbackOptionsKeyOutcome] names the list. */
+    OPEN_OPTIONS,
     SEEK_BACK,
     SEEK_FORWARD,
     CLOSE_PLAYER,
@@ -54,6 +56,8 @@ data class PlayerKeyContext(
     val infoOpen: Boolean = false,
     val statsOpen: Boolean = false,
     val drawerOpen: Boolean = false,
+    /** A modal confirmation (e.g. the live recording dialog) owns the keys. */
+    val confirmationOpen: Boolean = false,
     /** Live Pause state; a still-starting timeshift accepts a pause like an available one. */
     val livePause: LivePauseAvailability = LivePauseAvailability.NONE,
 )
@@ -103,13 +107,52 @@ fun playerKeyActionStartsOpeningCycle(action: PlayerKeyAction): Boolean = when (
     PlayerKeyAction.REVEAL_CONTROLS,
     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
     PlayerKeyAction.OPEN_CHANNELS,
-    PlayerKeyAction.OPEN_INFO -> true
+    PlayerKeyAction.OPEN_INFO,
+    PlayerKeyAction.OPEN_OPTIONS -> true
     PlayerKeyAction.PASS_THROUGH,
     PlayerKeyAction.HIDE_CONTROLS,
     PlayerKeyAction.SEEK_BACK,
     PlayerKeyAction.SEEK_FORWARD,
     PlayerKeyAction.CLOSE_PLAYER,
     PlayerKeyAction.DISMISS_OVERLAY_ONLY -> false
+}
+
+/**
+ * The options page a dedicated remote key asks for: Menu opens the root, the
+ * audio-track key the Audio page and the captions key the Subtitles page.
+ */
+fun playbackOptionsKeyRequest(keyCode: Int): PlaybackOptionsPage? = when (keyCode) {
+    KeyEvent.KEYCODE_MENU -> PlaybackOptionsPage.ROOT
+    KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK -> PlaybackOptionsPage.AUDIO
+    KeyEvent.KEYCODE_CAPTIONS -> PlaybackOptionsPage.SUBTITLES
+    else -> null
+}
+
+/** What an options key does given the Audio or Subtitles quick list open right now. */
+sealed interface PlaybackOptionsKeyOutcome {
+    /** Menu: the full options menu at its root, keeping the current selections. */
+    data object OpenMenu : PlaybackOptionsKeyOutcome
+
+    /** Audio or captions key: the short list of that page only. */
+    data class OpenQuickList(val page: PlaybackOptionsPage) : PlaybackOptionsKeyOutcome
+
+    /** The key of the quick list already open: focus moves down one row and wraps. */
+    data object MoveDown : PlaybackOptionsKeyOutcome
+}
+
+/**
+ * The outcome of an options key. [quickListPage] is the page of the open quick
+ * list, or null when none is open (the full menu does not count). The other list
+ * key switches lists without undoing what is playing.
+ */
+fun playbackOptionsKeyOutcome(
+    keyCode: Int,
+    quickListPage: PlaybackOptionsPage?,
+): PlaybackOptionsKeyOutcome? = when (val page = playbackOptionsKeyRequest(keyCode)) {
+    null -> null
+    PlaybackOptionsPage.ROOT -> PlaybackOptionsKeyOutcome.OpenMenu
+    quickListPage -> PlaybackOptionsKeyOutcome.MoveDown
+    else -> PlaybackOptionsKeyOutcome.OpenQuickList(page)
 }
 
 fun playerParentConsumesRecoveryKey(keyCode: Int): Boolean = when (keyCode) {
@@ -135,6 +178,15 @@ fun playerKeyAction(
     context: PlayerKeyContext,
     keyCode: Int,
 ): PlayerKeyAction {
+    if (playbackOptionsKeyRequest(keyCode) != null) {
+        // Options keys replace Info, the drawer or another options page; a modal
+        // confirmation keeps them inert.
+        return if (context.confirmationOpen) {
+            PlayerKeyAction.PASS_THROUGH
+        } else {
+            PlayerKeyAction.OPEN_OPTIONS
+        }
+    }
     if (context.infoOpen && keyCode != KeyEvent.KEYCODE_BACK) {
         return PlayerKeyAction.PASS_THROUGH
     }

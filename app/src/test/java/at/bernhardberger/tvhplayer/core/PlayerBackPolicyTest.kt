@@ -33,6 +33,7 @@ class PlayerBackPolicyTest {
         listOf(
             PlayerForegroundLayer.CONFIRMATION,
             PlayerForegroundLayer.INFO,
+            PlayerForegroundLayer.OPTIONS_QUICK_LIST,
             PlayerForegroundLayer.OPTIONS_DETAIL,
             PlayerForegroundLayer.OPTIONS_ROOT,
             PlayerForegroundLayer.CHANNEL_DRAWER,
@@ -164,6 +165,24 @@ class PlayerBackPolicyTest {
     }
 
     @Test
+    fun aQuickListIsItsOwnLayerBelowInfoAndAboveTheControls() {
+        val quick = baseContext().copy(
+            optionsPage = PlaybackOptionsPage.SUBTITLES,
+            optionsQuickList = true,
+            controlsVisible = true,
+            statsEnabled = true,
+        )
+        assertEquals(PlayerForegroundLayer.OPTIONS_QUICK_LIST, playerForegroundLayer(quick))
+        assertEquals(PlayerForegroundLayer.INFO, playerForegroundLayer(quick.copy(infoVisible = true)))
+        // Without a page there is no list, whatever the flag says.
+        assertEquals(PlayerForegroundLayer.CONTROLS, playerForegroundLayer(quick.copy(optionsPage = null)))
+        assertEquals(
+            PlayerForegroundLayer.OPTIONS_DETAIL,
+            playerForegroundLayer(quick.copy(optionsQuickList = false)),
+        )
+    }
+
+    @Test
     fun everyHigherLayerSuppressesRenderedStats() {
         val stats = baseContext().copy(statsEnabled = true)
         assertEquals(PlayerForegroundLayer.STATS, playerForegroundLayer(stats))
@@ -195,6 +214,10 @@ class PlayerBackPolicyTest {
 
         assertEquals(PlayerBackAction.DISMISS_CONFIRMATION, actions[PlayerForegroundLayer.CONFIRMATION])
         assertEquals(PlayerBackAction.CLOSE_INFO, actions[PlayerForegroundLayer.INFO])
+        assertEquals(
+            PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST,
+            actions[PlayerForegroundLayer.OPTIONS_QUICK_LIST],
+        )
         assertEquals(PlayerBackAction.RETURN_TO_OPTIONS_ROOT, actions[PlayerForegroundLayer.OPTIONS_DETAIL])
         assertEquals(PlayerBackAction.CLOSE_OPTIONS, actions[PlayerForegroundLayer.OPTIONS_ROOT])
         assertEquals(PlayerBackAction.CLEAR_NUMBER_ENTRY, actions[PlayerForegroundLayer.NUMBER_ENTRY])

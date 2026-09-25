@@ -83,6 +83,7 @@ class RecordingPlaybackPolicyTest {
             RecordingPlaybackKeyAction.REVEAL_CONTROLS,
             RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE,
             RecordingPlaybackKeyAction.OPEN_INFO,
+            RecordingPlaybackKeyAction.OPEN_OPTIONS,
         ).forEach { action ->
             assertTrue(action.name, recordingKeyActionStartsOpeningCycle(action))
         }
@@ -98,4 +99,24 @@ class RecordingPlaybackPolicyTest {
         }
     }
 
+    @Test
+    fun optionKeysOpenOptionsWithControlsHiddenOrVisible() {
+        for (keyCode in listOf(
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+            KeyEvent.KEYCODE_CAPTIONS,
+        )) {
+            for (controlsVisible in listOf(false, true)) {
+                assertEquals(
+                    "$keyCode visible=$controlsVisible",
+                    RecordingPlaybackKeyAction.OPEN_OPTIONS,
+                    recordingPlaybackKeyAction(controlsVisible, keyCode),
+                )
+            }
+            assertEquals(
+                RecordingPlaybackKeyAction.OPEN_OPTIONS,
+                recordingPlaybackKeyAction(true, keyCode, seekbarFocused = true),
+            )
+        }
+    }
 }

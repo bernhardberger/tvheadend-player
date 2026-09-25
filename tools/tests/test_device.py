@@ -448,6 +448,20 @@ class DevicePolicyTest(unittest.TestCase):
             self.assertEqual(key_events[str(digit)], f"KEYCODE_{digit}")
         self.assertEqual(DEVICE["build_parser"]().parse_args(["keys", "1", "0"]).names, ["1", "0"])
 
+    def test_player_option_and_info_keys_are_available(self) -> None:
+        parser = DEVICE["build_parser"]()
+        for name, code in (
+            ("menu", "KEYCODE_MENU"),
+            ("audio-track", "KEYCODE_MEDIA_AUDIO_TRACK"),
+            ("captions", "KEYCODE_CAPTIONS"),
+            ("info", "KEYCODE_INFO"),
+        ):
+            self.assertEqual(key_events[name], code)
+            self.assertEqual(parser.parse_args(["key", name]).name, name)
+        args = parser.parse_args(["key", "audio-track", "--screenshot", "audio"])
+        self.assertEqual((args.name, args.screenshot), ("audio-track", "audio"))
+        self.assertEqual(parser.parse_args(["keys", "menu", "info"]).names, ["menu", "info"])
+
     def test_parser_accepts_ordered_keys_repeat_delay_and_long_press(self) -> None:
         parser = DEVICE["build_parser"]()
 

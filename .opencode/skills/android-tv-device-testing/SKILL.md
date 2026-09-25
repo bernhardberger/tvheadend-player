@@ -67,8 +67,19 @@ remain useful for separately authorized navigation:
 ./tools/device key play-pause
 ./tools/device key play
 ./tools/device key pause
+./tools/device key menu
+./tools/device key audio-track
+./tools/device key captions
+./tools/device key info
 ./tools/device keys 1 0
 ```
+
+In the player, `key audio-track --screenshot audio` opens the short Audio list
+and `key captions` the short Subtitles list: moving focus switches what plays
+after about 300 ms, the same key moves down one row, Center keeps the row, Back
+undoes the list, and it closes on its own 5 s after the last key keeping what
+plays. `key menu` opens the full playback options (focus applies nothing there)
+and `key info` opens Info. Prefer these to the Up/Right controls path.
 
 Before navigating Player, read `player-navigation.md` in this skill: what each key
 does, the Back order, and the buttons and screens to avoid.

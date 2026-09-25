@@ -9,6 +9,8 @@ enum class PlayerSeekPreviewPhase {
 enum class PlayerForegroundLayer {
     CONFIRMATION,
     INFO,
+    /** The Audio or Subtitles short list opened by its remote key. */
+    OPTIONS_QUICK_LIST,
     OPTIONS_DETAIL,
     OPTIONS_ROOT,
     NUMBER_ENTRY,
@@ -27,6 +29,8 @@ enum class PlayerBackAction {
     CLOSE_INFO,
     RETURN_TO_OPTIONS_ROOT,
     CLOSE_OPTIONS,
+    /** Put back what was selected when the quick list opened, then close it. */
+    RESTORE_AND_CLOSE_QUICK_LIST,
     CLEAR_NUMBER_ENTRY,
     CLOSE_CHANNEL_DRAWER,
     CLOSE_PLAYER,
@@ -47,11 +51,15 @@ data class PlayerForegroundContext(
     val seekPreviewPhase: PlayerSeekPreviewPhase,
     val controlsVisible: Boolean,
     val statsEnabled: Boolean,
+    /** [optionsPage] is shown as the short list of its remote key. */
+    val optionsQuickList: Boolean = false,
 )
 
 fun playerForegroundLayer(context: PlayerForegroundContext): PlayerForegroundLayer = when {
     context.confirmationVisible -> PlayerForegroundLayer.CONFIRMATION
     context.infoVisible -> PlayerForegroundLayer.INFO
+    context.optionsPage != null && context.optionsQuickList ->
+        PlayerForegroundLayer.OPTIONS_QUICK_LIST
     context.optionsPage != null && context.optionsPage != PlaybackOptionsPage.ROOT ->
         PlayerForegroundLayer.OPTIONS_DETAIL
     context.optionsPage == PlaybackOptionsPage.ROOT -> PlayerForegroundLayer.OPTIONS_ROOT
@@ -77,6 +85,7 @@ fun playerRootFocusRequired(foregroundLayer: PlayerForegroundLayer): Boolean =
         PlayerForegroundLayer.NONE -> true
         PlayerForegroundLayer.CONFIRMATION,
         PlayerForegroundLayer.INFO,
+        PlayerForegroundLayer.OPTIONS_QUICK_LIST,
         PlayerForegroundLayer.OPTIONS_DETAIL,
         PlayerForegroundLayer.OPTIONS_ROOT,
         PlayerForegroundLayer.CHANNEL_DRAWER,
@@ -92,6 +101,7 @@ fun playerBackAction(
 ): PlayerBackAction = when (foregroundLayer) {
     PlayerForegroundLayer.CONFIRMATION -> PlayerBackAction.DISMISS_CONFIRMATION
     PlayerForegroundLayer.INFO -> PlayerBackAction.CLOSE_INFO
+    PlayerForegroundLayer.OPTIONS_QUICK_LIST -> PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST
     PlayerForegroundLayer.OPTIONS_DETAIL -> PlayerBackAction.RETURN_TO_OPTIONS_ROOT
     PlayerForegroundLayer.OPTIONS_ROOT -> PlayerBackAction.CLOSE_OPTIONS
     PlayerForegroundLayer.NUMBER_ENTRY -> PlayerBackAction.CLEAR_NUMBER_ENTRY

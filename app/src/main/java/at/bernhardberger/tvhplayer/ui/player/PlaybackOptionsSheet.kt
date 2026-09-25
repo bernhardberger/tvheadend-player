@@ -22,8 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -82,6 +84,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
 internal data class PlaybackOptionTrack(
@@ -108,7 +111,30 @@ internal fun PlaybackOptionsSheet(
     onStatsVisibleChange: (Boolean) -> Unit,
     audioAutomatic: Boolean,
     onAutomaticAudio: () -> Unit,
+    quickList: PlaybackQuickListSignals? = null,
+    onQuickListClose: () -> Unit = {},
+    recording: Boolean = false,
+    quickListTargetEpoch: Long = 0L,
+    quickListAvailable: Boolean = true,
+    isQuickListTargetCurrent: (Long) -> Boolean = { true },
+    onQuickAudioSelection: ((Long, androidx.media3.common.TrackSelectionOverride?) -> Unit)? = null,
 ) {
+    // What the quick list of this page restores on Back: the selection it opened with.
+    val quickListStart = remember(page, quickList != null) { player.trackSelectionParameters }
+    val openingEpoch = remember(page, quickList != null) { quickListTargetEpoch }
+    // Back undoes only what this list changed: restoring an untouched Automatic list would
+    // forget the channel's saved choice.
+    var quickAudioChanged by remember(page, quickList != null) { mutableStateOf(false) }
+    val targetAvailable by rememberUpdatedState(quickListAvailable && openingEpoch == quickListTargetEpoch)
+    val targetCurrent by rememberUpdatedState(isQuickListTargetCurrent)
+    fun canApply() = quickList == null ||
+        (targetAvailable && targetCurrent(openingEpoch))
+    // Do not re-key the opening snapshot to a successor. Retire it without applying
+    // pending focus or restoring the predecessor's selection, even during disposal.
+    if (quickList != null && (openingEpoch != quickListTargetEpoch || !canApply())) {
+        LaunchedEffect(quickList) { onQuickListClose() }
+        return
+    }
     val unknownLanguage = stringResource(R.string.track_unknown_language)
     val multipleLanguages = stringResource(R.string.track_multiple_languages)
     val mono = stringResource(R.string.track_mono)
@@ -180,13 +206,27 @@ internal fun PlaybackOptionsSheet(
         aspectRatio = aspectRatio,
         statsVisible = statsVisible,
         audioAutomatic = audioAutomatic,
-        onAutomaticAudio = onAutomaticAudio,
+        onAutomaticAudio = {
+            if (canApply()) {
+                if (quickList != null && onQuickAudioSelection != null) {
+                    quickAudioChanged = true
+                    onQuickAudioSelection(openingEpoch, null)
+                } else onAutomaticAudio()
+            }
+        },
         onPageChange = onPageChange,
         onAudioTrackSelected = { key ->
-            audioChoices.firstOrNull { it.stableKey == key }?.let { selectAudioTrack(player, it) }
+            if (canApply()) audioChoices.firstOrNull { it.stableKey == key }?.let {
+                if (quickList != null && onQuickAudioSelection != null) {
+                    quickAudioChanged = true
+                    onQuickAudioSelection(openingEpoch, androidx.media3.common.TrackSelectionOverride(
+                        it.group.mediaTrackGroup, listOf(it.trackIndexInGroup),
+                    ))
+                } else selectAudioTrack(player, it)
+            }
         },
         onSubtitleTrackSelected = { key ->
-            selectTextTrack(
+            if (canApply()) selectTextTrack(
                 player = player,
                 choice = key?.let { selectedKey ->
                     subtitleChoices.firstOrNull { it.stableKey == selectedKey }
@@ -195,6 +235,18 @@ internal fun PlaybackOptionsSheet(
         },
         onAspectRatioChange = onAspectRatioChange,
         onStatsVisibleChange = onStatsVisibleChange,
+        quickList = quickList,
+        onQuickListClose = onQuickListClose,
+        onQuickListRestore = {
+            if (canApply()) {
+                if (page == PlaybackOptionsPage.AUDIO && onQuickAudioSelection != null) {
+                    // Enqueue even if the preview has not reached the player yet.
+                    if (quickAudioChanged) onQuickAudioSelection(openingEpoch,
+                        quickListStart.overrides.values.firstOrNull { it.type == C.TRACK_TYPE_AUDIO })
+                } else restoreQuickListStart(player, page, quickListStart, onAutomaticAudio)
+            }
+        },
+        recording = recording,
     )
 }
 
@@ -229,6 +281,10 @@ internal fun PlaybackOptionsSheetContent(
     onStatsVisibleChange: (Boolean) -> Unit,
     audioAutomatic: Boolean = false,
     onAutomaticAudio: () -> Unit = {},
+    quickList: PlaybackQuickListSignals? = null,
+    onQuickListClose: () -> Unit = {},
+    onQuickListRestore: () -> Unit = {},
+    recording: Boolean = false,
 ) {
     var lastRootPage by remember { mutableStateOf(PlaybackOptionsPage.AUDIO) }
     val availableRootPages = playbackOptionsCategories()
@@ -262,10 +318,17 @@ internal fun PlaybackOptionsSheetContent(
         }
     )
     val statsValue = stringResource(if (statsVisible) R.string.stats_on else R.string.stats_off)
+    val playingAudio = audioTracks.firstOrNull(PlaybackOptionTrack::selected)?.label
+    val automaticAudioSupport = if (audioAutomatic && playingAudio != null) {
+        stringResource(R.string.audio_automatic_playing, playingAudio)
+    } else {
+        stringResource(R.string.audio_automatic_help)
+    }
     val sheetTitle = stringResource(
         when (page) {
             PlaybackOptionsPage.ROOT -> R.string.playback_options
-            PlaybackOptionsPage.AUDIO -> R.string.audio_track
+            PlaybackOptionsPage.AUDIO ->
+                if (quickList != null) R.string.audio_quick_list else R.string.audio_track
             PlaybackOptionsPage.SUBTITLES -> R.string.subtitles
             PlaybackOptionsPage.DISPLAY -> R.string.display_mode
             PlaybackOptionsPage.STATS -> R.string.stats_for_nerds
@@ -308,10 +371,10 @@ internal fun PlaybackOptionsSheetContent(
                     onPageChange = ::openPage,
                 )
                 PlaybackOptionsPage.AUDIO -> TrackOptionsPage(
-                    title = stringResource(R.string.audio_track),
+                    title = sheetTitle,
                     currentValue = audioValue,
                     tracks = listOf(PlaybackOptionTrack("automatic", stringResource(R.string.audio_automatic),
-                        stringResource(R.string.audio_automatic_help), audioAutomatic)) +
+                        automaticAudioSupport, audioAutomatic)) +
                         audioTracks.map { it.copy(selected = !audioAutomatic && it.selected) },
                     contentState = audioState,
                     unavailableLabel = noAudioLabel,
@@ -319,6 +382,9 @@ internal fun PlaybackOptionsSheetContent(
                     subtitles = false,
                     onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
                     onSelect = { if (it == "automatic") onAutomaticAudio() else onAudioTrackSelected(it) },
+                    quickList = quickList,
+                    onQuickListClose = onQuickListClose,
+                    onQuickListRestore = onQuickListRestore,
                 )
                 PlaybackOptionsPage.SUBTITLES -> TrackOptionsPage(
                     title = stringResource(R.string.subtitles),
@@ -331,6 +397,12 @@ internal fun PlaybackOptionsSheetContent(
                     onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
                     onSelectOff = { onSubtitleTrackSelected(null) },
                     onSelect = onSubtitleTrackSelected,
+                    quickList = quickList,
+                    onQuickListClose = onQuickListClose,
+                    onQuickListRestore = onQuickListRestore,
+                    emptyOffLabel = stringResource(
+                        if (recording) R.string.no_subtitles_recording else R.string.no_subtitles_channel
+                    ),
                 )
                 PlaybackOptionsPage.DISPLAY -> DisplayOptionsPage(
                     selected = aspectRatio,
@@ -488,8 +560,15 @@ private fun ColumnScope.TrackOptionsPage(
     onBack: () -> Unit,
     onSelect: (String) -> Unit,
     onSelectOff: (() -> Unit)? = null,
+    quickList: PlaybackQuickListSignals? = null,
+    onQuickListClose: () -> Unit = {},
+    onQuickListRestore: () -> Unit = {},
+    emptyOffLabel: String? = null,
 ) {
+    val quick = quickList != null
     val headerBackFocus = remember { FocusRequester() }
+    // The quick list has no way up to the root: no back row above the first row.
+    val headerFocus = headerBackFocus.takeIf { !quick }
     val offFocus = remember { FocusRequester() }
     val requesterStore = remember { mutableMapOf<String, FocusRequester>() }
     val trackRequesters = remember(tracks) {
@@ -513,8 +592,88 @@ private fun ColumnScope.TrackOptionsPage(
         is PlaybackTrackFocusTarget.Track -> trackRequesters[focusTarget.key]
     }
     val listState = rememberLazyListState()
+    val offered = subtitles && onSelectOff != null
+    val rowKeys = buildList {
+        if (offered) add(QUICK_LIST_OFF_ROW)
+        tracks.forEach { add(it.key) }
+    }
+    val checkedRow = selectedKey
+        ?: QUICK_LIST_OFF_ROW.takeIf { offered && contentState != PlaybackTrackContentState.LOADING }
+    val session = remember(quick) { QuickListSession() }
+    session.checkedRow = checkedRow
+    session.applyRow = { row -> if (row == QUICK_LIST_OFF_ROW) onSelectOff?.invoke() else onSelect(row) }
+    var focusedRow by remember(quick) { mutableStateOf<String?>(null) }
+    val closeQuickList by rememberUpdatedState(onQuickListClose)
 
-    LaunchedEffect(focusTarget, contentState) {
+    fun onRowFocused(row: String) {
+        if (session.baselineRow == null) session.baselineRow = row
+        session.focusedRow = row
+        focusedRow = row
+    }
+
+    fun onRowClick(row: String) {
+        if (!quick) {
+            if (row == QUICK_LIST_OFF_ROW) onSelectOff?.invoke() else onSelect(row)
+            return
+        }
+        // OK keeps the focused row, applying it at once if the settle delay has not.
+        session.applyIfPending(row)
+        closeQuickList()
+    }
+
+    if (quickList != null) {
+        val restore by rememberUpdatedState(onQuickListRestore)
+        DisposableEffect(quickList) {
+            val handler = {
+                session.cancelled = true
+                restore()
+            }
+            quickList.bindRestore(handler)
+            onDispose {
+                quickList.unbindRestore(handler)
+                // Closing applies the row focus rests on unless Back undid the list.
+                if (!session.cancelled) session.focusedRow?.let(session::applyIfPending)
+            }
+        }
+        // Focus switches the track once it has rested on a row; passing rows do not.
+        LaunchedEffect(focusedRow) {
+            val row = focusedRow ?: return@LaunchedEffect
+            if (session.isApplied(row)) return@LaunchedEffect
+            delay(PLAYBACK_QUICK_LIST_SETTLE_MS)
+            if (!session.cancelled) session.applyIfPending(row)
+        }
+        // Every key press restarts the auto-close; closing keeps what is playing.
+        LaunchedEffect(quickList.keyPresses) {
+            delay(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS)
+            closeQuickList()
+        }
+        // The key of the open list moves focus down one row, wrapping to the top.
+        var handledMoves by remember { mutableIntStateOf(quickList.moveDownRequests) }
+        LaunchedEffect(quickList.moveDownRequests) {
+            val steps = quickList.moveDownRequests - handledMoves
+            handledMoves = quickList.moveDownRequests
+            if (steps <= 0 || rowKeys.isEmpty()) return@LaunchedEffect
+            val current = rowKeys.indexOf(focusedRow)
+                .takeIf { it >= 0 } ?: rowKeys.indexOf(checkedRow).coerceAtLeast(0)
+            val next = (current + steps).mod(rowKeys.size)
+            val requester = if (rowKeys[next] == QUICK_LIST_OFF_ROW) {
+                offFocus
+            } else {
+                trackRequesters[rowKeys[next]]
+            } ?: return@LaunchedEffect
+            if (listState.layoutInfo.visibleItemsInfo.none { it.index == next }) {
+                listState.scrollToItem(next)
+                snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.index == next } }
+                    .first { it }
+            }
+            runCatching { requester.requestFocus() }
+        }
+    }
+
+    LaunchedEffect(quick, focusTarget, contentState) {
+        // A quick list moves focus only on the first landing: a switched track must
+        // not pull focus back from a row the user has moved on to.
+        if (quick && focusedRow != null) return@LaunchedEffect
         when (focusTarget) {
             PlaybackTrackFocusTarget.HeaderBack -> runCatching {
                 headerBackFocus.requestFocus()
@@ -538,8 +697,8 @@ private fun ColumnScope.TrackOptionsPage(
     OptionsHeader(
         title = title,
         currentValue = currentValue,
-        onBack = onBack,
-        backFocusRequester = headerBackFocus,
+        onBack = onBack.takeIf { !quick },
+        backFocusRequester = headerFocus,
         downFocusRequester = initialContentFocus,
     )
     LazyColumn(
@@ -559,11 +718,17 @@ private fun ColumnScope.TrackOptionsPage(
             item(key = "subtitles-off") {
                 PlaybackOptionRow(
                     label = stringResource(R.string.subtitles_off),
+                    // Only Off is left without subtitles; the quick list says why.
+                    supportingLabel = emptyOffLabel.takeIf {
+                        quick && contentState == PlaybackTrackContentState.EMPTY
+                    },
+                    supportingTestTag = "playback-options-subtitles-off-support",
                     selected = contentState != PlaybackTrackContentState.LOADING &&
                         tracks.none(PlaybackOptionTrack::selected),
-                    onClick = onSelectOff,
+                    onClick = { onRowClick(QUICK_LIST_OFF_ROW) },
                     modifier = Modifier
-                        .containedFocus(offFocus, focusableRequesters, index = 0, headerBackFocus, lazy = true)
+                        .onFocusChanged { if (it.isFocused) onRowFocused(QUICK_LIST_OFF_ROW) }
+                        .containedFocus(offFocus, focusableRequesters, index = 0, headerFocus, lazy = true)
                         .testTag("playback-options-subtitles-off"),
                 )
             }
@@ -579,19 +744,23 @@ private fun ColumnScope.TrackOptionsPage(
                 supportingLabel = track.distinguishingSupportingLabel,
                 supportingTestTag = "playback-options-track-support-${track.key}",
                 selected = track.selected,
-                onClick = { onSelect(track.key) },
+                onClick = { onRowClick(track.key) },
                 modifier = Modifier
+                    .onFocusChanged { if (it.isFocused) onRowFocused(track.key) }
                     .containedFocus(
                         requester = requireNotNull(trackRequesters[track.key]),
                         orderedFocus = focusableRequesters,
                         index = focusIndex,
-                        headerFocus = headerBackFocus,
+                        headerFocus = headerFocus,
                         lazy = true,
                     )
                     .testTag("playback-options-track-${track.key}"),
             )
         }
-        if (contentState != PlaybackTrackContentState.AVAILABLE) {
+        if (
+            contentState != PlaybackTrackContentState.AVAILABLE &&
+            !(quick && offered && contentState == PlaybackTrackContentState.EMPTY)
+        ) {
             item(key = "track-status") {
                 Text(
                     text = if (contentState == PlaybackTrackContentState.LOADING) {
@@ -614,6 +783,30 @@ private fun ColumnScope.TrackOptionsPage(
                 )
             }
         }
+    }
+}
+
+private const val QUICK_LIST_OFF_ROW = "subtitles-off"
+
+/**
+ * Plain bookkeeping of one open quick list, read from key callbacks and disposal
+ * where composition state could be stale.
+ */
+private class QuickListSession {
+    var checkedRow: String? = null
+    var baselineRow: String? = null
+    var appliedRow: String? = null
+    var focusedRow: String? = null
+    var cancelled = false
+    var applyRow: (String) -> Unit = {}
+
+    /** The row that is playing: the last one applied, else the checked or first-focused row. */
+    fun isApplied(row: String): Boolean = row == (appliedRow ?: checkedRow ?: baselineRow)
+
+    fun applyIfPending(row: String) {
+        if (isApplied(row)) return
+        appliedRow = row
+        applyRow(row)
     }
 }
 

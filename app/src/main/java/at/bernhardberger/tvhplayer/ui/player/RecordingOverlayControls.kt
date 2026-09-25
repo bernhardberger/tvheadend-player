@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -27,6 +28,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -86,7 +88,11 @@ internal fun RecordingOverlayControls(
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     markerRevision: Long = 0L,
     onSeekMarker: (Long) -> Unit = {},
+    restoreQuickListControl: String? = null,
+    onQuickListFocusRestored: () -> Unit = {},
+    onControlFocused: (String) -> Unit = {},
 ) {
+    val focusManager = LocalFocusManager.current
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
@@ -110,9 +116,13 @@ internal fun RecordingOverlayControls(
             markerNavigation.dismiss()
         }
     }
-    LaunchedEffect(controlsVisible, optionsOpen, restoreOptionsFocus, restoreInfoFocus, seekable) {
+    LaunchedEffect(controlsVisible, optionsOpen, restoreOptionsFocus, restoreInfoFocus, restoreQuickListControl, seekable) {
         if (controlsVisible && !optionsOpen) {
             val target = when {
+                restoreQuickListControl == "recording-seekbar" -> if (seekable) timelineFocus else pauseFocus
+                restoreQuickListControl == "player-info" -> infoFocus
+                restoreQuickListControl == "player-settings" -> settingsFocus
+                restoreQuickListControl != null -> pauseFocus
                 restoreInfoFocus -> infoFocus
                 restoreOptionsFocus -> settingsFocus
                 !focusInitialized -> pauseFocus
@@ -122,7 +132,10 @@ internal fun RecordingOverlayControls(
             previousSeekable = seekable
             if (target != null) androidx.compose.runtime.withFrameNanos { }
             if (target?.requestFocus() == true) {
+                // Stop is the next action after Pause in the shared action row.
+                if (restoreQuickListControl == "player-stop") focusManager.moveFocus(FocusDirection.Next)
                 focusInitialized = true
+                if (restoreQuickListControl != null) onQuickListFocusRestored()
                 if (restoreOptionsFocus) onOptionsFocusRestored()
                 if (restoreInfoFocus) onInfoFocusRestored()
             }
@@ -174,7 +187,10 @@ internal fun RecordingOverlayControls(
                         .focusRequester(timelineFocus)
                         .onFocusChanged {
                             timelineFocused = it.isFocused
-                            if (it.isFocused) lastFocusWasTimeline = true
+                            if (it.isFocused) {
+                                lastFocusWasTimeline = true
+                                onControlFocused("recording-seekbar")
+                            }
                         }
                         .focusProperties { down = pauseFocus; up = FocusRequester.Cancel }
                         .onPreviewKeyEvent { event ->
@@ -219,6 +235,7 @@ internal fun RecordingOverlayControls(
             onInfo = onOpenInfo, onSettings = onOpenOptions, onStop = onStopPlayback,
             onInteraction = { lastFocusWasTimeline = false; onUserInteraction() },
             onTogglePause = onTogglePlayPause, paused = paused, pauseFocus = pauseFocus,
+            onActionFocused = onControlFocused,
             modifier = Modifier
                 .playerChromeEmphasis(chromeAlpha, chromeHidden, focusOverflow = 8.dp)
                 .testTag("recording-actions")

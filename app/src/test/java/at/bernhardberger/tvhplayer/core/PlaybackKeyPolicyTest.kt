@@ -88,6 +88,7 @@ class PlaybackKeyPolicyTest {
             PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
             PlayerKeyAction.OPEN_CHANNELS,
             PlayerKeyAction.OPEN_INFO,
+            PlayerKeyAction.OPEN_OPTIONS,
         ).forEach { action ->
             assertTrue(action.name, playerKeyActionStartsOpeningCycle(action))
         }
@@ -268,6 +269,96 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
+    fun optionKeysOpenOptionsFromEveryNonModalLiveLayer() {
+        val hidden = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = true,
+        )
+        val contexts = listOf(
+            hidden,
+            hidden.copy(controlsVisible = true),
+            hidden.copy(timeshiftAvailable = false),
+            hidden.copy(controlsVisible = true, seekbarFocused = true),
+            // Info, Stats, the drawer and another options page are replaced, not kept.
+            hidden.copy(infoOpen = true),
+            hidden.copy(statsOpen = true),
+            hidden.copy(drawerOpen = true),
+            hidden.copy(controlsVisible = true, optionsOpen = true),
+        )
+        for (keyCode in OPTION_KEYS) {
+            for (context in contexts) {
+                assertEquals(
+                    "$keyCode in $context",
+                    PlayerKeyAction.OPEN_OPTIONS,
+                    playerKeyAction(context, keyCode),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun optionKeysDoNothingBehindAModalConfirmation() {
+        val confirmation = PlayerKeyContext(
+            surface = PlayerSurface.LIVE,
+            controlsVisible = false,
+            seekbarFocused = false,
+            timeshiftAvailable = true,
+            infoOpen = true,
+            confirmationOpen = true,
+        )
+        for (keyCode in OPTION_KEYS) {
+            assertEquals(PlayerKeyAction.PASS_THROUGH, playerKeyAction(confirmation, keyCode))
+        }
+    }
+
+    @Test
+    fun menuOpensTheFullRootAndListKeysTheirShortListWithoutARootFallback() {
+        for (openList in listOf(null, PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES)) {
+            assertEquals(
+                PlaybackOptionsKeyOutcome.OpenMenu,
+                playbackOptionsKeyOutcome(KeyEvent.KEYCODE_MENU, quickListPage = openList),
+            )
+        }
+        // No list open (or the full menu open): the key opens its own short list,
+        // Subtitles included whether or not the channel has subtitles.
+        assertEquals(
+            PlaybackOptionsKeyOutcome.OpenQuickList(PlaybackOptionsPage.AUDIO),
+            playbackOptionsKeyOutcome(KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK, quickListPage = null),
+        )
+        assertEquals(
+            PlaybackOptionsKeyOutcome.OpenQuickList(PlaybackOptionsPage.SUBTITLES),
+            playbackOptionsKeyOutcome(KeyEvent.KEYCODE_CAPTIONS, quickListPage = null),
+        )
+        // The key of the open list moves down; the other key switches lists.
+        assertEquals(
+            PlaybackOptionsKeyOutcome.MoveDown,
+            playbackOptionsKeyOutcome(
+                KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+                quickListPage = PlaybackOptionsPage.AUDIO,
+            ),
+        )
+        assertEquals(
+            PlaybackOptionsKeyOutcome.MoveDown,
+            playbackOptionsKeyOutcome(KeyEvent.KEYCODE_CAPTIONS, quickListPage = PlaybackOptionsPage.SUBTITLES),
+        )
+        assertEquals(
+            PlaybackOptionsKeyOutcome.OpenQuickList(PlaybackOptionsPage.SUBTITLES),
+            playbackOptionsKeyOutcome(KeyEvent.KEYCODE_CAPTIONS, quickListPage = PlaybackOptionsPage.AUDIO),
+        )
+        assertEquals(
+            PlaybackOptionsKeyOutcome.OpenQuickList(PlaybackOptionsPage.AUDIO),
+            playbackOptionsKeyOutcome(
+                KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+                quickListPage = PlaybackOptionsPage.SUBTITLES,
+            ),
+        )
+        assertEquals(null, playbackOptionsKeyOutcome(KeyEvent.KEYCODE_INFO, quickListPage = null))
+        assertEquals(null, playbackOptionsKeyRequest(KeyEvent.KEYCODE_DPAD_CENTER))
+    }
+
+    @Test
     fun ordinaryLiveBackClosesOnlyAfterChromeIsDismissed() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
@@ -389,6 +480,14 @@ class PlaybackKeyPolicyTest {
         assertEquals(
             PlaybackOverlayFocusTarget.CONTROLS_CLUSTER,
             initialPlaybackOverlayFocus(timeshiftAvailable = false),
+        )
+    }
+
+    private companion object {
+        val OPTION_KEYS = listOf(
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+            KeyEvent.KEYCODE_CAPTIONS,
         )
     }
 }
