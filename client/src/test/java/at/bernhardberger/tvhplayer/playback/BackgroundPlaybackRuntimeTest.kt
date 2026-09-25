@@ -225,17 +225,28 @@ class BackgroundPlaybackRuntimeTest {
         // The fresh subscription has no timeshift grant: pause must fail closed, not
         // treat a locally paused player as evidence that the server accepted it.
         connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+        // The replacement is paused as soon as it is installed. Open and start its subscription
+        // first, so the pause doesn't race the subscription manager's own thread.
+        val previousMediaItem = player.currentMediaItem
+        afterPause = {
+            if (player.currentMediaItem !== previousMediaItem && runtime.activeTarget.value != null) {
+                afterPause = {}
+                runBlocking {
+                    await { connection.subscribeCount == 2 }
+                    connection.awaitCollectionRegistered()
+                    startSubscription()
+                    connection.emit(SubscriptionEvent.Speed(100))
+                }
+            }
+        }
         runtime.onAppForegrounded()
-        await { connection.subscribeCount == 2 }
-        connection.awaitCollectionRegistered()
-        startSubscription()
-        connection.emit(SubscriptionEvent.Speed(100))
         await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
         settle()
         assertNull(runtime.activeTarget.value)
         assertFalse(player.playWhenReady)
         assertFalse(playTransitions.contains(true))
         assertEquals(1, focus.requestCount)
+        assertEquals(2, connection.subscribeCount)
         runtime.onAppForegrounded()
         settle()
         assertEquals(2, connection.subscribeCount)
