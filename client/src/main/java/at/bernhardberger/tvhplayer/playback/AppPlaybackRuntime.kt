@@ -30,7 +30,6 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionPriority
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
-import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Duration
 import java.util.concurrent.atomic.AtomicLong
@@ -153,16 +152,24 @@ class AppPlaybackRuntime(
         _livePauseNotice.compareAndSet(notice, null)
     }
     private val audioSelection = SessionAudioSelection()
-    private var audioOutputConfigured = false
-    private var audioOutputChanging = false
-    private val _audioPassthroughChangeFailed = MutableStateFlow(false)
-    val audioPassthroughChangeFailed = _audioPassthroughChangeFailed.asStateFlow()
-    private var audioWriteJob: Job? = null
-    private val _audioAutomatic = MutableStateFlow(player.trackSelectionParameters.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO })
-    val audioAutomatic = _audioAutomatic.asStateFlow()
     private val presentationEpoch = PlaybackPresentationEpoch()
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     private val _activeTarget = MutableStateFlow<AppPlaybackTarget?>(null)
+    private val audioTracks = PlaybackAudioTracks(
+        player = player,
+        settings = settings,
+        profileOwner = profileOwner,
+        scope = scope,
+        audioOutput = audioOutput,
+        targetCommands = targetCommands,
+        audioSelection = audioSelection,
+        _activeTarget = _activeTarget,
+        targetInstallationInProgress = { targetInstallationInProgress },
+        interruptionMuted = { interruptionMuted },
+        preserveInterruptionMute = ::preserveInterruptionMute,
+    )
+    val audioPassthroughChangeFailed = audioTracks.audioPassthroughChangeFailed
+    val audioAutomatic = audioTracks.audioAutomatic
     private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
     private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
     private val recordingMarkers = RecordingMarkers(
@@ -220,8 +227,8 @@ class AppPlaybackRuntime(
         settings.playerSettings.distinctUntilChanged().collect {
             targetCommands.serialize(onClosed = {}) {
                 val latest = settings.playerSettings.first()
-                applyPlayerSettings(latest)
-                applyAudioPassthrough(latest.audioPassthroughEnabled)
+                audioTracks.applyPlayerSettingsLocked(latest)
+                audioTracks.applyAudioPassthroughLocked(latest.audioPassthroughEnabled)
             }
         }
     }
@@ -256,36 +263,15 @@ class AppPlaybackRuntime(
 
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            if (!targetCommands.isOpen()) return
-            audioSelection.useProfile(profileOwner.serverProfile.value, player)
-            audioSelection.onMediaItemTransition(player)
+            audioTracks.onMediaItemTransition()
         }
 
         override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
-            if (!targetCommands.isOpen()) return
-            _audioAutomatic.value = parameters.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO }
-            if (interruptionMuted) {
-                preserveInterruptionMute()
-                return
-            }
-            audioSelection.useProfile(profileOwner.serverProfile.value, player)
-            val profileId = profileOwner.audioProfileId ?: return
-            val selected = audioSelection.rememberExplicitChoice(player) ?: return
-            val previous = audioWriteJob
-            audioWriteJob = scope.launch {
-                previous?.join()
-                try {
-                    settings.audioChoices.write(profileId, selected.first, selected.second)
-                } catch (_: java.io.IOException) {
-                    // A storage failure must not interrupt otherwise valid playback.
-                }
-            }
+            audioTracks.onTrackSelectionParametersChanged(parameters)
         }
 
         override fun onTracksChanged(tracks: Tracks) {
-            if (targetInstallationInProgress || audioOutputChanging || interruptionMuted || !targetCommands.isOpen()) return
-            audioSelection.useProfile(profileOwner.serverProfile.value, player)
-            audioSelection.restore(player)
+            audioTracks.onTracksChanged()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -350,7 +336,7 @@ class AppPlaybackRuntime(
         }
         val playerSettings = settings.playerSettings.first()
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        configureAudioOutputBeforeFirstTarget(playerSettings)
+        audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
         val profileSelection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (profileSelection == null) {
             return completeUnavailableTarget(
@@ -370,20 +356,7 @@ class AppPlaybackRuntime(
             )
         }
         val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession)
-        val audioProfile = profileOwner.serverProfile.value
-        val audioProfileId = profileOwner.audioProfileId
-        audioWriteJob?.join()
-        val storedAudio = try {
-            audioProfileId?.let { settings.audioChoices.read(it, channelId) }
-        } catch (_: java.io.IOException) {
-            null
-        }
-        if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        if (profileOwner.serverProfile.value !== audioProfile || profileOwner.audioProfileId != audioProfileId) {
-            return PlaybackTargetResult.NOT_READY
-        }
-        audioSelection.useProfile(audioProfile, player)
-        audioSelection.load(channelId, storedAudio)
+        audioTracks.loadStoredAudioLocked(channelId)?.let { return it }
         val selection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (selection == null) {
             return completeUnavailableTarget(
@@ -562,7 +535,7 @@ class AppPlaybackRuntime(
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        configureAudioOutputBeforeFirstTarget(playerSettings)
+        audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
         val expectedPresentationEpoch = presentationEpoch.snapshot()
         lastRecordingRequest = recordingId to start
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
@@ -1014,12 +987,7 @@ class AppPlaybackRuntime(
         presentation.setDiagnosticsEnabled(enabled)
     }
     fun setRefreshRateMatchingEnabled(enabled: Boolean) {
-        targetCommands.runIfOpen {
-            player.setVideoChangeFrameRateStrategy(
-                if (enabled) C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
-                else C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF,
-            )
-        }
+        audioTracks.setRefreshRateMatchingEnabled(enabled)
     }
     fun onRecoveryRequired(reason: PlaybackRecoveryReason) {
         val requestedEpoch = activeTargetEpoch
@@ -1136,7 +1104,7 @@ class AppPlaybackRuntime(
             presentation.seekDiagnosticsListener?.let(player::removeAnalyticsListener)
             audioSelection.clear(player)
         }
-        audioWriteJob?.join()
+        audioTracks.joinAudioWrites()
     }
 
     private suspend fun installTargetForPresentation(
@@ -1179,12 +1147,7 @@ class AppPlaybackRuntime(
                 player.playWhenReady = previousPlayWhenReady
                 presentation.publishPlayerState()
             }
-            if (targetCommands.isOpen()) {
-                audioSelection.useProfile(profileOwner.serverProfile.value, player)
-                (_activeTarget.value as? AppPlaybackTarget.Live)?.takeUnless { interruptionMuted }?.let {
-                    audioSelection.activate(it.channelId, player)
-                }
-            }
+            audioTracks.activateAudioAfterInstallLocked()
         }
     }
 
@@ -1600,36 +1563,10 @@ class AppPlaybackRuntime(
         }
     }
 
-    private fun configureAudioOutputBeforeFirstTarget(value: PlayerSettings) {
-        targetCommands.runIfOpen {
-            if (!audioOutputConfigured) {
-                audioOutput.configurePassthrough(value.audioPassthroughEnabled)
-                audioOutputConfigured = true
-            }
-        }
-    }
-
-    private suspend fun applyAudioPassthrough(enabled: Boolean) {
-        if (!targetCommands.isOpen() || !audioOutputConfigured) return
-        if (audioOutput.isPassthroughEnabled == enabled) {
-            _audioPassthroughChangeFailed.value = false
-            return
-        }
-        audioOutputChanging = true
-        try {
-            val applied = audioOutput.setPassthroughEnabled(player, enabled)
-            if (targetCommands.isOpen()) _audioPassthroughChangeFailed.value = !applied
-        } finally {
-            audioOutputChanging = false
-            // onTracksChanged restores the remembered choice using NEW mode capabilities.
-            // currentTracks here can still describe the old mode and must not reapply an override.
-        }
-    }
-
     // A committed UI choice outlives the options sheet, including while another command holds the lock.
     fun useAutomaticAudio() = scope.launch {
         targetCommands.serialize(onClosed = {}) {
-            applyAutomaticAudio()
+            audioTracks.applyAutomaticAudioLocked()
         }
     }
 
@@ -1642,48 +1579,7 @@ class AppPlaybackRuntime(
     fun selectQuickListAudio(epoch: Long, override: androidx.media3.common.TrackSelectionOverride?) = scope.launch {
         targetCommands.serialize(onClosed = {}) {
             if (!isQuickListTargetCurrent(epoch)) return@serialize
-            if (override == null) {
-                applyAutomaticAudio()
-            } else {
-                // Keep the exact group identity for SessionAudioSelection's explicit-choice listener.
-                player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
-                    .addOverride(override)
-                    .build()
-            }
-        }
-    }
-
-    private fun applyAutomaticAudio() {
-        audioSelection.useProfile(profileOwner.serverProfile.value, player)
-        val channel = audioSelection.useAutomatic(player)
-        val profileId = profileOwner.audioProfileId
-        if (channel != null && profileId != null) {
-            // A pending explicit-choice write must finish before its removal is persisted.
-            val previous = audioWriteJob
-            audioWriteJob = scope.launch {
-                previous?.join()
-                try {
-                    settings.audioChoices.remove(profileId, channel)
-                } catch (_: java.io.IOException) {
-                    // Storage failure must not interrupt playback; the session choice is still forgotten.
-                }
-            }
-        }
-    }
-
-    private fun applyPlayerSettings(value: PlayerSettings) {
-        targetCommands.runIfOpen {
-            player.trackSelectionParameters = trackPreferences(
-                player.trackSelectionParameters, value,
-            )
-            player.setVideoChangeFrameRateStrategy(
-                if (value.refreshRateMatchingEnabled) {
-                    C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
-                } else {
-                    C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
-                },
-            )
+            audioTracks.selectQuickListAudioLocked(override)
         }
     }
 
