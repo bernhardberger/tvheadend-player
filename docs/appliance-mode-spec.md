@@ -260,8 +260,14 @@ fun adjacentChannelId(
    navigation or newly started playback may re-arm one warm return. Selecting the
    same channel does so without retuning. Root Back exits to Google TV when no
    warm-return opportunity remains. Explicit root exit stops the session before
-   finishing the activity. Ordinary HOME/background stops live playback and
-   retunes it once on foreground; a playing recording pauses and resumes only
+   finishing the activity. Ordinary HOME/background pauses and keeps live playback
+   with available timeshift at yield priority while the device is interactive,
+   for the selected Off/10/20/30-minute limit (20 minutes by default). Foreground
+   return within the limit restores normal priority and resumes only if previously
+   playing, without retuning. Expiry or tuner loss releases the tuner and retunes
+   once on foreground with a short notice; standby releases immediately without
+   a notice. Off, unavailable timeshift, or unsupported pause/priority uses the
+   immediate-stop/foreground-retune behavior. A playing recording pauses and resumes only
    while the same target remains current. Explicit Stop or a target replacement
     cancels that pending foreground action.
 8. The player Stop control completes serialized playback teardown before it

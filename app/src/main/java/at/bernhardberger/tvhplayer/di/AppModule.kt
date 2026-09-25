@@ -34,6 +34,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
@@ -93,6 +95,19 @@ val appModule = module {
             audioOutput = audioOutput,
             audioFocus = AndroidPlaybackAudioFocus(androidContext(), player.applicationLooper),
         )
+        // Application scope outlives a stopped/destroyed activity while a tuner is kept.
+        val context = androidContext()
+        applicationScope.launch {
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                    if (intent?.action == android.content.Intent.ACTION_SCREEN_OFF) playbackRuntime.onDeviceStandby()
+                }
+            }
+            androidx.core.content.ContextCompat.registerReceiver(context, receiver,
+                android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_OFF),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+            try { awaitCancellation() } finally { context.unregisterReceiver(receiver) }
+        }
         SdkRuntimeOwner.create(
             session = session,
             playbackRuntime = playbackRuntime,

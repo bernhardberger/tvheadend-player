@@ -17,6 +17,25 @@ import org.junit.Test
 
 class PlayerSettingsStoreTest {
     @Test
+    fun keepChannelDefaultsToTwentyAndPersistsEveryChoice() = runTest {
+        val dataStore = InMemoryPreferencesDataStore()
+        val store = PlayerSettingsStore(dataStore)
+        assertEquals(20, store.playerSettings.first().keepChannelMinutes)
+        for (minutes in listOf(0, 10, 20, 30)) {
+            store.setKeepChannelMinutes(minutes)
+            assertEquals(minutes, PlayerSettingsStore(dataStore).playerSettings.first().keepChannelMinutes)
+        }
+    }
+
+    @Test
+    fun invalidKeepChannelValueUsesDefault() = runTest {
+        val store = PlayerSettingsStore(InMemoryPreferencesDataStore(preferencesOf(
+            androidx.datastore.preferences.core.intPreferencesKey("keepChannelMinutes") to -1,
+        )))
+        assertEquals(20, store.playerSettings.first().keepChannelMinutes)
+    }
+
+    @Test
     fun audioPassthroughDefaultsOnAndPersistsBothChoices() = runTest {
         val dataStore = InMemoryPreferencesDataStore()
         val store = PlayerSettingsStore(dataStore)

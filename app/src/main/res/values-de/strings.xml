@@ -419,4 +419,9 @@
     <string name="recording_marker_previous">Vorherige Marke</string>
     <string name="recording_marker_start">Anfang der Aufnahme</string>
     <string name="recording_marker_next">Nächste Marke</string>
+    <string name="keep_channel_setting">Sender nach Verlassen der App beibehalten</string>
+    <string name="keep_channel_off">Aus</string>
+    <string name="keep_channel_minutes">%1$d Min.</string>
+    <string name="background_live_stopped">Live-TV wurde im Hintergrund beendet</string>
+    <string name="background_tuner_lost">Der Tuner wurde anderweitig benötigt; Live-TV wurde neu gestartet</string>
 </resources>

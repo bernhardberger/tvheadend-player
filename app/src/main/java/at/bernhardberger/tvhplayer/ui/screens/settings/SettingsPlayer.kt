@@ -15,6 +15,27 @@ import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import org.koin.androidx.compose.koinViewModel
 
+internal const val KEEP_CHANNEL_LEVEL = "keep-channel"
+
+@Composable
+internal fun settingsKeepChannelLevel(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    return settingsKeepChannelLevel(ui.keepChannelMinutes) { minutes ->
+        vm.onKeepChannelMinutesChanged(minutes)
+        navigation.pop()
+    }
+}
+
+@Composable
+internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): DepthLevel =
+    settingsLevel(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting), listOf(0, 10, 20, 30).map { value ->
+        settingsRow("keep-$value", keepChannelLabel(value), selected = minutes == value, onClick = { onSelect(value) })
+    }, initialItemId = "keep-$minutes")
+
+@Composable
+private fun keepChannelLabel(minutes: Int): String = if (minutes == 0) stringResource(R.string.keep_channel_off)
+    else stringResource(R.string.keep_channel_minutes, minutes)
+
 @Composable
 internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): List<DepthLevel> {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -47,6 +68,8 @@ internal fun settingsPlayerLevel(
                 else stringResource(R.string.audio_passthrough_description), checked = ui.audioPassthroughEnabled,
             onClick = { onAudioPassthroughEnabledChanged(!ui.audioPassthroughEnabled) }))
         addAll(settingsAudioPreferenceRows(ui, onAudioDescriptionChanged))
+        add(settingsRow(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting),
+            keepChannelLabel(ui.keepChannelMinutes), child = KEEP_CHANNEL_LEVEL))
         when (val profiles = ui.profiles) {
             StreamProfilesResult.NotReady -> add(settingsRow("profiles-status",
                 stringResource(if (ui.connected) R.string.loading_wait else R.string.not_connected), section = profileSection))

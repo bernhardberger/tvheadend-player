@@ -66,6 +66,7 @@ class SettingsPlayerTest(private val language: String) {
         val timeshift = context.getString(R.string.timeshift_setting)
         val refreshRate = context.getString(R.string.refresh_rate_matching_setting)
         val passthrough = context.getString(R.string.audio_passthrough_setting)
+        val keepChannel = context.getString(R.string.keep_channel_setting)
         val serverDefault = context.getString(R.string.profile_server_default)
         val profiles = List(24) { index ->
             StreamProfile(
@@ -128,6 +129,8 @@ class SettingsPlayerTest(private val language: String) {
         press(Key.DirectionDown)
         composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionDown)
+        composeRule.onNodeWithText(keepChannel).assertIsFocused().assertIsDisplayed()
+        press(Key.DirectionDown)
         composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsNotSelected()
 
         // Assert every choice, not just a jump/scroll directly to the last profile.
@@ -153,6 +156,8 @@ class SettingsPlayerTest(private val language: String) {
         press(Key.DirectionUp)
         composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionUp)
+        composeRule.onNodeWithText(keepChannel).assertIsFocused().assertIsDisplayed()
+        press(Key.DirectionUp)
         composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionUp)
         composeRule.onNodeWithText(refreshRate).assertIsFocused().assertIsDisplayed()
@@ -160,7 +165,7 @@ class SettingsPlayerTest(private val language: String) {
         composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
 
         // Left must also leave the scrolled bottom through the existing category owner.
-        repeat(profiles.size + 3) { press(Key.DirectionDown) }
+        repeat(profiles.size + 4) { press(Key.DirectionDown) }
         composeRule.onNodeWithText(profiles.last().name)
             .assertIsFocused().assertIsDisplayed().assertIsSelected()
         press(Key.DirectionLeft)

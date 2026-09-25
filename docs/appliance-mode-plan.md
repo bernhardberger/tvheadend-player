@@ -161,8 +161,14 @@ take precedence over completed-work narrative.
   Treat selection of the
   current playback channel as a drawer-close action rather than a tune request.
 - Keep the active service warm while Back exposes the foreground Channel List.
-  When ordinary HOME/background temporarily covers the activity, stop live
-  playback and retune it once on foreground; pause a playing recording and resume
+  When ordinary HOME/background temporarily covers the activity on an interactive
+  device, pause live playback with available timeshift and yield its tuner for
+  the selected Off/10/20/30-minute limit (default 20). Within the limit restore
+  normal priority, then resume only if previously playing, without retuning.
+  Expiry or tuner loss releases and retunes once on foreground with a notice;
+  standby releases immediately without a notice. Off, unavailable timeshift, or
+  unsupported pause/priority releases immediately and retunes on foreground.
+  Pause a playing recording and resume
   it only while the same target remains current. A same-service player request is
   idempotent; explicit player Stop and serialized root exit remain the terminal
   teardown boundaries and cancel any pending foreground resume.

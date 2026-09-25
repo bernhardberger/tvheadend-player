@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.StreamProfile
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
@@ -72,6 +73,7 @@ data class PlayerSettings(
     val timeshiftEnabled: Boolean = true,
     val refreshRateMatchingEnabled: Boolean = true,
     val audioPassthroughEnabled: Boolean = true,
+    val keepChannelMinutes: Int = 20,
 )
 
 class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
@@ -89,6 +91,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val TIMESHIFT_ENABLED = booleanPreferencesKey("timeshiftEnabled")
         val REFRESH_RATE_MATCHING_ENABLED = booleanPreferencesKey("refreshRateMatchingEnabled")
         val AUDIO_PASSTHROUGH_ENABLED = booleanPreferencesKey("audioPassthroughEnabled")
+        val KEEP_CHANNEL_MINUTES = intPreferencesKey("keepChannelMinutes")
     }
 
     val playerSettings: Flow<PlayerSettings> =
@@ -166,6 +169,11 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.AUDIO_PASSTHROUGH_ENABLED] = enabled }
     }
 
+    suspend fun setKeepChannelMinutes(minutes: Int) {
+        require(minutes in listOf(0, 10, 20, 30))
+        dataStore.edit { it[Keys.KEEP_CHANNEL_MINUTES] = minutes }
+    }
+
     internal companion object {
         fun decodePlayerSettings(p: Preferences): PlayerSettings {
             val ar = p[Keys.ASPECT_RATIO]
@@ -182,6 +190,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
                 timeshiftEnabled = p[Keys.TIMESHIFT_ENABLED] ?: true,
                 refreshRateMatchingEnabled = p[Keys.REFRESH_RATE_MATCHING_ENABLED] ?: true,
                 audioPassthroughEnabled = p[Keys.AUDIO_PASSTHROUGH_ENABLED] ?: true,
+                keepChannelMinutes = p[Keys.KEEP_CHANNEL_MINUTES]?.takeIf { it in listOf(0, 10, 20, 30) } ?: 20,
             )
         }
 

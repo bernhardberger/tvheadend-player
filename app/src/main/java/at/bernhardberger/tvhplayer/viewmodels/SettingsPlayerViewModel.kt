@@ -26,6 +26,7 @@ data class SettingsPlayerUiState(
     val refreshRateMatchingEnabled: Boolean = true,
     val audioPassthroughEnabled: Boolean = true,
     val audioPassthroughChangeFailed: Boolean = false,
+    val keepChannelMinutes: Int = 20,
 )
 
 class SettingsPlayerViewModel(
@@ -53,6 +54,7 @@ class SettingsPlayerViewModel(
             refreshRateMatchingEnabled = settings.refreshRateMatchingEnabled,
             audioPassthroughEnabled = settings.audioPassthroughEnabled,
             audioPassthroughChangeFailed = audioPassthroughChangeFailed,
+            keepChannelMinutes = settings.keepChannelMinutes,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsPlayerUiState())
 
@@ -93,5 +95,9 @@ class SettingsPlayerViewModel(
 
     fun onAudioPassthroughEnabledChanged(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setAudioPassthroughEnabled(enabled) }
+    }
+
+    fun onKeepChannelMinutesChanged(minutes: Int) {
+        viewModelScope.launch { settingsStore.setKeepChannelMinutes(minutes) }
     }
 }

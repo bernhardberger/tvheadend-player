@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.os.PowerManager
 import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.activity.addCallback
@@ -20,7 +21,13 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
@@ -100,9 +107,10 @@ private fun Int.isStartupActivationKey(): Boolean = when (this) {
 class MainActivity : AppCompatActivity() {
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
+    private val notices: AppNoticeQueue by inject()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
         onAppForegrounded = { playbackRuntime.onAppForegrounded() },
-        onAppBackgrounded = { playbackRuntime.onAppBackgrounded() },
+        onAppBackgrounded = { playbackRuntime.onAppBackgrounded(getSystemService(PowerManager::class.java).isInteractive) },
         stopPlayback = { playbackRuntime.stop() },
         finishActivity = ::finish,
     )
@@ -135,6 +143,19 @@ class MainActivity : AppCompatActivity() {
         val platformSplashDeadlineUptimeMillis =
             SystemClock.uptimeMillis() + MAX_PLATFORM_SPLASH_HOLD_MILLIS
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                playbackRuntime.backgroundNotice.collect { notice ->
+                    if (notice != null) {
+                        notices.post("background-playback", when (notice) {
+                            BackgroundPlaybackNotice.LIMIT_EXPIRED -> R.string.background_live_stopped
+                            BackgroundPlaybackNotice.TUNER_LOST -> R.string.background_tuner_lost
+                        }, AppNoticeKind.SUCCESS, notices.context())
+                        playbackRuntime.consumeBackgroundNotice(notice)
+                    }
+                }
+            }
+        }
         splashScreen.setKeepOnScreenCondition {
             startupViewModel.state.value is MainStartupState.ResolvingLocal &&
                 SystemClock.uptimeMillis() < platformSplashDeadlineUptimeMillis
