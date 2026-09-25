@@ -197,6 +197,12 @@ class GuideHistoryScreenTest {
                 else compose.onNodeWithText(context.getString(R.string.close)).assertIsFocused()
                     .performKeyInput { pressKey(Key.DirectionCenter) }
                 assertEquals(before, session.calls.size)
+                // Session replacement dismisses the dialog before background guide preparation finishes.
+                // The loading anchor can own focus meanwhile, so wait for the actual header action.
+                compose.waitUntil(10_000) {
+                    compose.onAllNodes(hasText(context.getString(R.string.now)) and isFocusable())
+                        .fetchSemanticsNodes().isNotEmpty()
+                }
                 compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
                 key(Key.DirectionCenter)
                 focused("Channel 1 hour 0")
