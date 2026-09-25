@@ -444,6 +444,9 @@ class DevicePolicyTest(unittest.TestCase):
         self.assertEqual(key_events["left"], "KEYCODE_DPAD_LEFT")
         self.assertEqual(key_events["right"], "KEYCODE_DPAD_RIGHT")
         self.assertEqual(key_events["center"], "KEYCODE_DPAD_CENTER")
+        for digit in range(10):
+            self.assertEqual(key_events[str(digit)], f"KEYCODE_{digit}")
+        self.assertEqual(DEVICE["build_parser"]().parse_args(["keys", "1", "0"]).names, ["1", "0"])
 
     def test_parser_accepts_ordered_keys_repeat_delay_and_long_press(self) -> None:
         parser = DEVICE["build_parser"]()

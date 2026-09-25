@@ -67,6 +67,7 @@ remain useful for separately authorized navigation:
 ./tools/device key play-pause
 ./tools/device key play
 ./tools/device key pause
+./tools/device keys 1 0
 ```
 
 Before navigating Player, read `player-navigation.md` in this skill: what each key

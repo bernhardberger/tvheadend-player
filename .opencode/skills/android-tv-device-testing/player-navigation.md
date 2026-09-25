@@ -28,6 +28,9 @@ subtitles.
   Right seeks forward with timeshift.
 - Channel up/down tune the adjacent channel. Media play/pause pauses and resumes
   timeshift.
+- Digits tune by channel number: `keys 1` for channel 1, `keys 1 0` for 10. Player
+  tunes 250 ms after the last digit once the number has as many digits as the
+  highest channel number, otherwise after 1.5 s.
 - **Back closes the player** (it returns to Channels or wherever playback was
   opened). Check that no overlay is open before pressing Back.
 
@@ -37,6 +40,13 @@ subtitles.
   during a pending seek, the channel shelf, number entry, recovery and errors.
   To hide them, wait instead of pressing Back: a Back that lands just after they
   auto-hide closes the player.
+- Looking at a screenshot takes longer than 5 s, so the controls have usually
+  hidden again before your next command, and a Center then pauses instead. Check a
+  path once, wait 6 s, then send the whole path again from the hidden state with
+  the Center in the same `keys` call, for example `keys up right right right right
+  --screenshot gear`, then after 6 s `keys up right right right right center center
+  --screenshot audio`. After hiding, the controls open again with focus on
+  Pause/Play (on Info without timeshift).
 - Action row, left to right: Pause/Play (only with timeshift), **Stop**, Info,
   Record, Settings (gear). Focus starts on Pause/Play, otherwise on Info.
 - **Never press Center on Stop**: it stops playback and closes the player.
@@ -55,6 +65,8 @@ subtitles.
   mode, Stats for nerds. Center or Right opens a row; in a list, Center selects.
   Back or Left returns to the list of rows; Back or Left there closes the sheet and
   focus returns to the gear.
+- In Audio track, a checked Automatic row means Player chooses the track; the list
+  does not mark which track is playing then.
 - Back closes one layer at a time: confirmation, Info, options page, options
   list, number entry, channel shelf, pending seek, controls, stats. Only the next
   Back closes the player, so press Back once and look before pressing it again.
