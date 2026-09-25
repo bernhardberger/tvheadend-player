@@ -430,6 +430,10 @@
     <string name="keep_channel_setting">Sender nach Verlassen der App beibehalten</string>
     <string name="keep_channel_off">Aus</string>
     <string name="keep_channel_minutes">%1$d Min.</string>
+    <string name="startup_buffer_setting">Startpuffer</string>
+    <string name="startup_buffer_automatic">Automatisch · %1$s</string>
+    <string name="startup_buffer_seconds">%1$s s</string>
+    <string name="startup_buffer_description">Kürzer startet schneller, länger schützt vor Aussetzern.</string>
     <string name="background_live_stopped">Live-TV wurde im Hintergrund beendet</string>
     <string name="background_tuner_lost">Der Tuner wurde anderweitig benötigt; Live-TV wurde neu gestartet</string>
 </resources>

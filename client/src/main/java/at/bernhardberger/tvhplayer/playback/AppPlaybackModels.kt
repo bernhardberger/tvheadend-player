@@ -167,6 +167,8 @@ data class AppPlaybackDiagnostics(
     val video: AppPlaybackFormatDiagnostics? = null,
     val audio: AppPlaybackFormatDiagnostics? = null,
     val live: LiveSubscriptionDiagnostics? = null,
+    /** Start-up buffer the next live start waits for; null outside live playback. */
+    val startupBuffer: StartupBufferInEffect? = null,
 )
 
 data class AppVideoPresentation(

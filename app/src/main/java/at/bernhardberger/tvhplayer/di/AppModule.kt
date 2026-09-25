@@ -18,6 +18,9 @@ import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
+import at.bernhardberger.tvhplayer.playback.StartupBufferController
+import at.bernhardberger.tvhplayer.playback.StartupBufferLoadControl
+import at.bernhardberger.tvhplayer.playback.startupBufferIdentity
 import at.bernhardberger.tvhplayer.profiling.ProfilePlaybackTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
@@ -75,14 +78,21 @@ val appModule = module {
             ioDispatcher = get(qualifier = named("io")),
         )
         val audioOutput = TvheadendAudioOutputProvider(androidContext())
+        val startupBufferLoadControl = StartupBufferLoadControl(createTvheadendLoadControl())
         val player = ExoPlayer.Builder(androidContext())
             .setRenderersFactory(createTvheadendRenderersFactory(androidContext(), audioOutput))
-            .setLoadControl(createTvheadendLoadControl())
+            .setLoadControl(startupBufferLoadControl)
             .setAudioAttributes(AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
                 .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), false)
             .setHandleAudioBecomingNoisy(false)
             .build()
+        val startupBuffer = StartupBufferController(
+            loadControl = startupBufferLoadControl,
+            settings = playerSettings,
+            serverIdentity = profileOwner.startupBufferIdentity(),
+            scope = applicationScope,
+        ).also { it.attach(player) }
         lateinit var playbackRuntime: AppPlaybackRuntime
         val coordinator = createTvheadendPlaybackCoordinator(
             player = player,
@@ -101,6 +111,7 @@ val appModule = module {
                 trace = ProfilePlaybackTrace,
                 seekDiagnostics = BuildConfig.DEBUG,
             ),
+            startupBuffer = startupBuffer,
         )
         // Application scope outlives a stopped/destroyed activity while a tuner is kept.
         val context = androidContext()

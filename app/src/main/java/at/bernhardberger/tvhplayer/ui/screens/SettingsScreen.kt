@@ -27,6 +27,7 @@ internal fun SettingsScreen(
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation) + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(),
         settingsKeepChannelLevel(navigation),
+        settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
         settingsApplianceLevel(),
     )

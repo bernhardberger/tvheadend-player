@@ -231,6 +231,9 @@
     <string name="stats_audio_decoder" translatable="false">Audio decoder</string>
     <string name="stats_audio_channels" translatable="false">%1$d ch</string>
     <string name="stats_sample_rate" translatable="false">%1$s Hz</string>
+    <string name="stats_startup_buffer" translatable="false">Start-up buffer</string>
+    <string name="stats_startup_buffer_automatic" translatable="false">%1$s ms · automatic</string>
+    <string name="stats_startup_buffer_fixed" translatable="false">%1$s ms · fixed</string>
     <string name="stats_underruns" translatable="false">Audio underruns</string>
     <string name="stats_stream_read_rate" translatable="false">Stream read rate</string>
     <string name="stats_file_read_rate" translatable="false">File read rate</string>
@@ -524,6 +527,10 @@
     <string name="keep_channel_setting">Keep channel after leaving the app</string>
     <string name="keep_channel_off">Off</string>
     <string name="keep_channel_minutes">%1$d min</string>
+    <string name="startup_buffer_setting">Start-up buffer</string>
+    <string name="startup_buffer_automatic">Automatic · %1$s</string>
+    <string name="startup_buffer_seconds">%1$s s</string>
+    <string name="startup_buffer_description">Shorter starts faster; longer protects against dropouts.</string>
     <string name="background_live_stopped">Live TV was stopped while the app was in the background</string>
     <string name="background_tuner_lost">The tuner was needed elsewhere; live TV was restarted</string>
 </resources>

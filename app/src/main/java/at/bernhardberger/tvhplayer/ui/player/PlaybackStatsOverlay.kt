@@ -161,6 +161,16 @@ internal fun PlaybackStatsOverlay(
                         },
                     ),
                 )
+                diagnostics.startupBuffer?.let { buffer ->
+                    StatLine(
+                        stringResource(R.string.stats_startup_buffer),
+                        stringResource(
+                            if (buffer.automatic) R.string.stats_startup_buffer_automatic
+                            else R.string.stats_startup_buffer_fixed,
+                            buffer.millis.toString(),
+                        ),
+                    )
+                }
                 val tunerSource = live?.source
                 val frontend = live?.frontend
                 if (tunerSource != null || frontend != null) {

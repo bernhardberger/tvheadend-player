@@ -74,6 +74,28 @@ data class PlayerSettings(
     val refreshRateMatchingEnabled: Boolean = true,
     val audioPassthroughEnabled: Boolean = true,
     val keepChannelMinutes: Int = 20,
+    /** Live start-up buffer in milliseconds; [STARTUP_BUFFER_AUTOMATIC] learns it per server. */
+    val startupBufferMillis: Int = STARTUP_BUFFER_AUTOMATIC,
+)
+
+/** Stored [PlayerSettings.startupBufferMillis] value for the learned, per-server buffer. */
+const val STARTUP_BUFFER_AUTOMATIC = 0
+
+internal const val STARTUP_BUFFER_LEARNED_MIN_MILLIS = 1000
+internal const val STARTUP_BUFFER_LEARNED_MAX_MILLIS = 3000
+
+/** Fixed start-up buffer choices, in milliseconds, offered next to Automatic. */
+val STARTUP_BUFFER_FIXED_MILLIS: List<Int> = listOf(500, 1000, 1500, 2000, 3000)
+
+/**
+ * Learned Automatic start-up buffer for one server identity. [profile] is the
+ * server-scoped identity the level was learned for; a different identity means
+ * the level no longer applies.
+ */
+data class StartupBufferLearningState(
+    val profile: String? = null,
+    val levelMillis: Int = 1000,
+    val cleanWindows: Int = 0,
 )
 
 class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
@@ -92,6 +114,10 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val REFRESH_RATE_MATCHING_ENABLED = booleanPreferencesKey("refreshRateMatchingEnabled")
         val AUDIO_PASSTHROUGH_ENABLED = booleanPreferencesKey("audioPassthroughEnabled")
         val KEEP_CHANNEL_MINUTES = intPreferencesKey("keepChannelMinutes")
+        val STARTUP_BUFFER_MILLIS = intPreferencesKey("startupBufferMillis")
+        val STARTUP_BUFFER_LEARNED_PROFILE = stringPreferencesKey("startupBufferLearnedProfile")
+        val STARTUP_BUFFER_LEARNED_MILLIS = intPreferencesKey("startupBufferLearnedMillis")
+        val STARTUP_BUFFER_CLEAN_WINDOWS = intPreferencesKey("startupBufferCleanWindows")
     }
 
     val playerSettings: Flow<PlayerSettings> =
@@ -174,7 +200,46 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.KEEP_CHANNEL_MINUTES] = minutes }
     }
 
+    suspend fun setStartupBufferMillis(millis: Int) {
+        require(millis == STARTUP_BUFFER_AUTOMATIC || millis in STARTUP_BUFFER_FIXED_MILLIS)
+        dataStore.edit { it[Keys.STARTUP_BUFFER_MILLIS] = millis }
+    }
+
+    /**
+     * Learned Automatic level. Kept out of [playerSettings] so that learning
+     * never re-emits the settings the playback runtime applies.
+     */
+    val startupBufferLearning: Flow<StartupBufferLearningState> =
+        dataStore.data.map(::decodeStartupBufferLearning)
+
+    /** Atomically replaces the learned state with [transform] of the stored one. */
+    internal suspend fun updateStartupBufferLearning(
+        transform: (StartupBufferLearningState) -> StartupBufferLearningState,
+    ): StartupBufferLearningState {
+        var result = StartupBufferLearningState()
+        dataStore.edit { p ->
+            result = transform(decodeStartupBufferLearning(p))
+            val profile = result.profile
+            if (profile == null) p.remove(Keys.STARTUP_BUFFER_LEARNED_PROFILE)
+            else p[Keys.STARTUP_BUFFER_LEARNED_PROFILE] = profile
+            p[Keys.STARTUP_BUFFER_LEARNED_MILLIS] = result.levelMillis
+            p[Keys.STARTUP_BUFFER_CLEAN_WINDOWS] = result.cleanWindows
+        }
+        return result
+    }
+
     internal companion object {
+        fun decodeStartupBufferLearning(p: Preferences): StartupBufferLearningState {
+            val default = StartupBufferLearningState()
+            return StartupBufferLearningState(
+                profile = p[Keys.STARTUP_BUFFER_LEARNED_PROFILE],
+                levelMillis = p[Keys.STARTUP_BUFFER_LEARNED_MILLIS]
+                    ?.takeIf { it in STARTUP_BUFFER_LEARNED_MIN_MILLIS..STARTUP_BUFFER_LEARNED_MAX_MILLIS }
+                    ?: default.levelMillis,
+                cleanWindows = p[Keys.STARTUP_BUFFER_CLEAN_WINDOWS]?.coerceAtLeast(0) ?: 0,
+            )
+        }
+
         fun decodePlayerSettings(p: Preferences): PlayerSettings {
             val ar = p[Keys.ASPECT_RATIO]
             val aspect = runCatching { ar?.let(AspectRatioMode::valueOf) }
@@ -191,6 +256,9 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
                 refreshRateMatchingEnabled = p[Keys.REFRESH_RATE_MATCHING_ENABLED] ?: true,
                 audioPassthroughEnabled = p[Keys.AUDIO_PASSTHROUGH_ENABLED] ?: true,
                 keepChannelMinutes = p[Keys.KEEP_CHANNEL_MINUTES]?.takeIf { it in listOf(0, 10, 20, 30) } ?: 20,
+                startupBufferMillis = p[Keys.STARTUP_BUFFER_MILLIS]
+                    ?.takeIf { it == STARTUP_BUFFER_AUTOMATIC || it in STARTUP_BUFFER_FIXED_MILLIS }
+                    ?: STARTUP_BUFFER_AUTOMATIC,
             )
         }
 

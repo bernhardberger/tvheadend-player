@@ -67,6 +67,7 @@ class AppPlaybackRuntime(
     private val audioFocus: PlaybackAudioFocus,
     private val policy: PlaybackRuntimePolicy,
     private val elapsedRealtime: () -> Long = android.os.SystemClock::elapsedRealtime,
+    private val startupBuffer: StartupBufferController? = null,
 ) {
     private val targetCommands = PlaybackTargetCommandSerialization()
     private val foregroundPlaybackLifecycle = ForegroundPlaybackLifecycle()
@@ -407,6 +408,8 @@ class AppPlaybackRuntime(
         val retainInterruptionMute = recovering && interruptionMuted
         val timeshiftPeriod = policy.liveTimeshiftPeriod(playerSettings)
         var committed = false
+        // The load control must know the target kind before the source is prepared.
+        startupBuffer?.targetInstalling(live = true)
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
             installTarget = {
@@ -471,6 +474,8 @@ class AppPlaybackRuntime(
             if (player.playbackState == Player.STATE_READY) onTargetReady(activeTargetEpoch)
             if (retainInterruptionMute && foreground) player.play()
             else applyPlayIntentToStartedTarget(result, playWhenReady)
+            // Only a start the viewer is waiting for opens a start-up buffer window.
+            startupBuffer?.liveStartApplied()
         }
         return result
     }
@@ -585,6 +590,7 @@ class AppPlaybackRuntime(
         var admission: RecordingPlaybackAdmission? = null
         var installedBinding: PlaybackBinding.Recording? = null
         var committed = false
+        startupBuffer?.targetInstalling(live = false)
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
             installTarget = {
@@ -863,7 +869,7 @@ class AppPlaybackRuntime(
     suspend fun goLive(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
     ) {
-        coordinator.returnToLive()
+        serverSkip({ it.disposition != TimeshiftCommandDisposition.NOT_ACCEPTED }) { coordinator.returnToLive() }
     }
     fun play() {
         val epoch = activeTargetEpoch
@@ -876,7 +882,9 @@ class AppPlaybackRuntime(
     suspend fun seekTimeshift(target: at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget) =
         targetCommands.serialize(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
-        ) { coordinator.seekTimeshift(target) }
+        ) {
+            serverSkip({ it.startedServerSkip() }) { coordinator.seekTimeshift(target) }
+        }
 
     suspend fun seekTimeshift(selection: at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekSelection) =
         targetCommands.serialize(
@@ -892,7 +900,7 @@ class AppPlaybackRuntime(
             val before = if (diagnose) counters() else ""
             val generation = diagnosticDecoderGeneration
             val started = android.os.SystemClock.elapsedRealtime()
-            coordinator.seekTimeshift(selection).also { result ->
+            serverSkip({ it.startedServerSkip() }) { coordinator.seekTimeshift(selection) }.also { result ->
                 if (diagnose) {
                     val completed = result as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Completed
                     val format = player.videoFormat
@@ -1232,6 +1240,11 @@ class AppPlaybackRuntime(
             result
         } finally {
             targetInstallationInProgress = false
+            // Also on failure or cancellation, so the load control follows the target that stays.
+            startupBuffer?.targetInstallFinished(
+                committed = activeTargetEpoch != previousTargetEpoch,
+                activeIsLive = _activeTarget.value is AppPlaybackTarget.Live,
+            )
             if (foreground && targetCommands.isOpen() && presentationEpoch.isCurrent(expectedPresentationEpoch) &&
                 previousTarget != null && healthyActiveTarget() == previousTarget &&
                 activeTargetEpoch == previousTargetEpoch && player.currentMediaItem == previousMediaItem
@@ -1900,7 +1913,19 @@ class AppPlaybackRuntime(
                 activeTarget = activeTarget,
                 diagnostics = activeLiveObservation?.diagnostics,
             ),
+            startupBuffer = startupBuffer?.inEffect?.value?.takeIf { activeTarget is AppPlaybackTarget.Live },
         )
+    }
+
+    /** Reports a server skip to the start-up buffer; a cancelled or failed request counts as not accepted. */
+    private inline fun <T> serverSkip(accepted: (T) -> Boolean, request: () -> T): T {
+        startupBuffer?.timeshiftSeeking()
+        var started = false
+        try {
+            return request().also { started = accepted(it) }
+        } finally {
+            startupBuffer?.timeshiftSeekFinished(accepted = started)
+        }
     }
 
     private fun source(activeTarget: AppPlaybackTarget? = _activeTarget.value) = when (activeTarget) {
@@ -1909,3 +1934,8 @@ class AppPlaybackRuntime(
         else -> AppPlaybackSource.NONE
     }
 }
+
+/** A seek skipped on the server unless it never ran or the server refused it. */
+private fun at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.startedServerSkip(): Boolean =
+    this is at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Completed &&
+        seekCommand.disposition != TimeshiftCommandDisposition.NOT_ACCEPTED

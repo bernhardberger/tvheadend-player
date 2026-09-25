@@ -6,9 +6,12 @@ import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.StartupBufferPolicy
+import at.bernhardberger.tvhplayer.playback.startupBufferIdentity
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
+import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -27,6 +30,9 @@ data class SettingsPlayerUiState(
     val audioPassthroughEnabled: Boolean = true,
     val audioPassthroughChangeFailed: Boolean = false,
     val keepChannelMinutes: Int = 20,
+    val startupBufferMillis: Int = STARTUP_BUFFER_AUTOMATIC,
+    /** Level Automatic currently uses for this server. */
+    val startupBufferLearnedMillis: Int = 1000,
 )
 
 class SettingsPlayerViewModel(
@@ -55,7 +61,14 @@ class SettingsPlayerViewModel(
             audioPassthroughEnabled = settings.audioPassthroughEnabled,
             audioPassthroughChangeFailed = audioPassthroughChangeFailed,
             keepChannelMinutes = settings.keepChannelMinutes,
+            startupBufferMillis = settings.startupBufferMillis,
         )
+    }.combine(
+        combine(settingsStore.startupBufferLearning, profileOwner.startupBufferIdentity()) { learning, identity ->
+            StartupBufferPolicy.learningFor(learning, identity).levelMillis
+        },
+    ) { state, learnedMillis ->
+        state.copy(startupBufferLearnedMillis = learnedMillis)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsPlayerUiState())
 
     fun onAudioLanguageSelected(slot: Int, language: String?) {
@@ -99,5 +112,9 @@ class SettingsPlayerViewModel(
 
     fun onKeepChannelMinutesChanged(minutes: Int) {
         viewModelScope.launch { settingsStore.setKeepChannelMinutes(minutes) }
+    }
+
+    fun onStartupBufferMillisChanged(millis: Int) {
+        viewModelScope.launch { settingsStore.setStartupBufferMillis(millis) }
     }
 }

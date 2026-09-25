@@ -24,13 +24,29 @@ internal fun settingsLevel(
     rows: List<DepthRow>,
     activeContent: (@Composable (androidx.compose.ui.focus.FocusRequester, (android.view.KeyEvent) -> Boolean) -> Unit)? = null,
     initialItemId: String? = null,
+    description: String? = null,
 ) = DepthLevel(id, rows, heading = { _ ->
     // Same heading in the active and preview slots (AOSP TvSettings parity): no
     // back chevron, so the title never shifts when a column changes role.
-    Row(Modifier.fillMaxWidth().heightIn(min = SettingsDepthHeadingHeight).padding(bottom = TvSpacing24),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.semantics { heading() })
+    if (description == null) {
+        Row(Modifier.fillMaxWidth().heightIn(min = SettingsDepthHeadingHeight).padding(bottom = TvSpacing24),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() })
+        }
+    } else {
+        // A level-wide explanation sits under the title, outside every row, so no
+        // single option carries it. It aligns with the option text and wraps.
+        Column(Modifier.fillMaxWidth().padding(bottom = TvSpacing24)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = SettingsDepthHeadingHeight - TvSpacing24),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() })
+            }
+            Text(description, style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = TvSpacing16))
+        }
     }
 }, activeContent = activeContent, initialItemId = initialItemId)
 

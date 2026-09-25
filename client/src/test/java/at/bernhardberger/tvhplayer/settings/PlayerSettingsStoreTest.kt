@@ -36,6 +36,36 @@ class PlayerSettingsStoreTest {
     }
 
     @Test
+    fun startupBufferDefaultsToAutomaticAndPersistsEveryChoice() = runTest {
+        val dataStore = InMemoryPreferencesDataStore()
+        val store = PlayerSettingsStore(dataStore)
+        assertEquals(STARTUP_BUFFER_AUTOMATIC, store.playerSettings.first().startupBufferMillis)
+        for (millis in STARTUP_BUFFER_FIXED_MILLIS + STARTUP_BUFFER_AUTOMATIC) {
+            store.setStartupBufferMillis(millis)
+            assertEquals(millis, PlayerSettingsStore(dataStore).playerSettings.first().startupBufferMillis)
+        }
+    }
+
+    @Test
+    fun invalidStartupBufferValueUsesAutomatic() = runTest {
+        val store = PlayerSettingsStore(InMemoryPreferencesDataStore(preferencesOf(
+            androidx.datastore.preferences.core.intPreferencesKey("startupBufferMillis") to 700,
+        )))
+        assertEquals(STARTUP_BUFFER_AUTOMATIC, store.playerSettings.first().startupBufferMillis)
+    }
+
+    @Test
+    fun startupBufferLearningRoundTripsWithoutChangingPlayerSettings() = runTest {
+        val dataStore = InMemoryPreferencesDataStore()
+        val store = PlayerSettingsStore(dataStore)
+        val settings = store.playerSettings.first()
+        assertEquals(StartupBufferLearningState(), store.startupBufferLearning.first())
+        store.updateStartupBufferLearning { StartupBufferLearningState("server-a", 2500, 7) }
+        assertEquals(StartupBufferLearningState("server-a", 2500, 7), PlayerSettingsStore(dataStore).startupBufferLearning.first())
+        assertEquals(settings, store.playerSettings.first())
+    }
+
+    @Test
     fun audioPassthroughDefaultsOnAndPersistsBothChoices() = runTest {
         val dataStore = InMemoryPreferencesDataStore()
         val store = PlayerSettingsStore(dataStore)

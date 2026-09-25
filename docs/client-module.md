@@ -35,7 +35,8 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
   `PlaybackRuntimePolicy` (with `PlaybackTrace`), and the runtime support files
   `AppPlaybackModels`, `PlaybackTargetCommandSerialization`, `PlaybackStatePolicy`,
   `LiveRecoveryAttempts`, `ForegroundPlaybackLifecycle`, `RecordingMarkerQuery`
-  and `PlaybackPresentation`.
+  and `PlaybackPresentation`, plus the start-up buffer files
+  `StartupBufferLoadControl`, `StartupBufferController` and `StartupBufferPolicy`.
 - `di/SdkRuntimeOwner`.
 - `settings/`: `AppProfileOwner`, `AudioChoiceStore`, `ChannelTagSettings`,
   `PlayerSettings`, `ServerSettings` (owns the single `Context.dataStore`
@@ -92,6 +93,67 @@ The runtime has no autostart. Startup channel choice stays with the front end
 (`StartupBootstrapPolicy` in `:app`, `LastPlayedChannelPolicy` in `:client`
 `core/`). Mobile background audio would be a separate future mode, not a
 policy value of this TV runtime.
+
+### Start-up buffer
+
+`StartupBufferLoadControl` wraps the SDK's `createTvheadendLoadControl()` in
+`AppModule`. It answers only `shouldStartPlayback` for a live start: playback
+starts once the buffered media reaches the start-up threshold, still capped by
+half the target live offset like `DefaultLoadControl`. Recordings, unknown
+periods and every other rebuffer go to the SDK load control unchanged. Every
+other `LoadControl` method is forwarded explicitly, because Kotlin class
+delegation does not forward Java default methods and their defaults throw. The
+threshold and the skip mark are read on the playback thread, so a new value
+applies to the next start without rebuilding the player.
+
+The load control reads the kind from the queried period itself: a period is
+live when its window's media item carries the SDK live source's media id
+(`tvheadend-live`). Nothing the runtime announces reaches the load control, so a
+recording that first selects its tracks while a live install is suspended or
+fails keeps delegating, and a live restart in a new period is a live start.
+Growing recordings can report a dynamic timeline, so the timeline alone cannot
+tell them apart. The SDK does not publish that id; if it changes, every start
+delegates, which is the SDK's own behaviour. `StartupBufferController` keeps
+the runtime's target kind only to decide whether a start arms a window.
+
+A timeshift seek or return to live is a server skip, not a player seek: the SDK
+resets the period's queues, Media3 drops to buffering as if rebuffering, and the
+skip surfaces as an internal discontinuity. The runtime reports the skip before
+it asks the server (`timeshiftSeeking`) and its outcome afterwards, also when the
+request throws or is cancelled. The load control stamps the request and the
+answer with the elapsed-realtime clock. A rebuffering start of a live period is
+treated as a live start only when Media3's last rebuffer began after the request
+and no later than 3 s after the answer; it is used once. A skip pressed while the
+player is already buffering (during an earlier skip's restart or a stall) takes
+over the rebuffer in progress, because Media3 keeps that rebuffer's start time.
+A rejected skip or a new
+target install clears the mark, and so does a grace that ends with playback
+running: the controller then opens the armed window. A skip the player absorbed
+without buffering therefore never takes over a later genuine rebuffer.
+
+`StartupBufferController` sets the threshold from the player setting (Automatic
+or a fixed 0.5, 1, 1.5, 2 or 3 s) and learns the Automatic level per server; a
+different server profile identity starts over at 1 s. A live start the viewer
+waits for (play intent applied after a tune, or a server skip while playing)
+arms a window; a paused start, one denied audio focus or one with audio
+disabled arms nothing. The
+window watches the first 30 s of playback (`StartupBufferPolicy`, plain Kotlin):
+
+- Trouble, a rebuffer (buffering while playback is wanted, not the buffering a
+  server skip causes, a pause, target change, background or stop) or three
+  audio underruns, raises the level by 0.5 s at once, up to 3 s, and clears the
+  clean count.
+- A window that plays 30 s without trouble counts as clean; 20 clean windows in
+  a row lower the level by 0.5 s, down to 1 s, and clear the count.
+- A window cut short by zapping, pausing, a server skip, muting or unmuting
+  audio, a change to the setting or server identity, background, stop or an
+  error gives no verdict.
+
+A verdict is stored only for a window armed in Automatic whose level is still
+the learned level. Level and clean count are stored next to the player settings
+but outside the `PlayerSettings` flow, so learning never re-applies player
+settings; a storage failure keeps the previous level and does not interrupt
+playback.
 
 ## System media controls
 

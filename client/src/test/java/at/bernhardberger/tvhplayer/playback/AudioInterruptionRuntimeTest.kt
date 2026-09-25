@@ -578,6 +578,38 @@ class AudioInterruptionRuntimeTest {
         assertNull(settings.audioChoices.read("test-profile", ChannelId(1)))
     }
 
+    @Test fun startupBufferKnowsTheTargetKindBeforePreparation() = exercise {
+        assertFalse(startupBuffer.isLiveTarget)
+        live(timeshift = false)
+        assertTrue(startupBuffer.isLiveTarget)
+        var liveDuringRecordingInstall: Boolean? = null
+        beforeRecordingBinding = { liveDuringRecordingInstall = startupBuffer.isLiveTarget }
+        recording()
+        assertEquals(false, liveDuringRecordingInstall)
+        assertFalse(startupBuffer.isLiveTarget)
+
+        val subscriptions = connection.subscribeCount
+        val install = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        await { connection.subscribeCount > subscriptions }
+        assertTrue("Live before the source starts", startupBuffer.isLiveTarget)
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+
+        // A failed recording replacement leaves the live target, and the live threshold, in place.
+        beforeRecordingBinding = { throw IllegalStateException("Synthetic binding failure") }
+        val failed = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
+                RecordingPlaybackStart.START_OVER)
+        }
+        await { failed.isCompleted }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertTrue(startupBuffer.isLiveTarget)
+    }
+
     private fun exercise(granted: Boolean = true, block: suspend Fixture.() -> Unit) = runBlocking {
         val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), granted)
         try { withTimeout(15_000) { fixture.block() } }
@@ -659,8 +691,11 @@ class AudioInterruptionRuntimeTest {
                 player.removeListener(listener)
             }
         }
+        val startupBuffer = StartupBufferController(StartupBufferLoadControl(androidx.media3.exoplayer.DefaultLoadControl()),
+            settings, profiles.startupBufferIdentity(), scope)
         val runtime = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
-            PlaybackRuntimePolicy.fromPlayerSettings())
+            PlaybackRuntimePolicy.fromPlayerSettings(),
+            startupBuffer = startupBuffer)
         val commands: PlaybackTargetCommandSerialization get() = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {
             it.isAccessible = true; it.get(runtime) as PlaybackTargetCommandSerialization
         }

@@ -2,12 +2,15 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
+import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
+import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_FIXED_MILLIS
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
@@ -35,6 +38,42 @@ internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): De
 @Composable
 private fun keepChannelLabel(minutes: Int): String = if (minutes == 0) stringResource(R.string.keep_channel_off)
     else stringResource(R.string.keep_channel_minutes, minutes)
+
+internal const val STARTUP_BUFFER_LEVEL = "startup-buffer"
+
+@Composable
+internal fun settingsStartupBufferLevel(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    return settingsStartupBufferLevel(ui.startupBufferMillis, ui.startupBufferLearnedMillis) { millis ->
+        vm.onStartupBufferMillisChanged(millis)
+        navigation.pop()
+    }
+}
+
+@Composable
+internal fun settingsStartupBufferLevel(millis: Int, learnedMillis: Int, onSelect: (Int) -> Unit): DepthLevel =
+    settingsLevel(STARTUP_BUFFER_LEVEL, stringResource(R.string.startup_buffer_setting),
+        (listOf(STARTUP_BUFFER_AUTOMATIC) + STARTUP_BUFFER_FIXED_MILLIS).map { value ->
+            settingsRow("startup-buffer-$value", startupBufferLabel(value, learnedMillis),
+                selected = millis == value, onClick = { onSelect(value) })
+        }, initialItemId = "startup-buffer-$millis",
+        description = stringResource(R.string.startup_buffer_description))
+
+/** "Automatic · 1 s" with the learned level, or a fixed level in locale decimals ("0,5 s"). */
+@Composable
+internal fun startupBufferLabel(millis: Int, learnedMillis: Int): String =
+    if (millis == STARTUP_BUFFER_AUTOMATIC) {
+        stringResource(R.string.startup_buffer_automatic, startupBufferSeconds(learnedMillis))
+    } else startupBufferSeconds(millis)
+
+@Composable
+private fun startupBufferSeconds(millis: Int): String {
+    val format = java.text.NumberFormat.getNumberInstance(LocalConfiguration.current.locales[0]).apply {
+        minimumFractionDigits = 0
+        maximumFractionDigits = 1
+    }
+    return stringResource(R.string.startup_buffer_seconds, format.format(millis / 1000.0))
+}
 
 @Composable
 internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): List<DepthLevel> {
@@ -69,7 +108,9 @@ internal fun settingsPlayerLevel(
             onClick = { onAudioPassthroughEnabledChanged(!ui.audioPassthroughEnabled) }))
         addAll(settingsAudioPreferenceRows(ui, onAudioDescriptionChanged))
         add(settingsRow(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting),
-            keepChannelLabel(ui.keepChannelMinutes), child = KEEP_CHANNEL_LEVEL))
+            keepChannelLabel(ui.keepChannelMinutes), child = KEEP_CHANNEL_LEVEL, titleMaxLines = 2))
+        add(settingsRow(STARTUP_BUFFER_LEVEL, stringResource(R.string.startup_buffer_setting),
+            startupBufferLabel(ui.startupBufferMillis, ui.startupBufferLearnedMillis), child = STARTUP_BUFFER_LEVEL))
         when (val profiles = ui.profiles) {
             StreamProfilesResult.NotReady -> add(settingsRow("profiles-status",
                 stringResource(if (ui.connected) R.string.loading_wait else R.string.not_connected), section = profileSection))

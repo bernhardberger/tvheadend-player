@@ -165,8 +165,11 @@ class AudioPreferenceUiTest {
         key(Key.Back)
         key(Key.DirectionUp)
         compose.onNodeWithText(description).assertIsFocused()
-        compose.onNodeWithText(if (locale == "de") "Dritte Audiosprache" else "Third audio language").assertIsDisplayed()
         capture(view, "$locale-player-three-languages-description-font$scale")
+        // The longer player list may scroll the third row out while description has focus; it stays reachable.
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        compose.onNodeWithText(if (locale == "de") "Dritte Audiosprache" else "Third audio language").assertIsFocused().assertIsDisplayed()
     }
 
     private fun audio(locale: String) {
