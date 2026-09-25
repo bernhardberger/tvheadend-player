@@ -2,22 +2,29 @@ package at.bernhardberger.tvhplayer.core
 
 import java.util.Locale
 
+/**
+ * A track label split into the lines of a track list row.
+ *
+ * [summary] is the one-line form for places that show only the chosen track.
+ */
 data class HumanTrackLabel(
-    val primary: String,
-    val secondary: String?,
+    val summary: String,
+    val name: String,
+    val overline: String?,
+    val detail: String?,
 )
 
 /**
  * Human-readable track labels for ten-foot UI.
  *
- * Language uses Locale display names with explicit und/mis/zxx fallbacks.
- * Channel layout is primary technical information (Mono/Stereo/5.1/7.1);
- * sample rate and codec remain secondary.
+ * The name is what the viewer picks: the track's role (audio description, clear
+ * dialogue) when it has one, otherwise its language. A role track with a known
+ * language shows the language as the overline. The detail is the channel layout and
+ * codec. Language uses Locale display names with explicit und/mis/zxx fallbacks.
  */
 fun humanTrackLabel(
     languageCode: String?,
     channelCount: Int?,
-    sampleRateHz: Int?,
     sampleMimeType: String?,
     roleLabel: String?,
     unknownLanguageLabel: String,
@@ -29,6 +36,7 @@ fun humanTrackLabel(
     trackFallbackLabel: String,
 ): HumanTrackLabel {
     val language = humanLanguageName(languageCode, unknownLanguageLabel)
+    val knownLanguage = language?.takeUnless { isUnknownLanguageCode(languageCode) }
     val channels = humanChannelLayout(
         channelCount = channelCount,
         monoLabel = monoLabel,
@@ -37,21 +45,30 @@ fun humanTrackLabel(
         surround71Label = surround71Label,
         channelsLabel = channelsLabel,
     )
-    val primary = listOfNotNull(language, channels, roleLabel?.takeIf { it.isNotBlank() })
-        .joinToString(" · ")
-        .ifBlank { trackFallbackLabel }
-    val secondary = listOfNotNull(
-        sampleRateHz?.takeIf { it > 0 }?.let { "${it} Hz" },
-        humanCodecName(sampleMimeType),
-    ).joinToString(" · ").ifBlank { null }
-    return HumanTrackLabel(primary = primary, secondary = secondary)
+    val role = roleLabel?.takeIf { it.isNotBlank() }
+    val name = role ?: language ?: channels ?: trackFallbackLabel
+    // Broadcasters often give audio description and clear dialogue tracks a placeholder
+    // language code; the role then names the track better than "Unknown language".
+    val summaryParts = if (role != null && knownLanguage == null) {
+        listOf(role, channels)
+    } else {
+        listOf(language, channels, role)
+    }
+    return HumanTrackLabel(
+        summary = summaryParts.filterNotNull().joinToString(" · ").ifBlank { trackFallbackLabel },
+        name = name,
+        overline = knownLanguage?.takeIf { role != null },
+        detail = listOfNotNull(channels?.takeIf { it != name }, humanCodecName(sampleMimeType))
+            .joinToString(" · ")
+            .ifBlank { null },
+    )
 }
 
 fun humanLanguageName(languageCode: String?, unknownLanguageLabel: String): String? {
     val code = languageCode?.trim().orEmpty()
     if (code.isEmpty()) return null
-    return when (code.lowercase(Locale.ROOT)) {
-        "und", "mis", "zxx", "mul", "qaa" -> unknownLanguageLabel
+    return when {
+        isUnknownLanguageCode(code) -> unknownLanguageLabel
         else -> {
             val locale = Locale.forLanguageTag(code.replace('_', '-'))
             locale.getDisplayLanguage(Locale.getDefault())
@@ -62,6 +79,11 @@ fun humanLanguageName(languageCode: String?, unknownLanguageLabel: String): Stri
         }
     }
 }
+
+private val UNKNOWN_LANGUAGE_CODES = setOf("und", "mis", "zxx", "mul", "qaa")
+
+private fun isUnknownLanguageCode(languageCode: String?): Boolean =
+    languageCode?.trim()?.lowercase(Locale.ROOT) in UNKNOWN_LANGUAGE_CODES
 
 fun humanChannelLayout(
     channelCount: Int?,
@@ -93,7 +115,11 @@ fun humanCodecName(sampleMimeType: String?): String? {
         mime.contains("mp4a", ignoreCase = true) || mime.contains("aac", ignoreCase = true) -> "AAC"
         mime.contains("opus", ignoreCase = true) -> "Opus"
         mime.startsWith("audio/") -> mime.removePrefix("audio/")
-        else -> mime
+        mime == "application/dvbsubs" -> "DVB"
+        // Tvheadend extracts its text subtitles from teletext pages; the SDK delivers them as cues.
+        mime == "application/x-media3-cues" -> "Teletext"
+        mime == "application/cea-608" || mime == "application/cea-708" -> "CC"
+        else -> null
     }
 }
 

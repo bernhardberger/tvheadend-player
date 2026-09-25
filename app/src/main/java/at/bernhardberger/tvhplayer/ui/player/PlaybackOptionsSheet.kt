@@ -8,11 +8,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -84,13 +84,13 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import kotlinx.coroutines.flow.first
 
-private val PlaybackOptionsTrackListMaxHeight = 236.dp
-
 internal data class PlaybackOptionTrack(
     val key: String,
     val label: String,
     val supportingLabel: String? = null,
     val selected: Boolean = false,
+    val headline: String = label,
+    val overline: String? = null,
 )
 
 /**
@@ -472,7 +472,7 @@ private fun PlaybackOptionsRoot(
 }
 
 @Composable
-private fun TrackOptionsPage(
+private fun ColumnScope.TrackOptionsPage(
     title: String,
     currentValue: String,
     tracks: List<PlaybackOptionTrack>,
@@ -545,8 +545,10 @@ private fun TrackOptionsPage(
         contentPadding = PaddingValues(horizontal = TvSpacing8, vertical = 4.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = PlaybackOptionsTrackListMaxHeight)
-            .focusGroup(),
+            // Use the rest of the panel height rather than a fixed list height.
+            .weight(1f, fill = false)
+            .focusGroup()
+            .testTag("playback-options-track-list"),
     ) {
         if (subtitles && onSelectOff != null) {
             item(key = "subtitles-off") {
@@ -567,7 +569,8 @@ private fun TrackOptionsPage(
         ) { index, track ->
             val focusIndex = index + if (subtitles) 1 else 0
             PlaybackOptionRow(
-                label = track.label,
+                label = track.headline,
+                overlineLabel = track.overline,
                 supportingLabel = track.distinguishingSupportingLabel,
                 supportingTestTag = "playback-options-track-support-${track.key}",
                 selected = track.selected,
@@ -749,6 +752,7 @@ private fun PlaybackOptionRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     supportingLabel: String? = null,
+    overlineLabel: String? = null,
     supportingTestTag: String? = null,
     selected: Boolean = false,
     showChevron: Boolean = false,
@@ -760,7 +764,10 @@ private fun PlaybackOptionRow(
         selected = if (showSwitch) false else selected,
         onClick = onClick,
         headlineContent = {
-            Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        },
+        overlineContent = overlineLabel?.let { text ->
+            { Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         },
         supportingContent = supportingLabel?.let { text ->
             {
@@ -844,11 +851,13 @@ private fun UiTrack.toPlaybackOptionTrack(): PlaybackOptionTrack = PlaybackOptio
     label = label,
     supportingLabel = secondaryLabel,
     selected = selected,
+    headline = headline,
+    overline = overline,
 )
 
 private val PlaybackOptionTrack.distinguishingSupportingLabel: String?
     get() {
-        val distinguishingSuffix = label.takeIf { it.length > 40 }?.takeLast(32)
+        val distinguishingSuffix = headline.takeIf { it.length > 40 }?.takeLast(32)
         return listOfNotNull(distinguishingSuffix, supportingLabel)
             .distinct()
             .takeIf(List<String>::isNotEmpty)

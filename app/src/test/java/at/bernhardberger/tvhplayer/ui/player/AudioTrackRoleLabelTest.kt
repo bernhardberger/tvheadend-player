@@ -27,18 +27,23 @@ class AudioTrackRoleLabelTest {
             ),
         )
 
-        val labels = collectTracks(
+        val collected = collectTracks(
             tracks = tracks,
             trackType = C.TRACK_TYPE_AUDIO,
             audioDescriptionLabel = "Audiodeskription",
             clearDialogueLabel = "Klare Sprache",
-        ).map { it.label }
+        )
+        val labels = collected.map { it.label }
 
         assertEquals(3, labels.size)
         assertFalse(labels[0].contains(" · Audiodeskription"))
         assertFalse(labels[0].contains(" · Klare Sprache"))
         assertTrue(labels[1].endsWith(" · Audiodeskription"))
         assertTrue(labels[2].endsWith(" · Klare Sprache"))
+        val german = collected[0].headline
+        assertEquals(listOf(german, "Audiodeskription", "Klare Sprache"), collected.map { it.headline })
+        assertEquals(listOf(null, german, german), collected.map { it.overline })
+        assertEquals(List(3) { "Stereo · MPEG-1 Layer II" }, collected.map { it.secondaryLabel })
     }
 
     @Test

@@ -13,6 +13,8 @@ data class UiTrack(
     val label: String,
     val secondaryLabel: String? = null,
     val selected: Boolean = false,
+    val headline: String = label,
+    val overline: String? = null,
 )
 
 fun collectTracks(
@@ -46,7 +48,6 @@ fun collectTracks(
             val human = humanTrackLabel(
                 languageCode = f.language,
                 channelCount = f.channelCount.takeIf { it != Format.NO_VALUE },
-                sampleRateHz = f.sampleRate.takeIf { it != Format.NO_VALUE },
                 sampleMimeType = f.sampleMimeType,
                 roleLabel = role,
                 unknownLanguageLabel = unknownLanguageLabel,
@@ -60,9 +61,11 @@ fun collectTracks(
             out += UiTrack(
                 group = g,
                 trackIndexInGroup = i,
-                label = human.primary,
-                secondaryLabel = human.secondary,
+                label = human.summary,
+                secondaryLabel = human.detail,
                 selected = g.isTrackSelected(i),
+                headline = human.name,
+                overline = human.overline,
             )
         }
     }
