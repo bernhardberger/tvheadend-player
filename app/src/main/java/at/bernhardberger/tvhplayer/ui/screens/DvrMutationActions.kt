@@ -18,6 +18,11 @@ internal sealed interface DvrMutationAction {
         val configId: DvrConfigId?,
     ) : DvrMutationAction
 
+    data class Stop(
+        val currentSession: CurrentSessionObservation,
+        val recordingId: DvrEntryId,
+    ) : DvrMutationAction
+
     data class Cancel(
         val currentSession: CurrentSessionObservation,
         val recordingId: DvrEntryId,
@@ -30,10 +35,13 @@ internal sealed interface DvrMutationAction {
 }
 
 internal enum class DvrMutationFeedback(val isFailure: Boolean) {
-    ACCEPTED(false),
+    CONFIRMED(false),
+    ACCEPTED_UNCONFIRMED(false),
     PERMISSION_DENIED(true),
     CONNECTION_LIMIT(true),
     REJECTED(true),
+    NOT_SUPPORTED(true),
+    TIMEOUT(true),
     CONNECTION_UNAVAILABLE(true),
 }
 
@@ -42,6 +50,10 @@ internal class DvrMutationActions(
         CurrentSessionObservation,
         DvrScheduleRequest,
     ) -> DvrMutationResult<DvrEntryId>,
+    private val stopEntry: suspend (
+        CurrentSessionObservation,
+        DvrEntryId,
+    ) -> DvrMutationResult<Unit>,
     private val cancelEntry: suspend (
         CurrentSessionObservation,
         DvrEntryId,
@@ -53,6 +65,7 @@ internal class DvrMutationActions(
 ) {
     constructor(repository: DvrRepository) : this(
         scheduleEntry = repository::scheduleEntry,
+        stopEntry = repository::stopEntry,
         cancelEntry = repository::cancelEntry,
         deleteEntry = repository::deleteEntry,
     )
@@ -66,6 +79,10 @@ internal class DvrMutationActions(
                     configId = action.configId,
                     title = action.target.title,
                 ),
+            )
+            is DvrMutationAction.Stop -> stopEntry(
+                action.currentSession,
+                action.recordingId,
             )
             is DvrMutationAction.Cancel -> cancelEntry(
                 action.currentSession,
@@ -82,25 +99,28 @@ internal class DvrMutationActions(
 }
 
 internal fun DvrMutationResult<*>.toDvrMutationFeedback(): DvrMutationFeedback = when (this) {
-    is DvrMutationResult.Confirmed,
-    is DvrMutationResult.AcceptedButUnconfirmed -> DvrMutationFeedback.ACCEPTED
+    is DvrMutationResult.Confirmed -> DvrMutationFeedback.CONFIRMED
+    is DvrMutationResult.AcceptedButUnconfirmed -> DvrMutationFeedback.ACCEPTED_UNCONFIRMED
     DvrMutationResult.AccessDenied -> DvrMutationFeedback.PERMISSION_DENIED
     DvrMutationResult.ConnectionLimit -> DvrMutationFeedback.CONNECTION_LIMIT
-    DvrMutationResult.ServerRejected,
-    DvrMutationResult.NotSupported -> DvrMutationFeedback.REJECTED
+    DvrMutationResult.ServerRejected -> DvrMutationFeedback.REJECTED
+    DvrMutationResult.NotSupported -> DvrMutationFeedback.NOT_SUPPORTED
+    DvrMutationResult.Timeout -> DvrMutationFeedback.TIMEOUT
     DvrMutationResult.NotReady,
     DvrMutationResult.ObservationExpired,
-    DvrMutationResult.Timeout,
     DvrMutationResult.TransportUnavailable -> DvrMutationFeedback.CONNECTION_UNAVAILABLE
 }
 
 @Composable
 internal fun DvrMutationFeedback.label(): String = stringResource(
     when (this) {
-        DvrMutationFeedback.ACCEPTED -> R.string.recording_action_accepted
+        DvrMutationFeedback.CONFIRMED -> R.string.recording_action_confirmed
+        DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> R.string.recording_action_accepted
         DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
         DvrMutationFeedback.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
         DvrMutationFeedback.REJECTED -> R.string.recording_action_rejected
+        DvrMutationFeedback.NOT_SUPPORTED -> R.string.recording_action_not_supported
+        DvrMutationFeedback.TIMEOUT -> R.string.recording_action_timeout
         DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
     },
 )

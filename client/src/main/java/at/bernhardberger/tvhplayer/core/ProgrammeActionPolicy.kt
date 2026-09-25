@@ -9,6 +9,7 @@ enum class ProgrammeAction {
     WATCH,
     RECORD,
     CANCEL_RECORDING,
+    STOP_RECORDING,
     WATCH_FROM_START,
 }
 
@@ -22,8 +23,9 @@ fun programmeActions(
     val actions = when {
         event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds -> listOf(ProgrammeAction.WATCH)
         event.start.epochSeconds > nowSec -> when (recording?.state) {
-            DvrEntryState.SCHEDULED,
-            DvrEntryState.RECORDING -> listOf(ProgrammeAction.CANCEL_RECORDING)
+            DvrEntryState.SCHEDULED -> listOf(ProgrammeAction.CANCEL_RECORDING)
+            // Stopping keeps the partial recording; cancelling would abort it on the server.
+            DvrEntryState.RECORDING -> listOf(ProgrammeAction.STOP_RECORDING)
             else -> listOf(ProgrammeAction.RECORD)
         }
         serverTimeshiftCoversEvent ||
@@ -33,7 +35,9 @@ fun programmeActions(
     }
     if (canModifyRecordings) return actions
     return actions.filter {
-        it != ProgrammeAction.RECORD && it != ProgrammeAction.CANCEL_RECORDING
+        it != ProgrammeAction.RECORD &&
+            it != ProgrammeAction.CANCEL_RECORDING &&
+            it != ProgrammeAction.STOP_RECORDING
     }
 }
 

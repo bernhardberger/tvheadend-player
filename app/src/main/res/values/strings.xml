@@ -329,6 +329,7 @@
     <string name="watch_from_start">Watch from start</string>
     <string name="record">Record</string>
     <string name="cancel_recording">Cancel recording</string>
+    <string name="stop_recording">Stop recording</string>
     <string name="record_confirm_title">Record “%1$s”?</string>
     <string name="record_confirm_message">Your Tvheadend server will add this programme to your recordings.</string>
     <string name="record_confirm_pane_title">Confirm recording</string>
@@ -342,8 +343,10 @@
     <string name="recording_request_failure_message">“%1$s” was not scheduled. %2$s</string>
     <string name="recording_config_title">Choose a recording configuration</string>
     <string name="recording_config_message">This server has several available recording configurations.</string>
-    <string name="cancel_recording_confirm_title">Stop “%1$s”?</string>
-    <string name="cancel_recording_confirm_message">Your Tvheadend server will stop or remove the scheduled recording.</string>
+    <string name="cancel_recording_confirm_title">Cancel “%1$s”?</string>
+    <string name="cancel_recording_confirm_message">Your Tvheadend server will remove the scheduled recording.</string>
+    <string name="stop_recording_confirm_title">Stop recording “%1$s”?</string>
+    <string name="stop_recording_confirm_message">Your Tvheadend server will stop recording now and keep the recording made so far.</string>
     <string name="recording_status">Recording: %1$s</string>
     <string name="recording_failure_reason">Reason: %1$s</string>
     <string name="recording_state_scheduled">Scheduled</string>
@@ -352,11 +355,14 @@
     <string name="recording_state_failed">Failed</string>
     <string name="recording_state_cancelled">Cancelled</string>
     <string name="recording_state_unknown">Server status unknown</string>
+    <string name="recording_action_confirmed">Done. Your Tvheadend server confirmed the change.</string>
     <string name="recording_action_accepted">Request accepted. Waiting for the server status update…</string>
     <string name="recording_action_permission">This account is not allowed to manage recordings.</string>
     <string name="recording_action_conn_limit">Your Tvheadend server refused the request: too many connections. Try again shortly.</string>
     <string name="recording_action_conflict">Your Tvheadend server reported a recording or tuner conflict.</string>
     <string name="recording_action_rejected">Your Tvheadend server rejected the recording request.</string>
+    <string name="recording_action_not_supported">Your Tvheadend server does not support this recording action.</string>
+    <string name="recording_action_timeout">Your Tvheadend server did not answer in time. The change may still apply; check the recording before trying again.</string>
     <string name="recording_action_connection">The recording request could not reach your Tvheadend server.</string>
     <string name="recording_already_scheduled">This programme is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>

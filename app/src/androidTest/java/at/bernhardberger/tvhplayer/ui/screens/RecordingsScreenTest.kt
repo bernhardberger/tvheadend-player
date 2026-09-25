@@ -108,6 +108,7 @@ class RecordingsScreenTest {
         val dvrMutationActions = remember(onCancelRecording, onDeleteRecording) {
             DvrMutationActions(
                 scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
+                stopEntry = { _, _ -> DvrMutationResult.NotReady },
                 cancelEntry = onCancelRecording,
                 deleteEntry = onDeleteRecording,
             )

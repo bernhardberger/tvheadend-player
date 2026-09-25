@@ -28,10 +28,11 @@ import org.junit.Test
 
 class DvrMutationActionsTest {
     @Test
-    fun createCancelAndDeleteDispatchCapturedTypedActions() = runTest {
+    fun createStopCancelAndDeleteDispatchCapturedTypedActions() = runTest {
         val capability = currentSession()
         var scheduledCapability: CurrentSessionObservation? = null
         var scheduledRequest: DvrScheduleRequest? = null
+        var stopped: Pair<CurrentSessionObservation, DvrEntryId>? = null
         var cancelled: Pair<CurrentSessionObservation, DvrEntryId>? = null
         var deleted: Pair<CurrentSessionObservation, DvrEntryId>? = null
         val actions = DvrMutationActions(
@@ -39,6 +40,10 @@ class DvrMutationActionsTest {
                 scheduledCapability = currentSession
                 scheduledRequest = request
                 DvrMutationResult.AcceptedButUnconfirmed(DvrEntryId(70))
+            },
+            stopEntry = { currentSession, id ->
+                stopped = currentSession to id
+                DvrMutationResult.Confirmed(Unit)
             },
             cancelEntry = { currentSession, id ->
                 cancelled = currentSession to id
@@ -61,8 +66,12 @@ class DvrMutationActionsTest {
         val recordingId = DvrEntryId(9)
 
         assertEquals(
-            DvrMutationFeedback.ACCEPTED,
+            DvrMutationFeedback.ACCEPTED_UNCONFIRMED,
             actions.execute(DvrMutationAction.CreateProgramme(target, configId)),
+        )
+        assertEquals(
+            DvrMutationFeedback.CONFIRMED,
+            actions.execute(DvrMutationAction.Stop(capability, recordingId)),
         )
         assertEquals(
             DvrMutationFeedback.PERMISSION_DENIED,
@@ -82,8 +91,26 @@ class DvrMutationActionsTest {
             ),
             scheduledRequest,
         )
+        assertEquals(capability to recordingId, stopped)
         assertEquals(capability to recordingId, cancelled)
         assertEquals(capability to recordingId, deleted)
+    }
+
+    @Test
+    fun stopDispatchesOnlyStopEntry() = runTest {
+        val capability = currentSession()
+        val calls = mutableListOf<String>()
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.NotReady },
+            stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.AcceptedButUnconfirmed(Unit) },
+            cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.NotReady },
+            deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.NotReady },
+        )
+
+        val feedback = actions.execute(DvrMutationAction.Stop(capability, DvrEntryId(4)))
+
+        assertEquals(listOf("stop"), calls)
+        assertEquals(DvrMutationFeedback.ACCEPTED_UNCONFIRMED, feedback)
     }
 
     @Test
@@ -91,6 +118,10 @@ class DvrMutationActionsTest {
         var dispatchCount = 0
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ ->
+                dispatchCount++
+                DvrMutationResult.NotReady
+            },
+            stopEntry = { _, _ ->
                 dispatchCount++
                 DvrMutationResult.NotReady
             },
@@ -112,24 +143,24 @@ class DvrMutationActionsTest {
 
     @Test
     fun everyReleasedMutationResultHasOneStablePresentation() {
-        val accepted = listOf(
-            DvrMutationResult.Confirmed(Unit),
-            DvrMutationResult.AcceptedButUnconfirmed(Unit),
+        val accepted = mapOf(
+            DvrMutationResult.Confirmed(Unit) to DvrMutationFeedback.CONFIRMED,
+            DvrMutationResult.AcceptedButUnconfirmed(Unit) to DvrMutationFeedback.ACCEPTED_UNCONFIRMED,
         )
         val failures = mapOf(
             DvrMutationResult.AccessDenied to DvrMutationFeedback.PERMISSION_DENIED,
             DvrMutationResult.ConnectionLimit to DvrMutationFeedback.CONNECTION_LIMIT,
             DvrMutationResult.ServerRejected to DvrMutationFeedback.REJECTED,
-            DvrMutationResult.NotSupported to DvrMutationFeedback.REJECTED,
+            DvrMutationResult.NotSupported to DvrMutationFeedback.NOT_SUPPORTED,
+            DvrMutationResult.Timeout to DvrMutationFeedback.TIMEOUT,
             DvrMutationResult.NotReady to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
             DvrMutationResult.ObservationExpired to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
-            DvrMutationResult.Timeout to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
             DvrMutationResult.TransportUnavailable to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
         )
 
-        accepted.forEach { result ->
+        accepted.forEach { (result, expected) ->
             val feedback = result.toDvrMutationFeedback()
-            assertEquals(DvrMutationFeedback.ACCEPTED, feedback)
+            assertEquals(expected, feedback)
             assertFalse(feedback.isFailure)
         }
         failures.forEach { (result, expected) ->

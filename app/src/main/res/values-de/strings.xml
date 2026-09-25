@@ -236,6 +236,7 @@
     <string name="watch_from_start">Von Anfang ansehen</string>
     <string name="record">Aufnehmen</string>
     <string name="cancel_recording">Aufnahme abbrechen</string>
+    <string name="stop_recording">Aufnahme beenden</string>
     <string name="record_confirm_title">„%1$s“ aufnehmen?</string>
     <string name="record_confirm_message">Ihr Tvheadend-Server fügt diese Sendung zu Ihren Aufnahmen hinzu.</string>
     <string name="record_confirm_pane_title">Aufnahme bestätigen</string>
@@ -249,8 +250,10 @@
     <string name="recording_request_failure_message">„%1$s“ wurde nicht geplant. %2$s</string>
     <string name="recording_config_title">Aufnahmekonfiguration wählen</string>
     <string name="recording_config_message">Auf diesem Server sind mehrere Aufnahmekonfigurationen verfügbar.</string>
-    <string name="cancel_recording_confirm_title">„%1$s“ stoppen?</string>
-    <string name="cancel_recording_confirm_message">Ihr Tvheadend-Server beendet oder entfernt die geplante Aufnahme.</string>
+    <string name="cancel_recording_confirm_title">„%1$s“ abbrechen?</string>
+    <string name="cancel_recording_confirm_message">Ihr Tvheadend-Server entfernt die geplante Aufnahme.</string>
+    <string name="stop_recording_confirm_title">Aufnahme von „%1$s“ beenden?</string>
+    <string name="stop_recording_confirm_message">Ihr Tvheadend-Server beendet die Aufnahme jetzt und behält das bisher Aufgenommene.</string>
     <string name="recording_status">Aufnahme: %1$s</string>
     <string name="recording_failure_reason">Grund: %1$s</string>
     <string name="recording_state_scheduled">Geplant</string>
@@ -259,11 +262,14 @@
     <string name="recording_state_failed">Fehlgeschlagen</string>
     <string name="recording_state_cancelled">Abgebrochen</string>
     <string name="recording_state_unknown">Serverstatus unbekannt</string>
+    <string name="recording_action_confirmed">Erledigt. Ihr Tvheadend-Server hat die Änderung bestätigt.</string>
     <string name="recording_action_accepted">Anfrage angenommen. Der Serverstatus wird abgewartet…</string>
     <string name="recording_action_permission">Dieses Konto darf Aufnahmen nicht verwalten.</string>
     <string name="recording_action_conn_limit">Ihr Tvheadend-Server hat die Anfrage abgelehnt: zu viele Verbindungen. Bitte kurz warten.</string>
     <string name="recording_action_conflict">Ihr Tvheadend-Server meldet einen Aufnahme- oder Tuner-Konflikt.</string>
     <string name="recording_action_rejected">Ihr Tvheadend-Server hat die Aufnahmeanfrage abgelehnt.</string>
+    <string name="recording_action_not_supported">Ihr Tvheadend-Server unterstützt diese Aufnahmeaktion nicht.</string>
+    <string name="recording_action_timeout">Ihr Tvheadend-Server hat nicht rechtzeitig geantwortet. Die Änderung kann trotzdem wirksam werden; prüfen Sie die Aufnahme, bevor Sie es erneut versuchen.</string>
     <string name="recording_action_connection">Ihr Tvheadend-Server konnte für die Aufnahmeanfrage nicht erreicht werden.</string>
     <string name="recording_already_scheduled">Diese Sendung wird aufgenommen oder ist geplant.</string>
     <string name="recordings_title">Aufnahmen</string>

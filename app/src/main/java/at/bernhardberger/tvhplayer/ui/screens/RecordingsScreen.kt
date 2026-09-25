@@ -789,6 +789,13 @@ internal fun RecordingsScreenContent(
                     )
                 }
             },
+            onStop = {
+                detailsInitialAction = RecordingDetailsAction.STOP
+                pendingMutation = selectedCapability?.let { capability ->
+                    DvrMutationAction.Stop(capability, opened.id)
+                }
+                pendingAction = PendingRecordingAction.STOP
+            },
             onCancel = {
                 detailsInitialAction = RecordingDetailsAction.CANCEL
                 pendingMutation = selectedCapability?.let { capability ->

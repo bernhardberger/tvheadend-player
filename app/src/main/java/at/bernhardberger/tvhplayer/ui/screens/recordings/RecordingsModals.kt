@@ -58,6 +58,7 @@ import at.bernhardberger.tvhplayer.ui.screens.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.ui.screens.label
 
 internal enum class PendingRecordingAction {
+    STOP,
     CANCEL,
     DELETE,
 }
@@ -66,9 +67,20 @@ internal enum class RecordingDetailsAction {
     RESUME,
     BEGINNING,
     PLAY,
+    STOP,
     CANCEL,
     DELETE,
     CLOSE,
+}
+
+/**
+ * Chooses how an active entry ends: a running recording is stopped (kept as recorded so far),
+ * a scheduled one is cancelled. Other states offer neither.
+ */
+internal fun recordingEndAction(state: DvrEntryState?): RecordingDetailsAction? = when (state) {
+    DvrEntryState.RECORDING -> RecordingDetailsAction.STOP
+    DvrEntryState.SCHEDULED -> RecordingDetailsAction.CANCEL
+    else -> null
 }
 
 @Composable
@@ -81,6 +93,7 @@ internal fun RecordingDetailsPanel(
     initialAction: RecordingDetailsAction?,
     backEnabled: Boolean,
     onPlay: (RecordingPlaybackStart) -> Unit,
+    onStop: () -> Unit,
     onCancel: () -> Unit,
     onDelete: () -> Unit,
     onClose: () -> Unit,
@@ -91,8 +104,9 @@ internal fun RecordingDetailsPanel(
     val deleteFocus = remember { FocusRequester() }
     val closeFocus = remember { FocusRequester() }
     var focusedAction by remember(entry.id) { mutableStateOf<RecordingDetailsAction?>(null) }
-    val canCancel = canModifyRecordings &&
-        (entry.state == DvrEntryState.SCHEDULED || entry.state == DvrEntryState.RECORDING)
+    // Stop and Cancel are mutually exclusive and share one button slot and focus requester.
+    val endAction = recordingEndAction(entry.state).takeIf { canModifyRecordings }
+    val canEnd = endAction != null
     val canDelete = canModifyRecordings &&
         entry.state in setOf(
             DvrEntryState.COMPLETED,
@@ -112,7 +126,7 @@ internal fun RecordingDetailsPanel(
     val primaryAction = when {
         resumeSeconds != null -> RecordingDetailsAction.RESUME
         canPlay -> RecordingDetailsAction.PLAY
-        canCancel -> RecordingDetailsAction.CANCEL
+        endAction != null -> endAction
         canDelete -> RecordingDetailsAction.DELETE
         else -> RecordingDetailsAction.CLOSE
     }
@@ -123,7 +137,7 @@ internal fun RecordingDetailsPanel(
         } else if (canPlay) {
             add(RecordingDetailsAction.PLAY)
         }
-        if (canCancel) add(RecordingDetailsAction.CANCEL)
+        endAction?.let(::add)
         if (canDelete) add(RecordingDetailsAction.DELETE)
         add(RecordingDetailsAction.CLOSE)
     }
@@ -131,6 +145,7 @@ internal fun RecordingDetailsPanel(
         RecordingDetailsAction.RESUME,
         RecordingDetailsAction.PLAY -> primaryFocus
         RecordingDetailsAction.BEGINNING -> secondaryFocus
+        RecordingDetailsAction.STOP,
         RecordingDetailsAction.CANCEL -> cancelFocus
         RecordingDetailsAction.DELETE -> deleteFocus
         RecordingDetailsAction.CLOSE -> closeFocus
@@ -264,7 +279,7 @@ internal fun RecordingDetailsPanel(
                             right = FocusRequester.Cancel
                             up = FocusRequester.Cancel
                             down = when {
-                                canCancel -> cancelFocus
+                                canEnd -> cancelFocus
                                 canDelete -> deleteFocus
                                 else -> closeFocus
                             }
@@ -312,7 +327,7 @@ internal fun RecordingDetailsPanel(
                     .focusProperties {
                         left = FocusRequester.Cancel
                         right = when {
-                            canCancel -> cancelFocus
+                            canEnd -> cancelFocus
                             canDelete -> deleteFocus
                             else -> FocusRequester.Cancel
                         }
@@ -325,13 +340,14 @@ internal fun RecordingDetailsPanel(
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.close))
             }
-            if (canCancel) {
+            if (endAction != null) {
+                val stops = endAction == RecordingDetailsAction.STOP
                 Button(
-                    onClick = onCancel,
+                    onClick = if (stops) onStop else onCancel,
                     modifier = Modifier
                         .focusRequester(cancelFocus)
                         .onFocusChanged {
-                            if (it.isFocused) focusedAction = RecordingDetailsAction.CANCEL
+                            if (it.isFocused) focusedAction = endAction
                         }
                         .focusProperties {
                             left = closeFocus
@@ -341,11 +357,11 @@ internal fun RecordingDetailsPanel(
                                 else FocusRequester.Cancel
                             down = FocusRequester.Cancel
                         }
-                        .testTag("recording-details-cancel"),
+                        .testTag(if (stops) "recording-details-stop" else "recording-details-cancel"),
                 ) {
                     Icon(painterResource(R.drawable.ic_stop), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.cancel_recording))
+                    Text(stringResource(if (stops) R.string.stop_recording else R.string.cancel_recording))
                 }
             }
             if (canDelete) {
@@ -449,10 +465,10 @@ internal fun RecordingConfirmationDialog(
     ) {
         Text(
             text = stringResource(
-                if (action == PendingRecordingAction.CANCEL) {
-                    R.string.cancel_recording_confirm_title
-                } else {
-                    R.string.delete_recording_confirm_title
+                when (action) {
+                    PendingRecordingAction.STOP -> R.string.stop_recording_confirm_title
+                    PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_title
+                    PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_title
                 },
                 title,
             ),
@@ -461,10 +477,10 @@ internal fun RecordingConfirmationDialog(
         )
         Text(
             text = stringResource(
-                if (action == PendingRecordingAction.CANCEL) {
-                    R.string.cancel_recording_confirm_message
-                } else {
-                    R.string.delete_recording_confirm_message
+                when (action) {
+                    PendingRecordingAction.STOP -> R.string.stop_recording_confirm_message
+                    PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_message
+                    PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_message
                 }
             ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -502,10 +518,10 @@ internal fun RecordingConfirmationDialog(
             ) {
                 Text(
                     stringResource(
-                        if (action == PendingRecordingAction.CANCEL) {
-                            R.string.cancel_recording
-                        } else {
-                            R.string.delete_recording
+                        when (action) {
+                            PendingRecordingAction.STOP -> R.string.stop_recording
+                            PendingRecordingAction.CANCEL -> R.string.cancel_recording
+                            PendingRecordingAction.DELETE -> R.string.delete_recording
                         }
                     )
                 )

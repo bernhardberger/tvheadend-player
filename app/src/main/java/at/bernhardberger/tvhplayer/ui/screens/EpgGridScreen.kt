@@ -2099,6 +2099,15 @@ fun EpgGridScreen(
                             )
                             pendingAction = action
                         }
+                        ProgrammeAction.STOP_RECORDING -> if (
+                            selectedCapability != null && recording != null
+                        ) {
+                            pendingMutation = DvrMutationAction.Stop(
+                                selectedCapability,
+                                recording.id,
+                            )
+                            pendingAction = action
+                        }
                     }
                 },
                 onClose = ::closeDetails,

@@ -528,10 +528,10 @@ internal fun ConfirmProgrammeActionDialog(
     DialogScrim(onDismissRequest = onDismiss) {
         Text(
             text = stringResource(
-                if (action == ProgrammeAction.RECORD) {
-                    R.string.record_confirm_title
-                } else {
-                    R.string.cancel_recording_confirm_title
+                when (action) {
+                    ProgrammeAction.RECORD -> R.string.record_confirm_title
+                    ProgrammeAction.STOP_RECORDING -> R.string.stop_recording_confirm_title
+                    else -> R.string.cancel_recording_confirm_title
                 },
                 programmeTitle,
             ),
@@ -559,10 +559,10 @@ internal fun ConfirmProgrammeActionDialog(
                 Spacer(Modifier.width(6.dp))
                 Text(
                     stringResource(
-                        if (action == ProgrammeAction.RECORD) {
-                            R.string.record
-                        } else {
-                            R.string.cancel_recording
+                        when (action) {
+                            ProgrammeAction.RECORD -> R.string.record
+                            ProgrammeAction.STOP_RECORDING -> R.string.stop_recording
+                            else -> R.string.cancel_recording
                         }
                     )
                 )
@@ -577,6 +577,7 @@ private fun programmeActionLabel(action: ProgrammeAction): String = stringResour
         ProgrammeAction.WATCH -> R.string.watch
         ProgrammeAction.RECORD -> R.string.record
         ProgrammeAction.CANCEL_RECORDING -> R.string.cancel_recording
+        ProgrammeAction.STOP_RECORDING -> R.string.stop_recording
         ProgrammeAction.WATCH_FROM_START -> R.string.watch_from_start
     }
 )

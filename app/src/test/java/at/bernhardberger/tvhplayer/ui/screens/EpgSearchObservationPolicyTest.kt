@@ -136,6 +136,10 @@ class EpgSearchObservationPolicyTest {
                 dispatchCount++
                 DvrMutationResult.NotReady
             },
+            stopEntry = { _, _ ->
+                dispatchCount++
+                DvrMutationResult.NotReady
+            },
             cancelEntry = { _, _ ->
                 dispatchCount++
                 DvrMutationResult.NotReady
