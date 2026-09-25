@@ -21,8 +21,7 @@ class TimeshiftCommandFeedbackTest {
             assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, action)
             val calls = mutableListOf<String>()
             if (action == PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE) {
-                dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, false, false,
-                    pause = { calls += "pause" },
+                dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, false,
                     dispatch = { resume, rollback -> calls += "$resume/$rollback" })
             }
             assertEquals(listOf("true/false"), calls)
@@ -30,29 +29,39 @@ class TimeshiftCommandFeedbackTest {
     }
 
     @Test
-    fun mutedPauseAndToggleOnlyRestoreSoundWithoutCommandOrFeedback() {
+    fun pauseAndToggleDispatchOneAtomicRuntimeOperationWithoutUiRollback() {
         for (action in listOf(MediaPlaybackAction.PAUSE, MediaPlaybackAction.TOGGLE)) {
             val calls = mutableListOf<String>()
-            dispatchTimeshiftPlaybackAction(action, true, true,
-                pause = { calls += "restore sound" },
-                dispatch = { _, _ -> calls += "server command and feedback" })
-            assertEquals(listOf("restore sound"), calls)
+            dispatchTimeshiftPlaybackAction(action, true,
+                dispatch = { resume, rollback -> calls += "$resume/$rollback" })
+            assertEquals(listOf("false/null"), calls)
         }
     }
 
     @Test
-    fun normalPauseIsLocalBeforeServerCommandAndTimeoutDoesNotUndoIt() {
+    fun pauseServerResultsHaveFeedbackButNeverUiRollback() {
         val calls = mutableListOf<String>()
-        dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, true, false,
-            pause = { calls += "local pause" },
+        dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, true,
             dispatch = { resume, rollback ->
-                calls += "server pause"
+                calls += "atomic pause"
                 assertFalse(resume)
-                val completion = timeshiftCommandCompletion(1, 1, result = TimeshiftCommandResult.TIMEOUT,
-                    unavailableText = "unavailable", rollbackPlayWhenReady = rollback)
-                assertNull(completion?.rollbackPlayWhenReady)
+                for (result in listOf(TimeshiftCommandResult.REJECTED, TimeshiftCommandResult.TIMEOUT)) {
+                    val completion = requireNotNull(timeshiftCommandCompletion(1, 1, result = result,
+                        unavailableText = "unavailable", rollbackPlayWhenReady = rollback))
+                    assertNull(completion.rollbackPlayWhenReady)
+                    assertEquals(if (result == TimeshiftCommandResult.REJECTED) "unavailable" else null, completion.feedback)
+                }
             })
-        assertEquals(listOf("local pause", "server pause"), calls)
+        assertEquals(listOf("atomic pause"), calls)
+    }
+
+    @Test
+    fun soundRestorationResultHasNoUnavailableFeedbackOrRollback() {
+        val completion = requireNotNull(timeshiftCommandCompletion(
+            1, 1, result = null, unavailableText = "unavailable", rollbackPlayWhenReady = null,
+        ))
+        assertNull(completion.feedback)
+        assertNull(completion.rollbackPlayWhenReady)
     }
 
     @Test

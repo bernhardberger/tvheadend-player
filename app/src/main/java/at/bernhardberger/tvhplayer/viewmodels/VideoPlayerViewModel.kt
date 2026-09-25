@@ -38,7 +38,6 @@ class VideoPlayerViewModel(
 
     fun pause() = playbackRuntime.pause()
 
-    val isInterruptionMuted: Boolean get() = playbackRuntime.isInterruptionMuted
     val hasAudioInterruption: Boolean get() = playbackRuntime.hasAudioInterruption
 
     suspend fun playChannel(selection: LivePlaybackSelection) = playbackRuntime.playLive(selection)
@@ -52,6 +51,7 @@ class VideoPlayerViewModel(
     }
 
     suspend fun pauseTimeshift() = playbackRuntime.pauseTimeshift()
+    suspend fun pauseTimeshiftPlayback() = playbackRuntime.pauseTimeshiftPlayback()
 
     suspend fun resumeTimeshift() = playbackRuntime.resumeTimeshift()
 

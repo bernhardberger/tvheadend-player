@@ -179,13 +179,13 @@ internal fun timeshiftCommandCompletion(
     currentToken: Long,
     feedbackToken: Long = commandToken,
     currentFeedbackToken: Long = currentToken,
-    result: TimeshiftCommandResult,
+    result: TimeshiftCommandResult?,
     unavailableText: String,
     rollbackPlayWhenReady: Boolean?,
     interruptionOwned: Boolean = false,
 ): TimeshiftCommandCompletion? {
     if (commandToken != currentToken) return null
-    val rejected = result.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED
+    val rejected = result?.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED
     return TimeshiftCommandCompletion(
         feedback = unavailableText.takeIf { rejected },
         applyFeedback = feedbackToken == currentFeedbackToken,
@@ -196,19 +196,14 @@ internal fun timeshiftCommandCompletion(
 internal fun dispatchTimeshiftPlaybackAction(
     action: MediaPlaybackAction,
     playWhenReady: Boolean,
-    interruptionMuted: Boolean,
-    pause: () -> Unit,
-    dispatch: (resume: Boolean, rollbackPlayWhenReady: Boolean) -> Unit,
+    dispatch: (resume: Boolean, rollbackPlayWhenReady: Boolean?) -> Unit,
 ) {
     val resolved = if (action == MediaPlaybackAction.TOGGLE) {
         if (playWhenReady) MediaPlaybackAction.PAUSE else MediaPlaybackAction.PLAY
     } else action
     when (resolved) {
         MediaPlaybackAction.PLAY -> dispatch(true, false)
-        MediaPlaybackAction.PAUSE -> {
-            pause()
-            if (!interruptionMuted) dispatch(false, true)
-        }
+        MediaPlaybackAction.PAUSE -> dispatch(false, null)
         else -> Unit
     }
 }
@@ -390,7 +385,7 @@ fun VideoPlayerScreen(
 
     fun dispatchTimeshiftCommand(
         rollbackPlayWhenReady: Boolean? = null,
-        command: suspend () -> TimeshiftCommandResult,
+        command: suspend () -> TimeshiftCommandResult?,
     ) {
         timeshiftCommandToken += 1L
         val commandToken = timeshiftCommandToken
@@ -422,11 +417,9 @@ fun VideoPlayerScreen(
         dispatchTimeshiftPlaybackAction(
             action = action,
             playWhenReady = player.playWhenReady,
-            interruptionMuted = videoPlayerViewModel.isInterruptionMuted,
-            pause = videoPlayerViewModel::pause,
         ) { resume, rollback ->
             dispatchTimeshiftCommand(rollbackPlayWhenReady = rollback) {
-                if (resume) videoPlayerViewModel.resumeTimeshift() else videoPlayerViewModel.pauseTimeshift()
+                if (resume) videoPlayerViewModel.resumeTimeshift() else videoPlayerViewModel.pauseTimeshiftPlayback()
             }
         }
     }

@@ -241,6 +241,67 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(2, connection.subscribeCount)
     }
 
+    @Test fun acceptedReplacementPauseKeepsRetunedChannelPausedWithoutFocusOrNotice() = exercise {
+        live()
+        connection.emit(SubscriptionEvent.Speed(0))
+        await { !player.playWhenReady }
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        connection.scriptPriority(SubscriptionOperationResult.NotSupported)
+        // Make the real SDK grant available before the replacement pause, rather than
+        // exercising the sibling test's Pending/unavailable fail-closed path.
+        val previousMediaItem = player.currentMediaItem
+        afterPause = {
+            if (player.currentMediaItem !== previousMediaItem && runtime.activeTarget.value != null) {
+                afterPause = {}
+                runBlocking {
+                    await { connection.subscribeCount == 2 }
+                    connection.awaitCollectionRegistered()
+                    startSubscription()
+                    await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                        ?.timeshiftState is LiveTimeshiftState.Available }
+                }
+            }
+        }
+        val speeds = connection.speeds.size
+        runtime.onAppForegrounded()
+        await { connection.speeds.size > speeds }
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(player.playWhenReady)
+        assertEquals(0, connection.speeds.last())
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(1, focus.requestCount)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun recoveryQueuedAfterBackgroundBehindLongCommandReleasesKeptTarget() = exercise {
+        live()
+        val resumeEntered = CompletableDeferred<Unit>()
+        val finishResume = CompletableDeferred<Unit>()
+        beforeSpeed = { speed ->
+            if (speed == 100) {
+                resumeEntered.complete(Unit)
+                finishResume.await()
+            }
+        }
+        val resume = scope.async { runtime.resumeTimeshift() }
+        await { resumeEntered.isCompleted }
+        runtime.onAppBackgrounded()
+        scheduler.runCurrent() // Background queues for the occupied command lock first.
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        scheduler.runCurrent() // Recovery is queued, but not yet admitted.
+        finishResume.complete(Unit)
+        await { resume.isCompleted && runtime.activeTarget.value == null }
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        returnAndRetune()
+        assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
+        runtime.onAppForegrounded()
+        settle()
+        assertEquals(2, connection.subscribeCount)
+    }
+
     @Test fun rejectedServerResumeRetunesOnceWithTunerLostNotice() = exercise {
         live()
         runtime.onAppBackgrounded()
@@ -379,7 +440,13 @@ class BackgroundPlaybackRuntimeTest {
         private val context = ApplicationProvider.getApplicationContext<Application>()
         val focus = FakeFocus()
         val connection = ScriptedSubscriptionConnection()
-        private val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        var beforeSpeed: suspend (Int) -> Unit = {}
+        private val manager = createSubscriptionManager(object : SubscriptionConnection by connection {
+            override suspend fun speed(id: SubscriptionId, speed: Int): SubscriptionOperationResult<Unit> {
+                beforeSpeed(speed)
+                return connection.speed(id, speed)
+            }
+        }, Dispatchers.Default).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
@@ -390,9 +457,15 @@ class BackgroundPlaybackRuntimeTest {
         private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val player = ExoPlayer.Builder(context).build()
+        var afterPause: () -> Unit = {}
         private val coordinator = createTvheadendPlaybackCoordinator(player,
             onRecoveryRequired = { recover(it) }).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+        val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
+            override fun pause() {
+                player.pause()
+                afterPause()
+            }
+        }, session, coordinator, settings, profiles, scope,
             audioOutput = TvheadendAudioOutputProvider(context), audioFocus = focus, elapsedRealtime = { scheduler.currentTime })
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 

@@ -27,6 +27,7 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
@@ -1131,9 +1132,13 @@ class AppPlaybackRuntime(
                 val currentJob = currentCoroutineContext().job
                 val recoveryPending = recoveryJob?.isActive == true && activeTargetEpoch != null &&
                     admittedRecoveryEpoch == activeTargetEpoch
-                recoveryJob?.takeUnless { it === currentJob }?.cancel()
-                if (recoveryJob !== currentJob) recoveryJob = null
-                admittedRecoveryEpoch = null
+                // A queued, un-admitted escalation must still reach admission and release
+                // any target kept below. The SDK will not escalate that target again.
+                if (admittedRecoveryEpoch != null) {
+                    recoveryJob?.takeUnless { it === currentJob }?.cancel()
+                    if (recoveryJob !== currentJob) recoveryJob = null
+                    admittedRecoveryEpoch = null
+                }
                 val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady }
                     ?: return@serialize
                 player.pause()
@@ -1235,6 +1240,32 @@ class AppPlaybackRuntime(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
     ) {
         if (interruptionMuted) TimeshiftCommandResult.UNAVAILABLE else coordinator.pauseTimeshift()
+    }
+
+    /**
+     * Atomically restores interruption-muted sound or pauses local and server playback.
+     * Null means a sound-restoration request was handled: no timeshift feedback or rollback.
+     * Otherwise returns the server result; rejected pauses restore local intent here without
+     * requesting focus. Ambiguous results (such as TIMEOUT) leave playback locally paused.
+     */
+    suspend fun pauseTimeshiftPlayback(): TimeshiftCommandResult? = targetCommands.serialize(
+        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
+    ) {
+        if (!foreground) return@serialize TimeshiftCommandResult.UNAVAILABLE
+        if (interruptionMuted) {
+            playWithAudioFocus(restoreSoundOnly = true)
+            return@serialize null
+        }
+        val wasPlaying = player.playWhenReady
+        resumeAfterInterruption = false
+        player.pause()
+        coordinator.pauseTimeshift().also { result ->
+            if (result.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED &&
+                foreground && interruption == null
+            ) {
+                player.playWhenReady = wasPlaying
+            }
+        }
     }
     suspend fun resumeTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
@@ -1724,7 +1755,10 @@ class AppPlaybackRuntime(
         }
     }
 
-    private suspend fun playWithAudioFocus(resumeTimeshift: Boolean = false): TimeshiftCommandResult {
+    private suspend fun playWithAudioFocus(
+        resumeTimeshift: Boolean = false,
+        restoreSoundOnly: Boolean = false,
+    ): TimeshiftCommandResult {
         if (!targetCommands.isOpen()) return TimeshiftCommandResult.SHUT_DOWN
         if (!foreground) return TimeshiftCommandResult.UNAVAILABLE
         val epoch = activeTargetEpoch ?: return TimeshiftCommandResult.UNAVAILABLE
@@ -1740,13 +1774,13 @@ class AppPlaybackRuntime(
         }
         if (!granted) {
             // Preserve a previous server hold even if timeshift availability has disappeared.
-            handleAudioInterruption(AudioInterruption.TRANSIENT_LOSS, wasPlaying = true)
+            if (!restoreSoundOnly) handleAudioInterruption(AudioInterruption.TRANSIENT_LOSS, wasPlaying = true)
             // Delayed gain is disabled: only another explicit request can resolve denial.
             resumeAfterInterruption = false
             return TimeshiftCommandResult.UNAVAILABLE
         }
-        val result = if (resumeTimeshift ||
-            interruption != null && interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT
+        val result = if (!restoreSoundOnly && (resumeTimeshift ||
+            interruption != null && interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT)
         ) coordinator.resumeTimeshift() else TimeshiftCommandResult.ACCEPTED
         interruption = null
         interruptionPaused = false

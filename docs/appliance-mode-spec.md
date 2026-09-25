@@ -271,6 +271,11 @@ fun adjacentChannelId(
    while the same target remains current. Explicit Stop or a target replacement
     cancels that pending foreground action.
 
+   A recovery already admitted for the current live target is treated as tuner
+   loss when backgrounding: release it and retune once on foreground with the
+   tuner-loss notice. This also applies with keep Off, unavailable timeshift, or
+   a non-interactive device, rather than silently resuming a target known to have failed.
+
    **Known limitation:** On Android 14+/Google TV, cached-app freezing can defer
    the keep timer and screen-off broadcast until the process thaws, delaying tuner
    release. YIELD normally lets other viewers and DVR take the tuner; a server

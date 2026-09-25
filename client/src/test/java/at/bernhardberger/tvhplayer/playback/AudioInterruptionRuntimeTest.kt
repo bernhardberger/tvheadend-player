@@ -344,9 +344,9 @@ class AudioInterruptionRuntimeTest {
             ?.timeshiftState is LiveTimeshiftState.Available }
         assertTrue(audioDisabled())
         assertTrue(runtime.isInterruptionMuted)
-        // Backstop remains safe, but the UI's muted toggle only uses the local sound-restoring path.
+        // The backstop remains safe; the atomic operation restores only sound.
         assertEquals(TimeshiftCommandResult.UNAVAILABLE, runtime.pauseTimeshift())
-        runtime.pause()
+        assertNull(runtime.pauseTimeshiftPlayback())
         await { !audioDisabled() }
         assertFalse(runtime.isInterruptionMuted)
         assertTrue(player.playWhenReady)
@@ -363,6 +363,64 @@ class AudioInterruptionRuntimeTest {
         assertTrue(player.playWhenReady)
         assertEquals(requests + 1, focus.requests.size)
         assertEquals(listOf(0, 100), connection.speeds)
+    }
+
+    @Test fun pauseQueuedDuringMutedResumePausesLocallyAndOnServer() = exercise {
+        live(timeshift = true)
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        focus.send(AudioInterruption.NOISY)
+        await { runtime.isInterruptionMuted }
+        connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
+        val resumeEntered = CompletableDeferred<Unit>()
+        val finishResume = CompletableDeferred<Unit>()
+        beforeSpeed = { speed ->
+            if (speed == 100) {
+                resumeEntered.complete(Unit)
+                finishResume.await()
+            } else withContext(scope.coroutineContext) { assertFalse(player.playWhenReady) }
+        }
+        val resume = scope.async { runtime.resumeTimeshift() }
+        resumeEntered.await()
+        assertTrue(runtime.isInterruptionMuted)
+        val pause = scope.async(start = CoroutineStart.UNDISPATCHED) { runtime.pauseTimeshiftPlayback() }
+        assertFalse(pause.isCompleted)
+        finishResume.complete(Unit)
+        assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
+        assertEquals(TimeshiftCommandResult.ACCEPTED, pause.await())
+        assertFalse(player.playWhenReady)
+        assertFalse(runtime.isInterruptionMuted)
+        assertEquals(listOf(0, 100, 0), connection.speeds)
+        assertEquals(2, focus.requests.size)
+    }
+
+    @Test fun atomicPauseRollsBackRejectedIntentWithoutFocusAndKeepsTimeoutPaused() = exercise {
+        live(timeshift = true)
+        beforeSpeed = { withContext(scope.coroutineContext) { assertFalse(player.playWhenReady) } }
+        val requests = focus.requests.size
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        assertEquals(TimeshiftCommandResult.SERVER_REJECTED, runtime.pauseTimeshiftPlayback())
+        assertTrue(player.playWhenReady)
+        assertEquals(requests, focus.requests.size)
+        connection.scriptSpeed(SubscriptionOperationResult.Timeout)
+        assertEquals(TimeshiftCommandResult.TIMEOUT, runtime.pauseTimeshiftPlayback())
+        assertFalse(player.playWhenReady)
+        assertEquals(requests, focus.requests.size)
+    }
+
+    @Test fun mutedSoundRestorationNeverSendsServerCommandsEvenWithDeniedFocus() = exercise {
+        live(timeshift = true)
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        focus.send(AudioInterruption.NOISY)
+        await { runtime.isInterruptionMuted }
+        val speeds = connection.speeds.toList()
+        focus.granted = false
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertTrue(runtime.isInterruptionMuted)
+        focus.granted = true
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertFalse(runtime.isInterruptionMuted)
+        assertTrue(player.playWhenReady)
+        assertEquals(speeds, connection.speeds)
     }
 
     @Test fun deniedResumeWithRejectedServerPauseExposesRuntimeInterruptionOwnership() = exercise {
@@ -448,7 +506,13 @@ class AudioInterruptionRuntimeTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }
-        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        var beforeSpeed: suspend (Int) -> Unit = {}
+        val manager = createSubscriptionManager(object : SubscriptionConnection by connection {
+            override suspend fun speed(id: SubscriptionId, speed: Int): SubscriptionOperationResult<Unit> {
+                beforeSpeed(speed)
+                return connection.speed(id, speed)
+            }
+        }, Dispatchers.Default).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
