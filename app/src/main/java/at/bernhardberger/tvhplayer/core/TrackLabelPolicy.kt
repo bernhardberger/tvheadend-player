@@ -20,7 +20,8 @@ data class HumanTrackLabel(
  * The name is what the viewer picks: the track's role (audio description, clear
  * dialogue) when it has one, otherwise its language. A role track with a known
  * language shows the language as the overline. The detail is the channel layout and
- * codec. Language uses Locale display names with explicit und/mis/zxx fallbacks.
+ * codec. Language uses Locale display names with explicit und/mis/zxx fallbacks;
+ * "mul" is named as multiple languages, which is all the code says about the track.
  */
 fun humanTrackLabel(
     languageCode: String?,
@@ -28,6 +29,7 @@ fun humanTrackLabel(
     sampleMimeType: String?,
     roleLabel: String?,
     unknownLanguageLabel: String,
+    multipleLanguagesLabel: String,
     monoLabel: String,
     stereoLabel: String,
     surround51Label: String,
@@ -35,8 +37,10 @@ fun humanTrackLabel(
     channelsLabel: (Int) -> String,
     trackFallbackLabel: String,
 ): HumanTrackLabel {
-    val language = humanLanguageName(languageCode, unknownLanguageLabel)
-    val knownLanguage = language?.takeUnless { isUnknownLanguageCode(languageCode) }
+    val language = humanLanguageName(languageCode, unknownLanguageLabel, multipleLanguagesLabel)
+    val knownLanguage = language?.takeUnless {
+        isUnknownLanguageCode(languageCode) || isMultipleLanguagesCode(languageCode)
+    }
     val channels = humanChannelLayout(
         channelCount = channelCount,
         monoLabel = monoLabel,
@@ -64,11 +68,16 @@ fun humanTrackLabel(
     )
 }
 
-fun humanLanguageName(languageCode: String?, unknownLanguageLabel: String): String? {
+fun humanLanguageName(
+    languageCode: String?,
+    unknownLanguageLabel: String,
+    multipleLanguagesLabel: String = unknownLanguageLabel,
+): String? {
     val code = languageCode?.trim().orEmpty()
     if (code.isEmpty()) return null
     return when {
         isUnknownLanguageCode(code) -> unknownLanguageLabel
+        isMultipleLanguagesCode(code) -> multipleLanguagesLabel
         else -> {
             val locale = Locale.forLanguageTag(code.replace('_', '-'))
             locale.getDisplayLanguage(Locale.getDefault())
@@ -80,10 +89,13 @@ fun humanLanguageName(languageCode: String?, unknownLanguageLabel: String): Stri
     }
 }
 
-private val UNKNOWN_LANGUAGE_CODES = setOf("und", "mis", "zxx", "mul", "qaa")
+private val UNKNOWN_LANGUAGE_CODES = setOf("und", "mis", "zxx", "qaa")
 
 private fun isUnknownLanguageCode(languageCode: String?): Boolean =
     languageCode?.trim()?.lowercase(Locale.ROOT) in UNKNOWN_LANGUAGE_CODES
+
+private fun isMultipleLanguagesCode(languageCode: String?): Boolean =
+    languageCode?.trim()?.lowercase(Locale.ROOT) == "mul"
 
 fun humanChannelLayout(
     channelCount: Int?,

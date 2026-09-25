@@ -11,6 +11,7 @@ class TrackLabelPolicyTest {
         assertEquals("Unknown language", humanLanguageName("und", "Unknown language"))
         assertEquals("Unknown language", humanLanguageName("mis", "Unknown language"))
         assertEquals("Unknown language", humanLanguageName("zxx", "Unknown language"))
+        assertEquals("Multiple languages", humanLanguageName("mul", "Unknown language", "Multiple languages"))
         val german = humanLanguageName("de", "Unknown language")
         assertTrue(german == "German" || german == "Deutsch" || german == "de")
     }
@@ -48,8 +49,13 @@ class TrackLabelPolicyTest {
         )
         assertEquals("5.1 · Dolby Digital", label("de", 6, "audio/ac3", role = null).detail)
         assertEquals(
-            HumanTrackLabel("Unknown language · Stereo", "Unknown language", null, "Stereo · MPEG-1 Layer II"),
+            HumanTrackLabel("Multiple languages · Stereo", "Multiple languages", null, "Stereo · MPEG-1 Layer II"),
             label("mul", 2, "audio/mpeg-L2", role = null),
+        )
+        // "mul" is not a language to show above a role.
+        assertEquals(
+            HumanTrackLabel("Clear dialogue · Stereo", "Clear dialogue", null, "Stereo · MPEG-1 Layer II"),
+            label("mul", 2, "audio/mpeg-L2", role = "Clear dialogue"),
         )
         assertEquals(
             HumanTrackLabel("Clear dialogue · Stereo", "Clear dialogue", null, "Stereo · MPEG-1 Layer II"),
@@ -79,6 +85,7 @@ class TrackLabelPolicyTest {
         sampleMimeType = mime,
         roleLabel = role,
         unknownLanguageLabel = "Unknown language",
+        multipleLanguagesLabel = "Multiple languages",
         monoLabel = "Mono",
         stereoLabel = "Stereo",
         surround51Label = "5.1",

@@ -110,6 +110,7 @@ internal fun PlaybackOptionsSheet(
     onAutomaticAudio: () -> Unit,
 ) {
     val unknownLanguage = stringResource(R.string.track_unknown_language)
+    val multipleLanguages = stringResource(R.string.track_multiple_languages)
     val mono = stringResource(R.string.track_mono)
     val stereo = stringResource(R.string.track_stereo)
     val surround51 = stringResource(R.string.track_surround_5_1)
@@ -121,6 +122,7 @@ internal fun PlaybackOptionsSheet(
     val audioChoices = remember(
         currentTracks,
         unknownLanguage,
+        multipleLanguages,
         mono,
         stereo,
         surround51,
@@ -133,6 +135,7 @@ internal fun PlaybackOptionsSheet(
             tracks = currentTracks,
             trackType = C.TRACK_TYPE_AUDIO,
             unknownLanguageLabel = unknownLanguage,
+            multipleLanguagesLabel = multipleLanguages,
             monoLabel = mono,
             stereoLabel = stereo,
             surround51Label = surround51,
@@ -145,6 +148,7 @@ internal fun PlaybackOptionsSheet(
     val subtitleChoices = remember(
         currentTracks,
         unknownLanguage,
+        multipleLanguages,
         mono,
         stereo,
         surround51,
@@ -155,6 +159,7 @@ internal fun PlaybackOptionsSheet(
             tracks = currentTracks,
             trackType = C.TRACK_TYPE_TEXT,
             unknownLanguageLabel = unknownLanguage,
+            multipleLanguagesLabel = multipleLanguages,
             monoLabel = mono,
             stereoLabel = stereo,
             surround51Label = surround51,

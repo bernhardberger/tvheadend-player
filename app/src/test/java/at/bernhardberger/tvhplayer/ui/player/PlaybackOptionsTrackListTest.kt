@@ -73,7 +73,7 @@ class PlaybackOptionsTrackListTest {
 
     private class RowTexts(
         val language: String,
-        val unknownLanguage: String,
+        val multipleLanguages: String,
         val clearDialogue: String,
         val audioDescription: String,
     )
@@ -96,7 +96,7 @@ class PlaybackOptionsTrackListTest {
         val expectedLines = mapOf(
             "main" to listOf(texts.language, stereo),
             "surround" to listOf(texts.language, "5.1 · Dolby Digital"),
-            "second" to listOf(texts.unknownLanguage, stereo),
+            "second" to listOf(texts.multipleLanguages, stereo),
             "clear" to listOf(texts.clearDialogue, stereo),
             "described" to listOf(texts.language, texts.audioDescription, stereo),
         )
@@ -172,8 +172,8 @@ class PlaybackOptionsTrackListTest {
     }
 
     private companion object {
-        val ENGLISH = RowTexts("German", "Unknown language", "Clear dialogue", "Audio description")
-        val GERMAN = RowTexts("Deutsch", "Unbekannte Sprache", "Klare Sprache", "Audiodeskription")
+        val ENGLISH = RowTexts("German", "Multiple languages", "Clear dialogue", "Audio description")
+        val GERMAN = RowTexts("Deutsch", "Mehrsprachig", "Klare Sprache", "Audiodeskription")
         val TRACK_IDS = listOf("main", "surround", "second", "clear", "described")
 
         // ORF1 HD in September 2026 as seen on the test TV, plus an audio description
