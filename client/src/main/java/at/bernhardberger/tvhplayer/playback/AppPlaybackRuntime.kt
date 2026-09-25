@@ -722,6 +722,7 @@ class AppPlaybackRuntime(
     private var focusGeneration = 0L
     private var interruption: AudioInterruption? = null
     private var interruptionContent = AudioInterruptionContent.NONE
+    private var interruptionHoldUnconfirmed = false
     private var resumeAfterInterruption = false
     private var interruptionPaused = false
     private var interruptionMuted = false
@@ -1784,6 +1785,7 @@ class AppPlaybackRuntime(
         focusGeneration++
         audioFocus.abandon()
         interruption = null
+        interruptionHoldUnconfirmed = false
         interruptionContent = AudioInterruptionContent.NONE
         resumeAfterInterruption = false
         interruptionPaused = false
@@ -1829,10 +1831,12 @@ class AppPlaybackRuntime(
             resumeAfterInterruption = false
             return TimeshiftCommandResult.UNAVAILABLE
         }
-        val result = if (!restoreSoundOnly && (resumeTimeshift ||
-            interruption != null && interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT)
-        ) coordinator.resumeTimeshift() else TimeshiftCommandResult.ACCEPTED
+        // Restoring sound only still releases a server hold whose acknowledgement was lost.
+        val releaseServer = if (restoreSoundOnly) interruption != null && interruptionHoldUnconfirmed
+        else resumeTimeshift || interruption != null && interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT
+        val result = if (releaseServer) coordinator.resumeTimeshift() else TimeshiftCommandResult.ACCEPTED
         interruption = null
+        interruptionHoldUnconfirmed = false
         interruptionPaused = false
         resumeAfterInterruption = false
         setInterruptionMuted(false)
@@ -1857,6 +1861,7 @@ class AppPlaybackRuntime(
                 else -> return
             }
             interruption = null
+            interruptionHoldUnconfirmed = false
             resumeAfterInterruption = false
             return
         }
@@ -1875,11 +1880,12 @@ class AppPlaybackRuntime(
                 }
                 interruptionPaused = true
                 player.pause()
-                if (content == AudioInterruptionContent.LIVE_TIMESHIFT &&
-                    coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED) {
+                val hold = if (content == AudioInterruptionContent.LIVE_TIMESHIFT) coordinator.pauseTimeshift() else null
+                if (hold != null && hold != TimeshiftCommandResult.ACCEPTED) {
                     // Do not leave an unconfirmed server hold filling the pushed source queues.
                     // Keep the timeshift content kind so a subsequent resume also releases a
                     // server hold whose acknowledgement may have been lost.
+                    interruptionHoldUnconfirmed = hold.disposition == TimeshiftCommandDisposition.UNCONFIRMED
                     setInterruptionMuted(true)
                     interruptionPaused = false
                     player.play()

@@ -407,6 +407,34 @@ class AudioInterruptionRuntimeTest {
         assertEquals(requests, focus.requests.size)
     }
 
+    @Test fun rejectedPauseAfterRuntimeCloseDoesNotRestorePlayback() = exercise {
+        live(timeshift = true)
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        beforeSpeed = {
+            withContext(scope.coroutineContext) {
+                scope.launch(start = CoroutineStart.UNDISPATCHED) { runtime.detach() }
+            }
+        }
+        assertEquals(TimeshiftCommandResult.SERVER_REJECTED, runtime.pauseTimeshiftPlayback())
+        assertFalse(player.playWhenReady)
+    }
+
+    @Test fun mutedSoundRestorationReleasesUnconfirmedInterruptionHoldOnce() = exercise {
+        live(timeshift = true)
+        connection.scriptSpeed(SubscriptionOperationResult.Timeout)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { runtime.isInterruptionMuted && player.playWhenReady }
+        connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertFalse(runtime.isInterruptionMuted)
+        assertTrue(player.playWhenReady)
+        assertEquals(listOf(0, 100), connection.speeds)
+        // The released hold is gone: the next Pause is an ordinary pause.
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.pauseTimeshiftPlayback())
+        assertFalse(player.playWhenReady)
+        assertEquals(listOf(0, 100, 0), connection.speeds)
+    }
+
     @Test fun mutedSoundRestorationNeverSendsServerCommandsEvenWithDeniedFocus() = exercise {
         live(timeshift = true)
         connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
