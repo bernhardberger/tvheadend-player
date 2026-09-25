@@ -103,8 +103,8 @@ subtitles.
 - Rail → Settings: General, Channel tags, Connection, Player, Appliance.
 - Player: timeshift, refresh-rate matching, audio passthrough, three audio
   languages, audio format, audio description, subtitle language, keep channel,
-  stream profiles. Languages, format and keep channel open a sub-list; Back or Left
-  goes up one level.
+  start-up buffer, stream profiles. Languages, format, keep channel and start-up
+  buffer open a sub-list; Back or Left goes up one level.
 - **Never capture Connection**: its overview shows host and port, and its editor
   shows username and password fields.
 
