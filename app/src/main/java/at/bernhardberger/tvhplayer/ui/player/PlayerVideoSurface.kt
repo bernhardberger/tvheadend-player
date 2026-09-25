@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.View
 import androidx.annotation.OptIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -96,6 +99,11 @@ fun PlayerVideoSurface(
                 view.keepScreenOn = false
             },
         )
+        // View alpha does not hide a SurfaceView's content: cover the old picture until the
+        // current target renders its first frame.
+        if (!videoVisible) {
+            Box(Modifier.matchParentSize().background(Color.Black).testTag("video-cover"))
+        }
         DebugVideoBackdrop(
             visible = debugVideoBackdropVisible,
             modifier = Modifier.matchParentSize(),

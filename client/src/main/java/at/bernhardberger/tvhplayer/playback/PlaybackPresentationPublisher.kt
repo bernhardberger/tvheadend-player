@@ -3,6 +3,7 @@
 package at.bernhardberger.tvhplayer.playback
 
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -34,6 +35,12 @@ internal class PlaybackPresentationPublisher(
     private val _videoPresentation = MutableStateFlow(AppVideoPresentation())
     private var diagnosticsEnabled = false
     private var targetFrameListener: Player.Listener? = null
+    private var presentationBeforeInstall: AppVideoPresentation? = null
+    private var staleVideoFormat: Format? = null
+
+    // Guarded by targetCommands.runIfOpen: set by the frame listener while an install runs, read
+    // by the install's finally block.
+    private var frameDuringInstall = false
     val diagnostics = _diagnostics.asStateFlow()
     val videoPresentation = _videoPresentation.asStateFlow()
 
@@ -95,13 +102,63 @@ internal class PlaybackPresentationPublisher(
         }
     }
 
+    /**
+     * Covers the video as a target install begins, before the old target is paused or a new
+     * source is set, so the old picture cannot show while the next target starts. Also records
+     * the old target's video format: its first-frame events can still be queued on the player
+     * looper when the next target's frame listener is registered.
+     */
+    fun coverVideoForTargetInstallLocked() {
+        targetCommands.runIfOpen {
+            val current = _videoPresentation.value
+            presentationBeforeInstall = current
+            staleVideoFormat = player.videoFormat
+            frameDuringInstall = false
+            _videoPresentation.value = current.copy(visible = false)
+            if (policy.trace.enabled) policy.trace.videoCoverShown()
+        }
+    }
+
+    /**
+     * Uncovers the old target's picture when an install failed and the old target stays. A first
+     * frame the old target rendered during the install counts: the player does not report it
+     * again, and the caller guarantees that the media item did not change.
+     */
+    fun restoreVideoAfterFailedInstallLocked() {
+        targetCommands.runIfOpen {
+            val previous = presentationBeforeInstall ?: return@runIfOpen
+            val frameRendered = frameDuringInstall
+            presentationBeforeInstall = null
+            staleVideoFormat = null
+            frameDuringInstall = false
+            if (_videoPresentation.value != previous.copy(visible = false)) return@runIfOpen
+            val restored = when {
+                previous.visible -> previous
+                frameRendered -> previous.onFirstFrame(frameEpoch = previous.epoch, activeTargetEpoch = activeTargetEpoch())
+                else -> return@runIfOpen
+            }
+            _videoPresentation.value = restored
+            if (policy.trace.enabled && restored.visible) policy.trace.videoCoverLifted(restored.epoch)
+        }
+    }
+
     fun beginTargetPresentationLocked(epoch: Long) {
         targetCommands.runIfOpen {
             targetFrameListener?.let(player::removeListener)
             _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
+            val staleFormat = staleVideoFormat
+            presentationBeforeInstall = null
+            staleVideoFormat = null
+            frameDuringInstall = false
             targetFrameListener = object : Player.Listener {
                 override fun onRenderedFirstFrame() {
-                    if (targetInstallationInProgress() || !targetCommands.isOpen()) return
+                    if (!targetCommands.isOpen()) return
+                    // Until the new source reports its own format, a first frame is the old one's.
+                    if (staleFormat != null && player.videoFormat === staleFormat) return
+                    if (targetInstallationInProgress()) {
+                        targetCommands.runIfOpen { frameDuringInstall = true }
+                        return
+                    }
                     val notYetVisible = policy.trace.enabled && !_videoPresentation.value.visible
                     _videoPresentation.value = _videoPresentation.value.onFirstFrame(
                         frameEpoch = epoch,
@@ -110,6 +167,7 @@ internal class PlaybackPresentationPublisher(
                     if (notYetVisible && epoch == activeTargetEpoch() && _videoPresentation.value.visible) {
                         val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
                         policy.trace.firstVideoFrame(epoch, player.videoFormat, live?.diagnostics?.source?.adapterName)
+                        policy.trace.videoCoverLifted(epoch)
                     }
                 }
             }.also(player::addListener)
@@ -120,6 +178,9 @@ internal class PlaybackPresentationPublisher(
         targetCommands.runIfOpen {
             targetFrameListener?.let(player::removeListener)
             targetFrameListener = null
+            presentationBeforeInstall = null
+            staleVideoFormat = null
+            frameDuringInstall = false
             _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
         }
     }

@@ -25,4 +25,12 @@ object ProfilePlaybackTrace : PlaybackTrace {
     override fun firstVideoFrame(epoch: Long, format: Format?, adapterName: String?) {
         profileFirstVideoFrame(epoch, format, adapterName)
     }
+
+    override fun videoCoverShown() {
+        profileTrace("P44:cover:shown") {}
+    }
+
+    override fun videoCoverLifted(epoch: Long) {
+        profileTrace("P44:cover:lifted:$epoch") {}
+    }
 }

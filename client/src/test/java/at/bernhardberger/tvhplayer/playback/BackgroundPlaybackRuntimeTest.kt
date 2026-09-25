@@ -543,8 +543,19 @@ class BackgroundPlaybackRuntimeTest {
         val playerListeners = mutableListOf<Player.Listener>()
         /** An error the runtime reads from the player, for errors the fake stream never raises. */
         var forcedPlayerError: ExoPlaybackException? = null
+        /** A video format the runtime reads from the player, for formats the fake stream never reports. */
+        var forcedVideoFormat: androidx.media3.common.Format? = null
+        /** Runs inside a live target install, before the session binds the channel. */
+        var beforeLiveBinding: () -> Unit = {}
+        private val runtimeSession = object : TvheadendSession by session {
+            override fun bindLivePlayback(currentSession: CurrentSessionObservation, channelId: ChannelId): PlaybackBindingResult<PlaybackBinding.Live> {
+                beforeLiveBinding()
+                return session.bindLivePlayback(currentSession, channelId)
+            }
+        }
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
             override fun getPlayerError(): ExoPlaybackException? = forcedPlayerError ?: player.playerError
+            override fun getVideoFormat(): androidx.media3.common.Format? = forcedVideoFormat ?: player.videoFormat
             override fun pause() {
                 player.pause()
                 afterPause()
@@ -557,7 +568,7 @@ class BackgroundPlaybackRuntimeTest {
                 playerListeners -= listener
                 player.removeListener(listener)
             }
-        }, session, coordinator, settings, profiles, scope,
+        }, runtimeSession, coordinator, settings, profiles, scope,
             audioOutput = TvheadendAudioOutputProvider(context), audioFocus = focus, policy = policy, elapsedRealtime = { scheduler.currentTime })
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 

@@ -93,6 +93,17 @@ class PlaybackRuntimePolicyTest {
         }
     }
 
+    @Test fun enabledTraceSeesCoverShownAtInstallAndLiftedAfterTheFirstFrame() {
+        val trace = RecordingTrace(enabled = true)
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            assertEquals(listOf("cover"), trace.events)
+            renderFirstFrame()
+            assertEquals(listOf("cover", "frame:$epoch", "lifted:$epoch"), trace.events)
+        }
+    }
+
     @Test fun disabledTraceIsNeverCalled() {
         val trace = RecordingTrace(enabled = false)
         exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
@@ -115,6 +126,7 @@ class PlaybackRuntimePolicyTest {
         val bound = mutableListOf<Long>()
         val ready = mutableListOf<Long?>()
         val frames = mutableListOf<Long>()
+        val events = mutableListOf<String>()
         var calls = 0
 
         override fun tuneAdmitted() { calls++; admitted++ }
@@ -123,6 +135,9 @@ class PlaybackRuntimePolicyTest {
         override fun firstVideoFrame(epoch: Long, format: androidx.media3.common.Format?, adapterName: String?) {
             calls++
             frames += epoch
+            events += "frame:$epoch"
         }
+        override fun videoCoverShown() { calls++; events += "cover" }
+        override fun videoCoverLifted(epoch: Long) { calls++; events += "lifted:$epoch" }
     }
 }

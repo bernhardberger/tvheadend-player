@@ -1078,6 +1078,7 @@ class AppPlaybackRuntime(
         val previousTarget = healthyActiveTarget()
         val previousTargetEpoch = activeTargetEpoch
         val previousMediaItem = player.currentMediaItem
+        presentation.coverVideoForTargetInstallLocked()
         player.pause()
         targetInstallationInProgress = true
         return try {
@@ -1100,10 +1101,12 @@ class AppPlaybackRuntime(
                 committed = activeTargetEpoch != previousTargetEpoch,
                 activeIsLive = _activeTarget.value is AppPlaybackTarget.Live,
             )
-            if (foreground && targetCommands.isOpen() && presentationEpoch.isCurrent(expectedPresentationEpoch) &&
+            val previousTargetStays = targetCommands.isOpen() &&
+                presentationEpoch.isCurrent(expectedPresentationEpoch) &&
                 previousTarget != null && healthyActiveTarget() == previousTarget &&
                 activeTargetEpoch == previousTargetEpoch && player.currentMediaItem == previousMediaItem
-            ) {
+            if (previousTargetStays) presentation.restoreVideoAfterFailedInstallLocked()
+            if (foreground && previousTargetStays) {
                 player.playWhenReady = previousPlayWhenReady
                 presentation.publishPlayerState()
             }
