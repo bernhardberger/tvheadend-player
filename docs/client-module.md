@@ -82,7 +82,10 @@ Live Play/Pause remains unavailable without timeshift, matching the live player'
 remote-key policy; only seekable recordings expose seek-in-current-item. Activity
 startup handling and Compose retain key priority: player media actions consume
 the opening down/repeat/up cycle, while unhandled keys on browse screens reach
-the system session once. The appliance accessibility service still handles only
+the system session once.
+When the player info/options layer is open, both player screens leave media keys
+unhandled so they reach the session as the single handler.
+The appliance accessibility service still handles only
 its appliance-entry keys, not media keys. No next/previous, stop, playlist, volume,
 device or speed commands are exposed by the session.
 

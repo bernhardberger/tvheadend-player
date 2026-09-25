@@ -59,7 +59,6 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
     private var metadata = MediaMetadata.EMPTY
     private var metadataTarget: AppPlaybackTarget? = null
     private var itemUid = Any()
-    private val pendingCommands = mutableSetOf<Job>()
     private var closed = false
 
     /** The activity starts this on the player's looper and cancels it before releasing the session. */
@@ -115,9 +114,7 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
 
     private fun awaitCommand(job: Job): ListenableFuture<*> {
         val result = SettableFuture.create<Void>()
-        pendingCommands += job
         job.invokeOnCompletion { failure ->
-            pendingCommands -= job
             if (failure == null) result.set(null) else result.cancel(false)
         }
         return result
@@ -127,7 +124,8 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
     fun close() {
         if (closed) return
         closed = true
-        pendingCommands.toList().forEach { it.cancel() }
+        // Commands belong to the runtime: let their local/server transaction finish even
+        // after this presentation wrapper is detached. Their futures may still complete.
         // ForwardingSimpleBasePlayer owns a private listener. Swapping detaches it without
         // releasing the app-scoped ExoPlayer (which must survive activity stop/start).
         setPlayer(object : SimpleBasePlayer(applicationLooper) {

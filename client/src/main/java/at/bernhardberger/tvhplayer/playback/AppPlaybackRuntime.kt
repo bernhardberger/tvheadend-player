@@ -1363,19 +1363,22 @@ class AppPlaybackRuntime(
                 val timeshift = currentInterruptionContent() == AudioInterruptionContent.LIVE_TIMESHIFT
                 if (_activeTarget.value is AppPlaybackTarget.Live && !timeshift) return@serialize
                 if (playWhenReady) {
-                    // Focus recovery already resumes the server; do not send it twice.
-                    val resumesInterruption = interruption != null &&
-                        interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT
-                    playWithAudioFocus()
-                    if (timeshift && interruption == null && player.playWhenReady && !resumesInterruption &&
-                        coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED) {
+                    val result = playWithAudioFocus(resumeTimeshift = timeshift)
+                    // A denied focus request retains its interruption hold/mute. Only a
+                    // granted request follows the player-key server-rejection rollback.
+                    if (timeshift && interruption == null && result != TimeshiftCommandResult.ACCEPTED) {
                         player.pause()
                     }
+                } else if (interruptionMuted) {
+                    // Match pause(): the explicit toggle restores sound rather than holding
+                    // the pushed source. Do not send a pause while interruption-muted.
+                    playWithAudioFocus()
                 } else {
                     resumeAfterInterruption = false
                     val wasPlaying = player.playWhenReady
                     player.pause()
-                    if (timeshift && coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED) {
+                    if (timeshift && !interruptionPaused &&
+                        coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED) {
                         player.playWhenReady = wasPlaying
                     }
                 }

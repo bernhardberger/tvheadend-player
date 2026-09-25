@@ -271,6 +271,7 @@ class MainActivity : AppCompatActivity() {
 
 /** Activity-only session: no service, notification or background controller ownership. */
 internal class ActivityMediaSessionLifecycle {
+    private val sessionId = java.util.UUID.randomUUID().toString()
     private var session: MediaSession? = null
     private var observation: Job? = null
     private var releasePlayer: (() -> Unit)? = null
@@ -279,7 +280,7 @@ internal class ActivityMediaSessionLifecycle {
         check(session == null)
         this.observation = observation
         this.releasePlayer = releasePlayer
-        session = MediaSession.Builder(context, player).build()
+        session = MediaSession.Builder(context, player).setId(sessionId).build()
     }
 
     fun stop() {

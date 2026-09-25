@@ -34,4 +34,30 @@ class ActivityMediaSessionLifecycleTest {
             assertEquals(it + 1, releases)
         }
     }
+
+    @Test fun overlappingActivitySessionsHaveIndependentIdsAndLifetimes() {
+        val first = ActivityMediaSessionLifecycle()
+        val second = ActivityMediaSessionLifecycle()
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        fun player() = object : SimpleBasePlayer(Looper.getMainLooper()) {
+            override fun getState(): State = State.Builder().build()
+        }
+        val firstObservation = Job()
+        val secondObservation = Job()
+        var releases = 0
+        try {
+            first.start(context, player(), firstObservation) { releases++ }
+            // New activity onStart may precede the old activity's onStop.
+            second.start(context, player(), secondObservation) { releases++ }
+            first.stop()
+            assertTrue(firstObservation.isCancelled)
+            assertTrue(secondObservation.isActive)
+            assertEquals(1, releases)
+        } finally {
+            first.stop()
+            second.stop()
+        }
+        assertTrue(secondObservation.isCancelled)
+        assertEquals(2, releases)
+    }
 }

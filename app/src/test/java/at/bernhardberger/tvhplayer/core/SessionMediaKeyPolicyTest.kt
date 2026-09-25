@@ -7,12 +7,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionMediaKeyPolicyTest {
-    @Test fun playerMediaActionsOwnTheEntireOpeningCycle() {
+    @Test fun mediaActionAndOpeningKeySuppressionPoliciesRecognizeMediaKeys() {
         for (key in listOf(KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)) {
             assertTrue(mediaPlaybackAction(key, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE,
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) != MediaPlaybackAction.NONE)
-            // Both player screens store this opening key before acting and test suppression
-            // before handling repeat/down/up, returning true for the whole handled cycle.
+            // Pure policy coverage only; this does not dispatch events through Compose
+            // or prove that a screen consumes the complete down/repeat/up sequence.
             assertTrue(playbackSuppressesRevealingKey(key, key))
             assertEquals(MediaPlaybackAction.NONE, mediaPlaybackAction(key, KeyEvent.KEYCODE_MEDIA_PLAY,
                 KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, repeatCount = 1))

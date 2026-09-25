@@ -107,6 +107,81 @@ class SessionPlaybackPlayerTest {
         assertEquals(2, focusRequests)
     }
 
+    @Test fun rejectedResumeAfterFocusInterruptionPausesLocallyAndSendsOneResume() = exercise {
+        live(true)
+        focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
+        await { connection.speeds == listOf(0) && !player.playWhenReady }
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        wrapper.play()
+        await { connection.speeds == listOf(0, 100) && focusRequests == 2 }
+        settle()
+        assertEquals(listOf(0, 100), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertFalse(wrapper.playWhenReady)
+    }
+
+    @Test fun pauseDuringInterruptionDoesNotSendASecondServerHoldOrAutoResume() = exercise {
+        live(true)
+        focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
+        await { connection.speeds == listOf(0) && !player.playWhenReady }
+        wrapper.pause()
+        settle()
+        focusListener?.invoke(AudioInterruption.GAIN)
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertEquals(1, focusRequests)
+        assertFalse(player.playWhenReady)
+    }
+
+    @Test fun pauseWhileInterruptionMutedUsesExplicitFocusRecoveryWithoutServerPause() = exercise {
+        live(true)
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
+        await { androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes }
+        connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
+        wrapper.pause()
+        await { connection.speeds == listOf(0, 100) && focusRequests == 2 }
+        settle()
+        assertEquals(listOf(0, 100), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+    }
+
+    @Test fun pauseWhileInterruptionMutedAndFocusDeniedPreservesMuteWithoutServerPause() = exercise {
+        live(true)
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
+        await { androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes }
+        focusGranted = false
+        wrapper.pause()
+        await { focusRequests == 2 }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertTrue(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
+    }
+
+    @Test fun closeDuringLocalPauseLetsServerRejectionRollbackComplete() = exercise {
+        live(true)
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        val closed = CompletableDeferred<Unit>()
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (!playWhenReady && !closed.isCompleted) {
+                    observation.cancel()
+                    wrapper.close()
+                    closed.complete(Unit)
+                }
+            }
+        })
+        wrapper.pause()
+        await { closed.isCompleted && connection.speeds == listOf(0) && player.playWhenReady }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertEquals(Player.Commands.EMPTY, wrapper.availableCommands)
+    }
+
     @Test fun recordingPauseAndPlayUseRuntimeFocusPath() = exercise {
         recording()
         wrapper.pause()
