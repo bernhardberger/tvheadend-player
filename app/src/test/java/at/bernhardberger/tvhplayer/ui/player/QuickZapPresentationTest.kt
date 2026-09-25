@@ -656,7 +656,7 @@ class QuickZapPresentationTest {
                             }
                         }) {
                         OverlayControlsTv(
-                            imageLoader = loader, currentSession = session, channelNumber = playing?.value?.toInt(), channelName = playing?.let { "Channel ${it.value}" }.orEmpty(),
+                            imageLoader = loader, currentSession = session, channelNumber = playing?.value, channelName = playing?.let { "Channel ${it.value}" }.orEmpty(),
                             piconPath = playing?.let { ArtworkId(it.value.toInt()) }, nowEvent = playing?.let(::event), nextEvent = null, nowSec = 900,
                             controlsVisible = layers.controlsVisible, optionsOpen = false,
                             onOpenChannels = {

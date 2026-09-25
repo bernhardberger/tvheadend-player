@@ -57,6 +57,7 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -86,7 +87,7 @@ fun ChannelDrawer(
     onCloseDrawer: (Int?) -> Unit,
 ) {
     val ids = remember(channels) { channels.map { it.id } }
-    val numbers = remember(channels) { channels.associate { it.id to it.number?.toInt() } }
+    val numbers = remember(channels) { channels.associate { it.id to it.visibleChannelNumber } }
     val requesters = remember(ids) { ids.associateWith { FocusRequester() } }
     val listState = rememberLazyListState()
     var focusedId by remember { mutableStateOf(playingChannelId ?: selectedId) }
@@ -235,7 +236,7 @@ fun ChannelDrawer(
 @Composable
 private fun CompactZapCard(
     channel: Channel,
-    number: Int?,
+    number: Long?,
     event: EpgEvent?,
     nowSec: Long,
     playbackIndicator: ChannelPlaybackIndicator,

@@ -76,6 +76,7 @@ import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
@@ -165,7 +166,7 @@ private data class GuideTabBody(
     val connection: ConnectionUiState,
     val index: TimelineEpgEventIndex,
     val ids: List<ChannelId>,
-    val numbers: Map<ChannelId, Int?>,
+    val numbers: Map<ChannelId, Long?>,
     val windowStart: Long,
     val windowEnd: Long,
     val nowSec: () -> Long,
@@ -308,7 +309,7 @@ fun EpgGridScreen(
     val channels = channelScope.visibleChannels
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) {
-        channels.associate { it.id to it.number?.toInt() }
+        channels.associate { it.id to it.visibleChannelNumber }
     }
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()

@@ -4,6 +4,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.channelComparator
 
 enum class TagScopeFallback {
     TAG_UNAVAILABLE,
@@ -38,13 +39,8 @@ fun resolveChannelScope(
     return resolveOrderedChannelScope(orderBrowseChannels(channels), tags, requestedTagId, visibility)
 }
 
-fun orderBrowseChannels(channels: List<Channel>): List<Channel> = channels.sortedWith(
-        compareBy<Channel> { it.number == null }
-            .thenBy { it.number }
-            .thenBy { it.numberMinor != null }
-            .thenBy { it.numberMinor }
-            .thenBy { it.id.value },
-    )
+fun orderBrowseChannels(channels: List<Channel>): List<Channel> =
+    channels.sortedWith(channelComparator())
 
 fun resolveOrderedChannelScope(
     orderedChannels: List<Channel>,

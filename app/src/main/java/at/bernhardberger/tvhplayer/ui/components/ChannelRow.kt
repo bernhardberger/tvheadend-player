@@ -65,7 +65,7 @@ internal val ChannelRowProgressHeight = 2.dp
 @Composable
 fun ChannelRow(
     modifier: Modifier = Modifier,
-    number: Int?,
+    number: Long?,
     name: String,
     programTitle: String,
     progress: Float?,

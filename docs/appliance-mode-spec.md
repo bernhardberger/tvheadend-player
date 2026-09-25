@@ -240,8 +240,11 @@ fun adjacentChannelId(
    The owner can independently limit each TV to All Channels, selected TVHeadend
    channel tags, or a mixture, with at least one browsing scope always enabled.
 4. Physical `0`-`9` keys show a channel-number overlay and select the matching
-   TVHeadend channel number after 1 to 3 digits. Positional numbering is used only
-   when the server supplies no channel numbers at all.
+   TVHeadend channel number using up to as many digits as the largest visible
+   channel number (or channel count under positional fallback), with a minimum
+   entry limit of 1 digit. Positional numbering is used only when no channel
+   in the current ordered scope has a positive major channel number; TVHeadend
+   reports unnumbered channels as `0`, which counts as unnumbered.
 5. The last successfully selected channel survives process death and reboot.
 6. When startup autoplay is enabled, a fresh app, HOME, boot, wake, or
    GUIDE-appliance launch waits for connection and channel data, then plays the

@@ -170,7 +170,7 @@ internal fun TimelineTimeRuler(
 internal fun TimelineChannelRow(
     channel: Channel,
     channelIndex: Int,
-    number: Int?,
+    number: Long?,
     selectedEventId: EventId?,
     eventFocusRequesters: MutableMap<EventId, FocusRequester>,
     windowStartSec: Long,
@@ -304,7 +304,7 @@ internal fun TimelineChannelRow(
 @Composable
 internal fun TimelineChannelHeader(
     channel: Channel,
-    number: Int?,
+    number: Long?,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
     selected: Boolean = false,

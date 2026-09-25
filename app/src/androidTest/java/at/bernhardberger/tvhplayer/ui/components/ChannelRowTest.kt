@@ -84,7 +84,7 @@ class ChannelRowTest {
                             modifier = Modifier
                                 .width(400.dp)
                                 .testTag("status-row-$index"),
-                            number = index + 1,
+                            number = index + 1L,
                             name = if (index == 2) {
                                 "Short title"
                             } else {
@@ -144,7 +144,7 @@ class ChannelRowTest {
                         val number = index + 1
                         ChannelRow(
                             modifier = Modifier.testTag("row-$number"),
-                            number = number,
+                            number = number.toLong(),
                             name = "Channel $number",
                             programTitle = "Programme $number",
                             progress = 0.5f,
@@ -185,7 +185,7 @@ class ChannelRowTest {
                         SideEffect { compositionCounts[number - 1]++ }
                         ChannelRow(
                             modifier = Modifier.testTag("measured-row-$number"),
-                            number = number,
+                            number = number.toLong(),
                             name = "Channel $number",
                             programTitle = "Programme $number",
                             progress = 0.5f,

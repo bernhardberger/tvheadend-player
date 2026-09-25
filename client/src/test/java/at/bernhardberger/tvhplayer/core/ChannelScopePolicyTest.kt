@@ -9,19 +9,22 @@ import org.junit.Test
 
 class ChannelScopePolicyTest {
     @Test
-    fun channelsAreOrderedByTypedNumberWithDeterministicMinorDuplicateAndMissingTies() {
+    fun browseOrderUsesMajorMinorNameAndIdentityWithUnnumberedLast() {
         val channels = listOf(
             channel(id = 90, number = 90),
-            channel(id = 99, number = null),
+            channel(id = 99, number = null, name = "Alpha"),
+            channel(id = 98, number = 0, name = "Beta"),
             channel(id = 12, number = 2, numberMinor = 1),
-            channel(id = 11, number = 2),
-            channel(id = 10, number = 2),
+            channel(id = 13, number = 2, numberMinor = 0),
+            channel(id = 11, number = 2, name = "Alpha"),
+            channel(id = 10, number = 2, name = "Zulu"),
+            channel(id = 14, number = 2, name = "Alpha"),
             channel(id = 1, number = 1),
         )
 
-        val scope = resolveChannelScope(channels, emptyList(), requestedTagId = null)
+        val ordered = orderBrowseChannels(channels)
 
-        assertEquals(listOf(1L, 10L, 11L, 12L, 90L, 99L), scope.visibleChannels.map { it.id.value })
+        assertEquals(listOf(1L, 11L, 14L, 10L, 13L, 12L, 90L, 99L, 98L), ordered.map { it.id.value })
     }
 
     @Test
@@ -42,18 +45,32 @@ class ChannelScopePolicyTest {
     }
 
     @Test
-    fun missingMajorNumbersStillUseMinorNumberBeforeTheIdentityTieBreak() {
-        val scope = resolveChannelScope(
-            channels = listOf(
-                channel(id = 10, number = null, numberMinor = 9),
-                channel(id = 20, number = null, numberMinor = 2),
-                channel(id = 30, number = null),
+    fun unnumberedChannelsIgnoreMinorNumbersAndSortByNameWithBlankNamesLast() {
+        val ordered = orderBrowseChannels(
+            listOf(
+                channel(id = 10, number = null, numberMinor = 9, name = "Alpha"),
+                channel(id = 20, number = 0, numberMinor = 2, name = "Zulu"),
+                channel(id = 30, number = null, name = "Beta"),
+                channel(id = 40, number = 0, name = "Alpha"),
+                channel(id = 2, number = 0, name = ""),
+                channel(id = 1, number = null, name = ""),
             ),
-            tags = emptyList(),
-            requestedTagId = null,
         )
 
-        assertEquals(listOf(30L, 20L, 10L), scope.visibleChannels.map { it.id.value })
+        assertEquals(listOf(10L, 40L, 30L, 20L, 1L, 2L), ordered.map { it.id.value })
+    }
+
+    @Test
+    fun duplicateNumberedChannelsPutBlankNamesLast() {
+        val ordered = orderBrowseChannels(
+            listOf(
+                channel(id = 1, number = 7, name = ""),
+                channel(id = 2, number = 7, name = "Zulu"),
+                channel(id = 3, number = 7, name = "Alpha"),
+            ),
+        )
+
+        assertEquals(listOf(3L, 2L, 1L), ordered.map { it.id.value })
     }
 
     private fun channel(
@@ -61,9 +78,10 @@ class ChannelScopePolicyTest {
         number: Long?,
         numberMinor: Long? = null,
         tagId: ChannelTagId? = null,
+        name: String = "Channel $id",
     ) = Channel.create(
         id = ChannelId(id),
-        name = "Channel $id",
+        name = name,
         number = number,
         numberMinor = numberMinor,
         tagIds = tagId?.let(::listOf),

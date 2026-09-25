@@ -46,7 +46,7 @@ import coil3.ImageLoader
 fun OverlayControlsTv(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
-    channelNumber: Int?,
+    channelNumber: Long?,
     channelName: String,
     piconPath: ArtworkId?,
     nowEvent: EpgEvent?,

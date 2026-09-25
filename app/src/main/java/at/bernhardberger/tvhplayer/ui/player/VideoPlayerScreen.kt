@@ -60,6 +60,7 @@ import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_DELAY_MS
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_FADE_IN_MS
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_MINIMUM_OPAQUE_MS
@@ -283,7 +284,10 @@ fun VideoPlayerScreen(
     val canModifyRecordings = currentSession != null
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) {
-        channels.associate { it.id to it.number?.toInt() }
+        channels.associate { it.id to it.visibleChannelNumber }
+    }
+    val maxChannelNumberDigits = remember(orderedChannelIds, channelNumbers) {
+        ChannelNavigation.maxChannelNumberDigits(orderedChannelIds, channelNumbers)
     }
     val selectedInitId by selection.selectedId.collectAsStateWithLifecycle()
     var selectedId by remember { mutableStateOf(selectedInitId) }
@@ -574,10 +578,10 @@ fun VideoPlayerScreen(
         return channel?.let(::tuneChannel) ?: true
     }
 
-    LaunchedEffect(channelNumberInput) {
+    LaunchedEffect(channelNumberInput, maxChannelNumberDigits) {
         if (channelNumberInput.isEmpty()) return@LaunchedEffect
         delay(
-            if (channelNumberInput.length == 3) {
+            if (ChannelNavigation.isCompleteEntry(channelNumberInput, maxChannelNumberDigits)) {
                 COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS
             } else {
                 CHANNEL_NUMBER_TIMEOUT_MS
@@ -938,7 +942,9 @@ fun VideoPlayerScreen(
 
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
                     if (event.nativeKeyEvent.repeatCount == 0) {
-                        channelNumberInput = ChannelNavigation.appendDigit(channelNumberInput, digit)
+                        channelNumberInput = ChannelNavigation.appendDigit(
+                            channelNumberInput, digit, maxChannelNumberDigits,
+                        )
                     }
                     return@onPreviewKeyEvent true
                 }

@@ -205,7 +205,7 @@ class TimelineEpgPerformanceTest {
                         Box(Modifier.width(190.dp).height(76.dp)) {
                             TimelineChannelHeader(
                                 channel = channel,
-                                number = channel.number?.toInt(),
+                                number = channel.number,
                                 imageLoader = imageLoader,
                             )
                         }

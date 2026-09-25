@@ -68,7 +68,7 @@ class GuideHistoryCompositionTest {
                     else Column(Modifier.fillMaxSize()) {
                         listOf(1L, 2L).forEach { channel -> TimelineChannelRow(
                             channel = Channel.create(ChannelId(channel), name = "Documentary $channel"),
-                            channelIndex = (channel - 1).toInt(), number = channel.toInt(), selectedEventId = null,
+                            channelIndex = (channel - 1).toInt(), number = channel, selectedEventId = null,
                             eventFocusRequesters = requesters, windowStartSec = 0, windowEndSec = 7200,
                             nowSecProvider = { 4000 }, imageLoader = loader, currentSession = null,
                             events = events.filter { it.channelId == ChannelId(channel) }, hasCachedEvents = true,

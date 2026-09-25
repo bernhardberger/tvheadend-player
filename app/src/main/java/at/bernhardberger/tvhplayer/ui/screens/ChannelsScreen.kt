@@ -93,6 +93,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.channelNowStatus
@@ -286,7 +287,7 @@ internal fun ChannelsScreenContent(
         orderedChannelIds.associateWith { FocusRequester() }
     }
     val channelNumbers = remember(channels) {
-        channels.associate { it.id to it.number?.toInt() }
+        channels.associate { it.id to it.visibleChannelNumber }
     }
     var didInitialRestore by remember { mutableStateOf(false) }
     // One-shot per player return; AppRoot clears the request when the destination changes.
@@ -868,7 +869,7 @@ private data class ChannelsTabBody(
     val observation: SessionObservation,
     val connection: ConnectionUiState,
     val ids: List<ChannelId>,
-    val numbers: Map<ChannelId, Int?>,
+    val numbers: Map<ChannelId, Long?>,
     val playingId: ChannelId?,
     val recordingIds: Set<ChannelId>,
     val tagNotice: Boolean,

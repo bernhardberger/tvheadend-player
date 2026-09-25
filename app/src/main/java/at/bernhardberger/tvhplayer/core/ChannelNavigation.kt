@@ -1,11 +1,14 @@
 package at.bernhardberger.tvhplayer.core
 
 import android.view.KeyEvent
+import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.hasChannelNumber
+
+val Channel.visibleChannelNumber: Long?
+    get() = number?.takeIf { hasChannelNumber }
 
 object ChannelNavigation {
-    private const val MAX_CHANNEL_NUMBER_DIGITS = 3
-
     fun directionForKeyCode(keyCode: Int): Int? = when (keyCode) {
         KeyEvent.KEYCODE_CHANNEL_UP,
         KeyEvent.KEYCODE_MEDIA_NEXT,
@@ -29,9 +32,18 @@ object ChannelNavigation {
         else -> null
     }
 
-    fun appendDigit(current: String, digit: Int): String {
+    fun maxChannelNumberDigits(
+        orderedIds: List<ChannelId>,
+        channelNumbers: Map<ChannelId, Long?>,
+    ): Int = (orderedIds.mapNotNull { channelNumbers[it] }.maxOrNull() ?: orderedIds.size.toLong())
+        .toString().length.coerceAtLeast(1)
+
+    fun isCompleteEntry(entered: String, maxDigits: Int): Boolean = entered.length >= maxDigits
+
+    fun appendDigit(current: String, digit: Int, maxDigits: Int): String {
         require(digit in 0..9)
-        return if (current.length >= MAX_CHANNEL_NUMBER_DIGITS) {
+        require(maxDigits >= 1)
+        return if (current.length >= maxDigits) {
             digit.toString()
         } else {
             current + digit
@@ -40,27 +52,28 @@ object ChannelNavigation {
 
     fun idForNumber(
         orderedIds: List<ChannelId>,
-        channelNumbers: Map<ChannelId, Int?>,
+        channelNumbers: Map<ChannelId, Long?>,
         enteredNumber: String,
     ): ChannelId? {
-        val number = enteredNumber.toIntOrNull() ?: return null
+        val number = enteredNumber.toLongOrNull() ?: return null
+        if (number <= 0) return null
         orderedIds.firstOrNull { channelNumbers[it] == number }?.let { return it }
 
-        return if (channelNumbers.values.none { it != null }) {
-            orderedIds.getOrNull(number - 1)
+        return if (number <= orderedIds.size && orderedIds.none { channelNumbers[it] != null }) {
+            orderedIds.getOrNull((number - 1).toInt())
         } else null
     }
 
     fun numberForId(
         orderedIds: List<ChannelId>,
-        channelNumbers: Map<ChannelId, Int?>,
+        channelNumbers: Map<ChannelId, Long?>,
         channelId: ChannelId,
-    ): Int? {
+    ): Long? {
         val index = orderedIds.indexOf(channelId)
         if (index < 0) return null
 
         return channelNumbers[channelId]
-            ?: if (channelNumbers.values.none { it != null }) index + 1 else null
+            ?: if (orderedIds.none { channelNumbers[it] != null }) index + 1L else null
     }
 
     fun adjacentId(

@@ -7,12 +7,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.LocalTextStyle
 import androidx.tv.material3.Text
 
-internal fun channelTitleText(number: Int?, name: String): String =
+internal fun channelTitleText(number: Long?, name: String): String =
     number?.let { "$it  $name" } ?: name
 
 @Composable
 fun ChannelTitle(
-    number: Int?,
+    number: Long?,
     name: String,
     modifier: Modifier = Modifier,
     style: TextStyle = LocalTextStyle.current,
