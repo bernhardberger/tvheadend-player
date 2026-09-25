@@ -45,7 +45,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.job
 
@@ -166,13 +165,15 @@ class AppPlaybackRuntime(
     private val _activeTarget = MutableStateFlow<AppPlaybackTarget?>(null)
     private val _recordingSelection = MutableStateFlow<RecordingPlaybackSelection?>(null)
     private val _recordingAdmission = MutableStateFlow<RecordingPlaybackAdmission?>(null)
-    private val markerQuery = RecordingMarkerQuery()
-    private var markerJob: Job? = null
-    val recordingCutpoints = markerQuery.cutpoints
-    val recordingMarkerRevision = markerQuery.revision
-    private val _diagnostics = MutableStateFlow(AppPlaybackDiagnostics())
-    private val _videoPresentation = MutableStateFlow(AppVideoPresentation())
-    private var diagnosticsEnabled = false
+    private val recordingMarkers = RecordingMarkers(
+        player = player,
+        session = session,
+        scope = scope,
+        targetCommands = targetCommands,
+        targetInstallationInProgress = { targetInstallationInProgress },
+    )
+    val recordingCutpoints = recordingMarkers.recordingCutpoints
+    val recordingMarkerRevision = recordingMarkers.recordingMarkerRevision
     @Volatile
     private var activeTargetEpoch: Long? = null
     @Volatile
@@ -183,7 +184,20 @@ class AppPlaybackRuntime(
     private var admittedRecoveryEpoch: Long? = null
     private val recoveryBackoff = LiveRecoveryBackoff()
     private val recoveryAttempts = LiveRecoveryAttemptRunner(::publishResolvedRecoveryPlayerState)
-    private var targetFrameListener: Player.Listener? = null
+    private val presentation = PlaybackPresentationPublisher(
+        player = player,
+        session = session,
+        policy = policy,
+        startupBuffer = startupBuffer,
+        targetCommands = targetCommands,
+        recoveryAttempts = recoveryAttempts,
+        livePlaybackObservation = coordinator.livePlaybackObservation,
+        _state = _state,
+        _activeTarget = _activeTarget,
+        activeTargetEpoch = { activeTargetEpoch },
+        targetInstallationInProgress = { targetInstallationInProgress },
+        publishPlayerErrorFromPlayer = ::publishPlayerErrorFromPlayer,
+    )
     private var foreground = true
     private var focusGeneration = 0L
     private var interruption: AudioInterruption? = null
@@ -199,8 +213,8 @@ class AppPlaybackRuntime(
     val recordingSelection = _recordingSelection.asStateFlow()
     val recordingAdmission = _recordingAdmission.asStateFlow()
     val livePlaybackObservation = coordinator.livePlaybackObservation
-    val diagnostics = _diagnostics.asStateFlow()
-    val videoPresentation = _videoPresentation.asStateFlow()
+    val diagnostics = presentation.diagnostics
+    val videoPresentation = presentation.videoPresentation
 
     private val settingsJob = scope.launch {
         settings.playerSettings.distinctUntilChanged().collect {
@@ -235,26 +249,10 @@ class AppPlaybackRuntime(
                         serverPaused = timeshift?.playbackPaused,
                     )?.let { player.playWhenReady = it }
                 }
-                publishDiagnostics()
+                presentation.publishDiagnostics()
             }
         }
     }
-
-    private var diagnosticDecoderName = "unknown"
-    private var diagnosticDecoderGeneration = 0
-    private val seekDiagnosticsListener = if (policy.seekDiagnostics) {
-        object : androidx.media3.exoplayer.analytics.AnalyticsListener {
-            override fun onVideoDecoderInitialized(
-                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
-                decoderName: String,
-                initializedTimestampMs: Long,
-                initializationDurationMs: Long,
-            ) {
-                diagnosticDecoderName = decoderName.take(80).replace(Regex("[^A-Za-z0-9._-]"), "_")
-                diagnosticDecoderGeneration++
-            }
-        }
-    } else null
 
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -295,13 +293,13 @@ class AppPlaybackRuntime(
                 if (policy.trace.enabled && playbackState == Player.STATE_READY) {
                     policy.trace.ready(activeTargetEpoch)
                 }
-                publishPlayerState()
+                presentation.publishPlayerState()
                 if (playbackState == Player.STATE_READY) onTargetReady(activeTargetEpoch)
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (!targetInstallationInProgress && targetCommands.isOpen()) publishPlayerState()
+            if (!targetInstallationInProgress && targetCommands.isOpen()) presentation.publishPlayerState()
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -312,7 +310,7 @@ class AppPlaybackRuntime(
     init {
         targetCommands.runIfOpen {
             player.addListener(listener)
-            seekDiagnosticsListener?.let(player::addAnalyticsListener)
+            presentation.seekDiagnosticsListener?.let(player::addAnalyticsListener)
         }
     }
 
@@ -453,11 +451,11 @@ class AppPlaybackRuntime(
                     lastLiveChannelId = selection.channelId
                     _recordingSelection.value = null
                     _recordingAdmission.value = null
-                    clearRecordingMarkers()
+                    recordingMarkers.clearRecordingMarkers()
                     _state.value = AppPlaybackState.Starting
                     if (policy.trace.enabled) policy.trace.tuneBound(epoch)
-                    beginTargetPresentation(epoch)
-                    publishInstalledPlayerState()
+                    presentation.beginTargetPresentationLocked(epoch)
+                    presentation.publishInstalledPlayerStateLocked()
                     publishLivePause()
                 }
             },
@@ -631,10 +629,10 @@ class AppPlaybackRuntime(
                     _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
-                    observeRecordingMarkers(requireNotNull(installedBinding))
+                    recordingMarkers.observeRecordingMarkersLocked(requireNotNull(installedBinding))
                     _state.value = AppPlaybackState.Starting
-                    beginTargetPresentation(epoch)
-                    publishInstalledPlayerState()
+                    presentation.beginTargetPresentationLocked(epoch)
+                    presentation.publishInstalledPlayerStateLocked()
                     publishLivePause()
                 }
             },
@@ -764,9 +762,9 @@ class AppPlaybackRuntime(
         player.pause()
         pendingLivePause = null
         clearAudioInterruption()
-        clearRecordingMarkers()
+        recordingMarkers.clearRecordingMarkers()
         val epoch = presentationEpoch.begin()
-        endTargetPresentation(epoch)
+        presentation.endTargetPresentationLocked(epoch)
         val currentJob = currentCoroutineContext().job
         recoveryJob?.takeUnless { it === currentJob }?.cancel()
         recoveryJob = null
@@ -780,7 +778,7 @@ class AppPlaybackRuntime(
             activeTargetEpoch = null
             publishLivePause()
             _state.value = AppPlaybackState.Idle
-            publishDiagnostics()
+            presentation.publishDiagnostics()
         }
         return result
     }
@@ -890,34 +888,8 @@ class AppPlaybackRuntime(
         targetCommands.serialize(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
         ) {
-            val diagnose = policy.seekDiagnostics && !player.playWhenReady
-            fun counters(): String {
-                val value = player.videoDecoderCounters ?: return "none"
-                value.ensureUpdated()
-                return "${value.queuedInputBufferCount}/${value.renderedOutputBufferCount}/" +
-                    "${value.skippedOutputBufferCount}/${value.droppedBufferCount}"
-            }
-            val before = if (diagnose) counters() else ""
-            val generation = diagnosticDecoderGeneration
-            val started = android.os.SystemClock.elapsedRealtime()
-            serverSkip({ it.startedServerSkip() }) { coordinator.seekTimeshift(selection) }.also { result ->
-                if (diagnose) {
-                    val completed = result as? at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Completed
-                    val format = player.videoFormat
-                    val videoSelected = player.currentTracks.groups.any {
-                        it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO && it.isSelected
-                    }
-                    // One bounded line per paused UI seek. No channel, profile, endpoint,
-                    // raw error, subscription identity or credential-bearing payload.
-                    android.util.Log.i("TvhSeek", "outcome=${completed?.command ?: result.javaClass.simpleName} " +
-                        "seek=${completed?.seekCommand} buffering=${completed?.buffering} pause=${completed?.pauseRestoration} " +
-                        "elapsedMs=${android.os.SystemClock.elapsedRealtime() - started} " +
-                        "countsQueuedRenderedSkippedDropped=$before->${counters()} " +
-                        "decoder=$diagnosticDecoderName generation=$generation->$diagnosticDecoderGeneration " +
-                        "videoSelected=$videoSelected size=${format?.width}x${format?.height} state=${player.playbackState} " +
-                        "playWhenReady=${player.playWhenReady} bufferedMs=${player.totalBufferedDuration} " +
-                        "requestedDeltaMs=${selection.displacement.inWholeMilliseconds}")
-                }
+            presentation.diagnoseSeekLocked(selection) {
+                serverSkip({ it.startedServerSkip() }) { coordinator.seekTimeshift(selection) }
             }
         }
 
@@ -1036,52 +1008,10 @@ class AppPlaybackRuntime(
 
     fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
     fun seekRecordingMarker(positionMs: Long, expectedRevision: Long) {
-        targetCommands.runIfOpen {
-            if (expectedRevision != recordingMarkerRevision.value ||
-                !markerQuery.isCurrent() || targetInstallationInProgress) return@runIfOpen
-            if (!player.isCurrentMediaItemSeekable ||
-                !player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) return@runIfOpen
-            if (positionMs in at.bernhardberger.tvhplayer.core.recordingMarkerPositions(
-                    recordingCutpoints.value, player.duration,
-                )) {
-                // seekTo does not change playWhenReady: marker navigation preserves pause.
-                player.seekTo(positionMs)
-            }
-        }
-    }
-
-    private fun clearRecordingMarkers() {
-        markerQuery.use(null)
-        markerJob?.cancel()
-        markerJob = null
-    }
-
-    private fun observeRecordingMarkers(binding: PlaybackBinding.Recording) {
-        clearRecordingMarkers()
-        markerQuery.use(binding)
-        markerJob = scope.launch {
-            // Admission changes, not position samples: at most initial + growing completion.
-            var completionFetched = false
-            var initialFetched = false
-            session.observation.map { binding.admission::class }.distinctUntilChanged().collectLatest {
-                when (binding.admission) {
-                    is RecordingPlaybackAdmission.GrowingStartOverOnly -> if (!initialFetched) {
-                        initialFetched = true
-                        markerQuery.refresh(binding)
-                    }
-                    is RecordingPlaybackAdmission.Completed -> if (!completionFetched) {
-                        completionFetched = true
-                        markerQuery.refresh(binding)
-                    }
-                    else -> markerQuery.retire(binding)
-                }
-            }
-        }
+        recordingMarkers.seekRecordingMarker(positionMs, expectedRevision)
     }
     fun setDiagnosticsEnabled(enabled: Boolean) {
-        if (!targetCommands.isOpen()) return
-        diagnosticsEnabled = enabled
-        publishDiagnostics()
+        presentation.setDiagnosticsEnabled(enabled)
     }
     fun setRefreshRateMatchingEnabled(enabled: Boolean) {
         targetCommands.runIfOpen {
@@ -1133,7 +1063,7 @@ class AppPlaybackRuntime(
                             reason = fence.reason,
                             retryDelayMillis = attempt.delayMillis,
                         )
-                        publishDiagnostics()
+                        presentation.publishDiagnostics()
                     }
                     fence to attempt
                 }
@@ -1179,7 +1109,7 @@ class AppPlaybackRuntime(
         val stopResult = stopPlayback()
         if (!targetCommands.isOpen()) return
         _state.value = recoveryExhaustedState(stopResult, recoveryReason)
-        publishDiagnostics()
+        presentation.publishDiagnostics()
     }
 
     private fun lastSubscriptionIssue(): SubscriptionIssue? =
@@ -1188,9 +1118,7 @@ class AppPlaybackRuntime(
     suspend fun detach() {
         if (!targetCommands.close()) return
         cancelKeepTimer()
-        val pendingMarkers = markerJob
-        clearRecordingMarkers()
-        pendingMarkers?.join()
+        recordingMarkers.clearRecordingMarkersAndJoin()
         val pendingRecovery = recoveryJob
         recoveryJob = null
         admittedRecoveryEpoch = null
@@ -1203,10 +1131,9 @@ class AppPlaybackRuntime(
         targetCommands.awaitIdle {
             pendingLivePause = null
             clearAudioInterruption()
-            targetFrameListener?.let(player::removeListener)
-            targetFrameListener = null
+            presentation.removeTargetFrameListenerLocked()
             player.removeListener(listener)
-            seekDiagnosticsListener?.let(player::removeAnalyticsListener)
+            presentation.seekDiagnosticsListener?.let(player::removeAnalyticsListener)
             audioSelection.clear(player)
         }
         audioWriteJob?.join()
@@ -1250,7 +1177,7 @@ class AppPlaybackRuntime(
                 activeTargetEpoch == previousTargetEpoch && player.currentMediaItem == previousMediaItem
             ) {
                 player.playWhenReady = previousPlayWhenReady
-                publishPlayerState()
+                presentation.publishPlayerState()
             }
             if (targetCommands.isOpen()) {
                 audioSelection.useProfile(profileOwner.serverProfile.value, player)
@@ -1317,16 +1244,16 @@ class AppPlaybackRuntime(
         if (healthyActiveTarget() != null) return
         val epoch = presentationEpoch.beginIfCurrent(expectedPresentationEpoch) ?: return
         presentationEpoch.publishIfCurrent(epoch) {
-            endTargetPresentation(epoch)
+            presentation.endTargetPresentationLocked(epoch)
             activeTargetEpoch = null
             pendingLivePause = null
             _activeTarget.value = null
             publishLivePause()
             _recordingSelection.value = null
             _recordingAdmission.value = recordingAdmission
-            clearRecordingMarkers()
+            recordingMarkers.clearRecordingMarkers()
             _state.value = AppPlaybackState.Failed(reason, targetResult)
-            publishDiagnostics()
+            presentation.publishDiagnostics()
         }
     }
 
@@ -1673,35 +1600,6 @@ class AppPlaybackRuntime(
         }
     }
 
-    private fun beginTargetPresentation(epoch: Long) {
-        targetCommands.runIfOpen {
-            targetFrameListener?.let(player::removeListener)
-            _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
-            targetFrameListener = object : Player.Listener {
-                override fun onRenderedFirstFrame() {
-                    if (targetInstallationInProgress || !targetCommands.isOpen()) return
-                    val notYetVisible = policy.trace.enabled && !_videoPresentation.value.visible
-                    _videoPresentation.value = _videoPresentation.value.onFirstFrame(
-                        frameEpoch = epoch,
-                        activeTargetEpoch = activeTargetEpoch,
-                    )
-                    if (notYetVisible && epoch == activeTargetEpoch && _videoPresentation.value.visible) {
-                        val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
-                        policy.trace.firstVideoFrame(epoch, player.videoFormat, live?.diagnostics?.source?.adapterName)
-                    }
-                }
-            }.also(player::addListener)
-        }
-    }
-
-    private fun endTargetPresentation(epoch: Long) {
-        targetCommands.runIfOpen {
-            targetFrameListener?.let(player::removeListener)
-            targetFrameListener = null
-            _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
-        }
-    }
-
     private fun configureAudioOutputBeforeFirstTarget(value: PlayerSettings) {
         targetCommands.runIfOpen {
             if (!audioOutputConfigured) {
@@ -1789,32 +1687,6 @@ class AppPlaybackRuntime(
         }
     }
 
-    private fun publishPlayerState(recoveryResolved: Boolean = false) {
-        targetCommands.runIfOpen {
-            if (player.playerError == null) {
-                _state.value = if (recoveryResolved) {
-                    playerStateAfterRecoveryResolution(
-                        currentState = _state.value,
-                        playbackState = player.playbackState,
-                        isPlaying = player.isPlaying,
-                    )
-                } else {
-                    playerReportedPlaybackState(
-                        currentState = _state.value,
-                        recoveryAttemptInProgress = recoveryAttempts.ownsPlayerState(
-                            activeTarget = _activeTarget.value,
-                            activeTargetEpoch = activeTargetEpoch,
-                            observation = session.observation.value,
-                        ),
-                        playbackState = player.playbackState,
-                        isPlaying = player.isPlaying,
-                    )
-                }
-            }
-            publishDiagnosticsFromPlayer()
-        }
-    }
-
     private fun publishResolvedRecoveryPlayerState(
         fence: LiveRecoveryFence,
         result: PlaybackTargetResult?,
@@ -1828,23 +1700,7 @@ class AppPlaybackRuntime(
                 healthyActiveTarget = healthyActiveTarget(),
             )
         ) {
-            publishPlayerState(recoveryResolved = true)
-        }
-    }
-
-    private fun publishInstalledPlayerState() {
-        targetCommands.runIfOpen {
-            if (player.playerError != null) {
-                publishPlayerErrorFromPlayer()
-                return@runIfOpen
-            }
-            _state.value = playerReportedPlaybackState(
-                currentState = AppPlaybackState.Starting,
-                recoveryAttemptInProgress = false,
-                playbackState = player.playbackState,
-                isPlaying = player.isPlaying,
-            )
-            publishDiagnosticsFromPlayer()
+            presentation.publishPlayerState(recoveryResolved = true)
         }
     }
 
@@ -1867,54 +1723,8 @@ class AppPlaybackRuntime(
             subscriptionIssue = lastSubscriptionIssue(),
         )
         publishLivePause()
-        publishDiagnosticsFromPlayer()
+        presentation.publishDiagnosticsFromPlayer()
         if (pending?.failClosed == true) launchPendingLivePauseResolution(pending.epoch)
-    }
-
-    private fun publishDiagnostics() {
-        if (!diagnosticsEnabled) {
-            _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
-            return
-        }
-        if (!targetCommands.runIfOpen { publishDiagnosticsFromPlayer() }) {
-            _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
-        }
-    }
-
-    private fun publishDiagnosticsFromPlayer() {
-        val activeTarget = _activeTarget.value
-        val activeLiveObservation =
-            livePlaybackObservation.value as? LivePlaybackObservation.Active
-        val video = player.videoFormat
-        val audio = player.audioFormat
-        _diagnostics.value = AppPlaybackDiagnostics(
-            source = source(activeTarget),
-            state = _state.value,
-            isPlaying = player.isPlaying,
-            positionMs = player.currentPosition.coerceAtLeast(0L),
-            durationMs = player.duration.takeIf { it != C.TIME_UNSET && it >= 0L },
-            bufferedMs = player.bufferedPosition.coerceAtLeast(0L),
-            video = video?.let {
-                AppPlaybackFormatDiagnostics(
-                    codec = it.codecs,
-                    resolution = if (it.width > 0 && it.height > 0) "${it.width}×${it.height}" else null,
-                    frameRate = it.frameRate.takeIf { rate -> rate > 0f },
-                )
-            },
-            audio = audio?.let {
-                AppPlaybackFormatDiagnostics(
-                    codec = it.codecs,
-                    language = it.language,
-                    channelCount = it.channelCount.takeIf { count -> count > 0 },
-                    sampleRateHz = it.sampleRate.takeIf { rate -> rate > 0 },
-                )
-            },
-            live = liveDiagnosticsForTarget(
-                activeTarget = activeTarget,
-                diagnostics = activeLiveObservation?.diagnostics,
-            ),
-            startupBuffer = startupBuffer?.inEffect?.value?.takeIf { activeTarget is AppPlaybackTarget.Live },
-        )
     }
 
     /** Reports a server skip to the start-up buffer; a cancelled or failed request counts as not accepted. */
@@ -1926,12 +1736,6 @@ class AppPlaybackRuntime(
         } finally {
             startupBuffer?.timeshiftSeekFinished(accepted = started)
         }
-    }
-
-    private fun source(activeTarget: AppPlaybackTarget? = _activeTarget.value) = when (activeTarget) {
-        is AppPlaybackTarget.Live -> AppPlaybackSource.LIVE_TV
-        is AppPlaybackTarget.Recording -> AppPlaybackSource.RECORDING
-        else -> AppPlaybackSource.NONE
     }
 }
 
