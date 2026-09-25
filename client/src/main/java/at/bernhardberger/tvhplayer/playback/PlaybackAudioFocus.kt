@@ -15,6 +15,12 @@ import android.os.Looper
 interface PlaybackAudioFocus {
     fun request(onInterruption: (AudioInterruption) -> Unit): Boolean
     fun abandon()
+
+    /** Explicit opt-out for synthetic/profile hosts that do not own audible playback. */
+    object None : PlaybackAudioFocus {
+        override fun request(onInterruption: (AudioInterruption) -> Unit) = true
+        override fun abandon() = Unit
+    }
 }
 
 class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudioFocus {
@@ -23,9 +29,16 @@ class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudi
     private val handler = Handler(looper)
     private var request: AudioFocusRequest? = null
     private var receiver: BroadcastReceiver? = null
+    private var held = false
+    private var callback: ((AudioInterruption) -> Unit)? = null
 
     override fun request(onInterruption: (AudioInterruption) -> Unit): Boolean {
+        if (held) {
+            callback = onInterruption
+            return true
+        }
         abandon()
+        callback = onInterruption
         lateinit var next: AudioFocusRequest
         next = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(AudioAttributes.Builder()
@@ -42,26 +55,35 @@ class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudi
                         AudioManager.AUDIOFOCUS_LOSS -> AudioInterruption.PERMANENT_LOSS
                         else -> null
                     }
-                    if (event == AudioInterruption.GAIN) registerNoisy(next, onInterruption)
+                    if (event == AudioInterruption.GAIN) {
+                        held = true
+                        registerNoisy(next)
+                    }
                     if (event == AudioInterruption.PERMANENT_LOSS || event == AudioInterruption.TRANSIENT_LOSS) {
+                        held = false
                         unregisterNoisy()
                     }
-                    event?.let(onInterruption)
+                    event?.let { callback?.invoke(it) }
                 }
             }, handler)
             .build()
         request = next
         val granted = manager.requestAudioFocus(next) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        if (granted) registerNoisy(next, onInterruption)
+        held = granted
+        if (granted) registerNoisy(next)
+        else {
+            request = null
+            callback = null
+        }
         return granted
     }
 
-    private fun registerNoisy(current: AudioFocusRequest, onInterruption: (AudioInterruption) -> Unit) {
+    private fun registerNoisy(current: AudioFocusRequest) {
         if (receiver != null) return
         val next = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (request === current && intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-                    onInterruption(AudioInterruption.NOISY)
+                    callback?.invoke(AudioInterruption.NOISY)
                 }
             }
         }
@@ -82,6 +104,8 @@ class AndroidPlaybackAudioFocus(context: Context, looper: Looper) : PlaybackAudi
     override fun abandon() {
         val previous = request
         request = null
+        held = false
+        callback = null
         unregisterNoisy()
         previous?.let(manager::abandonAudioFocusRequest)
     }

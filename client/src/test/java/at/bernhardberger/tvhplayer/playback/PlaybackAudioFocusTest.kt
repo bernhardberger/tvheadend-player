@@ -45,6 +45,7 @@ class PlaybackAudioFocusTest {
         assertFalse(shadowOf(context).hasReceiverForIntent(noisy))
         old.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
         assertTrue(shadowOf(context).hasReceiverForIntent(noisy))
+        focus.abandon()
         focus.request(events::add)
         val size = events.size
         old.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS)
@@ -54,9 +55,30 @@ class PlaybackAudioFocusTest {
     }
 
     @Test fun deniedRequestDoesNotRegisterNoisyReceiver() {
+        val events = mutableListOf<AudioInterruption>()
         manager.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
-        assertFalse(focus.request {})
+        assertFalse(focus.request(events::add))
+        manager.lastAudioFocusRequest.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+        assertTrue(events.isEmpty())
         assertFalse(shadowOf(context).hasReceiverForIntent(noisy))
+        focus.abandon()
+    }
+
+    @Test fun heldFocusReusesFrameworkRequestButReplacesCallback() {
+        val oldEvents = mutableListOf<AudioInterruption>()
+        val newEvents = mutableListOf<AudioInterruption>()
+        assertTrue(focus.request(oldEvents::add))
+        val original = manager.lastAudioFocusRequest.audioFocusRequest
+        assertTrue(focus.request(newEvents::add))
+        assertSame(original, manager.lastAudioFocusRequest.audioFocusRequest)
+        assertNull(manager.lastAbandonedAudioFocusRequest)
+        context.sendBroadcast(noisy)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(oldEvents.isEmpty())
+        assertEquals(listOf(AudioInterruption.NOISY), newEvents)
+        manager.lastAudioFocusRequest.listener.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        assertTrue(focus.request {})
+        assertNotSame(original, manager.lastAudioFocusRequest.audioFocusRequest)
         focus.abandon()
     }
 }

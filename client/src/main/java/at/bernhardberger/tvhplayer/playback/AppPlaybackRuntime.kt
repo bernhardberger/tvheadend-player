@@ -615,7 +615,7 @@ class AppPlaybackRuntime(
     private val profileOwner: AppProfileOwner,
     private val scope: CoroutineScope,
     private val audioOutput: TvheadendAudioOutputProvider,
-    private val audioFocus: PlaybackAudioFocus? = null,
+    private val audioFocus: PlaybackAudioFocus,
 ) {
     private val targetCommands = PlaybackTargetCommandSerialization()
     private val foregroundPlaybackLifecycle = ForegroundPlaybackLifecycle()
@@ -677,7 +677,7 @@ class AppPlaybackRuntime(
             targetCommands.serialize(onClosed = {}) {
                 val active = livePlaybackObservation.value as? LivePlaybackObservation.Active
                 val timeshift = active?.timeshiftState as? LiveTimeshiftState.Available
-                if (!targetInstallationInProgress && !interruptionPaused) {
+                if (!targetInstallationInProgress && !interruptionPaused && !interruptionMuted) {
                     observedLivePlayIntent(
                         activeTarget = _activeTarget.value,
                         serverPaused = timeshift?.playbackPaused,
@@ -841,6 +841,7 @@ class AppPlaybackRuntime(
                 failureReason = AppPlaybackFailureReason.OTHER,
             )
         }
+        val retainInterruptionMute = recovering && interruptionMuted
         var committed = false
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
@@ -873,7 +874,13 @@ class AppPlaybackRuntime(
                     ?: return@started
                 presentationEpoch.publishIfCurrent(epoch) {
                     committed = true
-                    clearAudioInterruption()
+                    if (retainInterruptionMute) {
+                        // Recovery is not viewer consent to resume audio. Retire the old epoch's
+                        // callback and keep consuming silently until an explicit focus request.
+                        focusGeneration++
+                        audioFocus.abandon()
+                        resumeAfterInterruption = false
+                    } else clearAudioInterruption()
                     activeTargetEpoch = epoch
                     _activeTarget.value = AppPlaybackTarget.Live(selection.channelId)
                     lastLiveChannelId = selection.channelId
@@ -894,7 +901,10 @@ class AppPlaybackRuntime(
                 )
             }
         )
-        if (committed) applyPlayIntentToStartedTarget(result)
+        if (committed) {
+            if (retainInterruptionMute && foreground) player.play()
+            else applyPlayIntentToStartedTarget(result)
+        }
         return result
     }
 
@@ -1110,8 +1120,7 @@ class AppPlaybackRuntime(
     suspend fun resumeTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
     ) {
-        if (interruptionPaused || !foreground) TimeshiftCommandResult.UNAVAILABLE
-        else coordinator.resumeTimeshift()
+        playWithAudioFocus(resumeTimeshift = true)
     }
     suspend fun goLive(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
@@ -1261,7 +1270,7 @@ class AppPlaybackRuntime(
                 // Admit the attempt under the command lock, then wait for the backoff delay
                 // without holding it so a channel change or Stop stays responsive meanwhile.
                 val admitted = targetCommands.serialize(onClosed = { null }) {
-                    if (interruption != null || !foreground) return@serialize null
+                    if (interruptionPaused || !foreground) return@serialize null
                     val fence = currentLiveRecoveryFence(
                         reason = dispatchedReason,
                         observation = session.observation.value,
@@ -1295,7 +1304,7 @@ class AppPlaybackRuntime(
                     recoveryAttempts.run(fence) {
                         if (attempt.delayMillis > 0L) delay(attempt.delayMillis)
                         targetCommands.serialize(onClosed = { null }) {
-                            if (interruption != null || !foreground) return@serialize null
+                            if (interruptionPaused || !foreground) return@serialize null
                             if (!fence.matches(
                                     activeTarget = _activeTarget.value,
                                     activeTargetEpoch = activeTargetEpoch,
@@ -1367,6 +1376,9 @@ class AppPlaybackRuntime(
     ): PlaybackTargetResult {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val previousPlayWhenReady = player.playWhenReady
+        val previousTarget = healthyActiveTarget()
+        val previousTargetEpoch = activeTargetEpoch
+        val previousMediaItem = player.currentMediaItem
         player.pause()
         targetInstallationInProgress = true
         return try {
@@ -1381,17 +1393,16 @@ class AppPlaybackRuntime(
                 onFailed = onFailed,
             )
             if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-            if (
-                !result.isStarted &&
-                presentationEpoch.isCurrent(expectedPresentationEpoch) &&
-                healthyActiveTarget() != null
+            result
+        } finally {
+            targetInstallationInProgress = false
+            if (targetCommands.isOpen() && presentationEpoch.isCurrent(expectedPresentationEpoch) &&
+                previousTarget != null && healthyActiveTarget() == previousTarget &&
+                activeTargetEpoch == previousTargetEpoch && player.currentMediaItem == previousMediaItem
             ) {
                 player.playWhenReady = previousPlayWhenReady
                 publishPlayerState()
             }
-            result
-        } finally {
-            targetInstallationInProgress = false
             if (targetCommands.isOpen()) {
                 audioSelection.useProfile(profileOwner.serverProfile.value, player)
                 (_activeTarget.value as? AppPlaybackTarget.Live)?.takeUnless { interruptionMuted }?.let {
@@ -1516,7 +1527,7 @@ class AppPlaybackRuntime(
 
     private fun clearAudioInterruption() {
         focusGeneration++
-        audioFocus?.abandon()
+        audioFocus.abandon()
         interruption = null
         interruptionContent = AudioInterruptionContent.NONE
         resumeAfterInterruption = false
@@ -1539,11 +1550,12 @@ class AppPlaybackRuntime(
         }
     }
 
-    private suspend fun playWithAudioFocus() {
-        if (!foreground || !targetCommands.isOpen()) return
-        val epoch = activeTargetEpoch ?: return
+    private suspend fun playWithAudioFocus(resumeTimeshift: Boolean = false): TimeshiftCommandResult {
+        if (!targetCommands.isOpen()) return TimeshiftCommandResult.SHUT_DOWN
+        if (!foreground) return TimeshiftCommandResult.UNAVAILABLE
+        val epoch = activeTargetEpoch ?: return TimeshiftCommandResult.UNAVAILABLE
         val generation = ++focusGeneration
-        val granted = audioFocus?.request { event ->
+        val granted = audioFocus.request { event ->
             scope.launch {
                 targetCommands.serialize(onClosed = {}) {
                     if (foreground && epoch == activeTargetEpoch && generation == focusGeneration) {
@@ -1551,22 +1563,23 @@ class AppPlaybackRuntime(
                     }
                 }
             }
-        } ?: true
+        }
         if (!granted) {
-            // This is a new explicit play intent, even if the preceding loss was permanent.
-            interruption = null
-            resumeAfterInterruption = false
+            // Preserve a previous server hold even if timeshift availability has disappeared.
             handleAudioInterruption(AudioInterruption.TRANSIENT_LOSS, wasPlaying = true)
-            return
+            // Delayed gain is disabled: only another explicit request can resolve denial.
+            resumeAfterInterruption = false
+            return TimeshiftCommandResult.UNAVAILABLE
         }
-        if (interruption != null && interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT) {
-            if (coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED) return
-        }
+        val result = if (resumeTimeshift ||
+            interruption != null && interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT
+        ) coordinator.resumeTimeshift() else TimeshiftCommandResult.ACCEPTED
         interruption = null
         interruptionPaused = false
         resumeAfterInterruption = false
         setInterruptionMuted(false)
         player.play()
+        return result
     }
 
     private suspend fun handleAudioInterruption(event: AudioInterruption, wasPlaying: Boolean = player.playWhenReady) {
@@ -1577,7 +1590,7 @@ class AppPlaybackRuntime(
             when (action) {
                 AudioInterruptionAction.RESUME -> {
                     if (content == AudioInterruptionContent.LIVE_TIMESHIFT &&
-                        coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED) return
+                        coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED && interruptionPaused) return
                     interruptionPaused = false
                     setInterruptionMuted(false)
                     player.play()
@@ -1594,10 +1607,11 @@ class AppPlaybackRuntime(
         else if (!persistent && interruption == null) resumeAfterInterruption = wasPlaying
         if (!persistent || event != AudioInterruption.TRANSIENT_LOSS) interruption = event
         interruptionContent = content
-        recoveryJob?.cancel()
-        recoveryJob = null
         when (action) {
             AudioInterruptionAction.PAUSE -> if (!interruptionPaused && !interruptionMuted) {
+                val currentJob = currentCoroutineContext().job
+                recoveryJob?.takeUnless { it === currentJob }?.cancel()
+                if (recoveryJob !== currentJob) recoveryJob = null
                 interruptionPaused = true
                 player.pause()
                 if (content == AudioInterruptionContent.LIVE_TIMESHIFT &&

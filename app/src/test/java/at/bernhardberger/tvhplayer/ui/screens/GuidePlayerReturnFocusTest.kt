@@ -184,7 +184,8 @@ class GuidePlayerReturnFocusTest {
         }
         player = ExoPlayer.Builder(context).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player), settings, profiles, scope,
-            at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context))
+            at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context),
+            at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None)
         // The guide position saved when the historical programme on channel 1 was opened.
         val position = GuidePositionStore().apply {
             save(GuidePosition(ChannelId(1), event(1, -2).id, hour - 2 * 3600, hour - 2 * 3600, 0))

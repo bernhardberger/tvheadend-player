@@ -106,7 +106,8 @@ class GuideHistoryScreenTest {
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player)
         val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
-            at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context))
+            at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context),
+            at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None)
         val selection = ChannelSelectionStore()
         val position = GuidePositionStore()
         val lastPlayed = LastPlayedChannelStore(context)

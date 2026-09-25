@@ -151,16 +151,21 @@ class AudioInterruptionRuntimeTest {
         assertFalse(player.playWhenReady)
     }
 
-    @Test fun deniedStartKeepsLiveConsumingMutedUntilGain() = exercise(granted = false) {
+    @Test fun deniedStartKeepsLiveConsumingMutedUntilExplicitRequest() = exercise(granted = false) {
         live(timeshift = false)
         assertTrue(audioDisabled())
         assertTrue(player.playWhenReady)
         focus.send(AudioInterruption.GAIN)
+        settle()
+        assertTrue(audioDisabled())
+        focus.granted = true
+        runtime.play()
         await { !audioDisabled() }
+        assertEquals(2, focus.requests.size)
         assertEquals(1, connection.subscribeCount)
     }
 
-    @Test fun explicitPlayAfterPermanentLossCanWaitForNewFocusGain() = exercise {
+    @Test fun deniedExplicitPlayAfterPermanentLossRequiresAnotherRequest() = exercise {
         recording()
         focus.send(AudioInterruption.PERMANENT_LOSS)
         await { !player.playWhenReady }
@@ -169,7 +174,12 @@ class AudioInterruptionRuntimeTest {
         await { focus.requests.size == 2 }
         assertFalse(player.playWhenReady)
         focus.send(AudioInterruption.GAIN)
+        settle()
+        assertFalse(player.playWhenReady)
+        focus.granted = true
+        runtime.play()
         await { player.playWhenReady }
+        assertEquals(3, focus.requests.size)
     }
 
     @Test fun failedReplacementPreservesPlayingTargetAndItsFocus() = exercise {
@@ -212,6 +222,147 @@ class AudioInterruptionRuntimeTest {
         assertEquals(listOf(0, 100), connection.speeds)
     }
 
+    @Test fun explicitTimeshiftResumeResolvesPermanentAndNoisyInterruptions() = exercise {
+        for (event in listOf(AudioInterruption.PERMANENT_LOSS, AudioInterruption.NOISY)) {
+            live(timeshift = true)
+            focus.send(event)
+            await { !player.playWhenReady }
+            val requests = focus.requests.size
+            assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+            assertTrue(player.playWhenReady)
+            assertEquals(100, connection.speeds.last())
+            assertEquals(requests + 1, focus.requests.size)
+        }
+    }
+
+    @Test fun cancelledReplacementRestoresRetainedTargetAndFocus() = exercise {
+        live(timeshift = false)
+        val callback = focus.requests.last()
+        val abandons = focus.abandons
+        lateinit var replacement: Deferred<PlaybackTargetResult?>
+        beforeRecordingBinding = {
+            replacement.cancel()
+            throw CancellationException("Cancelled replacement")
+        }
+        replacement = scope.async(start = CoroutineStart.LAZY) {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
+                RecordingPlaybackStart.START_OVER)
+        }
+        replacement.start()
+        await { replacement.isCompleted }
+        assertTrue(replacement.isCancelled)
+        assertTrue(player.playWhenReady)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(abandons, focus.abandons)
+        assertSame(callback, focus.requests.last())
+        callback(AudioInterruption.TRANSIENT_LOSS)
+        await { audioDisabled() }
+    }
+
+    @Test fun rejectedPauseIgnoresPausedObservationAndRejectedResumeUnmutes() = exercise {
+        live(timeshift = true)
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { audioDisabled() && player.playWhenReady }
+        connection.emit(SubscriptionEvent.Speed(0))
+        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused == true }
+        settle()
+        assertTrue(audioDisabled())
+        assertTrue(player.playWhenReady)
+        focus.send(AudioInterruption.GAIN)
+        await { !audioDisabled() }
+        assertTrue(player.playWhenReady)
+        assertEquals(listOf(0, 100), connection.speeds)
+    }
+
+    @Test fun exceptionalReplacementRestoresRetainedTargetButShutdownDoesNot() = exercise {
+        live(timeshift = false)
+        beforeRecordingBinding = { throw IllegalStateException("Synthetic binding failure") }
+        val exceptional = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
+                RecordingPlaybackStart.START_OVER)
+        }
+        await { exceptional.isCompleted }
+        assertTrue(runCatching { exceptional.await() }.exceptionOrNull() is IllegalStateException)
+        assertTrue(player.playWhenReady)
+        assertEquals(1, focus.requests.size)
+        lateinit var shutdown: Job
+        beforeRecordingBinding = {
+            shutdown = scope.launch(start = CoroutineStart.UNDISPATCHED) { runtime.detach() }
+            throw CancellationException("Shutdown during replacement")
+        }
+        val cancelled = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
+                RecordingPlaybackStart.START_OVER)
+        }
+        await { cancelled.isCompleted && shutdown.isCompleted }
+        assertFalse(player.playWhenReady)
+        assertEquals(1, focus.requests.size)
+    }
+
+    @Test fun rejectedExplicitResumeClearsPauseOwnershipAndReportsServerResult() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.PERMANENT_LOSS)
+        await { !player.playWhenReady }
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        assertNotEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertTrue(player.playWhenReady)
+        connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertEquals(listOf(0, 100, 100), connection.speeds)
+    }
+
+    @Test fun mutedLiveStillAdmitsRecovery() = exercise {
+        live(timeshift = false)
+        focus.send(AudioInterruption.NOISY)
+        await { audioDisabled() }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { player.playWhenReady }
+        assertTrue(audioDisabled())
+        assertEquals(1, focus.requests.size)
+        runtime.play()
+        await { !audioDisabled() }
+    }
+
+    @Test fun deniedFocusDuringTimeshiftRecoveryStillSendsServerPause() = exercise {
+        live(timeshift = true)
+        focus.granted = false
+        // Let the replacement subscription publish its timeshift grant before focus returns.
+        // Normally ExoPlayer prepares asynchronously, so the new observation can still be Pending.
+        focus.beforeRequest = {
+            runBlocking {
+                await { connection.subscribeCount == 2 }
+                connection.awaitCollectionRegistered()
+                startSubscription()
+                await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                    ?.timeshiftState is LiveTimeshiftState.Available }
+            }
+        }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { focus.requests.size == 2 }
+        await { connection.speeds.contains(0) }
+        assertFalse(player.playWhenReady)
+    }
+
+    @Test fun deniedResumePreservesServerHoldWhenTimeshiftDisappears() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.PERMANENT_LOSS)
+        await { !player.playWhenReady }
+        manager.closeAndJoin()
+        await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState !is LiveTimeshiftState.Available }
+        focus.granted = false
+        runtime.play()
+        await { focus.requests.size == 2 }
+        assertFalse(player.playWhenReady)
+        assertFalse(audioDisabled())
+        assertEquals(listOf(0), connection.speeds)
+    }
+
     private fun exercise(granted: Boolean = true, block: suspend Fixture.() -> Unit) = runBlocking {
         val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), granted)
         try { withTimeout(15_000) { fixture.block() } }
@@ -225,13 +376,17 @@ class AudioInterruptionRuntimeTest {
 
     private class FakeFocus(var granted: Boolean) : PlaybackAudioFocus {
         val requests = mutableListOf<(AudioInterruption) -> Unit>()
+        private var callback: ((AudioInterruption) -> Unit)? = null
+        var beforeRequest: () -> Unit = {}
         var abandons = 0
         override fun request(onInterruption: (AudioInterruption) -> Unit): Boolean {
+            beforeRequest()
             requests += onInterruption
+            callback = onInterruption.takeIf { granted }
             return granted
         }
-        override fun abandon() { abandons++ }
-        fun send(event: AudioInterruption) { requests.last()(event) }
+        override fun abandon() { abandons++; callback = null }
+        fun send(event: AudioInterruption) { callback?.invoke(event) }
     }
 
     private class Fixture(val scope: CoroutineScope, granted: Boolean) {
@@ -240,7 +395,7 @@ class AudioInterruptionRuntimeTest {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }
-        private val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
@@ -260,7 +415,14 @@ class AudioInterruptionRuntimeTest {
             recoveries += it
             recover(it)
         }).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, output, focus)
+        var beforeRecordingBinding: () -> Unit = {}
+        private val runtimeSession = object : TvheadendSession by session {
+            override fun bindRecordingPlayback(currentSession: CurrentSessionObservation, recordingId: DvrEntryId): PlaybackBindingResult<PlaybackBinding.Recording> {
+                beforeRecordingBinding()
+                return session.bindRecordingPlayback(currentSession, recordingId)
+            }
+        }
+        val runtime = AppPlaybackRuntime(player, runtimeSession, coordinator, settings, profiles, scope, output, focus)
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
         fun audioDisabled() = C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes
