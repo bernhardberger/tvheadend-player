@@ -171,17 +171,18 @@ class AppPlaybackRuntime(
     private var targetInstallationInProgress = false
     private var lastLiveChannelId: ChannelId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
-    private var recoveryJob: Job? = null
-    private var admittedRecoveryEpoch: Long? = null
-    private val recoveryBackoff = LiveRecoveryBackoff()
-    private val recoveryAttempts = LiveRecoveryAttemptRunner(::publishResolvedRecoveryPlayerState)
+    private val liveRecovery: LiveRecoveryController = LiveRecoveryController(
+        scope = scope,
+        targetCommands = targetCommands,
+        publishResolvedRecoveryPlayerState = ::publishResolvedRecoveryPlayerState,
+    )
     private val presentation = PlaybackPresentationPublisher(
         player = player,
         session = session,
         policy = policy,
         startupBuffer = startupBuffer,
         targetCommands = targetCommands,
-        recoveryAttempts = recoveryAttempts,
+        recoveryAttempts = liveRecovery.recoveryAttempts,
         livePlaybackObservation = coordinator.livePlaybackObservation,
         _state = _state,
         _activeTarget = _activeTarget,
@@ -203,7 +204,7 @@ class AppPlaybackRuntime(
         foreground = { foreground },
         activeTargetEpoch = { activeTargetEpoch },
         targetInstallationInProgress = { targetInstallationInProgress },
-        cancelRecoveryForInterruptionLocked = ::cancelRecoveryForInterruptionLocked,
+        cancelRecoveryForInterruptionLocked = liveRecovery::cancelOnInterruptionLocked,
     )
     val isInterruptionMuted: Boolean get() = audioInterruptions.interruptionMuted
     val hasAudioInterruption: Boolean get() = audioInterruptions.interruption != null
@@ -304,7 +305,7 @@ class AppPlaybackRuntime(
             if (intent != null && isPlaybackIntentStopped(intent)) return@serialize null
             if (policy.trace.enabled) policy.trace.tuneAdmitted()
             lastLiveChannelId = selection.channelId
-            recoveryBackoff.reset()
+            liveRecovery.resetBackoffLocked()
             val result = playLive(
                 channelId = selection.channelId,
                 recovering = false,
@@ -639,7 +640,7 @@ class AppPlaybackRuntime(
         foregroundPlaybackLifecycle.onExplicitStop()
         cancelKeepTimer()
         _backgroundNotice.value = null
-        recoveryBackoff.reset()
+        liveRecovery.resetBackoffLocked()
         return stopPlayback()
     }
 
@@ -652,15 +653,7 @@ class AppPlaybackRuntime(
                 }
                 foreground = false
                 val currentJob = currentCoroutineContext().job
-                val recoveryPending = recoveryJob?.isActive == true && activeTargetEpoch != null &&
-                    admittedRecoveryEpoch == activeTargetEpoch
-                // A queued, un-admitted escalation must still reach admission and release
-                // any target kept below. The SDK will not escalate that target again.
-                if (admittedRecoveryEpoch != null) {
-                    recoveryJob?.takeUnless { it === currentJob }?.cancel()
-                    if (recoveryJob !== currentJob) recoveryJob = null
-                    admittedRecoveryEpoch = null
-                }
+                val recoveryPending = liveRecovery.cancelOnBackgroundLocked(currentJob, activeTargetEpoch)
                 val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady }
                     ?: return@serialize
                 player.pause()
@@ -729,9 +722,7 @@ class AppPlaybackRuntime(
         val epoch = presentationEpoch.begin()
         presentation.endTargetPresentationLocked(epoch)
         val currentJob = currentCoroutineContext().job
-        recoveryJob?.takeUnless { it === currentJob }?.cancel()
-        recoveryJob = null
-        admittedRecoveryEpoch = null
+        liveRecovery.cancelOnStopLocked(currentJob)
         val result = coordinator.stop()
         if (!targetCommands.isOpen()) return PlaybackStopResult.ShutDown
         presentationEpoch.publishIfCurrent(epoch) {
@@ -755,7 +746,7 @@ class AppPlaybackRuntime(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
     ) {
         // An explicit retry is a user decision, so it refills the budget an exhausted target used.
-        recoveryBackoff.reset()
+        liveRecovery.resetBackoffLocked()
         lastLiveChannelId?.let { channelId ->
             playLive(
                 channelId = channelId,
@@ -981,80 +972,62 @@ class AppPlaybackRuntime(
     }
     fun onRecoveryRequired(reason: PlaybackRecoveryReason) {
         val requestedEpoch = activeTargetEpoch
-        dispatchPlaybackRecovery(scope, reason) { dispatchedReason ->
-            val currentJob = currentCoroutineContext().job
-            recoveryJob?.takeUnless { it === currentJob }?.cancel()
-            recoveryJob = currentJob
-            admittedRecoveryEpoch = null
-            try {
-                // Admit the attempt under the command lock, then wait for the backoff delay
-                // without holding it so a channel change or Stop stays responsive meanwhile.
-                val admitted = targetCommands.serialize(onClosed = { null }) {
-                    if (foregroundPlaybackLifecycle.isKeeping(activeTargetEpoch)) {
-                        if (requestedEpoch != activeTargetEpoch) return@serialize null
-                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(requestedEpoch, BackgroundPlaybackNotice.TUNER_LOST))
-                        return@serialize null
-                    }
-                    if (audioInterruptions.interruptionPaused || !foreground) return@serialize null
-                    val fence = currentLiveRecoveryFence(
-                        reason = dispatchedReason,
-                        observation = session.observation.value,
+        liveRecovery.dispatch(
+            reason = reason,
+            admitLocked = admit@{ dispatchedReason ->
+                if (foregroundPlaybackLifecycle.isKeeping(activeTargetEpoch)) {
+                    if (requestedEpoch != activeTargetEpoch) return@admit null
+                    applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(requestedEpoch, BackgroundPlaybackNotice.TUNER_LOST))
+                    return@admit null
+                }
+                if (audioInterruptions.interruptionPaused || !foreground) return@admit null
+                val fence = currentLiveRecoveryFence(
+                    reason = dispatchedReason,
+                    observation = session.observation.value,
+                    activeTarget = _activeTarget.value,
+                    activeTargetEpoch = activeTargetEpoch,
+                ) ?: return@admit null
+                if (!fence.matches(
                         activeTarget = _activeTarget.value,
                         activeTargetEpoch = activeTargetEpoch,
-                    ) ?: return@serialize null
-                    if (!fence.matches(
-                            activeTarget = _activeTarget.value,
-                            activeTargetEpoch = activeTargetEpoch,
-                            observation = session.observation.value,
-                        )
-                    ) {
-                        return@serialize null
-                    }
-                    val attempt = recoveryBackoff.nextAttempt()
-                    if (attempt == null) {
-                        publishRecoveryExhausted(fence.reason)
-                        return@serialize null
-                    }
-                    admittedRecoveryEpoch = fence.targetEpoch
-                    presentationEpoch.publishIfCurrent(fence.targetEpoch) {
-                        _state.value = AppPlaybackState.Recovering(
-                            reason = fence.reason,
-                            retryDelayMillis = attempt.delayMillis,
-                        )
-                        presentation.publishDiagnostics()
-                    }
-                    fence to attempt
+                        observation = session.observation.value,
+                    )
+                ) {
+                    return@admit null
                 }
-                if (admitted != null) {
-                    val (fence, attempt) = admitted
-                    recoveryAttempts.run(fence) {
-                        if (attempt.delayMillis > 0L) delay(attempt.delayMillis)
-                        targetCommands.serialize(onClosed = { null }) {
-                            if (audioInterruptions.interruptionPaused || !foreground) return@serialize null
-                            if (!fence.matches(
-                                    activeTarget = _activeTarget.value,
-                                    activeTargetEpoch = activeTargetEpoch,
-                                    observation = session.observation.value,
-                                )
-                            ) {
-                                return@serialize null
-                            }
-                            playLive(
-                                channelId = fence.selection.channelId,
-                                recovering = true,
-                                expectedPresentationEpoch = fence.targetEpoch,
-                                recoverySelection = fence.selection,
-                            )
-                        }
-                    }
+                val attempt = liveRecovery.nextAttemptLocked()
+                if (attempt == null) {
+                    publishRecoveryExhausted(fence.reason)
+                    return@admit null
                 }
-            } finally {
-                if (recoveryJob === currentJob) {
-                    recoveryJob = null
-                    admittedRecoveryEpoch = null
+                liveRecovery.admitLocked(fence.targetEpoch)
+                presentationEpoch.publishIfCurrent(fence.targetEpoch) {
+                    _state.value = AppPlaybackState.Recovering(
+                        reason = fence.reason,
+                        retryDelayMillis = attempt.delayMillis,
+                    )
+                    presentation.publishDiagnostics()
                 }
-            }
-        }
+                fence to attempt
+            },
+            retryLocked = retry@{ fence ->
+                if (audioInterruptions.interruptionPaused || !foreground) return@retry null
+                if (!fence.matches(
+                        activeTarget = _activeTarget.value,
+                        activeTargetEpoch = activeTargetEpoch,
+                        observation = session.observation.value,
+                    )
+                ) {
+                    return@retry null
+                }
+                playLive(
+                    channelId = fence.selection.channelId,
+                    recovering = true,
+                    expectedPresentationEpoch = fence.targetEpoch,
+                    recoverySelection = fence.selection,
+                )
+            },
+        )
     }
 
     /**
@@ -1077,10 +1050,7 @@ class AppPlaybackRuntime(
         if (!targetCommands.close()) return
         cancelKeepTimer()
         recordingMarkers.clearRecordingMarkersAndJoin()
-        val pendingRecovery = recoveryJob
-        recoveryJob = null
-        admittedRecoveryEpoch = null
-        pendingRecovery?.cancel()
+        val pendingRecovery = liveRecovery.cancelOnDetach()
         livePlaybackObservationJob.cancel()
         settingsJob.cancel()
         pendingRecovery?.join()
@@ -1304,18 +1274,6 @@ class AppPlaybackRuntime(
             },
             notice = { _backgroundNotice.value = it },
         )
-    }
-
-    /**
-     * An interruption pause ends a live recovery, unless the interruption arrived inside that
-     * recovery's own serialized attempt.
-     */
-    private fun cancelRecoveryForInterruptionLocked(currentJob: Job) {
-        recoveryJob?.takeUnless { it === currentJob }?.cancel()
-        if (recoveryJob !== currentJob) {
-            recoveryJob = null
-            admittedRecoveryEpoch = null
-        }
     }
 
     // A committed UI choice outlives the options sheet, including while another command holds the lock.
