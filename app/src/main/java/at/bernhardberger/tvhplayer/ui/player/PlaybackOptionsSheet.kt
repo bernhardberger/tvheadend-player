@@ -115,6 +115,8 @@ internal fun PlaybackOptionsSheet(
     val surround51 = stringResource(R.string.track_surround_5_1)
     val surround71 = stringResource(R.string.track_surround_7_1)
     val channelsTemplate = stringResource(R.string.track_channels_count)
+    val audioDescription = stringResource(R.string.audio_description)
+    val clearDialogue = stringResource(R.string.track_clear_dialogue)
     val currentTracks = rememberPlayerTracks(player)
     val audioChoices = remember(
         currentTracks,
@@ -124,6 +126,8 @@ internal fun PlaybackOptionsSheet(
         surround51,
         surround71,
         channelsTemplate,
+        audioDescription,
+        clearDialogue,
     ) {
         collectTracks(
             tracks = currentTracks,
@@ -134,6 +138,8 @@ internal fun PlaybackOptionsSheet(
             surround51Label = surround51,
             surround71Label = surround71,
             channelsLabel = { count -> channelsTemplate.format(count) },
+            audioDescriptionLabel = audioDescription,
+            clearDialogueLabel = clearDialogue,
         )
     }
     val subtitleChoices = remember(

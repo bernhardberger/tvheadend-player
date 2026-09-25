@@ -364,6 +364,7 @@
     <string name="track_surround_5_1">5.1</string>
     <string name="track_surround_7_1">7.1</string>
     <string name="track_channels_count">%1$d Kanäle</string>
+    <string name="track_clear_dialogue">Klare Sprache</string>
     <string name="timeshift_behind_live">%1$s hinter Live</string>
     <string name="timeshift_go_live">Zu Live</string>
     <string name="timeshift_seek_clamped">Grenze des verfügbaren Puffers erreicht.</string>

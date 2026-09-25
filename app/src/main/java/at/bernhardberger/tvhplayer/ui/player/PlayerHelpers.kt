@@ -24,6 +24,8 @@ fun collectTracks(
     surround51Label: String = "5.1",
     surround71Label: String = "7.1",
     channelsLabel: (Int) -> String = { "$it channels" },
+    audioDescriptionLabel: String = "Audio description",
+    clearDialogueLabel: String = "Clear dialogue",
 ): List<UiTrack> {
     val out = mutableListOf<UiTrack>()
     for (g in tracks.groups) {
@@ -34,6 +36,8 @@ fun collectTracks(
             if (!g.isTrackSupported(i)) continue
             val f = g.getTrackFormat(i)
             val role = when {
+                (f.roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO) != 0 -> audioDescriptionLabel
+                (f.roleFlags and C.ROLE_FLAG_ENHANCED_DIALOG_INTELLIGIBILITY) != 0 -> clearDialogueLabel
                 (f.roleFlags and C.ROLE_FLAG_COMMENTARY) != 0 -> "Commentary"
                 (f.roleFlags and C.ROLE_FLAG_ALTERNATE) != 0 -> "Alternate"
                 (f.roleFlags and C.ROLE_FLAG_MAIN) != 0 -> null
