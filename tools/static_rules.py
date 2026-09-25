@@ -95,7 +95,12 @@ def line_number(text: str, offset: int) -> int:
 def find_static_rule_violations(root: Path) -> list[str]:
     violations = []
     source_root = root / "app/src/main"
-    for path in sorted(source_root.rglob("*.kt")):
+    # Production sources of the UI-free :client library carry the same no-probe contract.
+    # Theme rules below stay app-only: :client has no UI, resources or theme.
+    production_roots = (source_root, root / "client/src/main")
+    kotlin_paths = [path for production_root in production_roots
+                    for path in sorted(production_root.rglob("*.kt"))]
+    for path in kotlin_paths:
         text = path.read_text(encoding="utf-8")
         code = kotlin_code(text)
         for label, pattern in PROBE_CODE_PATTERNS:
@@ -105,7 +110,9 @@ def find_static_rule_violations(root: Path) -> list[str]:
                     f"{line_number(code, match.start())} uses {label}"
                 )
 
-    for path in sorted((source_root / "res").rglob("*.xml")):
+    resource_paths = [path for production_root in production_roots
+                      for path in sorted((production_root / "res").rglob("*.xml"))]
+    for path in resource_paths:
         root_element = ElementTree.parse(path).getroot()
         elements = root_element.iter()
         if any(

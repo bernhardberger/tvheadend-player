@@ -8,7 +8,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.AudioTrackChoice
 
 /** One configured profile, at most 64 explicit channel choices, and no retained track groups. */
-internal class SessionAudioSelection {
+class SessionAudioSelection {
     private fun choice(format: Format) = AudioTrackChoice(
         format.language, format.sampleMimeType,
         format.roleFlags, format.channelCount, format.sampleRate,

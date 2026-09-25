@@ -13,7 +13,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
-internal data class AudioTrackChoice(
+data class AudioTrackChoice(
     val language: String?,
     val mimeType: String?,
     val roleFlags: Int,
@@ -22,7 +22,7 @@ internal data class AudioTrackChoice(
 )
 
 /** App-private semantic choices, never Media3 group references or track indices. */
-internal class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
+class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
     @Serializable
     private data class Entry(val profile: String, val channel: Long, val choice: AudioTrackChoice)
 

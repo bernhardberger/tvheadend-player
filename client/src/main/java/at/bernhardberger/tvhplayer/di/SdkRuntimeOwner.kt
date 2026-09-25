@@ -21,7 +21,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.yield
 
 /** Process-lifetime owner for the one released-SDK session/coordinator/player graph. */
-internal class SdkRuntimeOwner(
+class SdkRuntimeOwner(
     val session: TvheadendSession,
     val playbackRuntime: AppPlaybackRuntime,
     val appProfileOwner: AppProfileOwner,

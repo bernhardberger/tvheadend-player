@@ -24,6 +24,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 |---|---|
 | `ai-engineering-harness.md` | Current AI-harness architecture and operation; harness work only. |
 | `code-ownership.md` | Compact source and tooling ownership map; read before locating application code or delegating broad repository mapping. |
+| `client-module.md` | UI-free `:client` library ownership, dependency rules and placement rule; read before adding runtime, persistence or domain code. |
 | `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
 | `android-tooling.md` | Standard build and explicit-target offline emulator workflow; qualified Android CLI and R8 payload limits. |

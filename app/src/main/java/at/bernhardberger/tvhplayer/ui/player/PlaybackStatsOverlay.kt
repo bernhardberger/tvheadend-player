@@ -75,7 +75,7 @@ internal fun PlaybackStatsOverlay(
                 )
                 StatLine(
                     stringResource(R.string.stats_state),
-                    when (diagnostics.state) {
+                    when (val state = diagnostics.state) {
                         AppPlaybackState.Idle -> stringResource(R.string.stats_state_idle)
                         AppPlaybackState.Starting -> stringResource(R.string.stats_state_starting)
                         AppPlaybackState.Playing -> stringResource(
@@ -91,7 +91,7 @@ internal fun PlaybackStatsOverlay(
                             stringResource(R.string.stats_state_recovering)
                         is AppPlaybackState.Failed -> listOfNotNull(
                             stringResource(R.string.stats_state_failed),
-                            diagnostics.state.playerErrorCode ?: diagnostics.state.targetResult?.toString(),
+                            state.playerErrorCode ?: state.targetResult?.toString(),
                         ).joinToString(" · ")
                     },
                 )

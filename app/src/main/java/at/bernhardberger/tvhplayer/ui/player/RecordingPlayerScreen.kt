@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.KeyEvent as AndroidKeyEvent
+import androidx.annotation.OptIn
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -77,6 +79,7 @@ private const val RECORDING_SHORT_SEEK_MS = 30_000L
 private const val RECORDING_LONG_SEEK_MS = 10 * 60_000L
 private const val RECORDING_CONTROLS_AUTO_HIDE_MS = 5_000L
 
+@OptIn(UnstableApi::class)
 @Composable
 fun RecordingPlayerScreen(
     recordingId: DvrEntryId,

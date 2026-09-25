@@ -43,7 +43,7 @@ fun ConnectionUiState.primaryRecoveryAction(): ConnectionRecoveryAction = when (
     ConnectionUiState.Reconnecting -> ConnectionRecoveryAction.NONE
 }
 
-internal fun ConnectionUiState.forEmptyChannelPresentation(
+fun ConnectionUiState.forEmptyChannelPresentation(
     channelCatalogCurrent: Boolean,
 ): ConnectionUiState = if (this == ConnectionUiState.Ready && !channelCatalogCurrent) {
     ConnectionUiState.SyncingChannels
@@ -51,7 +51,7 @@ internal fun ConnectionUiState.forEmptyChannelPresentation(
     this
 }
 
-internal fun shouldPresentEmptyTag(
+fun shouldPresentEmptyTag(
     channelCatalogCurrent: Boolean,
     connectionState: ConnectionUiState,
     hasChannelsOutsideActiveTag: Boolean,

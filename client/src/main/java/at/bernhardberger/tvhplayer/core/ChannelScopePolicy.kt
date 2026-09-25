@@ -38,7 +38,7 @@ fun resolveChannelScope(
     return resolveOrderedChannelScope(orderBrowseChannels(channels), tags, requestedTagId, visibility)
 }
 
-internal fun orderBrowseChannels(channels: List<Channel>): List<Channel> = channels.sortedWith(
+fun orderBrowseChannels(channels: List<Channel>): List<Channel> = channels.sortedWith(
         compareBy<Channel> { it.number == null }
             .thenBy { it.number }
             .thenBy { it.numberMinor != null }
@@ -46,7 +46,7 @@ internal fun orderBrowseChannels(channels: List<Channel>): List<Channel> = chann
             .thenBy { it.id.value },
     )
 
-internal fun resolveOrderedChannelScope(
+fun resolveOrderedChannelScope(
     orderedChannels: List<Channel>,
     tags: List<ChannelTag>,
     requestedTagId: ChannelTagId?,

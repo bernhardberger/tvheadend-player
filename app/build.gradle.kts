@@ -113,6 +113,8 @@ dependencies {
         }
     }
 
+    implementation(project(":client"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.appcompat)
@@ -208,11 +210,14 @@ tasks.register("verifyExternalSdkConsumption") {
                 }
         }
     }.toSet()
+    // The in-repo :client library is the only allowed project dependency; SDK projects stay forbidden.
+    val clientProjectPath = ":client"
     val forbiddenLocalDependencies = productionClasspaths.flatMap { (classpathName, classpath) ->
         classpath.hierarchy.flatMap { configuration ->
             configuration.dependencies.mapNotNull { dependency ->
                 when (dependency) {
                     is ProjectDependency -> "$classpathName:${configuration.name}:project:${dependency.path}"
+                        .takeIf { dependency.path != clientProjectPath }
                     is FileCollectionDependency -> dependency.files.files
                         .filterNot { it.name in setOf("android.jar", "core-for-system-modules.jar") }
                         .takeIf { it.isNotEmpty() }
@@ -244,7 +249,9 @@ tasks.register("verifyExternalSdkConsumption") {
                 components.flatMap { component ->
                     when (val id = component.id) {
                         is ProjectComponentIdentifier -> listOfNotNull(
-                            "project=${id.displayName}".takeIf { id.projectPath != appProjectPath },
+                            "project=${id.displayName}".takeIf {
+                                id.projectPath != appProjectPath && id.projectPath != clientProjectPath
+                            },
                         )
                         is ModuleComponentIdentifier -> buildList {
                             if (id.group == sdkGroup) add("tvheadend=${id.module}:${id.version}")
@@ -298,7 +305,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "App dependencies contain local fallbacks: $forbiddenLocalDependencies"
         }
         check(includedBuildNames.isEmpty()) { "The app must not use included builds: $includedBuildNames" }
-        check(projectPaths == setOf(":", ":app")) {
+        check(projectPaths == setOf(":", ":app", clientProjectPath)) {
             "Unexpected Gradle projects: $projectPaths"
         }
 

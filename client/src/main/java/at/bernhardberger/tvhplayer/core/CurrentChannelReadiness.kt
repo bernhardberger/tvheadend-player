@@ -9,7 +9,7 @@ sealed interface CurrentChannelReadiness {
     data class Ready(val channels: List<Channel>) : CurrentChannelReadiness
 }
 
-internal fun deriveCurrentChannelReadiness(
+fun deriveCurrentChannelReadiness(
     connected: Boolean,
     authority: RetainedMetadataAuthority,
     channels: List<Channel>,

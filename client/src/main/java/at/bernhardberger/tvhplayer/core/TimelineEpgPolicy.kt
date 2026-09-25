@@ -19,14 +19,14 @@ import kotlin.math.min
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
-internal const val GUIDE_VISIBLE_WINDOW_SEC = 3 * 3600L
-internal val GUIDE_EPG_COVERAGE_POLICY = EpgCoveragePolicy.create(7.days)
+const val GUIDE_VISIBLE_WINDOW_SEC = 3 * 3600L
+val GUIDE_EPG_COVERAGE_POLICY = EpgCoveragePolicy.create(7.days)
 
 /** Display-only archive is merged once by the Guide snapshot owner. Live identity wins. */
-internal fun guideDisplayEvents(snapshot: EpgSnapshot?): List<EpgEventEntry> =
+fun guideDisplayEvents(snapshot: EpgSnapshot?): List<EpgEventEntry> =
     if (snapshot == null) emptyList() else (snapshot.events + snapshot.historicalEvents).distinctBy { it.id }
 
-internal data class GuideWindowBounds(
+data class GuideWindowBounds(
     val earliestStartSec: Long,
     val latestStartSec: Long,
 ) {
@@ -37,7 +37,7 @@ internal data class GuideWindowBounds(
     fun constrain(startSec: Long): Long = startSec.coerceIn(earliestStartSec, latestStartSec)
 }
 
-internal fun guideWindowBounds(openedAtSec: Long, zoneId: ZoneId): GuideWindowBounds {
+fun guideWindowBounds(openedAtSec: Long, zoneId: ZoneId): GuideWindowBounds {
     val earliestStartSec = floorGuideWindowToHour(openedAtSec, zoneId) - 6 * 3600L
     val latestStartSec = floorGuideWindowToHour(
         openedAtSec + GUIDE_EPG_COVERAGE_POLICY.futureHorizon.inWholeSeconds -
@@ -47,7 +47,7 @@ internal fun guideWindowBounds(openedAtSec: Long, zoneId: ZoneId): GuideWindowBo
     return GuideWindowBounds(earliestStartSec, latestStartSec)
 }
 
-internal fun moveGuideWindowByDays(
+fun moveGuideWindowByDays(
     windowStartSec: Long,
     dayDelta: Int,
     bounds: GuideWindowBounds,
@@ -59,7 +59,7 @@ internal fun moveGuideWindowByDays(
         .toEpochSecond(),
 )
 
-internal fun floorGuideWindowToHour(epochSec: Long, zoneId: ZoneId): Long =
+fun floorGuideWindowToHour(epochSec: Long, zoneId: ZoneId): Long =
     JavaInstant.ofEpochSecond(epochSec)
         .atZone(zoneId)
         .withMinute(0)
@@ -67,17 +67,17 @@ internal fun floorGuideWindowToHour(epochSec: Long, zoneId: ZoneId): Long =
         .withNano(0)
         .toEpochSecond()
 
-internal fun shouldWaitForGuideCoverage(
+fun shouldWaitForGuideCoverage(
     connectionReady: Boolean,
     hasCurrentSnapshot: Boolean,
     acquisitionPending: Boolean,
     coverageSettled: Boolean,
 ): Boolean = connectionReady && acquisitionPending && (!hasCurrentSnapshot || !coverageSettled)
 
-internal enum class GuidePendingNavigationAction { WAIT, RESTORE_ORIGIN, HEADER, MOVE }
+enum class GuidePendingNavigationAction { WAIT, RESTORE_ORIGIN, HEADER, MOVE }
 
 /** Cancels navigation intent, never grants coverage to an unknown destination. */
-internal fun guidePendingNavigationAction(
+fun guidePendingNavigationAction(
     direction: EpgFocusDirection,
     frontierDirection: Int?,
     channelDirection: Int?,
@@ -104,7 +104,7 @@ internal fun guidePendingNavigationAction(
     }
 }
 
-internal fun firstUnsettledGuidePageIndex(
+fun firstUnsettledGuidePageIndex(
     currentChannelIndex: Int,
     targetChannelIndex: Int,
     channelCount: Int,
@@ -341,7 +341,7 @@ fun timelinePageFocusTarget(
 }
 
 /** Logical leading-edge pixels work identically with relative placement in LTR and RTL. */
-internal fun shouldComposeTimelineCell(
+fun shouldComposeTimelineCell(
     startPx: Int,
     widthPx: Int,
     visibleWidthPx: Int?,
@@ -380,7 +380,7 @@ private fun midpoint(event: EpgEventEntry): Long =
 fun epgFrontierSettled(coverage: EpgCoverage?, requestedThrough: Instant): Boolean =
     coverage?.knownTo?.let { it >= requestedThrough } == true
 
-internal fun guideChannelPageCoverageSettled(
+fun guideChannelPageCoverageSettled(
     channelIds: List<ChannelId>,
     coverages: List<EpgCoverage>,
     requestedThrough: Instant,
@@ -391,13 +391,13 @@ internal fun guideChannelPageCoverageSettled(
     )
 }
 
-internal sealed interface GuideCoverageFocusResolution {
+sealed interface GuideCoverageFocusResolution {
     data object Wait : GuideCoverageFocusResolution
     data object Release : GuideCoverageFocusResolution
     data class Select(val target: EpgFocusTarget) : GuideCoverageFocusResolution
 }
 
-internal fun resolveGuideWindowFocus(
+fun resolveGuideWindowFocus(
     rows: List<EpgFocusColumn>,
     preferredChannelId: ChannelId,
     targetSec: Long,
@@ -438,13 +438,13 @@ internal fun resolveGuideWindowFocus(
     return GuideCoverageFocusResolution.Select(target)
 }
 
-internal sealed interface GuideDeferredOriginResolution {
+sealed interface GuideDeferredOriginResolution {
     data object Wait : GuideDeferredOriginResolution
     data object Release : GuideDeferredOriginResolution
     data class Restore(val target: EpgFocusTarget) : GuideDeferredOriginResolution
 }
 
-internal fun resolveGuideFrontierOrigin(
+fun resolveGuideFrontierOrigin(
     rows: List<EpgFocusColumn>,
     channelId: ChannelId,
     eventId: EventId,

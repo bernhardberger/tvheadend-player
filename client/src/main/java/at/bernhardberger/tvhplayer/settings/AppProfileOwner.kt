@@ -37,7 +37,7 @@ fun interface CredentialEditLease {
 }
 
 /** Connection-form operations backed by the process-owned SDK profile store. */
-internal interface ConnectionProfileEditor {
+interface ConnectionProfileEditor {
     val serverSettings: Flow<ServerSettings>
 
     suspend fun loadServerForEditing(
@@ -57,14 +57,14 @@ internal interface ConnectionProfileEditor {
     suspend fun clearProfile()
 }
 
-class AppProfileOwner internal constructor(
+class AppProfileOwner(
     private val session: TvheadendSession,
     private val profileStore: ServerProfileStore,
     private val playerSettings: PlayerSettingsStore,
     private val ioDispatcher: CoroutineDispatcher,
     private val readProfileForEditing: suspend () -> ServerProfileEditReadResult,
 ) : ConnectionProfileEditor {
-    internal constructor(
+    constructor(
         session: TvheadendSession,
         profileStore: TvheadendServerProfileStore,
         playerSettings: PlayerSettingsStore,
@@ -93,7 +93,7 @@ class AppProfileOwner internal constructor(
     private var availableForObservation: CurrentSessionObservation? = null
 
     val serverProfile: StateFlow<ServerProfileReadResult?> = mutableServerProfile.asStateFlow()
-    internal var audioProfileId: String? = null
+    var audioProfileId: String? = null
         private set
     override val serverSettings: Flow<ServerSettings> = serverProfile
         .filterNotNull()
@@ -425,7 +425,7 @@ private class SelectStreamProfileCommand(
     val profileId: StreamProfileId?,
 ) : ProfileCommand()
 
-internal fun ServerProfileReadResult.toServerSettings(): ServerSettings = when (this) {
+fun ServerProfileReadResult.toServerSettings(): ServerSettings = when (this) {
     is ServerProfileReadResult.Available -> serverSettingsForEditing(
         host = host,
         htspPort = port,

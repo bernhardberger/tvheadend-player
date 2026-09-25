@@ -32,7 +32,7 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
-import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.client.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileFirstVideoFrame
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
@@ -104,7 +104,7 @@ data class RecordingPlaybackSelection(
     val recordingId: DvrEntryId,
 )
 
-internal fun currentLivePlaybackSelection(
+fun currentLivePlaybackSelection(
     observation: SessionObservation,
     channelId: ChannelId,
 ): LivePlaybackSelection? {
@@ -113,7 +113,7 @@ internal fun currentLivePlaybackSelection(
     return LivePlaybackSelection(currentSession, channelId)
 }
 
-internal fun resolveLivePlaybackSelection(
+fun resolveLivePlaybackSelection(
     observation: SessionObservation,
     channelId: ChannelId,
     requestedSelection: LivePlaybackSelection?,
@@ -125,7 +125,7 @@ internal fun resolveLivePlaybackSelection(
     } ?: current
 }
 
-internal fun currentRecordingPlaybackSelection(
+fun currentRecordingPlaybackSelection(
     observation: SessionObservation,
     recordingId: DvrEntryId,
 ): RecordingPlaybackSelection? {
@@ -199,7 +199,7 @@ data class AppPlaybackDiagnostics(
     val live: LiveSubscriptionDiagnostics? = null,
 )
 
-internal data class AppVideoPresentation(
+data class AppVideoPresentation(
     val epoch: Long = 0L,
     val visible: Boolean = false,
 )
@@ -652,7 +652,7 @@ class AppPlaybackRuntime(
     val recordingAdmission = _recordingAdmission.asStateFlow()
     val livePlaybackObservation = coordinator.livePlaybackObservation
     val diagnostics = _diagnostics.asStateFlow()
-    internal val videoPresentation = _videoPresentation.asStateFlow()
+    val videoPresentation = _videoPresentation.asStateFlow()
 
     private val settingsJob = scope.launch {
         settings.playerSettings.distinctUntilChanged().collect {
@@ -682,7 +682,7 @@ class AppPlaybackRuntime(
 
     private var diagnosticDecoderName = "unknown"
     private var diagnosticDecoderGeneration = 0
-    private val seekDiagnosticsListener = if (at.bernhardberger.tvhplayer.BuildConfig.DEBUG) {
+    private val seekDiagnosticsListener = if (at.bernhardberger.tvhplayer.client.BuildConfig.DEBUG) {
         object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onVideoDecoderInitialized(
                 eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
@@ -1107,7 +1107,7 @@ class AppPlaybackRuntime(
         targetCommands.serialize(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
         ) {
-            val diagnose = at.bernhardberger.tvhplayer.BuildConfig.DEBUG && !player.playWhenReady
+            val diagnose = at.bernhardberger.tvhplayer.client.BuildConfig.DEBUG && !player.playWhenReady
             fun counters(): String {
                 val value = player.videoDecoderCounters ?: return "none"
                 value.ensureUpdated()
@@ -1210,7 +1210,7 @@ class AppPlaybackRuntime(
             )
         }
     }
-    internal fun onRecoveryRequired(reason: PlaybackRecoveryReason) {
+    fun onRecoveryRequired(reason: PlaybackRecoveryReason) {
         dispatchPlaybackRecovery(scope, reason) { dispatchedReason ->
             val currentJob = currentCoroutineContext().job
             recoveryJob?.takeUnless { it === currentJob }?.cancel()

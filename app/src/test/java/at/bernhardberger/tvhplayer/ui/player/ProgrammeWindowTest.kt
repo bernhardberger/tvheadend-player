@@ -145,7 +145,7 @@ class ProgrammeWindowTest {
         assertNull(previous.liveFraction)
         assertTrue(previous.targetAvailable)
         assertEquals("19:00" to "20:00", programmeWindowClockLabels(previous.event, ZoneId.of("UTC")))
-        assertNull(state.timeline.select(0.minutes))
+        assertNull(state.timeline!!.select(0.minutes))
     }
 
     @Test fun validPresentedPositionAheadOfStatusEdgeDoesNotLookExpired() {
@@ -202,7 +202,7 @@ class ProgrammeWindowTest {
         fixture.updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = live)
         val current = fixture.presentation()
         assertTrue(previous.timeline!!.describesSameSubscription(current.timeline))
-        assertFalse(previous.timeline.describesSameSegment(current.timeline))
+        assertFalse(previous.timeline!!.describesSameSegment(current.timeline))
         assertNull(programmeWindow(current, previous.playbackTarget, previous.timeline, ::lookup))
         assertNotNull(programmeWindow(current, eventAt = ::lookup))
     }

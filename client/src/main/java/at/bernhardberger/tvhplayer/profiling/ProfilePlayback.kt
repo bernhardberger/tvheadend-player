@@ -4,7 +4,7 @@ package at.bernhardberger.tvhplayer.profiling
 
 import androidx.media3.common.Format
 import androidx.media3.container.NalUnitUtil
-import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.client.BuildConfig
 
 /** Numeric/allowlisted metadata only: never emit source labels, URLs or channel identifiers. */
 internal fun profileFirstVideoFrame(epoch: Long, format: Format?, adapterName: String?) {

@@ -65,3 +65,4 @@ gradle.extensions.extraProperties.set(
 
 rootProject.name = "TVHeadendPlayer"
 include(":app")
+include(":client")
