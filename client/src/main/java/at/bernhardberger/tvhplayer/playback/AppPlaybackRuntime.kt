@@ -47,12 +47,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.job
 
-/**
- * How long a pending live pause waits for the first picture before holding the server anyway:
- * below the SDK's preparation budget and well before the SDK sample queues fill.
- */
-internal const val FIRST_PICTURE_BUDGET_MILLIS = 10_000L
-
 /** App presentation adapter over the released coordinator and app-owned player. */
 class AppPlaybackRuntime(
     val player: ExoPlayer,
@@ -124,37 +118,28 @@ class AppPlaybackRuntime(
         _backgroundNotice.compareAndSet(notice, null)
     }
 
-    /**
-     * A Pause pressed before the timeshift grant is known, for one live target epoch.
-     * [failClosed] marks the paused retune of a kept channel: without a server pause it stops.
-     * [pictureWaitExpired]: the first picture did not arrive within [FIRST_PICTURE_BUDGET_MILLIS],
-     * so the grant alone resolves it; [pictureWait] is that budget.
-     */
-    private class PendingLivePause(val epoch: Long, val wasPlaying: Boolean, val failClosed: Boolean) {
-        var pictureWaitExpired = false
-        var pictureWait: Job? = null
-    }
-    private var pendingLivePause: PendingLivePause? = null
-        set(value) {
-            // Every way a pending pause ends (resolution, resume, retarget, stop, detach,
-            // background, failure) also ends its first-picture budget.
-            if (field !== value) field?.pictureWait?.cancel()
-            field = value
-        }
-    private var timeshiftRequestedEpoch: Long? = null
-    private var readyReachedEpoch: Long? = null
-    private val _livePause = MutableStateFlow(LivePauseState())
-    val livePause = _livePause.asStateFlow()
-    private val _livePauseNotice = MutableStateFlow<LivePauseUnavailableNotice?>(null)
-    val livePauseNotice = _livePauseNotice.asStateFlow()
-
     fun consumeLivePauseNotice(notice: LivePauseUnavailableNotice) {
-        _livePauseNotice.compareAndSet(notice, null)
+        livePauseController.consumeLivePauseNotice(notice)
     }
     private val audioSelection = SessionAudioSelection()
     private val presentationEpoch = PlaybackPresentationEpoch()
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     private val _activeTarget = MutableStateFlow<AppPlaybackTarget?>(null)
+    private val livePauseController = LivePauseController(
+        player = player,
+        coordinator = coordinator,
+        scope = scope,
+        targetCommands = targetCommands,
+        livePlaybackObservation = coordinator.livePlaybackObservation,
+        _state = _state,
+        _activeTarget = _activeTarget,
+        activeTargetEpoch = { activeTargetEpoch },
+        foreground = { foreground },
+        interruption = { interruption },
+        stopPausedRetune = ::stopPausedRetune,
+    )
+    val livePause = livePauseController.livePause
+    val livePauseNotice = livePauseController.livePauseNotice
     private val audioTracks = PlaybackAudioTracks(
         player = player,
         settings = settings,
@@ -244,12 +229,12 @@ class AppPlaybackRuntime(
                 }
                 // Before the play intent: an unresolved local pause is not a server resume, and a
                 // just-resolved one keeps its own outcome (an ambiguous result stays paused).
-                val resolvedPause = resolvePendingLivePause()
-                publishLivePause()
+                val resolvedPause = livePauseController.resolvePendingLivePauseLocked()
+                livePauseController.publishLivePause()
                 val active = livePlaybackObservation.value as? LivePlaybackObservation.Active
                 val timeshift = active?.timeshiftState as? LiveTimeshiftState.Available
                 if (foreground && !targetInstallationInProgress && !interruptionPaused && !interruptionMuted &&
-                    !resolvedPause && pendingLivePause?.epoch != activeTargetEpoch
+                    !resolvedPause && livePauseController.pendingLivePauseEpoch != activeTargetEpoch
                 ) {
                     observedLivePlayIntent(
                         activeTarget = _activeTarget.value,
@@ -280,7 +265,7 @@ class AppPlaybackRuntime(
                     policy.trace.ready(activeTargetEpoch)
                 }
                 presentation.publishPlayerState()
-                if (playbackState == Player.STATE_READY) onTargetReady(activeTargetEpoch)
+                if (playbackState == Player.STATE_READY) livePauseController.onTargetReady(activeTargetEpoch)
             }
         }
 
@@ -418,8 +403,8 @@ class AppPlaybackRuntime(
                         resumeAfterInterruption = false
                     } else clearAudioInterruption()
                     activeTargetEpoch = epoch
-                    pendingLivePause = null
-                    timeshiftRequestedEpoch = epoch.takeIf { timeshiftPeriod > Duration.ZERO }
+                    livePauseController.dropPendingLivePauseLocked()
+                    livePauseController.timeshiftRequestedEpoch = epoch.takeIf { timeshiftPeriod > Duration.ZERO }
                     _activeTarget.value = AppPlaybackTarget.Live(selection.channelId)
                     lastLiveChannelId = selection.channelId
                     _recordingSelection.value = null
@@ -429,7 +414,7 @@ class AppPlaybackRuntime(
                     if (policy.trace.enabled) policy.trace.tuneBound(epoch)
                     presentation.beginTargetPresentationLocked(epoch)
                     presentation.publishInstalledPlayerStateLocked()
-                    publishLivePause()
+                    livePauseController.publishLivePause()
                 }
             },
             onFailed = { targetResult ->
@@ -442,7 +427,7 @@ class AppPlaybackRuntime(
         )
         if (committed) {
             // STATE_READY reported while installation was in progress was not observed.
-            if (player.playbackState == Player.STATE_READY) onTargetReady(activeTargetEpoch)
+            if (player.playbackState == Player.STATE_READY) livePauseController.onTargetReady(activeTargetEpoch)
             if (retainInterruptionMute && foreground) player.play()
             else applyPlayIntentToStartedTarget(result, playWhenReady)
             // Only a start the viewer is waiting for opens a start-up buffer window.
@@ -598,7 +583,7 @@ class AppPlaybackRuntime(
                     committed = true
                     clearAudioInterruption()
                     activeTargetEpoch = epoch
-                    pendingLivePause = null
+                    livePauseController.dropPendingLivePauseLocked()
                     _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
                     _recordingSelection.value = selection
                     _recordingAdmission.value = admission
@@ -606,7 +591,7 @@ class AppPlaybackRuntime(
                     _state.value = AppPlaybackState.Starting
                     presentation.beginTargetPresentationLocked(epoch)
                     presentation.publishInstalledPlayerStateLocked()
-                    publishLivePause()
+                    livePauseController.publishLivePause()
                 }
             },
             onFailed = { targetResult ->
@@ -675,8 +660,8 @@ class AppPlaybackRuntime(
                     ?: return@serialize
                 player.pause()
                 // A pending pause is already a local pause: the paused intent below carries it.
-                pendingLivePause = null
-                publishLivePause()
+                livePauseController.dropPendingLivePauseLocked()
+                livePauseController.publishLivePause()
                 clearAudioInterruption()
                 val playerSettings = settings.playerSettings.first()
                 val timeshift = (livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState as? LiveTimeshiftState.Available
@@ -733,7 +718,7 @@ class AppPlaybackRuntime(
         keepTimer = null
         if (timer !== currentCoroutineContext().job) timer?.cancel()
         player.pause()
-        pendingLivePause = null
+        livePauseController.dropPendingLivePauseLocked()
         clearAudioInterruption()
         recordingMarkers.clearRecordingMarkers()
         val epoch = presentationEpoch.begin()
@@ -749,7 +734,7 @@ class AppPlaybackRuntime(
             _recordingSelection.value = null
             _recordingAdmission.value = null
             activeTargetEpoch = null
-            publishLivePause()
+            livePauseController.publishLivePause()
             _state.value = AppPlaybackState.Idle
             presentation.publishDiagnostics()
         }
@@ -819,9 +804,9 @@ class AppPlaybackRuntime(
         if (interruptionPaused) return null
         val epoch = activeTargetEpoch
         if (epoch != null && interruption == null && targetCommands.isOpen() &&
-            awaitsFirstPicture(epoch, currentLivePauseAvailability())
+            livePauseController.awaitsFirstPicture(epoch, livePauseController.currentLivePauseAvailability())
         ) {
-            if (pendingLivePause?.epoch != epoch) startPendingLivePause(epoch, wasPlaying = wasPlaying, failClosed = false)
+            if (livePauseController.pendingLivePauseEpoch != epoch) livePauseController.startPendingLivePauseLocked(epoch, wasPlaying = wasPlaying, failClosed = false)
             return null
         }
         return coordinator.pauseTimeshift().also { result ->
@@ -1097,7 +1082,7 @@ class AppPlaybackRuntime(
         livePlaybackObservationJob.join()
         settingsJob.join()
         targetCommands.awaitIdle {
-            pendingLivePause = null
+            livePauseController.dropPendingLivePauseLocked()
             clearAudioInterruption()
             presentation.removeTargetFrameListenerLocked()
             player.removeListener(listener)
@@ -1209,9 +1194,9 @@ class AppPlaybackRuntime(
         presentationEpoch.publishIfCurrent(epoch) {
             presentation.endTargetPresentationLocked(epoch)
             activeTargetEpoch = null
-            pendingLivePause = null
+            livePauseController.dropPendingLivePauseLocked()
             _activeTarget.value = null
-            publishLivePause()
+            livePauseController.publishLivePause()
             _recordingSelection.value = null
             _recordingAdmission.value = recordingAdmission
             recordingMarkers.clearRecordingMarkers()
@@ -1243,10 +1228,10 @@ class AppPlaybackRuntime(
                 // A player that failed during installation never reaches READY to resolve a pause.
                 if (_state.value is AppPlaybackState.Failed) {
                     stopPausedRetune()
-                } else if (readyReachedEpoch != targetEpoch) {
+                } else if (livePauseController.readyReachedEpoch != targetEpoch) {
                     // The server pause waits for the first picture (and the grant): a hold before
                     // it leaves the viewer on the tuning screen.
-                    startPendingLivePause(targetEpoch, wasPlaying = false, failClosed = true)
+                    livePauseController.startPendingLivePauseLocked(targetEpoch, wasPlaying = false, failClosed = true)
                 } else if (coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED ||
                     _state.value is AppPlaybackState.Failed
                 ) {
@@ -1262,121 +1247,6 @@ class AppPlaybackRuntime(
     private suspend fun stopPausedRetune() {
         stopPlayback()
         _backgroundNotice.value = BackgroundPlaybackNotice.TUNER_LOST
-    }
-
-    private fun currentLivePauseAvailability(): LivePauseAvailability {
-        val epoch = activeTargetEpoch
-        return livePauseAvailability(
-            liveTarget = epoch != null && _activeTarget.value is AppPlaybackTarget.Live,
-            timeshiftRequested = epoch != null && timeshiftRequestedEpoch == epoch,
-            timeshiftAvailable = (livePlaybackObservation.value as? LivePlaybackObservation.Active)
-                ?.timeshiftState is LiveTimeshiftState.Available,
-            readyReached = epoch != null && readyReachedEpoch == epoch,
-        )
-    }
-
-    private fun publishLivePause() {
-        val epoch = activeTargetEpoch
-        _livePause.value = LivePauseState(
-            availability = currentLivePauseAvailability(),
-            pending = epoch != null && pendingLivePause?.epoch == epoch,
-        )
-    }
-
-    /** Serialized. The pending pause waits for the first picture at most [FIRST_PICTURE_BUDGET_MILLIS]. */
-    private fun startPendingLivePause(epoch: Long, wasPlaying: Boolean, failClosed: Boolean) {
-        val pending = PendingLivePause(epoch, wasPlaying = wasPlaying, failClosed = failClosed)
-        pendingLivePause = pending
-        publishLivePause()
-        pending.pictureWait = scope.launch {
-            delay(FIRST_PICTURE_BUDGET_MILLIS)
-            targetCommands.serialize(onClosed = {}) {
-                if (pendingLivePause !== pending || pending.epoch != activeTargetEpoch) return@serialize
-                // Resolving clears this pending pause; that must not cancel the resolution itself.
-                pending.pictureWait = null
-                pending.pictureWaitExpired = true
-                resolvePendingLivePause()
-                Unit
-            }
-        }
-    }
-
-    private fun clearPendingLivePause() {
-        if (pendingLivePause == null) return
-        pendingLivePause = null
-        publishLivePause()
-    }
-
-    /**
-     * A live pause for [epoch] stays local and pending until the target first reached STATE_READY:
-     * the grant is still undecided, or granted but a server hold now would stop the stream before
-     * the first picture. The wait for the picture is bounded ([pictureWaitExpired]): past the
-     * budget a granted pause holds the server, so its queues do not fill behind a paused player.
-     *
-     * Known limitation: [readyReachedEpoch] stays set for the whole epoch, so while the SDK
-     * re-prepares the same target (no new epoch) a Pause sends the server pause at once, before
-     * the new first picture.
-     */
-    private fun awaitsFirstPicture(
-        epoch: Long,
-        availability: LivePauseAvailability,
-        pictureWaitExpired: Boolean = false,
-    ): Boolean =
-        availability == LivePauseAvailability.STARTING ||
-            availability == LivePauseAvailability.READY && readyReachedEpoch != epoch && !pictureWaitExpired
-
-    /** The current target reached STATE_READY; without a grant by now it has none. */
-    private fun onTargetReady(epoch: Long?) {
-        if (epoch == null || epoch != activeTargetEpoch || readyReachedEpoch == epoch) return
-        readyReachedEpoch = epoch
-        publishLivePause()
-        if (pendingLivePause?.epoch != epoch) return
-        launchPendingLivePauseResolution(epoch)
-    }
-
-    private fun launchPendingLivePauseResolution(epoch: Long) {
-        scope.launch {
-            targetCommands.serialize(onClosed = {}) {
-                if (epoch == activeTargetEpoch) resolvePendingLivePause()
-                Unit
-            }
-        }
-    }
-
-    /**
-     * Serialized. Completes a pending pause once the grant is decided: one server pause when
-     * timeshift became available, otherwise the pause is dropped without any server command.
-     * A failed target drops it too; a paused kept-channel retune then stops (fail closed).
-     */
-    private suspend fun resolvePendingLivePause(): Boolean {
-        val pending = pendingLivePause ?: return false
-        if (pending.epoch != activeTargetEpoch || !foreground || !targetCommands.isOpen()) {
-            if (pending.epoch != activeTargetEpoch) clearPendingLivePause()
-            return false
-        }
-        if (_state.value is AppPlaybackState.Failed) {
-            clearPendingLivePause()
-            if (pending.failClosed) stopPausedRetune()
-            return true
-        }
-        val availability = currentLivePauseAvailability()
-        // The grant alone does not resolve it: STATE_READY does (see onTargetReady).
-        if (awaitsFirstPicture(pending.epoch, availability, pending.pictureWaitExpired)) return false
-        clearPendingLivePause()
-        val rejected = if (availability == LivePauseAvailability.READY) {
-            val result = coordinator.pauseTimeshift()
-            // A player error while the pause was in flight found no pending pause to fail closed.
-            if (pending.failClosed) result != TimeshiftCommandResult.ACCEPTED || _state.value is AppPlaybackState.Failed
-            else result.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED
-        } else true
-        if (!rejected || !targetCommands.isOpen() || pending.epoch != activeTargetEpoch) return true
-        if (pending.failClosed) {
-            stopPausedRetune()
-            return true
-        }
-        if (foreground && interruption == null) player.playWhenReady = pending.wasPlaying
-        _livePauseNotice.value = LivePauseUnavailableNotice()
-        return true
     }
 
     private suspend fun applyForegroundPlaybackAction(action: ForegroundPlaybackAction) {
@@ -1474,8 +1344,8 @@ class AppPlaybackRuntime(
         val epoch = activeTargetEpoch ?: return TimeshiftCommandResult.UNAVAILABLE
         // Every explicit play retires a pause still pending for this target: it never reached
         // the server, so the play resumes locally only.
-        val retiredPendingPause = !restoreSoundOnly && pendingLivePause?.epoch == epoch
-        if (retiredPendingPause) clearPendingLivePause()
+        val retiredPendingPause = !restoreSoundOnly && livePauseController.pendingLivePauseEpoch == epoch
+        if (retiredPendingPause) livePauseController.clearPendingLivePauseLocked()
         val generation = ++focusGeneration
         val granted = audioFocus.request { event ->
             scope.launch {
@@ -1607,8 +1477,7 @@ class AppPlaybackRuntime(
     private fun publishPlayerErrorFromPlayer() {
         // A failed target never completes a pause pressed before its grant. A paused kept-channel
         // retune still has to fail closed, so its pending pause resolves (and stops) serialized.
-        val pending = pendingLivePause
-        if (pending?.failClosed == false) pendingLivePause = null
+        val failClosedPauseEpoch = livePauseController.onPlayerErrorUnderAccessLock()
         _state.value = AppPlaybackState.Failed(
             reason = if (_activeTarget.value is AppPlaybackTarget.Recording) {
                 AppPlaybackFailureReason.RECORDING_READ_FAILED
@@ -1618,9 +1487,9 @@ class AppPlaybackRuntime(
             playerErrorCode = player.playerError?.errorCodeName,
             subscriptionIssue = lastSubscriptionIssue(),
         )
-        publishLivePause()
+        livePauseController.publishLivePause()
         presentation.publishDiagnosticsFromPlayer()
-        if (pending?.failClosed == true) launchPendingLivePauseResolution(pending.epoch)
+        if (failClosedPauseEpoch != null) livePauseController.launchPendingLivePauseResolution(failClosedPauseEpoch)
     }
 
     /** Reports a server skip to the start-up buffer; a cancelled or failed request counts as not accepted. */
