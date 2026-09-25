@@ -51,7 +51,6 @@ import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
-import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.ui.TvSpacing56
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.ActionsTemplate
@@ -149,6 +148,7 @@ internal fun LiveProgrammeInfoOverlay(
         PlaybackOptionsOverlayFrame(
             paneTitle = paneTitle,
             panelTag = "live-info-panel",
+            panelWidth = PlaybackInfoPanelWidth,
         ) {
             Box(
                 modifier = Modifier
@@ -157,7 +157,7 @@ internal fun LiveProgrammeInfoOverlay(
                         this.paneTitle = paneTitle
                         if (showingRecordingDialog) dialog()
                     }
-                    .padding(horizontal = TvSpacing32, vertical = 16.dp),
+                    .padding(PlaybackInfoPanelPadding),
             ) {
                 if (showingRecordingDialog) {
                     ProgrammeRecordingConfirmation(

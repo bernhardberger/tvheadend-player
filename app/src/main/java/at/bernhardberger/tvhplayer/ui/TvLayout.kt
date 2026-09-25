@@ -25,7 +25,7 @@ const val TvTextDisabledAlpha = 0.38f
 const val TvPanelBrowseAlpha = 0.84f
 const val TvPanelDenseAlpha = 0.92f
 const val WarmPlaybackScrimAlpha = 0.84f
-const val TvScrimModalAlpha = 0.76f
+const val TvScrimModalAlpha = 0.60f
 const val TvTrackAlpha = 0.20f
 const val TvGhostFillAlpha = 0.40f
 

@@ -2,7 +2,23 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.unit.Dp
+import at.bernhardberger.tvhplayer.ui.screens.InsetBringIntoViewSpec
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -74,12 +90,10 @@ import at.bernhardberger.tvhplayer.core.playbackOptionsCategories
 import at.bernhardberger.tvhplayer.core.playbackTrackContentState
 import at.bernhardberger.tvhplayer.core.playbackTrackFocusTarget
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
-import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
-import at.bernhardberger.tvhplayer.ui.TvSpacing32
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -356,8 +370,9 @@ internal fun PlaybackOptionsSheetContent(
         },
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = TvSpacing32, vertical = TvSpacing16),
-            verticalArrangement = Arrangement.spacedBy(TvSpacing24),
+            // Rows and lists own the start/end padding so a scaled focused row can use it.
+            modifier = Modifier.padding(top = PlaybackPanelHeaderTop),
+            verticalArrangement = Arrangement.spacedBy(TvSpacing16),
         ) {
             when (page) {
                 PlaybackOptionsPage.ROOT -> PlaybackOptionsRoot(
@@ -421,13 +436,56 @@ internal fun PlaybackOptionsSheetContent(
     }
 }
 
+/** Width of the floating side panel (Material for TV kit, modal drawer). */
+internal val PlaybackPanelWidth = 320.dp
+
+/** Wider panel for programme info, which reads a title and synopsis. */
+internal val PlaybackInfoPanelWidth = 400.dp
+
+/** Gap between the panel and the screen's end, top and bottom edges. */
+internal val PlaybackPanelEdgeInset = TvSpacing24
+
+/** Start/end padding inside the panel; rows are this far from the panel edge. */
+internal val PlaybackPanelPadding = 20.dp
+
+/** Space above the panel header, putting its glyph tops about 33 dp below the panel top. */
+internal val PlaybackPanelHeaderTop = 26.dp
+
+/** Start inset of a row's text inside the TV ListItem; the header title lines up with it. */
+private val PlaybackRowTextInset = 16.dp
+
+/** Padding around non-scrolling rows: the panel padding at the sides and bottom. */
+private val PanelRowsPadding = PaddingValues(
+    start = PlaybackPanelPadding,
+    end = PlaybackPanelPadding,
+    bottom = PlaybackPanelPadding,
+)
+
+/** Padding of a panel without a scrolling list, such as programme info. */
+internal val PlaybackInfoPanelPadding = PaddingValues(
+    start = PlaybackPanelPadding,
+    end = PlaybackPanelPadding,
+    top = PlaybackPanelHeaderTop,
+    bottom = PlaybackPanelPadding,
+)
+
+/** Level-3 elevation of the panel. */
+internal val PlaybackPanelElevation = 6.dp
+
+/**
+ * Floating side panel over a full-screen scrim: the end side, inset on three
+ * edges, rounded on all corners and clipped to its own shape only, so a scaled
+ * focused row may reach into the padding. Content supplies its own padding.
+ */
 @Composable
 internal fun PlaybackOptionsOverlayFrame(
     modifier: Modifier = Modifier,
     paneTitle: String? = null,
     panelTag: String = "playback-options-overlay",
+    panelWidth: Dp = PlaybackPanelWidth,
     content: @Composable () -> Unit,
 ) {
+    val shape = MaterialTheme.shapes.large
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -435,30 +493,26 @@ internal fun PlaybackOptionsOverlayFrame(
             .focusGroup(),
         contentAlignment = Alignment.CenterEnd,
     ) {
-        Box(
+        Surface(
             modifier = Modifier
-                .fillMaxSize(),
-            contentAlignment = Alignment.CenterEnd,
+                .padding(PlaybackPanelEdgeInset)
+                .width(panelWidth)
+                .fillMaxHeight()
+                // Shadow before the clip so the clip cannot cut it away.
+                .shadow(PlaybackPanelElevation, shape)
+                .clip(shape)
+                .testTag(panelTag)
+                .semantics {
+                    dialog()
+                    paneTitle?.let { this.paneTitle = it }
+                },
+            shape = shape,
+            colors = SurfaceDefaults.colors(
+                containerColor = TvSurfaceColors.container,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
         ) {
-            Surface(
-                modifier = Modifier
-                    .width(420.dp)
-                    .fillMaxHeight()
-                    .testTag(panelTag)
-                    .semantics {
-                        dialog()
-                        paneTitle?.let { this.paneTitle = it }
-                    },
-                shape = androidx.compose.ui.graphics.RectangleShape,
-                colors = SurfaceDefaults.colors(
-                    containerColor = TvSurfaceColors.containerHigh.copy(
-                        alpha = TvPanelDenseAlpha
-                    ),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            ) {
-                Box(Modifier.padding(top = TvSpacing32, bottom = TvSpacing32)) { content() }
-            }
+            content()
         }
     }
 }
@@ -500,7 +554,7 @@ private fun PlaybackOptionsRoot(
         onBack = null,
     )
     Column(
-        modifier = Modifier.fillMaxWidth().focusGroup(),
+        modifier = Modifier.fillMaxWidth().padding(PanelRowsPadding).focusGroup(),
         verticalArrangement = Arrangement.spacedBy(TvSpacing8),
     ) {
         PlaybackOptionRow(
@@ -548,6 +602,7 @@ private fun PlaybackOptionsRoot(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ColumnScope.TrackOptionsPage(
     title: String,
@@ -701,90 +756,162 @@ private fun ColumnScope.TrackOptionsPage(
         backFocusRequester = headerFocus,
         downFocusRequester = initialContentFocus,
     )
-    LazyColumn(
-        state = listState,
-        verticalArrangement = Arrangement.spacedBy(TvSpacing8),
-        // Reserve the ListItem focus-scale overflow so the scroll container does
-        // not clip the focused row at its edges.
-        contentPadding = PaddingValues(horizontal = TvSpacing8, vertical = 4.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            // Use the rest of the panel height rather than a fixed list height.
-            .weight(1f, fill = false)
-            .focusGroup()
-            .testTag("playback-options-track-list"),
-    ) {
-        if (subtitles && onSelectOff != null) {
-            item(key = "subtitles-off") {
-                PlaybackOptionRow(
-                    label = stringResource(R.string.subtitles_off),
-                    // Only Off is left without subtitles; the quick list says why.
-                    supportingLabel = emptyOffLabel.takeIf {
-                        quick && contentState == PlaybackTrackContentState.EMPTY
-                    },
-                    supportingTestTag = "playback-options-subtitles-off-support",
-                    selected = contentState != PlaybackTrackContentState.LOADING &&
-                        tracks.none(PlaybackOptionTrack::selected),
-                    onClick = { onRowClick(QUICK_LIST_OFF_ROW) },
-                    modifier = Modifier
-                        .onFocusChanged { if (it.isFocused) onRowFocused(QUICK_LIST_OFF_ROW) }
-                        .containedFocus(offFocus, focusableRequesters, index = 0, headerFocus, lazy = true)
-                        .testTag("playback-options-subtitles-off"),
-                )
-            }
-        }
-        itemsIndexed(
-            items = tracks,
-            key = { _, track -> track.key },
-        ) { index, track ->
-            val focusIndex = index + if (subtitles) 1 else 0
-            PlaybackOptionRow(
-                label = track.headline,
-                overlineLabel = track.overline,
-                supportingLabel = track.distinguishingSupportingLabel,
-                supportingTestTag = "playback-options-track-support-${track.key}",
-                selected = track.selected,
-                onClick = { onRowClick(track.key) },
-                modifier = Modifier
-                    .onFocusChanged { if (it.isFocused) onRowFocused(track.key) }
-                    .containedFocus(
-                        requester = requireNotNull(trackRequesters[track.key]),
-                        orderedFocus = focusableRequesters,
-                        index = focusIndex,
-                        headerFocus = headerFocus,
-                        lazy = true,
-                    )
-                    .testTag("playback-options-track-${track.key}"),
+    // The bottom band hints that the list continues and shows only while it can
+    // scroll forward; a short top fade shows only while it can scroll back.
+    val fade = PlaybackListFade(
+        top = listState.canScrollBackward,
+        bottom = listState.canScrollForward,
+    )
+    // Focus scrolling always keeps the focused row out of both fade bands. The insets
+    // stay fixed: tying them to the fades would feed each scroll back into the next.
+    // At either end of the list the scroll stops there, and that fade is off.
+    val platformBringIntoViewSpec = LocalBringIntoViewSpec.current
+    val density = LocalDensity.current
+    val bringIntoViewSpec = remember(platformBringIntoViewSpec, density) {
+        with(density) {
+            InsetBringIntoViewSpec(
+                delegate = platformBringIntoViewSpec,
+                topInsetPx = PlaybackListTopFade.toPx(),
+                bottomInsetPx = PlaybackListBottomFade.toPx(),
             )
         }
-        if (
-            contentState != PlaybackTrackContentState.AVAILABLE &&
-            !(quick && offered && contentState == PlaybackTrackContentState.EMPTY)
+    }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(TvSpacing8),
+            // The side padding leaves room for the ListItem focus scale; the bottom
+            // padding lets the viewport run to the panel edge beneath the fade.
+            contentPadding = PaddingValues(
+                start = PlaybackPanelPadding,
+                end = PlaybackPanelPadding,
+                top = 4.dp,
+                bottom = PlaybackPanelPadding,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                // Use the rest of the panel height rather than a fixed list height.
+                .weight(1f, fill = false)
+                .playbackListFade(fade)
+                .focusGroup()
+                .testTag("playback-options-track-list"),
         ) {
-            item(key = "track-status") {
-                Text(
-                    text = if (contentState == PlaybackTrackContentState.LOADING) {
-                        loadingLabel
-                    } else {
-                        unavailableLabel
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
+            if (subtitles && onSelectOff != null) {
+                item(key = "subtitles-off") {
+                    PlaybackOptionRow(
+                        label = stringResource(R.string.subtitles_off),
+                        // Only Off is left without subtitles; the quick list says why.
+                        supportingLabel = emptyOffLabel.takeIf {
+                            quick && contentState == PlaybackTrackContentState.EMPTY
+                        },
+                        supportingTestTag = "playback-options-subtitles-off-support",
+                        selected = contentState != PlaybackTrackContentState.LOADING &&
+                            tracks.none(PlaybackOptionTrack::selected),
+                        onClick = { onRowClick(QUICK_LIST_OFF_ROW) },
+                        modifier = Modifier
+                            .onFocusChanged { if (it.isFocused) onRowFocused(QUICK_LIST_OFF_ROW) }
+                            .containedFocus(offFocus, focusableRequesters, index = 0, headerFocus, lazy = true)
+                            .testTag("playback-options-subtitles-off"),
+                    )
+                }
+            }
+            itemsIndexed(
+                items = tracks,
+                key = { _, track -> track.key },
+            ) { index, track ->
+                val focusIndex = index + if (subtitles) 1 else 0
+                PlaybackOptionRow(
+                    label = track.headline,
+                    overlineLabel = track.overline,
+                    supportingLabel = track.distinguishingSupportingLabel,
+                    supportingTestTag = "playback-options-track-support-${track.key}",
+                    selected = track.selected,
+                    onClick = { onRowClick(track.key) },
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = TvSpacing16, vertical = TvSpacing12)
-                        .testTag(
-                            if (contentState == PlaybackTrackContentState.LOADING) {
-                                "playback-options-track-loading"
-                            } else {
-                                "playback-options-track-empty"
-                            }
-                        ),
+                        .onFocusChanged { if (it.isFocused) onRowFocused(track.key) }
+                        .containedFocus(
+                            requester = requireNotNull(trackRequesters[track.key]),
+                            orderedFocus = focusableRequesters,
+                            index = focusIndex,
+                            headerFocus = headerFocus,
+                            lazy = true,
+                        )
+                        .testTag("playback-options-track-${track.key}"),
                 )
+            }
+            if (
+                contentState != PlaybackTrackContentState.AVAILABLE &&
+                !(quick && offered && contentState == PlaybackTrackContentState.EMPTY)
+            ) {
+                item(key = "track-status") {
+                    Text(
+                        text = if (contentState == PlaybackTrackContentState.LOADING) {
+                            loadingLabel
+                        } else {
+                            unavailableLabel
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = TvSpacing16, vertical = TvSpacing12)
+                            .testTag(
+                                if (contentState == PlaybackTrackContentState.LOADING) {
+                                    "playback-options-track-loading"
+                                } else {
+                                    "playback-options-track-empty"
+                                }
+                            ),
+                    )
+                }
             }
         }
     }
 }
+
+/** Bottom fade band of a scrolling panel list (the kit's mask from the panel centre down). */
+internal val PlaybackListBottomFade = 128.dp
+
+/** Short fade under the header while the list can scroll back. */
+internal val PlaybackListTopFade = 24.dp
+
+/** Which edges of a panel list are faded. */
+internal data class PlaybackListFade(val top: Boolean, val bottom: Boolean)
+
+/** Test-visible record of the fade drawn on a panel list. */
+internal val PlaybackListFadeKey = SemanticsPropertyKey<PlaybackListFade>("PlaybackListFade")
+
+private fun Modifier.playbackListFade(fade: PlaybackListFade): Modifier = this
+    .semantics { this[PlaybackListFadeKey] = fade }
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        if (fade.bottom) {
+            val band = PlaybackListBottomFade.toPx().coerceAtMost(size.height)
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Black, Color.Transparent),
+                    startY = size.height - band,
+                    endY = size.height,
+                ),
+                topLeft = Offset(0f, size.height - band),
+                size = Size(size.width, band),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+        if (fade.top) {
+            val band = PlaybackListTopFade.toPx().coerceAtMost(size.height)
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black),
+                    startY = 0f,
+                    endY = band,
+                ),
+                size = Size(size.width, band),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+    }
 
 private const val QUICK_LIST_OFF_ROW = "subtitles-off"
 
@@ -836,7 +963,10 @@ private fun DisplayOptionsPage(
         backFocusRequester = headerBackFocus,
         downFocusRequester = initialFocus,
     )
-    Column(verticalArrangement = Arrangement.spacedBy(TvSpacing8)) {
+    Column(
+        modifier = Modifier.padding(PanelRowsPadding),
+        verticalArrangement = Arrangement.spacedBy(TvSpacing8),
+    ) {
         PlaybackOptionRow(
             label = stringResource(R.string.display_mode_auto),
             selected = selected == AspectRatioMode.FIT,
@@ -880,7 +1010,7 @@ private fun StatsOptionsPage(
         selected = selected,
         onClick = { onSelectedChange(!selected) },
         showSwitch = true,
-        modifier = Modifier.containedFocus(
+        modifier = Modifier.padding(PanelRowsPadding).containedFocus(
             requester = statsFocus,
             orderedFocus = listOf(statsFocus),
             index = 0,
@@ -897,16 +1027,23 @@ private fun OptionsHeader(
     backFocusRequester: FocusRequester? = null,
     downFocusRequester: FocusRequester? = null,
 ) {
+    val backShown = onBack != null && backFocusRequester != null
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            // Without a back button the title starts on the row text column.
+            .padding(
+                start = PlaybackPanelPadding + if (backShown) 0.dp else PlaybackRowTextInset,
+                end = PlaybackPanelPadding,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
     ) {
-        if (onBack != null && backFocusRequester != null) {
+        if (backShown) {
             IconButton(
-                onClick = onBack,
+                onClick = requireNotNull(onBack),
                 modifier = Modifier
-                    .focusRequester(backFocusRequester)
+                    .focusRequester(requireNotNull(backFocusRequester))
                     .focusProperties {
                         up = FocusRequester.Cancel
                         down = downFocusRequester ?: FocusRequester.Cancel
@@ -936,7 +1073,8 @@ private fun OptionsHeader(
                     text = it,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha),
-                    maxLines = 1,
+                    // The narrow panel wraps a long German value at large text.
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -971,7 +1109,7 @@ private fun PlaybackOptionRow(
             {
                 Text(
                     text = text,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = supportingTestTag?.let(Modifier::testTag) ?: Modifier,
                 )

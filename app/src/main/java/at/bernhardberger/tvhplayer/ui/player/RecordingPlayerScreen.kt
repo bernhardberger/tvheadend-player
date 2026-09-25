@@ -594,13 +594,14 @@ fun RecordingPlayerScreen(
                 PlaybackOptionsOverlayFrame(
                     paneTitle = stringResource(R.string.player_info),
                     panelTag = "recording-info-panel",
+                    panelWidth = PlaybackInfoPanelWidth,
                 ) {
                     PlayerInfoReadingContent(
                         title = entry.title.orEmpty(),
                         subtitle = listOfNotNull(entry.subtitle, entry.channelName).joinToString(" / "),
                         body = entry.summary?.takeIf(String::isNotBlank) ?: entry.description,
                         readingFocus = infoFocus,
-                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp),
+                        modifier = Modifier.padding(PlaybackInfoPanelPadding),
                         footer = {
                             androidx.tv.material3.OutlinedButton(
                                 onClick = ::closeInfo,

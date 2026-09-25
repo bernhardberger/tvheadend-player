@@ -413,6 +413,18 @@ colour and indication rules above apply here. Remote keys follow §6.
   changes the selected group: outside it, Channels falls back to the row that
   opened the player, then the first row, and the Guide keeps its prior position.
 
+### Modal side panel (accepted 2026-09-25)
+
+- Player options, recording options and programme info float as one panel:
+  320dp wide (programme info 400dp), inset 24dp from the end, top and bottom
+  edges, 16dp corners, 20dp padding and a level-3 shadow, over a 60% black
+  scrim.
+- A scrolling list fades out over its bottom 128dp only while it can scroll
+  forward; the focused row stays above the fade.
+- The Audio and Subtitle short lists: focus switches the track after 300 ms,
+  OK keeps it and closes, Back reverts, and the list closes 5 s after the last
+  key and keeps the track. Menu opens the full panel.
+
 ## 11. Icons
 
 Material Symbols, Outlined family, imported as vector drawables. Icons carry

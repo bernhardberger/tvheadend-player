@@ -4,7 +4,11 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ProvidedValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -71,6 +75,12 @@ class PlaybackOptionsTrackListTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = trackList("de", 1.3f, GERMAN)
 
+    /**
+     * The TV pivot scroll already keeps focus high in the list; a minimal scroll would
+     * park it on the bottom edge. The panel's own inset keeps it above the band either way.
+     */
+    @Test fun englishLargeTextMinimalScroll() = trackList("en", 1.3f, ENGLISH, minimalScroll = true)
+
     private class RowTexts(
         val language: String,
         val multipleLanguages: String,
@@ -78,10 +88,13 @@ class PlaybackOptionsTrackListTest {
         val audioDescription: String,
     )
 
-    private fun trackList(locale: String, fontScale: Float, texts: RowTexts) {
+    @OptIn(ExperimentalFoundationApi::class)
+    private fun trackList(locale: String, fontScale: Float, texts: RowTexts, minimalScroll: Boolean = false) {
         lateinit var view: View
+        val platformSpec: Array<ProvidedValue<*>> =
+            if (minimalScroll) arrayOf(LocalBringIntoViewSpec provides object : BringIntoViewSpec {}) else emptyArray()
         compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
+            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale), *platformSpec) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     PlaybackOptionsSheet(
@@ -103,12 +116,16 @@ class PlaybackOptionsTrackListTest {
         // The fixed 236 dp list showed three rows; the list now uses the panel height.
         val rowsInView = if (fontScale > 1f) 4 else 5
         (listOf("automatic") + TRACK_IDS).take(rowsInView).forEach(::assertRowFullyInList)
-        capture(view, "$locale-font$fontScale-top")
+        assertFade(focusedId = "automatic")
+        assertTrue("The ORF list continues below the panel, so its band shows", listFade().bottom)
+        val name = "audio-menu-$locale-font$fontScale" + if (minimalScroll) "-minimal-scroll" else ""
+        capture(view, "$name-top")
 
         TRACK_IDS.forEach { id ->
             key(Key.DirectionDown)
             compose.onNodeWithTag(rowTag(id)).assertIsFocused()
             assertRowFullyInList(id)
+            assertFade(focusedId = id)
             assertEquals("Track $id lines", expectedLines.getValue(id), rowTextNodes(id).map { it.text() })
             // What a screen reader announces for the focusable row.
             val announced = compose.onNodeWithTag(rowTag(id)).fetchSemanticsNode()
@@ -116,8 +133,44 @@ class PlaybackOptionsTrackListTest {
             assertTrue("Track $id announces $announced", announced.containsAll(expectedLines.getValue(id)))
             assertNoLineCut(id)
         }
+        // The last row is focused: the list has reached its end and shows it unfaded.
+        assertFalse("The last row is faded", listFade().bottom)
         compose.onAllNodes(hasText("Hz", substring = true), useUnmergedTree = true).assertCountEquals(0)
-        capture(view, "$locale-font$fontScale-bottom")
+        capture(view, "$name-bottom")
+
+        // Back up: the top fade shows while the list can scroll back and never covers focus.
+        (listOf("automatic") + TRACK_IDS).dropLast(1).reversed().forEach { id ->
+            key(Key.DirectionUp)
+            compose.onNodeWithTag(rowTag(id)).assertIsFocused()
+            assertRowFullyInList(id)
+            assertFade(focusedId = id)
+        }
+        assertFalse("The first row is faded", listFade().top)
+    }
+
+    private fun listFade(): PlaybackListFade =
+        compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[PlaybackListFadeKey]
+
+    /**
+     * The bottom band shows exactly while the list can scroll forward, the top fade
+     * while it can scroll back, and the focused row is never inside either.
+     */
+    private fun assertFade(focusedId: String) {
+        val list = compose.onNodeWithTag("playback-options-track-list")
+        val range = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+        val fade = listFade()
+        assertEquals("Bottom band at $focusedId", range.value() < range.maxValue(), fade.bottom)
+        assertEquals("Top fade at $focusedId", range.value() > 0f, fade.top)
+        val bounds = list.getUnclippedBoundsInRoot()
+        val row = compose.onNodeWithTag(rowTag(focusedId)).getUnclippedBoundsInRoot()
+        if (fade.bottom) {
+            val bandTop = bounds.bottom - PlaybackListBottomFade
+            assertTrue("Focused row $focusedId $row reaches into the band below $bandTop", row.bottom <= bandTop)
+        }
+        if (fade.top) {
+            val fadeBottom = bounds.top + PlaybackListTopFade
+            assertTrue("Focused row $focusedId $row reaches into the fade above $fadeBottom", row.top >= fadeBottom)
+        }
     }
 
     private fun rowTextNodes(id: String): List<SemanticsNode> {
@@ -166,14 +219,14 @@ class PlaybackOptionsTrackListTest {
         assertEquals(1080, view.height)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
-        val directory = File("build/outputs/playback-options-captures").apply { mkdirs() }
+        val directory = File("build/outputs/playback-panel-captures").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         bitmap.recycle()
     }
 
-    private companion object {
-        val ENGLISH = RowTexts("German", "Multiple languages", "Clear dialogue", "Audio description")
-        val GERMAN = RowTexts("Deutsch", "Mehrsprachig", "Klare Sprache", "Audiodeskription")
+    internal companion object {
+        private val ENGLISH = RowTexts("German", "Multiple languages", "Clear dialogue", "Audio description")
+        private val GERMAN = RowTexts("Deutsch", "Mehrsprachig", "Klare Sprache", "Audiodeskription")
         val TRACK_IDS = listOf("main", "surround", "second", "clear", "described")
 
         // ORF1 HD in September 2026 as seen on the test TV, plus an audio description
