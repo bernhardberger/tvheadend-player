@@ -38,9 +38,10 @@ subtitles.
   keeps what plays, so screenshot within 5 s. `key captions` does the same with
   Off and the subtitle tracks; without subtitles it shows only Off and why. The
   controls stay as they were. `key menu` opens the full options list, which works
-  as after the gear (focus applies nothing, Back goes up). `key info` opens the
-  Info panel. These keys replace an open Info panel, shelf or options list, and do
-  nothing while a confirmation is open.
+  as after the gear (focus applies nothing, Back goes up). `key audio-track`,
+  `key captions` and `key menu` replace an open Info panel, shelf or options list,
+  and do nothing while a confirmation is open. `key info` opens the Info panel, but
+  not while an options list is open: press Back first.
 - Digits tune by channel number: `keys 1` for channel 1, `keys 1 0` for 10. Player
   tunes 250 ms after the last digit once the number has as many digits as the
   highest channel number, otherwise after 1.5 s.
@@ -80,8 +81,8 @@ subtitles.
   mode, Stats for nerds. Center or Right opens a row; in a list, Center selects.
   Back or Left returns to the list of rows; Back or Left there closes the sheet and
   focus returns to the gear.
-- In Audio track, a checked Automatic row means Player chooses the track; the list
-  does not mark which track is playing then.
+- In Audio track, a checked Automatic row means Player chooses the track; its second
+  line then names the playing track ("Playing: …").
 - Back closes one layer at a time: confirmation, Info, options page, options
   list, number entry, channel shelf, pending seek, controls, stats. Only the next
   Back closes the player, so press Back once and look before pressing it again.
