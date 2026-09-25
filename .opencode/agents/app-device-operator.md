@@ -3,7 +3,7 @@ description: Operates an explicitly authorized test TV with official CLI-first i
 mode: subagent
 model: openai/gpt-6-sol
 variant: medium
-steps: 40
+steps: 120
 permission:
   edit: deny
   shell: allow
