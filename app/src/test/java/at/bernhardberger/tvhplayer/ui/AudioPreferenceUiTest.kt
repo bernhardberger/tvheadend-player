@@ -212,7 +212,7 @@ class AudioPreferenceUiTest {
         assertEquals(1080, view.height)
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
-        val directory = File("/tmp/opencode/overnight/captures/P2").apply { mkdirs() }
+        val directory = File("build/outputs/audio-preference-captures").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         bitmap.recycle()
     }
