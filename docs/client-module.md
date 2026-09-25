@@ -72,6 +72,20 @@ pins, resolve the expected release graph, and use only the settings-owned public
 repositories (project repositories are forbidden). The app's offline profile
 variant additionally permits the strictly pinned released `sdk-testing` artifact.
 
+## System media controls
+
+The activity creates a Media3 session on start and releases it on stop; there is
+no service, notification or background playback. Its `:client` wrapper publishes
+only names (current programme/channel or recording/channel), without artwork,
+and routes play/pause and seek through the runtime's serialized, focus-aware path.
+Live Play/Pause remains unavailable without timeshift, matching the live player's
+remote-key policy; only seekable recordings expose seek-in-current-item. Activity
+startup handling and Compose retain key priority: player media actions consume
+the opening down/repeat/up cycle, while unhandled keys on browse screens reach
+the system session once. The appliance accessibility service still handles only
+its appliance-entry keys, not media keys. No next/previous, stop, playlist, volume,
+device or speed commands are exposed by the session.
+
 ## Deferred work
 
 - Split `AppPlaybackRuntime` into reusable mechanics plus app-supplied product

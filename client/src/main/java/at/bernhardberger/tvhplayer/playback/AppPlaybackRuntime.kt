@@ -1354,6 +1354,47 @@ class AppPlaybackRuntime(
             }
         }
     }
+    /** System controls use the same local/server intent as the player keys, atomically. */
+    fun setSessionPlayWhenReady(playWhenReady: Boolean): Job {
+        val epoch = activeTargetEpoch
+        return scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                if (!foreground || epoch == null || epoch != activeTargetEpoch) return@serialize
+                val timeshift = currentInterruptionContent() == AudioInterruptionContent.LIVE_TIMESHIFT
+                if (_activeTarget.value is AppPlaybackTarget.Live && !timeshift) return@serialize
+                if (playWhenReady) {
+                    // Focus recovery already resumes the server; do not send it twice.
+                    val resumesInterruption = interruption != null &&
+                        interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT
+                    playWithAudioFocus()
+                    if (timeshift && interruption == null && player.playWhenReady && !resumesInterruption &&
+                        coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED) {
+                        player.pause()
+                    }
+                } else {
+                    resumeAfterInterruption = false
+                    val wasPlaying = player.playWhenReady
+                    player.pause()
+                    if (timeshift && coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED) {
+                        player.playWhenReady = wasPlaying
+                    }
+                }
+            }
+        }
+    }
+
+    fun seekRecordingFromSession(positionMs: Long): Job {
+        val epoch = activeTargetEpoch
+        return scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                if (!foreground || epoch == null || epoch != activeTargetEpoch ||
+                    _activeTarget.value !is AppPlaybackTarget.Recording) return@serialize
+                if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) &&
+                    player.isCurrentMediaItemSeekable) player.seekTo(positionMs)
+            }
+        }
+    }
+
     fun seekTo(positionMs: Long) { targetCommands.runIfOpen { player.seekTo(positionMs) } }
     fun seekRecordingMarker(positionMs: Long, expectedRevision: Long) {
         targetCommands.runIfOpen {

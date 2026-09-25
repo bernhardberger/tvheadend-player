@@ -137,6 +137,7 @@ dependencies {
 
     // Presentation API only; the released SDK owns concrete playback and codecs.
     implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.session)
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.androidx.palette)

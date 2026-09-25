@@ -23,6 +23,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.media3.session.MediaSession
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.playback.SessionPlaybackPlayer
+import kotlinx.coroutines.Job
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
@@ -108,6 +112,8 @@ class MainActivity : AppCompatActivity() {
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
     private val notices: AppNoticeQueue by inject()
+    private val tvheadendSession: TvheadendSession by inject()
+    private val mediaSessionLifecycle = ActivityMediaSessionLifecycle()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
         onAppForegrounded = { playbackRuntime.onAppForegrounded() },
         onAppBackgrounded = { playbackRuntime.onAppBackgrounded(getSystemService(PowerManager::class.java).isInteractive) },
@@ -185,6 +191,10 @@ class MainActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         playbackLifecycle.onActivityStarted()
+        val sessionPlayer = SessionPlaybackPlayer(playbackRuntime)
+        mediaSessionLifecycle.start(this, sessionPlayer, lifecycleScope.launch {
+            sessionPlayer.observe(tvheadendSession.observation)
+        }, sessionPlayer::close)
         if (BuildConfig.DEBUG && !debugVideoBackdropReceiverRegistered) {
             ContextCompat.registerReceiver(
                 this,
@@ -214,6 +224,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        mediaSessionLifecycle.stop()
         if (debugVideoBackdropReceiverRegistered) {
             unregisterReceiver(debugVideoBackdropReceiver)
             debugVideoBackdropReceiverRegistered = false
@@ -255,6 +266,30 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_DEBUG_VIDEO_BACKDROP =
             "at.bernhardberger.tvhplayer.action.DEBUG_VIDEO_BACKDROP"
         const val EXTRA_DEBUG_VIDEO_BACKDROP_VISIBLE = "visible"
+    }
+}
+
+/** Activity-only session: no service, notification or background controller ownership. */
+internal class ActivityMediaSessionLifecycle {
+    private var session: MediaSession? = null
+    private var observation: Job? = null
+    private var releasePlayer: (() -> Unit)? = null
+
+    fun start(context: Context, player: androidx.media3.common.Player, observation: Job, releasePlayer: () -> Unit) {
+        check(session == null)
+        this.observation = observation
+        this.releasePlayer = releasePlayer
+        session = MediaSession.Builder(context, player).build()
+    }
+
+    fun stop() {
+        observation?.cancel()
+        observation = null
+        val previous = session ?: return
+        session = null
+        previous.release()
+        releasePlayer?.invoke()
+        releasePlayer = null
     }
 }
 
