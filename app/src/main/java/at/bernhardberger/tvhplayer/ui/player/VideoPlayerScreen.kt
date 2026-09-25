@@ -907,31 +907,36 @@ fun VideoPlayerScreen(
                     layerState.beginOpeningKeyCycle(keyCode)
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> {
-                            videoPlayerViewModel.play()
                             dispatchTimeshiftCommand(
                                 rollbackPlayWhenReady = false,
                                 command = videoPlayerViewModel::resumeTimeshift,
                             )
                         }
                         MediaPlaybackAction.PAUSE -> {
-                            videoPlayerViewModel.pause()
+                            // Check the server command before local pause can clear an interruption mute.
                             dispatchTimeshiftCommand(
                                 rollbackPlayWhenReady = true,
-                                command = videoPlayerViewModel::pauseTimeshift,
+                                command = {
+                                    videoPlayerViewModel.pauseTimeshift().also {
+                                        if (it == TimeshiftCommandResult.ACCEPTED) videoPlayerViewModel.pause()
+                                    }
+                                },
                             )
                         }
                         MediaPlaybackAction.TOGGLE -> {
                             if (!player.playWhenReady) {
-                                videoPlayerViewModel.play()
                                 dispatchTimeshiftCommand(
                                     rollbackPlayWhenReady = false,
                                     command = videoPlayerViewModel::resumeTimeshift,
                                 )
                             } else {
-                                videoPlayerViewModel.pause()
                                 dispatchTimeshiftCommand(
                                     rollbackPlayWhenReady = true,
-                                    command = videoPlayerViewModel::pauseTimeshift,
+                                    command = {
+                                        videoPlayerViewModel.pauseTimeshift().also {
+                                            if (it == TimeshiftCommandResult.ACCEPTED) videoPlayerViewModel.pause()
+                                        }
+                                    },
                                 )
                             }
                         }
@@ -1144,16 +1149,18 @@ fun VideoPlayerScreen(
                 paused = !playWhenReady,
                 onToggleTimeshiftPause = {
                     if (!player.playWhenReady) {
-                        videoPlayerViewModel.play()
                         dispatchTimeshiftCommand(
                             rollbackPlayWhenReady = false,
                             command = videoPlayerViewModel::resumeTimeshift,
                         )
                     } else {
-                        videoPlayerViewModel.pause()
                         dispatchTimeshiftCommand(
                             rollbackPlayWhenReady = true,
-                            command = videoPlayerViewModel::pauseTimeshift,
+                            command = {
+                                videoPlayerViewModel.pauseTimeshift().also {
+                                    if (it == TimeshiftCommandResult.ACCEPTED) videoPlayerViewModel.pause()
+                                }
+                            },
                         )
                     }
                 },

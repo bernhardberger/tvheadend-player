@@ -328,6 +328,41 @@ class AudioInterruptionRuntimeTest {
         await { !audioDisabled() }
     }
 
+    @Test fun mutedThroughRecoveryToggleOnlyRestoresSoundWithoutServerPause() = exercise {
+        live(timeshift = false)
+        focus.send(AudioInterruption.NOISY)
+        await { audioDisabled() }
+        settings.setTimeshiftEnabled(true)
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { player.playWhenReady }
+        connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState is LiveTimeshiftState.Available }
+        assertTrue(audioDisabled())
+        // UI checks the server command first; unavailable rolls back to playing once.
+        assertEquals(TimeshiftCommandResult.UNAVAILABLE, runtime.pauseTimeshift())
+        runtime.play()
+        await { !audioDisabled() }
+        assertTrue(player.playWhenReady)
+        assertTrue(connection.speeds.isEmpty())
+        assertEquals(2, focus.requests.size)
+    }
+
+    @Test fun oneTimeshiftPlayActionRequestsFocusAndResumesServerOnce() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.PERMANENT_LOSS)
+        await { !player.playWhenReady }
+        val requests = focus.requests.size
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertTrue(player.playWhenReady)
+        assertEquals(requests + 1, focus.requests.size)
+        assertEquals(listOf(0, 100), connection.speeds)
+    }
+
     @Test fun deniedFocusDuringTimeshiftRecoveryStillSendsServerPause() = exercise {
         live(timeshift = true)
         focus.granted = false

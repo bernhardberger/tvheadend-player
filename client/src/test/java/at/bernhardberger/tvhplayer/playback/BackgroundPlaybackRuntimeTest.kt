@@ -171,18 +171,25 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(1, connection.subscribeCount)
     }
 
-    @Test fun deniedForegroundFocusKeepsPausedUntilCurrentFocusGain() = exercise {
+    @Test fun deniedForegroundFocusKeepsPausedUntilExplicitResumeIsGranted() = exercise {
         live()
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
         focus.granted = false
         runtime.onAppForegrounded()
-        await { focus.requests.size == 2 }
+        await { focus.requestCount == 2 }
         settle()
         assertFalse(player.playWhenReady)
         assertFalse(connection.speeds.contains(100))
-        focus.requests.last()(AudioInterruption.GAIN)
-        await { player.playWhenReady }
+        assertNull(focus.callback)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
+        assertEquals(1, connection.subscribeCount)
+        focus.granted = true
+        val resume = scope.async { runtime.resumeTimeshift() }
+        await { resume.isCompleted && player.playWhenReady }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
+        assertEquals(3, focus.requestCount)
+        assertEquals(1, connection.speeds.count { it == 100 })
         assertEquals(100, connection.speeds.last())
         assertEquals(1, connection.subscribeCount)
     }
@@ -196,7 +203,93 @@ class BackgroundPlaybackRuntimeTest {
         runtime.onAppForegrounded()
         settle()
         assertEquals(2, connection.subscribeCount)
+        assertTrue(player.playWhenReady)
+        assertEquals(2, focus.requestCount)
         assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun rejectedNormalPriorityPreservesPausedIntentWithoutRequestingFocus() = exercise {
+        live()
+        connection.emit(SubscriptionEvent.Speed(0))
+        await { !player.playWhenReady }
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        connection.scriptPriority(SubscriptionOperationResult.NotSupported)
+        returnAndRetune(playWhenReady = false)
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(0, connection.speeds.last())
+        assertEquals(1, focus.requestCount)
+        runtime.onAppForegrounded()
+        settle()
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun rejectedServerResumeRetunesOnceWithTunerLostNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        returnAndRetune()
+        await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
+        assertEquals(1, connection.speeds.count { it == 100 })
+        runtime.onAppForegrounded()
+        settle()
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun unsupportedServerResumeIsNotMistakenForFocusDenial() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        connection.scriptSpeed(SubscriptionOperationResult.NotSupported)
+        returnAndRetune()
+        await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
+        assertTrue(player.playWhenReady)
+        runtime.onAppForegrounded()
+        settle()
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun backgroundKeepCancelsAdmittedBackoffEvenAfterAnEarlyForegroundReturn() = exercise {
+        for (returnBeforeBackoff in listOf(false, true)) {
+            live()
+            val initialSubscriptions = connection.subscribeCount
+            runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+            await { connection.subscribeCount == initialSubscriptions + 1 }
+            connection.awaitCollectionRegistered()
+            startSubscription()
+            await { player.playWhenReady }
+            connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+            await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available }
+            runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+            await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+            val priorities = connection.priorityChanges.size
+            runtime.onAppBackgrounded()
+            await { connection.priorityChanges.size == priorities + 1 }
+            if (!returnBeforeBackoff) {
+                scheduler.advanceTimeBy(2_001)
+                settle()
+                assertFalse(player.playWhenReady)
+                assertEquals(initialSubscriptions + 1, connection.subscribeCount)
+            }
+            runtime.onAppForegrounded()
+            await { player.playWhenReady && connection.priorityChanges.size == priorities + 2 }
+            scheduler.advanceTimeBy(2_001)
+            settle()
+            assertEquals(initialSubscriptions + 1, connection.subscribeCount)
+            assertNotNull(runtime.activeTarget.value)
+        }
+    }
+
+    @Test fun recoveryRaisedDuringInstallationIsNotDiscardedByThePublishedEpoch() = exercise {
+        live(timeshift = false, beforeStart = { runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED) })
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { player.playWhenReady }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
     @Test fun existingSubscriptionIssueReleasesWithoutWaitingForAnotherObservation() = exercise {
@@ -252,11 +345,15 @@ class BackgroundPlaybackRuntimeTest {
         val requests = mutableListOf<(AudioInterruption) -> Unit>()
         var abandons = 0
         var granted = true
+        var requestCount = 0
+        var callback: ((AudioInterruption) -> Unit)? = null
         override fun request(onInterruption: (AudioInterruption) -> Unit): Boolean {
-            requests += onInterruption
+            requestCount++
+            callback = onInterruption.takeIf { granted }
+            if (granted) requests += onInterruption
             return granted
         }
-        override fun abandon() { abandons++ }
+        override fun abandon() { abandons++; callback = null }
     }
 
     private class Fixture {
@@ -286,7 +383,7 @@ class BackgroundPlaybackRuntimeTest {
             it == ScriptedSubscriptionCall.SPEED || it == ScriptedSubscriptionCall.PRIORITY
         }
 
-        suspend fun live(channel: Int = 1, timeshift: Boolean = true) {
+        suspend fun live(channel: Int = 1, timeshift: Boolean = true, beforeStart: () -> Unit = {}) {
             settings.setTimeshiftEnabled(timeshift)
             connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (timeshift) 120 else 0)))
             val previous = connection.subscribeCount
@@ -295,6 +392,7 @@ class BackgroundPlaybackRuntimeTest {
             }
             await { connection.subscribeCount > previous }
             connection.awaitCollectionRegistered()
+            beforeStart()
             startSubscription()
             await { install.isCompleted }
             assertTrue(install.await()?.isStarted == true)
@@ -304,13 +402,13 @@ class BackgroundPlaybackRuntimeTest {
             }
         }
 
-        suspend fun returnAndRetune() {
+        suspend fun returnAndRetune(playWhenReady: Boolean = true) {
             val previous = connection.subscribeCount
             runtime.onAppForegrounded()
             await { connection.subscribeCount > previous }
             connection.awaitCollectionRegistered()
             startSubscription()
-            await { runtime.activeTarget.value != null && player.playWhenReady }
+            await { runtime.activeTarget.value != null && player.playWhenReady == playWhenReady }
         }
 
         suspend fun startSubscription() {

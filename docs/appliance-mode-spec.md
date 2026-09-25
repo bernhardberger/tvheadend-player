@@ -270,6 +270,13 @@ fun adjacentChannelId(
    immediate-stop/foreground-retune behavior. A playing recording pauses and resumes only
    while the same target remains current. Explicit Stop or a target replacement
     cancels that pending foreground action.
+
+   **Known limitation:** On Android 14+/Google TV, cached-app freezing can defer
+   the keep timer and screen-off broadcast until the process thaws, delaying tuner
+   release. YIELD normally lets other viewers and DVR take the tuner; a server
+   stream profile with a forced priority overrides YIELD and does not provide
+   that guarantee. Timer, standby, and tuner-contention behavior remain physical-TV
+   gates; no foreground service is used to keep the process awake.
 8. The player Stop control completes serialized playback teardown before it
    returns to the operator UI. It clears the warm-return opportunity so root Back
    cannot redirect to a torn-down session.
