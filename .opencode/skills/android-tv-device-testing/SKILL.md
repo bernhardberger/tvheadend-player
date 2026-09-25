@@ -36,6 +36,10 @@ gates. No route permits broad ADB dumps or automatic uninstall/data clearing.
 
 ## Safe sequence
 
+Prefer `./tools/device status` as the first diagnostic call: identity, installed
+version/hash, focus, playback and a 0.5 s frame sample. Use `--frames-window` to
+adjust the sample or `--no-frames` to skip it; an identity mismatch exits nonzero.
+
 For an authorized test device, install only when the required verified APK is not
 already installed. An install does not authorize credential provisioning or launch,
 but the G10's standing authorization in `docs/device-targets.md` covers launching
@@ -60,7 +64,13 @@ remain useful for separately authorized navigation:
 ./tools/device key home
 ./tools/device key back
 ./tools/device key power
+./tools/device key play-pause
+./tools/device key play
+./tools/device key pause
 ```
+
+Before navigating Player, read `player-navigation.md` in this skill: what each key
+does, the Back order, and the buttons and screens to avoid.
 
 For ordered navigation, send a short screen-agnostic sequence in one invocation
 instead of consuming one agent turn per key:
@@ -78,6 +88,10 @@ long-press flag rather than holding a key for a configurable duration. During
 active UI iteration, prefer short explicit sequences that can change with the UI
 over permanent screen-specific scenarios. Keep atomic `key` calls for exploratory
 steps where the next direction depends on the resulting screen.
+
+For navigate-then-look, use `keys down center --screenshot guide --confirm-safe-screen`
+(also supported by `key`); `--settle-ms` defaults to 700, bounded to 0–5000.
+Only use this when the resulting screen is known safe; PNGs go to `captures/device/`.
 
 For production and unclassified devices, use only bounded diagnostics such as
 `doctor`, `current`, and `package-info`. Do not bypass the role policy with raw
@@ -110,6 +124,10 @@ focus appearance, clipping, and text, but cannot establish video visibility or
 motion quality.
 
 ## Video-plane progress
+
+Use `./tools/device playback-state` instead of raw media-session dumpsys: only
+the selected package's active/state/position/speed/update and title/subtitle fields
+are shown. This read-only diagnostic is available for every role.
 
 `screencap` never captures the SurfaceView, so a black capture cannot separate
 "controls hidden over live video" from a frozen or empty picture. For a bounded

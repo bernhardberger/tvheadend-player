@@ -96,6 +96,9 @@ KEY_EVENTS = {
     "home": "KEYCODE_HOME",
     "back": "KEYCODE_BACK",
     "power": "KEYCODE_POWER",
+    "play-pause": "KEYCODE_MEDIA_PLAY_PAUSE",
+    "play": "KEYCODE_MEDIA_PLAY",
+    "pause": "KEYCODE_MEDIA_PAUSE",
 }
 DEFAULT_KEY_DELAY_MS = 300
 MAX_KEY_DELAY_MS = 5_000
@@ -480,6 +483,98 @@ def verify_configured_identity(
     )
     if errors:
         fail("; ".join(errors))
+
+
+PLAYBACK_STATE_NAMES = (
+    "NONE", "STOPPED", "PAUSED", "PLAYING", "FAST_FORWARDING", "REWINDING",
+    "BUFFERING", "ERROR", "CONNECTING", "SKIPPING_TO_PREVIOUS",
+    "SKIPPING_TO_NEXT", "SKIPPING_TO_QUEUE_ITEM",
+)
+
+
+def playback_sessions(text: str, package_name: str) -> list[dict[str, str]]:
+    sessions: list[dict[str, str]] = []
+    session: dict[str, str] | None = None
+    field_indent = -1
+    for line in text.splitlines():
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+        if stripped and indent < field_indent:
+            session = None
+            field_indent = -1
+        if re.fullmatch(r".+ \(userId=\d+\)", stripped) and field_indent == -1:
+            field_indent = indent + 2
+            continue
+        if indent != field_indent:
+            continue
+        package = re.fullmatch(r"package=([\w.]+)", stripped)
+        if package:
+            session = {} if package[1] == package_name else None
+            if session is not None:
+                sessions.append(session)
+        if session is None or indent != field_indent:
+            continue
+        active = re.fullmatch(r"active=(true|false)", stripped)
+        if active:
+            session["active"] = active[1]
+        if stripped.startswith("state=PlaybackState {"):
+            for source, target, pattern in (
+                ("state", "state", r"\d+"),
+                ("position", "position", r"-?\d+"),
+                ("speed", "speed", r"-?\d+(?:\.\d+)?"),
+                ("updated", "lastUpdated", r"\d+"),
+            ):
+                match = re.search(r"(?:\{\s*|,\s*)" + source + r"=(" + pattern + r")(?=\s*[,}])", stripped)
+                if match:
+                    session[target] = match[1]
+        description = re.fullmatch(r"metadata:.*?description=(.*)", stripped)
+        if description:
+            # MediaDescription's dump is title, subtitle, description; omit description.
+            parts = description[1].split(", ")
+            if len(parts) == 3:
+                for key, value in zip(("title", "subtitle"), parts[:2]):
+                    if value != "null":
+                        session[key] = value
+    return sessions
+
+
+def show_playback_state(adb: str, serial: str, package_name: str) -> None:
+    result = run(adb_command(adb, serial, "shell", "dumpsys", "media_session"),
+                 capture=True, sensitive=True, announce=False)
+    sessions = playback_sessions(result.stdout, package_name)
+    if not sessions:
+        print("playbackSession=not found")
+    for index, session in enumerate(sessions, 1):
+        print(f"playbackSession={index}")
+        for key, value in session.items():
+            if key == "state":
+                number = int(value)
+                name = PLAYBACK_STATE_NAMES[number] if number < len(PLAYBACK_STATE_NAMES) else "UNKNOWN"
+                print(f"state={number} ({name})")
+            else:
+                print(f"{key}={json.dumps(value, ensure_ascii=True) if key in {'title', 'subtitle'} else value}")
+
+
+def show_status_package(adb: str, serial: str, package_name: str) -> None:
+    result = run(adb_command(adb, serial, "shell", "pm", "path", package_name),
+                 capture=True, sensitive=True, announce=False)
+    if not result.stdout.strip():
+        print("package=not installed")
+        return
+    bases = re.findall(r"^package:(/data/app/[A-Za-z0-9_./=+~-]+/base\.apk)$", result.stdout, re.MULTILINE)
+    if len(bases) != 1:
+        fail("expected exactly one installed base APK")
+    metadata = run(adb_command(adb, serial, "shell", "dumpsys", "package", package_name),
+                   capture=True, sensitive=True, announce=False)
+    for key in ("versionName", "versionCode"):
+        match = re.search(r"^\s*" + key + r"=([^\s]+)", metadata.stdout, re.MULTILINE)
+        print(f"{key}={match[1] if match else 'unknown'}")
+    digest = run(adb_command(adb, serial, "shell", "sha256sum", bases[0]),
+                 capture=True, sensitive=True, announce=False)
+    match = re.fullmatch(r"([0-9a-fA-F]{64})\s+" + re.escape(bases[0]) + r"\s*", digest.stdout)
+    if not match:
+        fail("installed base APK did not return a valid SHA-256 digest")
+    print(f"baseApkSha256={match[1].lower()}")
 
 
 def show_current_focus(adb: str, serial: str) -> None:
@@ -1316,6 +1411,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("launch", help="Launch the Leanback activity")
     subparsers.add_parser("force-stop", help="Force-stop the selected package")
     subparsers.add_parser("current", help="Show only the current/focused activity")
+    subparsers.add_parser("playback-state", help="Show only the selected package's playback session fields")
+    status_parser = subparsers.add_parser("status", help="Show compact identity, package and playback diagnostics")
+    status_parser.add_argument("--frames-window", type=bounded_frame_window, default=0.5)
+    status_parser.add_argument("--no-frames", action="store_true")
     frames_parser = subparsers.add_parser(
         "video-frames",
         help="Count video-plane frames presented in a short window (playback progress)",
@@ -1447,6 +1546,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Send each event with Android's long-press flag",
     )
+    for navigation_parser in (key_parser, keys_parser):
+        navigation_parser.add_argument("--screenshot", metavar="NAME", help="Capture the resulting safe screen to captures/device")
+        navigation_parser.add_argument("--settle-ms", type=bounded_key_delay, default=700)
+        navigation_parser.add_argument("--confirm-safe-screen", action="store_true")
     return parser
 
 
@@ -1491,7 +1594,7 @@ def main() -> int:
         fail("install-release requires --confirm-release-install")
     if args.action == "uninstall-legacy" and not args.confirm_legacy_uninstall:
         fail("uninstall-legacy requires --confirm-legacy-uninstall")
-    if args.action == "screenshot" and not args.confirm_safe_screen:
+    if (args.action == "screenshot" or (key_names is not None and args.screenshot is not None)) and not args.confirm_safe_screen:
         fail("screenshot requires --confirm-safe-screen")
     if (
         args.action == "allow-appliance-autostart"
@@ -1692,6 +1795,31 @@ def main() -> int:
         show_current_focus(adb, serial)
         return 0
 
+    if args.action == "playback-state":
+        show_playback_state(adb, serial, package_name)
+        return 0
+
+    if args.action == "status":
+        require_device_ready(adb, serial, announce=False)
+        properties = read_device_properties(adb, serial, announce=False)
+        print(f"target={target_name or 'unnamed'} role={role}")
+        for name in ("manufacturer", "model", "device", "product"):
+            print(f"{name}={properties[name]}")
+        identity_status = 0
+        try:
+            verify_configured_identity(properties, config, require_expected=True)
+        except SystemExit:
+            print("identity=mismatch")
+            identity_status = 2
+        else:
+            print("identity=match")
+        show_status_package(adb, serial, package_name)
+        show_current_focus(adb, serial)
+        show_playback_state(adb, serial, package_name)
+        if not args.no_frames:
+            show_video_frames(adb, serial, package_name, args.frames_window, "video")
+        return identity_status
+
     if args.action == "video-frames":
         show_video_frames(adb, serial, package_name, args.window_seconds, args.plane)
         return 0
@@ -1763,6 +1891,9 @@ def main() -> int:
             delay_ms=args.delay_ms,
             long_press=args.long_press,
         )
+        if args.screenshot is not None:
+            time.sleep(args.settle_ms / 1_000)
+            capture_screenshot(adb, serial, default_screenshot_output(args.screenshot))
         return 0
 
     if args.action == "smoke":

@@ -84,6 +84,143 @@ CLEAR_SUCCESS = subprocess.CompletedProcess(
     stdout="Success\n",
     stderr="",
 )
+class OperatorShortcutsTest(unittest.TestCase):
+    PROPERTIES = dict(manufacturer="Example", model="TV", device="test", product="test")
+    MEDIA_DUMP = """MEDIA SESSION SERVICE (dumpsys media_session)
+  Sessions Stack - have 3 sessions:
+    Other session (userId=0)
+      package=other.player
+      active=true
+      state=PlaybackState {state=2, position=999, speed=0.0, updated=888}
+      metadata: size=2, description=Other title, Other subtitle, null
+    Player session (userId=0)
+      ownerPid=123, ownerUid=456, userId=0
+      package=at.bernhardberger.tvhplayer
+      active=true
+      controller=OMIT_CONTROLLER
+      callback=OMIT_CALLBACK
+      state=PlaybackState {state=3, position=1234, buffered position=2000, speed=1.0, updated=5678, actions=123, error=null, extras=Bundle[OMIT_EXTRAS]}
+      metadata: size=3, description=Programme, Channel, OMIT_DESCRIPTION
+      extras=Bundle[OMIT_EXTRAS]
+        package=at.bernhardberger.tvhplayer
+        active=false
+        metadata: size=1, description=Nested, Nested, null
+    Last session (userId=0)
+      package=other.player
+      active=false
+      metadata: size=1, description=Last title, Last subtitle, null
+  Global extras:
+    metadata: size=1, description=Global title, Global subtitle, null
+"""
+
+    def main_fakes(self, role="test"):
+        config = {"serial": "private-device", "role": role}
+        config.update({f"expected_{key}": value for key, value in self.PROPERTIES.items()})
+        return {
+            "load_local_config": Mock(return_value=("test-target", config)),
+            "require_device_ready": Mock(),
+            "read_device_properties": Mock(return_value=self.PROPERTIES),
+            "run": Mock(side_effect=AssertionError("unexpected device operation")),
+        }
+
+    def test_media_key_mapping_and_parser_choices(self):
+        parser = DEVICE["build_parser"]()
+        for name, code in (("play", "PLAY"), ("pause", "PAUSE"), ("play-pause", "PLAY_PAUSE")):
+            self.assertEqual(key_events[name], f"KEYCODE_MEDIA_{code}")
+            self.assertEqual(parser.parse_args(["key", name]).name, name)
+        self.assertEqual(parser.parse_args(["playback-state"]).action, "playback-state")
+        self.assertEqual(parser.parse_args(["status"]).frames_window, 0.5)
+        self.assertTrue(parser.parse_args(["status", "--no-frames"]).no_frames)
+        self.assertEqual(parser.parse_args(["status", "--frames-window", "1"]).frames_window, 1)
+        for args in (["key", "play", "--settle-ms", "5001"], ["status", "--frames-window", "0"]):
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                parser.parse_args(args)
+
+    def test_playback_whitelist_excludes_other_sessions_and_nested_fields(self):
+        result = subprocess.CompletedProcess([], 0, stdout=self.MEDIA_DUMP, stderr="")
+        runner = Mock(return_value=result)
+        output = io.StringIO()
+        with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
+            DEVICE["show_playback_state"]("adb", "private-device", DEVICE["DEFAULT_PACKAGE"])
+        self.assertEqual(output.getvalue(), 'playbackSession=1\nactive=true\nstate=3 (PLAYING)\nposition=1234\nspeed=1.0\nlastUpdated=5678\ntitle="Programme"\nsubtitle="Channel"\n')
+        self.assertTrue(runner.call_args.kwargs["sensitive"])
+
+    def test_playback_missing_session(self):
+        runner = Mock(return_value=subprocess.CompletedProcess([], 0, stdout=self.MEDIA_DUMP, stderr=""))
+        output = io.StringIO()
+        with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
+            DEVICE["show_playback_state"]("adb", "private-device", "missing.player")
+        self.assertEqual(output.getvalue(), "playbackSession=not found\n")
+
+    def test_multiple_matching_sessions_and_unknown_state(self):
+        text = "First (userId=0)\n  package=selected.player\n  active=false\n  state=PlaybackState {state=99, position=-1, speed=0.0, updated=0}\nSecond (userId=0)\n  package=selected.player\n  active=true\n"
+        sessions = DEVICE["playback_sessions"](text, "selected.player")
+        self.assertEqual(len(sessions), 2)
+        self.assertEqual(sessions[0]["state"], "99")
+        self.assertEqual(sessions[1], {"active": "true"})
+
+    def test_status_composition_and_mismatch_exit(self):
+        for mismatch, no_frames in ((False, False), (True, False), (False, True)):
+            with self.subTest(mismatch=mismatch, no_frames=no_frames):
+                fakes = self.main_fakes("production")
+                fakes.update({name: Mock() for name in ("show_status_package", "show_current_focus", "show_playback_state", "show_video_frames")})
+                if mismatch:
+                    fakes["read_device_properties"] = Mock(return_value={**self.PROPERTIES, "model": "Different"})
+                output = io.StringIO()
+                with patch.dict(DEVICE_GLOBALS, fakes), patch.object(DEVICE["shutil"], "which", return_value="adb"), patch.object(DEVICE["sys"], "argv", ["device", "status"] + (["--no-frames"] if no_frames else [])), redirect_stdout(output), redirect_stderr(io.StringIO()):
+                    self.assertEqual(DEVICE["main"](), 2 if mismatch else 0)
+                self.assertIn("target=test-target role=production", output.getvalue())
+                self.assertIn("identity=mismatch" if mismatch else "identity=match", output.getvalue())
+                for name in ("show_status_package", "show_current_focus", "show_playback_state"):
+                    fakes[name].assert_called_once()
+                self.assertEqual(fakes["show_video_frames"].call_count, 0 if no_frames else 1)
+                if not no_frames:
+                    self.assertEqual(fakes["show_video_frames"].call_args.args[-2:], (0.5, "video"))
+
+    def test_status_installed_version_and_hash(self):
+        base = "/data/app/example/base.apk"
+        responses = [f"package:{base}\n", "  versionCode=42 minSdk=23\n  versionName=1.2\n  OMIT_EXTRA=yes\n", f"{'a' * 64}  {base}\n"]
+        runner = Mock(side_effect=[subprocess.CompletedProcess([], 0, stdout=value, stderr="") for value in responses])
+        output = io.StringIO()
+        with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
+            DEVICE["show_status_package"]("adb", "private-device", DEVICE["DEFAULT_PACKAGE"])
+        self.assertEqual(output.getvalue(), f"versionName=1.2\nversionCode=42\nbaseApkSha256={'a' * 64}\n")
+
+    def test_status_package_not_installed(self):
+        runner = Mock(return_value=subprocess.CompletedProcess([], 0, stdout="", stderr=""))
+        output = io.StringIO()
+        with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
+            DEVICE["show_status_package"]("adb", "private-device", DEVICE["DEFAULT_PACKAGE"])
+        self.assertEqual(output.getvalue(), "package=not installed\n")
+        runner.assert_called_once()
+
+    def test_navigation_capture_requires_confirmation_before_events(self):
+        for action in ("key", "keys"):
+            fakes = self.main_fakes()
+            with patch.dict(DEVICE_GLOBALS, fakes), patch.object(DEVICE["shutil"], "which", return_value="adb"), patch.object(DEVICE["sys"], "argv", ["device", action, "play", "--screenshot", "after"]), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                DEVICE["main"]()
+            fakes["run"].assert_not_called()
+            fakes["require_device_ready"].assert_not_called()
+
+    def test_navigation_capture_runs_after_keys_and_settle(self):
+        for action in ("key", "keys"):
+            events = []
+            fakes = self.main_fakes()
+            fakes["run"] = Mock(side_effect=lambda command, **kwargs: events.append(command[-1]))
+            fakes["capture_screenshot"] = Mock(side_effect=lambda adb, serial, path: events.append(path))
+            with patch.dict(DEVICE_GLOBALS, fakes), patch.object(DEVICE["shutil"], "which", return_value="adb"), patch.object(DEVICE["sys"], "argv", ["device", action, "pause", "--screenshot", "after pause", "--confirm-safe-screen"]), patch.object(DEVICE["time"], "sleep", side_effect=lambda seconds: events.append(seconds)), redirect_stdout(io.StringIO()):
+                self.assertEqual(DEVICE["main"](), 0)
+            self.assertEqual(events[:2], ["KEYCODE_MEDIA_PAUSE", 0.7])
+            self.assertEqual(events[2].parent, ROOT / "captures/device")
+            self.assertTrue(events[2].name.endswith("-after-pause.png"))
+
+    def test_read_only_role_policy_is_preserved(self):
+        for role in ("production", "test", "unclassified"):
+            for action in ("status", "playback-state"):
+                self.assertIsNone(action_policy_error(role, action))
+        self.assertIsNotNone(action_policy_error("production", "keys"))
+
+
 class DevicePolicyTest(unittest.TestCase):
     def test_product_identity_defaults_are_current(self) -> None:
         self.assertEqual(DEVICE["LOCAL_CONFIG"].name, ".tvhplayer-device.json")
