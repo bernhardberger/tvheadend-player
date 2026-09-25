@@ -76,6 +76,27 @@ class LivePlaybackStartPolicyTest {
     }
 
     @Test
+    fun startWithdrawnByALaterUserStopIsNeitherAFailureNorASecondStop() = runTest {
+        val calls = mutableListOf<String>()
+        startInitialLivePlayback(
+            startPlayback = { null },
+            isCurrent = { true },
+            onRejected = { calls += "failure-stop" },
+            onResolved = { calls += "resolved" },
+            withdrawn = { true },
+        )
+        assertEquals(emptyList<String>(), calls)
+        startInitialLivePlayback(
+            startPlayback = { PlaybackTargetResult.STARTED },
+            isCurrent = { true },
+            onRejected = { calls += "failure-stop" },
+            onResolved = { calls += "resolved" },
+            withdrawn = { true },
+        )
+        assertEquals(listOf("resolved"), calls)
+    }
+
+    @Test
     fun supersededRejectedAdmissionCannotStopOrResolveTheNewChannel() = runTest {
         var current = true
         val result = CompletableDeferred<PlaybackTargetResult?>()

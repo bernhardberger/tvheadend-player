@@ -220,10 +220,13 @@ internal suspend fun startInitialLivePlayback(
     isCurrent: () -> Boolean,
     onRejected: suspend () -> Unit,
     onResolved: (PlaybackTargetResult?) -> Unit,
+    withdrawn: () -> Boolean = { false },
 ) {
     val result = startPlayback()
     kotlinx.coroutines.currentCoroutineContext().ensureActive()
     if (!isCurrent()) return
+    // The viewer's Stop came after this selection: nothing started and nothing failed.
+    if (result?.isStarted != true && withdrawn()) return
     if (result?.isStarted != true) onRejected()
     kotlinx.coroutines.currentCoroutineContext().ensureActive()
     if (isCurrent()) onResolved(result)
@@ -276,6 +279,18 @@ fun VideoPlayerScreen(
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
+    val playerClose = rememberPlayerClose(onClose)
+    // First, before any playback effect: a user stop since the last intent closes the screen.
+    val screenEntry = rememberPlayerEntry(playbackRuntime::enterPlayerScreen, playerClose)
+    val stopAndClose: () -> Unit = {
+        scope.launch {
+            stopPlaybackAndClose(
+                stopPlayback = videoPlayerViewModel::stop,
+                closePlayer = playerClose::close,
+            )
+        }
+    }
+    CloseOnSessionStop(playbackRuntime.sessionStops, playerClose)
 
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings()
@@ -372,6 +387,8 @@ fun VideoPlayerScreen(
     )
     var initialPlaybackResolved by remember { mutableStateOf(false) }
     var liveRequestToken by remember { mutableLongStateOf(0L) }
+    // The viewing intent of the selection the next live start plays (entry, then each tune).
+    var liveIntent by remember { mutableStateOf(screenEntry) }
     var zapSettlePending by remember { mutableStateOf(false) }
     var requestedChannelFailed by remember { mutableStateOf(false) }
 
@@ -474,6 +491,7 @@ fun VideoPlayerScreen(
         requestedLiveSelection,
         liveRequestToken,
     ) {
+        if (screenEntry == null) return@LaunchedEffect
         if (!screenActive) {
             lastPlayedChannelId = null
             return@LaunchedEffect
@@ -497,17 +515,18 @@ fun VideoPlayerScreen(
         if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
         val playbackSelection = authorizedLiveSelection ?: return@LaunchedEffect
         val requestToken = liveRequestToken
+        val requestIntent = liveIntent
         if (zapSettlePending) {
             delay(CHANNEL_ZAP_SETTLE_MS)
             zapSettlePending = false
         }
         startInitialLivePlayback(
-            startPlayback = { videoPlayerViewModel.playChannel(playbackSelection) },
+            startPlayback = { videoPlayerViewModel.playChannel(playbackSelection, requestIntent) },
             isCurrent = { requestToken == liveRequestToken },
             onRejected = {
                 requestedChannelFailed = true
                 lastPlayedChannelId = null
-                videoPlayerViewModel.stop()
+                videoPlayerViewModel.stopAfterLoss()
             },
             onResolved = { result ->
                 initialPlaybackResolved = true
@@ -517,6 +536,7 @@ fun VideoPlayerScreen(
                 }
                 requestedLiveSelection = null
             },
+            withdrawn = { requestIntent != null && playbackRuntime.isPlaybackIntentStopped(requestIntent) },
         )
     }
 
@@ -598,6 +618,9 @@ fun VideoPlayerScreen(
         timeshiftCommandToken += 1L
         timelineState.invalidateForSourceChange()
         liveRequestToken += 1L
+        // Accepted now, played after the zap settles under this one intent: a Stop from
+        // before loses, a Stop from after withdraws the delayed start.
+        liveIntent = playbackRuntime.notePlaybackIntent()
         requestedChannelFailed = false
         lastPlayedChannelId = null
         requestedLiveSelection = playbackSelection
@@ -856,7 +879,7 @@ fun VideoPlayerScreen(
     }
 
     LaunchedEffect(connState, screenActive) {
-        if (!screenActive) return@LaunchedEffect
+        if (!screenActive || screenEntry == null) return@LaunchedEffect
 
         when (connState) {
             is ConnectionState.Connected -> {
@@ -883,7 +906,7 @@ fun VideoPlayerScreen(
                                 effectiveTimeshiftState
                             ).atLiveEdge
                     layerState.showControls()
-                    videoPlayerViewModel.stop()
+                    videoPlayerViewModel.stopAfterLoss()
                     lastPlayedChannelId = null
                 }
             }
@@ -912,7 +935,7 @@ fun VideoPlayerScreen(
             }
             PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.dismissChannelDrawer()
-            PlayerBackAction.CLOSE_PLAYER -> onClose()
+            PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
@@ -927,6 +950,15 @@ fun VideoPlayerScreen(
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
+                if (handlePlayerStopKeyWithoutTarget(
+                        event = event,
+                        hasActiveTarget = playbackRuntime.activeTarget.value != null,
+                        beginKeyCycle = layerState::beginOpeningKeyCycle,
+                        stopAndClose = stopAndClose,
+                    )
+                ) {
+                    return@onPreviewKeyEvent true
+                }
                 val keyContext = PlayerKeyContext(
                     surface = PlayerSurface.LIVE,
                     controlsVisible = layerState.controlsVisible,
@@ -1065,7 +1097,7 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.CLOSE_PLAYER -> {
-                        onClose()
+                        playerClose.close()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.PASS_THROUGH -> Unit
@@ -1131,14 +1163,7 @@ fun VideoPlayerScreen(
                     openInfo()
                 },
                 onOpenRecord = { openInfo(fromRecord = true) },
-                onStopPlayback = {
-                    scope.launch {
-                        stopPlaybackAndClose(
-                            stopPlayback = videoPlayerViewModel::stop,
-                            closePlayer = onClose,
-                        )
-                    }
-                },
+                onStopPlayback = stopAndClose,
                 onUserInteraction = layerState::onUserInteraction,
                 onCommitSeek = timelineState::commitPendingSeek,
                 onOpenOptions = {
@@ -1393,7 +1418,7 @@ fun VideoPlayerScreen(
             onPrimaryAction = if (recoveryHasRetry) {
                 ::dispatchRecoveryRetry
             } else {
-                onClose
+                playerClose::close
             },
             secondaryActionLabel = if (recoveryHasRetry) {
                 stringResource(R.string.close)
@@ -1403,7 +1428,7 @@ fun VideoPlayerScreen(
             onSecondaryAction = if (!recoveryHasRetry) {
                 null
             } else {
-                onClose
+                playerClose::close
             },
         )
     }

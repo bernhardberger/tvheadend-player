@@ -65,7 +65,10 @@ subtitles.
 - Action row, left to right: Pause/Play, **Stop**, Info, Record, Settings (gear).
   Focus starts on Pause/Play. Without timeshift Pause/Play is dimmed; Center on it
   only shows why in the timeline line.
-- **Never press Center on Stop**: it stops playback and closes the player.
+- **Never press Center on Stop**: it stops playback and closes the player. `key
+  stop` (the remote's Stop key) does the same: the media session handles it while a
+  channel or recording is active, otherwise the player screen closes itself. Only
+  send it when you mean to end playback.
 - Up from the action row reaches the timeline: Left/Right queue a seek, Center
   pauses or resumes, Up/Down commit the seek. Avoid it unless you are testing seeks.
 - Down from the action row opens the channel shelf.

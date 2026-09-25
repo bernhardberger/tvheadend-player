@@ -40,10 +40,16 @@ class VideoPlayerViewModel(
 
     val hasAudioInterruption: Boolean get() = playbackRuntime.hasAudioInterruption
 
-    suspend fun playChannel(selection: LivePlaybackSelection) = playbackRuntime.playLive(selection)
+    suspend fun playChannel(selection: LivePlaybackSelection, intent: Long? = null) =
+        playbackRuntime.playLive(selection, intent)
 
     suspend fun stop() {
         playbackRuntime.stop()
+    }
+
+    /** Automatic stop (connection lost, rejected start); records no user stop. */
+    suspend fun stopAfterLoss() {
+        playbackRuntime.stopAfterLoss()
     }
 
     fun retryLiveNow() {

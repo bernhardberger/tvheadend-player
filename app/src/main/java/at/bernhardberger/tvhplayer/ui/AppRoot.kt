@@ -575,6 +575,7 @@ fun AppRoot(
                         activeChannelId = activeChannelId,
                         activeRecordingId = activeRecordingId,
                         currentChannelReadiness = currentChannelReadiness,
+                        noteViewingIntent = { playbackRuntime.notePlaybackIntent() },
                     )
                 ) {
                     is PlayerRouteTarget.Live -> {
@@ -602,13 +603,15 @@ fun AppRoot(
         if (showRail) browseBackHandler.value() else handleRootBack()
     }
     val requestLivePlayer: (LivePlaybackSelection, String) -> Unit = { selection, name ->
+        val viewingIntent = playbackRuntime.notePlaybackIntent()
         playbackSelectionScope.launch {
             val target = playbackOrchestrator.requestLivePlayer(
                 activeChannelId = activeChannelId,
                 activeRecordingId = activeRecordingId,
                 requestedChannelId = selection.channelId,
                 requestedChannelName = name,
-                startPlayback = { playbackRuntime.playLive(selection) },
+                viewingIntent = viewingIntent,
+                startPlayback = { playbackRuntime.playLive(selection, it) },
             ) ?: return@launch
             backStack.pushTransient(
                 LivePlayerKey(target.channelId.value, target.channelName),

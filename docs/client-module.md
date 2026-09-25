@@ -98,16 +98,57 @@ policy value of this TV runtime.
 The activity creates a Media3 session on start and releases it on stop; there is
 no service, notification or background playback. Its `:client` wrapper publishes
 only names (current programme/channel or recording/channel), without artwork,
-and routes play/pause and seek through the runtime's serialized, focus-aware path.
+and routes play/pause, seek and stop through the runtime's serialized, focus-aware path.
 Live Play/Pause remains unavailable without timeshift, matching the live player's
-remote-key policy; only seekable recordings expose seek-in-current-item. Activity
+remote-key policy; only seekable recordings expose seek-in-current-item. Stop is
+available whenever a live channel or recording is active. A session Stop (Assistant,
+Now-playing card, `cmd media_session dispatch stop`, a remote's Stop key) is fenced
+to the viewing intent current when it arrived, performs the same explicit stop as
+the player's Stop button (clearing the warm-return opportunity) on whatever target is
+active when it runs, and then publishes its intent as the latest session Stop on
+`AppPlaybackRuntime.sessionStops`, which a player screen subscribing late still sees
+while that intent is current. Viewing intent is:
+a live or recording start, a launch request (appliance entry or startup autoplay, which
+open the live player without a runtime call), a warm opening action that starts nothing
+(a click on the channel already playing, noted at the click before its coroutine is
+dispatched; a warm return to the player), a retry (including the live screen's automatic retry
+after a reconnect), a channel the live screen accepted (one intent, which its delayed
+start after the zap settles carries instead of minting another), and opening a player
+screen unless a user stop is the latest playback event. Recovery, route restore and
+automatic stops (connection lost, a rejected start) are not intent. Intent noted
+after the Stop arrived wins: before the Stop runs it cancels it outright, after it
+runs it drops the announcement, so a Stop never closes the player the viewer just
+asked for. A Stop after a selection wins over it: the selection's delayed start then
+does nothing and is neither a failure nor a second stop. User stops (the Stop
+buttons, the no-target Stop key, a session Stop, a finished recording, the root exit)
+are recorded under the intent they arrived with; automatic stops record nothing. A
+player screen's first step, before any playback, retune or restore work, closes it
+and starts nothing when a user stop is the latest playback event, and an automatic
+recording route restore then does nothing either. A session Stop registers as pending
+the moment it arrives; a player screen entering while a Stop under the current intent is
+still pending joins that intent instead of noting a new one, so the Stop still stops what
+the screen would play and closes it (the click that opened the screen came before the
+Stop). The registration ends when the Stop runs or is dropped (session detached, app
+in the background, no active target, newer intent, runtime closed). When it runs, the
+Stop's final fence is: session still attached, app in the foreground, some target
+active, and no intent newer than the Stop's; a target installed or retuned after the
+Stop arrived under the same intent (the start it was queued behind, a recovery retune,
+a route restore) is the one it stops. On a session Stop's
+announcement a showing live or recording player only closes (playback is already stopped), through the same close-once guard as its Stop button, Back and
+overlay Close, so a player that is already closing or fading out ignores it; with no
+player showing (warm video behind browse) the stop alone happens and nothing
+navigates. While a target is active the player screens leave the remote's Stop key
+to the session. Without one (recovery, error, or before a target started) the session
+does not offer Stop, so the showing player handles the Stop key itself: its first key
+down runs the screen's Stop button path and the screen consumes that key's repeats
+and key up. Activity
 startup handling and Compose retain key priority: player media actions consume
 the opening down/repeat/up cycle, while unhandled keys on browse screens reach
 the system session once.
 When the player info/options layer is open, both player screens leave media keys
 unhandled so they reach the session as the single handler.
 The appliance accessibility service still handles only
-its appliance-entry keys, not media keys. No next/previous, stop, playlist, volume,
+its appliance-entry keys, not media keys. No next/previous, playlist, volume,
 device or speed commands are exposed by the session.
 
 ## Deferred work

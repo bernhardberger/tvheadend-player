@@ -466,6 +466,37 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
+    fun stopKeyClosesThePlayerItselfOnlyWithoutAnActiveTarget() {
+        // No target (recovery, terminal error, never started): nothing for the session to
+        // stop, so the first key down runs the screen's Stop button path.
+        assertTrue(playerStopKeyClosesScreen(KeyEvent.KEYCODE_MEDIA_STOP, repeatCount = 0, hasActiveTarget = false))
+        // A target plays: the media session handles Stop.
+        assertFalse(playerStopKeyClosesScreen(KeyEvent.KEYCODE_MEDIA_STOP, repeatCount = 0, hasActiveTarget = true))
+        // Auto-repeats never start a close of their own; the key cycle consumes them.
+        assertFalse(playerStopKeyClosesScreen(KeyEvent.KEYCODE_MEDIA_STOP, repeatCount = 1, hasActiveTarget = false))
+        assertFalse(playerStopKeyClosesScreen(KeyEvent.KEYCODE_BACK, repeatCount = 0, hasActiveTarget = false))
+        assertFalse(playerStopKeyClosesScreen(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, repeatCount = 0, hasActiveTarget = false))
+    }
+
+    @Test
+    fun stopKeyWithAnActiveTargetPassesThroughEveryPlayerStateToTheMediaSession() {
+        assertFalse(playerParentConsumesRecoveryKey(KeyEvent.KEYCODE_MEDIA_STOP))
+        for (surface in PlayerSurface.entries) {
+            for (controlsVisible in listOf(false, true)) {
+                for (overlay in 0..5) {
+                    val ctx = PlayerKeyContext(
+                        surface, controlsVisible = controlsVisible, seekbarFocused = false,
+                        timeshiftAvailable = true,
+                        optionsOpen = overlay == 1, infoOpen = overlay == 2, statsOpen = overlay == 3,
+                        drawerOpen = overlay == 4, confirmationOpen = overlay == 5,
+                    )
+                    assertEquals(PlayerKeyAction.PASS_THROUGH, playerKeyAction(ctx, KeyEvent.KEYCODE_MEDIA_STOP))
+                }
+            }
+        }
+    }
+
+    @Test
     fun channelKeysTuneInTheShelfAndFullscreenPlayback() {
         assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = true))
         assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = false))

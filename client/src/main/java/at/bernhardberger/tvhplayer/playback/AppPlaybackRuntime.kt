@@ -33,11 +33,14 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlin.time.Duration
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -70,6 +73,53 @@ class AppPlaybackRuntime(
     private var keepTimer: Job? = null
     private val _backgroundNotice = MutableStateFlow<BackgroundPlaybackNotice?>(null)
     val backgroundNotice = _backgroundNotice.asStateFlow()
+    /**
+     * The viewing-intent generation, bumped synchronously before any command waits for the
+     * serializer. Intent is: a live or recording start ([playLive] without an intent of its
+     * own, [playRecording]), a retry ([retryLive], including the live screen's automatic
+     * retry after a reconnect, and [retryRecording]), a channel the live screen accepted
+     * ([notePlaybackIntent], carried to its delayed [playLive]), a launch request (appliance
+     * entry or startup autoplay, [notePlaybackIntent]), a warm opening action that starts
+     * nothing (a click on the channel already playing, noted at the click and carried to
+     * [playLive]; a warm return; both [notePlaybackIntent]), and opening a player screen
+     * unless a user stop is the latest playback event ([enterPlayerScreen]). Not intent:
+     * recovery, [restoreRecordingRoute], and automatic stops ([stopAfterLoss]).
+     */
+    private val playbackRequests = AtomicLong()
+
+    /**
+     * Guards [userStopIntent] and the pending session Stops against [enterPlayerScreen] and
+     * the session Stop's check.
+     */
+    private val intentLock = Any()
+
+    /**
+     * The intent generation under which the latest user stop was asked for ([stop],
+     * [stopFromSession]); -1 before any. A user stop is the latest playback event while this
+     * equals [playbackRequests].
+     */
+    private var userStopIntent = -1L
+
+    /**
+     * Session Stops that arrived but have not run their check yet: the generation of the
+     * latest arrivals and how many arrived under it. Arrivals under an older generation
+     * are already stale (newer intent wins over them), so only the latest one counts.
+     */
+    private var pendingStopIntent = -1L
+    private var pendingStops = 0
+
+    /** The generation the latest completed session Stop arrived under; -1 before any. */
+    private val lastSessionStop = MutableStateFlow(-1L)
+
+    /**
+     * The latest media-session Stop that tore down its target, delivered while no user
+     * viewing intent was noted after that Stop arrived: later intent wins over an earlier
+     * Stop. The runtime has already stopped, so a showing player screen only closes. The
+     * latest Stop is kept, so a screen whose entry the Stop was pending against still closes
+     * when it starts collecting after the Stop ran; any screen entered or tuned later has
+     * noted newer intent and ignores it. Browse screens do not collect.
+     */
+    val sessionStops: Flow<Unit> = lastSessionStop.filter { it >= 0 && it == playbackRequests.get() }.map { }
 
     fun consumeBackgroundNotice(notice: BackgroundPlaybackNotice) {
         _backgroundNotice.compareAndSet(notice, null)
@@ -265,8 +315,16 @@ class AppPlaybackRuntime(
         }
     }
 
-    suspend fun playLive(selection: LivePlaybackSelection): PlaybackTargetResult? =
-        targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
+    /**
+     * Starts [selection]. Without [intent] this call is new viewing intent. With the intent
+     * the live screen noted when it accepted the channel ([notePlaybackIntent]) it adds none,
+     * and returns null without touching playback when a user stop was asked for under that
+     * intent or later (see [isPlaybackIntentStopped]): the viewer's Stop came last.
+     */
+    suspend fun playLive(selection: LivePlaybackSelection, intent: Long? = null): PlaybackTargetResult? {
+        if (intent == null) playbackRequests.incrementAndGet()
+        return targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
+            if (intent != null && isPlaybackIntentStopped(intent)) return@serialize null
             if (policy.trace.enabled) policy.trace.tuneAdmitted()
             lastLiveChannelId = selection.channelId
             recoveryBackoff.reset()
@@ -276,6 +334,7 @@ class AppPlaybackRuntime(
             )
             result
         }
+    }
 
     private suspend fun playLive(
         channelId: ChannelId,
@@ -419,12 +478,54 @@ class AppPlaybackRuntime(
     suspend fun playRecording(
         selection: RecordingPlaybackSelection,
         start: RecordingPlaybackStart,
-    ): PlaybackTargetResult? = targetCommands.serialize(
-        onClosed = { PlaybackTargetResult.SHUT_DOWN },
-    ) {
-        playRecordingLocked(selection.recordingId, start)
+    ): PlaybackTargetResult? {
+        playbackRequests.incrementAndGet()
+        return targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
+            playRecordingLocked(selection.recordingId, start)
+        }
     }
 
+    /**
+     * Notes viewing intent that has no command yet (a channel the live screen accepted
+     * before its zap settles, a launch request whose live player starts the
+     * channel itself) and returns its generation for [playLive]. A
+     * media-session Stop that arrived earlier then loses: it neither stops nor closes.
+     */
+    fun notePlaybackIntent(): Long = playbackRequests.incrementAndGet()
+
+    /**
+     * A player screen's first step, before any of its playback, retune or restore work.
+     * Returns null when a user stop is the latest playback event since the last intent (the
+     * viewer stopped after asking for this screen's target, so the screen closes and starts
+     * nothing). While a session Stop that arrived under the current generation is still
+     * pending, returns that generation without noting intent: the Stop is newer than
+     * whatever opened the screen, so it still runs, withdraws this entry's start or restore
+     * and closes the screen; if it is skipped instead (detached, backgrounded, nothing
+     * active), the entry plays. Otherwise notes opening the screen as intent and returns
+     * its generation.
+     */
+    fun enterPlayerScreen(): Long? = synchronized(intentLock) {
+        val current = playbackRequests.get()
+        when {
+            userStopIntent == current -> null
+            pendingStops > 0 && pendingStopIntent == current -> current
+            else -> playbackRequests.incrementAndGet()
+        }
+    }
+
+    /** Whether a user stop was asked for under [intent] or a later generation. */
+    fun isPlaybackIntentStopped(intent: Long): Boolean = synchronized(intentLock) { userStopIntent >= intent }
+
+    private fun userStopIsLatest(): Boolean = synchronized(intentLock) {
+        userStopIntent == playbackRequests.get()
+    }
+
+    /**
+     * Automatic: restores a recording route's target (first showing, new server session).
+     * It is not viewing intent, and it does nothing while a user stop is the latest playback
+     * event since the last intent, so it never resurrects a target the viewer stopped.
+     * Automatic stops ([stopAfterLoss]) do not block it.
+     */
     suspend fun restoreRecordingRoute(
         selection: RecordingPlaybackSelection,
         start: RecordingPlaybackStart,
@@ -443,7 +544,11 @@ class AppPlaybackRuntime(
             } == true
         },
         restore = {
-            playRecordingLocked(selection.recordingId, start)
+            if (userStopIsLatest()) {
+                null
+            } else {
+                playRecordingLocked(selection.recordingId, start)
+            }
         },
     )
 
@@ -540,14 +645,35 @@ class AppPlaybackRuntime(
         return result
     }
 
-    suspend fun stop(): PlaybackStopResult = targetCommands.serialize(
+    /**
+     * The user's (or a terminal) stop: Stop buttons, the no-target Stop key, a finished
+     * recording, the root exit. Recorded under the intent current when it was asked for.
+     */
+    suspend fun stop(): PlaybackStopResult {
+        val intent = playbackRequests.get()
+        return targetCommands.serialize(
+            onClosed = { PlaybackStopResult.ShutDown },
+        ) {
+            synchronized(intentLock) { userStopIntent = maxOf(userStopIntent, intent) }
+            explicitStopLocked()
+        }
+    }
+
+    /**
+     * The same teardown as [stop] for automatic stops (connection lost, a rejected start):
+     * no user stop is recorded, so it neither blocks a later restore nor closes a player
+     * screen entered afterwards.
+     */
+    suspend fun stopAfterLoss(): PlaybackStopResult = targetCommands.serialize(
         onClosed = { PlaybackStopResult.ShutDown },
-    ) {
+    ) { explicitStopLocked() }
+
+    private suspend fun explicitStopLocked(): PlaybackStopResult {
         foregroundPlaybackLifecycle.onExplicitStop()
         cancelKeepTimer()
         _backgroundNotice.value = null
         recoveryBackoff.reset()
-        stopPlayback()
+        return stopPlayback()
     }
 
     fun onAppBackgrounded(interactive: Boolean = true) {
@@ -653,7 +779,12 @@ class AppPlaybackRuntime(
         return result
     }
 
-    suspend fun retryLive(): PlaybackTargetResult? = targetCommands.serialize(
+    suspend fun retryLive(): PlaybackTargetResult? {
+        playbackRequests.incrementAndGet()
+        return retryLiveCommand()
+    }
+
+    private suspend fun retryLiveCommand(): PlaybackTargetResult? = targetCommands.serialize(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
     ) {
         // An explicit retry is a user decision, so it refills the budget an exhausted target used.
@@ -665,7 +796,12 @@ class AppPlaybackRuntime(
             )
         }
     }
-    suspend fun retryRecording(): PlaybackTargetResult? = targetCommands.retryRecording(
+    suspend fun retryRecording(): PlaybackTargetResult? {
+        playbackRequests.incrementAndGet()
+        return retryRecordingCommand()
+    }
+
+    private suspend fun retryRecordingCommand(): PlaybackTargetResult? = targetCommands.retryRecording(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
         currentRequest = { lastRecordingRequest },
     ) { (recordingId, start) ->
@@ -834,6 +970,48 @@ class AppPlaybackRuntime(
                 }
             }
         }
+    }
+
+    /**
+     * The player's Stop for system controls, fenced on viewing intent: user intent noted
+     * after it arrived cancels it outright. While it is still the viewer's latest action it
+     * stops whatever target is active when it runs (a channel or recording still starting
+     * when it arrived included), provided the session is attached and the app is in the
+     * foreground. Registered as pending from arrival until its check (see
+     * [enterPlayerScreen]). Announces itself on [sessionStops] together with the intent
+     * generation current when it arrived.
+     */
+    fun stopFromSession(isAttached: () -> Boolean): Job {
+        val request = synchronized(intentLock) {
+            playbackRequests.get().also { request ->
+                if (request != pendingStopIntent) {
+                    pendingStopIntent = request
+                    pendingStops = 0
+                }
+                pendingStops++
+            }
+        }
+        // Guarded by intentLock. Every path (run, skipped, runtime closed, cancelled before
+        // it ran) ends the registration exactly once: at the check, or on completion.
+        var pending = true
+        fun endPendingLocked() {
+            if (!pending) return
+            pending = false
+            if (pendingStopIntent == request && pendingStops > 0) pendingStops--
+        }
+        return scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                val current = synchronized(intentLock) {
+                    endPendingLocked()
+                    (isAttached() && foreground && activeTargetEpoch != null &&
+                        request == playbackRequests.get())
+                        .also { if (it) userStopIntent = maxOf(userStopIntent, request) }
+                }
+                if (!current) return@serialize
+                explicitStopLocked()
+                if (targetCommands.isOpen()) lastSessionStop.value = request
+            }
+        }.also { job -> job.invokeOnCompletion { synchronized(intentLock) { endPendingLocked() } } }
     }
 
     fun seekRecordingFromSession(positionMs: Long, isAttached: () -> Boolean): Job {

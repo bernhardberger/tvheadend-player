@@ -28,6 +28,7 @@ internal fun sessionPlaybackCommands(target: AppPlaybackTarget?, timeshift: Bool
         Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
         Player.COMMAND_GET_METADATA,
         Player.COMMAND_GET_TIMELINE,
+        Player.COMMAND_STOP,
     ).apply {
         if (target is AppPlaybackTarget.Recording || timeshift) add(Player.COMMAND_PLAY_PAUSE)
         if (target is AppPlaybackTarget.Recording && seekable) add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
@@ -111,6 +112,10 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
 
     override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> =
         awaitCommand(runtime.seekRecordingFromSession(positionMs) { !closed })
+
+    /** The player's own Stop: runtime teardown, then a showing player screen closes. */
+    override fun handleStop(): ListenableFuture<*> =
+        awaitCommand(runtime.stopFromSession { !closed })
 
     private fun awaitCommand(job: Job): ListenableFuture<*> {
         val result = SettableFuture.create<Void>()

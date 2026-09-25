@@ -163,9 +163,19 @@ fun playerParentConsumesRecoveryKey(keyCode: Int): Boolean = when (keyCode) {
     KeyEvent.KEYCODE_DPAD_DOWN,
     KeyEvent.KEYCODE_DPAD_LEFT,
     KeyEvent.KEYCODE_DPAD_RIGHT,
-    KeyEvent.KEYCODE_BACK -> false
+    KeyEvent.KEYCODE_BACK,
+    // With a target the media session stops it and the player closes; without one the
+    // player screen handled the key before this point.
+    KeyEvent.KEYCODE_MEDIA_STOP -> false
     else -> true
 }
+
+/**
+ * The remote Stop key's first key down on a player screen: the media session handles it
+ * while a target is active; without one the screen stops and closes itself.
+ */
+fun playerStopKeyClosesScreen(keyCode: Int, repeatCount: Int, hasActiveTarget: Boolean): Boolean =
+    keyCode == KeyEvent.KEYCODE_MEDIA_STOP && repeatCount == 0 && !hasActiveTarget
 
 /**
  * Hidden-control player key contract.

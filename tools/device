@@ -99,6 +99,7 @@ KEY_EVENTS = {
     "play-pause": "KEYCODE_MEDIA_PLAY_PAUSE",
     "play": "KEYCODE_MEDIA_PLAY",
     "pause": "KEYCODE_MEDIA_PAUSE",
+    "stop": "KEYCODE_MEDIA_STOP",
     "menu": "KEYCODE_MENU",
     "audio-track": "KEYCODE_MEDIA_AUDIO_TRACK",
     "captions": "KEYCODE_CAPTIONS",

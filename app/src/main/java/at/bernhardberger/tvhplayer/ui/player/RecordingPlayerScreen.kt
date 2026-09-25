@@ -95,6 +95,9 @@ fun RecordingPlayerScreen(
     onReconnect: () -> Unit,
     onClose: () -> Unit,
 ) {
+    val playerClose = rememberPlayerClose(onClose)
+    // First, before the route restore: a user stop since the last intent closes the screen.
+    val screenEntry = rememberPlayerEntry(session::enterPlayerScreen, playerClose)
     val connectionAvailable = connectionState is ConnectionState.Connected
     val scope = rememberCoroutineScope()
     val playbackState by session.state.collectAsStateWithLifecycle()
@@ -107,7 +110,7 @@ fun RecordingPlayerScreen(
     val observation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     val routeSelection = currentRecordingPlaybackSelection(observation, recordingId)
-    if (routeSelection != null) {
+    if (screenEntry != null && routeSelection != null) {
         RecordingPlaybackRouteRestorationEffect(
             recordingId = recordingId,
             playbackStart = playbackStart,
@@ -214,10 +217,11 @@ fun RecordingPlayerScreen(
         scope.launch {
             stopPlaybackAndClose(
                 stopPlayback = session::stop,
-                closePlayer = onClose,
+                closePlayer = playerClose::close,
             )
         }
     }
+    CloseOnSessionStop(session.sessionStops, playerClose)
 
     fun showControls() {
         controlsVisible = true
@@ -301,7 +305,7 @@ fun RecordingPlayerScreen(
             true
         }
         RecordingPlaybackKeyAction.CLOSE -> {
-            onClose()
+            playerClose.close()
             true
         }
         RecordingPlaybackKeyAction.OPEN_INFO -> {
@@ -417,7 +421,7 @@ fun RecordingPlayerScreen(
             }
             PlayerBackAction.CLEAR_NUMBER_ENTRY,
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> Unit
-            PlayerBackAction.CLOSE_PLAYER -> onClose()
+            PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
@@ -447,6 +451,15 @@ fun RecordingPlayerScreen(
                 }
                 if (recordingPlaybackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
+                    return@onPreviewKeyEvent true
+                }
+                if (handlePlayerStopKeyWithoutTarget(
+                        event = event,
+                        hasActiveTarget = session.activeTarget.value != null,
+                        beginKeyCycle = { revealingKeyCode = it },
+                        stopAndClose = ::stopAndClose,
+                    )
+                ) {
                     return@onPreviewKeyEvent true
                 }
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -662,7 +675,7 @@ fun RecordingPlayerScreen(
             detail = entry?.title,
             opaque = false,
             primaryActionLabel = stringResource(R.string.close),
-            onPrimaryAction = onClose,
+            onPrimaryAction = playerClose::close,
         )
         TvRecoveryOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
@@ -699,7 +712,7 @@ fun RecordingPlayerScreen(
             ) {
                 ::dispatchRecoveryRetry
             } else {
-                onClose
+                playerClose::close
             },
             secondaryActionLabel = if (
                 recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
@@ -711,7 +724,7 @@ fun RecordingPlayerScreen(
             onSecondaryAction = if (
                 recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
             ) {
-                onClose
+                playerClose::close
             } else {
                 null
             },

@@ -125,7 +125,7 @@ class OperatorShortcutsTest(unittest.TestCase):
 
     def test_media_key_mapping_and_parser_choices(self):
         parser = DEVICE["build_parser"]()
-        for name, code in (("play", "PLAY"), ("pause", "PAUSE"), ("play-pause", "PLAY_PAUSE")):
+        for name, code in (("play", "PLAY"), ("pause", "PAUSE"), ("play-pause", "PLAY_PAUSE"), ("stop", "STOP")):
             self.assertEqual(key_events[name], f"KEYCODE_MEDIA_{code}")
             self.assertEqual(parser.parse_args(["key", name]).name, name)
         self.assertEqual(parser.parse_args(["playback-state"]).action, "playback-state")

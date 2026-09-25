@@ -47,12 +47,18 @@ internal class AppRootPlaybackOrchestrator {
         }
     }
 
+    /**
+     * [viewingIntent] is the intent the click noted synchronously, before this suspends. It is
+     * the start's generation when the channel changes, and it alone keeps an older pending
+     * session Stop from closing the player when the requested channel is already playing.
+     */
     suspend fun requestLivePlayer(
         activeChannelId: ChannelId?,
         activeRecordingId: DvrEntryId?,
         requestedChannelId: ChannelId,
         requestedChannelName: String,
-        startPlayback: suspend () -> Unit,
+        viewingIntent: Long,
+        startPlayback: suspend (viewingIntent: Long) -> Unit,
     ): PlayerRouteTarget.Live? {
         val generation = ++playbackSelectionGeneration
         warmReturn = rearmWarmReturnForPlaybackSelection(
@@ -62,7 +68,7 @@ internal class AppRootPlaybackOrchestrator {
             currentIdentity = activeChannelId,
             requestedIdentity = requestedChannelId,
         )
-        if (activeChannelId != requestedChannelId) startPlayback()
+        if (activeChannelId != requestedChannelId) startPlayback(viewingIntent)
         if (generation != playbackSelectionGeneration) return null
         return PlayerRouteTarget.Live(requestedChannelId, requestedChannelName)
     }
@@ -94,10 +100,15 @@ internal class AppRootPlaybackOrchestrator {
         if (target != WarmPlaybackTarget.NONE) warmReturn = rearmWarmReturn(target)
     }
 
+    /**
+     * A warm return starts nothing, so [noteViewingIntent] records the viewer's return before
+     * the caller pushes the player. It runs only when there is a target to return to.
+     */
     fun consumeWarmPlayerTarget(
         activeChannelId: ChannelId?,
         activeRecordingId: DvrEntryId?,
         currentChannelReadiness: CurrentChannelReadiness,
+        noteViewingIntent: () -> Unit,
     ): PlayerRouteTarget? {
         if (!warmReturn.canReturn) return null
         val target = warmReturn.target
@@ -108,7 +119,7 @@ internal class AppRootPlaybackOrchestrator {
             }
             WarmPlaybackTarget.RECORDING -> activeRecordingId?.let(PlayerRouteTarget::Recording)
             WarmPlaybackTarget.NONE -> null
-        }
+        }?.also { noteViewingIntent() }
     }
 
 }

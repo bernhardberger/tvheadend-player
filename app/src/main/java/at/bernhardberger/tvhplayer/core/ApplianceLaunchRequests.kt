@@ -30,6 +30,13 @@ sealed interface ApplianceLaunchState {
 class ApplianceLaunchRequests(
     restoredRequestId: Long? = null,
     private val onRetainedRequestIdChanged: (Long?) -> Unit = {},
+    /**
+     * Notes the viewer's playback intent for every launch request (appliance entry and
+     * startup autoplay). The live player such a request opens starts its channel itself
+     * and must not take an earlier user stop, such as the root exit before a relaunch
+     * in the same process, for the latest playback event.
+     */
+    private val onLaunchRequested: () -> Unit = {},
 ) {
     private val nextRequestId = AtomicLong(restoredRequestId?.coerceAtLeast(0L) ?: 0L)
     private val _state = MutableStateFlow<ApplianceLaunchState>(
@@ -48,6 +55,7 @@ class ApplianceLaunchRequests(
 
     @Synchronized
     fun request() {
+        onLaunchRequested()
         while (true) {
             if (_state.value != ApplianceLaunchState.Idle) return
 

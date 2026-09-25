@@ -147,6 +147,7 @@ val appModule = module {
             profileOwner = get(),
             uiSettingsStore = get(),
             savedStateHandle = get(),
+            noteViewingIntent = get<AppPlaybackRuntime>()::notePlaybackIntent,
         )
     }
     viewModel { VideoPlayerViewModel(playbackRuntime = get(), session = get()) }

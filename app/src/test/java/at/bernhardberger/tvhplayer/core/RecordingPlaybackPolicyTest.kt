@@ -78,6 +78,21 @@ class RecordingPlaybackPolicyTest {
     }
 
     @Test
+    fun recordingStopKeyIsTheSessionsWithATargetAndClosesTheScreenWithout() {
+        // With a target the recording screen leaves Stop to the media session.
+        for (controlsVisible in listOf(false, true)) {
+            assertEquals(
+                RecordingPlaybackKeyAction.PASS_THROUGH,
+                recordingPlaybackKeyAction(controlsVisible, KeyEvent.KEYCODE_MEDIA_STOP),
+            )
+        }
+        // Without one the first key down closes the screen and opens a Stop key cycle,
+        // which the recording screen's suppression consumes until the matching key up.
+        assertTrue(playerStopKeyClosesScreen(KeyEvent.KEYCODE_MEDIA_STOP, repeatCount = 0, hasActiveTarget = false))
+        assertTrue(recordingPlaybackSuppressesRevealingKey(KeyEvent.KEYCODE_MEDIA_STOP, KeyEvent.KEYCODE_MEDIA_STOP))
+    }
+
+    @Test
     fun recordingStartsCompleteCyclesForEveryFocusCreatingAction() {
         listOf(
             RecordingPlaybackKeyAction.REVEAL_CONTROLS,

@@ -21,12 +21,13 @@ class MainStartupViewModel(
     profileOwner: AppProfileOwner,
     uiSettingsStore: UiSettingsStore,
     savedStateHandle: SavedStateHandle,
+    noteViewingIntent: () -> Unit = {},
 ) : ViewModel() {
     private val createStartupRequest = shouldCreateStartupRequest(savedStateHandle)
     private val initialActivityIntentPolicy = InitialActivityIntentPolicy(
         allowRestoredIntent = createStartupRequest,
     )
-    val applianceLaunchRequests = createRetainedApplianceLaunchRequests(savedStateHandle)
+    val applianceLaunchRequests = createRetainedApplianceLaunchRequests(savedStateHandle, noteViewingIntent)
     private val _state = MutableStateFlow<MainStartupState>(MainStartupState.ResolvingLocal)
     val state = _state.asStateFlow()
     private val _runtimeServerSettings = MutableStateFlow<ServerSettings?>(null)
@@ -80,6 +81,7 @@ class MainStartupViewModel(
 
         internal fun createRetainedApplianceLaunchRequests(
             savedStateHandle: SavedStateHandle,
+            noteViewingIntent: () -> Unit = {},
         ): ApplianceLaunchRequests = ApplianceLaunchRequests(
             restoredRequestId = savedStateHandle[RETAINED_REQUEST_ID_KEY],
             onRetainedRequestIdChanged = { requestId ->
@@ -89,6 +91,7 @@ class MainStartupViewModel(
                     savedStateHandle[RETAINED_REQUEST_ID_KEY] = requestId
                 }
             },
+            onLaunchRequested = noteViewingIntent,
         )
 
         internal fun shouldCreateStartupRequest(savedStateHandle: SavedStateHandle): Boolean =

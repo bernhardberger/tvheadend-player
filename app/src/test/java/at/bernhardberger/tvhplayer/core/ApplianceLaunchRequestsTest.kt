@@ -161,6 +161,19 @@ class ApplianceLaunchRequestsTest {
     }
 
     @Test
+    fun everyLaunchRequestNotesViewingIntentButDisabledStartupDoesNot() {
+        var notes = 0
+        val requests = ApplianceLaunchRequests(onLaunchRequested = { notes += 1 })
+
+        requests.requestStartup(autoStartPlayback = false)
+        assertEquals(0, notes)
+        requests.requestStartup(autoStartPlayback = true)
+        assertEquals(1, notes)
+        requests.request() // appliance entry while the startup request is still pending
+        assertEquals(2, notes)
+    }
+
+    @Test
     fun requestsCoalesceWhilePending() {
         val requests = ApplianceLaunchRequests()
         requests.request()
