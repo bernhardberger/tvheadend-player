@@ -302,6 +302,42 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(2, connection.subscribeCount)
     }
 
+    @Test fun stoppedAdmittedRecoveryCannotCancelNextTargetsQueuedRecovery() = exercise {
+        live()
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { player.playWhenReady }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        // Retires the admitted recovery while it waits for its backoff.
+        val stopped = scope.async { runtime.stop() }
+        await { stopped.isCompleted }
+        live(channel = 2)
+        val subscriptions = connection.subscribeCount
+        val resumeEntered = CompletableDeferred<Unit>()
+        val finishResume = CompletableDeferred<Unit>()
+        beforeSpeed = { speed ->
+            if (speed == 100) {
+                resumeEntered.complete(Unit)
+                finishResume.await()
+            }
+        }
+        val resume = scope.async { runtime.resumeTimeshift() }
+        await { resumeEntered.isCompleted }
+        runtime.onAppBackgrounded()
+        scheduler.runCurrent()
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        scheduler.runCurrent()
+        finishResume.complete(Unit)
+        await { resume.isCompleted && runtime.activeTarget.value == null }
+        assertEquals(subscriptions, connection.subscribeCount)
+        returnAndRetune()
+        assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+    }
+
     @Test fun rejectedServerResumeRetunesOnceWithTunerLostNotice() = exercise {
         live()
         runtime.onAppBackgrounded()

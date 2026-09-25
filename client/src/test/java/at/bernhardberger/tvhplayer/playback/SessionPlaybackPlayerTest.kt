@@ -141,16 +141,16 @@ class SessionPlaybackPlayerTest {
         assertFalse(player.playWhenReady)
     }
 
-    @Test fun pauseWhileInterruptionMutedUsesExplicitFocusRecoveryWithoutServerPause() = exercise {
+    @Test fun pauseWhileInterruptionMutedRestoresSoundWithoutServerCommands() = exercise {
         live(true)
         connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
         focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
         await { androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes }
         connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
         wrapper.pause()
-        await { connection.speeds == listOf(0, 100) && focusRequests == 2 }
+        await { focusRequests == 2 }
         settle()
-        assertEquals(listOf(0, 100), connection.speeds)
+        assertEquals(listOf(0), connection.speeds)
         assertTrue(player.playWhenReady)
         assertFalse(androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes)
     }

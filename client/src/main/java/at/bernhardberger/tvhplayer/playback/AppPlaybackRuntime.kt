@@ -1205,6 +1205,7 @@ class AppPlaybackRuntime(
         val currentJob = currentCoroutineContext().job
         recoveryJob?.takeUnless { it === currentJob }?.cancel()
         recoveryJob = null
+        admittedRecoveryEpoch = null
         val result = coordinator.stop()
         if (!targetCommands.isOpen()) return PlaybackStopResult.ShutDown
         presentationEpoch.publishIfCurrent(epoch) {
@@ -1247,21 +1248,26 @@ class AppPlaybackRuntime(
      * Null means a sound-restoration request was handled: no timeshift feedback or rollback.
      * Otherwise returns the server result; rejected pauses restore local intent here without
      * requesting focus. Ambiguous results (such as TIMEOUT) leave playback locally paused.
+     * Only for live timeshift targets; other targets pause locally.
      */
     suspend fun pauseTimeshiftPlayback(): TimeshiftCommandResult? = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
-    ) {
-        if (!foreground) return@serialize TimeshiftCommandResult.UNAVAILABLE
+    ) { pauseTimeshiftPlaybackLocked() }
+
+    private suspend fun pauseTimeshiftPlaybackLocked(): TimeshiftCommandResult? {
+        if (!foreground) return TimeshiftCommandResult.UNAVAILABLE
         if (interruptionMuted) {
             playWithAudioFocus(restoreSoundOnly = true)
-            return@serialize null
+            return null
         }
         val wasPlaying = player.playWhenReady
         resumeAfterInterruption = false
         player.pause()
-        coordinator.pauseTimeshift().also { result ->
+        // The interruption already holds the server; a second pause adds nothing.
+        if (interruptionPaused) return null
+        return coordinator.pauseTimeshift().also { result ->
             if (result.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED &&
-                foreground && interruption == null
+                foreground && interruption == null && targetCommands.isOpen()
             ) {
                 player.playWhenReady = wasPlaying
             }
@@ -1375,12 +1381,10 @@ class AppPlaybackRuntime(
                     if (timeshift && interruption == null && result != TimeshiftCommandResult.ACCEPTED) {
                         player.pause()
                     }
+                } else if (timeshift) {
+                    pauseTimeshiftPlaybackLocked()
                 } else {
-                    val wasPlaying = player.playWhenReady
-                    if (pauseLocallyOrRestoreSound() && timeshift && !interruptionPaused &&
-                        coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED) {
-                        player.playWhenReady = wasPlaying
-                    }
+                    pauseLocallyOrRestoreSound()
                 }
             }
         }
@@ -1461,6 +1465,7 @@ class AppPlaybackRuntime(
             val currentJob = currentCoroutineContext().job
             recoveryJob?.takeUnless { it === currentJob }?.cancel()
             recoveryJob = currentJob
+            admittedRecoveryEpoch = null
             try {
                 // Admit the attempt under the command lock, then wait for the backoff delay
                 // without holding it so a channel change or Stop stays responsive meanwhile.
@@ -1556,6 +1561,7 @@ class AppPlaybackRuntime(
         pendingMarkers?.join()
         val pendingRecovery = recoveryJob
         recoveryJob = null
+        admittedRecoveryEpoch = null
         pendingRecovery?.cancel()
         livePlaybackObservationJob.cancel()
         settingsJob.cancel()
@@ -1863,7 +1869,10 @@ class AppPlaybackRuntime(
             AudioInterruptionAction.PAUSE -> if (!interruptionPaused && !interruptionMuted) {
                 val currentJob = currentCoroutineContext().job
                 recoveryJob?.takeUnless { it === currentJob }?.cancel()
-                if (recoveryJob !== currentJob) recoveryJob = null
+                if (recoveryJob !== currentJob) {
+                    recoveryJob = null
+                    admittedRecoveryEpoch = null
+                }
                 interruptionPaused = true
                 player.pause()
                 if (content == AudioInterruptionContent.LIVE_TIMESHIFT &&
