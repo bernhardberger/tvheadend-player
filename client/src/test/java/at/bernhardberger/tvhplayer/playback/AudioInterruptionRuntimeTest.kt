@@ -587,7 +587,11 @@ class AudioInterruptionRuntimeTest {
             assertTrue("Live target installed", install.await()?.isStarted == true)
             if (timeshift) {
                 connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
-                await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available }
+                // The subscription grant alone already publishes Available (playbackPaused = null).
+                // Wait for this status: the runtime mirrors its playbackPaused into the local play
+                // intent, so arriving after a test's local pause it would resume playback.
+                await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                    ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
             }
         }
 
