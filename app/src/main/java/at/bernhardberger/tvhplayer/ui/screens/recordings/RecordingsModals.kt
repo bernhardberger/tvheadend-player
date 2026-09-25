@@ -458,7 +458,11 @@ internal fun RecordingConfirmationDialog(
 ) {
     val safeFocus = remember { FocusRequester() }
     val confirmFocus = remember { FocusRequester() }
-    LaunchedEffect(action) { safeFocus.requestFocus() }
+    LaunchedEffect(action) {
+        // Wait one frame so Back is ready to draw its focused state.
+        withFrameNanos { }
+        safeFocus.requestFocus()
+    }
     RecordingDialogSurface(
         backEnabled = backEnabled,
         onBack = onDismiss,
