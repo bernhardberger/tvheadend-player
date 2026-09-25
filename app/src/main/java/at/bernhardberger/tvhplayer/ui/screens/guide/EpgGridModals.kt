@@ -35,6 +35,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -356,6 +358,7 @@ internal fun ProgrammeDetailsPanel(
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
     liveProgrammeActions: Boolean = true,
+    onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
 ) {
     val nowSec = nowSecProvider()
     val actions = programmeActions(
@@ -392,6 +395,7 @@ internal fun ProgrammeDetailsPanel(
     }
     DialogScrim(
         onDismissRequest = onClose,
+        onPreviewKeyEvent = onPreviewKeyEvent,
         wide = true,
         contentPadding = contentPadding,
     ) {
@@ -522,10 +526,11 @@ internal fun ConfirmProgrammeActionDialog(
     programmeTitle: String,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
 ) {
     val safeFocus = remember { FocusRequester() }
     LaunchedEffect(action) { safeFocus.requestFocus() }
-    DialogScrim(onDismissRequest = onDismiss) {
+    DialogScrim(onDismissRequest = onDismiss, onPreviewKeyEvent = onPreviewKeyEvent) {
         Text(
             text = stringResource(
                 when (action) {
@@ -603,6 +608,7 @@ private fun DialogScrim(
     onDismissRequest: () -> Unit,
     wide: Boolean = false,
     contentPadding: PaddingValues = PaddingValues(),
+    onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -617,6 +623,7 @@ private fun DialogScrim(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = TvScrimModalAlpha))
+                .onPreviewKeyEvent(onPreviewKeyEvent)
                 .focusGroup()
                 .then(if (wide) Modifier.padding(contentPadding) else Modifier),
             contentAlignment = if (wide) Alignment.CenterEnd else Alignment.Center,

@@ -47,6 +47,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -387,6 +388,19 @@ fun EpgGridScreen(
     var restoreDetailsFocus by remember { mutableStateOf(false) }
     var detailsFromSearch by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
+    var confirmationKey by remember(detailsOpening) { mutableStateOf<Key?>(null) }
+    val confirmationKeyHandler: (KeyEvent) -> Boolean = { event ->
+        // Dialog windows do not share preview dispatch. Keep the interrupted
+        // confirmation's key cycle here until the refreshed details sees its release.
+        if (event.key == confirmationKey && pendingAction == null) {
+            if (event.type == KeyEventType.KeyUp) confirmationKey = null
+            true
+        } else {
+            if (pendingAction != null && event.type == KeyEventType.KeyDown) confirmationKey = event.key
+            if (event.key == confirmationKey && event.type == KeyEventType.KeyUp) confirmationKey = null
+            false
+        }
+    }
     var configChoices by remember { mutableStateOf<List<DvrConfiguration>?>(null) }
     var pendingRecordingTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
@@ -2030,6 +2044,7 @@ fun EpgGridScreen(
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForProgramme(event)
             if (pendingAction == null) ProgrammeDetailsPanel(
+                onPreviewKeyEvent = confirmationKeyHandler,
                 contentPadding = contentPadding,
                 event = event,
                 channel = channel,
@@ -2144,6 +2159,7 @@ fun EpgGridScreen(
             confirmationMutation != null
         ) {
             ConfirmProgrammeActionDialog(
+                onPreviewKeyEvent = confirmationKeyHandler,
                 action = confirmationAction,
                 programmeTitle = confirmationEvent.title.orEmpty(),
                 onDismiss = {
