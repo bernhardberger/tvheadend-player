@@ -343,10 +343,12 @@ class AudioInterruptionRuntimeTest {
         await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
             ?.timeshiftState is LiveTimeshiftState.Available }
         assertTrue(audioDisabled())
-        // UI checks the server command first; unavailable rolls back to playing once.
+        assertTrue(runtime.isInterruptionMuted)
+        // Backstop remains safe, but the UI's muted toggle only uses the local sound-restoring path.
         assertEquals(TimeshiftCommandResult.UNAVAILABLE, runtime.pauseTimeshift())
-        runtime.play()
+        runtime.pause()
         await { !audioDisabled() }
+        assertFalse(runtime.isInterruptionMuted)
         assertTrue(player.playWhenReady)
         assertTrue(connection.speeds.isEmpty())
         assertEquals(2, focus.requests.size)
@@ -361,6 +363,22 @@ class AudioInterruptionRuntimeTest {
         assertTrue(player.playWhenReady)
         assertEquals(requests + 1, focus.requests.size)
         assertEquals(listOf(0, 100), connection.speeds)
+    }
+
+    @Test fun deniedResumeWithRejectedServerPauseExposesRuntimeInterruptionOwnership() = exercise {
+        live(timeshift = true)
+        runtime.pause()
+        await { !player.playWhenReady }
+        focus.granted = false
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        val requests = focus.requests.size
+        assertEquals(TimeshiftCommandResult.UNAVAILABLE, runtime.resumeTimeshift())
+        assertTrue(runtime.hasAudioInterruption)
+        assertTrue(runtime.isInterruptionMuted)
+        assertEquals(requests + 1, focus.requests.size)
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertEquals(requests + 1, focus.requests.size)
     }
 
     @Test fun deniedFocusDuringTimeshiftRecoveryStillSendsServerPause() = exercise {

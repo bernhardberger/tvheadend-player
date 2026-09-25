@@ -507,9 +507,14 @@ internal class ForegroundPlaybackLifecycle {
         keepMinutes: Int = 0,
         interactive: Boolean = true,
         nowMillis: Long = 0,
+        recoveryPending: Boolean = false,
     ): ForegroundPlaybackAction {
         if (!foreground) return ForegroundPlaybackAction.None
         foreground = false
+        if (activeTarget is AppPlaybackTarget.Live && recoveryPending) {
+            backgroundedTarget = BackgroundedPlaybackTarget.Live(activeTarget.channelId, notice = BackgroundPlaybackNotice.TUNER_LOST)
+            return ForegroundPlaybackAction.StopLive
+        }
         if (activeTarget is AppPlaybackTarget.Live && activeTargetEpoch != null &&
             timeshiftAvailable && keepMinutes > 0 && interactive) {
             val deadline = nowMillis + keepMinutes * 60_000L
@@ -708,6 +713,7 @@ class AppPlaybackRuntime(
     private var lastLiveChannelId: ChannelId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
     private var recoveryJob: Job? = null
+    private var admittedRecoveryEpoch: Long? = null
     private val recoveryBackoff = LiveRecoveryBackoff()
     private val recoveryAttempts = LiveRecoveryAttemptRunner(::publishResolvedRecoveryPlayerState)
     private var targetFrameListener: Player.Listener? = null
@@ -718,6 +724,8 @@ class AppPlaybackRuntime(
     private var resumeAfterInterruption = false
     private var interruptionPaused = false
     private var interruptionMuted = false
+    val isInterruptionMuted: Boolean get() = interruptionMuted
+    val hasAudioInterruption: Boolean get() = interruption != null
     val state = _state.asStateFlow()
     val activeTarget = _activeTarget.asStateFlow()
     val recordingSelection = _recordingSelection.asStateFlow()
@@ -1121,8 +1129,11 @@ class AppPlaybackRuntime(
                 }
                 foreground = false
                 val currentJob = currentCoroutineContext().job
+                val recoveryPending = recoveryJob?.isActive == true && activeTargetEpoch != null &&
+                    admittedRecoveryEpoch == activeTargetEpoch
                 recoveryJob?.takeUnless { it === currentJob }?.cancel()
                 if (recoveryJob !== currentJob) recoveryJob = null
+                admittedRecoveryEpoch = null
                 val recordingPlayWhenReady = targetCommands.readIfOpen { player.playWhenReady }
                     ?: return@serialize
                 player.pause()
@@ -1139,6 +1150,7 @@ class AppPlaybackRuntime(
                         keepMinutes = playerSettings.keepChannelMinutes,
                         interactive = interactive,
                         nowMillis = elapsedRealtime(),
+                        recoveryPending = recoveryPending,
                     ),
                 )
             }
@@ -1403,6 +1415,7 @@ class AppPlaybackRuntime(
                         publishRecoveryExhausted(fence.reason)
                         return@serialize null
                     }
+                    admittedRecoveryEpoch = fence.targetEpoch
                     presentationEpoch.publishIfCurrent(fence.targetEpoch) {
                         _state.value = AppPlaybackState.Recovering(
                             reason = fence.reason,
@@ -1436,7 +1449,10 @@ class AppPlaybackRuntime(
                     }
                 }
             } finally {
-                if (recoveryJob === currentJob) recoveryJob = null
+                if (recoveryJob === currentJob) {
+                    recoveryJob = null
+                    admittedRecoveryEpoch = null
+                }
             }
         }
     }
@@ -1612,8 +1628,11 @@ class AppPlaybackRuntime(
         if (foreground) {
             if (playWhenReady) playWithAudioFocus()
             else {
-                coordinator.pauseTimeshift()
                 player.pause()
+                if (coordinator.pauseTimeshift() != TimeshiftCommandResult.ACCEPTED) {
+                    stopPlayback()
+                    _backgroundNotice.value = BackgroundPlaybackNotice.TUNER_LOST
+                }
             }
             return
         }

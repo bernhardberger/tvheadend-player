@@ -1,5 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import android.view.KeyEvent
+import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
+import at.bernhardberger.tvhplayer.core.PlayerKeyAction
+import at.bernhardberger.tvhplayer.core.PlayerKeyContext
+import at.bernhardberger.tvhplayer.core.PlayerSurface
+import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,6 +14,57 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimeshiftCommandFeedbackTest {
+    @Test
+    fun hiddenControlsOkAndEnterResumeExactlyOnce() {
+        for (key in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+            val action = playerKeyAction(PlayerKeyContext(PlayerSurface.LIVE, false, false, true), key)
+            assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, action)
+            val calls = mutableListOf<String>()
+            if (action == PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE) {
+                dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, false, false,
+                    pause = { calls += "pause" },
+                    dispatch = { resume, rollback -> calls += "$resume/$rollback" })
+            }
+            assertEquals(listOf("true/false"), calls)
+        }
+    }
+
+    @Test
+    fun mutedPauseAndToggleOnlyRestoreSoundWithoutCommandOrFeedback() {
+        for (action in listOf(MediaPlaybackAction.PAUSE, MediaPlaybackAction.TOGGLE)) {
+            val calls = mutableListOf<String>()
+            dispatchTimeshiftPlaybackAction(action, true, true,
+                pause = { calls += "restore sound" },
+                dispatch = { _, _ -> calls += "server command and feedback" })
+            assertEquals(listOf("restore sound"), calls)
+        }
+    }
+
+    @Test
+    fun normalPauseIsLocalBeforeServerCommandAndTimeoutDoesNotUndoIt() {
+        val calls = mutableListOf<String>()
+        dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, true, false,
+            pause = { calls += "local pause" },
+            dispatch = { resume, rollback ->
+                calls += "server pause"
+                assertFalse(resume)
+                val completion = timeshiftCommandCompletion(1, 1, result = TimeshiftCommandResult.TIMEOUT,
+                    unavailableText = "unavailable", rollbackPlayWhenReady = rollback)
+                assertNull(completion?.rollbackPlayWhenReady)
+            })
+        assertEquals(listOf("local pause", "server pause"), calls)
+    }
+
+    @Test
+    fun deniedResumeWithRejectedServerPauseCannotRollbackIntoAnotherFocusRequest() {
+        val completion = requireNotNull(timeshiftCommandCompletion(
+            1, 1, result = TimeshiftCommandResult.UNAVAILABLE,
+            unavailableText = "unavailable", rollbackPlayWhenReady = false,
+            interruptionOwned = true,
+        ))
+        assertNull(completion.rollbackPlayWhenReady)
+    }
+
     @Test
     fun supersededRejectedCommandCannotRestoreFeedbackOrPlayIntent() {
         assertNull(

@@ -9,6 +9,7 @@ package at.bernhardberger.tvhplayer.playback
 
 import android.app.Application
 import android.os.Looper
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
@@ -208,17 +209,32 @@ class BackgroundPlaybackRuntimeTest {
         assertNull(runtime.backgroundNotice.value)
     }
 
-    @Test fun rejectedNormalPriorityPreservesPausedIntentWithoutRequestingFocus() = exercise {
+    @Test fun unavailableReplacementPauseStopsWithoutFocusOrAutoplayDespiteNormalSpeedObservation() = exercise {
         live()
         connection.emit(SubscriptionEvent.Speed(0))
         await { !player.playWhenReady }
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
+        val playTransitions = mutableListOf<Boolean>()
+        player.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                playTransitions += playWhenReady
+            }
+        })
         connection.scriptPriority(SubscriptionOperationResult.NotSupported)
-        returnAndRetune(playWhenReady = false)
+        // The fresh subscription has no timeshift grant: pause must fail closed, not
+        // treat a locally paused player as evidence that the server accepted it.
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+        runtime.onAppForegrounded()
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        connection.emit(SubscriptionEvent.Speed(100))
+        await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
         settle()
+        assertNull(runtime.activeTarget.value)
         assertFalse(player.playWhenReady)
-        assertEquals(0, connection.speeds.last())
+        assertFalse(playTransitions.contains(true))
         assertEquals(1, focus.requestCount)
         runtime.onAppForegrounded()
         settle()
@@ -252,7 +268,7 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(2, connection.subscribeCount)
     }
 
-    @Test fun backgroundKeepCancelsAdmittedBackoffEvenAfterAnEarlyForegroundReturn() = exercise {
+    @Test fun backgroundReleasesAdmittedRecoveryAndRetunesOnlyOnForeground() = exercise {
         for (returnBeforeBackoff in listOf(false, true)) {
             live()
             val initialSubscriptions = connection.subscribeCount
@@ -267,18 +283,19 @@ class BackgroundPlaybackRuntimeTest {
             await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
             val priorities = connection.priorityChanges.size
             runtime.onAppBackgrounded()
-            await { connection.priorityChanges.size == priorities + 1 }
+            await { runtime.activeTarget.value == null }
+            assertEquals(priorities, connection.priorityChanges.size)
             if (!returnBeforeBackoff) {
                 scheduler.advanceTimeBy(2_001)
                 settle()
                 assertFalse(player.playWhenReady)
                 assertEquals(initialSubscriptions + 1, connection.subscribeCount)
             }
-            runtime.onAppForegrounded()
-            await { player.playWhenReady && connection.priorityChanges.size == priorities + 2 }
+            returnAndRetune()
+            assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
             scheduler.advanceTimeBy(2_001)
             settle()
-            assertEquals(initialSubscriptions + 1, connection.subscribeCount)
+            assertEquals(initialSubscriptions + 2, connection.subscribeCount)
             assertNotNull(runtime.activeTarget.value)
         }
     }
@@ -390,10 +407,13 @@ class BackgroundPlaybackRuntimeTest {
             val install = scope.async {
                 runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(channel.toLong()))))
             }
-            await { connection.subscribeCount > previous }
-            connection.awaitCollectionRegistered()
-            beforeStart()
-            startSubscription()
+            // A background replacement can be released before ExoPlayer opens its source.
+            await { connection.subscribeCount > previous || (install.isCompleted && runtime.activeTarget.value == null) }
+            if (connection.subscribeCount > previous) {
+                connection.awaitCollectionRegistered()
+                beforeStart()
+                startSubscription()
+            }
             await { install.isCompleted }
             assertTrue(install.await()?.isStarted == true)
             if (timeshift) {

@@ -182,14 +182,35 @@ internal fun timeshiftCommandCompletion(
     result: TimeshiftCommandResult,
     unavailableText: String,
     rollbackPlayWhenReady: Boolean?,
+    interruptionOwned: Boolean = false,
 ): TimeshiftCommandCompletion? {
     if (commandToken != currentToken) return null
     val rejected = result.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED
     return TimeshiftCommandCompletion(
         feedback = unavailableText.takeIf { rejected },
         applyFeedback = feedbackToken == currentFeedbackToken,
-        rollbackPlayWhenReady = rollbackPlayWhenReady.takeIf { rejected },
+        rollbackPlayWhenReady = rollbackPlayWhenReady.takeIf { rejected && !interruptionOwned },
     )
+}
+
+internal fun dispatchTimeshiftPlaybackAction(
+    action: MediaPlaybackAction,
+    playWhenReady: Boolean,
+    interruptionMuted: Boolean,
+    pause: () -> Unit,
+    dispatch: (resume: Boolean, rollbackPlayWhenReady: Boolean) -> Unit,
+) {
+    val resolved = if (action == MediaPlaybackAction.TOGGLE) {
+        if (playWhenReady) MediaPlaybackAction.PAUSE else MediaPlaybackAction.PLAY
+    } else action
+    when (resolved) {
+        MediaPlaybackAction.PLAY -> dispatch(true, false)
+        MediaPlaybackAction.PAUSE -> {
+            pause()
+            if (!interruptionMuted) dispatch(false, true)
+        }
+        else -> Unit
+    }
 }
 
 internal suspend fun stopPlaybackAndClose(
@@ -384,6 +405,7 @@ fun VideoPlayerScreen(
                 result = result,
                 unavailableText = timeshiftUnavailableText,
                 rollbackPlayWhenReady = rollbackPlayWhenReady,
+                interruptionOwned = videoPlayerViewModel.hasAudioInterruption,
             ) ?: return@launch
             if (completion.applyFeedback) {
                 timelineState.applyFeedback(feedbackToken, completion.feedback)
@@ -392,6 +414,19 @@ fun VideoPlayerScreen(
                 true -> videoPlayerViewModel.play()
                 false -> videoPlayerViewModel.pause()
                 null -> Unit
+            }
+        }
+    }
+
+    fun dispatchPlaybackAction(action: MediaPlaybackAction) {
+        dispatchTimeshiftPlaybackAction(
+            action = action,
+            playWhenReady = player.playWhenReady,
+            interruptionMuted = videoPlayerViewModel.isInterruptionMuted,
+            pause = videoPlayerViewModel::pause,
+        ) { resume, rollback ->
+            dispatchTimeshiftCommand(rollbackPlayWhenReady = rollback) {
+                if (resume) videoPlayerViewModel.resumeTimeshift() else videoPlayerViewModel.pauseTimeshift()
             }
         }
     }
@@ -905,43 +940,7 @@ fun VideoPlayerScreen(
                     effectiveTimeshiftState.available
                 ) {
                     layerState.beginOpeningKeyCycle(keyCode)
-                    when (mediaAction) {
-                        MediaPlaybackAction.PLAY -> {
-                            dispatchTimeshiftCommand(
-                                rollbackPlayWhenReady = false,
-                                command = videoPlayerViewModel::resumeTimeshift,
-                            )
-                        }
-                        MediaPlaybackAction.PAUSE -> {
-                            // Check the server command before local pause can clear an interruption mute.
-                            dispatchTimeshiftCommand(
-                                rollbackPlayWhenReady = true,
-                                command = {
-                                    videoPlayerViewModel.pauseTimeshift().also {
-                                        if (it == TimeshiftCommandResult.ACCEPTED) videoPlayerViewModel.pause()
-                                    }
-                                },
-                            )
-                        }
-                        MediaPlaybackAction.TOGGLE -> {
-                            if (!player.playWhenReady) {
-                                dispatchTimeshiftCommand(
-                                    rollbackPlayWhenReady = false,
-                                    command = videoPlayerViewModel::resumeTimeshift,
-                                )
-                            } else {
-                                dispatchTimeshiftCommand(
-                                    rollbackPlayWhenReady = true,
-                                    command = {
-                                        videoPlayerViewModel.pauseTimeshift().also {
-                                            if (it == TimeshiftCommandResult.ACCEPTED) videoPlayerViewModel.pause()
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                        MediaPlaybackAction.NONE -> Unit
-                    }
+                    dispatchPlaybackAction(mediaAction)
                     layerState.showControls()
                     return@onPreviewKeyEvent true
                 }
@@ -1019,19 +1018,7 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
-                        if (!player.playWhenReady) {
-                            videoPlayerViewModel.play()
-                            dispatchTimeshiftCommand(
-                                rollbackPlayWhenReady = false,
-                                command = videoPlayerViewModel::resumeTimeshift,
-                            )
-                        } else {
-                            videoPlayerViewModel.pause()
-                            dispatchTimeshiftCommand(
-                                rollbackPlayWhenReady = true,
-                                command = videoPlayerViewModel::pauseTimeshift,
-                            )
-                        }
+                        dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
                         layerState.showControls()
                         return@onPreviewKeyEvent true
                     }
@@ -1148,21 +1135,7 @@ fun VideoPlayerScreen(
                 timeshiftFeedbackIsError = timelineState.feedbackIsError,
                 paused = !playWhenReady,
                 onToggleTimeshiftPause = {
-                    if (!player.playWhenReady) {
-                        dispatchTimeshiftCommand(
-                            rollbackPlayWhenReady = false,
-                            command = videoPlayerViewModel::resumeTimeshift,
-                        )
-                    } else {
-                        dispatchTimeshiftCommand(
-                            rollbackPlayWhenReady = true,
-                            command = {
-                                videoPlayerViewModel.pauseTimeshift().also {
-                                    if (it == TimeshiftCommandResult.ACCEPTED) videoPlayerViewModel.pause()
-                                }
-                            },
-                        )
-                    }
+                    dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
                 },
                 onSeekTimeshift = { deltaMs ->
                     queueTimeshiftSeek(deltaMs)
