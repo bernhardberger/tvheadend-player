@@ -35,6 +35,9 @@ device operations, not general repository or infrastructure mutation.
   credentials, server configuration or unrelated devices without explicit scope.
 - Use batched safe key sequences and only necessary captures. Confirm a
   non-secret screen before screenshots; keep evidence local and report paths.
+- Save screenshots under the repository's ignored `captures/` directory; the
+  read tool cannot open files outside the repository. Look at each screenshot
+  with the read tool to check focus, selection and text; do not rely on OCR.
 - No repository edits, Git mutations, Gradle, signing, publishing, unbounded ADB,
   broad logs, UI hierarchy dumps, credential exports or infrastructure restarts.
 - Report observed states, exact captures, final foreground/focus where known,

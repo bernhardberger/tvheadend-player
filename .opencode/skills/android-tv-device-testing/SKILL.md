@@ -94,7 +94,9 @@ android --no-metrics screen capture --device="$TVHPLAYER_ADB_SERIAL" --output="$
 
 Use a fresh filename in a private ignored evidence directory (`umask 077`,
 directory mode 0700), and open the newly produced PNG to confirm usable output and
-the intended screen. CLI 1.0.16261425 can exit 0 with no PNG for a nonexistent
+the intended screen. Use the repository's ignored `captures/` directory: the
+device operator cannot read files outside the repository, and OCR misses focus
+and selection indicators. CLI 1.0.16261425 can exit 0 with no PNG for a nonexistent
 device; missing/stale output is failure, not a reason for an ADB fallback or a new
 checker/preflight framework. Filenames do not establish source provenance.
 For attributed evidence, record the installed app/test APK
