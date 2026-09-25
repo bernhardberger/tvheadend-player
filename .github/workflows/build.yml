@@ -26,11 +26,10 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
-
+      # The runner image ships the Android SDK; android-actions/setup-android fails on current
+      # images because it still installs the removed `tools` package.
       - name: Install Android platform and build tools
-        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+        run: '"$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
 
       - name: Verify
         run: ./tools/verify
