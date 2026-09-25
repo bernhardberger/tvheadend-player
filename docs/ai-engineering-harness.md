@@ -95,7 +95,9 @@ child; a CLI configuration dump alone does not qualify the running server.
 `app-device-operator` is the bounded device-operation exception to read-only
 delegation. It has Bash but no repository edits or child delegation. The primary
 hands over exclusive device ownership with an exact authorized target and task,
-then waits for its result before resuming device operations. Review and retrieval
+then waits for its result before resuming device operations. The G10 has the
+owner's standing authorization (`docs/device-targets.md`), so the dispatch itself
+is the handover and nobody asks the owner for it. Review and retrieval
 roles remain read-only; do not dispatch operational work through `general`.
 
 Review and retrieval delegation is read-only and may nest through one additional

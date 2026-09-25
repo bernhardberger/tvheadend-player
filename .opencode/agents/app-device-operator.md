@@ -11,6 +11,7 @@ permission:
   glob: allow
   grep: allow
   skill: allow
+  question: deny
   subagent: deny
   publish_artifact: deny
   external_directory: deny
@@ -24,8 +25,12 @@ device operations, not general repository or infrastructure mutation.
   explicit --device for ordinary install/capture; ADB only for missing CLI
   capabilities and the documented specialized workflows.
   Verify test role and all four live identity properties before mutation.
-- The primary must explicitly hand over exclusive device ownership. Never run
+- The primary's dispatch hands over exclusive device ownership. The owner has
+  given standing authorization to take over the G10 for its allowed uses in
+  docs/device-targets.md; never stop to ask whether you may take it. Never run
   alongside another device operator; return ownership with the final state.
+- Report anything that needs the owner, such as a human-visible check or an
+  operation outside the task, as a blocker in your result.
 - Use only the authorized app and actions. Do not access accounts, settings,
   credentials, server configuration or unrelated devices without explicit scope.
 - Use batched safe key sequences and only necessary captures. Confirm a

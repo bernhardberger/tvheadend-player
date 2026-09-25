@@ -144,6 +144,8 @@ it does not replace integrated or physical-TV gates.
   with explicit `--device` for ordinary install/capture, ADB only for missing CLI
   capabilities. Confirm the selected role and all four live identity properties
   before mutation; `tools/device doctor` is not a mandatory extra preflight.
+  The G10 has the owner's standing authorization for its allowed uses; never ask
+  whether an agent may take it over.
 - Production and unclassified devices are read-only except for an explicitly
   approved production-signed update. Never substitute one TV for another based
   only on a generic model string.

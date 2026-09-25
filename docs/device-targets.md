@@ -17,6 +17,12 @@ roles. Do not treat a generic model name as an unambiguous target.
 - The G10 remains the acceptance target. The NVIDIA Shield
   may be selected in ignored local configuration with role `test` as a temporary
   deployment target while the G10 handover is pending.
+- The owner has given standing authorization for agents to take over the G10
+  at any time for the allowed uses in its row, including launching Player. Do not
+  ask the owner first; the primary's dispatch packet is the device handover. This
+  does not cover the G08, uninstalling or clearing data, or anything that needs
+  separate approval elsewhere in these rules. Credential provisioning keeps its
+  own procedure, and human-visible checks still use one focused question.
 - The Sony Bravia 8 may be selected with target name `sony-bravia-8` and role
   `test`. It uses paired Android Wireless debugging with a dynamic connection
   port, so refresh its ignored local `serial` from the TV's current **IP address

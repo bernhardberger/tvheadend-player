@@ -37,7 +37,9 @@ gates. No route permits broad ADB dumps or automatic uninstall/data clearing.
 ## Safe sequence
 
 For an authorized test device, install only when the required verified APK is not
-already installed. An install does not authorize credential provisioning or launch:
+already installed. An install does not authorize credential provisioning or launch,
+but the G10's standing authorization in `docs/device-targets.md` covers launching
+Player there:
 
 ```bash
 android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/debug/app-debug.apk --use-delta-install=false --install-options=-r,-t
