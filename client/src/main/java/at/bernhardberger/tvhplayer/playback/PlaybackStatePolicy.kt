@@ -12,6 +12,28 @@ internal fun observedLivePlayIntent(
     serverPaused: Boolean?,
 ): Boolean? = if (activeTarget is AppPlaybackTarget.Live) serverPaused?.not() else null
 
+/**
+ * Available decides READY. Without it, a target that already reached STATE_READY has no grant:
+ * the SDK publishes the grant when the subscription binds, before any sample is presented.
+ *
+ * Known limitation: while the SDK re-prepares the same target, the state can read UNAVAILABLE
+ * until the grant is published again. That only dims Pause briefly; no server command results.
+ * [readyReached] also stays true for the whole target epoch, so once the grant is back a Pause
+ * during that re-prepare reads READY and sends the server pause before the new first picture.
+ */
+internal fun livePauseAvailability(
+    liveTarget: Boolean,
+    timeshiftRequested: Boolean,
+    timeshiftAvailable: Boolean,
+    readyReached: Boolean,
+): LivePauseAvailability = when {
+    !liveTarget -> LivePauseAvailability.NONE
+    !timeshiftRequested -> LivePauseAvailability.OFF
+    timeshiftAvailable -> LivePauseAvailability.READY
+    readyReached -> LivePauseAvailability.UNAVAILABLE
+    else -> LivePauseAvailability.STARTING
+}
+
 internal fun liveDiagnosticsForTarget(
     activeTarget: AppPlaybackTarget?,
     diagnostics: LiveSubscriptionDiagnostics?,

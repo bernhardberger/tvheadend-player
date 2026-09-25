@@ -18,10 +18,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
@@ -34,6 +37,9 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
+
+/** Material disabled content alpha, used for a pause control that stays focusable. */
+internal const val PauseUnavailableIconAlpha = 0.38f
 
 private data class PlayerAction(
     val tag: String,
@@ -60,6 +66,8 @@ internal fun PlayerActionRow(
     pauseFocus: FocusRequester? = null,
     goLiveFocus: FocusRequester? = null,
     onActionFocused: (String) -> Unit = {},
+    /** Dims the pause control, which stays focusable and clickable, and announces why it cannot pause. */
+    pauseUnavailableReason: String? = null,
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val info = stringResource(R.string.player_info)
@@ -92,6 +100,9 @@ internal fun PlayerActionRow(
                             Modifier.focusProperties { right = goLiveFocus }
                         } else Modifier)
                         .onFocusChanged { if (it.isFocused) { onActionFocused(tag); onInteraction() } }
+                        .then(if (tag == "player-pause" && pauseUnavailableReason != null) {
+                            Modifier.semantics { stateDescription = pauseUnavailableReason }
+                        } else Modifier)
                     if (tag == "player-info") {
                         Button(
                             onClick = { onInteraction(); action() },
@@ -113,7 +124,12 @@ internal fun PlayerActionRow(
                                 contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
                             ),
                             modifier = actionModifier.size(TvOverlayActionButtonSize),
-                        ) { Icon(painterResource(icon), contentDescription = label) }
+                        ) {
+                            Icon(painterResource(icon), contentDescription = label,
+                                modifier = if (tag == "player-pause" && pauseUnavailableReason != null) {
+                                    Modifier.graphicsLayer { alpha = PauseUnavailableIconAlpha }
+                                } else Modifier)
+                        }
                     }
                 }
             }

@@ -97,6 +97,29 @@ internal fun recordingRouteNeedsRestoration(
                 selected.currentSession === routeSelection.currentSession
         } != true
 
+/** What the live Pause control can do for the current live target. */
+enum class LivePauseAvailability {
+    /** No live target: recordings and idle keep their own controls. */
+    NONE,
+    /** Timeshift was requested and the grant is not decided yet. A press waits for it. */
+    STARTING,
+    /** The SDK reports timeshift available for the current target. */
+    READY,
+    /** The target reached playback without a timeshift grant. */
+    UNAVAILABLE,
+    /** Timeshift was not requested for this target. */
+    OFF,
+}
+
+/** [pending] is a Pause pressed before the first picture: local only, the server pause waits for it. */
+data class LivePauseState(
+    val availability: LivePauseAvailability = LivePauseAvailability.NONE,
+    val pending: Boolean = false,
+)
+
+/** One-shot: a pending pause was dropped because the channel has no timeshift. Identity is the event. */
+class LivePauseUnavailableNotice internal constructor()
+
 data class AppTimeshiftState(
     val available: Boolean = false,
     val paused: Boolean = false,

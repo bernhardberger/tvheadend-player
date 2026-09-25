@@ -370,6 +370,8 @@
     <string name="timeshift_seek_clamped">Grenze des verfügbaren Puffers erreicht.</string>
     <string name="timeshift_reconnect_live">Der Server konnte die vorherige Position nicht bestätigen. Zur Live-Sendung zurückgekehrt.</string>
     <string name="timeshift_unavailable">Timeshift ist für diesen Server oder dieses Stream-Profil nicht verfügbar.</string>
+    <string name="pause_unavailable_channel">Pausieren ist auf diesem Sender nicht möglich.</string>
+    <string name="pause_timeshift_off">Timeshift ist in den Einstellungen ausgeschaltet.</string>
     <string name="player_timing_unavailable">Wiedergabezeit nicht verfügbar</string>
     <string name="timeshift_target_expired">Diese Position ist nicht mehr im Puffer.</string>
     <string name="timeshift_seek_uncertain">Sprungergebnis ungewiss. Die Position wird aktualisiert, sobald sie verfügbar ist.</string>

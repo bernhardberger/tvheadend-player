@@ -92,6 +92,9 @@ import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
+import at.bernhardberger.tvhplayer.core.LiveMediaKeyAction
+import at.bernhardberger.tvhplayer.core.liveMediaKeyAction
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
@@ -331,6 +334,11 @@ fun VideoPlayerScreen(
     }
     val player = remember { videoPlayerViewModel.getPlayerInstance() }
     val playWhenReady by rememberPlaybackIntent(player)
+    val livePauseState by playbackRuntime.livePause.collectAsStateWithLifecycle()
+    val livePauseNotice by playbackRuntime.livePauseNotice.collectAsStateWithLifecycle()
+    // The runtime state describes its installed target; a requested zap has not reached it yet.
+    val livePauseAvailability = livePauseState.availability.takeIf { playingLiveChannelId == currentChannelId }
+        ?: LivePauseAvailability.NONE
     val channelIndicator = channelPlaybackIndicator(
         currentChannelId,
         playingLiveChannelId?.let { at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(it) },
@@ -376,6 +384,8 @@ fun VideoPlayerScreen(
     val timeshiftExpiredText = stringResource(R.string.timeshift_target_expired)
     val timeshiftReplacedText = stringResource(R.string.timeshift_target_replaced)
     val timeshiftUncertainText = stringResource(R.string.timeshift_seek_uncertain)
+    val pauseUnavailableChannelText = stringResource(R.string.pause_unavailable_channel)
+    val pauseTimeshiftOffText = stringResource(R.string.pause_timeshift_off)
     LaunchedEffect(timelineState, effectiveTimeshiftState.timeline) {
         timelineState.updateTimeline(effectiveTimeshiftState.timeline)
     }
@@ -411,6 +421,18 @@ fun VideoPlayerScreen(
                 null -> Unit
             }
         }
+    }
+
+    fun showPauseUnavailable(reason: String) {
+        timelineState.applyFeedback(timelineState.beginFeedbackOperation(), reason)
+    }
+
+    LaunchedEffect(livePauseNotice) {
+        val notice = livePauseNotice ?: return@LaunchedEffect
+        // A pause pressed while timeshift was starting was dropped: no grant for this channel.
+        showPauseUnavailable(pauseUnavailableChannelText)
+        layerState.showControls()
+        playbackRuntime.consumeLivePauseNotice(notice)
     }
 
     fun dispatchPlaybackAction(action: MediaPlaybackAction) {
@@ -928,14 +950,25 @@ fun VideoPlayerScreen(
                     toggleKeyCode = AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                     repeatCount = event.nativeKeyEvent.repeatCount,
                 )
-                if (
-                    mediaAction != MediaPlaybackAction.NONE &&
-                    effectiveTimeshiftState.available
-                ) {
-                    layerState.beginOpeningKeyCycle(keyCode)
-                    dispatchPlaybackAction(mediaAction)
-                    layerState.showControls()
-                    return@onPreviewKeyEvent true
+                if (mediaAction != MediaPlaybackAction.NONE) {
+                    when (liveMediaKeyAction(effectiveTimeshiftState.available, livePauseAvailability)) {
+                        LiveMediaKeyAction.DISPATCH -> {
+                            layerState.beginOpeningKeyCycle(keyCode)
+                            dispatchPlaybackAction(mediaAction)
+                            layerState.showControls()
+                            return@onPreviewKeyEvent true
+                        }
+                        LiveMediaKeyAction.REVEAL_WITH_REASON -> {
+                            layerState.beginOpeningKeyCycle(keyCode)
+                            showPauseUnavailable(
+                                if (livePauseAvailability == LivePauseAvailability.OFF) pauseTimeshiftOffText
+                                else pauseUnavailableChannelText,
+                            )
+                            layerState.showControls()
+                            return@onPreviewKeyEvent true
+                        }
+                        LiveMediaKeyAction.PASS_THROUGH -> Unit
+                    }
                 }
 
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
@@ -982,6 +1015,7 @@ fun VideoPlayerScreen(
                         statsOpen = layerState.statsVisible,
                         infoOpen = layerState.infoOpen,
                         drawerOpen = showDrawer,
+                        livePause = livePauseAvailability,
                     ),
                     keyCode = keyCode,
                 )
@@ -1126,10 +1160,12 @@ fun VideoPlayerScreen(
                     at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
                 timeshiftFeedback = timelineState.feedback,
                 timeshiftFeedbackIsError = timelineState.feedbackIsError,
-                paused = !playWhenReady,
+                paused = !playWhenReady || livePauseState.pending,
                 onToggleTimeshiftPause = {
                     dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
                 },
+                livePause = livePauseAvailability,
+                onPauseUnavailable = ::showPauseUnavailable,
                 onSeekTimeshift = { deltaMs ->
                     queueTimeshiftSeek(deltaMs)
                 },

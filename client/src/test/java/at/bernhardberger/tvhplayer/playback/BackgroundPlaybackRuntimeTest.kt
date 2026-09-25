@@ -10,6 +10,7 @@ package at.bernhardberger.tvhplayer.playback
 import android.app.Application
 import android.os.Looper
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
@@ -240,6 +241,10 @@ class BackgroundPlaybackRuntimeTest {
             }
         }
         runtime.onAppForegrounded()
+        // The paused replacement waits for its grant; reaching READY without one decides it.
+        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.STARTING, pending = true) }
+        assertNull(runtime.backgroundNotice.value)
+        playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
         await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
         settle()
         assertNull(runtime.activeTarget.value)
@@ -276,6 +281,10 @@ class BackgroundPlaybackRuntimeTest {
         }
         val speeds = connection.speeds.size
         runtime.onAppForegrounded()
+        // The server pause waits for the replacement's first picture.
+        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
+        assertEquals(speeds, connection.speeds.size)
+        playerReady()
         await { connection.speeds.size > speeds }
         settle()
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
@@ -493,10 +502,28 @@ class BackgroundPlaybackRuntimeTest {
         val focus = FakeFocus()
         val connection = ScriptedSubscriptionConnection()
         var beforeSpeed: suspend (Int) -> Unit = {}
+        /** Holds a subscription before its confirmation, so the timeshift grant stays undecided. */
+        var beforeSubscribe: suspend () -> Unit = {}
         private val manager = createSubscriptionManager(object : SubscriptionConnection by connection {
             override suspend fun speed(id: SubscriptionId, speed: Int): SubscriptionOperationResult<Unit> {
                 beforeSpeed(speed)
                 return connection.speed(id, speed)
+            }
+            override suspend fun subscribe(
+                id: SubscriptionId,
+                channelId: SubscriptionChannelId,
+                timeshiftPeriod: kotlin.time.Duration,
+            ): SubscriptionOperationResult<SubscriptionConfirmation> {
+                beforeSubscribe()
+                return connection.subscribe(id, channelId, timeshiftPeriod)
+            }
+            override suspend fun subscribe(
+                id: SubscriptionId,
+                channelId: SubscriptionChannelId,
+                options: SubscriptionOptions,
+            ): SubscriptionOperationResult<SubscriptionConfirmation> {
+                beforeSubscribe()
+                return connection.subscribe(id, channelId, options)
             }
         }, Dispatchers.Default).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
@@ -514,7 +541,10 @@ class BackgroundPlaybackRuntimeTest {
             onRecoveryRequired = { recover(it) }).also { it.launchIn(scope) }
         /** Currently registered runtime listeners, so tests can drive states the fake stream never reaches. */
         val playerListeners = mutableListOf<Player.Listener>()
+        /** An error the runtime reads from the player, for errors the fake stream never raises. */
+        var forcedPlayerError: ExoPlaybackException? = null
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
+            override fun getPlayerError(): ExoPlaybackException? = forcedPlayerError ?: player.playerError
             override fun pause() {
                 player.pause()
                 afterPause()
@@ -555,6 +585,12 @@ class BackgroundPlaybackRuntimeTest {
                 connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
                 await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available }
             }
+            playerReady()
+        }
+
+        /** The first picture is ready; the fake stream never reaches STATE_READY itself. */
+        fun playerReady() {
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
         }
 
         suspend fun returnAndRetune(playWhenReady: Boolean = true) {

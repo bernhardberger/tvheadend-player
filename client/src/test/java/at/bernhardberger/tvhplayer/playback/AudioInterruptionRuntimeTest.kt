@@ -9,6 +9,7 @@ package at.bernhardberger.tvhplayer.playback
 import android.app.Application
 import android.os.Looper
 import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
@@ -567,7 +568,18 @@ class AudioInterruptionRuntimeTest {
                 return session.bindRecordingPlayback(currentSession, recordingId)
             }
         }
-        val runtime = AppPlaybackRuntime(player, runtimeSession, coordinator, settings, profiles, scope, output, focus,
+        /** Runtime listeners, so tests can drive STATE_READY, which the fake stream never reaches. */
+        private val playerListeners = mutableListOf<Player.Listener>()
+        val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
+            override fun addListener(listener: Player.Listener) {
+                playerListeners += listener
+                player.addListener(listener)
+            }
+            override fun removeListener(listener: Player.Listener) {
+                playerListeners -= listener
+                player.removeListener(listener)
+            }
+        }, runtimeSession, coordinator, settings, profiles, scope, output, focus,
             PlaybackRuntimePolicy.fromPlayerSettings())
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
@@ -593,6 +605,8 @@ class AudioInterruptionRuntimeTest {
                 await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
                     ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
             }
+            // The first picture is ready: a server pause is only sent after it.
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
         }
 
         suspend fun recording() {

@@ -468,6 +468,8 @@
     <string name="timeshift_seek_clamped">Reached the available buffer limit.</string>
     <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
     <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
+    <string name="pause_unavailable_channel">Pause isn\'t available on this channel.</string>
+    <string name="pause_timeshift_off">Timeshift is off in Settings.</string>
     <string name="player_timing_unavailable">Playback timing unavailable</string>
     <string name="timeshift_target_expired">That position is no longer in the buffer.</string>
     <string name="timeshift_seek_uncertain">Seek result uncertain. Playback position will update when available.</string>

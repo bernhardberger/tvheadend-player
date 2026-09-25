@@ -325,6 +325,9 @@ colour and indication rules above apply here. Remote keys follow §6.
   for contrast over bright video. Action controls remain 48dp; a 4dp timeline/action
   gap and 36dp bottom inset move the actions upward without moving the timeline.
   Standalone seek previews use the same timeline anchor.
+- Live Pause always keeps its slot. While timeshift starts it acts (the server pause
+  follows once the first picture is ready); without a grant or with timeshift off it is dimmed but focusable,
+  and pressing it states the reason in the timeline feedback line.
 - Pause has a transparent idle container, like the other icon actions. Native
   focused and pressed indication remains intact. The fading action layer reserves
   8dp of rendering overflow so native focus growth is not cropped mid-animation;

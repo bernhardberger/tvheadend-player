@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import android.view.KeyEvent
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 
 enum class MediaPlaybackAction {
     NONE,
@@ -53,7 +54,30 @@ data class PlayerKeyContext(
     val infoOpen: Boolean = false,
     val statsOpen: Boolean = false,
     val drawerOpen: Boolean = false,
+    /** Live Pause state; a still-starting timeshift accepts a pause like an available one. */
+    val livePause: LivePauseAvailability = LivePauseAvailability.NONE,
 )
+
+/** What a media play/pause key does on the live surface. */
+enum class LiveMediaKeyAction {
+    DISPATCH,
+    REVEAL_WITH_REASON,
+    PASS_THROUGH,
+}
+
+/** True while a live Pause press is accepted: timeshift available or still starting. */
+fun livePauseAccepted(timeshiftAvailable: Boolean, livePause: LivePauseAvailability): Boolean =
+    timeshiftAvailable || livePause == LivePauseAvailability.READY || livePause == LivePauseAvailability.STARTING
+
+/** Dimmed live Pause (no grant, or timeshift off in Settings) explains itself instead of acting. */
+fun livePauseUnavailable(livePause: LivePauseAvailability): Boolean =
+    livePause == LivePauseAvailability.UNAVAILABLE || livePause == LivePauseAvailability.OFF
+
+fun liveMediaKeyAction(timeshiftAvailable: Boolean, livePause: LivePauseAvailability): LiveMediaKeyAction = when {
+    livePauseAccepted(timeshiftAvailable, livePause) -> LiveMediaKeyAction.DISPATCH
+    livePauseUnavailable(livePause) -> LiveMediaKeyAction.REVEAL_WITH_REASON
+    else -> LiveMediaKeyAction.PASS_THROUGH
+}
 
 fun initialPlaybackOverlayFocus(timeshiftAvailable: Boolean): PlaybackOverlayFocusTarget =
     PlaybackOverlayFocusTarget.CONTROLS_CLUSTER
@@ -164,7 +188,8 @@ fun playerKeyAction(
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,
         KeyEvent.KEYCODE_NUMPAD_ENTER -> when {
-            context.surface == PlayerSurface.RECORDING || context.timeshiftAvailable ->
+            context.surface == PlayerSurface.RECORDING ||
+                livePauseAccepted(context.timeshiftAvailable, context.livePause) ->
                 PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE
             else -> PlayerKeyAction.REVEAL_CONTROLS
         }

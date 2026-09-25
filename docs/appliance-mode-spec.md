@@ -276,8 +276,10 @@ fun adjacentChannelId(
    tuner-loss notice. This also applies with keep Off, unavailable timeshift, or
    a non-interactive device, rather than silently resuming a target known to have failed.
    If a paused kept channel cannot return to normal priority, its retuned
-   replacement stays paused only when the new timeshift is already available;
-   otherwise playback stops with the tuner-loss notice instead of playing.
+   replacement starts paused and stays paused once its first picture is ready, it
+   has a timeshift grant, and the server accepts the pause; without a grant, or if
+   the server rejects the pause, playback stops with the tuner-loss notice instead
+   of playing.
 
    **Known limitation:** On Android 14+/Google TV, cached-app freezing can defer
    the keep timer and screen-off broadcast until the process thaws, delaying tuner

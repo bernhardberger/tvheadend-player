@@ -37,6 +37,7 @@ import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
@@ -88,6 +89,12 @@ fun OverlayControlsTv(
     timeshiftFeedbackIsError: Boolean = timeshiftFeedback != null,
     channelRailOpen: Boolean = false,
     channelRailContent: @Composable () -> Unit = {},
+    /**
+     * Live Pause state from the runtime. Non-null keeps Pause in its slot on live: dimmed with a reason
+     * when it cannot pause. Null keeps Pause only while timeshift is available (presentation fixtures).
+     */
+    livePause: LivePauseAvailability? = null,
+    onPauseUnavailable: (reason: String) -> Unit = {},
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -100,6 +107,12 @@ fun OverlayControlsTv(
         timeshiftPositionPresentation(timeshiftState.positionMs, timeshiftState.liveEdgeMs)
     } else timeshiftPositionPresentation(timeshiftState)
     val pausable = timeshiftState.available
+    val pauseInSlot = pausable || livePause != null
+    val pauseUnavailableReason = when (livePause) {
+        LivePauseAvailability.UNAVAILABLE -> stringResource(R.string.pause_unavailable_channel)
+        LivePauseAvailability.OFF -> stringResource(R.string.pause_timeshift_off)
+        else -> null
+    }?.takeUnless { pausable }
     var timingUnavailable by remember(channelNumber, channelName) { mutableStateOf(false) }
     LaunchedEffect(channelNumber, channelName, pausable, seekable) {
         timingUnavailable = false
@@ -108,7 +121,7 @@ fun OverlayControlsTv(
             timingUnavailable = true
         }
     }
-    val initialFocus = if (pausable) pauseFocus else infoFocus
+    val initialFocus = if (pauseInSlot) pauseFocus else infoFocus
     val displayedEvent = displayedProgrammeEvent(previewing, programmeWindow, committedWindow, committedTimeshiftState, nowEvent)
     val programmeTimeKnown = displayedEvent != null
     val programmeTitle = displayedEvent?.title.orEmpty()
@@ -128,11 +141,11 @@ fun OverlayControlsTv(
     // surviving action during apply; that must not erase the disappearing node's fallback.
     val removedFocusTarget = when (lastFocusedControl) {
         "player-go-live" -> initialFocus.takeIf { atLive != false }
-        "player-pause" -> infoFocus.takeIf { !pausable }
+        "player-pause" -> infoFocus.takeIf { !pauseInSlot }
         "player-seekbar" -> if (pausable) timelineFocus else initialFocus
         else -> null
     }
-    LaunchedEffect(controlsVisible, optionsOpen, restoreInfoFocus, restoreRecordActionFocus, restoreOptionsFocus, restoreChannelAction, seekable, pausable, atLive) {
+    LaunchedEffect(controlsVisible, optionsOpen, restoreInfoFocus, restoreRecordActionFocus, restoreOptionsFocus, restoreChannelAction, seekable, pausable, pauseInSlot, atLive) {
         if (controlsVisible && !optionsOpen) {
             val target = when {
                 restoreInfoFocus -> infoFocus
@@ -342,7 +355,14 @@ fun OverlayControlsTv(
             onInteraction = onUserInteraction,
             onActionFocused = { lastFocusedControl = it; onActionFocused(it) },
             goLiveFocus = goLiveFocus.takeIf { atLive == false },
-            onTogglePause = { onToggleTimeshiftPause() }.takeIf { pausable },
+            onTogglePause = when {
+                !pauseInSlot -> null
+                pauseUnavailableReason != null -> { { onPauseUnavailable(pauseUnavailableReason) } }
+                // The selected channel has no installed target yet; a toggle would reach the previous one.
+                !pausable && livePause == LivePauseAvailability.NONE -> { {} }
+                else -> { { onToggleTimeshiftPause() } }
+            },
+            pauseUnavailableReason = pauseUnavailableReason,
             paused = paused, pauseFocus = pauseFocus,
             modifier = Modifier
                 .playerChromeEmphasis(chromeAlpha, chromeHidden, focusOverflow = 8.dp)

@@ -22,8 +22,9 @@ subtitles.
 
 ## Live player without an overlay
 
-- Up or Down shows the controls. Use them instead of Center: with timeshift,
-  Center also pauses or resumes.
+- Up or Down shows the controls. Use them instead of Center: with timeshift
+  (or while it is still starting), Center also pauses or resumes. On a channel
+  without timeshift Center only shows the controls.
 - Left seeks back with timeshift; without timeshift it opens the channel shelf.
   Right seeks forward with timeshift.
 - Channel up/down tune the adjacent channel. Media play/pause pauses and resumes
@@ -46,9 +47,10 @@ subtitles.
   the Center in the same `keys` call, for example `keys up right right right right
   --screenshot gear`, then after 6 s `keys up right right right right center center
   --screenshot audio`. After hiding, the controls open again with focus on
-  Pause/Play (on Info without timeshift).
-- Action row, left to right: Pause/Play (only with timeshift), **Stop**, Info,
-  Record, Settings (gear). Focus starts on Pause/Play, otherwise on Info.
+  Pause/Play.
+- Action row, left to right: Pause/Play, **Stop**, Info, Record, Settings (gear).
+  Focus starts on Pause/Play. Without timeshift Pause/Play is dimmed; Center on it
+  only shows why in the timeline line.
 - **Never press Center on Stop**: it stops playback and closes the player.
 - Up from the action row reaches the timeline: Left/Right queue a seek, Center
   pauses or resumes, Up/Down commit the seek. Avoid it unless you are testing seeks.

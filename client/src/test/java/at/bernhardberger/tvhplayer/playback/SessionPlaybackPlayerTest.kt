@@ -75,6 +75,22 @@ class SessionPlaybackPlayerTest {
         assertEquals(1, connection.subscribeCount)
     }
 
+    @Test fun sessionPlayRetiresAPauseAwaitingTheFirstPictureWithoutServerCommands() = exercise {
+        live(true, firstPicture = false)
+        wrapper.pause()
+        await { runtime.livePause.value.pending && !player.playWhenReady }
+        val requests = focusRequests
+
+        wrapper.play()
+        await { !runtime.livePause.value.pending && player.playWhenReady }
+        playerReady()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertFalse(runtime.livePause.value.pending)
+        assertEquals(requests + 1, focusRequests)
+    }
+
     @Test fun rejectedTimeshiftPauseRollsBackLocalIntent() = exercise {
         live(true)
         connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
@@ -352,12 +368,23 @@ class SessionPlaybackPlayerTest {
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val player = ExoPlayer.Builder(context).build()
         private val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
+        /** Runtime listeners, so tests can drive STATE_READY, which the fake stream never reaches. */
+        private val playerListeners = mutableListOf<Player.Listener>()
+        val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
+            override fun addListener(listener: Player.Listener) {
+                playerListeners += listener
+                player.addListener(listener)
+            }
+            override fun removeListener(listener: Player.Listener) {
+                playerListeners -= listener
+                player.removeListener(listener)
+            }
+        }, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
             PlaybackRuntimePolicy.fromPlayerSettings())
         val wrapper = SessionPlaybackPlayer(runtime)
         val observation = scope.launch { wrapper.observe(session.observation) }
 
-        suspend fun live(timeshift: Boolean) {
+        suspend fun live(timeshift: Boolean, firstPicture: Boolean = true) {
             settings.setTimeshiftEnabled(timeshift)
             connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (timeshift) 120 else 0)))
             val install = scope.async {
@@ -377,7 +404,13 @@ class SessionPlaybackPlayerTest {
                 connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
                 await { wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
             }
+            // The first picture is ready: a server pause is only sent after it.
+            if (firstPicture) playerReady()
             settle()
+        }
+
+        fun playerReady() {
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
         }
 
         suspend fun recording() {

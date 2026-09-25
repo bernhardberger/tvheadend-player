@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import android.view.KeyEvent
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -157,6 +158,38 @@ class PlaybackKeyPolicyTest {
             PlayerKeyAction.SEEK_FORWARD,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT),
         )
+    }
+
+    @Test
+    fun hiddenCenterTogglesWhileTimeshiftStartsAndOnlyRevealsWhenPauseIsUnavailable() {
+        fun center(livePause: LivePauseAvailability, available: Boolean = false) = playerKeyAction(
+            PlayerKeyContext(PlayerSurface.LIVE, controlsVisible = false, seekbarFocused = false,
+                timeshiftAvailable = available, livePause = livePause),
+            KeyEvent.KEYCODE_DPAD_CENTER,
+        )
+        assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, center(LivePauseAvailability.READY, available = true))
+        assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, center(LivePauseAvailability.STARTING))
+        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, center(LivePauseAvailability.UNAVAILABLE))
+        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, center(LivePauseAvailability.OFF))
+        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, center(LivePauseAvailability.NONE))
+    }
+
+    @Test
+    fun startingTimeshiftKeepsSeekAndDrawerKeysTiedToAvailability() {
+        val ctx = PlayerKeyContext(PlayerSurface.LIVE, controlsVisible = false, seekbarFocused = false,
+            timeshiftAvailable = false, livePause = LivePauseAvailability.STARTING)
+        assertEquals(PlayerKeyAction.OPEN_CHANNELS, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT))
+        assertEquals(PlayerKeyAction.PASS_THROUGH, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP))
+    }
+
+    @Test
+    fun liveMediaKeysActWhenPauseIsAcceptedAndExplainWhenUnavailable() {
+        assertEquals(LiveMediaKeyAction.DISPATCH, liveMediaKeyAction(true, LivePauseAvailability.READY))
+        assertEquals(LiveMediaKeyAction.DISPATCH, liveMediaKeyAction(false, LivePauseAvailability.STARTING))
+        assertEquals(LiveMediaKeyAction.REVEAL_WITH_REASON, liveMediaKeyAction(false, LivePauseAvailability.UNAVAILABLE))
+        assertEquals(LiveMediaKeyAction.REVEAL_WITH_REASON, liveMediaKeyAction(false, LivePauseAvailability.OFF))
+        assertEquals(LiveMediaKeyAction.PASS_THROUGH, liveMediaKeyAction(false, LivePauseAvailability.NONE))
     }
 
     @Test
