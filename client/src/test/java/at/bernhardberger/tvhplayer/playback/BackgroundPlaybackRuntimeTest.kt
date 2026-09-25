@@ -454,19 +454,24 @@ class BackgroundPlaybackRuntimeTest {
         assertNull(runtime.backgroundNotice.value)
     }
 
-    private fun exercise(block: suspend Fixture.() -> Unit) = runBlocking {
-        val fixture = Fixture()
-        try { withTimeout(20_000) { fixture.block() } }
-        finally {
-            fixture.scope.cancel()
-            fixture.scheduler.runCurrent()
-            fixture.runtime.detach()
-            fixture.player.release()
-            fixture.session.shutdown()
+    private fun exercise(block: suspend Fixture.() -> Unit) = exercise(PlaybackRuntimePolicy.fromPlayerSettings(), block)
+
+    companion object {
+        /** Shared with [PlaybackRuntimePolicyTest] so host policies run against the same runtime fixture. */
+        fun exercise(policy: PlaybackRuntimePolicy, block: suspend Fixture.() -> Unit) = runBlocking {
+            val fixture = Fixture(policy)
+            try { withTimeout(20_000) { fixture.block() } }
+            finally {
+                fixture.scope.cancel()
+                fixture.scheduler.runCurrent()
+                fixture.runtime.detach()
+                fixture.player.release()
+                fixture.session.shutdown()
+            }
         }
     }
 
-    private class FakeFocus : PlaybackAudioFocus {
+    class FakeFocus : PlaybackAudioFocus {
         val requests = mutableListOf<(AudioInterruption) -> Unit>()
         var abandons = 0
         var granted = true
@@ -481,7 +486,7 @@ class BackgroundPlaybackRuntimeTest {
         override fun abandon() { abandons++; callback = null }
     }
 
-    private class Fixture {
+    class Fixture(policy: PlaybackRuntimePolicy) {
         val scheduler = TestCoroutineScheduler()
         val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(scheduler))
         private val context = ApplicationProvider.getApplicationContext<Application>()
@@ -507,13 +512,23 @@ class BackgroundPlaybackRuntimeTest {
         var afterPause: () -> Unit = {}
         private val coordinator = createTvheadendPlaybackCoordinator(player,
             onRecoveryRequired = { recover(it) }).also { it.launchIn(scope) }
+        /** Currently registered runtime listeners, so tests can drive states the fake stream never reaches. */
+        val playerListeners = mutableListOf<Player.Listener>()
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
             override fun pause() {
                 player.pause()
                 afterPause()
             }
+            override fun addListener(listener: Player.Listener) {
+                playerListeners += listener
+                player.addListener(listener)
+            }
+            override fun removeListener(listener: Player.Listener) {
+                playerListeners -= listener
+                player.removeListener(listener)
+            }
         }, session, coordinator, settings, profiles, scope,
-            audioOutput = TvheadendAudioOutputProvider(context), audioFocus = focus, elapsedRealtime = { scheduler.currentTime })
+            audioOutput = TvheadendAudioOutputProvider(context), audioFocus = focus, policy = policy, elapsedRealtime = { scheduler.currentTime })
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
         fun controlCalls(from: Int) = connection.calls.drop(from).filter {

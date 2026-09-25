@@ -567,7 +567,8 @@ class AudioInterruptionRuntimeTest {
                 return session.bindRecordingPlayback(currentSession, recordingId)
             }
         }
-        val runtime = AppPlaybackRuntime(player, runtimeSession, coordinator, settings, profiles, scope, output, focus)
+        val runtime = AppPlaybackRuntime(player, runtimeSession, coordinator, settings, profiles, scope, output, focus,
+            PlaybackRuntimePolicy.fromPlayerSettings())
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
 
         fun audioDisabled() = C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes

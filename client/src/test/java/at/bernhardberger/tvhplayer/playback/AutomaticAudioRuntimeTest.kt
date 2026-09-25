@@ -42,7 +42,8 @@ class AutomaticAudioRuntimeTest {
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         val player = ExoPlayer.Builder(context).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player),
-            settings, profiles, backgroundScope, TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None)
+            settings, profiles, backgroundScope, TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
+            PlaybackRuntimePolicy.fromPlayerSettings())
         val sheetScope = CoroutineScope(coroutineContext + Job())
         // Hold the existing command serializer without adding a production test seam.
         val commands = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {

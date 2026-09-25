@@ -11,11 +11,14 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
+import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
+import at.bernhardberger.tvhplayer.profiling.ProfilePlaybackTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -94,6 +97,10 @@ val appModule = module {
             scope = applicationScope,
             audioOutput = audioOutput,
             audioFocus = AndroidPlaybackAudioFocus(androidContext(), player.applicationLooper),
+            policy = PlaybackRuntimePolicy.fromPlayerSettings(
+                trace = ProfilePlaybackTrace,
+                seekDiagnostics = BuildConfig.DEBUG,
+            ),
         )
         // Application scope outlives a stopped/destroyed activity while a tuner is kept.
         val context = androidContext()

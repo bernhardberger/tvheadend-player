@@ -352,7 +352,8 @@ class SessionPlaybackPlayerTest {
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val player = ExoPlayer.Builder(context).build()
         private val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus)
+        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
+            PlaybackRuntimePolicy.fromPlayerSettings())
         val wrapper = SessionPlaybackPlayer(runtime)
         val observation = scope.launch { wrapper.observe(session.observation) }
 

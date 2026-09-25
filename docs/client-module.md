@@ -31,13 +31,17 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 
 ## What lives here
 
-- `playback/`: `AppPlaybackRuntime`, `LiveRecoveryBackoff`, `SessionAudioSelection`.
+- `playback/`: `AppPlaybackRuntime`, `LiveRecoveryBackoff`, `SessionAudioSelection`,
+  `PlaybackRuntimePolicy` (with `PlaybackTrace`), and the runtime support files
+  `AppPlaybackModels`, `PlaybackTargetCommandSerialization`, `PlaybackStatePolicy`,
+  `LiveRecoveryAttempts`, `ForegroundPlaybackLifecycle`, `RecordingMarkerQuery`
+  and `PlaybackPresentation`.
 - `di/SdkRuntimeOwner`.
 - `settings/`: `AppProfileOwner`, `AudioChoiceStore`, `ChannelTagSettings`,
   `PlayerSettings`, `ServerSettings` (owns the single `Context.dataStore`
   delegate for `tvhplayer_settings`).
 - `stores/`: `LastPlayedChannelStore` (owns `tvhplayer_appliance`), `ChannelSelectionStore`.
-- `profiling/`: `ProfileTrace`, `ProfilePlayback`.
+- `profiling/`: `ProfileTrace`, `ProfilePlayback`, `ProfilePlaybackTrace`.
 - `data/FrontendModels`.
 - `core/` domain policy: connection state, channel readiness, DVR library,
   growing timeline end, last-played channel, live-info recording, metadata
@@ -72,6 +76,23 @@ pins, resolve the expected release graph, and use only the settings-owned public
 repositories (project repositories are forbidden). The app's offline profile
 variant additionally permits the strictly pinned released `sdk-testing` artifact.
 
+## Runtime policy
+
+`AppPlaybackRuntime` owns the playback mechanics: target command serialization,
+live recovery, audio focus, background keep/release, and the entry points the
+media session uses. Hosts supply a `PlaybackRuntimePolicy` as a required
+constructor argument: the keep-tuned limit, the live timeshift period, a
+`PlaybackTrace` and the seek-diagnostics switch. The runtime does not read
+`BuildConfig` or `profiling/` directly. `PlaybackRuntimePolicy.fromPlayerSettings()`
+reproduces the player-settings values (keep-channel minutes, fixed timeshift
+period when timeshift is enabled); the app passes `ProfilePlaybackTrace` and
+its `BuildConfig.DEBUG`, tests pass the defaults.
+
+The runtime has no autostart. Startup channel choice stays with the front end
+(`StartupBootstrapPolicy` in `:app`, `LastPlayedChannelPolicy` in `:client`
+`core/`). Mobile background audio would be a separate future mode, not a
+policy value of this TV runtime.
+
 ## System media controls
 
 The activity creates a Media3 session on start and releases it on stop; there is
@@ -91,7 +112,5 @@ device or speed commands are exposed by the session.
 
 ## Deferred work
 
-- Split `AppPlaybackRuntime` into reusable mechanics plus app-supplied product
-  configuration.
 - Split `AppProfileOwner` into generic profile ownership and app policy.
 - Rename packages to a client namespace once the boundary is stable.

@@ -107,7 +107,8 @@ class JourneyProfileActivity : AppCompatActivity() {
                 .build()
             val coordinator = createTvheadendPlaybackCoordinator(player)
             val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope, audioOutput,
-                at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None)
+                at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None,
+                at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings(trace = ProfilePlaybackTrace))
             runtimeOwner = SdkRuntimeOwner.create(session, runtime, profiles, coordinator, player, scope)
             withTimeout(5_000) { profiles.serverProfile.filterNotNull().first() }
             session.publish(observation)

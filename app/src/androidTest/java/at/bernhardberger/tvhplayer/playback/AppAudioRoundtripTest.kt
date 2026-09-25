@@ -108,7 +108,8 @@ class AppAudioRoundtripTest {
                 var coordinator = createTvheadendPlaybackCoordinator(controlled.player)
                 var lifetime = coordinator.launchIn(scope)
                 var runtime = AppPlaybackRuntime(controlled.player, session, coordinator, settings, profiles, scope,
-                    at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None)
+                    at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
+                    at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings())
                 try {
                     profiles.serverProfile.filterNotNull().first()
                     suspend fun tune(id: Long, tracks: Tracks = audioTracks()) {
@@ -138,7 +139,8 @@ class AppAudioRoundtripTest {
                     coordinator = createTvheadendPlaybackCoordinator(controlled.player)
                     lifetime = coordinator.launchIn(scope)
                     runtime = AppPlaybackRuntime(controlled.player, session, coordinator, freshSettings, profiles, scope,
-                        at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None)
+                        at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
+                        at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings())
                     tune(1, audioTracks(reverse = true))
                     val restored = controlled.parameters.overrides.values.single()
                     assertNotSame(explicit.group.mediaTrackGroup, restored.mediaTrackGroup)

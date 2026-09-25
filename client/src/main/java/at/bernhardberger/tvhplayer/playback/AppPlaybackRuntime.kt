@@ -29,12 +29,10 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionPriority
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
-import at.bernhardberger.tvhplayer.client.BuildConfig
-import at.bernhardberger.tvhplayer.profiling.profileFirstVideoFrame
-import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import kotlin.time.Duration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -58,6 +56,7 @@ class AppPlaybackRuntime(
     private val scope: CoroutineScope,
     private val audioOutput: TvheadendAudioOutputProvider,
     private val audioFocus: PlaybackAudioFocus,
+    private val policy: PlaybackRuntimePolicy,
     private val elapsedRealtime: () -> Long = android.os.SystemClock::elapsedRealtime,
 ) {
     private val targetCommands = PlaybackTargetCommandSerialization()
@@ -152,7 +151,7 @@ class AppPlaybackRuntime(
 
     private var diagnosticDecoderName = "unknown"
     private var diagnosticDecoderGeneration = 0
-    private val seekDiagnosticsListener = if (at.bernhardberger.tvhplayer.client.BuildConfig.DEBUG) {
+    private val seekDiagnosticsListener = if (policy.seekDiagnostics) {
         object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onVideoDecoderInitialized(
                 eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
@@ -202,8 +201,8 @@ class AppPlaybackRuntime(
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             if (!targetInstallationInProgress && targetCommands.isOpen()) {
-                if (BuildConfig.PROFILE_TRACE && playbackState == Player.STATE_READY) {
-                    profileTrace("P44:ready:$activeTargetEpoch") {}
+                if (policy.trace.enabled && playbackState == Player.STATE_READY) {
+                    policy.trace.ready(activeTargetEpoch)
                 }
                 publishPlayerState()
             }
@@ -227,7 +226,7 @@ class AppPlaybackRuntime(
 
     suspend fun playLive(selection: LivePlaybackSelection): PlaybackTargetResult? =
         targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
-            profileTrace("P44:tune:admitted") {}
+            if (policy.trace.enabled) policy.trace.tuneAdmitted()
             lastLiveChannelId = selection.channelId
             recoveryBackoff.reset()
             val result = playLive(
@@ -320,9 +319,7 @@ class AppPlaybackRuntime(
                             channelId = selection.channelId,
                             options = LivePlaybackOptions(
                                 streamProfileId = streamProfileId,
-                                timeshiftPeriod = requestedLiveTimeshiftPeriod(
-                                    playerSettings.timeshiftEnabled,
-                                ),
+                                timeshiftPeriod = policy.liveTimeshiftPeriod(playerSettings),
                             ),
                         )
                     ) {
@@ -352,7 +349,7 @@ class AppPlaybackRuntime(
                     _recordingAdmission.value = null
                     clearRecordingMarkers()
                     _state.value = AppPlaybackState.Starting
-                    if (BuildConfig.PROFILE_TRACE) profileTrace("P44:tune:bound:$epoch") {}
+                    if (policy.trace.enabled) policy.trace.tuneBound(epoch)
                     beginTargetPresentation(epoch)
                     publishInstalledPlayerState()
                 }
@@ -533,9 +530,9 @@ class AppPlaybackRuntime(
                         activeTarget = _activeTarget.value,
                         activeTargetEpoch = activeTargetEpoch,
                         recordingPlayWhenReady = recordingPlayWhenReady,
-                        timeshiftAvailable = playerSettings.timeshiftEnabled && timeshift != null,
+                        timeshiftAvailable = policy.liveTimeshiftPeriod(playerSettings) > Duration.ZERO && timeshift != null,
                         serverPaused = timeshift?.serverPaused == true || timeshift?.playbackPaused == true,
-                        keepMinutes = playerSettings.keepChannelMinutes,
+                        keepLimit = policy.keepTunedLimit(playerSettings),
                         interactive = interactive,
                         nowMillis = elapsedRealtime(),
                         recoveryPending = recoveryPending,
@@ -683,7 +680,7 @@ class AppPlaybackRuntime(
         targetCommands.serialize(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
         ) {
-            val diagnose = at.bernhardberger.tvhplayer.client.BuildConfig.DEBUG && !player.playWhenReady
+            val diagnose = policy.seekDiagnostics && !player.playWhenReady
             fun counters(): String {
                 val value = player.videoDecoderCounters ?: return "none"
                 value.ensureUpdated()
@@ -1289,14 +1286,14 @@ class AppPlaybackRuntime(
             targetFrameListener = object : Player.Listener {
                 override fun onRenderedFirstFrame() {
                     if (targetInstallationInProgress || !targetCommands.isOpen()) return
-                    val notYetVisible = BuildConfig.PROFILE_TRACE && !_videoPresentation.value.visible
+                    val notYetVisible = policy.trace.enabled && !_videoPresentation.value.visible
                     _videoPresentation.value = _videoPresentation.value.onFirstFrame(
                         frameEpoch = epoch,
                         activeTargetEpoch = activeTargetEpoch,
                     )
                     if (notYetVisible && epoch == activeTargetEpoch && _videoPresentation.value.visible) {
                         val live = livePlaybackObservation.value as? LivePlaybackObservation.Active
-                        profileFirstVideoFrame(epoch, player.videoFormat, live?.diagnostics?.source?.adapterName)
+                        policy.trace.firstVideoFrame(epoch, player.videoFormat, live?.diagnostics?.source?.adapterName)
                     }
                 }
             }.also(player::addListener)

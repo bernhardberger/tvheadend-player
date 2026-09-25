@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.playback
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -13,7 +15,7 @@ class BackgroundPlaybackLifecycleTest {
             for (playing in listOf(false, true)) for (interactive in listOf(false, true))
                 for (serverPaused in listOf(false, true)) {
                     val lifecycle = ForegroundPlaybackLifecycle()
-                    val action = lifecycle.onBackgrounded(live, 7, playing, timeshift, serverPaused, minutes, interactive, 1_000)
+                    val action = lifecycle.onBackgrounded(live, 7, playing, timeshift, serverPaused, minutes.minutes, interactive, 1_000)
                     if (timeshift && minutes > 0 && interactive) {
                         assertEquals(ForegroundPlaybackAction.KeepLive(7, 1_201_000), action)
                         assertEquals(ForegroundPlaybackAction.ResumeKeptLive(7, playing && !serverPaused),
@@ -45,9 +47,16 @@ class BackgroundPlaybackLifecycleTest {
 
     @Test fun repeatedBackgroundDoesNotReplaceOriginalResumeIntentOrDeadline() {
         val lifecycle = kept()
-        assertEquals(ForegroundPlaybackAction.None, lifecycle.onBackgrounded(live, 7, false, true, true, 10, true, 100))
+        assertEquals(ForegroundPlaybackAction.None, lifecycle.onBackgrounded(live, 7, false, true, true, 10.minutes, true, 100))
         assertEquals(ForegroundPlaybackAction.ResumeKeptLive(7, true), lifecycle.onForegrounded(live, 7, 600_001))
         assertEquals(ForegroundPlaybackAction.None, lifecycle.onForegrounded(live, 7, 600_002))
+    }
+
+    @Test fun unlimitedKeepLimitSaturatesDeadlineInsteadOfExpiring() {
+        val lifecycle = ForegroundPlaybackLifecycle()
+        assertEquals(ForegroundPlaybackAction.KeepLive(7, Long.MAX_VALUE),
+            lifecycle.onBackgrounded(live, 7, true, true, false, Duration.INFINITE, true, 5_000))
+        assertEquals(ForegroundPlaybackAction.ResumeKeptLive(7, true), lifecycle.onForegrounded(live, 7, 10_000_000))
     }
 
     @Test fun staleEpochAndExplicitStopCannotReleaseOrResumeReplacement() {
@@ -71,6 +80,6 @@ class BackgroundPlaybackLifecycleTest {
     }
 
     private fun kept() = ForegroundPlaybackLifecycle().apply {
-        onBackgrounded(live, 7, true, true, false, 20, true, 0)
+        onBackgrounded(live, 7, true, true, false, 20.minutes, true, 0)
     }
 }

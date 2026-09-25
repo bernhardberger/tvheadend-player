@@ -62,7 +62,7 @@ class AudioPassthroughStartupTest {
         val player = ExoPlayer.Builder(context)
             .setRenderersFactory(createTvheadendRenderersFactory(context, output)).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player),
-            settings, profiles, runtimeScope, output, PlaybackAudioFocus.None)
+            settings, profiles, runtimeScope, output, PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
         val selection = requireNotNull(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,

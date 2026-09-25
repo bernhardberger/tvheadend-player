@@ -4,6 +4,7 @@ package at.bernhardberger.tvhplayer.playback
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import kotlin.time.Duration
 
 internal sealed interface ForegroundPlaybackAction {
     data object None : ForegroundPlaybackAction
@@ -64,7 +65,7 @@ internal class ForegroundPlaybackLifecycle {
         recordingPlayWhenReady: Boolean,
         timeshiftAvailable: Boolean = false,
         serverPaused: Boolean = false,
-        keepMinutes: Int = 0,
+        keepLimit: Duration = Duration.ZERO,
         interactive: Boolean = true,
         nowMillis: Long = 0,
         recoveryPending: Boolean = false,
@@ -76,8 +77,9 @@ internal class ForegroundPlaybackLifecycle {
             return ForegroundPlaybackAction.StopLive
         }
         if (activeTarget is AppPlaybackTarget.Live && activeTargetEpoch != null &&
-            timeshiftAvailable && keepMinutes > 0 && interactive) {
-            val deadline = nowMillis + keepMinutes * 60_000L
+            timeshiftAvailable && keepLimit > Duration.ZERO && interactive) {
+            val limitMillis = keepLimit.inWholeMilliseconds
+            val deadline = if (limitMillis > Long.MAX_VALUE - nowMillis) Long.MAX_VALUE else nowMillis + limitMillis
             backgroundedTarget = BackgroundedPlaybackTarget.Live(
                 activeTarget.channelId, activeTargetEpoch, deadline,
                 recordingPlayWhenReady && !serverPaused,

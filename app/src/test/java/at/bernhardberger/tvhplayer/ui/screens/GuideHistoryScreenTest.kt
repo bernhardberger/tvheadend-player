@@ -107,7 +107,8 @@ class GuideHistoryScreenTest {
         val coordinator = createTvheadendPlaybackCoordinator(player)
         val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
             at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider(context),
-            at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None)
+            at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus.None,
+            at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy.fromPlayerSettings())
         val selection = ChannelSelectionStore()
         val position = GuidePositionStore()
         val lastPlayed = LastPlayedChannelStore(context)
