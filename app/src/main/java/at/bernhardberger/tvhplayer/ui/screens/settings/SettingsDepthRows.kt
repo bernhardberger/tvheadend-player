@@ -47,6 +47,8 @@ internal fun settingsRow(
     announcement: String? = null,
     busy: Boolean = false,
     trailingIcon: Int? = null,
+    titleMaxLines: Int = 1,
+    sectionBottomSpacing: androidx.compose.ui.unit.Dp = 0.dp,
     onClick: () -> Unit = {},
 ) = DepthRow(DepthItem(id, child), { if (enabled) onClick() }) { modifier, activate ->
     Column {
@@ -61,14 +63,14 @@ internal fun settingsRow(
             // Announce the untransformed label so TalkBack is unaffected by the casing.
             Text(section.uppercase(LocalConfiguration.current.locales[0]),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = TvSpacing16, top = TvSpacing16)
+                modifier = Modifier.padding(start = TvSpacing16, top = TvSpacing16, bottom = sectionBottomSpacing)
                     .semantics { heading(); contentDescription = section })
         }
         ListItem(
             selected = selected == true,
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
-            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
             supportingContent = supporting?.let { { Text(it, style = MaterialTheme.typography.bodyMedium) } },
             leadingContent = icon?.let { { Icon(painterResource(it), null, Modifier.size(24.dp)) } },
             trailingContent = when {

@@ -115,7 +115,7 @@ fun RecordingPlayerScreen(
     }
     val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings(audioLanguage = null, subtitleLanguage = null)
+        initialValue = PlayerSettings()
     )
     val retainedSelection = recordingSelection?.takeIf { it.recordingId == recordingId }
     var targetObservation by remember(recordingId, retainedSelection?.currentSession) {
@@ -646,9 +646,12 @@ fun RecordingPlayerScreen(
             liveRegionMode = LiveRegionMode.Assertive,
         )
         optionsPage?.let { page ->
+            val audioAutomatic by session.audioAutomatic.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
+                audioAutomatic = audioAutomatic,
+                onAutomaticAudio = { session.useAutomaticAudio() },
                 tracksResolving =
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,

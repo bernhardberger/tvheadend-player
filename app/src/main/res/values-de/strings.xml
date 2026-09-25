@@ -1,4 +1,20 @@
 <resources>
+    <string name="audio_subtitles_section">Ton &amp; Untertitel</string>
+    <string name="audio_language_first">Audiosprache</string>
+    <string name="audio_language_second">Zweite Audiosprache</string>
+    <string name="audio_language_third">Dritte Audiosprache</string>
+    <string name="audio_language_automatic">Automatisch (Gerätesprache)</string>
+    <string name="audio_language_none">Keine</string>
+    <string name="audio_automatic">Automatisch</string>
+    <string name="audio_automatic_help">Verwendet deine Audioeinstellungen</string>
+    <string name="audio_format">Audioformat</string>
+    <string name="audio_format_dolby">Dolby Digital bevorzugen</string>
+    <string name="audio_format_stereo">Stereo bevorzugen</string>
+    <string name="audio_format_automatic_help">Der Player wählt das Audioformat.</string>
+    <string name="audio_format_dolby_help">E-AC-3 und AC-3 in der gewählten Sprache bevorzugen.</string>
+    <string name="audio_format_stereo_help">AAC und MPEG-Audio bevorzugen, ohne Kanalbegrenzung.</string>
+    <string name="audio_description">Audiodeskription</string>
+    <string name="subtitle_follow_system">Untertiteleinstellungen des Systems verwenden</string>
     <string name="player_programme_ended_at">Endete um %1$s</string>
     <string name="player_status_recording_playback">Aufnahme läuft</string>
     <string name="player_status_recording_now">Aufnahme läuft</string>

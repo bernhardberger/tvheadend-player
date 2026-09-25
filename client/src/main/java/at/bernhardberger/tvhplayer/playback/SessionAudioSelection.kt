@@ -62,15 +62,20 @@ class SessionAudioSelection {
 
     fun restore(player: Player) {
         val choice = choices[channel] ?: return
-        val matches = player.currentTracks.groups.flatMap { group ->
+        val candidates = player.currentTracks.groups.flatMap { group ->
             if (group.type != C.TRACK_TYPE_AUDIO) return@flatMap emptyList()
             (0 until group.length).mapNotNull { index ->
-                if (group.isTrackSupported(index) && choice(group.getTrackFormat(index)) == choice) {
+                if (group.isTrackSupported(index)) {
                     group to index
                 } else null
             }
         }
-        val match = matches.singleOrNull()
+        val exact = candidates.filter { (group, index) -> choice(group.getTrackFormat(index)) == choice }
+        val match = if (exact.isNotEmpty()) exact.singleOrNull() else candidates.filter { (group, index) ->
+            val candidate = choice(group.getTrackFormat(index))
+            candidate.language == choice.language && candidate.mimeType == choice.mimeType &&
+                candidate.roleFlags == choice.roleFlags
+        }.singleOrNull()
         if (match == null) {
             clearOverride(player)
             return
@@ -84,12 +89,18 @@ class SessionAudioSelection {
         restoring = true
         try {
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
                 .addOverride(TrackSelectionOverride(group.mediaTrackGroup, listOf(index)))
                 .build()
         } finally {
             restoring = false
         }
+    }
+
+    fun useAutomatic(player: Player): ChannelId? {
+        val forgotten = channel
+        if (forgotten != null) choices.remove(forgotten)
+        clearOverride(player)
+        return forgotten
     }
 
     fun clear(player: Player) {

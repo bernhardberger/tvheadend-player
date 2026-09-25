@@ -95,7 +95,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
             composeRule.setContent {
                 if (visible.value) TVHeadendPlayerTheme {
                     VideoPlayerScreen(video, selection, LastPlayedChannelStore(context), settings,
-                        catalog, images, session, ChannelId(1), "Offline 1", {}, {})
+                        catalog, images, session, ChannelId(1), "Offline 1", {}, {}, runtime)
                 }
             }
             composeRule.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }

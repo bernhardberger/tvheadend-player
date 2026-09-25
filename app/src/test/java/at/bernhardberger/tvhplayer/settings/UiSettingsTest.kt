@@ -30,7 +30,7 @@ class UiSettingsTest {
     @Test
     fun refreshRateMatching_isEnabledByDefault() {
         val settings = PlayerSettings(
-            audioLanguage = null,
+            audioLanguages = emptyList(),
             subtitleLanguage = null,
         )
 

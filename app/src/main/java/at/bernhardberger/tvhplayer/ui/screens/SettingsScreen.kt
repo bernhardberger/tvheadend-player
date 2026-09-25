@@ -24,9 +24,8 @@ internal fun SettingsScreen(
     isCurrent: Boolean = true,
 ) {
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
-    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation) + listOf(
+    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation) + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(),
-        settingsPlayerLevel(),
         settingsChannelTagsLevel(channelsVm),
         settingsApplianceLevel(),
     )

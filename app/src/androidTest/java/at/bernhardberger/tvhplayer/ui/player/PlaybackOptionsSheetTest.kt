@@ -19,6 +19,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -97,14 +98,15 @@ class PlaybackOptionsSheetTest {
     }
 
     @Test
-    fun unavailableCategoriesDoNotOpenDeadEndsOrStealFocusWhenTracksArrive() {
+    fun automaticKeepsAudioAvailableWithoutStealingFocusWhenTracksArrive() {
         var tracks by mutableStateOf(emptyList<PlaybackOptionTrack>())
         setOptionsContent(
             page = { PlaybackOptionsPage.ROOT },
             onPageChange = {},
             audioTracksProvider = { tracks },
         )
-        composeRule.onNodeWithTag("playback-options-audio").assertIsNotEnabled()
+        composeRule.onNodeWithTag("playback-options-audio").assertIsEnabled().assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("playback-options-subtitles").assertIsNotEnabled()
         composeRule.onNodeWithText("No audio tracks available.").assertIsDisplayed()
         composeRule.onNodeWithTag("playback-options-display").assertIsFocused()
@@ -114,7 +116,7 @@ class PlaybackOptionsSheetTest {
             .performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("playback-options-audio").assertIsFocused()
         composeRule.runOnIdle { tracks = emptyList() }
-        composeRule.onNodeWithTag("playback-options-display").assertIsFocused()
+        composeRule.onNodeWithTag("playback-options-audio").assertIsFocused()
     }
 
     @Test
@@ -133,7 +135,7 @@ class PlaybackOptionsSheetTest {
             .assertIsDisplayed()
             .assertHasNoClickAction()
         composeRule.onNodeWithText("No audio tracks available.").assertDoesNotExist()
-        composeRule.onNodeWithTag("playback-options-header-back").assertIsFocused()
+        composeRule.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
 
         composeRule.runOnIdle { page = PlaybackOptionsPage.SUBTITLES }
         composeRule.onNodeWithTag("playback-options-subtitles-off")
@@ -151,7 +153,7 @@ class PlaybackOptionsSheetTest {
         composeRule.onNodeWithTag("playback-options-track-empty")
             .assertIsDisplayed()
             .assertHasNoClickAction()
-        composeRule.onNodeWithTag("playback-options-header-back").assertIsFocused()
+        composeRule.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
 
         composeRule.runOnIdle { page = PlaybackOptionsPage.SUBTITLES }
         composeRule.onNodeWithTag("playback-options-subtitles-off")
@@ -203,7 +205,7 @@ class PlaybackOptionsSheetTest {
             .assertIsFocused()
 
         composeRule.runOnIdle { tracks = tracks.filterNot { it.key == "audio-16" } }
-        composeRule.onNodeWithTag("playback-options-track-audio-0")
+        composeRule.onNodeWithTag("playback-options-track-automatic")
             .assertIsDisplayed()
             .assertIsFocused()
         composeRule.onNodeWithText("Audio track").assertIsDisplayed()
@@ -236,7 +238,7 @@ class PlaybackOptionsSheetTest {
 
         composeRule.runOnIdle { tracks = emptyList() }
         composeRule.onNodeWithTag("playback-options-track-empty").assertIsDisplayed()
-        composeRule.onNodeWithTag("playback-options-header-back").assertIsFocused()
+        composeRule.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
         composeRule.onNodeWithText("Audio track").assertIsDisplayed()
     }
 
@@ -257,6 +259,8 @@ class PlaybackOptionsSheetTest {
                         onPageChange = {},
                         onAspectRatioChange = {},
                         onStatsVisibleChange = {},
+                        audioAutomatic = false,
+                        onAutomaticAudio = {},
                     )
                 }
             }
@@ -278,7 +282,7 @@ class PlaybackOptionsSheetTest {
 
         composeRule.runOnIdle { player.update(Tracks.EMPTY) }
         composeRule.onNodeWithTag("playback-options-track-empty").assertIsDisplayed()
-        composeRule.onNodeWithTag("playback-options-header-back").assertIsFocused()
+        composeRule.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
 
         composeRule.runOnIdle { mounted = false }
         composeRule.waitForIdle()
@@ -596,6 +600,7 @@ class PlaybackOptionsSheetTest {
         override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any? =
             when (method.name) {
                 "getCurrentTracks" -> currentTracks
+                "getTrackSelectionParameters" -> androidx.media3.common.TrackSelectionParameters.DEFAULT
                 "addListener" -> {
                     listeners += requireNotNull(args?.first()) as Player.Listener
                     Unit

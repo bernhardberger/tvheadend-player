@@ -388,7 +388,7 @@ fun AppRoot(
     val activeChannelId = (activeTarget as? AppPlaybackTarget.Live)?.channelId
     val activeRecordingId = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings(audioLanguage = null, subtitleLanguage = null)
+        initialValue = PlayerSettings()
     )
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())

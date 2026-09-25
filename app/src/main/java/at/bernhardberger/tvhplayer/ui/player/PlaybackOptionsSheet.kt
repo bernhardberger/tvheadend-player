@@ -106,6 +106,8 @@ internal fun PlaybackOptionsSheet(
     onPageChange: (PlaybackOptionsPage) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
     onStatsVisibleChange: (Boolean) -> Unit,
+    audioAutomatic: Boolean,
+    onAutomaticAudio: () -> Unit,
 ) {
     val unknownLanguage = stringResource(R.string.track_unknown_language)
     val mono = stringResource(R.string.track_mono)
@@ -166,6 +168,8 @@ internal fun PlaybackOptionsSheet(
         tracksResolving = tracksResolving,
         aspectRatio = aspectRatio,
         statsVisible = statsVisible,
+        audioAutomatic = audioAutomatic,
+        onAutomaticAudio = onAutomaticAudio,
         onPageChange = onPageChange,
         onAudioTrackSelected = { key ->
             audioChoices.firstOrNull { it.stableKey == key }?.let { selectAudioTrack(player, it) }
@@ -212,6 +216,8 @@ internal fun PlaybackOptionsSheetContent(
     onSubtitleTrackSelected: (String?) -> Unit,
     onAspectRatioChange: (AspectRatioMode) -> Unit,
     onStatsVisibleChange: (Boolean) -> Unit,
+    audioAutomatic: Boolean = false,
+    onAutomaticAudio: () -> Unit = {},
 ) {
     var lastRootPage by remember { mutableStateOf(PlaybackOptionsPage.AUDIO) }
     val availableRootPages = playbackOptionsCategories()
@@ -285,7 +291,7 @@ internal fun PlaybackOptionsSheetContent(
                     subtitlesValue = subtitlesValue,
                     displayValue = displayValue,
                     statsVisible = statsVisible,
-                    audioAvailable = audioTracks.isNotEmpty(),
+                    audioAvailable = true,
                     subtitlesAvailable = subtitleTracks.isNotEmpty(),
                     initialPage = rootRestorePage,
                     onPageChange = ::openPage,
@@ -293,13 +299,15 @@ internal fun PlaybackOptionsSheetContent(
                 PlaybackOptionsPage.AUDIO -> TrackOptionsPage(
                     title = stringResource(R.string.audio_track),
                     currentValue = audioValue,
-                    tracks = audioTracks,
+                    tracks = listOf(PlaybackOptionTrack("automatic", stringResource(R.string.audio_automatic),
+                        stringResource(R.string.audio_automatic_help), audioAutomatic)) +
+                        audioTracks.map { it.copy(selected = !audioAutomatic && it.selected) },
                     contentState = audioState,
                     unavailableLabel = noAudioLabel,
                     loadingLabel = loadingLabel,
                     subtitles = false,
                     onBack = { onPageChange(PlaybackOptionsPage.ROOT) },
-                    onSelect = onAudioTrackSelected,
+                    onSelect = { if (it == "automatic") onAutomaticAudio() else onAudioTrackSelected(it) },
                 )
                 PlaybackOptionsPage.SUBTITLES -> TrackOptionsPage(
                     title = stringResource(R.string.subtitles),

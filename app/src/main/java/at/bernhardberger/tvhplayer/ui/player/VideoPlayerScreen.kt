@@ -256,13 +256,14 @@ fun VideoPlayerScreen(
     channelId: ChannelId,
     channelName: String,
     onReconnect: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
 
     val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings(audioLanguage = null, subtitleLanguage = null)
+        initialValue = PlayerSettings()
     )
 
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
@@ -1284,9 +1285,12 @@ fun VideoPlayerScreen(
         }
 
         layerState.optionsPage?.let { page ->
+            val audioAutomatic by playbackRuntime.audioAutomatic.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,
                 player = player,
+                audioAutomatic = audioAutomatic,
+                onAutomaticAudio = { playbackRuntime.useAutomaticAudio() },
                 tracksResolving =
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,

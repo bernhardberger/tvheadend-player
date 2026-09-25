@@ -50,6 +50,15 @@ class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    suspend fun remove(profile: String, channel: ChannelId) {
+        dataStore.edit { preferences ->
+            val remaining = decode(preferences[key]).filterNot {
+                it.profile == profile && it.channel == channel.value
+            }
+            preferences[key] = Json.encodeToString(remaining)
+        }
+    }
+
     private fun decode(value: String?): List<Entry> {
         if (value == null) return emptyList()
         return try {

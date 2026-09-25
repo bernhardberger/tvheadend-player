@@ -10,15 +10,20 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
-internal fun settingsPlayerLevel(vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
+internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): List<DepthLevel> {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    return settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onRefreshRateMatchingEnabledChanged,
-        vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged)
+    return listOf(settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onRefreshRateMatchingEnabledChanged,
+        vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged)) +
+        settingsAudioPreferenceLevels(ui,
+            onAudioLanguageSelected = { slot, language -> vm.onAudioLanguageSelected(slot, language); navigation.pop() },
+            onAudioFormatSelected = { vm.onAudioFormatSelected(it); navigation.pop() },
+            onSubtitleLanguageSelected = { vm.onSubtitleLanguageSelected(it); navigation.pop() })
 }
 
 @Composable
@@ -28,6 +33,7 @@ internal fun settingsPlayerLevel(
     onRefreshRateMatchingEnabledChanged: (Boolean) -> Unit,
     onProfileSelected: (StreamProfileId?) -> Unit,
     onAudioPassthroughEnabledChanged: (Boolean) -> Unit,
+    onAudioDescriptionChanged: (Boolean) -> Unit = {},
 ): DepthLevel {
     val direct = stringResource(R.string.profile_direct_streaming)
     val profileSection = stringResource(R.string.profile)
@@ -40,6 +46,7 @@ internal fun settingsPlayerLevel(
             supporting = if (ui.audioPassthroughChangeFailed) stringResource(R.string.audio_passthrough_failed)
                 else stringResource(R.string.audio_passthrough_description), checked = ui.audioPassthroughEnabled,
             onClick = { onAudioPassthroughEnabledChanged(!ui.audioPassthroughEnabled) }))
+        addAll(settingsAudioPreferenceRows(ui, onAudioDescriptionChanged))
         when (val profiles = ui.profiles) {
             StreamProfilesResult.NotReady -> add(settingsRow("profiles-status",
                 stringResource(if (ui.connected) R.string.loading_wait else R.string.not_connected), section = profileSection))

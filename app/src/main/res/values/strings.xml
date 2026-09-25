@@ -1,4 +1,20 @@
 <resources>
+    <string name="audio_subtitles_section">Audio &amp; subtitles</string>
+    <string name="audio_language_first">Audio language</string>
+    <string name="audio_language_second">Second audio language</string>
+    <string name="audio_language_third">Third audio language</string>
+    <string name="audio_language_automatic">Automatic (device language)</string>
+    <string name="audio_language_none">None</string>
+    <string name="audio_automatic">Automatic</string>
+    <string name="audio_automatic_help">Uses your audio preferences</string>
+    <string name="audio_format">Audio format</string>
+    <string name="audio_format_dolby">Prefer Dolby Digital</string>
+    <string name="audio_format_stereo">Prefer stereo</string>
+    <string name="audio_format_automatic_help">Let the player choose the audio format.</string>
+    <string name="audio_format_dolby_help">Prefer E-AC-3 and AC-3 within your chosen language.</string>
+    <string name="audio_format_stereo_help">Prefer AAC and MPEG audio, without limiting channels.</string>
+    <string name="audio_description">Audio description</string>
+    <string name="subtitle_follow_system">Follow system caption settings</string>
     <string name="player_programme_ended_at">Ended at %1$s</string>
     <string name="player_status_recording_playback">Recording in progress</string>
     <string name="player_status_recording_now">Recording now</string>

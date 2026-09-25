@@ -625,6 +625,8 @@ class AppPlaybackRuntime(
     private val _audioPassthroughChangeFailed = MutableStateFlow(false)
     val audioPassthroughChangeFailed = _audioPassthroughChangeFailed.asStateFlow()
     private var audioWriteJob: Job? = null
+    private val _audioAutomatic = MutableStateFlow(player.trackSelectionParameters.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO })
+    val audioAutomatic = _audioAutomatic.asStateFlow()
     private val presentationEpoch = PlaybackPresentationEpoch()
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     private val _activeTarget = MutableStateFlow<AppPlaybackTarget?>(null)
@@ -713,6 +715,7 @@ class AppPlaybackRuntime(
 
         override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
             if (!targetCommands.isOpen()) return
+            _audioAutomatic.value = parameters.overrides.values.none { it.type == C.TRACK_TYPE_AUDIO }
             if (interruptionMuted) {
                 preserveInterruptionMute()
                 return
@@ -1688,15 +1691,32 @@ class AppPlaybackRuntime(
         }
     }
 
+    // A committed UI choice outlives the options sheet, including while another command holds the lock.
+    fun useAutomaticAudio() = scope.launch {
+        targetCommands.serialize(onClosed = {}) {
+            audioSelection.useProfile(profileOwner.serverProfile.value, player)
+            val channel = audioSelection.useAutomatic(player)
+            val profileId = profileOwner.audioProfileId
+            if (channel != null && profileId != null) {
+                // A pending explicit-choice write must finish before its removal is persisted.
+                val previous = audioWriteJob
+                audioWriteJob = scope.launch {
+                    previous?.join()
+                    try {
+                        settings.audioChoices.remove(profileId, channel)
+                    } catch (_: java.io.IOException) {
+                        // Storage failure must not interrupt playback; the session choice is still forgotten.
+                    }
+                }
+            }
+        }
+    }
+
     private fun applyPlayerSettings(value: PlayerSettings) {
-        val audioLanguages: Array<String> = value.audioLanguage?.let { arrayOf(it) } ?: emptyArray()
-        val subtitleLanguages: Array<String> =
-            value.subtitleLanguage?.let { arrayOf(it) } ?: emptyArray()
         targetCommands.runIfOpen {
-            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                .setPreferredAudioLanguages(*audioLanguages)
-                .setPreferredTextLanguages(*subtitleLanguages)
-                .build()
+            player.trackSelectionParameters = trackPreferences(
+                player.trackSelectionParameters, value,
+            )
             player.setVideoChangeFrameRateStrategy(
                 if (value.refreshRateMatchingEnabled) {
                     C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
