@@ -3,6 +3,8 @@
 package at.bernhardberger.tvhplayer.di
 
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
@@ -13,6 +15,7 @@ import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -70,6 +73,10 @@ val appModule = module {
         val player = ExoPlayer.Builder(androidContext())
             .setRenderersFactory(createTvheadendRenderersFactory(androidContext(), audioOutput))
             .setLoadControl(createTvheadendLoadControl())
+            .setAudioAttributes(AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), false)
+            .setHandleAudioBecomingNoisy(false)
             .build()
         lateinit var playbackRuntime: AppPlaybackRuntime
         val coordinator = createTvheadendPlaybackCoordinator(
@@ -84,6 +91,7 @@ val appModule = module {
             profileOwner = profileOwner,
             scope = applicationScope,
             audioOutput = audioOutput,
+            audioFocus = AndroidPlaybackAudioFocus(androidContext(), player.applicationLooper),
         )
         SdkRuntimeOwner.create(
             session = session,
