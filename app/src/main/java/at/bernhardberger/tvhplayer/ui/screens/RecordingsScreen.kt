@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -169,6 +170,7 @@ fun RecordingsScreen(
         onPlayRecording = onPlayRecording,
         state = state,
         dvrMutationActions = dvrMutationActions,
+        currentObservation = { session.observation.value },
     )
 }
 
@@ -184,12 +186,14 @@ internal fun RecordingsScreenContent(
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
     dvrMutationActions: DvrMutationActions,
+    currentObservation: () -> SessionObservation = { observation },
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val currentSession = observation.currentSession
     val latestSession by rememberUpdatedState(currentSession)
+    val latestObservationProvider by rememberUpdatedState(currentObservation)
     val preparationAuthority = currentSession ?: observation.dvrSnapshotForDisplay
     var retainedPreparation by remember(preparationAuthority) {
         mutableStateOf<PreparedBrowseData<DvrSnapshot?, RecordingLibraryPresentation>?>(null)
@@ -223,6 +227,7 @@ internal fun RecordingsScreenContent(
     }
     var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
+    var confirmationKey by remember { mutableStateOf<Key?>(null) }
     var actionResult by remember { mutableStateOf<DvrMutationFeedback?>(null) }
     var pendingDetailsReturn by remember {
         mutableStateOf<RecordingDetailsReturnTarget?>(null)
@@ -245,7 +250,18 @@ internal fun RecordingsScreenContent(
             problems = groupDvrProblems(library.problems),
         )
     }
-    Box(Modifier.fillMaxSize()) content@{
+    Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+        // An observation can dismiss the confirmation between down and up.
+        // Finish that key cycle here, not on the refreshed details' action.
+        if (event.key == confirmationKey && pendingAction == null) {
+            if (event.type == KeyEventType.KeyUp) confirmationKey = null
+            true
+        } else {
+            if (pendingAction != null && event.type == KeyEventType.KeyDown) confirmationKey = event.key
+            if (event.key == confirmationKey && event.type == KeyEventType.KeyUp) confirmationKey = null
+            false
+        }
+    }) content@{
     BrowsePreparationPending(contentPadding, initialFocusEnabled, ready = prepared != null,
         onReadyFocus = { requestContentFocus = true; true })
     if (prepared == null) return@content
@@ -774,7 +790,15 @@ internal fun RecordingsScreenContent(
             actionResult = actionResult,
             canModifyRecordings = selectedCapability != null,
             playbackEligible = selectedCapability != null,
-            initialAction = detailsInitialAction,
+            initialAction = when (detailsInitialAction) {
+                RecordingDetailsAction.CANCEL,
+                RecordingDetailsAction.STOP -> when (opened.state) {
+                    DvrEntryState.SCHEDULED -> RecordingDetailsAction.CANCEL
+                    DvrEntryState.RECORDING -> RecordingDetailsAction.STOP
+                    else -> null
+                }
+                else -> detailsInitialAction
+            },
             backEnabled = backEnabled,
             onPlay = { intent ->
                 selectedCapability?.let { capability ->
@@ -836,14 +860,15 @@ internal fun RecordingsScreenContent(
 
     val action = pendingAction
     val target = opened
-    LaunchedEffect(action, selectedCapability) {
-        if (action != null && selectedCapability == null) {
+    val mutationStateCurrent = pendingMutation?.recordingStateIsCurrent(observation) == true
+    LaunchedEffect(action, selectedCapability, mutationStateCurrent) {
+        if (action != null && (selectedCapability == null || !mutationStateCurrent)) {
             pendingAction = null
             pendingMutation = null
-            actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE
+            if (selectedCapability == null) actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE
         }
     }
-    if (action != null && target != null && selectedCapability != null) {
+    if (action != null && target != null && selectedCapability != null && mutationStateCurrent) {
         RecordingConfirmationDialog(
             action = action,
             title = target.title.orEmpty(),
@@ -860,6 +885,11 @@ internal fun RecordingsScreenContent(
                 val mutationObservation = detailsObservation
                 val mutationGeneration = detailsGeneration
                 scope.launch {
+                    val latestObservation = latestObservationProvider()
+                    if (mutation == null ||
+                        mutationObservation?.currentSession !== latestObservation.currentSession ||
+                        !mutation.recordingStateIsCurrent(latestObservation)
+                    ) return@launch
                     val result = dvrMutationActions.execute(mutation)
                     if (
                         detailsGeneration == mutationGeneration &&

@@ -2028,7 +2028,7 @@ fun EpgGridScreen(
             val eventChannelId = event.channelId
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForProgramme(event)
-            ProgrammeDetailsPanel(
+            if (pendingAction == null) ProgrammeDetailsPanel(
                 contentPadding = contentPadding,
                 event = event,
                 channel = channel,
@@ -2132,7 +2132,9 @@ fun EpgGridScreen(
                 pendingMutation = null
                 pendingRecordingTarget = null
                 configChoices = null
-                actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE
+                if (currentSession == null || detailsObservation?.currentSession !== currentSession) {
+                    actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE
+                }
             }
         }
         if (
@@ -2226,6 +2228,7 @@ internal fun currentDvrMutation(
     currentObservation: SessionObservation,
 ): DvrMutationAction? = mutation?.takeIf {
     currentObservation.currentSession != null && sourceObservation?.currentSession === currentObservation.currentSession &&
+        it.recordingStateIsCurrent(currentObservation) &&
         (it !is DvrMutationAction.CreateProgramme || currentGuideRecordingTarget(it.target, currentObservation) != null)
 }
 

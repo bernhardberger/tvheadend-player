@@ -62,6 +62,8 @@ class GuideHistoryScreenTest {
     @Test fun pendingConfirmationClearsOnSessionReplacement() = exercise("en", 1f, "confirm", replaceSession = true)
     @Test fun pendingConfigurationClearsOnSessionReplacement() = exercise("en", 1f, "config", replaceSession = true)
     @Test fun historicalRecordingDetailsCloseOnSessionReplacement() = exercise("en", 1f, "details")
+    @Test fun pendingCancelDismissesWhenRecordingStarts() = exercise("en", 1f, "cancel")
+    @Test fun pendingStopDismissesWhenRecordingCompletes() = exercise("en", 1f, "stop")
 
     private fun exercise(locale: String, scale: Float, transition: String? = null, replaceSession: Boolean = false) {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
@@ -74,6 +76,7 @@ class GuideHistoryScreenTest {
         val current = channels.flatMap { channel -> (0..3).map { event(channel.id.value, it) } }
         val history = channels.flatMap { channel -> (-6..-1).map { event(channel.id.value, it) } }
         var archiveFuture = false
+        var recordingState = if (transition == "cancel") DvrEntryState.SCHEDULED else DvrEntryState.RECORDING
         fun observation(withHistory: Boolean) = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels)),
@@ -82,7 +85,10 @@ class GuideHistoryScreenTest {
                     EpgCoverage.create(channelId = it.id, coveredFrom = Instant.fromEpochSeconds(hour),
                         coveredTo = Instant.fromEpochSeconds(hour + 7 * 86400)) })),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = if (transition == "details") listOf(
-                DvrEntry.create(id = DvrEntryId(42), eventId = event(1, -1).id, state = DvrEntryState.COMPLETED)) else emptyList())),
+                DvrEntry.create(id = DvrEntryId(42), eventId = event(1, -1).id, state = DvrEntryState.COMPLETED))
+                else if (transition == "cancel" || transition == "stop") listOf(
+                    DvrEntry.create(id = DvrEntryId(42), eventId = event(1, 1).id, state = recordingState))
+                else emptyList())),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(if (transition == "config") listOf(
                 DvrConfiguration(DvrConfigId("one"), "One", ""), DvrConfiguration(DvrConfigId("two"), "Two", "")) else emptyList()),
         )
@@ -120,6 +126,28 @@ class GuideHistoryScreenTest {
             key(if (transition == "details") Key.DirectionLeft else Key.DirectionRight)
             focused(if (transition == "details") "Channel 1 hour -1" else "Channel 1 hour 1")
             key(Key.DirectionCenter)
+            if (transition == "cancel" || transition == "stop") {
+                val label = context.getString(if (transition == "cancel") R.string.cancel_recording else R.string.stop_recording)
+                compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithText(context.getString(R.string.back)).assertIsFocused()
+                compose.onNodeWithText(label).requestFocus().performKeyPress(androidx.compose.ui.input.key.KeyEvent(
+                    android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_CENTER)))
+                val before = session.calls.size
+                compose.runOnIdle {
+                    recordingState = if (transition == "cancel") DvrEntryState.RECORDING else DvrEntryState.COMPLETED
+                    session.publish(observation(true))
+                }
+                compose.onNodeWithText(context.getString(R.string.back)).assertDoesNotExist()
+                compose.onNodeWithText(label).assertDoesNotExist()
+                val nextLabel = context.getString(if (transition == "cancel") R.string.stop_recording else R.string.record)
+                compose.onNodeWithText(nextLabel).assertIsFocused()
+                // A new Dialog owns this focus target; an orphaned key-up must not activate it.
+                compose.onNodeWithText(nextLabel).performKeyPress(androidx.compose.ui.input.key.KeyEvent(
+                    android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_CENTER)))
+                compose.onNodeWithText(context.getString(R.string.back)).assertDoesNotExist()
+                assertEquals(before, session.calls.size)
+                return
+            }
             if (transition == "details") {
                 compose.onNodeWithText(context.getString(R.string.watch_from_start)).assertExists()
                 compose.runOnIdle { session.replaceGeneration(observation(false)) }

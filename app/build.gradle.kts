@@ -183,7 +183,7 @@ val syncReleasedSdkEvidence = tasks.register<Sync>("syncReleasedSdkEvidence") {
 }
 tasks.register("verifyExternalSdkConsumption") {
     group = "verification"
-    description = "Proves the app consumes only the exact public TVHeadend SDK release."
+    description = "Proves app and client consume only the exact public TVHeadend SDK release."
     dependsOn("assembleDebug", syncReleasedSdkEvidence)
 
     val sdkGroup = "at.bernhardberger.tvheadend"
@@ -191,23 +191,26 @@ tasks.register("verifyExternalSdkConsumption") {
     val stagedSdkSubstitution = providers.gradleProperty("tvheadend.sdk.local")
         .map(String::toBooleanStrict)
         .getOrElse(false)
-    val productionClasspaths = listOf(
-        "debugCompileClasspath",
-        "debugRuntimeClasspath",
-        "releaseCompileClasspath",
-        "releaseRuntimeClasspath",
-        "profileServerCompileClasspath",
-        "profileServerRuntimeClasspath",
-    ).associateWith(configurations::getByName)
-    val productionConfigurations = productionClasspaths.values.flatMap { it.hierarchy }.toSet()
-    val directSdkDependencies = productionConfigurations.flatMap { configuration ->
-        configuration.dependencies.mapNotNull { dependency ->
-            (dependency as? ExternalModuleDependency)
-                ?.takeIf { it.group == sdkGroup }
-                ?.let {
-                    val strictVersion = it.versionConstraint.strictVersion
-                    "${configuration.name}:${it.name}:$strictVersion"
-                }
+    evaluationDependsOn(":client")
+    val productionVariants = listOf(":app", ":client").flatMap { owner ->
+        listOf("debug", "release", "profile", "profileServer").map { "$owner:$it" }
+    }
+    val productionClasspaths = productionVariants.flatMap { variant ->
+        val owner = project(variant.substringBeforeLast(":"))
+        listOf("CompileClasspath", "RuntimeClasspath").map { suffix ->
+            "$variant$suffix" to owner.configurations.getByName("${variant.substringAfterLast(":")}$suffix")
+        }
+    }.toMap()
+    val directSdkDependencies = productionClasspaths.flatMap { (classpathName, classpath) ->
+        classpath.hierarchy.flatMap { configuration ->
+            configuration.dependencies.mapNotNull { dependency ->
+                (dependency as? ExternalModuleDependency)
+                    ?.takeIf { it.group == sdkGroup }
+                    ?.let {
+                        val strictVersion = it.versionConstraint.strictVersion
+                        "${classpathName.substringBeforeLast(":")}:${configuration.name}:${it.name}:$strictVersion"
+                    }
+            }
         }
     }.toSet()
     // The in-repo :client library is the only allowed project dependency; SDK projects stay forbidden.
@@ -232,7 +235,7 @@ tasks.register("verifyExternalSdkConsumption") {
     val publicRepositoryUrls = gradle.extensions.extraProperties.get("dependencyRepositoryUrls")
     val repositoriesMode = gradle.extensions.extraProperties.get("dependencyRepositoriesMode")
     val appProjectPath = project.path
-    listOf("debug", "release", "profileServer").forEach { variant ->
+    productionVariants.forEach { variant ->
         val runtimeGraph = productionClasspaths.getValue("${variant}RuntimeClasspath")
             .incoming.resolutionResult.rootComponent.map { root ->
                 val components = mutableSetOf<ResolvedComponentResult>()
@@ -295,14 +298,17 @@ tasks.register("verifyExternalSdkConsumption") {
         }
         check(sdkVersion == "0.19.0") { "Expected public SDK 0.19.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
-            "implementation:sdk-android:$sdkVersion",
-            "implementation:sdk-media3:$sdkVersion",
+            ":app:implementation:sdk-android:$sdkVersion",
+            ":app:implementation:sdk-media3:$sdkVersion",
+            ":app:profileImplementation:sdk-testing:$sdkVersion",
+            ":client:implementation:sdk-android:$sdkVersion",
+            ":client:implementation:sdk-media3:$sdkVersion",
         )
         check(directSdkDependencies == expectedDirectSdkDependencies) {
-            "App SDK declarations $directSdkDependencies do not match $expectedDirectSdkDependencies"
+            "App/client SDK declarations $directSdkDependencies do not match $expectedDirectSdkDependencies"
         }
         check(forbiddenLocalDependencies.isEmpty()) {
-            "App dependencies contain local fallbacks: $forbiddenLocalDependencies"
+            "App/client dependencies contain local fallbacks: $forbiddenLocalDependencies"
         }
         check(includedBuildNames.isEmpty()) { "The app must not use included builds: $includedBuildNames" }
         check(projectPaths == setOf(":", ":app", clientProjectPath)) {
@@ -327,7 +333,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "sdk-media3" to sdkVersion,
             "sdk-playback" to sdkVersion,
         )
-        listOf("debug", "release", "profileServer").forEach { variant ->
+        productionVariants.forEach { variant ->
             val runtimeGraph = (inputs.properties.getValue("${variant}RuntimeGraph") as Iterable<*>)
                 .map(Any?::toString)
                 .toSet()
@@ -342,9 +348,12 @@ tasks.register("verifyExternalSdkConsumption") {
                     val (module, version) = entry.removePrefix("tvheadend=").split(":", limit = 2)
                     module to version
                 }
-            check(resolvedTvheadendModules == expectedTvheadendModules) {
+            val expectedModules = if (variant == ":app:profile") {
+                expectedTvheadendModules + ("sdk-testing" to sdkVersion)
+            } else expectedTvheadendModules
+            check(resolvedTvheadendModules == expectedModules) {
                 "$variant runtime TVHeadend graph $resolvedTvheadendModules " +
-                    "does not match $expectedTvheadendModules"
+                    "does not match $expectedModules"
             }
             val compileTvheadendModules =
                 (inputs.properties.getValue("${variant}CompileTvheadendModules") as Iterable<*>)

@@ -5,12 +5,15 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepository
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
+import at.bernhardberger.tvhplayer.core.dvrMutationStateIsCurrent
 
 internal sealed interface DvrMutationAction {
     data class CreateProgramme(
@@ -32,6 +35,17 @@ internal sealed interface DvrMutationAction {
         val currentSession: CurrentSessionObservation,
         val recordingId: DvrEntryId,
     ) : DvrMutationAction
+}
+
+internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObservation): Boolean = when (this) {
+    is DvrMutationAction.Cancel -> dvrMutationStateIsCurrent(
+        currentSession, recordingId, DvrEntryState.SCHEDULED, observation,
+    )
+    is DvrMutationAction.Stop -> dvrMutationStateIsCurrent(
+        currentSession, recordingId, DvrEntryState.RECORDING, observation,
+    )
+    is DvrMutationAction.CreateProgramme,
+    is DvrMutationAction.Delete -> true
 }
 
 internal enum class DvrMutationFeedback(val isFailure: Boolean) {

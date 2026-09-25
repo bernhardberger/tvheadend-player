@@ -63,9 +63,14 @@ SDK. Anything that needs Compose, `R`, views, Koin or TV interaction stays in `:
 ## Tooling
 
 `tools/static_rules.py` applies the connection-probe rule to `client/src/main`
-as well; theme rules stay app-only. `:app:verifyExternalSdkConsumption` allows
-exactly the `:client` project and still rejects every other project, file or
-substituted SDK component.
+as well; theme rules stay app-only. `:app:verifyExternalSdkConsumption` checks
+both modules' debug, release, profile and profileServer compile/runtime classpaths
+and inherited dependency declarations. Only the in-repo `:client` project
+dependency is allowed; local file dependencies and substituted SDK components
+are rejected. Both modules must declare the released SDK with strict version
+pins, resolve the expected release graph, and use only the settings-owned public
+repositories (project repositories are forbidden). The app's offline profile
+variant additionally permits the strictly pinned released `sdk-testing` artifact.
 
 ## Deferred work
 

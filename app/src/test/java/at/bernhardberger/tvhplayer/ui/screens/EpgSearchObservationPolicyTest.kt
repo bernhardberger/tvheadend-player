@@ -5,6 +5,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
@@ -126,7 +127,9 @@ class EpgSearchObservationPolicyTest {
 
     @Test
     fun pendingConfirmationDoesNotDispatchAfterGenerationReplacement() = runTest {
-        val opened = observation()
+        val opened = observation(recordings = listOf(
+            DvrEntry.create(id = DvrEntryId(31), state = DvrEntryState.SCHEDULED),
+        ))
         val replacement = observation()
         val openedSession = requireNotNull(opened.currentSession)
         val mutation = DvrMutationAction.Cancel(openedSession, DvrEntryId(31))
