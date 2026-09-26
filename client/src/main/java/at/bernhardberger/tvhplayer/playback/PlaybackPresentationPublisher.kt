@@ -261,6 +261,9 @@ internal class PlaybackPresentationPublisher(
                     codec = it.codecs,
                     resolution = if (it.width > 0 && it.height > 0) "${it.width}×${it.height}" else null,
                     frameRate = it.frameRate.takeIf { rate -> rate > 0f },
+                    sampleMimeType = it.sampleMimeType,
+                    width = it.width.takeIf { width -> width > 0 },
+                    height = it.height.takeIf { height -> height > 0 },
                 )
             },
             audio = audio?.let {
@@ -269,6 +272,7 @@ internal class PlaybackPresentationPublisher(
                     language = it.language,
                     channelCount = it.channelCount.takeIf { count -> count > 0 },
                     sampleRateHz = it.sampleRate.takeIf { rate -> rate > 0 },
+                    sampleMimeType = it.sampleMimeType,
                 )
             },
             live = liveDiagnosticsForTarget(
