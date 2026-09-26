@@ -43,7 +43,8 @@ trap 'rm -rf "$temporary_dir"' EXIT
 
 cd "$ROOT_DIR"
 ./tools/verify
-./gradlew clean :app:syncReleasedSdkEvidence assembleRelease --no-daemon
+# Release bytes are always built from scratch: a fresh JVM and no outputs restored from the build cache.
+./gradlew clean :app:syncReleasedSdkEvidence assembleRelease --no-daemon --no-build-cache
 
 built_apk="app/build/outputs/apk/release/app-release-unsigned.apk"
 if [[ ! -f "$built_apk" ]]; then

@@ -68,7 +68,7 @@ printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
     assembleDebug \
     "${provenance_tasks[@]}" \
     "${gradle_arguments[@]}" \
-    --no-daemon --console=plain --no-scan
+    --console=plain --no-scan
 
 printf '==> External native dependency and packaged APK integrity\n'
 if [[ "$staged_sdk" == true ]]; then

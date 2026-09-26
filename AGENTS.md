@@ -111,9 +111,10 @@ repository-local domain overlays, then the focused skill, then local style.
 - One primary owns a coherent task end-to-end, including authorized release and
   verification. Split only for a real dependency, ownership boundary or context
   problem—not because implementation, review and release are different stages.
-- On the shared LXC, keep Gradle state in disk-backed `$HOME/.gradle`, retain
-  `--no-daemon`, and stop rather than increasing memory if the host becomes
-  sluggish.
+- On the shared LXC, keep Gradle state in disk-backed `$HOME/.gradle` and stop
+  rather than increasing memory if the host becomes sluggish. Builds reuse warm
+  Gradle daemons, which expire after 10 idle minutes. Never run `./gradlew --stop`
+  or kill daemons you did not start: it aborts other agents' running builds.
 
 ## TV interaction floor
 

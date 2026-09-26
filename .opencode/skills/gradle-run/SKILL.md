@@ -9,15 +9,23 @@ metadata:
 
 # Gradle Run
 
-Run the smallest owning Gradle task directly, with `--no-daemon --console=plain
---no-scan`. Run `./tools/verify` for the final application gate; it supplies those
-flags. Compilation of Android tests is not execution on a device.
+Run the smallest owning Gradle task directly, with `--console=plain --no-scan`.
+Run `./tools/verify` for the final application gate; it supplies those flags.
+Compilation of Android tests is not execution on a device.
+
+Builds reuse warm Gradle daemons, which exit after 10 idle minutes; the Kotlin
+compile daemon is bounded the same way. Never run `./gradlew --stop` or kill a
+daemon you did not start: daemons are shared, so that aborts other agents' builds.
+The build cache is on and shared across worktrees, so compile, resource and lint
+outputs built elsewhere are restored instead of rebuilt. Test tasks are never
+cached: they keep ordinary up-to-date checks in each worktree, and evidence tests
+run and write their files as before. Every test task fails after 15 minutes.
 
 On the shared Linux host, bound the command with GNU `timeout`, without
 `--foreground`, so interruption/timeout reaches the process group. For example:
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:testDebugUnitTest --no-daemon --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:testDebugUnitTest --console=plain --no-scan
 timeout --kill-after=5s 30m ./tools/verify
 ```
 

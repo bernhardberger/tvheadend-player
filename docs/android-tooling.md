@@ -19,7 +19,7 @@ nonempty serial, not a CLI default; confirm it against the intended role/identit
 Build on the engineering host, with disk-backed `$HOME/.gradle`:
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --offline --no-daemon --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --offline --console=plain --no-scan
 timeout --kill-after=5s 30m ./tools/verify
 ```
 

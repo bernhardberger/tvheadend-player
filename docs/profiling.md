@@ -48,7 +48,7 @@ together, so it does not establish an R8-only speedup. See the
 Build the physical performance baseline explicitly:
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:assembleProfileServer :app:lintProfileServer :app:verifyExternalSdkConsumption -Ptvhplayer.profileMinify=true --offline --no-daemon --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:assembleProfileServer :app:lintProfileServer :app:verifyExternalSdkConsumption -Ptvhplayer.profileMinify=true --offline --console=plain --no-scan
 ```
 
 The output is `app/build/outputs/apk/profileServer/app-profileServer.apk`.
@@ -81,7 +81,7 @@ background, GPU completion, submitted-buffer contents or physical presentation.
 Cached drawing also makes absence of a witness insufficient to infer unreadiness.
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:assembleProfile :app:assembleProfileServer :app:lintProfile :app:lintProfileServer --offline --no-daemon --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:assembleProfile :app:assembleProfileServer :app:lintProfile :app:lintProfileServer --offline --console=plain --no-scan
 ```
 
 The command above builds the **unoptimized diagnostic arm**. For a controlled
@@ -248,7 +248,7 @@ cannot load saved Player profiles or contact TVHeadend and is not a deployment
 replacement for Player. It adds no libraries or custom profiler.
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:assembleRelease :app:assembleProfile :app:lintProfile --offline --no-daemon --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:assembleRelease :app:assembleProfile :app:lintProfile --offline --console=plain --no-scan
 timeout --kill-after=5s 30m ./tools/verify
 ```
 

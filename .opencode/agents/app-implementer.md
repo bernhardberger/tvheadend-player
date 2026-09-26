@@ -47,7 +47,7 @@ reviews your diff, runs the final gate, and commits.
 
 ## Repository rules that apply to you
 
-- Gradle: JDK 21, always `--no-daemon`, one Gradle invocation at a time,
+- Gradle: JDK 21, one Gradle invocation at a time, never `./gradlew --stop`,
   redirect output to a file under `/tmp/opencode/` and read only the failing
   part. Prefer focused tasks (`:app:compileDebugKotlin`,
   `:app:testDebugUnitTest --tests '<class>'`) while iterating; run the gate the
