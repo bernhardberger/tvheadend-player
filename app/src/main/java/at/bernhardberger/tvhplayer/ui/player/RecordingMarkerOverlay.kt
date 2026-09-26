@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import kotlin.math.roundToInt
@@ -107,7 +108,11 @@ internal fun RecordingMarkerOverlay(
     val previousLabel = stringResource(R.string.recording_marker_previous)
     val nextLabel = stringResource(R.string.recording_marker_next)
     val closeLabel = stringResource(R.string.close)
-    LaunchedEffect(focus) { focus.requestFocus() }
+    LaunchedEffect(focus) {
+        // Wait one frame so the marker is ready to draw its focused state.
+        withFrameNanos { }
+        focus.requestFocus()
+    }
     val description = if (selected == 0L) stringResource(R.string.recording_marker_start)
         else stringResource(R.string.recording_marker_label,
             index + if (markers.firstOrNull() == 0L) 0 else 1, formatPlaybackDuration(selected))

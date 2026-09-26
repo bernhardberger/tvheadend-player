@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,13 +15,21 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.dialog
@@ -56,9 +65,21 @@ fun TvRecoveryOverlay(
     val secondaryFocus = remember { FocusRequester() }
     val primaryVisible = primaryActionLabel != null && onPrimaryAction != null
     val secondaryVisible = secondaryActionLabel != null && onSecondaryAction != null
+    val holderFocus = remember { FocusRequester() }
+    var holding by remember { mutableStateOf(false) }
+    var holderFocused by remember { mutableStateOf(false) }
     LaunchedEffect(visible, primaryActionLabel, primaryVisible) {
         if (visible && primaryVisible) {
-            runCatching { primaryFocus.requestFocus() }
+            // Take focus from anything behind the overlay at once, then wait one frame
+            // so the action is ready to draw its focused state.
+            holding = true
+            try {
+                runCatching { holderFocus.requestFocus() }
+                withFrameNanos { }
+                runCatching { primaryFocus.requestFocus() }
+            } finally {
+                holding = false
+            }
         }
     }
     AnimatedVisibility(
@@ -72,6 +93,13 @@ fun TvRecoveryOverlay(
                 .fillMaxSize()
                 .background(if (opaque) MaterialTheme.colorScheme.background else Color.Black.copy(alpha = 0.86f))
                 .padding(48.dp)
+                // Holds focus without a visible indication until the action takes it;
+                // OK and directions there do nothing, so none reaches what is behind.
+                .focusRequester(holderFocus)
+                .onFocusChanged { holderFocused = it.isFocused }
+                .onKeyEvent { event -> holderFocused && event.key in HeldKeys }
+                .focusProperties { canFocus = holding }
+                .focusable()
                 .focusGroup()
                 .semantics {
                     paneTitle = message
@@ -168,3 +196,13 @@ fun TvRecoveryOverlay(
         }
     }
 }
+
+private val HeldKeys = setOf(
+    Key.DirectionCenter,
+    Key.Enter,
+    Key.NumPadEnter,
+    Key.DirectionUp,
+    Key.DirectionDown,
+    Key.DirectionLeft,
+    Key.DirectionRight,
+)

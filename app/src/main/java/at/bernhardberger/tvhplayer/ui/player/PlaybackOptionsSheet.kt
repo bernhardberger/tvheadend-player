@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -955,7 +956,13 @@ private fun DisplayOptionsPage(
         AspectRatioMode.FORCE_4_3 -> standardFocus
     }
 
-    LaunchedEffect(selected) { runCatching { initialFocus.requestFocus() } }
+    // Focus the selected row once as the page opens: a later selection comes from the
+    // focused row itself, and focus must stay wherever the viewer moves on to.
+    LaunchedEffect(Unit) {
+        // Wait one frame so the row is ready to draw its focused state.
+        withFrameNanos { }
+        runCatching { initialFocus.requestFocus() }
+    }
     OptionsHeader(
         title = stringResource(R.string.display_mode),
         currentValue = currentValue,
@@ -997,7 +1004,11 @@ private fun StatsOptionsPage(
 ) {
     val headerBackFocus = remember { FocusRequester() }
     val statsFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { statsFocus.requestFocus() } }
+    LaunchedEffect(Unit) {
+        // Wait one frame so the row is ready to draw its focused state.
+        withFrameNanos { }
+        runCatching { statsFocus.requestFocus() }
+    }
     OptionsHeader(
         title = stringResource(R.string.stats_for_nerds),
         currentValue = currentValue,

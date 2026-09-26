@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -31,7 +32,11 @@ internal fun ChannelSettingsNotice(
 ) {
     if (loaded && !failed) return
     LaunchedEffect(loaded, failed, initialFocusEnabled) {
-        if (!loaded && failed && initialFocusEnabled) retryFocus.requestFocus()
+        if (!loaded && failed && initialFocusEnabled) {
+            // Wait one frame so Retry is ready to draw its focused state.
+            withFrameNanos { }
+            retryFocus.requestFocus()
+        }
     }
     Row(
         modifier.padding(24.dp).semantics { liveRegion = LiveRegionMode.Polite },

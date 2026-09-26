@@ -311,6 +311,8 @@ internal fun ProgrammeRecordingConfirmation(
     }
 
     LaunchedEffect(state) {
+        // Wait one frame so the new button is ready to draw its focused state.
+        withFrameNanos { }
         when (state) {
             is LiveInfoRecordingState.Failed -> activateFocus.requestFocus()
             is LiveInfoRecordingState.Confirming,
