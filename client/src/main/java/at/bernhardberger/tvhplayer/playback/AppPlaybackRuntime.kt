@@ -2,14 +2,17 @@
 
 package at.bernhardberger.tvhplayer.playback
 
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrProgressPolicy
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBindingResult
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
@@ -182,6 +185,11 @@ class AppPlaybackRuntime(
     private var targetInstallationInProgress = false
     private var lastLiveChannelId: ChannelId? = null
     private var lastRecordingRequest: Pair<DvrEntryId, RecordingPlaybackStart>? = null
+    // Where the failed or lost recording target last stood; only Retry and route restoration read it.
+    private var recordingRecovery: RecordingRecoveryPosition? = null
+    // The recovery seek owed to the installed target until its timeline can take it; under
+    // the target access lock, because player callbacks apply it outside target commands.
+    private var pendingRecordingRecovery: PendingRecordingRecovery? = null
     private val liveRecovery: LiveRecoveryController = LiveRecoveryController(
         scope = scope,
         targetCommands = targetCommands,
@@ -286,6 +294,22 @@ class AppPlaybackRuntime(
                 presentation.publishPlayerState()
                 if (playbackState == Player.STATE_READY) livePauseController.onTargetReady(activeTargetEpoch)
             }
+            applyPendingRecordingRecovery()
+        }
+
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            applyPendingRecordingRecovery()
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            // Any other seek (the viewer's, a marker's) replaces the owed recovery seek.
+            if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                targetCommands.runIfOpen { pendingRecordingRecovery = null }
+            }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -316,6 +340,7 @@ class AppPlaybackRuntime(
             if (intent != null && isPlaybackIntentStopped(intent)) return@serialize null
             if (policy.trace.enabled) policy.trace.tuneAdmitted()
             lastLiveChannelId = selection.channelId
+            forgetRecordingRecoveryLocked()
             liveRecovery.resetBackoffLocked()
             val result = playLive(
                 channelId = selection.channelId,
@@ -463,6 +488,8 @@ class AppPlaybackRuntime(
     ): PlaybackTargetResult? {
         playbackRequests.incrementAndGet()
         return targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
+            // The viewer's start choice applies to a new play; no earlier position carries over.
+            forgetRecordingRecoveryLocked()
             playRecordingLocked(selection.recordingId, start)
         }
     }
@@ -538,14 +565,70 @@ class AppPlaybackRuntime(
             if (userStopIsLatest()) {
                 null
             } else {
-                playRecordingLocked(selection.recordingId, start)
+                noteRecordingInterruptionLocked()
+                playRecordingLocked(selection.recordingId, start, recoverAt = recordingRecovery)
             }
         },
     )
 
+    /**
+     * Remembers where the recording target being replaced by recovery stands, read from the
+     * player before the replacement retires it. A target still owed its recovery seek stands
+     * where that seek would take it, not where the player waits. Without a recording target
+     * (a failed retry already removed it, or an automatic stop did) the earlier note stays.
+     */
+    private fun noteRecordingInterruptionLocked() {
+        val target = _activeTarget.value as? AppPlaybackTarget.Recording ?: return
+        recordingRecovery = targetCommands.readIfOpen {
+            pendingRecordingRecovery
+                ?.takeIf { it.epoch == activeTargetEpoch && it.position.recordingId == target.recordingId }
+                ?.position
+                ?: RecordingRecoveryPosition(
+                    recordingId = target.recordingId,
+                    positionMs = player.currentPosition,
+                    durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+                )
+        } ?: recordingRecovery
+    }
+
+    /** A new play, live, or Stop: nothing from an earlier recording target carries over. */
+    private fun forgetRecordingRecoveryLocked() {
+        recordingRecovery = null
+        targetCommands.runIfOpen { pendingRecordingRecovery = null }
+    }
+
+    /**
+     * Seeks the installed recording to its owed recovery position once its timeline can take
+     * the seek, by the rule the SDK's own resume follows: a known duration, a position before
+     * its end, a seekable item. An earlier seek into a progressive item not yet seekable is
+     * lost to its start. A replaced, failed, or stopped target drops the seek.
+     */
+    private fun applyPendingRecordingRecovery() {
+        targetCommands.runIfOpen {
+            val pending = pendingRecordingRecovery ?: return@runIfOpen
+            if (targetInstallationInProgress) return@runIfOpen
+            val target = _activeTarget.value as? AppPlaybackTarget.Recording
+            if (pending.epoch != activeTargetEpoch || target?.recordingId != pending.position.recordingId) {
+                pendingRecordingRecovery = null
+                return@runIfOpen
+            }
+            // A failed target keeps the seek owed, so its own recovery continues there.
+            if (player.playerError != null) return@runIfOpen
+            val durationMs = player.duration.takeIf { it != C.TIME_UNSET && it >= 0 } ?: return@runIfOpen
+            if (pending.position.positionMs >= durationMs) {
+                pendingRecordingRecovery = null
+                return@runIfOpen
+            }
+            if (!player.isCurrentMediaItemSeekable) return@runIfOpen
+            pendingRecordingRecovery = null
+            player.seekTo(pending.position.positionMs)
+        }
+    }
+
     private suspend fun playRecordingLocked(
         recordingId: DvrEntryId,
         start: RecordingPlaybackStart,
+        recoverAt: RecordingRecoveryPosition? = null,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
@@ -576,6 +659,7 @@ class AppPlaybackRuntime(
         var admission: RecordingPlaybackAdmission? = null
         var installedBinding: PlaybackBinding.Recording? = null
         var committed = false
+        var recoverySeekMs: Long? = null
         startupBuffer?.targetInstalling(live = false)
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
@@ -590,10 +674,19 @@ class AppPlaybackRuntime(
                     is PlaybackBindingResult.Bound -> {
                         admission = binding.binding.admission
                         installedBinding = binding.binding
+                        recoverySeekMs = recordingRecoverySeekMs(
+                            recovery = recoverAt,
+                            recordingId = recordingId,
+                            completedRecording = admission is RecordingPlaybackAdmission.Completed,
+                        )
                         if (!targetCommands.isOpen()) {
                             PlaybackTargetResult.SHUT_DOWN
                         } else {
-                            coordinator.setRecordingTarget(binding.binding, start)
+                            // Recovery owns the position: the SDK schedules no bookmark seek.
+                            coordinator.setRecordingTarget(
+                                binding.binding,
+                                if (recoverySeekMs != null) RecordingPlaybackStart.START_OVER else start,
+                            )
                         }
                     }
                     PlaybackBindingResult.ObservationExpired -> {
@@ -633,7 +726,24 @@ class AppPlaybackRuntime(
                 )
             }
         )
-        if (committed) applyPlayIntentToStartedTarget(result)
+        if (committed) {
+            // Recovery continues where the lost target stood; the viewer's start applied once.
+            val recovery = recoverAt
+            val positionMs = recoverySeekMs
+            recordingRecovery = null
+            targetCommands.runIfOpen {
+                pendingRecordingRecovery = if (positionMs != null && recovery != null) {
+                    PendingRecordingRecovery(
+                        epoch = activeTargetEpoch,
+                        position = recovery.copy(positionMs = positionMs),
+                    )
+                } else {
+                    null
+                }
+            }
+            applyPendingRecordingRecovery()
+            applyPlayIntentToStartedTarget(result)
+        }
         return result
     }
 
@@ -647,6 +757,7 @@ class AppPlaybackRuntime(
             onClosed = { PlaybackStopResult.ShutDown },
         ) {
             synchronized(intentLock) { userStopIntent = maxOf(userStopIntent, intent) }
+            forgetRecordingRecoveryLocked()
             explicitStopLocked()
         }
     }
@@ -658,7 +769,11 @@ class AppPlaybackRuntime(
      */
     suspend fun stopAfterLoss(): PlaybackStopResult = targetCommands.serialize(
         onClosed = { PlaybackStopResult.ShutDown },
-    ) { explicitStopLocked() }
+    ) {
+        noteRecordingInterruptionLocked()
+        targetCommands.runIfOpen { pendingRecordingRecovery = null }
+        explicitStopLocked()
+    }
 
     private suspend fun explicitStopLocked(): PlaybackStopResult {
         foregroundPlaybackLifecycle.onExplicitStop()
@@ -789,7 +904,8 @@ class AppPlaybackRuntime(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
         currentRequest = { lastRecordingRequest },
     ) { (recordingId, start) ->
-        playRecordingLocked(recordingId, start)
+        noteRecordingInterruptionLocked()
+        playRecordingLocked(recordingId, start, recoverAt = recordingRecovery)
     }
     suspend fun pauseTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
@@ -1083,6 +1199,8 @@ class AppPlaybackRuntime(
         livePlaybackObservationJob.join()
         settingsJob.join()
         targetCommands.awaitIdle {
+            recordingRecovery = null
+            pendingRecordingRecovery = null
             livePauseController.dropPendingLivePauseLocked()
             audioInterruptions.clearAudioInterruptionLocked()
             presentation.removeTargetFrameListenerLocked()
@@ -1374,6 +1492,38 @@ class AppPlaybackRuntime(
             startupBuffer?.timeshiftSeekFinished(accepted = started)
         }
     }
+}
+
+/** Where a recording target stood when recovery (Retry, route restoration) replaced it. */
+internal data class RecordingRecoveryPosition(
+    val recordingId: DvrEntryId,
+    val positionMs: Long,
+    val durationMs: Long?,
+)
+
+/** A recovery seek owed to the recording target installed under [epoch]. */
+private data class PendingRecordingRecovery(
+    val epoch: Long?,
+    val position: RecordingRecoveryPosition,
+)
+
+/**
+ * The position recovery of [recordingId] continues at, or null to keep the viewer's start.
+ * Only the same completed recording carries over. A growing recording keeps its start: its
+ * extent moves and a remembered offset is not proven seekable. A position at or past the
+ * point where an orderly exit counts as finished starts per the viewer's choice instead.
+ */
+internal fun recordingRecoverySeekMs(
+    recovery: RecordingRecoveryPosition?,
+    recordingId: DvrEntryId,
+    completedRecording: Boolean,
+    orderlyCompletionFraction: Double = DvrProgressPolicy().orderlyCompletionFraction,
+): Long? {
+    if (recovery == null || recovery.recordingId != recordingId || !completedRecording) return null
+    if (recovery.positionMs <= 0) return null
+    val durationMs = recovery.durationMs
+    if (durationMs != null && recovery.positionMs >= durationMs * orderlyCompletionFraction) return null
+    return recovery.positionMs
 }
 
 /** A seek skipped on the server unless it never ran or the server refused it. */
