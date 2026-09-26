@@ -79,6 +79,22 @@ internal class LiveRecoveryAttemptRunner(
         observation: SessionObservation,
     ): Boolean = current?.matches(activeTarget, activeTargetEpoch, observation) == true
 
+    /**
+     * Makes [fence] the owned attempt before its job runs, so a superseded attempt that is still
+     * unwinding no longer resolves (and republishes over) the presentation [fence] publishes.
+     */
+    fun claim(fence: LiveRecoveryFence) {
+        current = fence
+    }
+
+    /** Resolves a claimed [fence] whose job ended without running it. */
+    fun releaseUnrun(fence: LiveRecoveryFence) {
+        if (current === fence) {
+            current = null
+            onResolved(fence, null)
+        }
+    }
+
     suspend fun run(
         fence: LiveRecoveryFence,
         recover: suspend () -> PlaybackTargetResult?,

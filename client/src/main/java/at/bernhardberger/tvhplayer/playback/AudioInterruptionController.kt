@@ -35,6 +35,8 @@ internal class AudioInterruptionController(
     private val activeTargetEpoch: () -> Long?,
     private val targetInstallationInProgress: () -> Boolean,
     private val cancelRecoveryForInterruptionLocked: (currentJob: Job) -> Unit,
+    /** Playback may continue: a live recovery the interruption stopped may retune now. */
+    private val resumeInterruptedRecoveryLocked: () -> Unit,
 ) {
     private var focusGeneration = 0L
     var interruption: AudioInterruption? = null
@@ -130,6 +132,7 @@ internal class AudioInterruptionController(
         resumeAfterInterruption = false
         setInterruptionMuted(false)
         player.play()
+        resumeInterruptedRecoveryLocked()
         return result
     }
 
@@ -152,6 +155,7 @@ internal class AudioInterruptionController(
             interruption = null
             interruptionHoldUnconfirmed = false
             resumeAfterInterruption = false
+            resumeInterruptedRecoveryLocked()
             return
         }
         val persistent = interruption == AudioInterruption.PERMANENT_LOSS || interruption == AudioInterruption.NOISY
@@ -174,12 +178,16 @@ internal class AudioInterruptionController(
                     setInterruptionMuted(true)
                     interruptionPaused = false
                     player.play()
+                    // Consumption goes on muted, so the stopped recovery goes on too (and keeps the mute).
+                    resumeInterruptedRecoveryLocked()
                 }
             }
             AudioInterruptionAction.MUTE -> {
                 setInterruptionMuted(true)
                 // A denied initial request also needs to start video consumption.
                 player.play()
+                // Consumption goes on muted, so a recovery a Pause held goes on too.
+                resumeInterruptedRecoveryLocked()
             }
             else -> Unit
         }

@@ -41,6 +41,8 @@ internal class LivePauseController(
     private val stopPausedRetune: suspend () -> Unit,
     /** Serialized. The startup Play that a Pause given before the channel started replaced. */
     private val playStartedTarget: suspend () -> Unit,
+    /** Serialized. Playing again: a recovery the Pause deferred or kept owed goes on. */
+    private val resumeOwedRecovery: () -> Unit,
     /** The viewer's pending live selection: null without one, else whether it should play. */
     private val pendingLiveSelectionPlayWhenReady: () -> Boolean?,
 ) {
@@ -229,7 +231,13 @@ internal class LivePauseController(
             return true
         }
         if (foreground() && interruption() == null) {
-            if (pending.startupPlay) playStartedTarget() else player.playWhenReady = pending.wasPlaying
+            if (pending.startupPlay) {
+                playStartedTarget()
+            } else {
+                player.playWhenReady = pending.wasPlaying
+                // Its local pause may have deferred a recovery: the viewer need not press Play.
+                if (pending.wasPlaying) resumeOwedRecovery()
+            }
         }
         _livePauseNotice.value = LivePauseUnavailableNotice()
         return true

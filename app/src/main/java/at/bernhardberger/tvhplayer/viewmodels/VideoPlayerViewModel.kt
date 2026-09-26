@@ -52,8 +52,9 @@ class VideoPlayerViewModel(
         playbackRuntime.stopAfterLoss()
     }
 
-    fun retryLiveNow() {
-        viewModelScope.launch { playbackRuntime.retryLive() }
+    /** [viewerRetry]: the viewer pressed Retry (a fresh start); otherwise automatic reconnect recovery. */
+    fun retryLiveNow(viewerRetry: Boolean) {
+        viewModelScope.launch { playbackRuntime.retryLive(viewerRetry) }
     }
 
     suspend fun pauseTimeshift() = playbackRuntime.pauseTimeshift()

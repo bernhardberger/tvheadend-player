@@ -1115,7 +1115,7 @@ fun VideoPlayerScreen(
     fun dispatchRecoveryRetry() {
         when (recoveryUiModel.retryCommand) {
             PlaybackRetryCommand.RECONNECT -> onReconnect()
-            PlaybackRetryCommand.RETRY_LIVE -> videoPlayerViewModel.retryLiveNow()
+            PlaybackRetryCommand.RETRY_LIVE -> videoPlayerViewModel.retryLiveNow(viewerRetry = true)
             PlaybackRetryCommand.RESUME_RECORDING,
             PlaybackRetryCommand.NONE -> Unit
         }
@@ -1130,7 +1130,7 @@ fun VideoPlayerScreen(
                     connectionLost = false
                     layerState.showControls()
 
-                    videoPlayerViewModel.retryLiveNow()
+                    videoPlayerViewModel.retryLiveNow(viewerRetry = false)
                     if (restoreToLiveAfterReconnect) {
                         timelineState.showFeedback(timeshiftReconnectLiveText)
                         restoreToLiveAfterReconnect = false

@@ -10,6 +10,7 @@ import android.app.Application
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.TrackGroup
@@ -608,6 +609,976 @@ class AudioInterruptionRuntimeTest {
         assertTrue(startupBuffer.isLiveTarget)
     }
 
+    @Test fun interruptionDuringAdmittedRecoveryBackoffRetunesOnceAfterGain() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        // The backoff passes while the interruption holds playback: nothing retunes.
+        delay(2_500)
+        settle()
+        assertEquals(subscriptions, connection.subscribeCount)
+        assertFalse(player.playWhenReady)
+        focus.send(AudioInterruption.GAIN)
+        await { connection.subscribeCount == subscriptions + 1 }
+        assertEquals(listOf(0, 100), connection.speeds)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(audioDisabled())
+        delay(2_500)
+        settle()
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+    }
+
+    @Test fun rejectedInterruptionHoldKeepsTheAdmittedRecoveryAndItsMute() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        val requests = focus.requests.size
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { connection.subscribeCount == subscriptions + 1 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertTrue(audioDisabled())
+        assertEquals(requests, focus.requests.size)
+        delay(2_500)
+        settle()
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+    }
+
+    @Test fun permanentLossDuringRecoveryBackoffRetunesOnlyOnExplicitPlay() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.PERMANENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        delay(2_500)
+        focus.send(AudioInterruption.GAIN)
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(subscriptions, connection.subscribeCount)
+        runtime.play()
+        await { connection.subscribeCount == subscriptions + 1 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun viewerPauseDuringTheInterruptionKeepsTheRecoveryOwedUntilPlay() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        runtime.pauseTimeshiftPlayback()
+        focus.send(AudioInterruption.GAIN)
+        delay(300)
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(subscriptions, connection.subscribeCount)
+        runtime.play()
+        await { connection.subscribeCount == subscriptions + 1 }
+    }
+
+    @Test fun interruptedRecoveryNeverRetunesAReplacementTarget() = exercise {
+        awaitSecondRecoveryBackoff()
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
+        live(timeshift = true, channel = 2)
+        val subscriptions = connection.subscribeCount
+        runtime.play()
+        focus.send(AudioInterruption.GAIN)
+        delay(300)
+        settle()
+        assertEquals(subscriptions, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+
+        // Another recovery interrupted, then replaced by a recording.
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == subscriptions + 1 }
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
+        recording()
+        runtime.play()
+        delay(2_500)
+        settle()
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun interruptedRecoveryOfAReplacedSessionIsDropped() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
+        val previous = session.observation.value
+        session.replaceGeneration(SessionObservation.create(
+            sessionState = previous.sessionState, channelState = previous.channelState,
+            epgState = previous.epgState, dvrState = previous.dvrState,
+        ))
+        focus.send(AudioInterruption.GAIN)
+        delay(300)
+        settle()
+        assertEquals(subscriptions, connection.subscribeCount)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+    }
+
+    @Test fun stopAndDetachEndAnInterruptedRecovery() = exercise {
+        awaitSecondRecoveryBackoff()
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
+        val beforeStop = focus.requests.last()
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        beforeStop(AudioInterruption.GAIN)
+        live(timeshift = true)
+        val subscriptions = connection.subscribeCount
+        delay(300)
+        settle()
+        assertEquals(subscriptions, connection.subscribeCount)
+
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == subscriptions + 1 }
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
+        val beforeDetach = focus.requests.last()
+        runtime.detach()
+        beforeDetach(AudioInterruption.GAIN)
+        delay(2_500)
+        settle()
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+    }
+
+    @Test fun backgroundTurnsAnInterruptedRecoveryIntoOneForegroundRetune() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
+        val callback = focus.requests.last()
+        runtime.onAppBackgrounded()
+        await { runtime.activeTarget.value == null }
+        callback(AudioInterruption.GAIN)
+        delay(2_500)
+        settle()
+        assertEquals(subscriptions, connection.subscribeCount)
+        runtime.onAppForegrounded()
+        await { connection.subscribeCount == subscriptions + 1 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) && player.playWhenReady }
+        delay(300)
+        settle()
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+    }
+
+    @Test fun viewerRetryOfAMutedChannelStartsFreshWithFocusAndSound() = exercise {
+        live(timeshift = false)
+        focus.send(AudioInterruption.NOISY)
+        await { audioDisabled() }
+        val retry = scope.async { runtime.retryLive(viewerRetry = true) }
+        await { connection.subscribeCount == 2 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { retry.isCompleted }
+        assertTrue(retry.await()?.isStarted == true)
+        assertFalse(audioDisabled())
+        assertTrue(player.playWhenReady)
+        assertEquals(2, focus.requests.size)
+        // The new request owns focus: a later loss mutes again.
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { audioDisabled() }
+    }
+
+    @Test fun viewerRetryWithDeniedFocusStaysSafelyMuted() = exercise {
+        live(timeshift = false)
+        focus.send(AudioInterruption.NOISY)
+        await { audioDisabled() }
+        focus.granted = false
+        val retry = scope.async { runtime.retryLive(viewerRetry = true) }
+        await { connection.subscribeCount == 2 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { retry.isCompleted }
+        assertEquals(2, focus.requests.size)
+        assertTrue(audioDisabled())
+        assertTrue(player.playWhenReady)
+    }
+
+    @Test fun automaticRetryKeepsTheInterruptionMute() = exercise {
+        live(timeshift = false)
+        focus.send(AudioInterruption.NOISY)
+        await { audioDisabled() }
+        val retry = scope.async { runtime.retryLive() }
+        await { connection.subscribeCount == 2 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { retry.isCompleted }
+        assertTrue(retry.await()?.isStarted == true)
+        assertTrue(audioDisabled())
+        assertTrue(player.playWhenReady)
+        assertEquals(1, focus.requests.size)
+    }
+
+    @Test fun viewerRetryFromFailedShowsStartingWhileTheTunerIsAcquired() = exercise {
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val failed = runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+        assertFalse(failed?.isStarted == true)
+        assertTrue(runtime.state.value is AppPlaybackState.Failed)
+        session.scriptLivePlaybackSuccess(manager)
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        val subscriptions = connection.subscribeCount
+        val retry = scope.async { runtime.retryLive(viewerRetry = true) }
+        await { connection.subscribeCount > subscriptions }
+        // The viewer sees the retry start while the channel is still being bound and admitted.
+        assertEquals(listOf(AppPlaybackState.Starting), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { retry.isCompleted }
+        assertTrue(retry.await()?.isStarted == true)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun failedViewerRetryKeepsTheMutedTargetItsStateAndFocus() = exercise {
+        live(timeshift = false)
+        focus.send(AudioInterruption.NOISY)
+        await { audioDisabled() }
+        settle()
+        val state = runtime.state.value
+        val abandons = focus.abandons
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val retry = scope.async { runtime.retryLive(viewerRetry = true) }
+        await { retry.isCompleted }
+        assertFalse(retry.await()?.isStarted == true)
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(state, runtime.state.value)
+        assertTrue(audioDisabled())
+        assertTrue(player.playWhenReady)
+        assertEquals(1, focus.requests.size)
+        assertEquals(abandons, focus.abandons)
+    }
+
+    @Test fun pauseQueuedBehindTheFocusGainKeepsTheResumedRecoveryOwedUntilPlay() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        // The gain's server resume is still in flight when the viewer presses Pause.
+        val resumeSent = CompletableDeferred<Unit>()
+        val releaseResume = CompletableDeferred<Unit>()
+        beforeSpeed = { speed ->
+            if (speed == 100 && resumeSent.complete(Unit)) releaseResume.await()
+        }
+        focus.send(AudioInterruption.GAIN)
+        await { resumeSent.isCompleted }
+        val pause = scope.async { runtime.pauseTimeshiftPlayback() }
+        settle()
+        assertFalse(pause.isCompleted)
+        releaseResume.complete(Unit)
+        await { pause.isCompleted }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, pause.await())
+        delay(300)
+        settle()
+        // The resumed recovery ran after the Pause: it neither retuned nor played over it.
+        assertFalse(player.playWhenReady)
+        assertEquals(subscriptions, connection.subscribeCount)
+        assertEquals(listOf(0, 100, 0), connection.speeds)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // It is still owed: the viewer's Play retunes the target once.
+        runtime.play()
+        await { connection.subscribeCount == subscriptions + 1 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        delay(300)
+        settle()
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+    }
+
+    @Test fun pauseQueuedBehindTheResumedRetuneHoldsTheNewSubscription() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        focus.send(AudioInterruption.GAIN)
+        await { connection.subscribeCount == subscriptions + 1 }
+        // The viewer pauses while the retune is under way: its commit cannot interleave with the
+        // Pause, so the Pause serializes after it and addresses the retuned target.
+        val pause = scope.async { runtime.pauseTimeshiftPlayback() }
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
+        await { pause.isCompleted }
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        markReady()
+        // The Pause belongs to the retuned target and is held on its server once its picture is up.
+        await { connection.speeds == listOf(0, 100, 0) }
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun recoveryRequestedWhileAnInterruptionHoldsPlaybackIsAdmittedAfterGain() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        // The SDK escalates while the interruption holds playback, even repeatedly.
+        repeat(3) { runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED) }
+        delay(300)
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        assertFalse(player.playWhenReady)
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        focus.send(AudioInterruption.GAIN)
+        await { connection.subscribeCount == 2 }
+        // Admitted as the target's first attempt: waiting claimed no attempt and no backoff.
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        delay(300)
+        settle()
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun recoveryQueuedBehindAnInterruptionPauseIsAdmittedAfterGain() = exercise {
+        live(timeshift = true)
+        val release = CompletableDeferred<Unit>()
+        val blocker = scope.launch { commands.serialize(onClosed = {}) { release.await() } }
+        settle()
+        // The focus loss queues first, the escalation behind it.
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        settle()
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        settle()
+        release.complete(Unit)
+        blocker.join()
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        delay(300)
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        focus.send(AudioInterruption.GAIN)
+        await { connection.subscribeCount == 2 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun stopAndANewChannelEndADeferredRecovery() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        settle()
+        val beforeStop = focus.requests.last()
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        beforeStop(AudioInterruption.GAIN)
+        live(timeshift = true)
+        var subscriptions = connection.subscribeCount
+        runtime.play()
+        delay(300)
+        settle()
+        assertEquals(subscriptions, connection.subscribeCount)
+
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        settle()
+        live(timeshift = true, channel = 2)
+        subscriptions = connection.subscribeCount
+        focus.send(AudioInterruption.GAIN)
+        runtime.play()
+        delay(300)
+        settle()
+        assertEquals(subscriptions, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+    }
+
+    @Test fun backgroundTurnsADeferredRecoveryIntoOneForegroundRetune() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        settle()
+        val callback = focus.requests.last()
+        runtime.onAppBackgrounded()
+        await { runtime.activeTarget.value == null }
+        callback(AudioInterruption.GAIN)
+        delay(300)
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        runtime.onAppForegrounded()
+        await { connection.subscribeCount == 2 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) && player.playWhenReady }
+        delay(300)
+        settle()
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun resumedRecoveryStaysPresentedAsRecoveringUntilItRetunes() = exercise {
+        awaitSecondRecoveryBackoff()
+        val subscriptions = connection.subscribeCount
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        // A rejected hold goes on muted and resumes the stopped attempt in the same command,
+        // while that attempt is still unwinding.
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { connection.subscribeCount == subscriptions + 1 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun stoppedAttemptUnwindingAfterTheResumeDoesNotRepublishOverIt() = exercise {
+        val events = mutableListOf<String>()
+        val selection = requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))
+        val stopped = LiveRecoveryFence(PlaybackRecoveryReason.LIVE_ENDED, selection, targetEpoch = 1L)
+        var admitted = false
+        val recovery = LiveRecoveryController(scope, PlaybackTargetCommandSerialization()) { fence, _ ->
+            events += if (fence === stopped) "stopped attempt resolved" else "resumed attempt resolved"
+        }
+        recovery.dispatch(
+            PlaybackRecoveryReason.LIVE_ENDED,
+            admitLocked = {
+                recovery.admitLocked(stopped)
+                admitted = true
+                stopped to LiveRecoveryAttempt(attempt = 2, delayMillis = 60_000L)
+            },
+            retryLocked = { events += "stopped attempt retuned"; null },
+        )
+        await { admitted }
+        recovery.cancelOnInterruptionLocked(Job())
+        assertEquals(stopped, recovery.interruptedRecovery)
+        // Playback may continue before the stopped attempt has unwound from its backoff.
+        recovery.resumeInterruptedLocked({ events += "resumed attempt retuned"; null }) {
+            events += "Recovering published"
+        }
+        await { "resumed attempt resolved" in events }
+        settle()
+        assertEquals(listOf("Recovering published", "resumed attempt retuned", "resumed attempt resolved"), events)
+    }
+
+    @Test fun pauseQueuedBehindTheFocusGainKeepsADeferredRecoveryUnadmittedUntilPlay() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        settle()
+        // The gain's server resume is still in flight when the viewer presses Pause.
+        val resumeSent = CompletableDeferred<Unit>()
+        val releaseResume = CompletableDeferred<Unit>()
+        beforeSpeed = { speed ->
+            if (speed == 100 && resumeSent.complete(Unit)) releaseResume.await()
+        }
+        focus.send(AudioInterruption.GAIN)
+        await { resumeSent.isCompleted }
+        val pause = scope.async { runtime.pauseTimeshiftPlayback() }
+        settle()
+        assertFalse(pause.isCompleted)
+        releaseResume.complete(Unit)
+        await { pause.isCompleted }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, pause.await())
+        delay(300)
+        settle()
+        // The deferred request reached admission after the Pause: it neither retuned nor played.
+        assertFalse(player.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(listOf(0, 100, 0), connection.speeds)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // Still unadmitted: the viewer's Play admits it as the target's first attempt.
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        runtime.play()
+        await { connection.subscribeCount == 2 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        delay(300)
+        settle()
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun pauseDuringTheBackoffOfAnAdmittedDeferredRecoveryKeepsItOwedWithoutAnotherAttempt() = exercise {
+        live(timeshift = true)
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 2 }
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        markReady()
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        settle()
+        focus.send(AudioInterruption.GAIN)
+        // Admitted after the gain as the second attempt, it waits out its backoff.
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.pauseTimeshiftPlayback())
+        delay(2_500)
+        settle()
+        // Its retune found the viewer's Pause: nothing retuned or played over it.
+        assertFalse(player.playWhenReady)
+        assertEquals(2, connection.subscribeCount)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // It stays owed: the viewer's Play retunes at once, claiming no further attempt.
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        runtime.play()
+        await { connection.subscribeCount == 3 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun channelChangeQueuedBehindTheFocusGainNeitherRetunesNorSpendsItsBudget() = exercise {
+        live(timeshift = true)
+        focus.send(AudioInterruption.TRANSIENT_LOSS)
+        await { !player.playWhenReady && connection.speeds == listOf(0) }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        settle()
+        val resumeSent = CompletableDeferred<Unit>()
+        val releaseResume = CompletableDeferred<Unit>()
+        beforeSpeed = { speed ->
+            if (speed == 100 && resumeSent.complete(Unit)) releaseResume.await()
+        }
+        focus.send(AudioInterruption.GAIN)
+        await { resumeSent.isCompleted }
+        // The viewer changes channel while the gain's server resume is in flight.
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        val zap = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        settle()
+        releaseResume.complete(Unit)
+        await { connection.subscribeCount == 2 }
+        startSubscription(connection.awaitCollectionRegistered())
+        await { zap.isCompleted }
+        assertTrue(zap.await()?.isStarted == true)
+        delay(300)
+        settle()
+        // The request deferred for channel 1 does not retune channel 2.
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // Channel 2's own first recovery still finds its whole budget: admitted without backoff.
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 3 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun sessionPauseQueuedDuringARecoveryRetuneHoldsTheRecoveredChannel() = exercise {
+        live(timeshift = true)
+        // The system's Pause arrives while the automatic retune is under way, before it commits.
+        var pause: Job? = null
+        beforeLiveBinding = { if (pause == null) pause = runtime.setSessionPlayWhenReady(false) { true } }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 2 }
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
+        await { pause?.isCompleted == true }
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        markReady()
+        // The recovered target is the same channel for the same intent: the Pause holds it.
+        await { connection.speeds == listOf(0) }
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun channelChangeDuringARecoveryRetuneDropsTheSessionPauseQueuedBeforeIt() = exercise {
+        live(timeshift = true)
+        // The system's Pause arrives during the retune, and a channel change right after it.
+        var pause: Job? = null
+        var zap: Deferred<PlaybackTargetResult?>? = null
+        beforeLiveBinding = {
+            if (pause == null) {
+                pause = runtime.setSessionPlayWhenReady(false) { true }
+                zap = scope.async {
+                    runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+                }
+            }
+        }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        // The retune and then the channel change both install (subscribe order: 2 and 3).
+        await { connection.subscribeCount == 3 && zap?.isCompleted == true && pause?.isCompleted == true }
+        connection.awaitCollectionRegistered()
+        val channel2 = connection.awaitCollectionRegistered()
+        startSubscription(channel2)
+        assertTrue(zap?.await()?.isStarted == true)
+        connection.emit(channel2, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        markReady()
+        delay(300)
+        settle()
+        // The newer channel wins: the Pause touches neither the recovered nor the new target.
+        assertTrue(player.playWhenReady)
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun pauseDuringTheBackoffOfAnOrdinaryRecoveryKeepsItOwedUntilPlay() = exercise {
+        awaitSecondRecoveryBackoff()
+        // The viewer pauses while the second attempt waits out its backoff.
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.pauseTimeshiftPlayback())
+        delay(2_500)
+        settle()
+        // Its retune found the viewer's Pause: nothing retuned or played over it.
+        assertFalse(player.playWhenReady)
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(0, connection.speeds.last())
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // It stays owed: the viewer's Play retunes once, at once, claiming no further attempt.
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        runtime.play()
+        await { connection.subscribeCount == 3 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        delay(300)
+        settle()
+        assertEquals(3, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        // The paused attempt was budgeted once: the next escalation is the third attempt.
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 5_000L }
+    }
+
+    @Test fun recoveryRequestedWhileTheViewerIsPausedWaitsUnadmittedUntilPlay() = exercise {
+        live(timeshift = true)
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.pauseTimeshiftPlayback())
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        delay(300)
+        settle()
+        // Deferred: no retune, no startup Play, no Recovering state over the viewer's Pause.
+        assertFalse(player.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // The viewer's Play admits it as the target's first attempt.
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        runtime.play()
+        await { connection.subscribeCount == 2 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        delay(300)
+        settle()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun escalationQueuedBehindAChannelChangeNeitherRetunesNorSpendsItsBudget() = exercise {
+        live(timeshift = true)
+        // Channel 1 escalates while channel 2's install holds the command lock.
+        var escalated = false
+        beforeLiveBinding = {
+            if (!escalated) {
+                escalated = true
+                runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+            }
+        }
+        val zap = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        // Channel 2's install completes before its stream starts: nothing started yet that a
+        // stale retune could replace, so the count below decides before the fixture emits.
+        await { zap.isCompleted }
+        assertTrue(escalated)
+        assertTrue(zap.await()?.isStarted == true)
+        delay(300)
+        settle()
+        // Channel 1's escalation is stale once channel 2 committed: dropped silently.
+        assertEquals("channel 1's stale escalation retuned channel 2", 2, connection.subscribeCount)
+        startSubscription(connection.awaitCollectionRegistered())
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        assertTrue(player.playWhenReady)
+        // Channel 2's own first recovery still finds its whole budget: admitted without backoff.
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 3 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun rejectedPendingPauseGoesOnWithTheRecoveryItDeferred() = exercise {
+        live(timeshift = true, firstPicture = false)
+        // Before the first picture the viewer's Pause waits locally; a recovery arriving now
+        // waits unadmitted behind it.
+        assertNull(runtime.pauseTimeshiftPlayback())
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        delay(300)
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // The first picture sends the held pause; the server rejects it and playback goes on.
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        markReady()
+        await { runtime.livePauseNotice.value != null }
+        assertEquals(listOf(0), connection.speeds)
+        delay(300)
+        settle()
+        // Playing again, the deferred recovery goes on without a Play from the viewer: one
+        // retune, admitted as the target's first attempt.
+        assertEquals("the recovery the rejected pause deferred stayed stranded", 2, connection.subscribeCount)
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        delay(300)
+        settle()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        // One attempt was spent: the next escalation is the second attempt.
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+    }
+
+    @Test fun pendingPauseWithoutAGrantGoesOnWithTheRecoveryItDeferred() = exercise {
+        live(timeshift = true, granted = false, firstPicture = false)
+        // The grant is still undecided: the Pause waits locally, and so does the recovery.
+        assertNull(runtime.pauseTimeshiftPlayback())
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        delay(300)
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
+        // The first picture without a grant drops the Pause without any server command.
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        markReady()
+        await { runtime.livePauseNotice.value != null }
+        delay(300)
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertEquals("the recovery the dropped pause deferred stayed stranded", 2, connection.subscribeCount)
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun escalationOfTheFirstInstallsOwnSourceRetunesItOnceItCommits() = exercise {
+        // The SDK reports the new source's escalation (here: at once) before the install that
+        // set the source has committed in the runtime.
+        escalateOnNextSource()
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        val install = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+        }
+        // The install completes before its stream starts; nothing is emitted before the count.
+        await { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        // Bounded, so a dropped escalation still fails on the count below.
+        withTimeoutOrNull(3_000) { await { connection.subscribeCount >= 2 } }
+        delay(300)
+        settle()
+        assertEquals("the first install's own escalation was dropped", 2, connection.subscribeCount)
+        assertEquals(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L), installing.last())
+        connection.awaitCollectionRegistered()
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        delay(300)
+        settle()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun escalationOfAChannelChangesNewSourceRetunesTheNewChannelOnce() = exercise {
+        live(timeshift = false)
+        escalateOnNextSource()
+        val zap = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        await { zap.isCompleted }
+        assertTrue(zap.await()?.isStarted == true)
+        // Bounded, so a dropped escalation still fails on the count below.
+        withTimeoutOrNull(3_000) { await { connection.subscribeCount >= 3 } }
+        delay(300)
+        settle()
+        assertEquals("channel 2's own escalation was dropped", 3, connection.subscribeCount)
+        connection.awaitCollectionRegistered()
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        delay(300)
+        settle()
+        assertEquals(3, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun escalationOfAnInstallThatANewerChannelChangeReplacedIsDropped() = exercise {
+        live(timeshift = false)
+        // Channel 2's source escalates at once; a change back to channel 1 is already queued.
+        var zapBack: Deferred<PlaybackTargetResult?>? = null
+        escalateOnNextSource {
+            zapBack = scope.async(start = CoroutineStart.UNDISPATCHED) {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))))
+            }
+        }
+        val zap = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        await { zap.isCompleted && zapBack?.isCompleted == true }
+        delay(300)
+        settle()
+        // Channel 1 committed after channel 2: channel 2's escalation touches it not.
+        assertEquals(3, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        // Channel 1's own first recovery still finds its whole budget.
+        connection.awaitCollectionRegistered()
+        startSubscription(connection.awaitCollectionRegistered())
+        await { player.playWhenReady }
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 4 }
+        assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
+    }
+
+    @Test fun escalationOfATargetRestoredAfterAFailedReplacementRetunesThatTarget() = exercise {
+        live(timeshift = false)
+        // Channel 2's install sets its source, then fails; the SDK restores channel 1's source
+        // and delivers channel 1's pending escalation while that install is still unwinding.
+        failNextPrepare = true
+        var sources = 0
+        player.addListener(object : Player.Listener {
+            override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED || timeline.isEmpty) return
+                if (++sources == 2) runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+            }
+        })
+        val installing = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { installing += runtime.state.value }
+        val zap = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        await { zap.isCompleted }
+        // Channel 2's source, then channel 1's restored one (a retune may add its own after).
+        assertTrue(sources >= 2)
+        assertFalse(zap.await()?.isStarted == true)
+        // Bounded, so a dropped escalation still fails on the bindings below.
+        withTimeoutOrNull(3_000) { await { installing.size >= 2 } }
+        delay(300)
+        settle()
+        // Channel 1 stays and its escalation retunes it once, as its first attempt. (Bindings
+        // count the retunes: the restored source may subscribe once more on its own.)
+        assertEquals("the restored channel's escalation was dropped", 2, installing.size)
+        assertEquals(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L), installing.last())
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        // Charged to channel 1 only: its next escalation is the second attempt, and nothing
+        // else retuned meanwhile.
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        assertEquals(2, installing.size)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun installsEscalationIsDroppedWhenTheSessionIsReplacedBeforeItsAdmission() = exercise {
+        live(timeshift = false)
+        // Channel 2's source escalates during its install; a command queued first holds the
+        // admission after the commit, while the session is replaced.
+        val admissionHeld = CompletableDeferred<Unit>()
+        var holder: Job? = null
+        escalateOnNextSource {
+            holder = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                commands.serialize(onClosed = {}) { admissionHeld.await() }
+            }
+        }
+        val zap = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        await { zap.isCompleted }
+        assertTrue(zap.await()?.isStarted == true)
+        assertNotNull(holder)
+        val previous = session.observation.value
+        session.replaceGeneration(SessionObservation.create(
+            sessionState = previous.sessionState, channelState = previous.channelState,
+            epgState = previous.epgState, dvrState = previous.dvrState,
+        ))
+        settle()
+        admissionHeld.complete(Unit)
+        await { holder?.isCompleted == true }
+        delay(300)
+        settle()
+        // Reported under the replaced session: dropped, neither retuning nor charging channel 2.
+        assertEquals("the replaced session's escalation retuned channel 2", 2, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+    }
+
+    /**
+     * Reports an escalation when the SDK sets the next target's source, as its recovery may do
+     * for a source that ended at once: before that install commits in the runtime.
+     */
+    private fun Fixture.escalateOnNextSource(beforeReport: () -> Unit = {}) {
+        var reported = false
+        player.addListener(object : Player.Listener {
+            override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                if (reported || reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED || timeline.isEmpty) return
+                reported = true
+                beforeReport()
+                runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+            }
+        })
+    }
+
+    /** Live timeshift whose second recovery attempt is admitted and waits out its 2 s backoff. */
+    private suspend fun Fixture.awaitSecondRecoveryBackoff() {
+        live(timeshift = true)
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { connection.subscribeCount == 2 }
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
+        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        markReady()
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+    }
+
     private fun exercise(granted: Boolean = true, block: suspend Fixture.() -> Unit) = runBlocking {
         val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), granted)
         try { withTimeout(15_000) { fixture.block() } }
@@ -662,12 +1633,29 @@ class AudioInterruptionRuntimeTest {
         val output = TvheadendAudioOutputProvider(context)
         val player = ExoPlayer.Builder(context).build()
         val recoveries = mutableListOf<PlaybackRecoveryReason>()
-        private val coordinator = createTvheadendPlaybackCoordinator(player, onRecoveryRequired = {
+        /** Fails the SDK's next prepare, after it set the new source: it restores the previous one. */
+        var failNextPrepare = false
+        private val coordinatorPlayer = object : ExoPlayer by player {
+            override fun prepare() {
+                if (failNextPrepare) {
+                    failNextPrepare = false
+                    throw IllegalStateException("scripted prepare failure")
+                }
+                player.prepare()
+            }
+        }
+        private val coordinator = createTvheadendPlaybackCoordinator(coordinatorPlayer, onRecoveryRequired = {
             recoveries += it
             recover(it)
         }).also { it.launchIn(scope) }
         var beforeRecordingBinding: () -> Unit = {}
+        /** Runs inside a live target install, before the session binds the channel. */
+        var beforeLiveBinding: () -> Unit = {}
         private val runtimeSession = object : TvheadendSession by session {
+            override fun bindLivePlayback(currentSession: CurrentSessionObservation, channelId: ChannelId): PlaybackBindingResult<PlaybackBinding.Live> {
+                beforeLiveBinding()
+                return session.bindLivePlayback(currentSession, channelId)
+            }
             override fun bindRecordingPlayback(currentSession: CurrentSessionObservation, recordingId: DvrEntryId): PlaybackBindingResult<PlaybackBinding.Recording> {
                 beforeRecordingBinding()
                 return session.bindRecordingPlayback(currentSession, recordingId)
@@ -720,9 +1708,9 @@ class AudioInterruptionRuntimeTest {
 
         fun audioDisabled() = C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes
 
-        suspend fun live(timeshift: Boolean, channel: Int = 1) {
+        suspend fun live(timeshift: Boolean, channel: Int = 1, granted: Boolean = timeshift, firstPicture: Boolean = true) {
             settings.setTimeshiftEnabled(timeshift)
-            connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (timeshift) 120 else 0)))
+            connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (granted) 120 else 0)))
             val subscriptions = connection.subscribeCount
             val install = scope.async {
                 runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(channel.toLong()))))
@@ -732,7 +1720,7 @@ class AudioInterruptionRuntimeTest {
             startSubscription(registration)
             await { install.isCompleted }
             assertTrue("Live target installed", install.await()?.isStarted == true)
-            if (timeshift) {
+            if (granted) {
                 connection.emit(registration, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
                 // The subscription grant alone already publishes Available (playbackPaused = null).
                 // Wait for this status: the runtime mirrors its playbackPaused into the local play
@@ -741,7 +1729,7 @@ class AudioInterruptionRuntimeTest {
                     ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
             }
             // The first picture is ready: a server pause is only sent after it.
-            markReady()
+            if (firstPicture) markReady()
         }
 
         fun markReady() { playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) } }
