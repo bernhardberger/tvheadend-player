@@ -145,8 +145,7 @@ class AudioInterruptionRuntimeTest {
         val subscriptions = connection.subscribeCount
         runtime.onAppForegrounded()
         await { connection.subscribeCount > subscriptions }
-        connection.awaitCollectionRegistered()
-        startSubscription()
+        startSubscription(connection.awaitCollectionRegistered())
         await { runtime.activeTarget.value != null && player.playWhenReady }
         val beforeStop = focus.requests.last()
         val stop = scope.async { runtime.stop() }
@@ -325,8 +324,7 @@ class AudioInterruptionRuntimeTest {
         await { audioDisabled() }
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         await { connection.subscribeCount == 2 }
-        connection.awaitCollectionRegistered()
-        startSubscription()
+        startSubscription(connection.awaitCollectionRegistered())
         await { player.playWhenReady }
         assertTrue(audioDisabled())
         assertEquals(1, focus.requests.size)
@@ -342,10 +340,10 @@ class AudioInterruptionRuntimeTest {
         connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         await { connection.subscribeCount == 2 }
-        connection.awaitCollectionRegistered()
-        startSubscription()
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
         await { player.playWhenReady }
-        connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
         await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
             ?.timeshiftState is LiveTimeshiftState.Available }
         assertTrue(audioDisabled())
@@ -481,8 +479,7 @@ class AudioInterruptionRuntimeTest {
         focus.beforeRequest = {
             runBlocking {
                 await { connection.subscribeCount == 2 }
-                connection.awaitCollectionRegistered()
-                startSubscription()
+                startSubscription(connection.awaitCollectionRegistered())
                 await { (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
                     ?.timeshiftState is LiveTimeshiftState.Available }
             }
@@ -551,6 +548,8 @@ class AudioInterruptionRuntimeTest {
         assertFalse(stalePreview.isCompleted)
         release.complete(Unit)
         blocker.join(); replacement.await(); stalePreview.join()
+        // Consume the replacement's stream registration so live() below targets its successor.
+        connection.awaitCollectionRegistered()
         settle()
         assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
         assertNotNull(settings.audioChoices.read("test-profile", ChannelId(2)))
@@ -594,8 +593,7 @@ class AudioInterruptionRuntimeTest {
         }
         await { connection.subscribeCount > subscriptions }
         assertTrue("Live before the source starts", startupBuffer.isLiveTarget)
-        connection.awaitCollectionRegistered()
-        startSubscription()
+        startSubscription(connection.awaitCollectionRegistered())
         await { install.isCompleted }
         assertTrue(install.await()?.isStarted == true)
 
@@ -730,12 +728,12 @@ class AudioInterruptionRuntimeTest {
                 runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(channel.toLong()))))
             }
             await { connection.subscribeCount > subscriptions }
-            connection.awaitCollectionRegistered()
-            startSubscription()
+            val registration = connection.awaitCollectionRegistered()
+            startSubscription(registration)
             await { install.isCompleted }
             assertTrue("Live target installed", install.await()?.isStarted == true)
             if (timeshift) {
-                connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+                connection.emit(registration, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
                 // The subscription grant alone already publishes Available (playbackPaused = null).
                 // Wait for this status: the runtime mirrors its playbackPaused into the local play
                 // intent, so arriving after a test's local pause it would resume playback.
@@ -757,8 +755,10 @@ class AudioInterruptionRuntimeTest {
             assertTrue("Recording target installed", install.await()?.isStarted == true)
         }
 
-        suspend fun startSubscription() {
-            connection.emit(SubscriptionEvent.Started(listOf(
+        // Target the exact stream: a broadcast would also reach a predecessor whose channel
+        // unsubscribe already closed but whose collector has not yet deregistered it.
+        suspend fun startSubscription(registration: ScriptedSubscriptionRegistration) {
+            connection.emit(registration, SubscriptionEvent.Started(listOf(
                 SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
                     language = null, compositionId = null, ancillaryId = null, width = 320, height = 240,
                     frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
