@@ -12,6 +12,7 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.TrackGroupArray
 import androidx.media3.exoplayer.trackselection.ExoTrackSelection
 import androidx.media3.exoplayer.upstream.Allocator
+import at.bernhardberger.tvheadend.sdk.media3.isTvheadendLive
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -24,11 +25,10 @@ import java.util.concurrent.atomic.AtomicReference
  * throw.
  *
  * A start is live when the media item of the period being started is the SDK's
- * live item ([LIVE_MEDIA_ID]); everything else delegates, including recordings
+ * live item ([isTvheadendLive]); everything else delegates, including recordings
  * (which may be dynamic while they grow), unknown items and an empty timeline.
  * The kind is read from the parameters of each query, so no announcement by the
- * runtime can reach a period it does not belong to, and a changed SDK id only
- * makes every start delegate.
+ * runtime can reach a period it does not belong to.
  *
  * A timeshift seek or return to live is a server skip. Media3 sees the restart
  * after it as a rebuffer, but it is a live start: after [liveSeekStarting] the
@@ -132,7 +132,7 @@ class StartupBufferLoadControl(
         val periodIndex = timeline.getIndexOfPeriod(parameters.mediaPeriodId.periodUid)
         if (periodIndex == C.INDEX_UNSET) return false
         val windowIndex = timeline.getPeriod(periodIndex, scratchPeriod).windowIndex
-        return timeline.getWindow(windowIndex, scratchWindow).mediaItem.mediaId == LIVE_MEDIA_ID
+        return timeline.getWindow(windowIndex, scratchWindow).mediaItem.isTvheadendLive()
     }
 
     /**
@@ -150,15 +150,6 @@ class StartupBufferLoadControl(
     }
 
     companion object {
-        /**
-         * Media id of the SDK's live media item, set by tvheadend-sdk's
-         * `TvheadendLiveMediaSource` (sdk-media3). It is an internal SDK value,
-         * not public API; the app reads it because no SDK release exposes a
-         * live marker for this feature. If the SDK changes it, no start is
-         * classified live and every start delegates as before this feature.
-         */
-        internal const val LIVE_MEDIA_ID = "tvheadend-live"
-
         /** How long after a skip's result its rebuffer may still begin. */
         const val SKIP_REBUFFER_GRACE_MS = 3_000L
 

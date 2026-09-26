@@ -39,6 +39,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
+import at.bernhardberger.tvheadend.sdk.media3.isTvheadendLive
 import at.bernhardberger.tvheadend.sdk.playback.MuxFrameType
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
@@ -178,7 +179,8 @@ class StartupBufferLoadControlPlayerTest {
             assertNull(player.playerError)
             repeat(20) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(10) }
             assertEquals(Player.STATE_BUFFERING, player.playbackState)
-            assertEquals(StartupBufferLoadControl.LIVE_MEDIA_ID, player.currentMediaItem?.mediaId)
+            assertEquals(SDK_LIVE_MEDIA_ID, player.currentMediaItem?.mediaId)
+            assertTrue(requireNotNull(player.currentMediaItem).isTvheadendLive())
 
             // Lowering the live threshold below what is buffered lets the same start begin.
             control.setLiveStartBufferMillis(2_000)

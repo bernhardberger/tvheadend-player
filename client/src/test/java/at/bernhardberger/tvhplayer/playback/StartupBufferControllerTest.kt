@@ -260,7 +260,7 @@ class StartupBufferControllerTest {
         val stalledAtMs = android.os.SystemClock.elapsedRealtime() - 1_000
         harness.controller.timeshiftSeeking()
         harness.controller.timeshiftSeekFinished(accepted = true)
-        val item = MediaItem.Builder().setMediaId(StartupBufferLoadControl.LIVE_MEDIA_ID).build()
+        val item = MediaItem.Builder().setMediaId(SDK_LIVE_MEDIA_ID).build()
         val timeline = SinglePeriodTimeline(C.TIME_UNSET, false, true, true, null, item)
         val restart = LoadControl.Parameters(
             PlayerId.UNSET, timeline, MediaSource.MediaPeriodId(timeline.getUidOfPeriod(0)), 0L,

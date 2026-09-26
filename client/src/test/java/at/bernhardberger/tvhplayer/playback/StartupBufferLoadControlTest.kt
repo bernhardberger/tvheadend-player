@@ -21,6 +21,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Media id of the SDK's live media item, which `isTvheadendLive()` recognises. */
+internal const val SDK_LIVE_MEDIA_ID = "tvheadend-live"
+
 class StartupBufferLoadControlTest {
     /** Stands in for the SDK load control: records every call and always refuses to start. */
     private val calls = mutableListOf<String>()
@@ -47,7 +50,7 @@ class StartupBufferLoadControlTest {
         val period = MediaSource.MediaPeriodId(timeline.getUidOfPeriod(0))
     }
 
-    private fun live() = Target(MediaItem.Builder().setMediaId(StartupBufferLoadControl.LIVE_MEDIA_ID).build(), dynamic = true)
+    private fun live() = Target(MediaItem.Builder().setMediaId(SDK_LIVE_MEDIA_ID).build(), dynamic = true)
 
     /** The SDK's recording items carry their tvheadend-recording URI as id and may be dynamic while growing. */
     private fun recording(growing: Boolean = false) = Target(
