@@ -236,6 +236,38 @@ class ChannelNavigationTest {
     }
 
     @Test
+    fun entryBeforeTheListLoadsIsNotCompleteAfterOneDigitAndFollowsTheListOnceLoaded() {
+        val unloaded = ChannelNavigation.entryMaxDigits(emptyList(), emptyMap())
+        assertEquals(false, ChannelNavigation.isCompleteEntry("1", unloaded))
+        assertEquals(ChannelNavigation.UNLOADED_CHANNEL_NUMBER_DIGITS, unloaded)
+
+        assertEquals(1, ChannelNavigation.entryMaxDigits(channels, channelNumbers))
+        assertEquals(4, ChannelNavigation.entryMaxDigits(channels, mapOf(cid(20) to 1000L)))
+    }
+
+    @Test
+    fun entryReadinessWaitsForTheListAndTheSessionAndNamesUnknownNumbers() {
+        val playable = setOf(cid(20))
+
+        assertEquals(
+            ChannelNumberEntryReadiness.NOT_READY,
+            ChannelNavigation.entryReadiness(emptyList(), emptyMap(), "2") { true },
+        )
+        assertEquals(
+            ChannelNumberEntryReadiness.READY,
+            ChannelNavigation.entryReadiness(channels, channelNumbers, "2") { it in playable },
+        )
+        assertEquals(
+            ChannelNumberEntryReadiness.NOT_READY,
+            ChannelNavigation.entryReadiness(channels, channelNumbers, "4") { it in playable },
+        )
+        assertEquals(
+            ChannelNumberEntryReadiness.UNKNOWN,
+            ChannelNavigation.entryReadiness(channels, channelNumbers, "7") { true },
+        )
+    }
+
+    @Test
     fun numbersOutsideReachableChannelsDoNotDisablePositionalFallbackOrRaiseDigitLimit() {
         val numbers = mapOf(cid(99) to 1000L)
         assertEquals(1, ChannelNavigation.maxChannelNumberDigits(channels, numbers))

@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 
+import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -27,7 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,6 +62,8 @@ import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness
+import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_DELAY_MS
 import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_FADE_IN_MS
@@ -135,8 +141,16 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
@@ -144,8 +158,79 @@ import org.koin.compose.koinInject
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 
-/** Quiet time after the last CH+/CH- press before the shown channel is subscribed. */
-private const val CHANNEL_ZAP_SETTLE_MS = 350L
+/**
+ * A CH+/CH- press within this time of the previous one is a repeat: it waits this quiet time
+ * so a burst subscribes its last channel only. Every tune opens and releases a server
+ * subscription, so a tuner per press would cost more than it shows.
+ */
+internal const val CHANNEL_ZAP_SETTLE_MS = 350L
+
+/** From the first digit, how long an entry waits for its channel to become playable. */
+internal const val CHANNEL_NUMBER_READY_BOUND_MS = 5_000L
+
+private const val NO_DIRECT_LIVE_TOKEN = -1L
+
+/** Paces CH+/CH- presses: the first tunes at once, a repeat within the window settles. */
+internal class ChannelZapPacer(private val windowMs: Long = CHANNEL_ZAP_SETTLE_MS) {
+    private var lastPressMs: Long? = null
+
+    /** The settle delay for a press at [nowMs]; 0 tunes at once. */
+    fun settleDelayMs(nowMs: Long): Long {
+        val previous = lastPressMs
+        lastPressMs = nowMs
+        return if (previous != null && nowMs - previous in 0 until windowMs) windowMs else 0L
+    }
+}
+
+/**
+ * Supersedes [pending] and schedules a tune: at once (before returning) for a [settleMs] of 0,
+ * after it otherwise; `null` only supersedes. Returns the settling job, `null` when none.
+ */
+internal fun CoroutineScope.scheduleChannelZap(
+    pending: Job?,
+    settleMs: Long?,
+    start: (settled: Boolean) -> Unit,
+): Job? {
+    pending?.cancel()
+    if (settleMs == null) return null
+    if (settleMs <= 0L) {
+        start(false)
+        return null
+    }
+    return launch {
+        delay(settleMs)
+        start(true)
+    }
+}
+
+/**
+ * Commits a typed channel number [entryDelayMs] after its last digit with the readiness
+ * current then. An entry not yet playable (list not loaded, session not current) stays
+ * pending until it is, at most [readyBoundMs] from the digit, then commits NOT_READY.
+ */
+internal suspend fun commitChannelNumberEntry(
+    entryDelayMs: Long,
+    readiness: Flow<ChannelNumberEntryReadiness>,
+    readyBoundMs: Long = CHANNEL_NUMBER_READY_BOUND_MS,
+    commit: (atTimer: ChannelNumberEntryReadiness, settled: ChannelNumberEntryReadiness) -> Unit,
+) {
+    delay(entryDelayMs)
+    val atTimer = readiness.first()
+    val settled = if (atTimer != ChannelNumberEntryReadiness.NOT_READY) {
+        atTimer
+    } else {
+        withTimeoutOrNull((readyBoundMs - entryDelayMs).coerceAtLeast(0L)) {
+            readiness.first { it != ChannelNumberEntryReadiness.NOT_READY }
+        } ?: ChannelNumberEntryReadiness.NOT_READY
+    }
+    commit(atTimer, settled)
+}
+
+/** Stamps a digit or CH key's down for the zap trace and returns its uptime. */
+private fun profileZapKey(event: AndroidKeyEvent): Long {
+    profileTrace("P49:zap:key:${event.keyCode}:repeat:${event.repeatCount}:time:${event.eventTime}") { }
+    return event.eventTime.takeIf { it > 0L } ?: SystemClock.uptimeMillis()
+}
 
 internal fun SubscriptionIssue.messageResource(): Int = when (this) {
     SubscriptionIssue.NO_INPUT -> R.string.tvh_no_input
@@ -318,8 +403,8 @@ fun VideoPlayerScreen(
     val channelNumbers = remember(channels) {
         channels.associate { it.id to it.visibleChannelNumber }
     }
-    val maxChannelNumberDigits = remember(orderedChannelIds, channelNumbers) {
-        ChannelNavigation.maxChannelNumberDigits(orderedChannelIds, channelNumbers)
+    val channelNumberDigits = remember(orderedChannelIds, channelNumbers) {
+        ChannelNavigation.entryMaxDigits(orderedChannelIds, channelNumbers)
     }
     val selectedInitId by selection.selectedId.collectAsStateWithLifecycle()
     var selectedId by remember { mutableStateOf(selectedInitId) }
@@ -389,7 +474,15 @@ fun VideoPlayerScreen(
     var liveRequestToken by remember { mutableLongStateOf(0L) }
     // The viewing intent of the selection the next live start plays (entry, then each tune).
     var liveIntent by remember { mutableStateOf(screenEntry) }
-    var zapSettlePending by remember { mutableStateOf(false) }
+    // The request token a key's own tune owns (started at once, or settling after a CH+/-
+    // burst); the entry/resume effect below starts every other request.
+    var directLiveToken by remember { mutableLongStateOf(NO_DIRECT_LIVE_TOKEN) }
+    // The selection that key's start plays, and its running start.
+    var directLiveSelection by remember { mutableStateOf<LivePlaybackSelection?>(null) }
+    // The one outstanding live start (a key's, or the effect's that a key supersedes).
+    val directStart = remember { mutableStateOf<Job?>(null) }
+    val zapPacer = remember { ChannelZapPacer() }
+    val pendingZap = remember { mutableStateOf<Job?>(null) }
     var requestedChannelFailed by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -471,11 +564,31 @@ fun VideoPlayerScreen(
         }
     }
 
+    var lastPlayedChannelId by remember { mutableStateOf<ChannelId?>(null) }
+    // Counts ON_START: each start runs the entry/resume effect below again, even when a
+    // stopped window never composed the stop in between (its frame clock is paused).
+    var screenStarts by remember { mutableIntStateOf(0) }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> screenActive = true
-                Lifecycle.Event.ON_STOP -> screenActive = false
+                Lifecycle.Event.ON_START -> {
+                    screenActive = true
+                    screenStarts += 1
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    screenActive = false
+                    // Leaving drops a half-typed number: it never tunes on return.
+                    channelNumberInput = ""
+                    // Leaving cancels the settling and the running start now, before any
+                    // recomposition: an admitted start never installs behind a stopped screen.
+                    // Resume restarts the current request through the effect below.
+                    pendingZap.value?.cancel()
+                    pendingZap.value = null
+                    directStart.value?.cancel()
+                    directLiveToken = NO_DIRECT_LIVE_TOKEN
+                    lastPlayedChannelId = null
+                }
                 else -> Unit
             }
         }
@@ -483,45 +596,17 @@ fun VideoPlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    var lastPlayedChannelId by remember { mutableStateOf<ChannelId?>(null) }
-    LaunchedEffect(
-        screenActive,
-        currentChannelId,
-        authorizedLiveSelection,
-        requestedLiveSelection,
-        liveRequestToken,
+    /** Starts [requestToken]'s selection; a newer request supersedes its outcome. */
+    suspend fun runLiveStart(
+        playbackSelection: LivePlaybackSelection,
+        requestToken: Long,
+        requestIntent: Long?,
     ) {
-        if (screenEntry == null) return@LaunchedEffect
-        if (!screenActive) {
-            lastPlayedChannelId = null
-            return@LaunchedEffect
-        }
-
-        if (lastPlayedChannelId == currentChannelId) return@LaunchedEffect
-        if (
-            playingLiveChannelId == currentChannelId &&
-            playbackState !is AppPlaybackState.Idle &&
-            playbackState !is AppPlaybackState.Failed
-        ) {
-            lastPlayedChannelId = currentChannelId
-            requestedLiveSelection = null
-            initialPlaybackResolved = true
-            return@LaunchedEffect
-        }
-
-        if (playbackState is AppPlaybackState.Failed && requestedLiveSelection == null) {
-            return@LaunchedEffect
-        }
-        if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
-        val playbackSelection = authorizedLiveSelection ?: return@LaunchedEffect
-        val requestToken = liveRequestToken
-        val requestIntent = liveIntent
-        if (zapSettlePending) {
-            delay(CHANNEL_ZAP_SETTLE_MS)
-            zapSettlePending = false
-        }
         startInitialLivePlayback(
-            startPlayback = { videoPlayerViewModel.playChannel(playbackSelection, requestIntent) },
+            startPlayback = {
+                profileTrace("P49:zap:tune-start:token:$requestToken") { }
+                videoPlayerViewModel.playChannel(playbackSelection, requestIntent)
+            },
             isCurrent = { requestToken == liveRequestToken },
             onRejected = {
                 requestedChannelFailed = true
@@ -538,6 +623,52 @@ fun VideoPlayerScreen(
             },
             withdrawn = { requestIntent != null && playbackRuntime.isPlaybackIntentStopped(requestIntent) },
         )
+    }
+
+    LaunchedEffect(
+        screenActive,
+        screenStarts,
+        currentChannelId,
+        authorizedLiveSelection,
+        requestedLiveSelection,
+        liveRequestToken,
+        directLiveToken,
+    ) {
+        if (screenEntry == null) return@LaunchedEffect
+        // ON_STOP cancelled the outstanding start; the next ON_START restarts it here.
+        if (!screenActive) return@LaunchedEffect
+
+        if (lastPlayedChannelId == currentChannelId) return@LaunchedEffect
+        if (directLiveToken == liveRequestToken) {
+            if (pendingZap.value != null || directLiveSelection == authorizedLiveSelection) return@LaunchedEffect
+            // The session changed under the key's start: this effect restarts it.
+            directStart.value?.cancel()
+            directLiveToken = NO_DIRECT_LIVE_TOKEN
+            return@LaunchedEffect
+        }
+        if (
+            playingLiveChannelId == currentChannelId &&
+            playbackState !is AppPlaybackState.Idle &&
+            playbackState !is AppPlaybackState.Failed
+        ) {
+            lastPlayedChannelId = currentChannelId
+            requestedLiveSelection = null
+            initialPlaybackResolved = true
+            // A warm entry adopted the playing channel: it serves this screen's intent.
+            liveIntent?.let(playbackRuntime::notePlaybackIntentServed)
+            return@LaunchedEffect
+        }
+
+        if (playbackState is AppPlaybackState.Failed && requestedLiveSelection == null) {
+            return@LaunchedEffect
+        }
+        if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
+        val playbackSelection = authorizedLiveSelection ?: return@LaunchedEffect
+        // This start supersedes a key's running one and is superseded by the next key's.
+        val superseded = directStart.value
+        directStart.value = coroutineContext.job
+        superseded?.cancelAndJoin()
+        runLiveStart(playbackSelection, liveRequestToken, liveIntent)
     }
 
     LaunchedEffect(confirmedPlayingChannelId) {
@@ -601,7 +732,44 @@ fun VideoPlayerScreen(
         )
     }
 
-    fun tuneChannel(channel: Channel): Boolean {
+    /**
+     * Runs a key's start now, before this key's recomposition or controls reveal. It
+     * supersedes the running start: that one is cancelled, and this start waits for its
+     * cancellation to complete, so [directStart] alone owns every outstanding start.
+     */
+    fun launchDirectStart(playbackSelection: LivePlaybackSelection, requestToken: Long, requestIntent: Long?) {
+        directLiveSelection = playbackSelection
+        val superseded = directStart.value
+        superseded?.cancel()
+        directStart.value = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            superseded?.join()
+            runLiveStart(playbackSelection, requestToken, requestIntent)
+        }
+    }
+
+    /**
+     * A settled CH+/- burst tunes its last channel with the state current when it settles.
+     * A request no longer current, a screen that stopped meanwhile or a selection the
+     * session no longer authorizes goes back to the entry/resume effect above.
+     */
+    fun startSettledZap(requestToken: Long) {
+        pendingZap.value = null
+        if (directLiveToken != requestToken) return
+        val playbackSelection = authorizedLiveSelection
+        if (requestToken != liveRequestToken || !screenActive || playbackSelection == null) {
+            directLiveToken = NO_DIRECT_LIVE_TOKEN
+            return
+        }
+        launchDirectStart(playbackSelection, requestToken, liveIntent)
+    }
+    val latestStartSettledZap by rememberUpdatedState<(Long) -> Unit> { startSettledZap(it) }
+
+    /**
+     * Tunes [channel] from the key that chose it: at once, or [settleMs] after a CH+/- repeat
+     * so a burst opens no tuner per press. The newest request supersedes every earlier one.
+     */
+    fun tuneChannel(channel: Channel, settleMs: Long = 0L): Boolean {
+        profileTrace("P49:zap:tune-channel:settle:$settleMs:time:${SystemClock.uptimeMillis()}") { }
         val channelId = channel.id
         channelNumberInput = ""
         selection.setSelected(channelId)
@@ -618,21 +786,37 @@ fun VideoPlayerScreen(
         timeshiftCommandToken += 1L
         timelineState.invalidateForSourceChange()
         liveRequestToken += 1L
-        // Accepted now, played after the zap settles under this one intent: a Stop from
-        // before loses, a Stop from after withdraws the delayed start.
+        // Accepted now, played under this one intent (at once or after the burst settles):
+        // a Stop from before loses, a Stop from after withdraws the delayed start.
         liveIntent = playbackRuntime.notePlaybackIntent()
+        val requestIntent = liveIntent
         requestedChannelFailed = false
         lastPlayedChannelId = null
         requestedLiveSelection = playbackSelection
         currentChannelId = channelId
         currentChannelName = channel.name.orEmpty()
+
+        val requestToken = liveRequestToken
+        // A closing or stopped screen leaves the request to the entry/resume effect.
+        val direct = screenEntry != null && screenActive
+        directLiveToken = if (direct) requestToken else NO_DIRECT_LIVE_TOKEN
+        pendingZap.value = scope.scheduleChannelZap(
+            pending = pendingZap.value,
+            settleMs = settleMs.takeIf { direct },
+        ) { settled ->
+            if (settled) {
+                latestStartSettledZap(requestToken)
+            } else {
+                launchDirectStart(playbackSelection, requestToken, requestIntent)
+            }
+        }
         timelineState.clearFeedback()
 
         layerState.onChannelTuneRequested()
         return true
     }
 
-    fun tuneAdjacentChannel(direction: Int): Boolean {
+    fun tuneAdjacentChannel(direction: Int, keyTimeMs: Long): Boolean {
         val adjacentId = ChannelNavigation.adjacentId(
             orderedIds = orderedChannelIds,
             currentId = currentChannelId,
@@ -640,11 +824,9 @@ fun VideoPlayerScreen(
         ) ?: return false
 
         val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
-        if (!tuneChannel(channel)) return false
-        // Zapping shows the new channel immediately but subscribes only once the
-        // remote settles, so a CH+/- burst does not open one tuner per key press.
-        zapSettlePending = true
-        return true
+        // The first CH+/- tunes at once; a repeat within the window settles first, so a
+        // burst tunes its first and its last channel, not one tuner per key press.
+        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs))
     }
 
     fun tuneEnteredChannel(): Boolean {
@@ -661,16 +843,52 @@ fun VideoPlayerScreen(
         return channel?.let(::tuneChannel) ?: true
     }
 
-    LaunchedEffect(channelNumberInput, maxChannelNumberDigits) {
+    // The digit timer commits with the list, numbers and session current when it fires,
+    // not the ones of the composition that started it.
+    val channelNumberEntryReadiness = ChannelNavigation.entryReadiness(
+        orderedIds = orderedChannelIds,
+        channelNumbers = channelNumbers,
+        enteredNumber = channelNumberInput,
+        playable = { currentLivePlaybackSelection(observation, it) != null },
+    )
+    val latestChannelNumberEntryReadiness by rememberUpdatedState(channelNumberEntryReadiness)
+    val latestChannelNumberDigits by rememberUpdatedState(channelNumberDigits)
+    val latestTuneEnteredChannel by rememberUpdatedState<() -> Unit> { tuneEnteredChannel() }
+    // Uptime of the last digit or CH key not yet followed by a recomposition (0 when none).
+    val zapKeyUptime = remember { longArrayOf(0L) }
+    SideEffect {
+        val keyUptime = zapKeyUptime[0]
+        if (keyUptime != 0L) {
+            zapKeyUptime[0] = 0L
+            profileTrace("P49:zap:first-recomposition:age:${SystemClock.uptimeMillis() - keyUptime}") { }
+        }
+    }
+    LaunchedEffect(channelNumberInput) {
         if (channelNumberInput.isEmpty()) return@LaunchedEffect
-        delay(
-            if (ChannelNavigation.isCompleteEntry(channelNumberInput, maxChannelNumberDigits)) {
+        val entered = channelNumberInput
+        val enteredAt = SystemClock.uptimeMillis()
+        commitChannelNumberEntry(
+            entryDelayMs = if (ChannelNavigation.isCompleteEntry(entered, latestChannelNumberDigits)) {
                 COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS
             } else {
                 CHANNEL_NUMBER_TIMEOUT_MS
+            },
+            readiness = snapshotFlow { latestChannelNumberEntryReadiness },
+        ) { atTimer, settled ->
+            profileTrace(
+                "P49:zap:digit-commit:timer:$atTimer:commit:$settled:waited:${SystemClock.uptimeMillis() - enteredAt}",
+            ) { }
+            if (!screenActive) {
+                // Stopped before this effect was cancelled: leaving dropped the entry.
+                channelNumberInput = ""
+            } else if (settled == ChannelNumberEntryReadiness.NOT_READY) {
+                // Still not playable at the bound: drop the entry, keep the selection.
+                profileTrace("P49:zap:digit-dropped:not-ready") { }
+                channelNumberInput = ""
+            } else {
+                latestTuneEnteredChannel()
             }
-        )
-        tuneEnteredChannel()
+        }
     }
 
     val nowEvent = remember(observation, currentChannelId, nowSec) {
@@ -1010,19 +1228,21 @@ fun VideoPlayerScreen(
                 }
 
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
+                    zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
                     if (event.nativeKeyEvent.repeatCount == 0) {
                         channelNumberInput = ChannelNavigation.appendDigit(
-                            channelNumberInput, digit, maxChannelNumberDigits,
+                            channelNumberInput, digit, channelNumberDigits,
                         )
                     }
                     return@onPreviewKeyEvent true
                 }
 
                 ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)?.let { direction ->
+                    zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
                     channelNumberInput = ""
                     when (playbackChannelKeyAction(browserVisible = showDrawer)) {
                         ChannelKeyAction.TUNE ->
-                            return@onPreviewKeyEvent tuneAdjacentChannel(direction)
+                            return@onPreviewKeyEvent tuneAdjacentChannel(direction, event.nativeKeyEvent.eventTime)
                         ChannelKeyAction.PAGE_LIST -> Unit
                     }
                 }
@@ -1033,7 +1253,9 @@ fun VideoPlayerScreen(
                         Key.NumPadEnter,
                         Key.DirectionCenter -> {
                             layerState.beginOpeningKeyCycle(keyCode)
-                            tuneEnteredChannel()
+                            // Not playable yet: the entry stays pending for the digit timer.
+                            channelNumberEntryReadiness == ChannelNumberEntryReadiness.NOT_READY ||
+                                tuneEnteredChannel()
                         }
                         else -> false
                     }

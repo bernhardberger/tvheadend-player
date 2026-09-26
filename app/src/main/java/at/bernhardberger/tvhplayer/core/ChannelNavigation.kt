@@ -8,6 +8,18 @@ import at.bernhardberger.tvheadend.sdk.core.hasChannelNumber
 val Channel.visibleChannelNumber: Long?
     get() = number?.takeIf { hasChannelNumber }
 
+/** Whether a typed channel number can be committed now. */
+enum class ChannelNumberEntryReadiness {
+    /** The number names a channel the current session can play. */
+    READY,
+
+    /** The loaded list has no channel with this number. */
+    UNKNOWN,
+
+    /** The list has not loaded, or the session cannot play the named channel yet. */
+    NOT_READY,
+}
+
 object ChannelNavigation {
     fun directionForKeyCode(keyCode: Int): Int? = when (keyCode) {
         KeyEvent.KEYCODE_CHANNEL_UP,
@@ -38,7 +50,32 @@ object ChannelNavigation {
     ): Int = (orderedIds.mapNotNull { channelNumbers[it] }.maxOrNull() ?: orderedIds.size.toLong())
         .toString().length.coerceAtLeast(1)
 
+    /** Digits an entry takes before the list has loaded: no short entry is complete early. */
+    const val UNLOADED_CHANNEL_NUMBER_DIGITS = 4
+
+    /** [maxChannelNumberDigits] once the list has loaded, until then [UNLOADED_CHANNEL_NUMBER_DIGITS]. */
+    fun entryMaxDigits(
+        orderedIds: List<ChannelId>,
+        channelNumbers: Map<ChannelId, Long?>,
+    ): Int = if (orderedIds.isEmpty()) {
+        UNLOADED_CHANNEL_NUMBER_DIGITS
+    } else {
+        maxChannelNumberDigits(orderedIds, channelNumbers)
+    }
+
     fun isCompleteEntry(entered: String, maxDigits: Int): Boolean = entered.length >= maxDigits
+
+    fun entryReadiness(
+        orderedIds: List<ChannelId>,
+        channelNumbers: Map<ChannelId, Long?>,
+        enteredNumber: String,
+        playable: (ChannelId) -> Boolean,
+    ): ChannelNumberEntryReadiness {
+        if (orderedIds.isEmpty()) return ChannelNumberEntryReadiness.NOT_READY
+        val channelId = idForNumber(orderedIds, channelNumbers, enteredNumber)
+            ?: return ChannelNumberEntryReadiness.UNKNOWN
+        return if (playable(channelId)) ChannelNumberEntryReadiness.READY else ChannelNumberEntryReadiness.NOT_READY
+    }
 
     fun appendDigit(current: String, digit: Int, maxDigits: Int): String {
         require(digit in 0..9)

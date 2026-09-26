@@ -79,6 +79,27 @@ class BackgroundPlaybackLifecycleTest {
         assertEquals(ForegroundPlaybackAction.ResumeRecording, lifecycle.onForegrounded(replacement, 8))
     }
 
+    @Test fun newerIntentThanTheBackgroundedChannelSkipsResumeAndReleasesKeptTuner() {
+        val stopped = ForegroundPlaybackLifecycle()
+        assertEquals(ForegroundPlaybackAction.StopLive,
+            stopped.onBackgrounded(live, 7, true, false, false, 20.minutes, true, 0, targetIntent = 3))
+        assertEquals(ForegroundPlaybackAction.None, stopped.onForegrounded(null, null, 1, latestIntent = 4))
+        val lost = ForegroundPlaybackLifecycle()
+        lost.onBackgrounded(live, 7, true, recoveryPending = true, targetIntent = 3)
+        assertEquals(ForegroundPlaybackAction.None, lost.onForegrounded(null, null, 1, latestIntent = 4))
+        val kept = ForegroundPlaybackLifecycle()
+        kept.onBackgrounded(live, 7, true, true, false, 20.minutes, true, 0, targetIntent = 3)
+        assertEquals(ForegroundPlaybackAction.StopLive, kept.onForegrounded(live, 7, 1, latestIntent = 4))
+        val served = ForegroundPlaybackLifecycle()
+        served.onBackgrounded(live, 7, true, true, false, 20.minutes, true, 0, targetIntent = 4)
+        assertEquals(ForegroundPlaybackAction.ResumeKeptLive(7, true), served.onForegrounded(live, 7, 1, latestIntent = 4))
+        val startedInBackground = ForegroundPlaybackLifecycle()
+        startedInBackground.onBackgrounded(null, null, false)
+        assertEquals(ForegroundPlaybackAction.StopLive, startedInBackground.onTargetStarted(live, 8, targetIntent = 5))
+        assertEquals(ForegroundPlaybackAction.ResumeLive(ChannelId(1)),
+            startedInBackground.onForegrounded(null, null, 1, latestIntent = 5))
+    }
+
     private fun kept() = ForegroundPlaybackLifecycle().apply {
         onBackgrounded(live, 7, true, true, false, 20.minutes, true, 0)
     }

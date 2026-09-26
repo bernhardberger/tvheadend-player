@@ -22,6 +22,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -463,6 +464,88 @@ class BackgroundPlaybackRuntimeTest {
         assertNull(runtime.backgroundNotice.value)
     }
 
+    @Test fun zapNotedBeforeBackgroundIsNotPreemptedByRetuningTheStoppedChannel() = exercise {
+        settings.setKeepChannelMinutes(0)
+        live()
+        // CH+ accepted channel 2 (its start still settling) just before Home.
+        runtime.notePlaybackIntent()
+        runtime.onAppBackgrounded(interactive = true)
+        await { runtime.activeTarget.value == null }
+        runtime.onAppForegrounded()
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        assertNull(runtime.activeTarget.value)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun zapNotedBeforeBackgroundReleasesTheKeptChannelOnReturn() = exercise {
+        live()
+        runtime.notePlaybackIntent()
+        runtime.onAppBackgrounded(interactive = true)
+        await { connection.priorityChanges == listOf(LiveSubscriptionPriority.YIELD) }
+        runtime.onAppForegrounded()
+        await { runtime.activeTarget.value == null }
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun warmEntryThatAdoptedThePlayingChannelStillResumesIt() = exercise {
+        settings.setKeepChannelMinutes(0)
+        live()
+        runtime.notePlaybackIntentServed(runtime.notePlaybackIntent())
+        runtime.onAppBackgrounded(interactive = true)
+        await { runtime.activeTarget.value == null }
+        returnAndRetune()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun zapCancelledBeforeItCommitsDoesNotRetuneTheStoppedChannelOnReturn() = exercise {
+        settings.setKeepChannelMinutes(0)
+        live()
+        cancelZapBeforeCommit()
+        runtime.onAppBackgrounded(interactive = true)
+        await { runtime.activeTarget.value == null }
+        runtime.onAppForegrounded()
+        settle()
+        // Channel 1 does not serve the zap's intent: the screen, not the return, tunes channel 2.
+        assertEquals(1, connection.subscribeCount)
+        assertNull(runtime.activeTarget.value)
+    }
+
+    @Test fun zapCancelledBeforeItCommitsReleasesTheKeptChannelOnReturn() = exercise {
+        live()
+        cancelZapBeforeCommit()
+        runtime.onAppBackgrounded(interactive = true)
+        await { connection.priorityChanges == listOf(LiveSubscriptionPriority.YIELD) }
+        runtime.onAppForegrounded()
+        await { runtime.activeTarget.value == null }
+        settle()
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+    }
+
+    /** Channel 2's admitted start is cancelled (Home) before its target commits; channel 1 stays. */
+    private suspend fun Fixture.cancelZapBeforeCommit() {
+        val held = CompletableDeferred<Unit>()
+        val admitted = CompletableDeferred<Unit>()
+        beforeSettingsRead = { admitted.complete(Unit); held.await() }
+        val zap = scope.launch {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))),
+                runtime.notePlaybackIntent())
+        }
+        await { admitted.isCompleted }
+        zap.cancel()
+        await { zap.isCompleted }
+        beforeSettingsRead = {}
+        held.complete(Unit)
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(1, connection.subscribeCount)
+    }
+
     private fun exercise(block: suspend Fixture.() -> Unit) = exercise(PlaybackRuntimePolicy.fromPlayerSettings(), block)
 
     companion object {
@@ -532,7 +615,16 @@ class BackgroundPlaybackRuntimeTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).apply { scriptLivePlaybackSuccess(manager) }
-        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
+        /** Runs before each settings read; the runtime reads settings after admitting a start. */
+        var beforeSettingsRead: suspend () -> Unit = {}
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore().let { store ->
+            object : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> by store {
+                override val data = kotlinx.coroutines.flow.flow {
+                    beforeSettingsRead()
+                    emitAll(store.data)
+                }
+            }
+        })
         private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val player = ExoPlayer.Builder(context).build()

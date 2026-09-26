@@ -47,6 +47,8 @@ private sealed interface BackgroundedPlaybackTarget {
         val deadlineMillis: Long = 0,
         val resume: Boolean = false,
         val notice: BackgroundPlaybackNotice? = null,
+        /** The newest viewing-intent generation the channel served when it was backgrounded. */
+        val intent: Long = 0,
     ) : BackgroundedPlaybackTarget
     data class Recording(
         val recordingId: DvrEntryId,
@@ -69,11 +71,14 @@ internal class ForegroundPlaybackLifecycle {
         interactive: Boolean = true,
         nowMillis: Long = 0,
         recoveryPending: Boolean = false,
+        targetIntent: Long = 0,
     ): ForegroundPlaybackAction {
         if (!foreground) return ForegroundPlaybackAction.None
         foreground = false
         if (activeTarget is AppPlaybackTarget.Live && recoveryPending) {
-            backgroundedTarget = BackgroundedPlaybackTarget.Live(activeTarget.channelId, notice = BackgroundPlaybackNotice.TUNER_LOST)
+            backgroundedTarget = BackgroundedPlaybackTarget.Live(
+                activeTarget.channelId, notice = BackgroundPlaybackNotice.TUNER_LOST, intent = targetIntent,
+            )
             return ForegroundPlaybackAction.StopLive
         }
         if (activeTarget is AppPlaybackTarget.Live && activeTargetEpoch != null &&
@@ -83,6 +88,7 @@ internal class ForegroundPlaybackLifecycle {
             backgroundedTarget = BackgroundedPlaybackTarget.Live(
                 activeTarget.channelId, activeTargetEpoch, deadline,
                 recordingPlayWhenReady && !serverPaused,
+                intent = targetIntent,
             )
             return ForegroundPlaybackAction.KeepLive(activeTargetEpoch, deadline)
         }
@@ -90,13 +96,20 @@ internal class ForegroundPlaybackLifecycle {
             activeTarget = activeTarget,
             activeTargetEpoch = activeTargetEpoch,
             recordingPlayWhenReady = recordingPlayWhenReady,
+            targetIntent = targetIntent,
         )
     }
 
+    /**
+     * [latestIntent] is the newest viewing-intent generation. A backgrounded channel that
+     * serves an older one was replaced by the viewer before leaving (a zap still settling):
+     * it is not tuned again, and a kept tuner is released for the newer choice to start.
+     */
     fun onForegrounded(
         activeTarget: AppPlaybackTarget?,
         activeTargetEpoch: Long?,
         nowMillis: Long = 0,
+        latestIntent: Long = 0,
     ): ForegroundPlaybackAction {
         if (foreground) return ForegroundPlaybackAction.None
         foreground = true
@@ -104,6 +117,15 @@ internal class ForegroundPlaybackLifecycle {
         backgroundedTarget = null
         return when (target) {
             is BackgroundedPlaybackTarget.Live -> when {
+                latestIntent > target.intent -> if (
+                    target.keptEpoch != null &&
+                    activeTarget == AppPlaybackTarget.Live(target.channelId) &&
+                    activeTargetEpoch == target.keptEpoch
+                ) {
+                    ForegroundPlaybackAction.StopLive
+                } else {
+                    ForegroundPlaybackAction.None
+                }
                 target.keptEpoch == null -> ForegroundPlaybackAction.ResumeLive(target.channelId, target.notice)
                 activeTarget != AppPlaybackTarget.Live(target.channelId) || activeTargetEpoch != target.keptEpoch ->
                     ForegroundPlaybackAction.None
@@ -142,6 +164,7 @@ internal class ForegroundPlaybackLifecycle {
     fun onTargetStarted(
         activeTarget: AppPlaybackTarget,
         activeTargetEpoch: Long,
+        targetIntent: Long = 0,
     ): ForegroundPlaybackAction {
         backgroundedTarget = null
         return if (foreground) {
@@ -156,6 +179,7 @@ internal class ForegroundPlaybackLifecycle {
                 activeTargetEpoch = activeTargetEpoch,
                 // Opening a target (including Resume at a saved position) is a new play request.
                 recordingPlayWhenReady = true,
+                targetIntent = targetIntent,
             )
         }
     }
@@ -164,10 +188,11 @@ internal class ForegroundPlaybackLifecycle {
         activeTarget: AppPlaybackTarget?,
         activeTargetEpoch: Long?,
         recordingPlayWhenReady: Boolean,
+        targetIntent: Long,
     ): ForegroundPlaybackAction {
         backgroundedTarget = when {
             activeTarget is AppPlaybackTarget.Live && activeTargetEpoch != null ->
-                BackgroundedPlaybackTarget.Live(activeTarget.channelId)
+                BackgroundedPlaybackTarget.Live(activeTarget.channelId, intent = targetIntent)
             activeTarget is AppPlaybackTarget.Recording && activeTargetEpoch != null ->
                 BackgroundedPlaybackTarget.Recording(
                     recordingId = activeTarget.recordingId,

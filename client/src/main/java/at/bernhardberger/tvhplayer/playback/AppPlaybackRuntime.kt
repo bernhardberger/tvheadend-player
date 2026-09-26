@@ -80,6 +80,17 @@ class AppPlaybackRuntime(
     private val playbackRequests = AtomicLong()
 
     /**
+     * The newest intent generation the installed live target serves: the one it was started
+     * or retried under (recorded when that target commits, not when its start is admitted: a
+     * start cancelled before it commits leaves the previous target with its own intent), or a
+     * later warm entry that found it already playing
+     * ([notePlaybackIntentServed]). Returning from the background resumes a channel only
+     * while no newer intent exists; a channel the viewer zapped away from before leaving
+     * is not tuned again.
+     */
+    private val servedIntent = AtomicLong()
+
+    /**
      * Guards [userStopIntent] and the pending session Stops against [enterPlayerScreen] and
      * the session Stop's check.
      */
@@ -300,7 +311,7 @@ class AppPlaybackRuntime(
      * intent or later (see [isPlaybackIntentStopped]): the viewer's Stop came last.
      */
     suspend fun playLive(selection: LivePlaybackSelection, intent: Long? = null): PlaybackTargetResult? {
-        if (intent == null) playbackRequests.incrementAndGet()
+        val generation = intent ?: playbackRequests.incrementAndGet()
         return targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
             if (intent != null && isPlaybackIntentStopped(intent)) return@serialize null
             if (policy.trace.enabled) policy.trace.tuneAdmitted()
@@ -309,6 +320,7 @@ class AppPlaybackRuntime(
             val result = playLive(
                 channelId = selection.channelId,
                 recovering = false,
+                servedGeneration = generation,
             )
             result
         }
@@ -320,6 +332,8 @@ class AppPlaybackRuntime(
         expectedPresentationEpoch: Long = presentationEpoch.snapshot(),
         recoverySelection: LivePlaybackSelection? = null,
         playWhenReady: Boolean = true,
+        // The intent a start or retry installs for; the committed target serves it (servedIntent).
+        servedGeneration: Long? = null,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
@@ -409,6 +423,7 @@ class AppPlaybackRuntime(
                         audioInterruptions.retainInterruptionMuteLocked()
                     } else audioInterruptions.clearAudioInterruptionLocked()
                     activeTargetEpoch = epoch
+                    servedGeneration?.let(servedIntent::set)
                     livePauseController.dropPendingLivePauseLocked()
                     livePauseController.timeshiftRequestedEpoch = epoch.takeIf { timeshiftPeriod > Duration.ZERO }
                     _activeTarget.value = AppPlaybackTarget.Live(selection.channelId)
@@ -459,6 +474,15 @@ class AppPlaybackRuntime(
      * media-session Stop that arrived earlier then loses: it neither stops nor closes.
      */
     fun notePlaybackIntent(): Long = playbackRequests.incrementAndGet()
+
+    /**
+     * The live screen found the channel of [intent] already playing and adopted it without a
+     * command: the installed target now serves that intent too, so returning from the
+     * background still resumes it.
+     */
+    fun notePlaybackIntentServed(intent: Long) {
+        servedIntent.accumulateAndGet(intent, ::maxOf)
+    }
 
     /**
      * A player screen's first step, before any of its playback, retune or restore work.
@@ -674,6 +698,7 @@ class AppPlaybackRuntime(
                         interactive = interactive,
                         nowMillis = elapsedRealtime(),
                         recoveryPending = recoveryPending,
+                        targetIntent = servedIntent.get(),
                     ),
                 )
             }
@@ -690,6 +715,7 @@ class AppPlaybackRuntime(
                         activeTarget = _activeTarget.value,
                         activeTargetEpoch = activeTargetEpoch,
                         nowMillis = elapsedRealtime(),
+                        latestIntent = playbackRequests.get(),
                     ),
                 )
             }
@@ -738,11 +764,10 @@ class AppPlaybackRuntime(
     }
 
     suspend fun retryLive(): PlaybackTargetResult? {
-        playbackRequests.incrementAndGet()
-        return retryLiveCommand()
+        return retryLiveCommand(playbackRequests.incrementAndGet())
     }
 
-    private suspend fun retryLiveCommand(): PlaybackTargetResult? = targetCommands.serialize(
+    private suspend fun retryLiveCommand(generation: Long): PlaybackTargetResult? = targetCommands.serialize(
         onClosed = { PlaybackTargetResult.SHUT_DOWN },
     ) {
         // An explicit retry is a user decision, so it refills the budget an exhausted target used.
@@ -751,6 +776,7 @@ class AppPlaybackRuntime(
             playLive(
                 channelId = channelId,
                 recovering = true,
+                servedGeneration = generation,
             )
         }
     }
@@ -1198,7 +1224,7 @@ class AppPlaybackRuntime(
         val targetEpoch = activeTargetEpoch ?: return
         cancelKeepTimer()
         _backgroundNotice.value = null
-        val action = foregroundPlaybackLifecycle.onTargetStarted(target, targetEpoch)
+        val action = foregroundPlaybackLifecycle.onTargetStarted(target, targetEpoch, servedIntent.get())
         if (foreground) {
             if (playWhenReady) audioInterruptions.playWithAudioFocusLocked()
             else {
