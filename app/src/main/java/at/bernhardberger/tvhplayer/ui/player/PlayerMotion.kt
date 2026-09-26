@@ -54,8 +54,6 @@ internal object PlayerMotion {
     val PanelOffset = 40.dp
     /** Panel page travel between a page and its detail. */
     val PageOffset = 24.dp
-    /** Channel identity travel in the zap direction. */
-    val ZapTextOffset = 8.dp
 }
 
 /** Supplies the enter/exit transition of a player side panel to its frame. */

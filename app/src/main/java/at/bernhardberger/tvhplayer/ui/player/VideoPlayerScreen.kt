@@ -426,8 +426,6 @@ fun VideoPlayerScreen(
 
     var currentChannelId by remember { mutableStateOf(channelId) }
     var currentChannelName by remember { mutableStateOf(channelName) }
-    // Presentation only: which way the header identity travels on the next channel change.
-    var headerZapDirection by remember { mutableIntStateOf(0) }
     val confirmedPlayingChannelId = playingLiveChannelId.takeIf {
         it == currentChannelId && playbackState.presented
     }
@@ -770,7 +768,7 @@ fun VideoPlayerScreen(
      * Tunes [channel] from the key that chose it: at once, or [settleMs] after a CH+/- repeat
      * so a burst opens no tuner per press. The newest request supersedes every earlier one.
      */
-    fun tuneChannel(channel: Channel, settleMs: Long = 0L, zapDirection: Int = 0): Boolean {
+    fun tuneChannel(channel: Channel, settleMs: Long = 0L): Boolean {
         profileTrace("P49:zap:tune-channel:settle:$settleMs:time:${SystemClock.uptimeMillis()}") { }
         val channelId = channel.id
         channelNumberInput = ""
@@ -797,7 +795,6 @@ fun VideoPlayerScreen(
         requestedLiveSelection = playbackSelection
         currentChannelId = channelId
         currentChannelName = channel.name.orEmpty()
-        headerZapDirection = zapDirection
 
         val requestToken = liveRequestToken
         // A closing or stopped screen leaves the request to the entry/resume effect.
@@ -829,7 +826,7 @@ fun VideoPlayerScreen(
         val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
         // The first CH+/- tunes at once; a repeat within the window settles first, so a
         // burst tunes its first and its last channel, not one tuner per key press.
-        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs), zapDirection = direction)
+        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs))
     }
 
     fun tuneEnteredChannel(): Boolean {
@@ -1336,6 +1333,7 @@ fun VideoPlayerScreen(
         PlayerControlsLayer(
             visible = foregroundLayer == PlayerForegroundLayer.CONTROLS || foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
             modalVisible = layerState.optionsPage != null || layerState.infoOpen,
+            entry = layerState.controlsEntry,
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             OverlayControlsTv(
@@ -1451,7 +1449,6 @@ fun VideoPlayerScreen(
                 restoreOptionsFocus = restoreOptionsFocus,
                 onOptionsFocusRestored = { restoreOptionsFocus = false },
                 channelId = currentChannelId,
-                headerZapDirection = headerZapDirection,
             )
         }
 
@@ -1478,9 +1475,9 @@ fun VideoPlayerScreen(
                             ?: displayedWindow?.let { programmeWindowClockLabels(it.event).let { (start, end) -> "$start - $end" } }
                             ?: stringResource(R.string.player_programme_timing_unavailable),
                         clock = at.bernhardberger.tvhplayer.ui.common.formatClock(nowSec), clockSupport = null,
-                        clockStatus = { PlayerStatusTags(!playWhenReady, timeshift = effectiveTimeshiftState,
+                        status = PlayerHeaderStatus(!playWhenReady, timeshift = effectiveTimeshiftState,
                             recordingNow = currentChannelId in recordingChannelIds,
-                            playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering) },
+                            playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering),
                         modifier = modifier,
                         tags = PlayerHeaderTags(title = "player-programme-title"),
                     )

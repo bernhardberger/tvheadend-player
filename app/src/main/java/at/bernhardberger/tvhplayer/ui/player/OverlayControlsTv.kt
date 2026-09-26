@@ -98,8 +98,6 @@ fun OverlayControlsTv(
     onPauseUnavailable: (reason: String) -> Unit = {},
     /** Channel whose identity the header and timeline motion follow; null keeps them keyed on the programme only. */
     channelId: ChannelId? = null,
-    /** Direction of the channel step that tuned this channel: +1 up, -1 down, 0 picked. */
-    headerZapDirection: Int = 0,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -206,14 +204,13 @@ fun OverlayControlsTv(
                     if (nextScheduled) " / " + stringResource(R.string.recording_state_scheduled) else ""
             },
             clock = formatClock(nowSec), clockSupport = null,
-            clockStatus = { PlayerStatusTags(paused, timeshift = committedTimeshiftState,
-                recordingNow = channelRecordingNow, playbackPresented = playbackPresented && liveAvailable) },
+            status = PlayerHeaderStatus(paused, timeshift = committedTimeshiftState,
+                recordingNow = channelRecordingNow, playbackPresented = playbackPresented && liveAvailable),
             tags = PlayerHeaderTags(picon = "player-picon", eyebrow = "player-channel-identity",
                 title = "player-programme-title", support = "player-next-programme", clock = "player-clock",
                 clockSupport = "player-clock-status"),
             modifier = modifier,
             identity = PlayerHeaderIdentity(channelId, displayedEvent?.id),
-            zapDirection = headerZapDirection,
         )
     }) {
         val previewFeedback = timeshiftFeedback ?: if (previewing) {

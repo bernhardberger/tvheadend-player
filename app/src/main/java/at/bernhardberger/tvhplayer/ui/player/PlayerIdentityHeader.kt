@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.paddingFrom
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -26,7 +24,6 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
@@ -47,8 +44,8 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTextPrimaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import coil3.ImageLoader
-import kotlin.math.sign
 
 data class PlayerHeaderTags(
     val picon: String? = null,
@@ -60,15 +57,24 @@ data class PlayerHeaderTags(
 )
 
 /**
- * What the header identifies. A new [channel] fades the picon and the text; a new
- * [programme] on the same channel crossfades the text only.
+ * What the header identifies. A new [channel] crossfades the picon, the text and the
+ * status under the clock in place; a new [programme] on the same channel crossfades
+ * the text only.
  */
 data class PlayerHeaderIdentity(val channel: Any?, val programme: Any?)
 
+/** What the status row under the clock shows; see [PlayerStatusTags]. */
+data class PlayerHeaderStatus(
+    val paused: Boolean,
+    val timeshift: AppTimeshiftState = AppTimeshiftState(),
+    val recordingPlayback: Boolean = false,
+    val growing: Boolean = false,
+    val recordingNow: Boolean = false,
+    val playbackPresented: Boolean = true,
+)
+
 /**
  * @param identity animates changes of channel and programme; null keeps the header static.
- * @param zapDirection +1 after channel up, -1 after channel down, 0 when the channel was
- * picked directly; the identity text travels in that direction on a channel change.
  */
 @Composable
 fun PlayerIdentityHeader(
@@ -83,9 +89,8 @@ fun PlayerIdentityHeader(
     currentSession: CurrentSessionObservation? = null,
     tags: PlayerHeaderTags = PlayerHeaderTags(),
     compact: Boolean = false,
-    clockStatus: (@Composable () -> Unit)? = null,
+    status: PlayerHeaderStatus? = null,
     identity: PlayerHeaderIdentity? = null,
-    zapDirection: Int = 0,
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     Row(
@@ -97,8 +102,6 @@ fun PlayerIdentityHeader(
             state = HeaderPicon(identity?.channel, piconPath),
             animated = identity != null,
             key = { it.channel },
-            channel = { it.channel },
-            zapDirection = { 0 },
             modifier = piconModifier,
         ) { picon ->
             PiconBox(
@@ -112,13 +115,10 @@ fun PlayerIdentityHeader(
             )
         }
         Spacer(Modifier.width(TvOverlayHeaderPiconGap))
-        val direction by rememberUpdatedState(zapDirection)
         HeaderIdentityMotion(
             state = HeaderIdentityText(identity, eyebrow, title, support),
             animated = identity != null,
             key = { it.identity },
-            channel = { it.identity?.channel },
-            zapDirection = { direction },
             modifier = Modifier.weight(1f).padding(end = TvOverlayHeaderColumnGap),
         ) { text ->
             HeaderIdentityColumn(text, compact, tags, onSurface)
@@ -132,26 +132,51 @@ fun PlayerIdentityHeader(
                     .optionalTestTag(tags.clock)
                     .paddingFrom(FirstBaseline, before = TvOverlayHeaderFirstBaseline)
             )
-            clockStatus?.let {
-                Spacer(Modifier.height(TvOverlayHeaderStatusGap))
-                it()
-            }
-            clockSupport?.takeIf { clockStatus == null }?.let {
-                Spacer(Modifier.height(TvOverlayHeaderTextGap))
-                Text(
-                    text = it,
-                    color = onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.optionalTestTag(tags.clockSupport),
-                )
+            // The clock keeps time across a zap; the status under it belongs to the channel.
+            HeaderIdentityMotion(
+                state = HeaderClockStatus(identity?.channel, status, clockSupport),
+                animated = identity != null,
+                key = { it.channel },
+                modifier = Modifier,
+                contentAlignment = Alignment.TopEnd,
+            ) { shown ->
+                Column(horizontalAlignment = Alignment.End) {
+                    shown.status?.let {
+                        Spacer(Modifier.height(TvOverlayHeaderStatusGap))
+                        PlayerStatusTags(
+                            paused = it.paused,
+                            timeshift = it.timeshift,
+                            recordingPlayback = it.recordingPlayback,
+                            growing = it.growing,
+                            recordingNow = it.recordingNow,
+                            playbackPresented = it.playbackPresented,
+                        )
+                    }
+                    shown.support?.takeIf { shown.status == null }?.let {
+                        Spacer(Modifier.height(TvOverlayHeaderTextGap))
+                        Text(
+                            text = it,
+                            color = onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.optionalTestTag(tags.clockSupport),
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 private data class HeaderPicon(val channel: Any?, val path: ArtworkId?)
+
+/** Values only, so an outgoing copy keeps showing its own channel's status as it fades. */
+private data class HeaderClockStatus(
+    val channel: Any?,
+    val status: PlayerHeaderStatus?,
+    val support: String?,
+)
 
 private data class HeaderIdentityText(
     val identity: PlayerHeaderIdentity?,
@@ -208,19 +233,18 @@ private fun HeaderIdentityColumn(
 }
 
 /**
- * Crossfades header identity when [key] changes: in over 150 ms, out over 100 ms, size
- * snapping. On a channel change the incoming and outgoing content also travel 8 dp
- * in [zapDirection] (up for +1). Outgoing content leaves semantics at once, so its
- * tags never duplicate the incoming ones. Content with the same key updates in place.
+ * Crossfades header identity in place when [key] changes: in over 150 ms, out over
+ * 100 ms, size snapping, no travel, so a zap keeps the header layout still. Outgoing
+ * content leaves semantics at once, so its tags never duplicate the incoming ones.
+ * Content with the same key updates in place.
  */
 @Composable
 private fun <S : Any> HeaderIdentityMotion(
     state: S,
     animated: Boolean,
     key: (S) -> Any?,
-    channel: (S) -> Any?,
-    zapDirection: () -> Int,
     modifier: Modifier,
+    contentAlignment: Alignment = Alignment.TopStart,
     content: @Composable (S) -> Unit,
 ) {
     if (!animated) {
@@ -230,31 +254,14 @@ private fun <S : Any> HeaderIdentityMotion(
     val transition = updateTransition(state, label = "player-header-identity")
     transition.AnimatedContent(
         modifier = modifier,
+        contentAlignment = contentAlignment,
         contentKey = key,
         transitionSpec = {
             (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) togetherWith
                 fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
         },
     ) { shown ->
-        val travel = animateShown(
-            enter = tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate),
-            exit = tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate),
-            label = "player-header-zap",
-        )
-        val leaving = leaving
-        Box(
-            Modifier
-                .semanticsWhileShown(!leaving)
-                .graphicsLayer {
-                    val direction = zapDirection().sign
-                    val zapped = channel(transition.currentState) != channel(transition.targetState)
-                    translationY = if (direction != 0 && zapped) {
-                        // Up for channel up: incoming rises from below, outgoing rises away.
-                        val side = if (leaving) -1f else 1f
-                        side * direction * PlayerMotion.ZapTextOffset.toPx() * (1f - travel.value)
-                    } else 0f
-                },
-        ) { content(shown) }
+        Box(Modifier.semanticsWhileShown(!leaving)) { content(shown) }
     }
 }
 

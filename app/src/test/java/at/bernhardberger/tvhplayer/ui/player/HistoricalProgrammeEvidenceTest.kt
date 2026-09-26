@@ -93,7 +93,7 @@ class HistoricalProgrammeEvidenceTest {
                                     ?: selected?.let { programmeWindowClockLabels(it.event).let { (start, end) -> "$start - $end" } }
                                     ?: androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.player_programme_timing_unavailable),
                                 clock = "01:30", clockSupport = null, modifier = modifier,
-                                clockStatus = { PlayerStatusTags(true, timeshift = state, recordingNow = true) },
+                                status = PlayerHeaderStatus(true, timeshift = state, recordingNow = true),
                                 tags = PlayerHeaderTags(title = "player-programme-title"),
                             ) },
                         ) else OverlayControlsTv(

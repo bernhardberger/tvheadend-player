@@ -156,7 +156,7 @@ internal fun RecordingOverlayControls(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
             eyebrow = channelName, title = title, support = subtitle,
             clock = formatClock(nowSec), clockSupport = null,
-            clockStatus = { PlayerStatusTags(paused, recordingPlayback = true, growing = growing, playbackPresented = playbackPresented) },
+            status = PlayerHeaderStatus(paused, recordingPlayback = true, growing = growing, playbackPresented = playbackPresented),
             modifier = modifier,
             tags = PlayerHeaderTags(picon = "recording-picon", eyebrow = "recording-channel-identity",
                 title = "recording-title", support = "recording-subtitle", clock = "recording-clock"),

@@ -44,15 +44,17 @@ internal fun PlayerOverlayChrome(
     ),
     footerContent: @Composable ColumnScope.() -> Unit,
 ) {
-    // Inside the controls layer, the header comes down and the footer up as they fade in.
+    // Inside the controls layer, the header comes down and the footer up as they fade in;
+    // controls revealed by a zap fade in where they rest.
     val motion = LocalPlayerControlsMotion.current
+    val travels = LocalPlayerControlsEntry.current == PlayerControlsEntry.TRAVEL
     val entering = motion?.animateShown(
         enter = tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate),
         exit = snap(),
         label = "player-chrome-entry",
     )
     fun GraphicsLayerScope.enterFrom(offset: Dp) {
-        if (entering != null && motion.transition?.targetState == EnterExitState.Visible) {
+        if (travels && entering != null && motion.transition.targetState == EnterExitState.Visible) {
             translationY = offset.toPx() * (1f - entering.value)
         }
     }

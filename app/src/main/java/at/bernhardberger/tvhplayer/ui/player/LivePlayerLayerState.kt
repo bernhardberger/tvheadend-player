@@ -65,6 +65,10 @@ internal class LivePlayerLayerState(
     var revealingKeyCode by mutableStateOf<Int?>(null)
         private set
 
+    /** How the most recent request revealed the controls: a zap fades them in place. */
+    var controlsEntry by mutableStateOf(PlayerControlsEntry.TRAVEL)
+        private set
+
     private var autoHideEligible = false
     private var autoHideJob: Job? = null
     private var disposed = false
@@ -89,10 +93,13 @@ internal class LivePlayerLayerState(
 
     fun onChannelTuneRequested() {
         // Quick-zap owns focus until explicitly dismissed, including a failed tune.
-        if (!channelDrawerOpen) showControls()
+        if (!channelDrawerOpen) revealControls(PlayerControlsEntry.FADE)
     }
 
-    fun showControls() {
+    fun showControls() = revealControls(PlayerControlsEntry.TRAVEL)
+
+    private fun revealControls(entry: PlayerControlsEntry) {
+        controlsEntry = entry
         controlsVisible = true
         channelDrawerOpen = false
         restartAutoHideIfEligible()
@@ -105,6 +112,7 @@ internal class LivePlayerLayerState(
 
     fun openInfo() {
         suspendAutoHide()
+        controlsEntry = PlayerControlsEntry.TRAVEL
         controlsVisible = false
         channelDrawerOpen = false
         optionsPage = null
@@ -133,6 +141,7 @@ internal class LivePlayerLayerState(
 
     fun showOptionsPage(page: PlaybackOptionsPage) {
         suspendAutoHide()
+        controlsEntry = PlayerControlsEntry.TRAVEL
         controlsVisible = true
         channelDrawerOpen = false
         infoOpen = false
@@ -153,6 +162,7 @@ internal class LivePlayerLayerState(
                 .takeIf { controlsVisible }
         }
         suspendAutoHide()
+        controlsEntry = PlayerControlsEntry.TRAVEL
         channelDrawerOpen = false
         infoOpen = false
         recordingConfirmationVisible = false
@@ -255,6 +265,7 @@ internal class LivePlayerLayerState(
         channelDrawerReturnAction = lastFocusedAction.takeIf { controlsVisible }
         restoreChannelAction = null
         suspendAutoHide()
+        controlsEntry = PlayerControlsEntry.TRAVEL
         controlsVisible = false
         infoOpen = false
         recordingConfirmationVisible = false

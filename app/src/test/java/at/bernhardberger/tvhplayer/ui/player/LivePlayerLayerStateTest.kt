@@ -40,6 +40,36 @@ class LivePlayerLayerStateTest {
     }
 
     @Test
+    fun controlsRecordWhetherAZapOrTheViewerRevealedThem() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        assertEquals(PlayerControlsEntry.TRAVEL, state.controlsEntry)
+        state.onChannelTuneRequested()
+        assertTrue(state.controlsVisible)
+        assertEquals(PlayerControlsEntry.FADE, state.controlsEntry)
+        state.hideControls()
+        state.showControls()
+        assertEquals(PlayerControlsEntry.TRAVEL, state.controlsEntry)
+
+        // Controls returning from the tray, options or info still move in as before.
+        state.onChannelTuneRequested()
+        state.openChannelDrawer()
+        state.onChannelTuneRequested()
+        assertEquals(PlayerControlsEntry.TRAVEL, state.controlsEntry)
+        state.dismissChannelDrawer()
+        assertEquals(PlayerControlsEntry.TRAVEL, state.controlsEntry)
+        for (open in listOf(
+            { state.showOptionsPage(PlaybackOptionsPage.ROOT) },
+            { state.openInfo() },
+        )) {
+            state.onChannelTuneRequested()
+            open()
+            assertEquals(PlayerControlsEntry.TRAVEL, state.controlsEntry)
+        }
+        advanceTimeBy(20_000L)
+        runCurrent()
+    }
+
+    @Test
     fun shelfDismissalRestoresInvokerWithoutChangingTuneCloseBehavior() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         for (action in listOf("player-pause", "player-info", "player-record", "player-settings", "player-stop")) {
