@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -45,6 +46,9 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
+import at.bernhardberger.tvhplayer.ui.player.leaving
 
 @Composable
 fun TvRecoveryOverlay(
@@ -84,111 +88,113 @@ fun TvRecoveryOverlay(
     }
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(),
-        exit = fadeOut(),
+        enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)),
+        exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)),
         modifier = modifier,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(if (opaque) MaterialTheme.colorScheme.background else Color.Black.copy(alpha = 0.86f))
-                .padding(48.dp)
-                // Holds focus without a visible indication until the action takes it;
-                // OK and directions there do nothing, so none reaches what is behind.
-                .focusRequester(holderFocus)
-                .onFocusChanged { holderFocused = it.isFocused }
-                .onKeyEvent { event -> holderFocused && event.key in HeldKeys }
-                .focusProperties { canFocus = holding }
-                .focusable()
-                .focusGroup()
-                .semantics {
-                    paneTitle = message
-                    if (primaryVisible) dialog()
-                    liveRegion = liveRegionMode
-                    isTraversalGroup = true
-                }
-                .testTag("tv-recovery-overlay"),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            if (!primaryVisible) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
-            }
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Center,
+        PlayerMotionFrame(leaving = leaving) {
+            Column(
                 modifier = Modifier
-                    .padding(top = if (primaryVisible) 0.dp else 24.dp)
-                    .widthIn(max = 680.dp)
-                    .semantics { heading() },
-            )
-            if (detail != null) {
-                Text(
-                    text = detail,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .widthIn(max = 680.dp),
-                )
-            }
-            if (hint != null) {
-                Text(
-                    text = hint,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .widthIn(max = 680.dp),
-                )
-            }
-            if (primaryVisible) {
-                Row(
-                    modifier = Modifier
-                        .padding(top = 32.dp)
-                        .focusGroup(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Button(
-                        onClick = requireNotNull(onPrimaryAction),
-                        enabled = primaryActionEnabled,
-                        modifier = Modifier
-                            .focusRequester(primaryFocus)
-                            .focusProperties {
-                                left = FocusRequester.Cancel
-                                right = if (secondaryVisible) {
-                                    secondaryFocus
-                                } else {
-                                    FocusRequester.Cancel
-                                }
-                                up = FocusRequester.Cancel
-                                down = FocusRequester.Cancel
-                            }
-                            .testTag("tv-recovery-primary"),
-                    ) {
-                        Text(requireNotNull(primaryActionLabel))
+                    .fillMaxSize()
+                    .background(if (opaque) MaterialTheme.colorScheme.background else Color.Black.copy(alpha = 0.86f))
+                    .padding(48.dp)
+                    // Holds focus without a visible indication until the action takes it;
+                    // OK and directions there do nothing, so none reaches what is behind.
+                    .focusRequester(holderFocus)
+                    .onFocusChanged { holderFocused = it.isFocused }
+                    .onKeyEvent { event -> holderFocused && event.key in HeldKeys }
+                    .focusProperties { canFocus = holding }
+                    .focusable()
+                    .focusGroup()
+                    .semantics {
+                        paneTitle = message
+                        if (primaryVisible) dialog()
+                        liveRegion = liveRegionMode
+                        isTraversalGroup = true
                     }
-                    if (secondaryVisible) {
-                        OutlinedButton(
-                            onClick = requireNotNull(onSecondaryAction),
+                    .testTag("tv-recovery-overlay"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                if (!primaryVisible) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
+                }
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .padding(top = if (primaryVisible) 0.dp else 24.dp)
+                        .widthIn(max = 680.dp)
+                        .semantics { heading() },
+                )
+                if (detail != null) {
+                    Text(
+                        text = detail,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .widthIn(max = 680.dp),
+                    )
+                }
+                if (hint != null) {
+                    Text(
+                        text = hint,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .widthIn(max = 680.dp),
+                    )
+                }
+                if (primaryVisible) {
+                    Row(
+                        modifier = Modifier
+                            .padding(top = 32.dp)
+                            .focusGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Button(
+                            onClick = requireNotNull(onPrimaryAction),
+                            enabled = primaryActionEnabled,
                             modifier = Modifier
-                                .focusRequester(secondaryFocus)
+                                .focusRequester(primaryFocus)
                                 .focusProperties {
-                                    left = primaryFocus
-                                    right = FocusRequester.Cancel
+                                    left = FocusRequester.Cancel
+                                    right = if (secondaryVisible) {
+                                        secondaryFocus
+                                    } else {
+                                        FocusRequester.Cancel
+                                    }
                                     up = FocusRequester.Cancel
                                     down = FocusRequester.Cancel
                                 }
-                                .testTag("tv-recovery-secondary"),
+                                .testTag("tv-recovery-primary"),
                         ) {
-                            Text(requireNotNull(secondaryActionLabel))
+                            Text(requireNotNull(primaryActionLabel))
+                        }
+                        if (secondaryVisible) {
+                            OutlinedButton(
+                                onClick = requireNotNull(onSecondaryAction),
+                                modifier = Modifier
+                                    .focusRequester(secondaryFocus)
+                                    .focusProperties {
+                                        left = primaryFocus
+                                        right = FocusRequester.Cancel
+                                        up = FocusRequester.Cancel
+                                        down = FocusRequester.Cancel
+                                    }
+                                    .testTag("tv-recovery-secondary"),
+                            ) {
+                                Text(requireNotNull(secondaryActionLabel))
+                            }
                         }
                     }
                 }

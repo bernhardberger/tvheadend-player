@@ -2,6 +2,12 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -350,6 +356,10 @@ internal fun PlaybackOptionsSheetContent(
         }
     )
 
+    val audioTitle = stringResource(
+        if (quickList != null) R.string.audio_quick_list else R.string.audio_track
+    )
+
     LaunchedEffect(page) {
         if (page != PlaybackOptionsPage.ROOT && availableRootPages.contains(page)) {
             lastRootPage = page
@@ -363,19 +373,13 @@ internal fun PlaybackOptionsSheetContent(
         onPageChange(target)
     }
 
-    PlaybackOptionsOverlayFrame(
-        paneTitle = sheetTitle,
-        modifier = Modifier.onPreviewKeyEvent { event ->
-            event.key == Key.DirectionRight &&
-                (event.type == KeyEventType.KeyUp || page != PlaybackOptionsPage.ROOT)
-        },
-    ) {
+    val pageContent: @Composable (PlaybackOptionsPage) -> Unit = { target ->
         Column(
             // Rows and lists own the start/end padding so a scaled focused row can use it.
             modifier = Modifier.padding(top = PlaybackPanelHeaderTop),
             verticalArrangement = Arrangement.spacedBy(TvSpacing16),
         ) {
-            when (page) {
+            when (target) {
                 PlaybackOptionsPage.ROOT -> PlaybackOptionsRoot(
                     audioValue = audioValue,
                     subtitlesValue = subtitlesValue,
@@ -387,7 +391,7 @@ internal fun PlaybackOptionsSheetContent(
                     onPageChange = ::openPage,
                 )
                 PlaybackOptionsPage.AUDIO -> TrackOptionsPage(
-                    title = sheetTitle,
+                    title = audioTitle,
                     currentValue = audioValue,
                     tracks = listOf(PlaybackOptionTrack("automatic", stringResource(R.string.audio_automatic),
                         automaticAudioSupport, audioAutomatic)) +
@@ -435,7 +439,52 @@ internal fun PlaybackOptionsSheetContent(
             }
         }
     }
+
+    PlaybackOptionsOverlayFrame(
+        paneTitle = sheetTitle,
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            event.key == Key.DirectionRight &&
+                (event.type == KeyEventType.KeyUp || page != PlaybackOptionsPage.ROOT)
+        },
+    ) {
+        if (quickList != null) {
+            // A quick list switches pages at once: closing one applies its focused row as it
+            // leaves, and list keys must reach only the list that is open.
+            pageContent(page)
+        } else {
+            // A deeper page arrives from the end and a shallower one from the start; the
+            // outgoing page leaves the other way, already without focus or semantics. Each
+            // visit composes its page afresh, so returning to a page that is still leaving
+            // focuses its intended row again.
+            val pageTransition = updateTransition(rememberVisit(page), label = "playback-options-page")
+            pageTransition.AnimatedContent(
+                transitionSpec = {
+                    (fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)) togetherWith
+                        fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
+                },
+            ) { visit ->
+                val travel = animateShown(
+                    enter = tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate),
+                    exit = tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate),
+                    label = "playback-options-page-travel",
+                )
+                PlayerMotionFrame(
+                    leaving = leaving,
+                    modifier = Modifier.graphicsLayer {
+                        val deeper = playbackOptionsPageDepth(pageTransition.targetState.value) >
+                            playbackOptionsPageDepth(pageTransition.currentState.value)
+                        val towardEnd = if (deeper) 1f else -1f
+                        val side = if (leaving) -towardEnd else towardEnd
+                        translationX = side * PlayerMotion.PageOffset.toPx() * (1f - travel.value)
+                    },
+                ) { pageContent(visit.value) }
+            }
+        }
+    }
 }
+
+private fun playbackOptionsPageDepth(page: PlaybackOptionsPage): Int =
+    if (page == PlaybackOptionsPage.ROOT) 0 else 1
 
 /** Width of the floating side panel (Material for TV kit, modal drawer). */
 internal val PlaybackPanelWidth = 320.dp
@@ -487,35 +536,60 @@ internal fun PlaybackOptionsOverlayFrame(
     content: @Composable () -> Unit,
 ) {
     val shape = MaterialTheme.shapes.large
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = TvScrimModalAlpha))
-            .focusGroup(),
-        contentAlignment = Alignment.CenterEnd,
-    ) {
-        Surface(
-            modifier = Modifier
-                .padding(PlaybackPanelEdgeInset)
-                .width(panelWidth)
-                .fillMaxHeight()
-                // Shadow before the clip so the clip cannot cut it away.
-                .shadow(PlaybackPanelElevation, shape)
-                .clip(shape)
-                .testTag(panelTag)
-                .semantics {
-                    dialog()
-                    paneTitle?.let { this.paneTitle = it }
-                },
-            shape = shape,
-            colors = SurfaceDefaults.colors(
-                containerColor = TvSurfaceColors.container,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
+    // Inside PlayerPanelVisibility the scrim and the panel animate separately.
+    val motion = LocalPlayerPanelMotion.current
+    val scrimShown = motion?.animateShown(
+        enter = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+        exit = tween(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate),
+        label = "panel-scrim",
+    )
+    val panelShown = motion?.animateShown(
+        enter = tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate),
+        exit = tween(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate),
+        label = "panel",
+    )
+    val frame: @Composable () -> Unit = {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .focusGroup(),
+            contentAlignment = Alignment.CenterEnd,
         ) {
-            content()
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = scrimShown?.value ?: 1f }
+                    .background(Color.Black.copy(alpha = TvScrimModalAlpha))
+            )
+            Surface(
+                modifier = Modifier
+                    .padding(PlaybackPanelEdgeInset)
+                    .width(panelWidth)
+                    .fillMaxHeight()
+                    .graphicsLayer {
+                        val shown = panelShown?.value ?: 1f
+                        alpha = shown
+                        translationX = PlayerMotion.PanelOffset.toPx() * (1f - shown)
+                    }
+                    // Shadow before the clip so the clip cannot cut it away.
+                    .shadow(PlaybackPanelElevation, shape)
+                    .clip(shape)
+                    .testTag(panelTag)
+                    .semantics {
+                        dialog()
+                        paneTitle?.let { this.paneTitle = it }
+                    },
+                shape = shape,
+                colors = SurfaceDefaults.colors(
+                    containerColor = TvSurfaceColors.container,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            ) {
+                content()
+            }
         }
     }
+    if (motion == null) frame() else PlayerMotionFrame(leaving = motion.leaving, content = frame)
 }
 
 @Composable

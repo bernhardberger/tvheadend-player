@@ -1,5 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +33,24 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale
+
+/** Stats appear over 150 ms and leave over 100 ms, dropping semantics at once. */
+@Composable
+internal fun PlaybackStatsVisibility(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)),
+        exit = fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)),
+        modifier = Modifier.semanticsWhileShown(visible).then(modifier),
+        label = "playback-stats",
+    ) {
+        content()
+    }
+}
 
 @Composable
 internal fun PlaybackStatsOverlay(
@@ -292,7 +314,8 @@ private fun StatLine(label: String, value: String) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall,
+            // Tabular figures keep changing counters from shifting sideways.
+            style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
             modifier = Modifier.weight(0.62f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

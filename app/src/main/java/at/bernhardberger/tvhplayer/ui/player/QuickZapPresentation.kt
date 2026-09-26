@@ -28,7 +28,11 @@ internal fun QuickZapPresentation(
 ) {
     val expansion = animateFloatAsState(
         if (expanded) 1f else 0f,
-        animationSpec = tween(LIVE_PLAYER_LAYER_TRANSITION_MS),
+        animationSpec = if (expanded) {
+            tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate)
+        } else {
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedAccelerate)
+        },
         label = "quick-zap-expansion",
     )
     Box(Modifier.fillMaxSize().clipToBounds()) {

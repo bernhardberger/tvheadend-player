@@ -552,7 +552,7 @@ fun RecordingPlayerScreen(
             val entry = requireNotNull(entry)
             PlayerControlsLayer(
                 visible = foregroundLayer == PlayerForegroundLayer.CONTROLS,
-                modalVisible = optionsPage != null,
+                modalVisible = optionsPage != null || infoOpen,
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
                 RecordingOverlayControls(
@@ -603,7 +603,7 @@ fun RecordingPlayerScreen(
                 )
             }
 
-            if (foregroundLayer == PlayerForegroundLayer.INFO) {
+            PlayerPanelVisibility(Unit.takeIf { foregroundLayer == PlayerForegroundLayer.INFO }) {
                 PlaybackOptionsOverlayFrame(
                     paneTitle = stringResource(R.string.player_info),
                     panelTag = "recording-info-panel",
@@ -627,13 +627,15 @@ fun RecordingPlayerScreen(
                 }
             }
 
-            if (foregroundLayer == PlayerForegroundLayer.STATS) {
+            PlaybackStatsVisibility(
+                visible = foregroundLayer == PlayerForegroundLayer.STATS,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 36.dp, end = 48.dp),
+            ) {
                 PlaybackStatsOverlay(
                     diagnostics = diagnostics,
                     aspectRatio = aspectRatio,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 36.dp, end = 48.dp),
                 )
             }
 
@@ -730,7 +732,10 @@ fun RecordingPlayerScreen(
             },
             liveRegionMode = LiveRegionMode.Assertive,
         )
-        optionsPage?.let { page ->
+        PlayerPanelVisibility(
+            value = optionsPage?.let { it to optionsQuickList },
+            closesAtOnce = { (_, quick) -> quick },
+        ) { (page, _) ->
             val audioAutomatic by session.audioAutomatic.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,

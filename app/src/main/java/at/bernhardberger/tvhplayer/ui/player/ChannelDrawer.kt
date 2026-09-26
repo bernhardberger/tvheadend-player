@@ -3,6 +3,11 @@ package at.bernhardberger.tvhplayer.ui.player
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
@@ -271,7 +276,18 @@ private fun CompactZapCard(
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f).testTag("player-channel-${channel.id.value}-identity"),
                 )
-                ChannelPlaybackMarker(playbackIndicator, size = 16.dp)
+                // The new marker fades in; the old one leaves at once so two glyphs never
+                // overlap in the slot and its tag and announcement go with it.
+                AnimatedContent(
+                    targetState = playbackIndicator,
+                    transitionSpec = {
+                        (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) togetherWith
+                            ExitTransition.None).using(null)
+                    },
+                    label = "zap-card-marker",
+                ) { indicator ->
+                    if (!leaving) ChannelPlaybackMarker(indicator, size = 16.dp)
+                }
                 if (recording) Icon(painterResource(R.drawable.ic_fiber_manual_record),
                     contentDescription = stringResource(R.string.player_shelf_recording),
                     tint = TvRecordingColor, modifier = Modifier.size(12.dp))

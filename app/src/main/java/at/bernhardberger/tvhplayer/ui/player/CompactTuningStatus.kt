@@ -23,7 +23,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_FADE_IN_MS
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
@@ -37,9 +36,10 @@ internal fun CompactTuningStatus(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(COMPACT_TUNING_FADE_IN_MS.toInt())),
-        exit = fadeOut(),
-        modifier = modifier,
+        // The fade-in matches COMPACT_TUNING_FADE_IN_MS, which the minimum-visible policy counts.
+        enter = fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)),
+        exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)),
+        modifier = Modifier.semanticsWhileShown(visible).then(modifier),
     ) {
         Surface(
             modifier = Modifier

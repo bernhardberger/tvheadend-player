@@ -426,6 +426,8 @@ fun VideoPlayerScreen(
 
     var currentChannelId by remember { mutableStateOf(channelId) }
     var currentChannelName by remember { mutableStateOf(channelName) }
+    // Presentation only: which way the header identity travels on the next channel change.
+    var headerZapDirection by remember { mutableIntStateOf(0) }
     val confirmedPlayingChannelId = playingLiveChannelId.takeIf {
         it == currentChannelId && playbackState.presented
     }
@@ -768,7 +770,7 @@ fun VideoPlayerScreen(
      * Tunes [channel] from the key that chose it: at once, or [settleMs] after a CH+/- repeat
      * so a burst opens no tuner per press. The newest request supersedes every earlier one.
      */
-    fun tuneChannel(channel: Channel, settleMs: Long = 0L): Boolean {
+    fun tuneChannel(channel: Channel, settleMs: Long = 0L, zapDirection: Int = 0): Boolean {
         profileTrace("P49:zap:tune-channel:settle:$settleMs:time:${SystemClock.uptimeMillis()}") { }
         val channelId = channel.id
         channelNumberInput = ""
@@ -795,6 +797,7 @@ fun VideoPlayerScreen(
         requestedLiveSelection = playbackSelection
         currentChannelId = channelId
         currentChannelName = channel.name.orEmpty()
+        headerZapDirection = zapDirection
 
         val requestToken = liveRequestToken
         // A closing or stopped screen leaves the request to the entry/resume effect.
@@ -826,7 +829,7 @@ fun VideoPlayerScreen(
         val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
         // The first CH+/- tunes at once; a repeat within the window settles first, so a
         // burst tunes its first and its last channel, not one tuner per key press.
-        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs))
+        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs), zapDirection = direction)
     }
 
     fun tuneEnteredChannel(): Boolean {
@@ -1447,6 +1450,8 @@ fun VideoPlayerScreen(
                 onRecordActionFocusRestored = { restoreRecordActionFocus = false },
                 restoreOptionsFocus = restoreOptionsFocus,
                 onOptionsFocusRestored = { restoreOptionsFocus = false },
+                channelId = currentChannelId,
+                headerZapDirection = headerZapDirection,
             )
         }
 
@@ -1483,10 +1488,12 @@ fun VideoPlayerScreen(
             )
         }
 
-        if (
-            layerState.infoOpen &&
-            (foregroundLayer == PlayerForegroundLayer.INFO ||
-                foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
+        PlayerPanelVisibility(
+            Unit.takeIf {
+                layerState.infoOpen &&
+                    (foregroundLayer == PlayerForegroundLayer.INFO ||
+                        foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
+            },
         ) {
             LiveProgrammeInfoOverlay(
                 event = infoEvent,
@@ -1524,18 +1531,24 @@ fun VideoPlayerScreen(
             )
         }
 
-        if (foregroundLayer == PlayerForegroundLayer.STATS) {
+        PlaybackStatsVisibility(
+            visible = foregroundLayer == PlayerForegroundLayer.STATS,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 36.dp, end = 48.dp),
+        ) {
             PlaybackStatsOverlay(
                 diagnostics = diagnostics,
                 aspectRatio = aspectRatio,
                 timeshiftState = effectiveTimeshiftState,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 36.dp, end = 48.dp),
             )
         }
 
-        layerState.optionsPage?.let { page ->
+        PlayerPanelVisibility(
+            value = layerState.optionsPage?.let { it to layerState.optionsQuickList },
+            // A quick list applies its focused row when it leaves; that must not wait.
+            closesAtOnce = { (_, quick) -> quick },
+        ) { (page, _) ->
             val audioAutomatic by playbackRuntime.audioAutomatic.collectAsStateWithLifecycle()
             PlaybackOptionsSheet(
                 page = page,
@@ -1572,22 +1585,37 @@ fun VideoPlayerScreen(
                 .padding(48.dp),
         )
 
-        if (channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)) {
-            val failedState = playbackState as? AppPlaybackState.Failed
-            val failureDetail = listOfNotNull(
-                failedState?.recoveryReason?.name,
-                failedState?.playerErrorCode,
-                failedState?.targetResult?.toString(),
-            ).joinToString(" · ")
+        val unavailableShown = channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)
+        val failedState = playbackState as? AppPlaybackState.Failed
+        AnimatedVisibility(
+            visible = unavailableShown,
+            enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)),
+            exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)),
+            modifier = Modifier.align(Alignment.Center).semanticsWhileShown(unavailableShown),
+            label = "player-channel-unavailable",
+        ) {
+            // The exit keeps the message it showed while the failure state clears.
+            val (message, failureDetail) = rememberLastShown(
+                if (unavailableShown) {
+                    stringResource(currentSubscriptionFailure?.messageResource() ?: R.string.player_playback_failed) to
+                        listOfNotNull(
+                            failedState?.recoveryReason?.name,
+                            failedState?.playerErrorCode,
+                            failedState?.targetResult?.toString(),
+                        ).joinToString(" · ")
+                } else {
+                    null
+                },
+            ) ?: return@AnimatedVisibility
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.align(Alignment.Center)
+                modifier = Modifier
                     .background(Color.Black.copy(alpha = 0.78f), MaterialTheme.shapes.large)
                     .padding(24.dp)
                     .testTag("player-channel-unavailable"),
             ) {
                 Text(
-                    text = stringResource(currentSubscriptionFailure?.messageResource() ?: R.string.player_playback_failed),
+                    text = message,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )

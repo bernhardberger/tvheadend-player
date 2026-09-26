@@ -199,7 +199,7 @@ fun PlayerTimelineBar(
     val currentProgress = progress?.coerceIn(0f, 1f)
     val animatedProgress = key(motionKey, programmeWindow, currentProgress != null, programmeTargetAvailable) {
         animateFloatAsState(currentProgress ?: 0f,
-            animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+            animationSpec = tween(durationMillis = PlayerMotion.EmphasisMs, easing = LinearOutSlowInEasing),
             label = "player-timeline-position")
     }
     val barHeight = if (tone == PlayerTimelineTone.ACTIVE) {
@@ -409,6 +409,11 @@ fun PlayerTimelineBlock(
     collapsed: Boolean = false,
     markerFractions: List<Float> = emptyList(),
     trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
+    /**
+     * Identity of what the bar measures, such as the playing channel and programme. A
+     * change jumps the fill to the new position instead of sliding across programmes.
+     */
+    motionKey: Any? = null,
 ) {
     val statusHeight = TvOverlayStatusRowHeight
     val showStatus = !collapsed && (
@@ -419,7 +424,7 @@ fun PlayerTimelineBlock(
     val endpointColor = MaterialTheme.colorScheme.onSurface
     val endpointEmphasis = animateFloatAsState(
         if (tone == PlayerTimelineTone.ACTIVE || tone == PlayerTimelineTone.PREVIEW) 1f else TvOverlayTextTertiaryAlpha,
-        animationSpec = tween(180), label = "player-endpoint-emphasis",
+        animationSpec = tween(PlayerMotion.EmphasisMs), label = "player-endpoint-emphasis",
     )
     val leadingColor = leadingLabelColor ?: endpointColor
     val trailingColor = trailingLabelColor ?: endpointColor
@@ -448,7 +453,7 @@ fun PlayerTimelineBlock(
                 fillColor = fillColor,
                 showTrack = showTrack,
                 markerFractions = markerFractions,
-                motionKey = programmeWindow?.event?.let { Triple(it.id, it.start, it.stop) },
+                motionKey = motionKey to programmeWindow?.event?.let { Triple(it.id, it.start, it.stop) },
             )
             trackOverlay?.invoke(this)
         }

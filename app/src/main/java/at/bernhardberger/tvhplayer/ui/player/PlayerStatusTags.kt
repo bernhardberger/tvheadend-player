@@ -54,7 +54,7 @@ internal fun PlayerStatusTags(
         position != null -> stringResource(R.string.timeshift_behind_live, duration.orEmpty())
         else -> null
     }
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
         label?.let {
             StatusTag(it, if (paused) R.drawable.ic_pause else R.drawable.ic_play_arrow,
                 when {
@@ -79,7 +79,7 @@ private fun StatusTag(label: String, icon: Int, color: Color, modifier: Modifier
     Surface(modifier = modifier.clearAndSetSemantics { contentDescription = description },
         shape = RoundedCornerShape(4.dp), colors = SurfaceDefaults.colors(
             containerColor = TvSurfaceColors.container.copy(alpha = 0.82f))) {
-        Row(Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
             Text(label, color = color, style = MaterialTheme.typography.labelMedium, maxLines = 1)
@@ -94,7 +94,7 @@ private fun RecordingNowTag() {
         .clearAndSetSemantics { contentDescription = description },
         shape = RoundedCornerShape(4.dp), colors = SurfaceDefaults.colors(
             containerColor = TvSurfaceColors.container.copy(alpha = 0.82f))) {
-        Row(Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Icon(painterResource(R.drawable.ic_fiber_manual_record), contentDescription = null,
                 tint = TvRecordingColor, modifier = Modifier.size(10.dp))

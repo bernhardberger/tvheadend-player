@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
@@ -95,6 +96,10 @@ fun OverlayControlsTv(
      */
     livePause: LivePauseAvailability? = null,
     onPauseUnavailable: (reason: String) -> Unit = {},
+    /** Channel whose identity the header and timeline motion follow; null keeps them keyed on the programme only. */
+    channelId: ChannelId? = null,
+    /** Direction of the channel step that tuned this channel: +1 up, -1 down, 0 picked. */
+    headerZapDirection: Int = 0,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -207,6 +212,8 @@ fun OverlayControlsTv(
                 title = "player-programme-title", support = "player-next-programme", clock = "player-clock",
                 clockSupport = "player-clock-status"),
             modifier = modifier,
+            identity = PlayerHeaderIdentity(channelId, displayedEvent?.id),
+            zapDirection = headerZapDirection,
         )
     }) {
         val previewFeedback = timeshiftFeedback ?: if (previewing) {
@@ -310,6 +317,7 @@ fun OverlayControlsTv(
                 paused = paused,
                 onSeekTo = { onUserInteraction(); onSeekTimeshift(it - timeshiftState.positionMs) },
                 modifier = timelineModifier,
+                motionKey = channelId,
             )
         } else {
             // Schedule elapsed time is informational, never a playback coordinate or seek grant.
@@ -329,6 +337,7 @@ fun OverlayControlsTv(
                 tone = PlayerTimelineTone.AMBIENT,
                 fillColor = MaterialTheme.colorScheme.onSurface,
                 showTrack = true,
+                motionKey = channelId to event?.id,
                 leadingLabel = event?.let { formatClock(it.start.epochSeconds) },
                 trailingLabel = event?.let { formatClock(it.stop.epochSeconds) },
                 reserveLabelSpace = true,

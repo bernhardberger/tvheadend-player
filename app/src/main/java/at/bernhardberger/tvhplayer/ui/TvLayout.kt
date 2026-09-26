@@ -83,7 +83,13 @@ val TvOverlayHeaderMinHeight = 72.dp
 /** First-baseline anchor for both header columns. Must exceed the clock's ascent. */
 val TvOverlayHeaderFirstBaseline = 24.dp
 val TvOverlayHeaderPiconWidth = 96.dp
-val TvOverlayHeaderPiconHeight = 64.dp
+val TvOverlayHeaderPiconHeight = 56.dp
+/** Puts the picon's top at the eyebrow's cap line and its bottom at the title's first baseline. */
+val TvOverlayHeaderPiconTopOffset = TvSpacing8
+/** Eyebrow to title and title to support. */
+val TvOverlayHeaderTextGap = TvSpacing4
+/** Clock to the status tags below it. */
+val TvOverlayHeaderStatusGap = TvSpacing8
 val TvOverlayHeaderPiconGap = TvSpacing24
 val TvOverlayHeaderColumnGap = TvSpacing48
 

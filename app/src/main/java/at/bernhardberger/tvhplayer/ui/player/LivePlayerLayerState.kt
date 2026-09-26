@@ -32,7 +32,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
-internal const val LIVE_PLAYER_LAYER_TRANSITION_MS = 180
 
 @Stable
 internal class LivePlayerLayerState(

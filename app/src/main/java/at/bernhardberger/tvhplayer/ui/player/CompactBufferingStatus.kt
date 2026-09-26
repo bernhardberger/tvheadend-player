@@ -58,12 +58,11 @@ internal fun CompactBufferingStatus(
         screenActive && lifecycleState.isAtLeast(Lifecycle.State.RESUMED), foregroundBlocked,
     )
     val visible by rememberBufferingVisible(expectedTarget to generation, eligible)
-    // Unlike tuning, a stall has no minimum hold or exit fade: it disappears immediately.
-    if (visible && eligible) {
-        CompactTuningStatus(
-            visible = true,
-            label = stringResource(R.string.player_buffering),
-            modifier = modifier.testTag("player-buffering-status"),
-        )
-    }
+    // Unlike tuning, a stall has no minimum hold: it starts fading and leaves
+    // semantics as soon as it is no longer eligible.
+    CompactTuningStatus(
+        visible = visible && eligible,
+        label = stringResource(R.string.player_buffering),
+        modifier = modifier.testTag("player-buffering-status"),
+    )
 }

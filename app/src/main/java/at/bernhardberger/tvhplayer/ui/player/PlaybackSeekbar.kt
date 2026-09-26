@@ -51,6 +51,8 @@ fun PlaybackSeekbar(
     recordingMarkers: List<Long> = emptyList(),
     onOpenRecordingMarkers: (() -> Unit)? = null,
     trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
+    /** Identity of what the bar measures; see [PlayerTimelineBlock]. */
+    motionKey: Any? = null,
     /**
      * Enables timeshift labels. Timeline geometry and positional labels use the sampled
      * range; server-shift-aware Live status belongs to the passive player clock only.
@@ -211,6 +213,7 @@ fun PlaybackSeekbar(
             programmeWindow = programmeWindow,
             reserveLabelSpace = true,
             trackOverlay = trackOverlay,
+            motionKey = motionKey,
             statusAction = statusAction,
             feedback = windowFeedback,
             feedbackIsError = feedbackIsError,
