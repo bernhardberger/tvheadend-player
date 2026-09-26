@@ -39,14 +39,25 @@ internal class LivePauseController(
     private val foreground: () -> Boolean,
     private val interruption: () -> AudioInterruption?,
     private val stopPausedRetune: suspend () -> Unit,
+    /** Serialized. The startup Play that a Pause given before the channel started replaced. */
+    private val playStartedTarget: suspend () -> Unit,
+    /** The viewer's pending live selection: null without one, else whether it should play. */
+    private val pendingLiveSelectionPlayWhenReady: () -> Boolean?,
 ) {
     /**
      * A Pause pressed before the timeshift grant is known, for one live target epoch.
      * [failClosed] marks the paused retune of a kept channel: without a server pause it stops.
      * [pictureWaitExpired]: the first picture did not arrive within [FIRST_PICTURE_BUDGET_MILLIS],
      * so the grant alone resolves it; [pictureWait] is that budget.
+     * [startupPlay] marks a Pause given before the channel started: it replaced the startup
+     * Play, so a dropped one starts playback with its focus request ([playStartedTarget]).
      */
-    private class PendingLivePause(val epoch: Long, val wasPlaying: Boolean, val failClosed: Boolean) {
+    private class PendingLivePause(
+        val epoch: Long,
+        val wasPlaying: Boolean,
+        val failClosed: Boolean,
+        val startupPlay: Boolean,
+    ) {
         var pictureWaitExpired = false
         var pictureWait: Job? = null
     }
@@ -60,6 +71,7 @@ internal class LivePauseController(
     var timeshiftRequestedEpoch: Long? = null
     var readyReachedEpoch: Long? = null
         private set
+    private val publishLock = Any()
     private val _livePause = MutableStateFlow(LivePauseState())
     val livePause = _livePause.asStateFlow()
     private val _livePauseNotice = MutableStateFlow<LivePauseUnavailableNotice?>(null)
@@ -70,6 +82,11 @@ internal class LivePauseController(
 
     fun consumeLivePauseNotice(notice: LivePauseUnavailableNotice) {
         _livePauseNotice.compareAndSet(notice, null)
+    }
+
+    /** A Pause the viewer gave meanwhile was not applied: tells them, as a dropped pending pause does. */
+    fun noticeLivePauseUnavailable() {
+        _livePauseNotice.value = LivePauseUnavailableNotice()
     }
 
     /** Ends the pending pause without publishing, as installation, stop, detach and failures do. */
@@ -102,17 +119,27 @@ internal class LivePauseController(
         )
     }
 
-    fun publishLivePause() {
+    /**
+     * Also runs unserialized when the viewer's pending live selection changes; the lock orders
+     * publications, so the last one carries the latest selection. While a selection is pending,
+     * Pause addresses that channel: it is starting unless live pause is off.
+     */
+    fun publishLivePause() = synchronized(publishLock) {
         val epoch = activeTargetEpoch()
+        val selectionPlayWhenReady = pendingLiveSelectionPlayWhenReady()
+        val availability = currentLivePauseAvailability()
         _livePause.value = LivePauseState(
-            availability = currentLivePauseAvailability(),
-            pending = epoch != null && pendingLivePause?.epoch == epoch,
+            availability = if (selectionPlayWhenReady != null && availability != LivePauseAvailability.OFF) {
+                LivePauseAvailability.STARTING
+            } else availability,
+            pending = selectionPlayWhenReady?.not() ?: (epoch != null && pendingLivePause?.epoch == epoch),
+            selectionPending = selectionPlayWhenReady != null,
         )
     }
 
     /** Serialized. The pending pause waits for the first picture at most [FIRST_PICTURE_BUDGET_MILLIS]. */
-    fun startPendingLivePauseLocked(epoch: Long, wasPlaying: Boolean, failClosed: Boolean) {
-        val pending = PendingLivePause(epoch, wasPlaying = wasPlaying, failClosed = failClosed)
+    fun startPendingLivePauseLocked(epoch: Long, wasPlaying: Boolean, failClosed: Boolean, startupPlay: Boolean = false) {
+        val pending = PendingLivePause(epoch, wasPlaying = wasPlaying, failClosed = failClosed, startupPlay = startupPlay)
         pendingLivePause = pending
         publishLivePause()
         pending.pictureWait = scope.launch {
@@ -201,7 +228,9 @@ internal class LivePauseController(
             stopPausedRetune()
             return true
         }
-        if (foreground() && interruption() == null) player.playWhenReady = pending.wasPlaying
+        if (foreground() && interruption() == null) {
+            if (pending.startupPlay) playStartedTarget() else player.playWhenReady = pending.wasPlaying
+        }
         _livePauseNotice.value = LivePauseUnavailableNotice()
         return true
     }

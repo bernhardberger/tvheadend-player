@@ -556,8 +556,270 @@ class LivePauseRuntimeTest {
         assertNull(runtime.livePauseNotice.value)
     }
 
+    @Test fun pauseDuringAPendingChannelChangeReplacesTheNewChannelsStartupPlayAndHoldsItOnce() = exercise {
+        live()
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertEquals(LivePauseState(LivePauseAvailability.STARTING, selectionPending = true), runtime.livePause.value)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true, selectionPending = true),
+            runtime.livePause.value)
+        settle()
+        // Nothing reaches the channel still installed.
+        assertEquals(emptyList<Int>(), connection.speeds)
+        val playRequested = trackPlayRequests()
+
+        val gate = pendingZap(channel = 2, intent = intent)
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(player.playWhenReady)
+        assertFalse(playRequested())
+        assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true), runtime.livePause.value)
+        assertEquals(emptyList<Int>(), connection.speeds)
+
+        grant(gate)
+        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        playerReady()
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        assertFalse(player.playWhenReady)
+        assertFalse(playRequested())
+        assertNull(runtime.livePauseNotice.value)
+    }
+
+    @Test fun pauseQueuedBehindAStartingChannelChangeIsHeldAtOnceForTheNewChannel() = exercise {
+        live()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        // The zap is admitted and holds the command serializer while it reads settings.
+        beforeSettingsRead = {
+            entered.complete(Unit)
+            release.await()
+        }
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        val zap = scope.async { runtime.playLive(selection(2)) }
+        await { entered.isCompleted }
+        val pause = scope.async { runtime.pauseTimeshiftPlayback() }
+        await { pause.isCompleted }
+        assertNull(pause.await())
+        assertTrue(runtime.livePause.value.pending)
+
+        beforeSettingsRead = {}
+        release.complete(Unit)
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { zap.isCompleted }
+        assertTrue(zap.await()?.isStarted == true)
+        await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertFalse(player.playWhenReady)
+        playerReady()
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(player.playWhenReady)
+    }
+
+    @Test fun playAfterAHeldPauseRestoresTheStartupPlayWithoutServerCommands() = exercise {
+        live()
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
+        assertEquals(LivePauseState(LivePauseAvailability.STARTING, selectionPending = true), runtime.livePause.value)
+
+        val gate = pendingZap(channel = 2, intent = intent)
+        await { player.playWhenReady }
+        grant(gate)
+        playerReady()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+    }
+
+    @Test fun anotherChannelChangeDropsTheHeldPause() = exercise {
+        live()
+        runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        val latest = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertEquals(LivePauseState(LivePauseAvailability.STARTING, selectionPending = true), runtime.livePause.value)
+
+        val gate = pendingZap(channel = 2, intent = latest)
+        await { player.playWhenReady }
+        grant(gate)
+        playerReady()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertFalse(runtime.livePause.value.pending)
+    }
+
+    @Test fun stopDropsTheHeldPauseAndWithdrawsItsChannel() = exercise {
+        live()
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        val stop = scope.async { runtime.stop() }
+        await { stop.isCompleted }
+        assertNull(runtime.activeTarget.value)
+        assertEquals(LivePauseState(), runtime.livePause.value)
+        assertNull(runtime.playLive(selection(2), intent))
+
+        live(channel = 2)
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+    }
+
+    @Test fun heldPauseWithoutAGrantOnTheNewChannelStartsItWithFocusAndNotifies() = exercise {
+        live()
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        val requests = focus.requestCount
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+        val install = scope.async { runtime.playLive(selection(2), intent) }
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        settle()
+        assertFalse(player.playWhenReady)
+        assertTrue(runtime.livePause.value.pending)
+
+        playerReady()
+        await { runtime.livePauseNotice.value != null }
+        settle()
+        assertEquals(LivePauseState(LivePauseAvailability.UNAVAILABLE), runtime.livePause.value)
+        assertTrue(player.playWhenReady)
+        assertEquals(emptyList<Int>(), connection.speeds)
+        // The startup Play the held Pause replaced asks for focus, as a normal start does.
+        assertEquals(requests + 1, focus.requestCount)
+    }
+
+    @Test fun abandonedSelectionDropsItsHeldPauseAndTheNextPauseActsOnTheChannelThatPlays() = exercise {
+        live()
+        // The screen registered a channel change, then cancelled it before its start ran.
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        runtime.abandonLiveSelection(intent)
+        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        settle()
+        assertTrue(player.playWhenReady)
+        assertEquals(emptyList<Int>(), connection.speeds)
+
+        val pause = runtime.setSessionPlayWhenReady(false) { true }
+        await { pause.isCompleted }
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+    }
+
+    @Test fun startCancelledDuringItsInstallDropsTheHeldPauseAndTheNextPauseActsOnTheChannelThatPlays() = exercise {
+        live()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        beforeSettingsRead = {
+            entered.complete(Unit)
+            release.await()
+        }
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        val zap = scope.async { runtime.playLive(selection(2), intent) }
+        await { entered.isCompleted }
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertTrue(runtime.livePause.value.pending)
+
+        // The screen went away: its start is cancelled while it is suspended.
+        zap.cancel()
+        await { zap.isCompleted }
+        beforeSettingsRead = {}
+        release.complete(Unit)
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        assertTrue(player.playWhenReady)
+        assertEquals(emptyList<Int>(), connection.speeds)
+
+        val pause = runtime.setSessionPlayWhenReady(false) { true }
+        await { pause.isCompleted }
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
+    }
+
+    @Test fun abandoningAnOlderSelectionKeepsThePauseHeldForTheLatest() = exercise {
+        live()
+        val older = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        val latest = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        runtime.abandonLiveSelection(older)
+        assertTrue(runtime.livePause.value.selectionPending)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        runtime.abandonLiveSelection(older)
+        assertEquals(LivePauseState(LivePauseAvailability.STARTING, pending = true, selectionPending = true),
+            runtime.livePause.value)
+
+        val gate = pendingZap(channel = 2, intent = latest)
+        grant(gate)
+        playerReady()
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(player.playWhenReady)
+    }
+
+    @Test fun adoptingThePlayingChannelAppliesThePauseHeldForItsSelection() = exercise {
+        live()
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        // The screen found the selected channel already playing and started nothing.
+        runtime.notePlaybackIntentServed(intent)
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        assertNull(runtime.livePauseNotice.value)
+        assertEquals(1, connection.subscribeCount)
+    }
+
+    @Test fun adoptedChannelWhoseServerRejectsTheHeldPauseKeepsPlayingAndTellsTheViewer() = exercise {
+        live()
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        runtime.notePlaybackIntentServed(intent)
+        await { runtime.livePauseNotice.value != null }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+    }
+
     private fun exercise(block: suspend BackgroundPlaybackRuntimeTest.Fixture.() -> Unit) =
         BackgroundPlaybackRuntimeTest.exercise(PlaybackRuntimePolicy.fromPlayerSettings(), block)
+
+    /** Starts the viewer's noted [intent] for [channel]; its subscription is held before the grant. */
+    private suspend fun BackgroundPlaybackRuntimeTest.Fixture.pendingZap(
+        channel: Long,
+        intent: Long,
+    ): CompletableDeferred<Unit> {
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        val gate = holdSubscribe()
+        val install = scope.async { runtime.playLive(selection(channel), intent) }
+        await { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        return gate
+    }
 
     /** Holds the next subscription before its confirmation; completing the result releases it. */
     private fun BackgroundPlaybackRuntimeTest.Fixture.holdSubscribe(): CompletableDeferred<Unit> {

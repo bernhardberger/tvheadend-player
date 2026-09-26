@@ -66,6 +66,54 @@ class VideoCoverRuntimeTest {
             assertEquals(kept, runtime.videoPresentation.value)
         }
 
+    @Test fun failedReplacementUncoversAndPausesTheTargetThatStaysWhenItsPauseWasHeld() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live()
+            renderFirstFrame()
+            val kept = runtime.videoPresentation.value
+            val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+            assertEquals(null, runtime.pauseTimeshiftPlayback())
+            assertEquals(emptyList<Int>(), connection.speeds)
+            session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+            val install = scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))), intent)
+            }
+            await { install.isCompleted }
+
+            assertFalse(install.await()?.isStarted == true)
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            assertEquals(kept, runtime.videoPresentation.value)
+            // The viewer's latest transport intent was Pause: the channel that stays takes it.
+            await { connection.speeds == listOf(0) }
+            settle()
+            assertEquals(listOf(0), connection.speeds)
+            assertFalse(player.playWhenReady)
+            assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        }
+
+    @Test fun failedReplacementWhoseHeldPauseTheServerRejectsKeepsPlayingAndTellsTheViewer() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live()
+            renderFirstFrame()
+            val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+            assertEquals(null, runtime.pauseTimeshiftPlayback())
+            connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+            session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+            val install = scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))), intent)
+            }
+            await { install.isCompleted }
+
+            assertFalse(install.await()?.isStarted == true)
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            // The channel that stays was asked once, refused, and plays on; the viewer is told.
+            await { runtime.livePauseNotice.value != null }
+            settle()
+            assertEquals(listOf(0), connection.speeds)
+            assertTrue(player.playWhenReady)
+            assertEquals(LivePauseState(LivePauseAvailability.READY), runtime.livePause.value)
+        }
+
     @Test fun firstFrameRenderedDuringAFailedReplacementUncoversTheTargetThatStays() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             live(timeshift = false)

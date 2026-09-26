@@ -546,6 +546,34 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(1, connection.subscribeCount)
     }
 
+    @Test fun backgroundDropsAPauseHeldForAPendingChannelChange() = exercise {
+        live()
+        runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertTrue(runtime.livePause.value.pending)
+
+        runtime.onAppBackgrounded()
+        await { !runtime.livePause.value.pending }
+        // In the background a Pause is no longer held for the channel.
+        val pause = scope.async { runtime.pauseTimeshiftPlayback() }
+        await { pause.isCompleted }
+        assertEquals(TimeshiftCommandResult.UNAVAILABLE, pause.await())
+        assertFalse(runtime.livePause.value.pending)
+    }
+
+    @Test fun detachDropsAPauseHeldForAPendingChannelChange() = exercise {
+        live()
+        runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        assertNull(runtime.pauseTimeshiftPlayback())
+        assertTrue(runtime.livePause.value.pending)
+
+        val detach = scope.async { runtime.detach() }
+        await { detach.isCompleted }
+        assertFalse(runtime.livePause.value.pending)
+        assertEquals(TimeshiftCommandResult.SHUT_DOWN, runtime.pauseTimeshiftPlayback())
+        assertEquals(emptyList<Int>(), connection.speeds)
+    }
+
     private fun exercise(block: suspend Fixture.() -> Unit) = exercise(PlaybackRuntimePolicy.fromPlayerSettings(), block)
 
     companion object {

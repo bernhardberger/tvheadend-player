@@ -295,4 +295,22 @@ class SessionStopCloseTest {
         assertEquals(2, live.split("videoPlayerViewModel.stopAfterLoss()").size - 1)
         assertFalse(live.contains("videoPlayerViewModel.stop()"))
     }
+
+    @Test fun liveScreenAbandonsItsSelectionWhenItsStartCanNoLongerRun() {
+        val root = generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
+            .first { File(it, ".git").exists() }
+        val live = File(root, "app/src/main/java/at/bernhardberger/tvhplayer/ui/player/VideoPlayerScreen.kt").readText()
+            .lines().joinToString("") { it.substringBefore("//") }.filterNot(Char::isWhitespace)
+        val abandon = "liveIntent?.let(playbackRuntime::abandonLiveSelection)"
+        // ON_STOP cancels the settling and the start synchronously, and their selection with them.
+        val onStop = live.substringAfter("Lifecycle.Event.ON_STOP->{").substringBefore("else->")
+        assertTrue(onStop.contains("directStart.value?.cancel()"))
+        assertTrue(onStop.contains(abandon))
+        // Closing the screen cancels its composition jobs: the selection goes with them.
+        assertEquals(1, live.split("DisposableEffect(Unit){onDispose{$abandon}}").size - 1)
+        // A settled burst the session no longer authorizes starts nothing until the effect restarts it.
+        val settled = live.substringAfter("funstartSettledZap(").substringBefore("launchDirectStart(")
+        assertTrue(settled.contains("if(requestToken==liveRequestToken&&playbackSelection==null){$abandon}"))
+        assertEquals(3, live.split(abandon).size - 1)
+    }
 }

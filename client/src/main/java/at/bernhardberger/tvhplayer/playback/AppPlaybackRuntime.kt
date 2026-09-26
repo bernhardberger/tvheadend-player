@@ -114,6 +114,16 @@ class AppPlaybackRuntime(
     private var pendingStopIntent = -1L
     private var pendingStops = 0
 
+    /**
+     * The live channel the viewer accepted last, until its start commits or ends
+     * ([noteLiveSelection], [playLive]): its intent generation (-1 for none) and whether the
+     * viewer paused it meanwhile. It counts only while it is the latest intent and no user stop
+     * came under it or later, so a newer selection or Stop replaces it. While it counts, Pause
+     * and Play address it and never the target still installed. Guarded by [intentLock].
+     */
+    private var pendingLiveSelection = -1L
+    private var pendingLiveSelectionPaused = false
+
     /** The generation the latest completed session Stop arrived under; -1 before any. */
     private val lastSessionStop = MutableStateFlow(-1L)
 
@@ -150,6 +160,8 @@ class AppPlaybackRuntime(
         foreground = { foreground },
         interruption = { audioInterruptions.interruption },
         stopPausedRetune = ::stopPausedRetune,
+        playStartedTarget = { audioInterruptions.playWithAudioFocusLocked() },
+        pendingLiveSelectionPlayWhenReady = ::pendingLiveSelectionPlayWhenReady,
     )
     val livePause = livePauseController.livePause
     val livePauseNotice = livePauseController.livePauseNotice
@@ -209,6 +221,8 @@ class AppPlaybackRuntime(
         targetInstallationInProgress = { targetInstallationInProgress },
         publishPlayerErrorFromPlayer = ::publishPlayerErrorFromPlayer,
     )
+    /** Written under the command serializer, read at arrival by the transport commands. */
+    @Volatile
     private var foreground = true
     private val audioInterruptions: AudioInterruptionController = AudioInterruptionController(
         player = player,
@@ -333,11 +347,32 @@ class AppPlaybackRuntime(
      * the live screen noted when it accepted the channel ([notePlaybackIntent]) it adds none,
      * and returns null without touching playback when a user stop was asked for under that
      * intent or later (see [isPlaybackIntentStopped]): the viewer's Stop came last.
+     * While it is the latest intent the selection is pending from this call on (unless
+     * [noteLiveSelection] registered it earlier): a Pause meanwhile belongs to it. A call
+     * cancelled or shut down before its start ended the selection abandons it
+     * ([abandonLiveSelection]); a restart registers it again.
      */
     suspend fun playLive(selection: LivePlaybackSelection, intent: Long? = null): PlaybackTargetResult? {
         val generation = intent ?: playbackRequests.incrementAndGet()
-        return targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
-            if (intent != null && isPlaybackIntentStopped(intent)) return@serialize null
+        noteLiveSelection(generation)
+        try {
+            return startLiveSelection(selection, intent, generation)
+        } finally {
+            // Nothing left if the start committed, failed or was withdrawn: they ended it.
+            abandonLiveSelection(generation)
+        }
+    }
+
+    private suspend fun startLiveSelection(
+        selection: LivePlaybackSelection,
+        intent: Long?,
+        generation: Long,
+    ): PlaybackTargetResult? =
+        targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
+            if (intent != null && isPlaybackIntentStopped(intent)) {
+                endLiveSelection(generation)
+                return@serialize null
+            }
             if (policy.trace.enabled) policy.trace.tuneAdmitted()
             lastLiveChannelId = selection.channelId
             forgetRecordingRecoveryLocked()
@@ -347,7 +382,25 @@ class AppPlaybackRuntime(
                 recovering = false,
                 servedGeneration = generation,
             )
+            // A commit ended the selection. Otherwise the start failed while the previous live
+            // target stayed: a Pause the viewer gave meanwhile is still the latest transport
+            // intent, so it applies to that retained target.
+            if (endLiveSelection(generation)) pauseRetainedLiveTargetLocked()
             result
+        }
+
+    /**
+     * Applies a Pause held for a selection that ended without installing a target of its own
+     * to the live target that plays instead. A rejection restores its play state and shows
+     * [livePauseNotice], as a dropped pending pause does; an ambiguous result stays paused.
+     */
+    private suspend fun pauseRetainedLiveTargetLocked() {
+        if (!foreground || activeTargetEpoch == null || _activeTarget.value !is AppPlaybackTarget.Live) return
+        val result = pauseTimeshiftPlaybackLocked()
+        if (result?.disposition == TimeshiftCommandDisposition.NOT_ACCEPTED && foreground &&
+            targetCommands.isOpen()
+        ) {
+            livePauseController.noticeLivePauseUnavailable()
         }
     }
 
@@ -411,6 +464,8 @@ class AppPlaybackRuntime(
         val retainInterruptionMute = recovering && audioInterruptions.interruptionMuted
         val timeshiftPeriod = policy.liveTimeshiftPeriod(playerSettings)
         var committed = false
+        // The viewer paused this channel before it started: that Pause replaces the startup Play.
+        var heldPause = false
         // The load control must know the target kind before the source is prepared.
         startupBuffer?.targetInstalling(live = true)
         val result = installTargetForPresentation(
@@ -450,6 +505,8 @@ class AppPlaybackRuntime(
                     activeTargetEpoch = epoch
                     servedGeneration?.let(servedIntent::set)
                     livePauseController.dropPendingLivePauseLocked()
+                    // From here on Pause and Play address this target itself.
+                    heldPause = servedGeneration != null && endLiveSelection(servedGeneration)
                     livePauseController.timeshiftRequestedEpoch = epoch.takeIf { timeshiftPeriod > Duration.ZERO }
                     _activeTarget.value = AppPlaybackTarget.Live(selection.channelId)
                     lastLiveChannelId = selection.channelId
@@ -475,7 +532,7 @@ class AppPlaybackRuntime(
             // STATE_READY reported while installation was in progress was not observed.
             if (player.playbackState == Player.STATE_READY) livePauseController.onTargetReady(activeTargetEpoch)
             if (retainInterruptionMute && foreground) player.play()
-            else applyPlayIntentToStartedTarget(result, playWhenReady)
+            else applyPlayIntentToStartedTarget(result, playWhenReady, heldPause = heldPause)
             // Only a start the viewer is waiting for opens a start-up buffer window.
             startupBuffer?.liveStartApplied()
         }
@@ -502,13 +559,90 @@ class AppPlaybackRuntime(
      */
     fun notePlaybackIntent(): Long = playbackRequests.incrementAndGet()
 
+    private fun pendingLiveSelectionLocked(): Long? =
+        pendingLiveSelection.takeIf { it >= 0 && it == playbackRequests.get() && userStopIntent < it }
+
+    /** Null without a pending live selection, else whether the viewer wants it to play. */
+    private fun pendingLiveSelectionPlayWhenReady(): Boolean? = synchronized(intentLock) {
+        pendingLiveSelectionLocked()?.let { !pendingLiveSelectionPaused }
+    }
+
+    /**
+     * Registers the live channel the screen accepted under [generation], the intent it just
+     * noted ([notePlaybackIntent]) and will start with [playLive], at once or once a CH+/-
+     * burst settles. While [generation] is the latest intent and no user stop came, the channel
+     * is the pending selection: a Pause meanwhile is held for it, never sent to the target still
+     * installed, and replaces its startup Play.
+     */
+    fun noteLiveSelection(generation: Long) {
+        synchronized(intentLock) {
+            if (pendingLiveSelection == generation || generation != playbackRequests.get() ||
+                userStopIntent >= generation
+            ) return
+            pendingLiveSelection = generation
+            pendingLiveSelectionPaused = false
+        }
+        livePauseController.publishLivePause()
+    }
+
+    /** Records Pause or Play for the pending live selection; false when there is none. */
+    private fun setPendingLiveSelectionPaused(paused: Boolean): Boolean {
+        if (!targetCommands.isOpen()) return false
+        synchronized(intentLock) {
+            pendingLiveSelectionLocked() ?: return false
+            pendingLiveSelectionPaused = paused
+        }
+        livePauseController.publishLivePause()
+        return true
+    }
+
+    /** Drops a Pause held for the pending live selection; the selection itself stays. */
+    private fun dropHeldLiveSelectionPause() {
+        synchronized(intentLock) {
+            if (!pendingLiveSelectionPaused) return
+            pendingLiveSelectionPaused = false
+        }
+        livePauseController.publishLivePause()
+    }
+
+    /**
+     * The live screen gave up [generation]'s start before it ended: its settling or start was
+     * cancelled because the screen stopped or went away, or the session no longer authorizes
+     * the channel. The selection stops counting and a Pause held for it goes with it, so later
+     * Pause and Play address what actually plays; a restarted start registers it again. No-op
+     * for any other generation.
+     */
+    fun abandonLiveSelection(generation: Long) {
+        endLiveSelection(generation)
+    }
+
+    /** Ends [generation]'s pending selection; returns whether it still counted and was paused. */
+    private fun endLiveSelection(generation: Long): Boolean {
+        val paused = synchronized(intentLock) {
+            if (pendingLiveSelection != generation) return false
+            val paused = pendingLiveSelectionPaused && pendingLiveSelectionLocked() != null
+            pendingLiveSelection = -1L
+            pendingLiveSelectionPaused = false
+            paused
+        }
+        livePauseController.publishLivePause()
+        return paused
+    }
+
     /**
      * The live screen found the channel of [intent] already playing and adopted it without a
      * command: the installed target now serves that intent too, so returning from the
-     * background still resumes it.
+     * background still resumes it. That completes the intent's pending selection: a Pause the
+     * viewer gave for it meanwhile applies to the adopted target.
      */
     fun notePlaybackIntentServed(intent: Long) {
         servedIntent.accumulateAndGet(intent, ::maxOf)
+        if (!endLiveSelection(intent)) return
+        scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                if (intent == playbackRequests.get() && !isPlaybackIntentStopped(intent)) pauseRetainedLiveTargetLocked()
+            }
+        }
     }
 
     /**
@@ -798,6 +932,7 @@ class AppPlaybackRuntime(
                 player.pause()
                 // A pending pause is already a local pause: the paused intent below carries it.
                 livePauseController.dropPendingLivePauseLocked()
+                dropHeldLiveSelectionPause()
                 livePauseController.publishLivePause()
                 audioInterruptions.clearAudioInterruptionLocked()
                 val playerSettings = settings.playerSettings.first()
@@ -924,10 +1059,21 @@ class AppPlaybackRuntime(
      * Otherwise returns the server result; rejected pauses restore local intent here without
      * requesting focus. Ambiguous results (such as TIMEOUT) leave playback locally paused.
      * Only for live timeshift targets; other targets pause locally.
+     * While a live selection is pending ([noteLiveSelection]) the Pause is held for that channel
+     * at once, before any queued command, and returns null: the target still installed gets
+     * nothing, and the held Pause replaces the new channel's startup Play.
      */
-    suspend fun pauseTimeshiftPlayback(): TimeshiftCommandResult? = targetCommands.serialize(
-        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
-    ) { pauseTimeshiftPlaybackLocked() }
+    suspend fun pauseTimeshiftPlayback(): TimeshiftCommandResult? {
+        val arrival = playbackRequests.get()
+        if (foreground && setPendingLiveSelectionPaused(true)) return null
+        return targetCommands.serialize(
+            onClosed = { TimeshiftCommandResult.SHUT_DOWN },
+        ) {
+            // A channel change (or other viewing intent) noted while this Pause waited supersedes
+            // it: it touches neither the target it was meant for nor the new one.
+            if (arrival != playbackRequests.get()) null else pauseTimeshiftPlaybackLocked()
+        }
+    }
 
     private suspend fun pauseTimeshiftPlaybackLocked(): TimeshiftCommandResult? {
         if (!foreground) return TimeshiftCommandResult.UNAVAILABLE
@@ -955,10 +1101,21 @@ class AppPlaybackRuntime(
             }
         }
     }
-    suspend fun resumeTimeshift(): TimeshiftCommandResult = targetCommands.serialize(
-        onClosed = { TimeshiftCommandResult.SHUT_DOWN },
-    ) {
-        audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = true)
+
+    /**
+     * While a live selection is pending, Play only withdraws a Pause held for it: ACCEPTED.
+     * Viewing intent noted while it waited supersedes it: it resumes nothing and returns
+     * ACCEPTED, as the newer target starts playing on its own and there is nothing to roll back.
+     */
+    suspend fun resumeTimeshift(): TimeshiftCommandResult {
+        val arrival = playbackRequests.get()
+        if (foreground && setPendingLiveSelectionPaused(false)) return TimeshiftCommandResult.ACCEPTED
+        return targetCommands.serialize(
+            onClosed = { TimeshiftCommandResult.SHUT_DOWN },
+        ) {
+            if (arrival != playbackRequests.get()) TimeshiftCommandResult.ACCEPTED
+            else audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = true)
+        }
     }
     suspend fun goLive(): TimeshiftCommandResult = targetCommands.serialize(
         onClosed = { TimeshiftCommandResult.SHUT_DOWN },
@@ -966,6 +1123,7 @@ class AppPlaybackRuntime(
         serverSkip({ it.disposition != TimeshiftCommandDisposition.NOT_ACCEPTED }) { coordinator.returnToLive() }
     }
     fun play() {
+        if (foreground && setPendingLiveSelectionPaused(false)) return
         val epoch = activeTargetEpoch
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
@@ -1024,14 +1182,32 @@ class AppPlaybackRuntime(
         return true
     }
 
-    /** System controls use the same local/server intent as the player keys, atomically. */
+    /**
+     * System controls use the same local/server intent as the player keys, atomically: while a
+     * live selection is pending they hold or withdraw its Pause at once. A live target pauses
+     * through the pending live pause while its grant or first picture is outstanding; without
+     * timeshift (OFF, UNAVAILABLE) it neither pauses nor plays. Viewing intent noted while it
+     * waited supersedes it: it does nothing. A Retry already under way when it arrived is not
+     * newer: the retried target it commits is the one it addresses.
+     */
     fun setSessionPlayWhenReady(playWhenReady: Boolean, isAttached: () -> Boolean): Job {
+        val arrival = playbackRequests.get()
+        if (isAttached() && foreground && setPendingLiveSelectionPaused(!playWhenReady)) return Job().apply { complete() }
         val epoch = activeTargetEpoch
+        val servedAtArrival = servedIntent.get()
         return scope.launch {
             targetCommands.serialize(onClosed = {}) {
-                if (!isAttached() || !foreground || epoch == null || epoch != activeTargetEpoch) return@serialize
+                if (!isAttached() || !foreground || activeTargetEpoch == null) return@serialize
+                if (arrival != playbackRequests.get()) return@serialize
+                // A start of the arrival intent that was still under way (a Retry, the automatic
+                // reconnect) and committed while this waited serves that intent: the command
+                // addresses its target. Any other replacement (a recovery retune) drops it.
+                if (epoch != activeTargetEpoch && (servedAtArrival == arrival || servedIntent.get() != arrival)) {
+                    return@serialize
+                }
                 val timeshift = audioInterruptions.currentInterruptionContent() == AudioInterruptionContent.LIVE_TIMESHIFT
-                if (_activeTarget.value is AppPlaybackTarget.Live && !timeshift) return@serialize
+                val live = _activeTarget.value is AppPlaybackTarget.Live
+                if (live && !timeshift && !livePauseController.currentLivePauseAvailability().acceptsPause()) return@serialize
                 if (playWhenReady) {
                     val result = audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = timeshift)
                     // A denied focus request retains its interruption hold/mute. Only a
@@ -1039,7 +1215,7 @@ class AppPlaybackRuntime(
                     if (timeshift && audioInterruptions.interruption == null && result != TimeshiftCommandResult.ACCEPTED) {
                         player.pause()
                     }
-                } else if (timeshift) {
+                } else if (live) {
                     pauseTimeshiftPlaybackLocked()
                 } else {
                     pauseLocallyOrRestoreSound()
@@ -1202,6 +1378,7 @@ class AppPlaybackRuntime(
             recordingRecovery = null
             pendingRecordingRecovery = null
             livePauseController.dropPendingLivePauseLocked()
+            dropHeldLiveSelectionPause()
             audioInterruptions.clearAudioInterruptionLocked()
             presentation.removeTargetFrameListenerLocked()
             player.removeListener(listener)
@@ -1336,7 +1513,16 @@ class AppPlaybackRuntime(
         }
     }
 
-    private suspend fun applyPlayIntentToStartedTarget(result: PlaybackTargetResult?, playWhenReady: Boolean = true) {
+    /**
+     * [heldPause]: the viewer paused this channel before it started. It replaces the startup Play
+     * as an ordinary pending live pause: one server pause once the grant and the first picture
+     * are there, else it is dropped with its notice and playback starts.
+     */
+    private suspend fun applyPlayIntentToStartedTarget(
+        result: PlaybackTargetResult?,
+        playWhenReady: Boolean = true,
+        heldPause: Boolean = false,
+    ) {
         if (result?.isStarted != true) return
         val target = _activeTarget.value ?: return
         val targetEpoch = activeTargetEpoch ?: return
@@ -1344,7 +1530,16 @@ class AppPlaybackRuntime(
         _backgroundNotice.value = null
         val action = foregroundPlaybackLifecycle.onTargetStarted(target, targetEpoch, servedIntent.get())
         if (foreground) {
-            if (playWhenReady) audioInterruptions.playWithAudioFocusLocked()
+            if (playWhenReady && heldPause) {
+                player.pause()
+                livePauseController.startPendingLivePauseLocked(
+                    targetEpoch, wasPlaying = true, failClosed = false, startupPlay = true,
+                )
+                val availability = livePauseController.currentLivePauseAvailability()
+                if (!livePauseController.awaitsFirstPicture(targetEpoch, availability)) {
+                    livePauseController.resolvePendingLivePauseLocked()
+                }
+            } else if (playWhenReady) audioInterruptions.playWithAudioFocusLocked()
             else {
                 player.pause()
                 // A player that failed during installation never reaches READY to resolve a pause.

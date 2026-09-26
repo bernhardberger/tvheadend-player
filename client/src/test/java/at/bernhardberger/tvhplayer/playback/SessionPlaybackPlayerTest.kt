@@ -93,6 +93,303 @@ class SessionPlaybackPlayerTest {
         assertEquals(requests + 1, focusRequests)
     }
 
+    @Test fun startingLiveOffersPauseAndHoldsTheServerOnceAfterGrantAndFirstPicture() = exercise {
+        startingLive()
+        await { wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
+        wrapper.pause()
+        await { runtime.livePause.value.pending && !player.playWhenReady }
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+
+        grant()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        playerReady()
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertFalse(wrapper.playWhenReady)
+    }
+
+    @Test fun sessionPlayBeforeTheGrantClearsThePendingPauseWithoutAServerResume() = exercise {
+        startingLive()
+        await { wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
+        wrapper.pause()
+        await { runtime.livePause.value.pending && !player.playWhenReady }
+
+        wrapper.play()
+        await { !runtime.livePause.value.pending && player.playWhenReady }
+        grant()
+        playerReady()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+    }
+
+    @Test fun liveWithoutAGrantAtTheFirstPictureRejectsSessionPause() = exercise {
+        settings.setTimeshiftEnabled(true)
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+        val install = scope.async { runtime.playLive(liveSelection()) }
+        await { connection.subscribeCount == 1 }
+        connection.awaitCollectionRegistered()
+        connection.emit(started)
+        await { install.isCompleted }
+        playerReady()
+        await { runtime.livePause.value.availability == LivePauseAvailability.UNAVAILABLE }
+        // The session withdraws the Pause it offered while the start was undecided.
+        await { wrapper.isCommandAvailable(Player.COMMAND_STOP) && !wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
+
+        runtime.setSessionPlayWhenReady(false) { true }.join()
+        settle()
+        assertTrue(player.playWhenReady)
+        assertFalse(runtime.livePause.value.pending)
+        assertEquals(emptyList<Int>(), connection.speeds)
+    }
+
+    @Test fun liveWithTimeshiftOffRejectsSessionPause() = exercise {
+        live(false)
+        assertEquals(LivePauseAvailability.OFF, runtime.livePause.value.availability)
+        runtime.setSessionPlayWhenReady(false) { true }.join()
+        settle()
+        assertTrue(player.playWhenReady)
+        assertFalse(runtime.livePause.value.pending)
+        assertEquals(emptyList<Int>(), connection.speeds)
+    }
+
+    @Test fun sessionPauseDuringAPendingChannelChangeIsHeldForTheNewTarget() = exercise {
+        live(true)
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        wrapper.pause()
+        await { runtime.livePause.value.pending }
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(runtime.livePause.value.selectionPending)
+
+        startingLive(intent)
+        assertFalse(player.playWhenReady)
+        assertTrue(runtime.livePause.value.pending)
+        grant(subscription = 2)
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        playerReady()
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+    }
+
+    @Test fun sessionReportsTheViewersIntentWhileAChannelChangeIsPending() = exercise {
+        live(true)
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        await { runtime.livePause.value.selectionPending }
+        settle()
+        assertTrue(wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+        assertTrue(wrapper.playWhenReady)
+
+        wrapper.pause()
+        await { !wrapper.playWhenReady }
+        // The channel still installed plays on; the session reports the Pause held for the change.
+        assertTrue(player.playWhenReady)
+        assertTrue(wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+        wrapper.play()
+        await { wrapper.playWhenReady }
+        assertFalse(runtime.livePause.value.pending)
+        wrapper.pause()
+        await { !wrapper.playWhenReady }
+
+        // The new target installs paused and still reports (and offers) Pause until it holds.
+        startingLive(intent)
+        await { !runtime.livePause.value.selectionPending }
+        settle()
+        assertFalse(wrapper.playWhenReady)
+        assertTrue(wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+        grant(subscription = 2)
+        playerReady()
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(wrapper.playWhenReady)
+        assertTrue(wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE))
+    }
+
+    @Test fun sessionOffersPauseForAPendingChannelChangeAndReportsWhatPlaysOnceItIsAbandoned() = exercise {
+        settings.setTimeshiftEnabled(true)
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+        val install = scope.async { runtime.playLive(liveSelection()) }
+        await { connection.subscribeCount == 1 }
+        connection.awaitCollectionRegistered()
+        connection.emit(started)
+        await { install.isCompleted }
+        playerReady()
+        await { wrapper.isCommandAvailable(Player.COMMAND_STOP) && !wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
+
+        // A channel change is pending: the next channel may pause, so the session offers it.
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        await { wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
+        assertTrue(wrapper.playWhenReady)
+        wrapper.pause()
+        await { !wrapper.playWhenReady }
+        assertTrue(player.playWhenReady)
+
+        // Its start was cancelled: the held Pause goes and the session reports the channel that plays.
+        runtime.abandonLiveSelection(intent)
+        await { !wrapper.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) }
+        assertTrue(wrapper.playWhenReady)
+        assertTrue(player.playWhenReady)
+        assertEquals(emptyList<Int>(), connection.speeds)
+    }
+
+    @Test fun startCancelledBehindTheSerializerLetsASessionPauseActOnTheChannelThatPlays() = exercise {
+        live(true)
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        whileCommandsBlocked {
+            val start = scope.async { runtime.playLive(liveSelection(), intent) }
+            settle()
+            start.cancel()
+            await { start.isCompleted }
+        }
+        assertFalse(runtime.livePause.value.selectionPending)
+        wrapper.pause()
+        await { connection.speeds.isNotEmpty() }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertFalse(wrapper.playWhenReady)
+        assertEquals(1, connection.subscribeCount)
+    }
+
+    @Test fun sessionPauseQueuedBeforeAChannelChangePausesNeitherChannel() = exercise {
+        live(true)
+        var intent = 0L
+        whileCommandsBlocked {
+            wrapper.pause()
+            settle()
+            intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        }
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertFalse(runtime.livePause.value.pending)
+
+        startingLive(intent)
+        grant(subscription = 2)
+        playerReady()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+    }
+
+    @Test fun keyPauseQueuedBeforeAChannelChangePausesNeitherChannel() = exercise {
+        live(true)
+        lateinit var pause: Deferred<TimeshiftCommandResult?>
+        var intent = 0L
+        whileCommandsBlocked {
+            pause = scope.async { runtime.pauseTimeshiftPlayback() }
+            settle()
+            intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        }
+        await { pause.isCompleted }
+        assertNull(pause.await())
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertFalse(runtime.livePause.value.pending)
+
+        startingLive(intent)
+        grant(subscription = 2)
+        playerReady()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+    }
+
+    @Test fun keyPlayQueuedBeforeAChannelChangeResumesNothing() = exercise {
+        live(true)
+        wrapper.pause()
+        await { connection.speeds == listOf(0) && !player.playWhenReady }
+        val requests = focusRequests
+        lateinit var resume: Deferred<TimeshiftCommandResult>
+        whileCommandsBlocked {
+            resume = scope.async { runtime.resumeTimeshift() }
+            settle()
+            runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        }
+        await { resume.isCompleted }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertEquals(requests, focusRequests)
+    }
+
+    @Test fun sessionPauseAfterARetryBeganHoldsTheRetriedChannel() = exercise {
+        pauseDuringARetryHoldsTheRetriedChannel(viewerRetry = true) { wrapper.pause() }
+    }
+
+    @Test fun sessionPauseDuringTheAutomaticReconnectHoldsTheReconnectedChannel() = exercise {
+        pauseDuringARetryHoldsTheRetriedChannel(viewerRetry = false) { wrapper.pause() }
+    }
+
+    @Test fun keyPauseAfterARetryBeganHoldsTheRetriedChannel() = exercise {
+        pauseDuringARetryHoldsTheRetriedChannel(viewerRetry = true) {
+            scope.launch { runtime.pauseTimeshiftPlayback() }
+        }
+    }
+
+    @Test fun sessionPauseAfterARetryFromAFailedStartHoldsTheRetriedChannel() = exercise {
+        settings.setTimeshiftEnabled(true)
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        assertFalse(runtime.playLive(liveSelection())?.isStarted == true)
+        assertNull(runtime.activeTarget.value)
+        session.scriptLivePlaybackSuccess(manager)
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        lateinit var retry: Deferred<PlaybackTargetResult?>
+        lateinit var pause: Job
+        whileCommandsBlocked {
+            retry = scope.async { runtime.retryLive(viewerRetry = true) }
+            settle()
+            pause = runtime.setSessionPlayWhenReady(false) { true }
+        }
+        await { retry.isCompleted && pause.isCompleted }
+        assertTrue(retry.await()?.isStarted == true)
+        assertFalse(player.playWhenReady)
+        grant(subscription = 1)
+        playerReady()
+        await { connection.speeds == listOf(0) }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertFalse(wrapper.playWhenReady)
+    }
+
+    @Test fun channelChangeAfterASessionPauseDuringARetryWinsOverThePause() = exercise {
+        live(true)
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        lateinit var retry: Deferred<PlaybackTargetResult?>
+        var intent = 0L
+        whileCommandsBlocked {
+            retry = scope.async { runtime.retryLive(viewerRetry = true) }
+            settle()
+            wrapper.pause()
+            settle()
+            intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        }
+        await { retry.isCompleted }
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertFalse(runtime.livePause.value.pending)
+
+        startingLive(intent)
+        grant(subscription = 3)
+        playerReady()
+        settle()
+        assertEquals(emptyList<Int>(), connection.speeds)
+        assertTrue(player.playWhenReady)
+        assertTrue(wrapper.playWhenReady)
+    }
+
     @Test fun rejectedTimeshiftPauseRollsBackLocalIntent() = exercise {
         live(true)
         connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
@@ -744,6 +1041,37 @@ class SessionPlaybackPlayerTest {
     }
 
     // Real Media3 and the SDK's asynchronous subscription machinery require looper pumping.
+    /**
+     * A Retry (or the automatic reconnect) has begun but waits behind another command when the
+     * viewer pauses: the retried channel starts paused and its server hold follows the first picture.
+     */
+    private suspend fun Fixture.pauseDuringARetryHoldsTheRetriedChannel(
+        viewerRetry: Boolean,
+        pause: suspend Fixture.() -> Unit,
+    ) {
+        live(true)
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        lateinit var retry: Deferred<PlaybackTargetResult?>
+        whileCommandsBlocked {
+            retry = scope.async { runtime.retryLive(viewerRetry) }
+            settle()
+            pause()
+            settle()
+        }
+        await { retry.isCompleted }
+        assertTrue(retry.await()?.isStarted == true)
+        await { !player.playWhenReady }
+        assertEquals(emptyList<Int>(), connection.speeds)
+        grant(subscription = 2)
+        playerReady()
+        await { connection.speeds == listOf(0) }
+        settle()
+        assertEquals(listOf(0), connection.speeds)
+        assertFalse(player.playWhenReady)
+        assertFalse(wrapper.playWhenReady)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
     private fun exercise(block: suspend Fixture.() -> Unit) = runBlocking {
         val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()))
         try { withTimeout(15_000) { fixture.block() } }
@@ -771,7 +1099,7 @@ class SessionPlaybackPlayerTest {
             override fun abandon() = Unit
         }
         val connection = ScriptedSubscriptionConnection()
-        private val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Channel One")))),
@@ -780,7 +1108,7 @@ class SessionPlaybackPlayerTest {
                 id = DvrEntryId(1), state = DvrEntryState.COMPLETED, title = "Recording", channelName = "Recorded Channel",
             )))),
         )).apply { scriptLivePlaybackSuccess(manager); scriptRecordingPlaybackSuccess() }
-        private val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
+        val settings = PlayerSettingsStore(InMemoryPreferencesDataStore())
         private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val player = ExoPlayer.Builder(context).build()
@@ -831,6 +1159,25 @@ class SessionPlaybackPlayerTest {
         ), null, SubscriptionCondition.NO_DETAIL)
 
         fun liveSelection() = requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))
+
+        /** Installs live with timeshift requested ([intent] if given); its grant is delivered later by [grant]. */
+        suspend fun startingLive(intent: Long? = null) {
+            settings.setTimeshiftEnabled(true)
+            connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+            val install = scope.async { runtime.playLive(liveSelection(), intent) }
+            await { install.isCompleted }
+            assertTrue(install.await()?.isStarted == true)
+            await { runtime.livePause.value.availability == LivePauseAvailability.STARTING }
+        }
+
+        /** The subscription of the latest start is confirmed and granted. */
+        suspend fun grant(subscription: Int = 1) {
+            await { connection.subscribeCount == subscription }
+            connection.awaitCollectionRegistered()
+            connection.emit(started)
+            connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+            await { runtime.livePause.value.availability == LivePauseAvailability.READY }
+        }
 
         fun playerReady() {
             playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }

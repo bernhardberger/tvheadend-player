@@ -22,7 +22,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 
-internal fun sessionPlaybackCommands(target: AppPlaybackTarget?, timeshift: Boolean, seekable: Boolean): Player.Commands {
+/** [pausable]: live timeshift is granted, or live pause still awaits the grant or first picture. */
+internal fun sessionPlaybackCommands(target: AppPlaybackTarget?, pausable: Boolean, seekable: Boolean): Player.Commands {
     if (target == null) return Player.Commands.EMPTY
     return Player.Commands.Builder().addAll(
         Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
@@ -30,7 +31,7 @@ internal fun sessionPlaybackCommands(target: AppPlaybackTarget?, timeshift: Bool
         Player.COMMAND_GET_TIMELINE,
         Player.COMMAND_STOP,
     ).apply {
-        if (target is AppPlaybackTarget.Recording || timeshift) add(Player.COMMAND_PLAY_PAUSE)
+        if (target is AppPlaybackTarget.Recording || pausable) add(Player.COMMAND_PLAY_PAUSE)
         if (target is AppPlaybackTarget.Recording && seekable) add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
     }.build()
 }
@@ -70,8 +71,9 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
                 delay(1_000)
             }
         }
-        combine(runtime.activeTarget, runtime.livePlaybackObservation, observation, clock) { target, live, snapshot, now ->
-            Triple(target, (live as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available,
+        combine(runtime.activeTarget, runtime.livePlaybackObservation, runtime.livePause, observation, clock) {
+                target, live, livePause, snapshot, now ->
+            Triple(target, livePause to ((live as? LivePlaybackObservation.Active)?.timeshiftState is LiveTimeshiftState.Available),
                 sessionPlaybackMetadata(target, snapshot, now))
         }.distinctUntilChanged().collect { (target, _, value) ->
             if (!closed) {
@@ -88,6 +90,7 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
         if (closed || target == null) return State.Builder().build()
         val timeshift = (runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
             ?.timeshiftState is LiveTimeshiftState.Available
+        val livePause = runtime.livePause.value
         val seekable = target is AppPlaybackTarget.Recording && player.isCurrentMediaItemSeekable &&
             player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         // Publish a sanitized single-item timeline, never the SDK's URI, IDs, extras or raw errors.
@@ -99,7 +102,13 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
             .setDurationUs(if (player.duration == C.TIME_UNSET) C.TIME_UNSET else player.duration * 1_000)
             .build()
         return super.getState().buildUpon()
-            .setAvailableCommands(sessionPlaybackCommands(target, timeshift, seekable))
+            .setAvailableCommands(sessionPlaybackCommands(target, timeshift || livePause.availability.acceptsPause(), seekable))
+            .apply {
+                // A pending channel change: Play/Pause address that channel, not the installed player.
+                if (livePause.selectionPending) {
+                    setPlayWhenReady(!livePause.pending, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+                }
+            }
             .setPlaylist(listOf(item))
             .setPlaylistMetadata(MediaMetadata.EMPTY)
             .setCurrentMediaItemIndex(0)

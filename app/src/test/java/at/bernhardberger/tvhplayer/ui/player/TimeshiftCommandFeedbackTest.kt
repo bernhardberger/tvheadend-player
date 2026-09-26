@@ -1,11 +1,15 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.KeyEvent
+import at.bernhardberger.tvhplayer.core.LiveMediaKeyAction
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSurface
+import at.bernhardberger.tvhplayer.core.liveMediaKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyAction
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
+import at.bernhardberger.tvhplayer.playback.LivePauseState
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -176,5 +180,34 @@ class TimeshiftCommandFeedbackTest {
 
         assertFalse(completion.applyFeedback)
         assertEquals(true, completion.rollbackPlayWhenReady)
+    }
+
+    @Test
+    fun pendingChannelChangeTakesTheMediaKeyAndTogglesTheViewersIntentNotTheInstallingPlayer() {
+        val pending = LivePauseState(LivePauseAvailability.STARTING, selectionPending = true)
+        val availability = liveTransportAvailability(pending, installedIsRequested = false)
+        assertEquals(LivePauseAvailability.STARTING, availability)
+        assertEquals(LiveMediaKeyAction.DISPATCH, liveMediaKeyAction(timeshiftAvailable = false, livePause = availability))
+
+        // The installing player is paused, but the viewer's intent is still Play: Toggle pauses.
+        val calls = mutableListOf<String>()
+        dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, livePlayWhenReady(pending, playerPlayWhenReady = false),
+            dispatch = { resume, rollback -> calls += "$resume/$rollback" })
+        // Held: Toggle plays again, and the overlay shows the hold.
+        val held = pending.copy(pending = true)
+        assertFalse(livePlayWhenReady(held, playerPlayWhenReady = true))
+        dispatchTimeshiftPlaybackAction(MediaPlaybackAction.TOGGLE, livePlayWhenReady(held, playerPlayWhenReady = true),
+            dispatch = { resume, rollback -> calls += "$resume/$rollback" })
+        assertEquals(listOf("false/null", "true/false"), calls)
+    }
+
+    @Test
+    fun requestedChannelOffersNoPauseUntilTheRuntimeTracksIt() {
+        val installed = LivePauseState(LivePauseAvailability.READY)
+        assertEquals(LivePauseAvailability.NONE, liveTransportAvailability(installed, installedIsRequested = false))
+        assertEquals(LivePauseAvailability.READY, liveTransportAvailability(installed, installedIsRequested = true))
+        assertTrue(livePlayWhenReady(installed, playerPlayWhenReady = true))
+        assertFalse(livePlayWhenReady(installed.copy(pending = true), playerPlayWhenReady = true))
+        assertFalse(livePlayWhenReady(installed, playerPlayWhenReady = false))
     }
 }

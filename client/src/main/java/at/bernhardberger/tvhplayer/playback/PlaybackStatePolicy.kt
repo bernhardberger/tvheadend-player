@@ -34,6 +34,10 @@ internal fun livePauseAvailability(
     else -> LivePauseAvailability.STARTING
 }
 
+/** Pause is offered and taken: granted, or grant and first picture still outstanding. */
+internal fun LivePauseAvailability.acceptsPause(): Boolean =
+    this == LivePauseAvailability.STARTING || this == LivePauseAvailability.READY
+
 internal fun liveDiagnosticsForTarget(
     activeTarget: AppPlaybackTarget?,
     diagnostics: LiveSubscriptionDiagnostics?,

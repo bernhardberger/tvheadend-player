@@ -97,6 +97,7 @@ import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.LiveMediaKeyAction
 import at.bernhardberger.tvhplayer.core.liveMediaKeyAction
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
+import at.bernhardberger.tvhplayer.playback.LivePauseState
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
@@ -292,6 +293,18 @@ internal fun dispatchTimeshiftPlaybackAction(
     }
 }
 
+/**
+ * Live Pause availability for the viewer's channel. The runtime state describes its installed target,
+ * except while the viewer's latest channel change is pending: then it describes that channel, whose
+ * Pause the runtime holds. A requested channel the runtime does not track yet offers nothing.
+ */
+internal fun liveTransportAvailability(state: LivePauseState, installedIsRequested: Boolean): LivePauseAvailability =
+    state.availability.takeIf { state.selectionPending || installedIsRequested } ?: LivePauseAvailability.NONE
+
+/** The viewer's Play/Pause intent for live: the pending channel change's, else the installed player's. */
+internal fun livePlayWhenReady(state: LivePauseState, playerPlayWhenReady: Boolean): Boolean =
+    if (state.selectionPending) !state.pending else playerPlayWhenReady && !state.pending
+
 internal suspend fun stopPlaybackAndClose(
     stopPlayback: suspend () -> Unit,
     closePlayer: () -> Unit,
@@ -433,9 +446,7 @@ fun VideoPlayerScreen(
     val playWhenReady by rememberPlaybackIntent(player)
     val livePauseState by playbackRuntime.livePause.collectAsStateWithLifecycle()
     val livePauseNotice by playbackRuntime.livePauseNotice.collectAsStateWithLifecycle()
-    // The runtime state describes its installed target; a requested zap has not reached it yet.
-    val livePauseAvailability = livePauseState.availability.takeIf { playingLiveChannelId == currentChannelId }
-        ?: LivePauseAvailability.NONE
+    val livePauseAvailability = liveTransportAvailability(livePauseState, playingLiveChannelId == currentChannelId)
     val channelIndicator = channelPlaybackIndicator(
         currentChannelId,
         playingLiveChannelId?.let { at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(it) },
@@ -545,7 +556,8 @@ fun VideoPlayerScreen(
     fun dispatchPlaybackAction(action: MediaPlaybackAction) {
         dispatchTimeshiftPlaybackAction(
             action = action,
-            playWhenReady = player.playWhenReady,
+            // A pending channel change toggles the viewer's intent for it, not the installed player.
+            playWhenReady = livePlayWhenReady(playbackRuntime.livePause.value, player.playWhenReady),
         ) { resume, rollback ->
             dispatchTimeshiftCommand(rollbackPlayWhenReady = rollback) {
                 if (resume) videoPlayerViewModel.resumeTimeshift() else videoPlayerViewModel.pauseTimeshiftPlayback()
@@ -588,12 +600,19 @@ fun VideoPlayerScreen(
                     directStart.value?.cancel()
                     directLiveToken = NO_DIRECT_LIVE_TOKEN
                     lastPlayedChannelId = null
+                    // Its selection too, even when the start never reached the runtime; the
+                    // restart registers it again.
+                    liveIntent?.let(playbackRuntime::abandonLiveSelection)
                 }
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    DisposableEffect(Unit) {
+        // A closed screen cancels its settling and start: nothing starts its selection now.
+        onDispose { liveIntent?.let(playbackRuntime::abandonLiveSelection) }
     }
 
     /** Starts [requestToken]'s selection; a newer request supersedes its outcome. */
@@ -758,6 +777,10 @@ fun VideoPlayerScreen(
         val playbackSelection = authorizedLiveSelection
         if (requestToken != liveRequestToken || !screenActive || playbackSelection == null) {
             directLiveToken = NO_DIRECT_LIVE_TOKEN
+            // Unauthorized now: nothing starts it until the effect restarts it (and registers it).
+            if (requestToken == liveRequestToken && playbackSelection == null) {
+                liveIntent?.let(playbackRuntime::abandonLiveSelection)
+            }
             return
         }
         launchDirectStart(playbackSelection, requestToken, liveIntent)
@@ -790,6 +813,8 @@ fun VideoPlayerScreen(
         // a Stop from before loses, a Stop from after withdraws the delayed start.
         liveIntent = playbackRuntime.notePlaybackIntent()
         val requestIntent = liveIntent
+        // A Pause from now until this channel starts is held for it, not sent to the one playing.
+        requestIntent?.let(playbackRuntime::noteLiveSelection)
         requestedChannelFailed = false
         lastPlayedChannelId = null
         requestedLiveSelection = playbackSelection
@@ -1403,7 +1428,7 @@ fun VideoPlayerScreen(
                     at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
                 timeshiftFeedback = timelineState.feedback,
                 timeshiftFeedbackIsError = timelineState.feedbackIsError,
-                paused = !playWhenReady || livePauseState.pending,
+                paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 onToggleTimeshiftPause = {
                     dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
                 },
