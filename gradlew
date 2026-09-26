@@ -114,15 +114,39 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
-# All player worktrees share one Gradle owner on the integration host. Holding
-# this descriptor serializes direct wrapper calls and tools/verify.
+# All player worktrees share a fixed number of Gradle slots on the integration
+# host (one unless TVHPLAYER_GRADLE_SLOTS allows more). Holding this descriptor
+# admits direct wrapper calls and tools/verify.
 if command -v flock >/dev/null 2>&1; then
+    gradle_lock_slots=${TVHPLAYER_GRADLE_SLOTS:-1}
+    case $gradle_lock_slots in
+        1|2|3|4) ;;
+        *) die "TVHPLAYER_GRADLE_SLOTS must be 1, 2, 3 or 4" ;;
+    esac
     gradle_lock_uid=$(id -u) || die "Unable to resolve the Gradle lock owner"
     gradle_lock_dir=/tmp/tvheadend-player-gradle-$gradle_lock_uid
     mkdir -p "$gradle_lock_dir" || die "Unable to create the Gradle lock directory"
     chmod 700 "$gradle_lock_dir" || die "Unable to secure the Gradle lock directory"
-    exec 9>"$gradle_lock_dir/gradle.lock" || die "Unable to open the Gradle lock"
-    flock -x 9 || die "Unable to acquire the Gradle lock"
+    if [ "$gradle_lock_slots" -eq 1 ]; then
+        exec 9>"$gradle_lock_dir/gradle.lock" || die "Unable to open the Gradle lock"
+        flock -x 9 || die "Unable to acquire the Gradle lock"
+    else
+        # Slot 0 is the single-slot lock, so wrappers without slots still count.
+        while :; do
+            gradle_lock_slot=0
+            while [ "$gradle_lock_slot" -lt "$gradle_lock_slots" ]; do
+                gradle_lock_file=$gradle_lock_dir/gradle.lock
+                [ "$gradle_lock_slot" -eq 0 ] || gradle_lock_file=$gradle_lock_file.$gradle_lock_slot
+                exec 9>"$gradle_lock_file" || die "Unable to open the Gradle lock"
+                flock -n -E 75 -x 9
+                gradle_lock_status=$?
+                [ "$gradle_lock_status" -eq 0 ] && break 2
+                [ "$gradle_lock_status" -eq 75 ] || die "Unable to acquire the Gradle lock"
+                gradle_lock_slot=$(( gradle_lock_slot + 1 ))
+            done
+            sleep 1
+        done
+    fi
 elif [ "$( uname -s )" = Linux ]; then
     die "flock is required to serialize TVHeadend Player Gradle builds"
 fi

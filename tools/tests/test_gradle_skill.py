@@ -90,7 +90,14 @@ class GradleEnvironmentTest(unittest.TestCase):
     def test_live_test_environment_is_opt_in_at_standard_entrypoint(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            shutil.copy2(ROOT / "gradlew", root / "gradlew")
+            lock_dir = "gradle_lock_dir=/tmp/tvheadend-player-gradle-$gradle_lock_uid"
+            wrapper = (ROOT / "gradlew").read_text(encoding="utf-8")
+            self.assertIn(lock_dir, wrapper)
+            (root / "gradlew").write_text(
+                wrapper.replace(lock_dir, f"gradle_lock_dir={root / 'locks'}"),
+                encoding="utf-8",
+            )
+            (root / "gradlew").chmod(0o755)
             java = root / "bin/java"
             java.parent.mkdir()
             java.write_text(

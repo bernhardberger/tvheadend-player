@@ -74,10 +74,11 @@ Channels root cannot rely on NavDisplay's pop handler to unwind focus layers.
   operations, use `./tools/device --help` and documented commands. Do not read the
   implementation of `tools/device` unless the package edits it or a reproduced
   failure has been attributed to that tool.
-- Every `./gradlew` entry is serialized by one repository-wide flock. This
+- Every `./gradlew` entry takes a repository-wide flock slot. This
   includes `./tools/verify` and commands run through the repository-bundled
-  `gradle-run` skill. A waiting command must wait rather than
-  bypass the lock or start another daemon.
+  `gradle-run` skill. There is one slot by default; a host with memory for
+  more concurrent builds may set `TVHPLAYER_GRADLE_SLOTS` (1–4). A waiting
+  command must wait rather than bypass the lock or start another daemon.
 - Use the `gradle-run` skill for standard bounded execution and private diagnostics.
   No workflow ledger, sibling checkout or diagnostic child is required.
 - Authorized offline emulator work uses `docs/android-tooling.md`; the physical
