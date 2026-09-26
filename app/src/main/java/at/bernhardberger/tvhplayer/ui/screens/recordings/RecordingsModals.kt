@@ -120,9 +120,8 @@ internal fun RecordingDetailsPanel(
         DvrEntryState.COMPLETED,
         DvrEntryState.RECORDING,
     )
-    val resumeSeconds = entry.playPosition?.inWholeSeconds?.takeIf {
-        canPlay && entry.state == DvrEntryState.COMPLETED && it > 0L
-    }
+    // A completed or an in-progress recording resumes where the viewer stopped.
+    val resumeSeconds = entry.playPosition?.inWholeSeconds?.takeIf { canPlay && it > 0L }
     val primaryAction = when {
         resumeSeconds != null -> RecordingDetailsAction.RESUME
         canPlay -> RecordingDetailsAction.PLAY

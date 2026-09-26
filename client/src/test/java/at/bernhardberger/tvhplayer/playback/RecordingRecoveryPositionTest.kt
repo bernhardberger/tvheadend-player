@@ -9,6 +9,7 @@ package at.bernhardberger.tvhplayer.playback
 import android.app.Application
 import android.net.Uri
 import android.os.Looper
+import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -44,6 +45,7 @@ import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import java.io.FileNotFoundException
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -209,12 +211,130 @@ class RecordingRecoveryPositionTest {
         assertTrue("near the end: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
     }
 
+    @Test fun retryOfAGrowingRecordingWaitsForSeekabilityThenContinuesWhereItStood() = exercise(growing = true) {
+        play(FIRST)
+        assertGrowingTarget()
+        failAtTwentyMinutes()
+        media.seekable = false
+
+        assertTrue(runtime.retryRecording()?.isStarted == true)
+        assertGrowingTarget()
+
+        awaitUnseekablePlayback()
+        media.openSeeking()
+        assertEventuallyNear(TWENTY_MINUTES)
+        assertEquals(AppPlaybackTarget.Recording(FIRST), runtime.activeTarget.value)
+    }
+
+    @Test fun retryOfAGrowingRecordingClampsToThePlayableEndOfItsExtent() = exercise(growing = true) {
+        play(FIRST)
+        assertGrowingTarget()
+        failAtTwentyMinutes()
+        media.lengthMs = TEN_MINUTES // the retried recording's probe reports less than was played
+
+        assertTrue(runtime.retryRecording()?.isStarted == true)
+        assertGrowingTarget()
+
+        // The SDK's edge margin: three seconds before the extent's end, not at the end itself.
+        awaitMain { player.currentPosition >= TEN_MINUTES - 3_000 }
+        assertTrue("arrived at ${player.currentPosition}", player.currentPosition < TEN_MINUTES - 2_000)
+        assertEventuallyNear(TEN_MINUTES - 3_000)
+    }
+
+    @Test fun aGrowingRecordingSeekableOnlyAfterTheSettleBoundKeepsPlayingFromTheStart() = exercise(growing = true) {
+        play(FIRST)
+        assertGrowingTarget()
+        failAtTwentyMinutes()
+        media.seekable = false
+        assertTrue(runtime.retryRecording()?.isStarted == true)
+        assertGrowingTarget()
+        awaitUnseekablePlayback()
+
+        skippedMs += 20_000 // the recovered play has waited the SDK's growing settle bound
+        media.openSeeking()
+
+        awaitMain { player.isCurrentMediaItemSeekable }
+        settleMain()
+        assertTrue("after the settle bound: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
+    }
+
+    @Test fun aGrowingRecordingThatCompletedBeforeTheRetryIsJudgedByItsMediaNotItsFileTimes() =
+        exercise(growing = true) {
+            media.lengthMs = SIXTY_MINUTES
+            play(FIRST)
+            assertGrowingTarget()
+            failAt(FORTY_NINE_MINUTES)
+            // The files' wall-clock span (50 minutes) says less than the 60-minute media.
+            session.publish(completedObservation(spanMinutes = 50))
+
+            assertTrue(runtime.retryRecording()?.isStarted == true)
+            assertTrue(runtime.recordingAdmission.value is RecordingPlaybackAdmission.Completed)
+
+            assertEventuallyNear(FORTY_NINE_MINUTES)
+        }
+
+    @Test fun aGrowingRecordingThatCompletedBeforeTheRetryStartsPerTheViewersChoiceNearItsMediaEnd() =
+        exercise(growing = true) {
+            media.lengthMs = SIXTY_MINUTES
+            play(FIRST)
+            assertGrowingTarget()
+            failAt(FIFTY_EIGHT_MINUTES) // past the orderly-completion fraction of the 60-minute media
+            // The files' wall-clock span (70 minutes) says more than the media.
+            session.publish(completedObservation(spanMinutes = 70))
+
+            assertTrue(runtime.retryRecording()?.isStarted == true)
+            assertTrue(runtime.recordingAdmission.value is RecordingPlaybackAdmission.Completed)
+
+            awaitMain { player.isCurrentMediaItemSeekable && player.isPlaying }
+            settleMain()
+            assertTrue("near the media end: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
+        }
+
+    @Test fun aGrowingRecordingThatCompletesWhileItsRecoveryWaitsKeepsTheGrowingClamp() =
+        exercise(growing = true) {
+            play(FIRST)
+            assertGrowingTarget()
+            failAt(TWENTY_NINE_MINUTES) // past the orderly-completion fraction of the 30-minute files
+            media.seekable = false
+            media.lengthMs = TEN_MINUTES // the retried recording's probe reports less than was played
+            assertTrue(runtime.retryRecording()?.isStarted == true)
+            assertGrowingTarget()
+            awaitUnseekablePlayback()
+
+            session.publish(completedObservation(spanMinutes = 30)) // the recording ends while recovery waits
+            media.openSeeking()
+
+            awaitMain { player.currentPosition >= TEN_MINUTES - 3_000 }
+            assertTrue("arrived at ${player.currentPosition}", player.currentPosition < TEN_MINUTES - 2_000)
+            assertEventuallyNear(TEN_MINUTES - 3_000)
+        }
+
+    @Test fun aGrowingRecordingThatCompletesWhileItsRecoveryWaitsKeepsTheSettleBound() =
+        exercise(growing = true) {
+            play(FIRST)
+            assertGrowingTarget()
+            failAtTwentyMinutes()
+            media.seekable = false
+            assertTrue(runtime.retryRecording()?.isStarted == true)
+            assertGrowingTarget()
+            awaitUnseekablePlayback()
+
+            session.publish(completedObservation(spanMinutes = 30)) // the recording ends while recovery waits
+            skippedMs += 20_000 // the recovered play has waited the SDK's growing settle bound
+            media.openSeeking()
+
+            awaitMain { player.isCurrentMediaItemSeekable }
+            settleMain()
+            assertTrue("after the settle bound: ${player.currentPosition}", player.currentPosition < ONE_MINUTE)
+        }
+
     // Real Media3 and the SDK's asynchronous machinery require looper pumping.
     private fun exercise(
         bookmark: kotlin.time.Duration? = null,
+        growing: Boolean = false,
         block: suspend Fixture.() -> Unit,
     ) = runBlocking {
-        val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), bookmark)
+        val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), bookmark, growing)
         try { withTimeout(120_000) { fixture.block() } }
         finally {
             fixture.scope.cancel()
@@ -224,7 +344,11 @@ class RecordingRecoveryPositionTest {
         }
     }
 
-    private class Fixture(val scope: CoroutineScope, private val bookmark: kotlin.time.Duration?) {
+    private class Fixture(
+        val scope: CoroutineScope,
+        private val bookmark: kotlin.time.Duration?,
+        private val growing: Boolean,
+    ) {
         private val context = ApplicationProvider.getApplicationContext<Application>()
         private val focus = object : PlaybackAudioFocus {
             override fun request(onInterruption: (AudioInterruption) -> Unit): Boolean = true
@@ -255,11 +379,24 @@ class RecordingRecoveryPositionTest {
             }
         }).also { it.launchIn(scope) }
 
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
-            TvheadendAudioOutputProvider(context), focus, PlaybackRuntimePolicy.fromPlayerSettings())
+        /** Elapsed time the recovered play is taken to have waited beyond the player's clock. */
+        @Volatile var skippedMs = 0L
 
-        fun observation(entries: List<DvrEntryId> = listOf(FIRST, SECOND)) =
-            recordings(entries, bookmark)
+        val runtime = AppPlaybackRuntime(player, if (growing) GrowingRecordingSession(session) else session,
+            coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
+            PlaybackRuntimePolicy.fromPlayerSettings(), elapsedRealtime = { SystemClock.elapsedRealtime() + skippedMs })
+
+        fun observation(entries: List<DvrEntryId> = listOf(FIRST, SECOND)) = recordings(
+            entries, bookmark, if (growing) DvrEntryState.RECORDING else DvrEntryState.COMPLETED, growing,
+        )
+
+        /** The growing recordings as TVHeadend reports them once ended, their files spanning [spanMinutes]. */
+        fun completedObservation(spanMinutes: Int) = recordings(
+            listOf(FIRST, SECOND), bookmark, DvrEntryState.COMPLETED, growing, files = listOf(
+                DvrRecordingFile(fileId = 1, path = "first.ts", start = RECORDING_START,
+                    stop = RECORDING_START + spanMinutes.minutes, sizeBytes = null),
+            ),
+        )
 
         fun selection(recordingId: DvrEntryId) =
             requireNotNull(currentRecordingPlaybackSelection(session.observation.value, recordingId))
@@ -282,6 +419,12 @@ class RecordingRecoveryPositionTest {
             }
             awaitMain { restore.isCompleted }
             return restore.await()
+        }
+
+        /** The installed target plays the recording as the growing file TVHeadend still writes. */
+        fun assertGrowingTarget() {
+            assertTrue("admission: ${runtime.recordingAdmission.value}",
+                runtime.recordingAdmission.value is RecordingPlaybackAdmission.GrowingStartOverOnly)
         }
 
         /** The recovered play runs from the start while its recording cannot seek yet. */
@@ -340,13 +483,46 @@ class RecordingRecoveryPositionTest {
     }
 
     /**
-     * A 30-minute mono 8-bit 1 kHz WAV recording: one byte per millisecond. Reads from
+     * Binds the recordings TVHeadend still writes as the SDK does: growing, with an admission
+     * that follows the recording's state in the observation the binding was made from.
+     */
+    private class GrowingRecordingSession(private val session: FakeTvheadendSession) : TvheadendSession by session {
+        override fun bindRecordingPlayback(
+            currentSession: CurrentSessionObservation,
+            recordingId: DvrEntryId,
+        ): PlaybackBindingResult<PlaybackBinding.Recording> {
+            if (!session.isCurrent(currentSession)) return PlaybackBindingResult.ObservationExpired
+            if (session.observation.value.dvrEntry(recordingId)?.state != DvrEntryState.RECORDING) {
+                return session.bindRecordingPlayback(currentSession, recordingId)
+            }
+            val lease = object : GrowingRecordingFileLease {
+                override val isCurrent: Boolean get() = session.isCurrent(currentSession)
+                override suspend fun open(position: Long): RecordingFileResult<GrowingRecordingFileReader> =
+                    RecordingFileResult.Failed(RecordingFileFailure.NOT_SUPPORTED)
+            }
+            return GrowingRecordingBindings.bound({
+                val observation = session.observation.value
+                if (observation.currentSession !== currentSession) {
+                    RecordingPlaybackAdmission.ObservationExpired
+                } else when (observation.dvrEntry(recordingId)?.state) {
+                    DvrEntryState.RECORDING -> GrowingRecordingBindings.growing()
+                    DvrEntryState.COMPLETED -> GrowingRecordingBindings.completed()
+                    else -> RecordingPlaybackAdmission.TargetUnavailable
+                }
+            }, lease)
+        }
+    }
+
+    /**
+     * A 30-minute (or [lengthMs]) mono 8-bit 1 kHz WAV recording: one byte per millisecond. Reads from
      * [failFromByte] on fail as a lost server read does; while [seekable] is false a new
      * extraction announces an unseekable map until [openSeeking], as a progressive file can.
      */
     private class ControlledRecording {
         @Volatile var failFromByte = Long.MAX_VALUE
         @Volatile var seekable = true
+        /** The length a new open of the recording serves, as a growing file's probe reports it. */
+        @Volatile var lengthMs = RECORDING_MS.toLong()
         private val held = mutableListOf<Pair<ExtractorOutput, SeekMap>>()
 
         fun source(item: MediaItem): MediaSource =
@@ -363,7 +539,7 @@ class RecordingRecoveryPositionTest {
         }
 
         private inner class ControlledDataSource : BaseDataSource(false) {
-            private val bytes = ByteArrayDataSource(WAV)
+            private val bytes = ByteArrayDataSource(if (lengthMs == RECORDING_MS.toLong()) WAV else wav(lengthMs.toInt()))
             private var position = 0L
             override fun open(dataSpec: DataSpec): Long {
                 position = dataSpec.position
@@ -437,19 +613,26 @@ class RecordingRecoveryPositionTest {
         val SECOND = DvrEntryId(2)
         const val ONE_MINUTE = 60_000L
         const val FIVE_MINUTES = 5 * 60_000L
+        const val TEN_MINUTES = 10 * 60_000L
         const val TWENTY_MINUTES = 20 * 60_000L
         const val TWENTY_NINE_MINUTES = 29 * 60_000L
+        const val FORTY_NINE_MINUTES = 49 * 60_000L
+        const val FIFTY_EIGHT_MINUTES = 58 * 60_000L
+        const val SIXTY_MINUTES = 60 * 60_000L
         const val RECORDING_MS = 30 * 60_000
         const val WAV_HEADER = 44
         val TICK: java.time.Duration = java.time.Duration.ofMillis(10)
+        val RECORDING_START: Instant = Instant.fromEpochSeconds(1_700_000_000)
 
-        val WAV: ByteArray = java.nio.ByteBuffer.allocate(WAV_HEADER + RECORDING_MS)
+        fun wav(lengthMs: Int): ByteArray = java.nio.ByteBuffer.allocate(WAV_HEADER + lengthMs)
             .order(java.nio.ByteOrder.LITTLE_ENDIAN).apply {
-                put("RIFF".toByteArray()); putInt(36 + RECORDING_MS); put("WAVE".toByteArray())
+                put("RIFF".toByteArray()); putInt(36 + lengthMs); put("WAVE".toByteArray())
                 put("fmt ".toByteArray()); putInt(16); putShort(1); putShort(1); putInt(1_000); putInt(1_000)
                 putShort(1); putShort(8)
-                put("data".toByteArray()); putInt(RECORDING_MS)
+                put("data".toByteArray()); putInt(lengthMs)
             }.array()
+
+        val WAV: ByteArray = wav(RECORDING_MS)
 
         fun byteAt(positionMs: Long) = WAV_HEADER + positionMs
 
@@ -459,17 +642,23 @@ class RecordingRecoveryPositionTest {
             assertTrue("expected about $expectedMs ms but was $actualMs ms", near(expectedMs, actualMs))
         }
 
-        fun recordings(entries: List<DvrEntryId>, bookmark: kotlin.time.Duration?) = SessionObservation.create(
+        fun recordings(
+            entries: List<DvrEntryId>,
+            bookmark: kotlin.time.Duration?,
+            state: DvrEntryState = DvrEntryState.COMPLETED,
+            progressSupported: Boolean = false,
+            files: List<DvrRecordingFile>? = null,
+        ) = SessionObservation.create(
             sessionState = SessionState.Ready(
                 ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
             ),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Channel One")))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries.map { id ->
-                DvrEntry.create(id = id, state = DvrEntryState.COMPLETED, title = "Recording $id",
-                    channelName = "Recorded Channel", playPosition = bookmark)
+                DvrEntry.create(id = id, state = state, title = "Recording $id",
+                    channelName = "Recorded Channel", playPosition = bookmark, files = files)
             })),
-            recordingProgressCapability = if (bookmark != null) {
+            recordingProgressCapability = if (bookmark != null || progressSupported) {
                 RecordingProgressCapability.SUPPORTED
             } else {
                 RecordingProgressCapability.UNKNOWN

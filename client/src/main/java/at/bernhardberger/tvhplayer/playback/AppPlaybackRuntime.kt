@@ -763,7 +763,11 @@ class AppPlaybackRuntime(
                 ?: RecordingRecoveryPosition(
                     recordingId = target.recordingId,
                     positionMs = player.currentPosition,
-                    durationMs = player.duration.takeIf { it != C.TIME_UNSET && it > 0 },
+                    // A growing recording's extent is no final duration to judge a finish by.
+                    durationMs = player.duration.takeIf {
+                        _recordingAdmission.value is RecordingPlaybackAdmission.Completed &&
+                            it != C.TIME_UNSET && it > 0
+                    },
                 )
         } ?: recordingRecovery
     }
@@ -776,9 +780,9 @@ class AppPlaybackRuntime(
 
     /**
      * Seeks the installed recording to its owed recovery position once its timeline can take
-     * the seek, by the rule the SDK's own resume follows: a known duration, a position before
-     * its end, a seekable item. An earlier seek into a progressive item not yet seekable is
-     * lost to its start. A replaced, failed, or stopped target drops the seek.
+     * the seek, by the rule the SDK's own resume follows ([recordingRecoverySeek]). An earlier
+     * seek into a progressive item not yet seekable is lost to its start. A replaced, failed,
+     * or stopped target drops the seek.
      */
     private fun applyPendingRecordingRecovery() {
         targetCommands.runIfOpen {
@@ -791,14 +795,22 @@ class AppPlaybackRuntime(
             }
             // A failed target keeps the seek owed, so its own recovery continues there.
             if (player.playerError != null) return@runIfOpen
-            val durationMs = player.duration.takeIf { it != C.TIME_UNSET && it >= 0 } ?: return@runIfOpen
-            if (pending.position.positionMs >= durationMs) {
-                pendingRecordingRecovery = null
-                return@runIfOpen
+            val seek = recordingRecoverySeek(
+                positionMs = pending.position.positionMs,
+                growingRecording = pending.growing,
+                durationMs = player.duration.takeIf { it != C.TIME_UNSET && it >= 0 },
+                seekable = player.isCurrentMediaItemSeekable,
+                pendingForMs = elapsedRealtime() - pending.sinceMillis,
+                judgeOrderlyCompletion = pending.judgeOrderlyCompletion,
+            )
+            when (seek) {
+                RecordingRecoverySeek.Wait -> Unit
+                RecordingRecoverySeek.Drop -> pendingRecordingRecovery = null
+                is RecordingRecoverySeek.SeekTo -> {
+                    pendingRecordingRecovery = null
+                    player.seekTo(seek.positionMs)
+                }
             }
-            if (!player.isCurrentMediaItemSeekable) return@runIfOpen
-            pendingRecordingRecovery = null
-            player.seekTo(pending.position.positionMs)
         }
     }
 
@@ -837,6 +849,7 @@ class AppPlaybackRuntime(
         var installedBinding: PlaybackBinding.Recording? = null
         var committed = false
         var recoverySeekMs: Long? = null
+        var growingRecovery = false
         startupBuffer?.targetInstalling(live = false)
         val result = installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
@@ -851,10 +864,12 @@ class AppPlaybackRuntime(
                     is PlaybackBindingResult.Bound -> {
                         admission = binding.binding.admission
                         installedBinding = binding.binding
+                        growingRecovery = admission is RecordingPlaybackAdmission.GrowingStartOverOnly
                         recoverySeekMs = recordingRecoverySeekMs(
                             recovery = recoverAt,
                             recordingId = recordingId,
                             completedRecording = admission is RecordingPlaybackAdmission.Completed,
+                            growingRecording = growingRecovery,
                         )
                         if (!targetCommands.isOpen()) {
                             PlaybackTargetResult.SHUT_DOWN
@@ -914,6 +929,11 @@ class AppPlaybackRuntime(
                     PendingRecordingRecovery(
                         epoch = activeTargetEpoch,
                         position = recovery.copy(positionMs = positionMs),
+                        growing = growingRecovery,
+                        sinceMillis = elapsedRealtime(),
+                        // A lost growing target carried no duration to judge a finish by at
+                        // admission; the installed completed target's own duration judges it.
+                        judgeOrderlyCompletion = !growingRecovery && recovery.durationMs == null,
                     )
                 } else {
                     null
@@ -1845,30 +1865,99 @@ internal data class RecordingRecoveryPosition(
     val durationMs: Long?,
 )
 
-/** A recovery seek owed to the recording target installed under [epoch]. */
+/**
+ * A recovery seek owed to the recording target installed under [epoch] at [sinceMillis]
+ * (elapsed realtime); [growing] selects the growing-recording rule of [recordingRecoverySeek]
+ * and [judgeOrderlyCompletion] its orderly-completion check for a completed target.
+ */
 private data class PendingRecordingRecovery(
     val epoch: Long?,
     val position: RecordingRecoveryPosition,
+    val growing: Boolean,
+    val sinceMillis: Long,
+    val judgeOrderlyCompletion: Boolean,
 )
 
 /**
  * The position recovery of [recordingId] continues at, or null to keep the viewer's start.
- * Only the same completed recording carries over. A growing recording keeps its start: its
- * extent moves and a remembered offset is not proven seekable. A position at or past the
- * point where an orderly exit counts as finished starts per the viewer's choice instead.
+ * Only the same completed or growing recording carries over. For a completed recording a
+ * position at or past the point where an orderly exit counts as finished, judged by the lost
+ * target's duration, starts per the viewer's choice instead. A lost growing target carries no
+ * duration: its position carries over as is, and [recordingRecoverySeek] judges it by the
+ * installed target's timeline.
  */
 internal fun recordingRecoverySeekMs(
     recovery: RecordingRecoveryPosition?,
     recordingId: DvrEntryId,
     completedRecording: Boolean,
+    growingRecording: Boolean = false,
     orderlyCompletionFraction: Double = DvrProgressPolicy().orderlyCompletionFraction,
 ): Long? {
-    if (recovery == null || recovery.recordingId != recordingId || !completedRecording) return null
+    if (recovery == null || recovery.recordingId != recordingId) return null
+    if (!completedRecording && !growingRecording) return null
     if (recovery.positionMs <= 0) return null
     val durationMs = recovery.durationMs
-    if (durationMs != null && recovery.positionMs >= durationMs * orderlyCompletionFraction) return null
+    if (completedRecording && durationMs != null && recovery.positionMs >= durationMs * orderlyCompletionFraction) {
+        return null
+    }
     return recovery.positionMs
 }
+
+/** What an owed recovery seek does with the installed recording's current timeline. */
+internal sealed interface RecordingRecoverySeek {
+    /** The timeline cannot take the seek yet. */
+    data object Wait : RecordingRecoverySeek
+
+    /** The seek no longer applies; playback continues where it is. */
+    data object Drop : RecordingRecoverySeek
+
+    data class SeekTo(val positionMs: Long) : RecordingRecoverySeek
+}
+
+/**
+ * The SDK's recording-resume rule applied to a recovery seek. A completed recording waits for
+ * a known duration and a seekable item and drops a position at or past the end. With
+ * [judgeOrderlyCompletion] (the lost target carried no known duration, such as a growing
+ * one) it also drops a position at or past the orderly-completion point of the installed
+ * target's own duration;
+ * that target then plays on from the start it was installed with (START_OVER). A growing
+ * recording waits for a seekable item whose extent covers the SDK's edge margin, clamps the
+ * position that far before the extent's end, and gives up after the SDK's growing settle
+ * bound, so a timeline that turns seekable later never moves the playback that began at the
+ * start. A growing target whose recording completes meanwhile keeps these rules with no
+ * orderly-completion cutoff, since the public SDK offers no final media duration for it.
+ */
+internal fun recordingRecoverySeek(
+    positionMs: Long,
+    growingRecording: Boolean,
+    durationMs: Long?,
+    seekable: Boolean,
+    pendingForMs: Long,
+    judgeOrderlyCompletion: Boolean = false,
+    orderlyCompletionFraction: Double = DvrProgressPolicy().orderlyCompletionFraction,
+): RecordingRecoverySeek {
+    if (!growingRecording) {
+        return when {
+            durationMs == null -> RecordingRecoverySeek.Wait
+            positionMs >= durationMs -> RecordingRecoverySeek.Drop
+            judgeOrderlyCompletion && positionMs >= durationMs * orderlyCompletionFraction ->
+                RecordingRecoverySeek.Drop
+            !seekable -> RecordingRecoverySeek.Wait
+            else -> RecordingRecoverySeek.SeekTo(positionMs)
+        }
+    }
+    if (pendingForMs >= GROWING_RECOVERY_SETTLE_TIMEOUT_MS) return RecordingRecoverySeek.Drop
+    if (durationMs == null || !seekable) return RecordingRecoverySeek.Wait
+    val playableEndMs = durationMs - GROWING_RECOVERY_EDGE_MARGIN_MS
+    if (playableEndMs <= 0L) return RecordingRecoverySeek.Wait
+    return RecordingRecoverySeek.SeekTo(minOf(positionMs, playableEndMs))
+}
+
+/** The SDK's growing-resume distance from the probed extent's end (PCR vs PTS, whole seconds). */
+internal const val GROWING_RECOVERY_EDGE_MARGIN_MS: Long = 3_000L
+
+/** The SDK's bound for a growing recording to offer a seekable timeline (two extent probes). */
+internal const val GROWING_RECOVERY_SETTLE_TIMEOUT_MS: Long = 20_000L
 
 /** A seek skipped on the server unless it never ran or the server refused it. */
 private fun at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.startedServerSkip(): Boolean =

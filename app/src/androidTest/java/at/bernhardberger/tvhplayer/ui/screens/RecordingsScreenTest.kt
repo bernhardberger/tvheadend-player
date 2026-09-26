@@ -96,6 +96,10 @@ class RecordingsScreenTest {
             CurrentSessionObservation,
             DvrEntryId,
         ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+        onStopRecording: suspend (
+            CurrentSessionObservation,
+            DvrEntryId,
+        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
     ) {
         val context = LocalContext.current
         val imageLoader = remember(context) { ImageLoader.Builder(context).build() }
@@ -105,10 +109,10 @@ class RecordingsScreenTest {
                 recordingProgressCapability = recordingProgressCapability,
             )
         }
-        val dvrMutationActions = remember(onCancelRecording, onDeleteRecording) {
+        val dvrMutationActions = remember(onCancelRecording, onDeleteRecording, onStopRecording) {
             DvrMutationActions(
                 scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
-                stopEntry = { _, _ -> DvrMutationResult.NotReady },
+                stopEntry = onStopRecording,
                 cancelEntry = onCancelRecording,
                 deleteEntry = onDeleteRecording,
             )
@@ -991,6 +995,120 @@ class RecordingsScreenTest {
             assertEquals(RecordingPlaybackStart.START_OVER, playbackStart)
         }
         composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
+    }
+
+    @Test
+    fun inProgressResumableDetailsKeepFocusOrderAndResume() {
+        val starts = mutableListOf<RecordingPlaybackStart>()
+        showInProgressRecording(onPlayRecording = { _, start -> starts += start })
+
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().pressCenter()
+        composeRule.onNodeWithContentDescription("Resume from 12 minutes, 34 seconds").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("recording-details-play").assertCountEquals(0)
+        composeRule.onAllNodesWithTag("recording-details-delete").assertCountEquals(0)
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-details-stop").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-stop").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-details-stop").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("recording-details-stop").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-details-close").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-stop").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("recording-details-close").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused().pressCenter()
+        composeRule.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
+        composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
+    }
+
+    @Test
+    fun inProgressResumableDetailsCanStartFromTheBeginning() {
+        val starts = mutableListOf<RecordingPlaybackStart>()
+        showInProgressRecording(onPlayRecording = { _, start -> starts += start })
+
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().pressCenter()
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("recording-details-beginning").assertIsFocused().pressCenter()
+        composeRule.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
+        composeRule.onAllNodesWithTag("recording-details-panel").assertCountEquals(0)
+    }
+
+    @Test
+    fun inProgressResumableDetailsStillStopTheRecordingAfterConfirmation() {
+        val starts = mutableListOf<RecordingPlaybackStart>()
+        val stops = mutableListOf<DvrEntryId>()
+        showInProgressRecording(
+            onPlayRecording = { _, start -> starts += start },
+            onStopRecording = { _, id ->
+                stops += id
+                DvrMutationResult.Confirmed(Unit)
+            },
+        )
+
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().pressCenter()
+        composeRule.onNodeWithTag("recording-details-resume").assertIsFocused()
+            .performKeyInput {
+                pressKey(Key.DirectionRight)
+                pressKey(Key.DirectionDown)
+            }
+        composeRule.onNodeWithTag("recording-details-stop").assertIsFocused().pressCenter()
+        composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+            .performKeyInput {
+                pressKey(Key.DirectionRight)
+                pressKey(Key.DirectionCenter)
+            }
+        composeRule.runOnIdle {
+            assertEquals(listOf(DvrEntryId(7)), stops)
+            assertEquals(emptyList<RecordingPlaybackStart>(), starts)
+        }
+    }
+
+    private fun showInProgressRecording(
+        onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit,
+        onStopRecording: suspend (
+            CurrentSessionObservation,
+            DvrEntryId,
+        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+    ) {
+        val entries = listOf(
+            recording(
+                id = 7,
+                title = "Evening News",
+                state = DvrEntryState.RECORDING,
+                path = "evening-news.ts",
+                stop = 7_300L,
+                playPositionSeconds = 754L,
+            )
+        )
+        val screenState = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                TestRecordingsScreen(
+                    entries = entries,
+                    state = screenState,
+                    recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
+                    onPlayRecording = onPlayRecording,
+                    onStopRecording = onStopRecording,
+                )
+            }
+        }
     }
 
     @Test
