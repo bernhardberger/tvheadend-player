@@ -444,8 +444,13 @@ class RecordingRecoveryPositionTest {
 
         suspend fun failAt(positionMs: Long) {
             media.failFromByte = byteAt(positionMs + 2_000)
+            // Nothing at or past the seek target is loaded yet, so the seek restarts the load there
+            // and that load must reach the armed byte.
+            assertTrue("seek target already loaded: ${failurePlayback()}", media.readPosition < byteAt(positionMs))
             runtime.seekTo(positionMs)
-            awaitMain { player.playerError != null }
+            withTimeoutOrNull(10_000) {
+                while (player.playerError == null) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(5) }
+            } ?: throw AssertionError("the armed read failure never surfaced: ${failurePlayback()}")
             assertTrue(runtime.state.value is AppPlaybackState.Failed)
             // A real read error leaves the failed target where it stood.
             assertNear(positionMs, player.currentPosition)
@@ -468,6 +473,10 @@ class RecordingRecoveryPositionTest {
 
         private fun playback() = "position=${player.currentPosition} playing=${player.isPlaying} " +
             "state=${player.playbackState} error=${player.playerError?.errorCodeName}"
+
+        private fun failurePlayback() = "position=${player.currentPosition} " +
+            "buffered=${player.bufferedPosition} state=${player.playbackState} loading=${player.isLoading} " +
+            "playWhenReady=${player.playWhenReady} readByte=${media.readPosition} armedByte=${media.failFromByte}"
 
         private suspend fun tick() {
             shadowOf(Looper.getMainLooper()).idleFor(TICK)
@@ -515,11 +524,16 @@ class RecordingRecoveryPositionTest {
 
     /**
      * A 30-minute (or [lengthMs]) mono 8-bit 1 kHz WAV recording: one byte per millisecond. Reads from
-     * [failFromByte] on fail as a lost server read does; while [seekable] is false a new
-     * extraction announces an unseekable map until [openSeeking], as a progressive file can.
+     * [failFromByte] on fail as a lost server read does, and no byte past it is served; while
+     * [seekable] is false a new extraction announces an unseekable map until [openSeeking], as a
+     * progressive file can. The loader asks the player's load control every [LOAD_CHECK_BYTES], so
+     * what is loaded stays within the player's buffer ahead of playback instead of Media3's default
+     * 1 MiB (17 minutes here) chunk, and a seek minutes ahead always restarts the load.
      */
     private class ControlledRecording {
         @Volatile var failFromByte = Long.MAX_VALUE
+        /** The byte offset the most recent read reached, for diagnostics. */
+        @Volatile var readPosition = 0L
         @Volatile var seekable = true
         /** The length a new open of the recording serves, as a growing file's probe reports it. */
         @Volatile var lengthMs = RECORDING_MS.toLong()
@@ -528,7 +542,7 @@ class RecordingRecoveryPositionTest {
         fun source(item: MediaItem): MediaSource =
             ProgressiveMediaSource.Factory(DataSource.Factory { ControlledDataSource() }, ExtractorsFactory {
                 arrayOf<Extractor>(GatedExtractor())
-            }).createMediaSource(item)
+            }).setContinueLoadingCheckIntervalBytes(LOAD_CHECK_BYTES).createMediaSource(item)
 
         fun openSeeking() {
             val pending = synchronized(held) {
@@ -546,8 +560,10 @@ class RecordingRecoveryPositionTest {
                 return bytes.open(dataSpec)
             }
             override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-                if (position >= failFromByte) throw FileNotFoundException("recording read failed")
-                return bytes.read(buffer, offset, minOf(length, 1_000)).also { if (it > 0) position += it }
+                val failFrom = failFromByte
+                if (position >= failFrom) throw FileNotFoundException("recording read failed")
+                val allowed = minOf(length.toLong(), 1_000L, failFrom - position).toInt()
+                return bytes.read(buffer, offset, allowed).also { if (it > 0) position += it; readPosition = position }
             }
             override fun getUri(): Uri? = bytes.uri
             override fun close() = bytes.close()
@@ -621,6 +637,7 @@ class RecordingRecoveryPositionTest {
         const val SIXTY_MINUTES = 60 * 60_000L
         const val RECORDING_MS = 30 * 60_000
         const val WAV_HEADER = 44
+        const val LOAD_CHECK_BYTES = 10_000 // 10 s of the recording
         val TICK: java.time.Duration = java.time.Duration.ofMillis(10)
         val RECORDING_START: Instant = Instant.fromEpochSeconds(1_700_000_000)
 
