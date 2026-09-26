@@ -32,7 +32,7 @@ data class SettingsPlayerUiState(
     val keepChannelMinutes: Int = 20,
     val startupBufferMillis: Int = STARTUP_BUFFER_AUTOMATIC,
     /** Level Automatic currently uses for this server. */
-    val startupBufferLearnedMillis: Int = 1000,
+    val startupBufferLearnedMillis: Int = 500,
 )
 
 class SettingsPlayerViewModel(

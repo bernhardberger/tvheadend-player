@@ -16,6 +16,8 @@ import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.analytics.PlayerId
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.SinglePeriodTimeline
+import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict.CLEAN
+import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict.TROUBLE
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
@@ -150,29 +152,36 @@ class StartupBufferControllerTest {
     }
 
     @Test
-    fun rebufferInTheWindowRaisesTheLevelAtOnce() = runTest {
+    fun aSecondRebufferWithinFiveWindowsRaisesTheLevel() = runTest {
         val harness = Harness(this)
         settle()
         harness.liveStart()
         advanceTimeBy(10_000)
         harness.buffering()
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1500, 0), harness.learned())
-        assertEquals(StartupBufferInEffect(1500, automatic = true), harness.controller.inEffect.value)
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(TROUBLE)), harness.learned())
+        assertEquals(StartupBufferInEffect(500, automatic = true), harness.controller.inEffect.value)
+        harness.ready()
+        harness.liveStart()
+        advanceTimeBy(10_000)
+        harness.buffering()
+        settle()
+        assertEquals(StartupBufferLearningState("server-a", 1000), harness.learned())
+        assertEquals(StartupBufferInEffect(1000, automatic = true), harness.controller.inEffect.value)
     }
 
     @Test
-    fun threeAudioUnderrunsRaiseTheLevel() = runTest {
+    fun threeAudioUnderrunsAreTrouble() = runTest {
         val harness = Harness(this)
         settle()
         harness.liveStart()
         harness.underrun()
         harness.underrun()
         settle()
-        assertEquals(1000, harness.learned().levelMillis)
+        assertEquals(StartupBufferLearningState(), harness.learned())
         harness.underrun()
         settle()
-        assertEquals(1500, harness.learned().levelMillis)
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(TROUBLE)), harness.learned())
     }
 
     @Test
@@ -210,7 +219,7 @@ class StartupBufferControllerTest {
         harness.ready()
         advanceTimeBy(30_001)
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1000, 1), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(CLEAN)), harness.learned())
     }
 
     @Test
@@ -224,7 +233,7 @@ class StartupBufferControllerTest {
         advanceTimeBy(1_000)
         harness.buffering()
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1500, 0), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(TROUBLE)), harness.learned())
     }
 
     @Test
@@ -246,7 +255,7 @@ class StartupBufferControllerTest {
         advanceTimeBy(1_000)
         harness.buffering()
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1500, 0), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(TROUBLE)), harness.learned())
     }
 
     @Test
@@ -266,7 +275,7 @@ class StartupBufferControllerTest {
             PlayerId.UNSET, timeline, MediaSource.MediaPeriodId(timeline.getUidOfPeriod(0)), 0L,
             1_500_000L, 1f, true, true, C.TIME_UNSET, stalledAtMs,
         )
-        // Automatic's 1 s start threshold decides, not the delegate's 5 s rebuffer threshold.
+        // Automatic's 0.5 s start threshold decides, not the delegate's 5 s rebuffer threshold.
         harness.loadControl.onPrepared(PlayerId.UNSET)
         assertTrue(harness.loadControl.shouldStartPlayback(restart))
         assertFalse(harness.loadControl.isLiveSeekStartPending)
@@ -282,7 +291,7 @@ class StartupBufferControllerTest {
         harness.controller.timeshiftSeekFinished(accepted = true)
         advanceTimeBy(StartupBufferLoadControl.SKIP_REBUFFER_GRACE_MS + 30_001)
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1000, 1), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(CLEAN)), harness.learned())
     }
 
     @Test
@@ -366,7 +375,7 @@ class StartupBufferControllerTest {
         harness.controller.liveStartApplied()
         advanceTimeBy(30_001)
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1000, 1), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(CLEAN)), harness.learned())
     }
 
     @Test
@@ -391,19 +400,21 @@ class StartupBufferControllerTest {
         harness.controller.onTrackSelectionParametersChanged(harness.trackParameters)
         advanceTimeBy(30_001)
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1000, 1), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 500, listOf(CLEAN)), harness.learned())
     }
 
     @Test
     fun aStorageFailureKeepsTheLevelAndPlaybackRunning() = runTest {
-        val harness = Harness(this)
+        // One more trouble would raise the level.
+        val initial = StartupBufferLearningState("server-a", 500, listOf(TROUBLE))
+        val harness = Harness(this, initial)
         settle()
         harness.storageFails = true
         harness.liveStart()
         harness.buffering()
         settle()
-        assertEquals(StartupBufferLearningState(), harness.learned())
-        assertEquals(StartupBufferInEffect(1000, automatic = true), harness.controller.inEffect.value)
+        assertEquals(initial, harness.learned())
+        assertEquals(StartupBufferInEffect(500, automatic = true), harness.controller.inEffect.value)
 
         // Later windows still learn once storage recovers.
         harness.storageFails = false
@@ -411,7 +422,7 @@ class StartupBufferControllerTest {
         harness.liveStart()
         harness.buffering()
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1500, 0), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 1000), harness.learned())
     }
 
     @Test
@@ -461,29 +472,29 @@ class StartupBufferControllerTest {
         val harness = Harness(this)
         settle()
         harness.liveStart()
-        // The learned level moved on since this window started at 1 s.
-        harness.settings.updateStartupBufferLearning { StartupBufferLearningState("server-a", 2000, 0) }
+        // The learned level moved on since this window started at 0.5 s.
+        harness.settings.updateStartupBufferLearning { StartupBufferLearningState("server-a", 2000) }
         settle()
         harness.buffering()
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 2000, 0), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 2000), harness.learned())
     }
 
     @Test
-    fun twentyCleanWindowsLowerTheLevel() = runTest {
-        val harness = Harness(this, StartupBufferLearningState("server-a", 2000, 0))
+    fun fiveCleanWindowsLowerTheLevel() = runTest {
+        val harness = Harness(this, StartupBufferLearningState("server-a", 2000))
         settle()
         assertEquals(StartupBufferInEffect(2000, automatic = true), harness.controller.inEffect.value)
-        repeat(19) {
+        repeat(4) {
             harness.liveStart()
             advanceTimeBy(30_001)
             settle()
         }
-        assertEquals(StartupBufferLearningState("server-a", 2000, 19), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 2000, List(4) { CLEAN }), harness.learned())
         harness.liveStart()
         advanceTimeBy(30_001)
         settle()
-        assertEquals(StartupBufferLearningState("server-a", 1500, 0), harness.learned())
+        assertEquals(StartupBufferLearningState("server-a", 1500), harness.learned())
         assertEquals(StartupBufferInEffect(1500, automatic = true), harness.controller.inEffect.value)
     }
 
@@ -509,16 +520,16 @@ class StartupBufferControllerTest {
     }
 
     @Test
-    fun anotherServerStartsFromOneSecond() = runTest {
-        val harness = Harness(this, StartupBufferLearningState("server-a", 2500, 4))
+    fun anotherServerStartsFromHalfASecond() = runTest {
+        val harness = Harness(this, StartupBufferLearningState("server-a", 2500, listOf(TROUBLE)))
         settle()
         assertEquals(2500, harness.controller.inEffect.value.millis)
         harness.identity.value = "server-b"
         settle()
-        assertEquals(StartupBufferInEffect(1000, automatic = true), harness.controller.inEffect.value)
+        assertEquals(StartupBufferInEffect(500, automatic = true), harness.controller.inEffect.value)
         harness.liveStart()
         harness.buffering()
         settle()
-        assertEquals(StartupBufferLearningState("server-b", 1500, 0), harness.learned())
+        assertEquals(StartupBufferLearningState("server-b", 500, listOf(TROUBLE)), harness.learned())
     }
 }

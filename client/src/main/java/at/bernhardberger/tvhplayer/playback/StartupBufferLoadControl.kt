@@ -153,6 +153,6 @@ class StartupBufferLoadControl(
         /** How long after a skip's result its rebuffer may still begin. */
         const val SKIP_REBUFFER_GRACE_MS = 3_000L
 
-        private const val DEFAULT_LIVE_START_BUFFER_US = 1_000_000L
+        private const val DEFAULT_LIVE_START_BUFFER_US = 500_000L
     }
 }

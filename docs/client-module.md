@@ -132,28 +132,34 @@ running: the controller then opens the armed window. A skip the player absorbed
 without buffering therefore never takes over a later genuine rebuffer.
 
 `StartupBufferController` sets the threshold from the player setting (Automatic
-or a fixed 0.5, 1, 1.5, 2 or 3 s) and learns the Automatic level per server; a
-different server profile identity starts over at 1 s. A live start the viewer
+or a fixed 0.5, 1, 1.5, 2 or 3 s) and learns the Automatic level per server,
+between 0.5 and 3 s. Automatic favours fast tuning over a stutter-free start: a
+different server profile identity starts over at 0.5 s, and the level rises only
+when a server keeps struggling. A live start the viewer
 waits for (play intent applied after a tune, or a server skip while playing)
 arms a window; a paused start, one denied audio focus or one with audio
 disabled arms nothing. The
 window watches the first 30 s of playback (`StartupBufferPolicy`, plain Kotlin):
 
-- Trouble, a rebuffer (buffering while playback is wanted, not the buffering a
+- Trouble is a rebuffer (buffering while playback is wanted, not the buffering a
   server skip causes, a pause, target change, background or stop) or three
-  audio underruns, raises the level by 0.5 s at once, up to 3 s, and clears the
-  clean count.
-- A window that plays 30 s without trouble counts as clean; 20 clean windows in
-  a row lower the level by 0.5 s, down to 1 s, and clear the count.
+  audio underruns. A single trouble never raises the level; a trouble that makes
+  two of the last five verdicts trouble raises it by 0.5 s, up to 3 s.
+- A window that plays 30 s without trouble counts as clean; 5 clean windows in
+  a row lower the level by 0.5 s, down to 0.5 s.
+- Every raise or lowering starts the verdict history over.
 - A window cut short by zapping, pausing, a server skip, muting or unmuting
   audio, a change to the setting or server identity, background, stop or an
   error gives no verdict.
 
 A verdict is stored only for a window armed in Automatic whose level is still
-the learned level. Level and clean count are stored next to the player settings
-but outside the `PlayerSettings` flow, so learning never re-applies player
-settings; a storage failure keeps the previous level and does not interrupt
-playback.
+the learned level. Level and the last five verdicts are stored next to the
+player settings but outside the `PlayerSettings` flow, so learning never
+re-applies player settings; a storage failure keeps the previous level and does
+not interrupt playback. The stored learning carries a rules version: learning
+stored under earlier rules (such as a level raised by the old
+raise-on-first-trouble rule) starts over once at 0.5 s with an empty history,
+and an unreadable history counts as empty.
 
 ## System media controls
 

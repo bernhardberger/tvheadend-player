@@ -124,6 +124,14 @@ class StartupBufferLoadControlTest {
     }
 
     @Test
+    fun beforeAnySettingArrivesALiveStartWaitsForTheAutomaticStartingLevel() {
+        val live = live()
+        assertFalse(control.shouldStartPlayback(parameters(499, live)))
+        assertTrue(control.shouldStartPlayback(parameters(500, live)))
+        assertEquals(0, startQueries)
+    }
+
+    @Test
     fun liveStartWaitsForTheConfiguredBuffer() {
         val live = live()
         control.setLiveStartBufferMillis(1500)

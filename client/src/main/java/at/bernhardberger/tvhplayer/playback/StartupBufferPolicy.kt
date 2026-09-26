@@ -5,6 +5,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_LEARNED_MAX_MILLIS
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_LEARNED_MIN_MILLIS
+import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_RECENT_VERDICTS
 import at.bernhardberger.tvhplayer.settings.StartupBufferLearningState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -18,7 +19,8 @@ data class StartupBufferInEffect(val millis: Int, val automatic: Boolean)
 
 object StartupBufferPolicy {
     const val STEP_MILLIS = 500
-    const val CLEAN_WINDOWS_PER_STEP_DOWN = 20
+    const val TROUBLES_PER_STEP_UP = 2
+    const val CLEAN_WINDOWS_PER_STEP_DOWN = STARTUP_BUFFER_RECENT_VERDICTS
     const val WINDOW_MILLIS = 30_000L
     const val UNDERRUNS_FOR_TROUBLE = 3
 
@@ -27,8 +29,10 @@ object StartupBufferPolicy {
         if (stored.profile == profile) stored else StartupBufferLearningState(profile = profile)
 
     /**
-     * One learning step. Trouble raises the level at once (cap 3 s) and restarts
-     * the clean count; the twentieth consecutive clean window lowers it (floor 1 s).
+     * One learning step, favouring a fast start. Trouble raises the level only
+     * when it is the second trouble among the last five verdicts (cap 3 s); five
+     * clean windows in a row lower it (floor 0.5 s). Either move starts the
+     * verdict history over.
      */
     fun after(
         stored: StartupBufferLearningState,
@@ -36,18 +40,19 @@ object StartupBufferPolicy {
         profile: String?,
     ): StartupBufferLearningState {
         val current = learningFor(stored, profile)
-        return when (verdict) {
-            StartupBufferVerdict.TROUBLE -> current.copy(
+        val recent = (current.recentVerdicts + verdict).takeLast(STARTUP_BUFFER_RECENT_VERDICTS)
+        return when {
+            verdict == StartupBufferVerdict.TROUBLE &&
+                recent.count { it == StartupBufferVerdict.TROUBLE } >= TROUBLES_PER_STEP_UP -> current.copy(
                 levelMillis = (current.levelMillis + STEP_MILLIS).coerceAtMost(STARTUP_BUFFER_LEARNED_MAX_MILLIS),
-                cleanWindows = 0,
+                recentVerdicts = emptyList(),
             )
-            StartupBufferVerdict.CLEAN -> {
-                val clean = current.cleanWindows + 1
-                if (clean >= CLEAN_WINDOWS_PER_STEP_DOWN) current.copy(
-                    levelMillis = (current.levelMillis - STEP_MILLIS).coerceAtLeast(STARTUP_BUFFER_LEARNED_MIN_MILLIS),
-                    cleanWindows = 0,
-                ) else current.copy(cleanWindows = clean)
-            }
+            recent.size >= CLEAN_WINDOWS_PER_STEP_DOWN &&
+                recent.takeLast(CLEAN_WINDOWS_PER_STEP_DOWN).all { it == StartupBufferVerdict.CLEAN } -> current.copy(
+                levelMillis = (current.levelMillis - STEP_MILLIS).coerceAtLeast(STARTUP_BUFFER_LEARNED_MIN_MILLIS),
+                recentVerdicts = emptyList(),
+            )
+            else -> current.copy(recentVerdicts = recent)
         }
     }
 

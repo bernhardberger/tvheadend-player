@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.StreamProfile
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -81,8 +82,17 @@ data class PlayerSettings(
 /** Stored [PlayerSettings.startupBufferMillis] value for the learned, per-server buffer. */
 const val STARTUP_BUFFER_AUTOMATIC = 0
 
-internal const val STARTUP_BUFFER_LEARNED_MIN_MILLIS = 1000
+internal const val STARTUP_BUFFER_LEARNED_MIN_MILLIS = 500
 internal const val STARTUP_BUFFER_LEARNED_MAX_MILLIS = 3000
+
+/** Verdicts kept per server for the Automatic level. */
+internal const val STARTUP_BUFFER_RECENT_VERDICTS = 5
+
+/**
+ * Version of the Automatic learning rules. Learning stored under other rules
+ * (or without a version) starts over at the default level.
+ */
+internal const val STARTUP_BUFFER_LEARNING_POLICY = 2
 
 /** Fixed start-up buffer choices, in milliseconds, offered next to Automatic. */
 val STARTUP_BUFFER_FIXED_MILLIS: List<Int> = listOf(500, 1000, 1500, 2000, 3000)
@@ -90,12 +100,13 @@ val STARTUP_BUFFER_FIXED_MILLIS: List<Int> = listOf(500, 1000, 1500, 2000, 3000)
 /**
  * Learned Automatic start-up buffer for one server identity. [profile] is the
  * server-scoped identity the level was learned for; a different identity means
- * the level no longer applies.
+ * the level no longer applies. [recentVerdicts] holds the verdicts since the
+ * level last moved, oldest first, at most [STARTUP_BUFFER_RECENT_VERDICTS].
  */
 data class StartupBufferLearningState(
     val profile: String? = null,
-    val levelMillis: Int = 1000,
-    val cleanWindows: Int = 0,
+    val levelMillis: Int = STARTUP_BUFFER_LEARNED_MIN_MILLIS,
+    val recentVerdicts: List<StartupBufferVerdict> = emptyList(),
 )
 
 class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
@@ -117,7 +128,8 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val STARTUP_BUFFER_MILLIS = intPreferencesKey("startupBufferMillis")
         val STARTUP_BUFFER_LEARNED_PROFILE = stringPreferencesKey("startupBufferLearnedProfile")
         val STARTUP_BUFFER_LEARNED_MILLIS = intPreferencesKey("startupBufferLearnedMillis")
-        val STARTUP_BUFFER_CLEAN_WINDOWS = intPreferencesKey("startupBufferCleanWindows")
+        val STARTUP_BUFFER_RECENT_VERDICTS = stringPreferencesKey("startupBufferRecentVerdicts")
+        val STARTUP_BUFFER_LEARNING_POLICY = intPreferencesKey("startupBufferLearningPolicy")
     }
 
     val playerSettings: Flow<PlayerSettings> =
@@ -223,21 +235,41 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
             if (profile == null) p.remove(Keys.STARTUP_BUFFER_LEARNED_PROFILE)
             else p[Keys.STARTUP_BUFFER_LEARNED_PROFILE] = profile
             p[Keys.STARTUP_BUFFER_LEARNED_MILLIS] = result.levelMillis
-            p[Keys.STARTUP_BUFFER_CLEAN_WINDOWS] = result.cleanWindows
+            p[Keys.STARTUP_BUFFER_RECENT_VERDICTS] = result.recentVerdicts
+                .takeLast(STARTUP_BUFFER_RECENT_VERDICTS)
+                .joinToString("") { if (it == StartupBufferVerdict.TROUBLE) "T" else "C" }
+            p[Keys.STARTUP_BUFFER_LEARNING_POLICY] = STARTUP_BUFFER_LEARNING_POLICY
         }
         return result
     }
 
     internal companion object {
         fun decodeStartupBufferLearning(p: Preferences): StartupBufferLearningState {
+            val profile = p[Keys.STARTUP_BUFFER_LEARNED_PROFILE]
+            // Learning from other rules restarts at the default level.
+            if (p[Keys.STARTUP_BUFFER_LEARNING_POLICY] != STARTUP_BUFFER_LEARNING_POLICY) {
+                return StartupBufferLearningState(profile = profile)
+            }
             val default = StartupBufferLearningState()
             return StartupBufferLearningState(
-                profile = p[Keys.STARTUP_BUFFER_LEARNED_PROFILE],
+                profile = profile,
                 levelMillis = p[Keys.STARTUP_BUFFER_LEARNED_MILLIS]
                     ?.takeIf { it in STARTUP_BUFFER_LEARNED_MIN_MILLIS..STARTUP_BUFFER_LEARNED_MAX_MILLIS }
                     ?: default.levelMillis,
-                cleanWindows = p[Keys.STARTUP_BUFFER_CLEAN_WINDOWS]?.coerceAtLeast(0) ?: 0,
+                recentVerdicts = decodeRecentVerdicts(p[Keys.STARTUP_BUFFER_RECENT_VERDICTS]),
             )
+        }
+
+        /** "T" and "C" per verdict, oldest first; anything else is an empty history. */
+        private fun decodeRecentVerdicts(value: String?): List<StartupBufferVerdict> {
+            if (value == null || value.length > STARTUP_BUFFER_RECENT_VERDICTS) return emptyList()
+            return value.map { letter ->
+                when (letter) {
+                    'T' -> StartupBufferVerdict.TROUBLE
+                    'C' -> StartupBufferVerdict.CLEAN
+                    else -> return emptyList()
+                }
+            }
         }
 
         fun decodePlayerSettings(p: Preferences): PlayerSettings {

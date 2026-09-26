@@ -1,11 +1,15 @@
 package at.bernhardberger.tvhplayer.settings
 
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import at.bernhardberger.tvheadend.sdk.core.StreamProfile
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
+import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict.CLEAN
+import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict.TROUBLE
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
@@ -60,9 +64,44 @@ class PlayerSettingsStoreTest {
         val store = PlayerSettingsStore(dataStore)
         val settings = store.playerSettings.first()
         assertEquals(StartupBufferLearningState(), store.startupBufferLearning.first())
-        store.updateStartupBufferLearning { StartupBufferLearningState("server-a", 2500, 7) }
-        assertEquals(StartupBufferLearningState("server-a", 2500, 7), PlayerSettingsStore(dataStore).startupBufferLearning.first())
+        val learned = StartupBufferLearningState("server-a", 2500, listOf(TROUBLE, CLEAN, CLEAN))
+        store.updateStartupBufferLearning { learned }
+        assertEquals(learned, PlayerSettingsStore(dataStore).startupBufferLearning.first())
         assertEquals(settings, store.playerSettings.first())
+    }
+
+    @Test
+    fun startupBufferLearningFromEarlierRulesRestartsAtHalfASecond() = runTest {
+        for (policy in listOf(null, 1)) {
+            val stored = mutablePreferencesOf(
+                stringPreferencesKey("startupBufferLearnedProfile") to "server-a",
+                intPreferencesKey("startupBufferLearnedMillis") to 2000,
+                intPreferencesKey("startupBufferCleanWindows") to 7,
+            )
+            if (policy != null) stored[intPreferencesKey("startupBufferLearningPolicy")] = policy
+            val dataStore = InMemoryPreferencesDataStore(stored)
+            val store = PlayerSettingsStore(dataStore)
+            assertEquals(StartupBufferLearningState("server-a", 500), store.startupBufferLearning.first())
+
+            // The next verdict stores the current rules, so the reset happens once.
+            store.updateStartupBufferLearning { it.copy(levelMillis = 1000, recentVerdicts = listOf(TROUBLE)) }
+            assertEquals(StartupBufferLearningState("server-a", 1000, listOf(TROUBLE)),
+                PlayerSettingsStore(dataStore).startupBufferLearning.first())
+        }
+    }
+
+    @Test
+    fun invalidRecentVerdictsDecodeAsAnEmptyHistory() = runTest {
+        for (verdicts in listOf(null, "", "TX", "t", "TCCCCC")) {
+            val stored = mutablePreferencesOf(
+                stringPreferencesKey("startupBufferLearnedProfile") to "server-a",
+                intPreferencesKey("startupBufferLearnedMillis") to 1500,
+                intPreferencesKey("startupBufferLearningPolicy") to 2,
+            )
+            if (verdicts != null) stored[stringPreferencesKey("startupBufferRecentVerdicts")] = verdicts
+            val store = PlayerSettingsStore(InMemoryPreferencesDataStore(stored))
+            assertEquals(StartupBufferLearningState("server-a", 1500), store.startupBufferLearning.first())
+        }
     }
 
     @Test
