@@ -36,6 +36,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -45,7 +46,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -73,6 +76,18 @@ import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import coil3.ImageLoader
 import kotlinx.coroutines.flow.first
 
+/**
+ * Pinned rails keep the focused card on the start keyline (the row scrolls; at the list end
+ * scrolling stops and focus moves on). Otherwise only an off-edge card is brought into the
+ * safe area and the viewport stays put.
+ */
+internal fun railScrollDistance(offset: Float, size: Float, containerSize: Float, insetPx: Float, pinStart: Boolean): Float = when {
+    pinStart -> offset - insetPx
+    offset < insetPx -> offset - insetPx
+    offset + size > containerSize - insetPx -> offset + size - containerSize + insetPx
+    else -> 0f
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChannelDrawer(
@@ -90,6 +105,8 @@ fun ChannelDrawer(
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: (Int?) -> Unit,
+    pinFocusedCard: Boolean = false,
+    channelKeysBrowse: Boolean = false,
 ) {
     val ids = remember(channels) { channels.map { it.id } }
     val numbers = remember(channels) { channels.associate { it.id to it.visibleChannelNumber } }
@@ -103,16 +120,19 @@ fun ChannelDrawer(
     var confirmedId by remember { mutableStateOf(playingChannelId) }
     var reanchorId by remember { mutableStateOf<ChannelId?>(null) }
     val emptyFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     // 48dp screen-safe space plus native card enlargement/outline overflow.
     val edgeInset = 64.dp
-    val edgeInsetPx = with(LocalDensity.current) { edgeInset.toPx() }
-    val bringIntoView = remember(edgeInsetPx) {
+    // The viewport reaches this far past both screen edges so the next cards of a held
+    // D-pad are already composed and placed; otherwise each step past the edge runs a
+    // synchronous beyond-bounds search inside key dispatch and the rail stalls.
+    val offscreen = 440.dp
+    val offscreenPx = with(LocalDensity.current) { offscreen.roundToPx() }
+    val edgeInsetPx = with(LocalDensity.current) { edgeInset.toPx() } + offscreenPx
+    val bringIntoView = remember(edgeInsetPx, pinFocusedCard) {
         object : BringIntoViewSpec {
-            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float = when {
-                offset < edgeInsetPx -> offset - edgeInsetPx
-                offset + size > containerSize - edgeInsetPx -> offset + size - containerSize + edgeInsetPx
-                else -> 0f
-            }
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                railScrollDistance(offset, size, containerSize, edgeInsetPx, pinFocusedCard)
         }
     }
     LaunchedEffect(ids, active, playingChannelId) {
@@ -158,14 +178,25 @@ fun ChannelDrawer(
         withFrameNanos { }
         val layout = snapshotFlow { listState.layoutInfo }
             .first { it.totalItemsCount == ids.size && it.visibleItemsInfo.isNotEmpty() }
-        if (layout.visibleItemsInfo.none { it.key == target.value }) {
+        if (pinFocusedCard) {
             val index = ids.indexOf(target)
-            val lastVisible = layout.visibleItemsInfo.last()
-            val offset = if (index > lastVisible.index) {
-                // Enter from the nearest (right) safe edge, not the left edge.
-                -(layout.viewportEndOffset - layout.afterContentPadding - lastVisible.size).coerceAtLeast(0)
-            } else 0
-            listState.scrollToItem(index, offset)
+            if (listState.firstVisibleItemIndex != index || listState.firstVisibleItemScrollOffset != 0) {
+                listState.scrollToItem(index)
+            }
+        } else {
+            val onScreen = layout.visibleItemsInfo.filter {
+                it.offset + it.size > layout.viewportStartOffset + offscreenPx &&
+                    it.offset < layout.viewportEndOffset - offscreenPx
+            }
+            if (onScreen.none { it.key == target.value }) {
+                val index = ids.indexOf(target)
+                val lastVisible = onScreen.lastOrNull() ?: layout.visibleItemsInfo.last()
+                val offset = if (index > lastVisible.index) {
+                    // Enter from the nearest (right) safe edge, not the left edge.
+                    -(layout.viewportEndOffset - layout.afterContentPadding - lastVisible.size).coerceAtLeast(0)
+                } else 0
+                listState.scrollToItem(index, offset)
+            }
         }
         if (!active) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == target.value } }.first { it }
@@ -180,12 +211,23 @@ fun ChannelDrawer(
             .then(if (!active) Modifier.clearAndSetSemantics { } else Modifier)
             .testTag("player-channel-shelf")
             .onPreviewKeyEvent { event ->
-                if (event.key == Key.DirectionUp) {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        onCloseDrawer(event.nativeKeyEvent.keyCode)
+                val channelStep = ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)
+                    .takeIf { channelKeysBrowse && active }
+                when {
+                    event.key == Key.DirectionUp -> {
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            onCloseDrawer(event.nativeKeyEvent.keyCode)
+                        }
+                        true
                     }
-                    true
-                } else false
+                    channelStep != null -> {
+                        if (event.type == KeyEventType.KeyDown) {
+                            focusManager.moveFocus(if (channelStep > 0) FocusDirection.Right else FocusDirection.Left)
+                        }
+                        true
+                    }
+                    else -> false
+                }
             },
     ) {
         if (channels.isEmpty()) {
@@ -198,8 +240,18 @@ fun ChannelDrawer(
         // Insets belong to list content, not its viewport: adjacent cards travel to the screen edge.
         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyRow(
+            modifier = Modifier.layout { measurable, constraints ->
+                check(constraints.hasBoundedWidth) { "The rail needs a bounded width" }
+                val placeable = measurable.measure(
+                    constraints.copy(
+                        minWidth = constraints.minWidth + 2 * offscreenPx,
+                        maxWidth = constraints.maxWidth + 2 * offscreenPx,
+                    ),
+                )
+                layout((placeable.width - 2 * offscreenPx).coerceAtLeast(0), placeable.height) { placeable.place(-offscreenPx, 0) }
+            },
             state = listState,
-            contentPadding = PaddingValues(horizontal = edgeInset, vertical = 12.dp),
+            contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             items(channels, key = { it.id.value }) { channel ->

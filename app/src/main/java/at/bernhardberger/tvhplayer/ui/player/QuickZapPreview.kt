@@ -3,8 +3,10 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,5 +50,19 @@ fun QuickZapPreview(
             next?.let { Text(stringResource(R.string.trial_next, it), style = MaterialTheme.typography.labelLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)) }
         }
+    }
+}
+
+/** Invisible, unannounced stand-in as tall as the fullest [QuickZapPreview] at the current font scale. */
+@Composable
+internal fun QuickZapPreviewReserve(modifier: Modifier = Modifier) {
+    Column(
+        modifier.heightIn(min = PlayerTrialTokens.previewHeight).alpha(0f).clearAndSetSemantics { },
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("", style = MaterialTheme.typography.labelLarge, minLines = 1)
+        Text("", style = MaterialTheme.typography.titleLarge, minLines = 1)
+        Text("", style = MaterialTheme.typography.bodyMedium, minLines = 2)
+        Text("", style = MaterialTheme.typography.labelLarge, minLines = 1)
     }
 }

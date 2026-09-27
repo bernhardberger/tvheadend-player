@@ -19,6 +19,7 @@ internal object PlayerTrialTokens {
     val previewWidth = 160.dp
     val previewHeight = 90.dp
     val previewSlotHeight = 96.dp
+    val previewCardGap = 16.dp
 
     /** Host-sized bottom scrim on the 540dp canvas: clear to y184, then 0.60 / 0.80 / 0.92. */
     val bottomScrim = Brush.verticalGradient(

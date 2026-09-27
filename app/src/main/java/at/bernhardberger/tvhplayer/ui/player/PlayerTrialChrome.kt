@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +60,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import coil3.ImageLoader
 import java.time.ZoneId
+import kotlinx.coroutines.delay
 
 /*
  * New player design ("Player design: New") wiring helpers. Everything here is used
@@ -297,7 +299,31 @@ internal data class QuickZapPreviewSnapshot(
     val image: String?,
 )
 
-/** New design: passive preview of the focused quick-zap card; it crossfades between cards. */
+/** How long focus must rest on a quick-zap card before its preview fades in. */
+internal const val QuickZapPreviewSettleMs = 250L
+
+/**
+ * [value] once it has stayed unchanged for [settleMs], otherwise null. The initial value is
+ * settled immediately; every later change waits the full delay again.
+ */
+@Composable
+internal fun <T : Any> rememberSettled(value: T?, settleMs: Long): T? {
+    var settled by remember { mutableStateOf(value) }
+    LaunchedEffect(value) {
+        if (value != settled) {
+            settled = null
+            delay(settleMs)
+            settled = value
+        }
+    }
+    return value?.takeIf { it == settled }
+}
+
+/**
+ * New design: passive preview of the focused quick-zap card. It fades out as soon as focus
+ * moves and fades in once focus rests, bottom-anchored in a fixed slot so neither the tray
+ * nor the cards move with the preview's length.
+ */
 @Composable
 internal fun QuickZapTrayPreview(
     channel: Channel?,
@@ -308,7 +334,8 @@ internal fun QuickZapTrayPreview(
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
 ) {
-    val snapshot = channel?.let {
+    val settledId = rememberSettled(channel?.id, QuickZapPreviewSettleMs)
+    val snapshot = channel?.takeIf { it.id == settledId }?.let {
         QuickZapPreviewSnapshot(
             channelId = it.id,
             title = event?.title?.takeIf(String::isNotBlank) ?: it.name.orEmpty(),
@@ -318,23 +345,26 @@ internal fun QuickZapTrayPreview(
             image = event?.image,
         )
     }
-    QuickZapTrayPreviewFrame(snapshot, modifier) {
-        QuickZapPreview(
-            title = it.title,
-            metadata = it.metadata,
-            summary = it.summary,
-            next = it.next,
-            image = it.image,
-            imageLoader = imageLoader,
-            currentSession = currentSession,
-        )
+    Box(modifier, contentAlignment = Alignment.BottomStart) {
+        QuickZapPreviewReserve(Modifier.fillMaxWidth())
+        QuickZapTrayPreviewFrame(snapshot) {
+            QuickZapPreview(
+                title = it.title,
+                metadata = it.metadata,
+                summary = it.summary,
+                next = it.next,
+                image = it.image,
+                imageLoader = imageLoader,
+                currentSession = currentSession,
+            )
+        }
     }
 }
 
 /**
- * Crossfades between the focused cards' previews. Each side renders its own [snapshot];
- * a new card crossfades, a changed programme of the same card updates in place, and the
- * leaving side drops semantics and focus on its first exit frame.
+ * Fades between the focused cards' previews: out quickly, in a little slower. Each side
+ * renders its own [snapshot]; a new card fades, a changed programme of the same card updates
+ * in place, and the leaving side drops semantics and focus on its first exit frame.
  */
 @Composable
 internal fun QuickZapTrayPreviewFrame(
@@ -346,7 +376,7 @@ internal fun QuickZapTrayPreviewFrame(
         targetState = snapshot,
         transitionSpec = {
             (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)) togetherWith
-                fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate))).using(null)
+                fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
         },
         contentKey = { it?.channelId },
         modifier = modifier.focusProperties { canFocus = false }.testTag("trial-zap-preview"),

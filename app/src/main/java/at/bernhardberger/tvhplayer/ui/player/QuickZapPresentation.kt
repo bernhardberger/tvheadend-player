@@ -76,13 +76,18 @@ internal fun QuickZapPresentation(
                         } else {
                             // New design: the preview sits above the cards, so the scrim keeps the
                             // info bar's bottom-anchored stops instead of stretching over the tray.
+                            // While peeking, the tray's top reaches over the transport row, which
+                            // already sits on the controls' own scrim; only the open tray adds one.
                             Modifier.drawBehind {
                                 val span = PlayerTrialTokens.bottomScrimSpan.toPx().coerceAtMost(size.height)
-                                drawRect(Brush.verticalGradient(
-                                    *PlayerTrialTokens.bottomScrimStops,
-                                    startY = size.height - span,
-                                    endY = size.height,
-                                ))
+                                drawRect(
+                                    Brush.verticalGradient(
+                                        *PlayerTrialTokens.bottomScrimStops,
+                                        startY = size.height - span,
+                                        endY = size.height,
+                                    ),
+                                    alpha = expansion.value,
+                                )
                             }
                         },
                     )
@@ -96,11 +101,15 @@ internal fun QuickZapPresentation(
                         // The scrim's clear runout, so the preview text rests on the dark stops.
                         Spacer(Modifier.height(TvOverlayFooterGradientRunout))
                         Box(
-                            Modifier.fillMaxWidth().heightIn(min = PlayerTrialTokens.previewSlotHeight)
+                            Modifier.fillMaxWidth()
+                                // Measured with the gap, so the peek offset keeps the cards' top edge.
                                 .onSizeChanged { previewHeight = it.height }
+                                .padding(bottom = PlayerTrialTokens.previewCardGap)
+                                .heightIn(min = PlayerTrialTokens.previewSlotHeight)
                                 .graphicsLayer { alpha = expansion.value }
                                 .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
                                 .testTag("trial-zap-preview-slot"),
+                            contentAlignment = Alignment.BottomStart,
                         ) { preview() }
                         channelContent()
                     }

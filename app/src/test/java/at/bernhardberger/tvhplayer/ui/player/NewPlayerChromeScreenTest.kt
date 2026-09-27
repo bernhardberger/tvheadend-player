@@ -647,6 +647,38 @@ class NewPlayerChromeScreenTest {
         }
     }
 
+    @Test fun channelUpBrowsesTheOpenNewRailInsteadOfTuning() {
+        screen(PlayerChromeDesign.NEW)
+        openRail()
+        assertEquals(listOf("player-channel-card-1"), focused())
+        key(Key.ChannelUp)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertTrue("the rail stays open", exists("player-channel-shelf"))
+        assertEquals(listOf("player-channel-card-2"), focused())
+    }
+
+    @Test fun channelUpTunesWithTheNewRailClosed() {
+        screen(PlayerChromeDesign.NEW)
+        key(Key.ChannelUp)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun channelUpStillTunesWithTheCurrentRailOpen() {
+        screen(PlayerChromeDesign.CURRENT)
+        openRail()
+        key(Key.ChannelUp)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    private fun openRail() {
+        var presses = 0
+        while (!exists("player-channel-shelf") && presses < 3) {
+            key(Key.DirectionDown)
+            presses++
+        }
+        assertTrue("Down opens the rail", exists("player-channel-shelf"))
+    }
+
     private fun openStreamSignalDetails(alreadyOpen: Boolean = false) {
         if (!alreadyOpen) key(Key.Info)
         assertTrue(exists("live-info-stream-signal"))

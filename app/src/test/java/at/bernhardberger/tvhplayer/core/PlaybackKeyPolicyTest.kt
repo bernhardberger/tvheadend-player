@@ -497,9 +497,9 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun channelKeysTuneInTheShelfAndFullscreenPlayback() {
-        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = true))
-        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = false))
+    fun channelKeysTuneUnlessTheRailBrowsesWithThem() {
+        assertEquals(ChannelKeyAction.BROWSE_LIST, playbackChannelKeyAction(railBrowsesChannelKeys = true))
+        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(railBrowsesChannelKeys = false))
     }
 
     @Test

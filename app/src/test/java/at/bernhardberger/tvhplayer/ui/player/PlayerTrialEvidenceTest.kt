@@ -174,6 +174,37 @@ class PlayerTrialEvidenceTest {
         assertEquals(setOf(2L), active.toSet())
     }
 
+    @Test fun quickZapPreviewWaitsForFocusToRestAndRepeatedStepsRestartTheWait() {
+        var focused by mutableStateOf<ChannelId?>(ChannelId(1))
+        var settled: ChannelId? = null
+        fun focus(id: ChannelId) = compose.runOnIdle {
+            focused = id
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        }
+        compose.setContent { settled = rememberSettled(focused, QuickZapPreviewSettleMs) }
+        compose.waitForIdle()
+        assertEquals("the opening card previews at once", ChannelId(1), settled)
+        compose.mainClock.autoAdvance = false
+        focus(ChannelId(2))
+        compose.mainClock.advanceTimeByFrame()
+        assertNull("moving hides the preview immediately", settled)
+        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
+        focus(ChannelId(3))
+        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
+        assertNull("a repeat step restarts the wait", settled)
+        compose.mainClock.advanceTimeBy(100)
+        assertEquals(ChannelId(3), settled)
+        focus(ChannelId(4))
+        compose.mainClock.advanceTimeByFrame()
+        focus(ChannelId(3))
+        compose.mainClock.advanceTimeByFrame()
+        assertNull("returning to the previous card waits again", settled)
+        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
+        assertNull("the full wait restarts", settled)
+        compose.mainClock.advanceTimeBy(100)
+        assertEquals(ChannelId(3), settled)
+    }
+
     @Test fun tickingSecondsDoNotChangeLiveRegionAnnouncementButKindDoes() {
         var status by mutableStateOf(checkNotNull(playerStatus(behindLiveSeconds = 203)))
         compose.setContent { TVHeadendPlayerTheme { PlayerStatusChip(status, Modifier.testTag("chip")) } }

@@ -1386,10 +1386,12 @@ fun VideoPlayerScreen(
                 ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)?.let { direction ->
                     zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
                     channelNumberInput = ""
-                    when (playbackChannelKeyAction(browserVisible = showDrawer)) {
+                    when (playbackChannelKeyAction(
+                        railBrowsesChannelKeys = newChrome && foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
+                    )) {
                         ChannelKeyAction.TUNE ->
                             return@onPreviewKeyEvent tuneAdjacentChannel(direction, event.nativeKeyEvent.eventTime)
-                        ChannelKeyAction.PAGE_LIST -> Unit
+                        ChannelKeyAction.BROWSE_LIST -> Unit
                     }
                 }
 
@@ -1506,6 +1508,8 @@ fun VideoPlayerScreen(
                             if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
                             layerState.dismissChannelDrawer()
                         },
+                        pinFocusedCard = newChrome,
+                        channelKeysBrowse = newChrome,
                     )
                 },
                 restoreChannelAction = layerState.restoreChannelAction,

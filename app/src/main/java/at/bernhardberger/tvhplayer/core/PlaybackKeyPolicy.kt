@@ -17,7 +17,7 @@ enum class ChannelPickAction {
 }
 
 enum class ChannelKeyAction {
-    PAGE_LIST,
+    BROWSE_LIST,
     TUNE,
 }
 
@@ -280,8 +280,9 @@ fun channelPickAction(currentChannelId: ChannelId?, pickedChannelId: ChannelId):
         ChannelPickAction.TUNE
     }
 
-fun playbackChannelKeyAction(browserVisible: Boolean): ChannelKeyAction =
-    ChannelKeyAction.TUNE
+/** CH+/- tune, except in a rail that browses with them: there they step focus like Left/Right. */
+fun playbackChannelKeyAction(railBrowsesChannelKeys: Boolean): ChannelKeyAction =
+    if (railBrowsesChannelKeys) ChannelKeyAction.BROWSE_LIST else ChannelKeyAction.TUNE
 
 fun mediaPlaybackAction(
     keyCode: Int,
