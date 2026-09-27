@@ -85,6 +85,8 @@ import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
+import at.bernhardberger.tvhplayer.core.liveInterrupted
+import at.bernhardberger.tvhplayer.core.liveInterruptionMessageShown
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.compactTuningVisibilityAction
 import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
@@ -979,13 +981,24 @@ fun VideoPlayerScreen(
     val recordActionEligible = !infoRecordingScheduled && canRecordFromInfo
     val currentSubscriptionFailure = subscriptionFailure.takeIf { playingLiveChannelId == currentChannelId }
         ?: (playbackState as? AppPlaybackState.Failed)?.subscriptionIssue
+    val currentLiveInterrupted = liveInterrupted(
+        serverStopped = activeLivePlayback?.serverStopped == true,
+        playingLiveChannelId = playingLiveChannelId,
+        shownChannelId = currentChannelId,
+    )
+    val currentPlaybackFailed = requestedChannelFailed || playbackState is AppPlaybackState.Failed
     val statusPresentation = playbackStatusPresentation(
         connectionAvailable = connState is ConnectionState.Connected,
         playbackStarting = playbackState is AppPlaybackState.Starting,
         playbackRecovering = playbackState is AppPlaybackState.Recovering,
         playbackPlaying = playbackState.presented,
-        playbackFailed = requestedChannelFailed || playbackState is AppPlaybackState.Failed ||
-            currentSubscriptionFailure != null,
+        playbackFailed = currentPlaybackFailed || currentSubscriptionFailure != null,
+        liveInterrupted = currentLiveInterrupted,
+    )
+    val interruptionMessageShown = liveInterruptionMessageShown(
+        liveInterrupted = currentLiveInterrupted,
+        subscriptionIssuePresent = currentSubscriptionFailure != null,
+        playbackFailed = currentPlaybackFailed,
     )
     val recoveryVisible = screenActive &&
         statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
@@ -1619,7 +1632,10 @@ fun VideoPlayerScreen(
             // The exit keeps the message it showed while the failure state clears.
             val (message, failureDetail) = rememberLastShown(
                 if (unavailableShown) {
-                    stringResource(currentSubscriptionFailure?.messageResource() ?: R.string.player_playback_failed) to
+                    stringResource(
+                        currentSubscriptionFailure?.messageResource()
+                            ?: if (interruptionMessageShown) R.string.player_playback_interrupted else R.string.player_playback_failed,
+                    ) to
                         listOfNotNull(
                             failedState?.recoveryReason?.name,
                             failedState?.playerErrorCode,

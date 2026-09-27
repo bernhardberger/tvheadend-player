@@ -157,6 +157,7 @@ class MainActivity : AppCompatActivity() {
                         notices.post("background-playback", when (notice) {
                             BackgroundPlaybackNotice.LIMIT_EXPIRED -> R.string.background_live_stopped
                             BackgroundPlaybackNotice.TUNER_LOST -> R.string.background_tuner_lost
+                            BackgroundPlaybackNotice.INTERRUPTED -> R.string.background_live_interrupted
                         }, AppNoticeKind.SUCCESS, notices.context())
                         playbackRuntime.consumeBackgroundNotice(notice)
                     }

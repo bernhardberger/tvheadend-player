@@ -66,6 +66,13 @@ class AppPlaybackRuntime(
     private val targetCommands = PlaybackTargetCommandSerialization()
     private val foregroundPlaybackLifecycle = ForegroundPlaybackLifecycle()
     private var keepTimer: Job? = null
+    /**
+     * The last server stop or issue seen for a live target, recorded as it is observed. A queued
+     * check releases a kept target on it even if the flag has cleared meanwhile: a restart
+     * discards the kept timeshift, and an ended subscription clears the flag as well.
+     */
+    @Volatile
+    private var observedLiveLoss: ObservedLiveLoss? = null
     private val _backgroundNotice = MutableStateFlow<BackgroundPlaybackNotice?>(null)
     val backgroundNotice = _backgroundNotice.asStateFlow()
     /**
@@ -286,11 +293,16 @@ class AppPlaybackRuntime(
     private val livePlaybackObservationJob = scope.launch {
         livePlaybackObservation.collect { observation ->
             val observedEpoch = activeTargetEpoch
-            val lost = observation !is LivePlaybackObservation.Active || observation.subscriptionIssue != null
+            if (observation is LivePlaybackObservation.Active && observedEpoch != null) {
+                observation.keptLiveLossNotice()?.let { observedLiveLoss = ObservedLiveLoss(observedEpoch, it) }
+            }
             targetCommands.serialize(onClosed = {}) {
-                if (lost && observedEpoch == activeTargetEpoch && foregroundPlaybackLifecycle.isKeeping(observedEpoch)) {
-                    applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(observedEpoch, BackgroundPlaybackNotice.TUNER_LOST))
-                    return@serialize
+                // The recorded stop releases the keep even if the server restarted the stream since.
+                if (observedEpoch == activeTargetEpoch && foregroundPlaybackLifecycle.isKeeping(observedEpoch)) {
+                    keptLiveLoss(observedEpoch)?.let { notice ->
+                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(observedEpoch, notice))
+                        return@serialize
+                    }
                 }
                 // Before the play intent: an unresolved local pause is not a server resume, and a
                 // just-resolved one keeps its own outcome (an ambiguous result stays paused).
@@ -1729,11 +1741,28 @@ class AppPlaybackRuntime(
         applyForegroundPlaybackAction(action)
     }
 
-    /** A paused kept channel never plays without its server pause: stop with the tuner-loss notice. */
+    /**
+     * A paused kept channel never plays without its server pause: stop with the tuner-loss notice,
+     * or the neutral one while the server has stopped the stream without an issue.
+     */
     private suspend fun stopPausedRetune() {
+        val notice = currentLiveLossNotice() ?: BackgroundPlaybackNotice.TUNER_LOST
         stopPlayback()
-        _backgroundNotice.value = BackgroundPlaybackNotice.TUNER_LOST
+        _backgroundNotice.value = notice
     }
+
+    /**
+     * The loss that ends the kept target [epoch]: the current observation's stop or issue, or a
+     * stop observed for [epoch] since the keep began. The latter holds even if the server has
+     * restarted the stream meanwhile, because the restart discards the kept timeshift.
+     */
+    private fun keptLiveLoss(epoch: Long?): BackgroundPlaybackNotice? =
+        livePlaybackObservation.value.keptLiveLossNotice()
+            ?: observedLiveLoss?.takeIf { it.epoch == epoch }?.notice
+
+    /** The current live target's stop or issue; null without a live target. */
+    private fun currentLiveLossNotice(): BackgroundPlaybackNotice? =
+        (livePlaybackObservation.value as? LivePlaybackObservation.Active)?.keptLiveLossNotice()
 
     private suspend fun applyForegroundPlaybackAction(action: ForegroundPlaybackAction) {
         executeForegroundPlaybackAction(
@@ -1747,14 +1776,18 @@ class AppPlaybackRuntime(
             },
             resumeRecording = { audioInterruptions.playWithAudioFocusLocked() },
             keepLive = { keep ->
+                // Evidence from before this keep is superseded by the current observation below.
+                observedLiveLoss = null
                 player.pause()
                 val paused = coordinator.pauseTimeshift() == TimeshiftCommandResult.ACCEPTED
                 val yielded = paused && coordinator.setLivePriority(LiveSubscriptionPriority.YIELD) == TimeshiftCommandResult.ACCEPTED
                 if (targetCommands.isOpen() && activeTargetEpoch == keep.epoch) {
+                    // A stop or issue that arrived before the keep was admitted releases it now.
+                    val lossNotice = if (livePlaybackObservation.value is LivePlaybackObservation.Active) keptLiveLoss(keep.epoch) else null
                     if (!yielded) {
                         applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch))
-                    } else if ((livePlaybackObservation.value as? LivePlaybackObservation.Active)?.subscriptionIssue != null) {
-                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, BackgroundPlaybackNotice.TUNER_LOST))
+                    } else if (lossNotice != null) {
+                        applyForegroundPlaybackAction(foregroundPlaybackLifecycle.releaseKept(keep.epoch, lossNotice))
                     } else {
                         keepTimer = scope.launch {
                             delay((keep.deadlineMillis - elapsedRealtime()).coerceAtLeast(0))
@@ -1776,9 +1809,13 @@ class AppPlaybackRuntime(
                             resumed != TimeshiftCommandResult.SHUT_DOWN && audioInterruptions.interruption == null
                         if (!restored || resumeFailed) {
                             val channel = (_activeTarget.value as? AppPlaybackTarget.Live)?.channelId
+                            // A stop the queued loss check has not handled yet is not a lost tuner.
+                            val notice = currentLiveLossNotice()
+                                ?: observedLiveLoss?.takeIf { it.epoch == kept.epoch }?.notice
+                                ?: BackgroundPlaybackNotice.TUNER_LOST
                             stopPlayback()
                             channel?.let { playLive(it, recovering = false, playWhenReady = kept.resume) }
-                            if (resumeFailed) _backgroundNotice.value = BackgroundPlaybackNotice.TUNER_LOST
+                            if (resumeFailed) _backgroundNotice.value = notice
                         }
                     }
                 }
@@ -1958,6 +1995,19 @@ internal const val GROWING_RECOVERY_EDGE_MARGIN_MS: Long = 3_000L
 
 /** The SDK's bound for a growing recording to offer a seekable timeline (two extent probes). */
 internal const val GROWING_RECOVERY_SETTLE_TIMEOUT_MS: Long = 20_000L
+
+/**
+ * Why a kept live target no longer receives the stream, or null while it does. A server stop
+ * without an issue is only an interruption; one with an issue, or no target, lost the tuner.
+ */
+private fun LivePlaybackObservation.keptLiveLossNotice(): BackgroundPlaybackNotice? = when {
+    this !is LivePlaybackObservation.Active || subscriptionIssue != null -> BackgroundPlaybackNotice.TUNER_LOST
+    serverStopped -> BackgroundPlaybackNotice.INTERRUPTED
+    else -> null
+}
+
+/** A server stop or issue observed for the live target [epoch]. */
+private class ObservedLiveLoss(val epoch: Long, val notice: BackgroundPlaybackNotice)
 
 /** A seek skipped on the server unless it never ran or the server refused it. */
 private fun at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.startedServerSkip(): Boolean =

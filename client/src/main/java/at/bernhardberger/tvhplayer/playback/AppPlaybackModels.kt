@@ -195,4 +195,4 @@ internal fun AppVideoPresentation.onFirstFrame(
     this
 }
 
-enum class BackgroundPlaybackNotice { LIMIT_EXPIRED, TUNER_LOST }
+enum class BackgroundPlaybackNotice { LIMIT_EXPIRED, TUNER_LOST, INTERRUPTED }

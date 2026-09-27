@@ -160,6 +160,7 @@
     <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>
     <string name="player_playback_recovering">Playback interrupted. Retrying automatically…</string>
     <string name="player_playback_failed">Playback stopped.</string>
+    <string name="player_playback_interrupted">Playback interrupted</string>
 
     <string name="loading_wait">Waiting for loading…</string>
     <string name="not_connected">Not connected</string>
@@ -533,4 +534,5 @@
     <string name="startup_buffer_description">Shorter starts faster; longer protects against dropouts.</string>
     <string name="background_live_stopped">Live TV was stopped while the app was in the background</string>
     <string name="background_tuner_lost">The tuner was needed elsewhere; live TV was restarted</string>
+    <string name="background_live_interrupted">Live TV was interrupted in the background and was restarted</string>
 </resources>

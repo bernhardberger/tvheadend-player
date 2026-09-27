@@ -147,6 +147,239 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(BackgroundPlaybackNotice.TUNER_LOST, runtime.backgroundNotice.value)
     }
 
+    @Test fun issueLessServerStopReleasesKeptTargetOnceWithInterruptedNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        settle() // The keep is fully admitted; the stop reaches the observation check.
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { runtime.activeTarget.value == null }
+        scheduler.advanceTimeBy(1_200_000)
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+        runtime.consumeBackgroundNotice(BackgroundPlaybackNotice.INTERRUPTED)
+        runtime.onAppForegrounded()
+        settle()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun serverStopWhileTheKeepYieldsReleasesWithInterruptedNotice() = exercise {
+        live()
+        val yielding = CompletableDeferred<Unit>()
+        val finishYield = CompletableDeferred<Unit>()
+        beforePriority = {
+            yielding.complete(Unit)
+            finishYield.await()
+        }
+        runtime.onAppBackgrounded()
+        await { yielding.isCompleted }
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle()
+        beforePriority = {}
+        finishYield.complete(Unit)
+        await { runtime.activeTarget.value == null }
+        settle()
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertEquals(1, connection.unsubscribeCount)
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    }
+
+    @Test fun serverStopBeforeBackgroundingReleasesSilentlyAndRetunesOnReturn() = exercise {
+        live()
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        runtime.onAppBackgrounded()
+        // The stopped stream refuses the keep's pause; the viewer already saw the interruption.
+        await { runtime.activeTarget.value == null }
+        scheduler.advanceTimeBy(1_200_000)
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertTrue(connection.priorityChanges.isEmpty())
+        returnAndRetune()
+        assertEquals(2, connection.subscribeCount)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun stopThatRestartsBeforeTheQueuedCheckStillReleasesWithInterruptedNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        val release = holdCommands()
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle() // The loss check is queued behind the held command.
+        startSubscription()
+        await { liveObservation()?.let { !it.serverStopped && it.timeshiftState is LiveTimeshiftState.Available } == true }
+        release.complete(Unit)
+        // The restart discarded the kept timeshift: the recorded stop still ends the keep.
+        await { runtime.activeTarget.value == null }
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    }
+
+    @Test fun restartBeforeTheReplacementPeriodBindsStillReleasesWithInterruptedNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        val release = holdCommands()
+        // Holding the playback thread keeps the replacement period from binding.
+        val playbackHeld = java.util.concurrent.CountDownLatch(1)
+        val playbackBlocked = java.util.concurrent.CountDownLatch(1)
+        android.os.Handler(player.playbackLooper).post { playbackBlocked.countDown(); playbackHeld.await() }
+        try {
+            await { playbackBlocked.count == 0L }
+            connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+            await { liveObservation()?.let { it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true }
+            settle() // The loss check is queued behind the held command.
+            startSubscription()
+            // Started clears the flag before any period is bound to the restarted stream.
+            await { liveObservation()?.let { !it.serverStopped && it.timeshiftState == LiveTimeshiftState.Unavailable } == true }
+        } finally {
+            playbackHeld.countDown()
+        }
+        await { liveObservation()?.let { !it.serverStopped && it.timeshiftState is LiveTimeshiftState.Available } == true }
+        release.complete(Unit)
+        await { runtime.activeTarget.value == null }
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    }
+
+    @Test fun stopWhoseSubscriptionEndsBeforeTheQueuedCheckStillReleasesWithInterruptedNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        val release = holdCommands()
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle() // The loss check is queued behind the held command.
+        connection.loseGeneration()
+        // Ending the subscription clears the flag without a restart.
+        await { liveObservation()?.let { !it.serverStopped && it.timeshiftState !is LiveTimeshiftState.Available } == true }
+        release.complete(Unit)
+        await { runtime.activeTarget.value == null }
+        scheduler.advanceTimeBy(1_200_000)
+        settle()
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    }
+
+    @Test fun returnQueuedBeforeTheStopCheckRetunesWithInterruptedNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        settle()
+        val release = holdCommands()
+        runtime.onAppForegrounded()
+        settle() // The return queues before the stop's loss check.
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle()
+        release.complete(Unit)
+        await { connection.subscribeCount == 2 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { runtime.activeTarget.value != null && player.playWhenReady }
+        settle()
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    }
+
+    @Test fun explicitStopQueuedBeforeTheStopCheckLeavesNoNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        val release = holdCommands()
+        val stopped = scope.async { runtime.stop() }
+        settle() // The user's Stop queues first.
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle()
+        release.complete(Unit)
+        await { stopped.isCompleted }
+        settle()
+        runtime.onAppForegrounded()
+        settle()
+        assertNull(runtime.activeTarget.value)
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun replacementQueuedBeforeTheStopCheckIsNotReleasedForTheOldTarget() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        val release = holdCommands()
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
+        val replacement = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+        }
+        settle() // The replacement queues first.
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle()
+        release.complete(Unit)
+        // The replacement runs first: it tunes channel 2 and, being in the background, releases it
+        // without a keep. The old target's check then finds a new epoch and does nothing.
+        await { replacement.isCompleted }
+        settle()
+        // Whether the SDK opened channel 2's subscription before that release depends on the
+        // player's playback thread (4 of 40 probe runs did not); every opened one is closed.
+        await { runtime.activeTarget.value == null && connection.subscribeCount == connection.unsubscribeCount }
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
+    @Test fun detachDuringTheStopCheckReleasesNothing() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        holdCommands()
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle()
+        val detach = scope.async { runtime.detach() }
+        await { detach.isCompleted }
+        settle()
+        assertEquals(0, connection.unsubscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+    }
+
     @Test fun recoveryRequestWhileKeptReleasesInsteadOfRetuning() = exercise {
         live()
         runtime.onAppBackgrounded()
@@ -574,6 +807,18 @@ class BackgroundPlaybackRuntimeTest {
         assertEquals(emptyList<Int>(), connection.speeds)
     }
 
+    private fun Fixture.liveObservation() = runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active
+
+    /** Holds the command serializer inside a settings apply until the returned gate completes. */
+    private suspend fun Fixture.holdCommands(): CompletableDeferred<Unit> {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        beforeSettingsRead = { if (entered.complete(Unit)) release.await() }
+        settings.setKeepChannelMinutes(30)
+        await { entered.isCompleted }
+        return release
+    }
+
     private fun exercise(block: suspend Fixture.() -> Unit) = exercise(PlaybackRuntimePolicy.fromPlayerSettings(), block)
 
     companion object {
@@ -613,12 +858,20 @@ class BackgroundPlaybackRuntimeTest {
         val focus = FakeFocus()
         val connection = ScriptedSubscriptionConnection()
         var beforeSpeed: suspend (Int) -> Unit = {}
+        var beforePriority: suspend (LiveSubscriptionPriority) -> Unit = {}
         /** Holds a subscription before its confirmation, so the timeshift grant stays undecided. */
         var beforeSubscribe: suspend () -> Unit = {}
         private val manager = createSubscriptionManager(object : SubscriptionConnection by connection {
             override suspend fun speed(id: SubscriptionId, speed: Int): SubscriptionOperationResult<Unit> {
                 beforeSpeed(speed)
                 return connection.speed(id, speed)
+            }
+            override suspend fun changePriority(
+                id: SubscriptionId,
+                priority: LiveSubscriptionPriority,
+            ): SubscriptionOperationResult<Unit> {
+                beforePriority(priority)
+                return connection.changePriority(id, priority)
             }
             override suspend fun subscribe(
                 id: SubscriptionId,

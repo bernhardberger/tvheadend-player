@@ -155,6 +155,7 @@
     <string name="player_connection_recovering">Verbindung unterbrochen. Sie wird automatisch wiederhergestellt…</string>
     <string name="player_playback_recovering">Wiedergabe unterbrochen. Erneuter Versuch läuft automatisch…</string>
     <string name="player_playback_failed">Wiedergabe beendet.</string>
+    <string name="player_playback_interrupted">Wiedergabe unterbrochen</string>
 
     <string name="loading_wait">Warten auf Ladevorgang…</string>
     <string name="not_connected">Nicht verbunden</string>
@@ -436,4 +437,5 @@
     <string name="startup_buffer_description">Kürzer startet schneller, länger schützt vor Aussetzern.</string>
     <string name="background_live_stopped">Live-TV wurde im Hintergrund beendet</string>
     <string name="background_tuner_lost">Der Tuner wurde anderweitig benötigt; Live-TV wurde neu gestartet</string>
+    <string name="background_live_interrupted">Live-TV wurde im Hintergrund unterbrochen und neu gestartet</string>
 </resources>
