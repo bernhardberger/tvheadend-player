@@ -70,7 +70,7 @@ internal class LivePauseController(
             if (field !== value) field?.pictureWait?.cancel()
             field = value
         }
-    var timeshiftRequestedEpoch: Long? = null
+    private var timeshiftRequestedEpoch: Long? = null
     var readyReachedEpoch: Long? = null
         private set
     private val publishLock = Any()
@@ -78,6 +78,11 @@ internal class LivePauseController(
     val livePause = _livePause.asStateFlow()
     private val _livePauseNotice = MutableStateFlow<LivePauseUnavailableNotice?>(null)
     val livePauseNotice = _livePauseNotice.asStateFlow()
+
+    /** A live target commits: [epoch] if it was requested with timeshift, else null. */
+    fun noteTimeshiftRequestedLocked(epoch: Long?) {
+        timeshiftRequestedEpoch = epoch
+    }
 
     /** The epoch of the pending pause, if there is one. */
     val pendingLivePauseEpoch: Long? get() = pendingLivePause?.epoch

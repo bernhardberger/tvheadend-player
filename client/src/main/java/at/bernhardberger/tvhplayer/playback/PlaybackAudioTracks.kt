@@ -21,7 +21,9 @@ import kotlinx.coroutines.launch
 /**
  * [AppPlaybackRuntime]'s audio tracks and output: the session audio choice and its stored
  * per-channel copy, automatic audio, track preferences, frame-rate matching and passthrough.
- * The runtime owns the lock, the active target and the audio interruption mute.
+ * It is the only user of the [SessionAudioSelection]; the runtime and the audio interruption
+ * controller change it through the methods here. The runtime owns the lock, the active target
+ * and the audio interruption mute.
  */
 internal class PlaybackAudioTracks(
     private val player: ExoPlayer,
@@ -107,6 +109,24 @@ internal class PlaybackAudioTracks(
                 audioSelection.activate(it.channelId, player)
             }
         }
+    }
+
+    /**
+     * The interruption mute ended: restores the session audio choice to the unmuted tracks, unless
+     * a target installation runs (it activates the choice itself when it ends).
+     *
+     * Unlike [onTracksChanged], this needs no [audioOutputChanging] check: an interruption ends
+     * only while the command lock is held (a serialized command, or detach's final idle wait), and
+     * [applyAudioPassthroughLocked] holds the command lock for the whole output change, so the two
+     * never overlap.
+     */
+    fun restoreAudioAfterInterruptionLocked() {
+        if (!targetInstallationInProgress()) audioSelection.restore(player)
+    }
+
+    /** Detach, inside the runtime's final idle wait: forgets the session audio choices. */
+    fun clearSessionAudioLocked() {
+        audioSelection.clear(player)
     }
 
     /** Detach: waits for the last stored-choice write. */

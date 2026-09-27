@@ -8,14 +8,17 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * [AppPlaybackRuntime]'s publication of player state, diagnostics and video presentation, and its
- * debug seek diagnostics. The runtime owns the state, the active target and its epoch; player
- * errors are published by the runtime, because they end a pending live pause.
+ * debug seek diagnostics. This is the only writer of [state]: the runtime decides which state its
+ * commands reach and publishes it through the named `publish…` methods. The runtime owns the
+ * active target and its epoch; it handles player errors ([publishPlayerErrorFromPlayer]), because
+ * they end a pending live pause, and publishes the resulting failure here.
  */
 internal class PlaybackPresentationPublisher(
     private val player: ExoPlayer,
@@ -25,12 +28,13 @@ internal class PlaybackPresentationPublisher(
     private val targetCommands: PlaybackTargetCommandSerialization,
     private val recoveryAttempts: LiveRecoveryAttemptRunner,
     private val livePlaybackObservation: StateFlow<LivePlaybackObservation>,
-    private val _state: MutableStateFlow<AppPlaybackState>,
     private val _activeTarget: StateFlow<AppPlaybackTarget?>,
     private val activeTargetEpoch: () -> Long?,
     private val targetInstallationInProgress: () -> Boolean,
     private val publishPlayerErrorFromPlayer: () -> Unit,
 ) {
+    private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
+    val state = _state.asStateFlow()
     private val _diagnostics = MutableStateFlow(AppPlaybackDiagnostics())
     private val _videoPresentation = MutableStateFlow(AppVideoPresentation())
     private var diagnosticsEnabled = false
@@ -191,6 +195,27 @@ internal class PlaybackPresentationPublisher(
         targetFrameListener = null
     }
 
+    /*
+     * The runtime's state publications. Plain writes, as the runtime made them before: each caller
+     * keeps its own lock and presentation-epoch discipline, and publishes diagnostics itself.
+     */
+
+    fun publishIdle() {
+        _state.value = AppPlaybackState.Idle
+    }
+
+    fun publishStarting() {
+        _state.value = AppPlaybackState.Starting
+    }
+
+    fun publishRecovering(reason: PlaybackRecoveryReason, retryDelayMillis: Long) {
+        _state.value = AppPlaybackState.Recovering(reason = reason, retryDelayMillis = retryDelayMillis)
+    }
+
+    fun publishFailed(failure: AppPlaybackState.Failed) {
+        _state.value = failure
+    }
+
     fun publishPlayerState(recoveryResolved: Boolean = false) {
         targetCommands.runIfOpen {
             if (player.playerError == null) {
@@ -213,7 +238,7 @@ internal class PlaybackPresentationPublisher(
                     )
                 }
             }
-            publishDiagnosticsFromPlayer()
+            publishDiagnosticsUnderAccessLock()
         }
     }
 
@@ -229,7 +254,7 @@ internal class PlaybackPresentationPublisher(
                 playbackState = player.playbackState,
                 isPlaying = player.isPlaying,
             )
-            publishDiagnosticsFromPlayer()
+            publishDiagnosticsUnderAccessLock()
         }
     }
 
@@ -238,12 +263,18 @@ internal class PlaybackPresentationPublisher(
             _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
             return
         }
-        if (!targetCommands.runIfOpen { publishDiagnosticsFromPlayer() }) {
+        if (!targetCommands.runIfOpen { publishDiagnosticsUnderAccessLock() }) {
             _diagnostics.value = AppPlaybackDiagnostics(source = source(), state = _state.value)
         }
     }
 
-    fun publishDiagnosticsFromPlayer() {
+    /**
+     * Publishes diagnostics read from the player. The caller holds at least the access lock
+     * (`runIfOpen`), so the player is still attached; this may run while a serialized command is
+     * suspended, so it must not rely on the command lock. The runtime's player-error publication
+     * calls it after the failure and the live pause are published.
+     */
+    fun publishDiagnosticsUnderAccessLock() {
         val activeTarget = _activeTarget.value
         val activeLiveObservation =
             livePlaybackObservation.value as? LivePlaybackObservation.Active

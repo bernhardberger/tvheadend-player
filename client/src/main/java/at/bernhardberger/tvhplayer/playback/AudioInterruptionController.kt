@@ -27,13 +27,12 @@ internal class AudioInterruptionController(
     private val scope: CoroutineScope,
     private val targetCommands: PlaybackTargetCommandSerialization,
     private val audioFocus: PlaybackAudioFocus,
-    private val audioSelection: SessionAudioSelection,
+    private val audioTracks: PlaybackAudioTracks,
     private val livePauseController: LivePauseController,
     private val livePlaybackObservation: StateFlow<LivePlaybackObservation>,
     private val _activeTarget: StateFlow<AppPlaybackTarget?>,
     private val foreground: () -> Boolean,
     private val activeTargetEpoch: () -> Long?,
-    private val targetInstallationInProgress: () -> Boolean,
     private val cancelRecoveryForInterruptionLocked: (currentJob: Job) -> Unit,
     /** Playback may continue: a live recovery the interruption stopped may retune now. */
     private val resumeInterruptedRecoveryLocked: () -> Unit,
@@ -43,7 +42,7 @@ internal class AudioInterruptionController(
         private set
     private var interruptionContent = AudioInterruptionContent.NONE
     private var interruptionHoldUnconfirmed = false
-    var resumeAfterInterruption = false
+    private var resumeAfterInterruption = false
     var interruptionPaused = false
         private set
     var interruptionMuted = false
@@ -56,6 +55,11 @@ internal class AudioInterruptionController(
     fun retainInterruptionMuteLocked() {
         focusGeneration++
         audioFocus.abandon()
+        resumeAfterInterruption = false
+    }
+
+    /** An explicit viewer Pause: a later focus gain must not resume playback. */
+    fun forgetInterruptionResumeLocked() {
         resumeAfterInterruption = false
     }
 
@@ -83,7 +87,7 @@ internal class AudioInterruptionController(
         interruptionMuted = muted
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, muted).build()
-        if (!muted && !targetInstallationInProgress()) audioSelection.restore(player)
+        if (!muted) audioTracks.restoreAudioAfterInterruptionLocked()
     }
 
     fun preserveInterruptionMute() {
