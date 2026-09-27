@@ -93,6 +93,13 @@ class ProgrammeWindowTest {
             at.bernhardberger.tvhplayer.playback.AppTimeshiftState(), b))
     }
 
+    @Test fun freshLiveStartShowsCurrentBroadcastBeforeTheFirstTimeshiftStatus() {
+        val granted = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, timingKnown = false)
+        assertNull(displayedProgrammeEvent(false, null, null, granted, b))
+        assertEquals(b, displayedProgrammeEvent(false, null, null, granted, b, freshLiveStart = true))
+        assertNull(displayedProgrammeEvent(true, null, null, granted, b, freshLiveStart = true))
+    }
+
     @Test fun historicalBoundaryIgnoresEstimateWobbleButFollowsEvictionAndSegmentReplacement() = runTest {
         val fixture = fixture()
         fixture.updateHistory(80.minutes, 90.minutes, estimatedLiveEdgeTime = live)

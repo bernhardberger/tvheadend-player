@@ -79,6 +79,7 @@ fun OverlayControlsTv(
     nextScheduled: Boolean = false,
     paused: Boolean = false,
     committedTimeshiftState: AppTimeshiftState = timeshiftState,
+    freshLiveStart: Boolean = false,
     playbackPresented: Boolean = true,
     committedWindow: ProgrammeWindow? = null,
     programmeWindow: ProgrammeWindow? = null,
@@ -130,7 +131,8 @@ fun OverlayControlsTv(
         }
     }
     val initialFocus = if (pauseInSlot) pauseFocus else infoFocus
-    val displayedEvent = displayedProgrammeEvent(previewing, programmeWindow, committedWindow, committedTimeshiftState, nowEvent)
+    val displayedEvent = displayedProgrammeEvent(previewing, programmeWindow, committedWindow, committedTimeshiftState,
+        nowEvent, freshLiveStart)
     val programmeTimeKnown = displayedEvent != null
     val programmeTitle = displayedEvent?.title.orEmpty()
     var focusInitialized by remember { mutableStateOf(false) }
@@ -326,7 +328,8 @@ fun OverlayControlsTv(
         } else {
             // Schedule elapsed time is informational, never a playback coordinate or seek grant.
             val showTimingUnavailable = pausable && timingUnavailable
-            val event = displayedProgrammeEvent(false, null, committedWindow, committedTimeshiftState, nowEvent)?.takeIf {
+            val event = displayedProgrammeEvent(false, null, committedWindow, committedTimeshiftState, nowEvent,
+                freshLiveStart)?.takeIf {
                 it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds
             }
             val description = listOfNotNull(

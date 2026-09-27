@@ -468,21 +468,26 @@ fun VideoPlayerScreen(
     )
     val timelineState = rememberLiveTimelinePresentationState(player)
     var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }
+    // The command token a live start began with, until its position is known or it pauses.
+    var freshLiveStartToken by remember { mutableStateOf<Long?>(null) }
     // Key on the identity of the live target, not on the observation value. The observation
     // carries subscription counters that change several times a second, and restarting the loop
     // on those blanked the timeline and the distance behind live continuously.
     LaunchedEffect(videoPlayerViewModel, activeLivePlayback != null, playingLiveChannelId) {
         sampledTimeshiftState = AppTimeshiftState()
+        freshLiveStartToken = timeshiftCommandToken
         while (true) {
             timelineState.sampleTimeshiftPresentation(videoPlayerViewModel::sampleTimeshiftPresentation)?.let {
                 sampledTimeshiftState = it.copy(
                     displayLiveEdgeMs = timelineState.displayLiveEdgeMs,
                     historyStartTimeline = timelineState.historyStartTimeline,
                 )
+                if (it.timingKnown || it.paused) freshLiveStartToken = null
             }
             delay(250L)
         }
     }
+    val freshLiveStart = freshLiveStartToken == timeshiftCommandToken
     val effectiveTimeshiftState = if (confirmedPlayingChannelId != null) {
         sampledTimeshiftState
     } else {
@@ -960,8 +965,8 @@ fun VideoPlayerScreen(
     } else null
     val displayedNextEvent = if (displayedWindow != null) {
         observation.nextEvent(currentChannelId, displayedWindow.estimatedPosition)
-    } else nextEvent.takeIf { visibleSeekPreview == null &&
-        at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback(effectiveTimeshiftState) }
+    } else nextEvent.takeIf { visibleSeekPreview == null && (freshLiveStart ||
+        at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback(effectiveTimeshiftState)) }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,
@@ -970,7 +975,7 @@ fun VideoPlayerScreen(
         )
     }
     val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
-        committedWindow, effectiveTimeshiftState, nowEvent)
+        committedWindow, effectiveTimeshiftState, nowEvent, freshLiveStart)
     val actionableInfoEvent = currentProgrammeEvent(observation, infoEvent)
     val currentRecording = remember(observation, infoEvent?.id) {
         infoEvent?.let { observation.dvrEntryForEvent(it.id) }
@@ -1520,10 +1525,11 @@ fun VideoPlayerScreen(
                 channelNumber = currentChannelNumber,
                 channelName = currentChannelName,
                 piconPath = currentChannel?.icon,
-                nowEvent = displayedProgrammeEvent(false, null, committedWindow, effectiveTimeshiftState, nowEvent)
-                    .takeUnless { channelUnavailable },
+                nowEvent = displayedProgrammeEvent(false, null, committedWindow, effectiveTimeshiftState, nowEvent,
+                    freshLiveStart).takeUnless { channelUnavailable },
                 nextEvent = displayedNextEvent.takeUnless { channelUnavailable },
                 committedTimeshiftState = effectiveTimeshiftState,
+                freshLiveStart = freshLiveStart,
                 committedWindow = committedWindow,
                 programmeWindow = displayedWindow,
                 previewing = visibleSeekPreview != null,

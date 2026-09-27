@@ -26,18 +26,25 @@ data class ProgrammeWindow(
 internal fun currentProgrammeEvent(observation: SessionObservation, displayed: EpgEvent?): EpgEvent? =
     displayed?.takeIf { observation.event(it.id) == it }
 
-/** A preview with missing metadata must never borrow the committed/current broadcast title. */
+/**
+ * A preview with missing metadata must never borrow the committed/current broadcast title.
+ *
+ * A [freshLiveStart] plays the live edge, so the current broadcast describes it until its first
+ * known position, pause or timeshift command. The server grants timeshift with the subscription
+ * but reports the first history up to a second later.
+ */
 internal fun displayedProgrammeEvent(
     previewing: Boolean,
     displayedWindow: ProgrammeWindow?,
     committedWindow: ProgrammeWindow?,
     committedState: AppTimeshiftState,
     currentBroadcast: EpgEvent?,
+    freshLiveStart: Boolean = false,
 ): EpgEvent? = if (previewing) {
     displayedWindow?.event
 } else {
     committedWindow?.event ?: currentBroadcast.takeIf {
-        (!committedState.available || committedState.timingKnown) &&
+        freshLiveStart || (!committedState.available || committedState.timingKnown) &&
             committedState.playbackTarget == null && programmeTimingDescribesPlayback(committedState)
     }
 }
