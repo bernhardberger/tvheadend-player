@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.Tracks
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -40,6 +41,9 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.core.GlanceBadge
+import at.bernhardberger.tvhplayer.core.GlanceBadgeKind
+import at.bernhardberger.tvhplayer.core.GlanceSnr
+import at.bernhardberger.tvhplayer.core.glanceSnr
 import at.bernhardberger.tvhplayer.core.PlayerStatus
 import at.bernhardberger.tvhplayer.core.PlayerStatusKind
 import at.bernhardberger.tvhplayer.core.glanceBadges
@@ -86,13 +90,17 @@ internal fun liveInfoBarData(
     nextScheduled = nextScheduled && next != null,
 )
 
-/** Track facts the glance badges show: the selected audio's role and text-track presence. */
+/** Track facts the glance badges show: selected video/audio formats, audio role and text-track presence. */
 internal data class TrackGlance(
     val audioDescription: Boolean = false,
     val subtitles: Boolean = false,
     val teletext: Boolean = false,
     /** Positively audio-only: the player reports audio tracks and no video track. */
     val audioOnly: Boolean = false,
+    val videoHeight: Int? = null,
+    val videoSampleMimeType: String? = null,
+    val audioSampleMimeType: String? = null,
+    val audioChannelCount: Int? = null,
 )
 
 internal fun trackGlance(tracks: Tracks): TrackGlance {
@@ -107,31 +115,52 @@ internal fun trackGlance(tracks: Tracks): TrackGlance {
     val teletext = text.any { it == TELETEXT_CUES_MIME }
     val audioOnly = tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO } &&
         tracks.groups.none { it.type == C.TRACK_TYPE_VIDEO }
+    val video = selectedFormat(tracks, C.TRACK_TYPE_VIDEO)
+    val audio = selectedFormat(tracks, C.TRACK_TYPE_AUDIO)
     return TrackGlance(
         audioDescription,
         subtitles = text.any { it != TELETEXT_CUES_MIME },
         teletext = teletext,
         audioOnly = audioOnly,
+        videoHeight = video?.height?.takeIf { it > 0 },
+        videoSampleMimeType = video?.sampleMimeType,
+        audioSampleMimeType = audio?.sampleMimeType,
+        audioChannelCount = audio?.channelCount?.takeIf { it > 0 },
     )
 }
 
+private fun selectedFormat(tracks: Tracks, type: Int): Format? = tracks.groups
+    .firstOrNull { it.type == type && it.isSelected }
+    ?.let { group -> (0 until group.length).firstOrNull(group::isTrackSelected)?.let(group::getTrackFormat) }
+
 private const val TELETEXT_CUES_MIME = "application/x-media3-cues"
 
+/**
+ * Formats: diagnostics (Stats/details open) win when present, else the selected tracks.
+ * SNR: [liveSnr] from the live observation, else the diagnostics frontend. Diagnostics are also
+ * published on player state changes while Stats is closed, so their SNR may be an old sample.
+ */
 @Composable
-internal fun playerTrialBadges(diagnostics: AppPlaybackDiagnostics, tracks: TrackGlance): List<GlanceBadge> {
+internal fun playerTrialBadges(
+    diagnostics: AppPlaybackDiagnostics,
+    tracks: TrackGlance,
+    liveSnr: GlanceSnr? = null,
+): List<GlanceBadge> {
     val locale = LocalConfiguration.current.locales[0]
     val frontend = diagnostics.live?.frontend?.takeIf { diagnostics.source == AppPlaybackSource.LIVE_TV }
+    // liveSnr is already limited to a live target (liveDiagnosticsForTarget).
+    val snr = liveSnr ?: frontend?.let { glanceSnr(it.relativeSnrPercent, it.absoluteSnrDecibels) }
     return glanceBadges(
-        videoHeight = diagnostics.video?.height,
-        videoSampleMimeType = diagnostics.video?.sampleMimeType,
-        audioMimeType = diagnostics.audio?.sampleMimeType,
-        audioChannelCount = diagnostics.audio?.channelCount,
+        videoHeight = diagnostics.video?.height ?: tracks.videoHeight,
+        videoSampleMimeType = diagnostics.video?.sampleMimeType ?: tracks.videoSampleMimeType,
+        audioMimeType = diagnostics.audio?.sampleMimeType ?: tracks.audioSampleMimeType,
+        audioChannelCount = diagnostics.audio?.channelCount ?: tracks.audioChannelCount,
         audioDescription = tracks.audioDescription,
         subtitles = tracks.subtitles,
         teletext = tracks.teletext,
-        liveFrontend = frontend != null,
-        relativeSnrPercent = frontend?.relativeSnrPercent,
-        absoluteSnrDecibels = frontend?.absoluteSnrDecibels,
+        liveFrontend = snr != null,
+        relativeSnrPercent = snr?.value?.takeIf { snr.kind == GlanceBadgeKind.SNR_PERCENT },
+        absoluteSnrDecibels = snr?.value?.takeIf { snr.kind == GlanceBadgeKind.SNR_DB },
         locale = locale,
     )
 }
@@ -355,9 +384,12 @@ internal fun recordingInfoBarData(entry: DvrEntry, channelNumber: Long?): Player
 @Composable
 internal fun glanceSummary(badges: List<GlanceBadge>): String = badges.map { badgeLabel(it, spoken = false) }.joinToString(" · ")
 
-/** The Info panel's "Stream & signal" page: heading and the stream and signal details rows. */
+/**
+ * The Info panel's "Stream & signal" page: heading and the stream and signal details rows.
+ * Null [diagnostics] (the displayed channel is not yet playing) shows the no-details row.
+ */
 @Composable
-internal fun LiveStreamSignalPage(diagnostics: AppPlaybackDiagnostics) {
+internal fun LiveStreamSignalPage(diagnostics: AppPlaybackDiagnostics?) {
     Column(Modifier.fillMaxSize()) {
         Text(
             text = stringResource(R.string.trial_stream_signal),
@@ -365,7 +397,7 @@ internal fun LiveStreamSignalPage(diagnostics: AppPlaybackDiagnostics) {
             modifier = Modifier.semantics { heading() },
         )
         StreamSignalDetailsPage(
-            sections = formatStreamSignalDetails(diagnostics),
+            sections = diagnostics?.let { formatStreamSignalDetails(it) }.orEmpty(),
             modifier = Modifier.fillMaxWidth().weight(1f).testTag("live-info-stream-signal-details"),
         )
     }

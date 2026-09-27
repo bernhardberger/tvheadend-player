@@ -68,6 +68,7 @@ import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
@@ -581,10 +582,12 @@ fun VideoPlayerScreen(
         aspectRatio = settings.aspectRatio
     }
 
-    DisposableEffect(layerState.statsVisible) {
-        videoPlayerViewModel.setDiagnosticsEnabled(layerState.statsVisible)
+    // Stats for nerds and the New design's "Stream & signal" details page need full diagnostics.
+    val diagnosticsWanted = layerState.statsVisible || layerState.infoDetailsOpen
+    DisposableEffect(diagnosticsWanted) {
+        videoPlayerViewModel.setDiagnosticsEnabled(diagnosticsWanted)
         onDispose {
-            if (layerState.statsVisible) videoPlayerViewModel.setDiagnosticsEnabled(false)
+            if (diagnosticsWanted) videoPlayerViewModel.setDiagnosticsEnabled(false)
         }
     }
 
@@ -1265,7 +1268,14 @@ fun VideoPlayerScreen(
     PlayerBackHandler(handlePlaybackBack)
 
     // New player design slots; Current passes none of them.
-    val trialBadges = if (newChrome) playerTrialBadges(diagnostics, trialTracks) else emptyList()
+    // The live SNR is read only inside the composables that render badges, never at screen scope.
+    // Until the displayed channel is confirmed playing, tracks, diagnostics and SNR may still
+    // describe the previous channel, so no badge and no Stream & signal detail is shown.
+    val trialBadgesConfirmed = confirmedPlayingChannelId != null
+    val trialBadges: @Composable () -> List<GlanceBadge> = {
+        val liveSnr by videoPlayerViewModel.liveSnr.collectAsStateWithLifecycle()
+        if (trialBadgesConfirmed) playerTrialBadges(diagnostics, trialTracks, liveSnr) else emptyList()
+    }
     val trialUnavailableTitle = stringResource(R.string.player_info_unavailable_title)
     val trialHeader: @Composable (Modifier) -> Unit = { modifier ->
         PlayerTrialHeader(
@@ -1287,7 +1297,7 @@ fun VideoPlayerScreen(
                 nowSec = nowSec,
                 unavailableTitle = trialUnavailableTitle,
             ),
-            badges = trialBadges,
+            badges = trialBadges(),
             picon = currentChannel?.icon,
             imageLoader = imageLoader,
             currentSession = currentSession,
@@ -1364,6 +1374,8 @@ fun VideoPlayerScreen(
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
                     zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
                     if (event.nativeKeyEvent.repeatCount == 0) {
+                        // A number entry is its own interaction: a later OK is not the Banner's.
+                        layerState.endBannerOkGrace()
                         channelNumberInput = ChannelNavigation.appendDigit(
                             channelNumberInput, digit, channelNumberDigits,
                         )
@@ -1401,7 +1413,7 @@ fun VideoPlayerScreen(
 
                 val keyAction = at.bernhardberger.tvhplayer.core.bannerKeyAction(
                     playerKeyAction(keyContext, keyCode = keyCode),
-                    bannerVisible = layerState.bannerVisible,
+                    bannerVisible = layerState.bannerTakesOk,
                 )
                 if (playerKeyActionStartsOpeningCycle(keyAction)) {
                     layerState.beginOpeningKeyCycle(keyCode)
@@ -1717,12 +1729,13 @@ fun VideoPlayerScreen(
                         )
                     }
                 } else null,
-                streamSignalSummary = glanceSummary(trialBadges),
+                streamSignalSummary = if (newChrome) glanceSummary(trialBadges()) else null,
                 streamSignalDetailsOpen = layerState.infoDetailsOpen,
                 onOpenStreamSignal = layerState::openInfoDetails,
                 streamSignalDetails = if (newChrome) {
-                    { LiveStreamSignalPage(diagnostics) }
+                    { LiveStreamSignalPage(diagnostics.takeIf { trialBadgesConfirmed }) }
                 } else null,
+                initialFocusOnActions = newChrome,
             )
         }
 

@@ -268,6 +268,7 @@ class PlayerTrialStage2CaptureTest {
                     TrackGlance(audioDescription = true, subtitles = true, teletext = true))),
                 streamSignalDetailsOpen = scene != Scene.INFO && scene != Scene.INFO_NO_EPG,
                 streamSignalDetails = { LiveStreamSignalPage(diagnostics(scene != Scene.DETAILS_IPTV)) },
+                initialFocusOnActions = true,
             )
             Scene.BUFFERING_CHIP -> PlayerStandaloneStatusChip(
                 playerStatus(buffering = true),

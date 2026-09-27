@@ -202,6 +202,71 @@ class PlayerTrialBannerTest {
     }
 
     @Test
+    fun okJustAfterTheBannersTimeoutHideStillRevealsTheControlsWithoutPausing() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        state.enableBanner(true)
+        state.onBannerFramePresented(true)
+        advanceTimeBy(5_001L)
+        runCurrent()
+        assertFalse("the Banner timed out", state.bannerVisible)
+        assertTrue(state.bannerTakesOk)
+        assertEquals("OK within the grace is still meant for the Banner", PlayerKeyAction.REVEAL_CONTROLS,
+            bannerKeyAction(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, state.bannerTakesOk))
+        advanceTimeBy(LIVE_PLAYER_BANNER_OK_GRACE_MS)
+        runCurrent()
+        assertFalse(state.bannerTakesOk)
+        assertEquals("after the grace OK pauses as before", PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+            bannerKeyAction(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, state.bannerTakesOk))
+        state.dispose()
+    }
+
+    @Test
+    fun onlyTheTimeoutHideOpensTheOkGraceAndAnyLayerChangeEndsIt() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        state.enableBanner(true)
+        state.onBannerFramePresented(true)
+        // Back on the Banner (or a stop) hides it without a grace.
+        state.hideBanner()
+        assertFalse(state.bannerTakesOk)
+        state.onChannelTuneRequested()
+        state.showControls()
+        assertFalse("revealing the controls opens no grace", state.bannerTakesOk)
+        state.hideControls()
+        state.onChannelTuneRequested()
+        state.openInfo()
+        assertFalse("a panel opening opens no grace", state.bannerTakesOk)
+        state.closeInfo()
+        state.hideControls()
+
+        val timedOut: suspend () -> Unit = {
+            state.onChannelTuneRequested()
+            advanceTimeBy(5_001L)
+            runCurrent()
+            assertFalse(state.bannerVisible)
+            assertTrue(state.bannerTakesOk)
+        }
+        timedOut()
+        state.showControls()
+        assertFalse("a controls reveal ends the grace", state.bannerTakesOk)
+        state.hideControls()
+        timedOut()
+        state.hideBanner()
+        assertFalse("a stop ends the grace", state.bannerTakesOk)
+        timedOut()
+        state.showOptionsPage(PlaybackOptionsPage.ROOT)
+        assertFalse("a panel ends the grace", state.bannerTakesOk)
+        state.closeOptions()
+        state.hideControls()
+        timedOut()
+        state.onChannelTuneRequested()
+        state.onBannerFramePresented(false)
+        assertTrue("a new tune shows the Banner again", state.bannerVisible)
+        state.onChannelUnavailable()
+        assertFalse("a failed tune's hide opens no grace", state.bannerTakesOk)
+        state.dispose()
+    }
+
+    @Test
     fun liveStatusFollowsTuningBufferingPauseAndBehindLive() {
         assertNull(liveTrialStatus(AppTimeshiftState(), false, false, false, presented = false, unavailable = false))
         assertEquals(PlayerStatusKind.TUNING,

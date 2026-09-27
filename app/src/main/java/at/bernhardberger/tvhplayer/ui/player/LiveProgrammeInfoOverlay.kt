@@ -113,6 +113,11 @@ internal fun LiveProgrammeInfoOverlay(
     onOpenStreamSignal: () -> Unit = {},
     /** New player design only: the details page "Stream & signal" opens; null omits the row. */
     streamSignalDetails: (@Composable () -> Unit)? = null,
+    /**
+     * New player design only: the panel opens on Record (else Close) instead of the reading
+     * pane, which stays reachable with Up.
+     */
+    initialFocusOnActions: Boolean = false,
 ) {
     val closeFocus = remember { FocusRequester() }
     val recordFocus = remember { FocusRequester() }
@@ -139,7 +144,12 @@ internal fun LiveProgrammeInfoOverlay(
         if (showingRecordingDialog || restoreRecordFocus || latestDetailsShown) return@LaunchedEffect
         withFrameNanos { }
         if (latestDetailsShown) return@LaunchedEffect
-        (if (event != null) readingFocus else closeFocus).requestFocus()
+        when {
+            event == null -> closeFocus
+            !initialFocusOnActions -> readingFocus
+            recordAvailable -> recordFocus
+            else -> closeFocus
+        }.requestFocus()
     }
 
     LaunchedEffect(
@@ -189,7 +199,8 @@ internal fun LiveProgrammeInfoOverlay(
                 },
                 modifier = Modifier
                     .testTag("live-info-stream-signal")
-                    .focusRequester(streamSignalFocus),
+                    .focusRequester(streamSignalFocus)
+                    .focusProperties { up = if (recordAvailable) recordFocus else closeFocus },
             )
         }
     }
@@ -302,6 +313,10 @@ internal fun LiveProgrammeInfoOverlay(
                                                             .focusProperties {
                                                                 left = FocusRequester.Cancel
                                                                 right = closeFocus
+                                                                if (streamSignalRow != null) {
+                                                                    up = readingFocus
+                                                                    down = streamSignalFocus
+                                                                }
                                                             },
                                                     ) {
                                                         Text(stringResource(R.string.record))
@@ -319,6 +334,10 @@ internal fun LiveProgrammeInfoOverlay(
                                                                 FocusRequester.Cancel
                                                             }
                                                             right = FocusRequester.Cancel
+                                                            if (streamSignalRow != null) {
+                                                                up = readingFocus
+                                                                down = streamSignalFocus
+                                                            }
                                                         },
                                                 ) {
                                                     Text(stringResource(R.string.player_info_close))

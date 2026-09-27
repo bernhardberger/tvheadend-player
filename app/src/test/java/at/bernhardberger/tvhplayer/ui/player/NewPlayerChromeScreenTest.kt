@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.Density
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import android.os.Looper
 import java.io.File
 import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -49,6 +50,8 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -59,13 +62,27 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStream
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
+import at.bernhardberger.tvheadend.sdk.playback.createSubscriptionManager
+import at.bernhardberger.tvheadend.sdk.testing.ScriptedSubscriptionConnection
+import kotlinx.coroutines.runBlocking
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
+import at.bernhardberger.tvhplayer.core.PlayerKeyContext
+import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.PlaybackTrace
@@ -83,11 +100,13 @@ import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -96,6 +115,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
@@ -113,6 +133,7 @@ class NewPlayerChromeScreenTest {
     private lateinit var view: View
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var session: FakeTvheadendSession
+    private lateinit var video: VideoPlayerViewModel
     private val owner = object : LifecycleOwner {
         override val lifecycle = LifecycleRegistry.createUnsafe(this)
     }
@@ -122,6 +143,8 @@ class NewPlayerChromeScreenTest {
     private var forcedReady = false
     /** Tracks the player reports, for services the fake stream never describes. */
     private var forcedTracks: Tracks? = null
+    private var forcedVideoFormat: Format? = null
+    private var forcedAudioFormat: Format? = null
 
     @After fun after() {
         models.clear()
@@ -313,6 +336,317 @@ class NewPlayerChromeScreenTest {
         assertEquals(listOf("live-info-stream-signal"), focused())
     }
 
+    @Test fun newBadgesComeFromTheSelectedTracksAndTheLiveSnrWithoutDiagnostics() {
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
+        }
+        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        try {
+            screen(PlayerChromeDesign.NEW, opener = manager)
+            val tracks = Tracks(listOf(
+                Tracks.Group(TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264)
+                    .setWidth(1920).setHeight(1080).build()), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
+                Tracks.Group(TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3)
+                    .setChannelCount(6).build()), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
+            ))
+            forcedTracks = tracks
+            compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracks) } }
+            // Events reach only a registered collection; the media period registers it off the main thread.
+            val registered = scope.async(Dispatchers.Default) { connection.awaitCollectionRegistered() }
+            compose.waitUntil(5_000) { registered.isCompleted }
+            runBlocking {
+                connection.emit(SubscriptionEvent.Started(listOf(
+                    SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
+                        language = null, compositionId = null, ancillaryId = null, width = 1920, height = 1080,
+                        frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
+                        audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null),
+                ), null, SubscriptionCondition.NO_DETAIL))
+                // 53739 of 65535: 82 %.
+                connection.emit(SubscriptionEvent.Signal(53739, 12300, null, null, 0, 0, false))
+            }
+            // The observation arrives from a playback thread; its collectors run on the paused main looper.
+            compose.waitUntil(5_000) { idleMainLooper(); video.liveSnr.value != null }
+            val diagnostics = runtime.diagnostics.value
+            assertTrue("Stats and details are closed: no format or frontend diagnostics",
+                diagnostics.video == null && diagnostics.audio == null && diagnostics.live == null)
+            // Badges describe only the confirmed playing channel.
+            playerReady()
+            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            settle()
+            assertTrue(exists("trial-banner"))
+            val badges = badgeDescription("trial-banner")
+            for (expected in listOf("1080 lines", "Video H.264", "Audio DD+ 5.1", "Signal-to-noise ratio 82 percent")) {
+                assertTrue("Banner badges '$badges' contain '$expected'", badges.contains(expected))
+            }
+
+            key(Key.DirectionCenter)
+            assertTrue(exists("player-actions"))
+            val controls = badgeDescription("trial-info-bar")
+            for (expected in listOf("1080 lines", "Video H.264", "Audio DD+ 5.1", "Signal-to-noise ratio 82 percent")) {
+                assertTrue("controls badges '$controls' contain '$expected'", controls.contains(expected))
+            }
+
+            // The details page needs full diagnostics, exactly like Stats for nerds; closing it ends them.
+            key(Key.Info)
+            openStreamSignalDetails(alreadyOpen = true)
+            compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live != null }
+            key(Key.Back)
+            assertFalse(exists("live-info-stream-signal-details"))
+            compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live == null }
+        } finally {
+            runBlocking { manager.closeAndJoin() }
+        }
+    }
+
+    @Test fun afterAZapNoBadgeShowsThePreviousChannelsFactsUntilTheNewChannelPlays() {
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
+        }
+        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        try {
+            screen(PlayerChromeDesign.NEW, opener = manager)
+            // Diagnostics on, as with Stats open: A's frontend diagnostics are present too.
+            video.setDiagnosticsEnabled(true)
+            val videoA = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setWidth(1920).setHeight(1080).build()
+            val audioA = Format.Builder().setSampleMimeType(MimeTypes.AUDIO_E_AC3).setChannelCount(6).build()
+            val tracksA = Tracks(listOf(
+                Tracks.Group(TrackGroup(videoA), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
+                Tracks.Group(TrackGroup(audioA), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
+            ))
+            forcedTracks = tracksA
+            forcedVideoFormat = videoA
+            forcedAudioFormat = audioA
+            compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracksA) } }
+            startLiveSubscription(connection, height = 1080L, signal = 53739L) // 82 %
+            compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.live?.frontend != null }
+            playerReady()
+            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            settle()
+            val badgesA = badgeDescription("trial-banner")
+            for (expected in listOf("1080 lines", "Video H.264", "Signal-to-noise ratio 82 percent")) {
+                assertTrue("A's badges '$badgesA' contain '$expected'", badgesA.contains(expected))
+            }
+
+            // Zap to B: the player still reports A's tracks, A's diagnostics and A's retained SNR.
+            forcedReady = false
+            key(Key.ChannelUp)
+            assertTrue(exists("trial-banner"))
+            val staleBanner = badgeDescription("trial-banner")
+            for (stale in listOf("lines", "Video", "Audio", "Signal-to-noise")) {
+                assertFalse("B's Banner '$staleBanner' shows no badge ('$stale')", staleBanner.contains(stale))
+            }
+            key(Key.Info)
+            assertTrue("Stream & signal stays reachable", exists("live-info-stream-signal"))
+            val staleInfo = texts("live-info-stream-signal")
+            for (stale in listOf("1080", "H.264", "DD+", "SNR")) {
+                assertFalse("B's Info summary '$staleInfo' shows no '$stale'", staleInfo.contains(stale))
+            }
+            // Opening the details samples the installed player, which still plays A.
+            openStreamSignalDetails(alreadyOpen = true)
+            compose.waitUntil(5_000) { idleMainLooper(); runtime.diagnostics.value.video?.height == 1080 }
+            settle()
+            val staleDetails = texts("live-info-stream-signal-details")
+            for (stale in listOf("1920", "1080", "H.264", "Dolby", "82")) {
+                assertFalse("B's details '$staleDetails' show no '$stale'", staleDetails.contains(stale))
+            }
+            assertTrue("B's details '$staleDetails' say no details yet", staleDetails.contains("No stream details available"))
+            key(Key.Back)
+            assertTrue("Back returns to Info", exists("live-info-panel"))
+            key(Key.Back)
+            assertFalse(exists("live-info-panel"))
+            // Closing the details turned diagnostics off again; the waits below read them.
+            video.setDiagnosticsEnabled(true)
+
+            // B plays with its own facts.
+            compose.waitUntil(5_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+            val videoB = Format.Builder().setSampleMimeType(MimeTypes.VIDEO_H264).setWidth(1280).setHeight(720).build()
+            val tracksB = Tracks(listOf(
+                Tracks.Group(TrackGroup(videoB), false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true)),
+            ))
+            forcedTracks = tracksB
+            forcedVideoFormat = videoB
+            forcedAudioFormat = null
+            compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracksB) } }
+            startLiveSubscription(connection, height = 720L, signal = 32768L) // 50 %
+            compose.waitUntil(5_000) {
+                idleMainLooper()
+                runtime.diagnostics.value.live?.frontend?.relativeSnrPercent?.let { it < 60.0 } == true
+            }
+            playerReady()
+            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            settle()
+            key(Key.Info)
+            val infoB = texts("live-info-stream-signal")
+            for (expected in listOf("720", "H.264", "SNR", "50")) {
+                assertTrue("B's Info summary '$infoB' contains '$expected'", infoB.contains(expected))
+            }
+            assertFalse(infoB.contains("1080"))
+            openStreamSignalDetails(alreadyOpen = true)
+            compose.waitUntil(5_000) { idleMainLooper(); texts("live-info-stream-signal-details").contains("50") }
+            val detailsB = texts("live-info-stream-signal-details")
+            for (stale in listOf("1920", "Dolby", "82")) {
+                assertFalse("B's details '$detailsB' show no '$stale'", detailsB.contains(stale))
+            }
+            assertTrue("B's details '$detailsB' show B's picture", detailsB.contains("1280"))
+            key(Key.Back)
+            assertTrue("Back returns to Info", exists("live-info-panel"))
+            key(Key.Back)
+            assertTrue(exists("trial-info-bar"))
+            val badgesB = badgeDescription("trial-info-bar")
+            for (expected in listOf("720 lines", "Video H.264", "Signal-to-noise ratio 50 percent")) {
+                assertTrue("B's badges '$badgesB' contain '$expected'", badgesB.contains(expected))
+            }
+            assertFalse(badgesB.contains("1080"))
+            assertFalse(badgesB.contains("82 percent"))
+        } finally {
+            runBlocking { manager.closeAndJoin() }
+        }
+    }
+
+    private fun startLiveSubscription(
+        connection: ScriptedSubscriptionConnection,
+        height: Long,
+        signal: Long,
+        timeshift: Boolean = false,
+    ) {
+        // Events reach only a registered collection; the media period registers it off the main thread.
+        val registered = scope.async(Dispatchers.Default) { connection.awaitCollectionRegistered() }
+        compose.waitUntil(5_000) { idleMainLooper(); registered.isCompleted }
+        runBlocking {
+            val registration = registered.await()
+            connection.emit(registration, SubscriptionEvent.Started(listOf(
+                SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
+                    language = null, compositionId = null, ancillaryId = null, width = height * 16 / 9, height = height,
+                    frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
+                    audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null),
+            ), null, SubscriptionCondition.NO_DETAIL))
+            connection.emit(registration, SubscriptionEvent.Signal(signal, 12300, null, null, 0, 0, false))
+            // One minute buffered at the live edge.
+            if (timeshift) connection.emit(registration, SubscriptionEvent.Timeshift(60_000_000L, 0L, 0L, 60_000_000L, null, null))
+        }
+    }
+
+    private fun texts(tag: String): String =
+        compose.onAllNodes(hasTestTag(tag) or hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).fetchSemanticsNodes()
+            .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty().map { text -> text.text } }
+            .joinToString(" | ")
+
+    @Test fun newInfoStartsOnRecordAndDownReachesStreamAndSignal() {
+        screen(PlayerChromeDesign.NEW)
+        key(Key.Info)
+        assertEquals("New: the first action takes focus", listOf("live-info-record"), focused())
+        key(Key.DirectionDown)
+        assertEquals("one Down from the actions reaches Stream & signal", listOf("live-info-stream-signal"), focused())
+        key(Key.DirectionUp)
+        assertEquals(listOf("live-info-record"), focused())
+        key(Key.DirectionUp)
+        assertEquals("the description stays reachable with Up", listOf("player-info-reading"), focused())
+    }
+
+    @Test fun newInfoStartsOnCloseWithoutRecording() {
+        // The airing programme is already scheduled, so Record is not offered.
+        screen(PlayerChromeDesign.NEW, recordingScheduled = true)
+        key(Key.Info)
+        assertEquals(listOf("live-info-close"), focused())
+        key(Key.DirectionDown)
+        assertEquals(listOf("live-info-stream-signal"), focused())
+    }
+
+    @Test fun currentInfoStillStartsOnTheDescription() {
+        screen(PlayerChromeDesign.CURRENT)
+        key(Key.Info)
+        assertEquals(listOf("player-info-reading"), focused())
+    }
+
+    private fun idleMainLooper() = shadowOf(Looper.getMainLooper()).idle()
+
+    private fun badgeDescription(tag: String): String =
+        compose.onAllNodes(hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).fetchSemanticsNodes()
+            .flatMap { it.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty() }
+            .joinToString(" | ")
+
+    @Test fun backDuringTheOkGraceBehavesAsWithTheBannerHiddenAndEndsTheGrace() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        state.enableBanner(true)
+        state.onBannerFramePresented(true)
+        testScheduler.advanceTimeBy(5_001L)
+        testScheduler.runCurrent()
+        assertTrue(state.bannerTakesOk)
+        var backs = 0
+        val consumed = state.handleOverlayKey(
+            event = androidx.compose.ui.input.key.KeyEvent(
+                android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_BACK),
+            ),
+            keyContext = PlayerKeyContext(
+                surface = PlayerSurface.LIVE,
+                controlsVisible = false, seekbarFocused = false, timeshiftAvailable = false,
+            ),
+            foregroundLayer = PlayerForegroundLayer.NONE,
+            quickListAvailable = true,
+            onBack = { backs++ },
+            onOptionsOpened = {},
+        )
+        assertEquals(true, consumed)
+        assertEquals("Back is handled as before", 1, backs)
+        assertFalse("Back ends the grace", state.bannerTakesOk)
+        state.dispose()
+    }
+
+    @Test fun aChannelNumberEntryEndsTheBannerOkGrace() {
+        // Live Pause is available, so OK with hidden chrome pauses; the Banner's OK does not.
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 3_600L)))
+        }
+        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        try {
+            screen(PlayerChromeDesign.NEW, opener = manager)
+            startLiveSubscription(connection, height = 1080L, signal = 53739L, timeshift = true)
+            playerReady()
+            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+            playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+            compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
+            compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.READY }
+            val pauses = mutableListOf<Boolean>()
+            compose.runOnIdle {
+                player.addListener(object : Player.Listener {
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { pauses += playWhenReady }
+                })
+            }
+            compose.mainClock.advanceTimeBy(4_800)
+            compose.waitForIdle()
+            // Stop within 100 ms of the timeout hide, well inside the 500 ms grace.
+            var steps = 0
+            while (exists("trial-banner") && steps < 10) {
+                compose.mainClock.advanceTimeBy(100)
+                compose.waitForIdle()
+                steps++
+            }
+            assertFalse("the Banner timed out", exists("trial-banner"))
+            assertFalse(exists("player-actions"))
+
+            // Within the grace: a number no channel has, committed with OK, tunes nothing.
+            compose.onRoot().performKeyInput {
+                pressKey(Key.Nine)
+                pressKey(Key.DirectionCenter)
+            }
+            compose.waitForIdle()
+            idleMainLooper()
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            assertFalse("the dismissed entry reveals nothing", exists("player-actions"))
+            assertTrue("the dismissed entry pauses nothing", pauses.isEmpty())
+
+            // Still inside the Banner's 500 ms, OK now acts as with hidden chrome: it pauses.
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.waitForIdle()
+            assertTrue(exists("player-actions"))
+            settle()
+            val paused = runCatching { compose.waitUntil(3_000) { idleMainLooper(); false in pauses } }.isSuccess
+            assertTrue("OK after a number entry is not the Banner's OK: it paused ($pauses)", paused)
+        } finally {
+            runBlocking { manager.closeAndJoin() }
+        }
+    }
+
     private fun openStreamSignalDetails(alreadyOpen: Boolean = false) {
         if (!alreadyOpen) key(Key.Info)
         assertTrue(exists("live-info-stream-signal"))
@@ -379,14 +713,19 @@ class NewPlayerChromeScreenTest {
         }
     }
 
-    private fun observation(now: Long, events: List<EpgEvent>, dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED) =
+    private fun observation(
+        now: Long,
+        events: List<EpgEvent>,
+        dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED,
+        recordings: List<DvrEntry> = emptyList(),
+    ) =
         SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
                 (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) },
             )),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = events)),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = recordings)),
         )
 
     private fun screen(
@@ -395,6 +734,8 @@ class NewPlayerChromeScreenTest {
         failing: Boolean = false,
         fontScale: Float = 1f,
         epg: Boolean = true,
+        opener: SubscriptionOpener? = null,
+        recordingScheduled: Boolean = false,
     ) {
         val now = System.currentTimeMillis() / 1_000L
         session = FakeTvheadendSession(observation(now, if (!epg) emptyList() else listOf(
@@ -402,10 +743,12 @@ class NewPlayerChromeScreenTest {
                 Instant.fromEpochSeconds(now + 3_600L), title = "Now showing", summary = "Summary"),
             EpgEvent.create(EventId(12L), ChannelId(1L), Instant.fromEpochSeconds(now + 3_600L),
                 Instant.fromEpochSeconds(now + 7_200L), title = "Later"),
-        ))).apply {
+        ), recordings = if (recordingScheduled) listOf(DvrEntry.create(DvrEntryId(1L), eventId = EventId(11L)))
+            else emptyList())).apply {
             // The subscription never becomes playable: the channel stays tuning, as on a slow tune.
             // Failing: the scripted stream cannot be decoded, so the channel becomes unavailable.
-            if (failing) scriptLivePlaybackSuccess()
+            if (opener != null) scriptLivePlaybackSuccess(opener)
+            else if (failing) scriptLivePlaybackSuccess()
             else scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
         }
         val settings = PlayerSettingsStore(InMemoryData())
@@ -422,6 +765,8 @@ class NewPlayerChromeScreenTest {
             override fun getPlaybackState(): Int = if (forcedReady) Player.STATE_READY else base.playbackState
             override fun isPlaying(): Boolean = forcedReady || base.isPlaying
             override fun getCurrentTracks(): Tracks = forcedTracks ?: base.currentTracks
+            override fun getVideoFormat(): Format? = forcedVideoFormat ?: base.videoFormat
+            override fun getAudioFormat(): Format? = forcedAudioFormat ?: base.audioFormat
             override fun addListener(listener: Player.Listener) {
                 playerListeners += listener
                 base.addListener(listener)
@@ -434,7 +779,7 @@ class NewPlayerChromeScreenTest {
         runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
-        val video = VideoPlayerViewModel(runtime, session)
+        video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
         compose.waitForIdle()

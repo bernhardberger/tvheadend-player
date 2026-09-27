@@ -33,6 +33,8 @@ import kotlinx.coroutines.launch
 
 private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
 private const val LIVE_PLAYER_BANNER_MS = 5_000L
+/** After the Banner's timeout hide, an OK this soon was still meant for the Banner. */
+internal const val LIVE_PLAYER_BANNER_OK_GRACE_MS = 500L
 
 @Stable
 internal class LivePlayerLayerState(
@@ -86,6 +88,15 @@ internal class LivePlayerLayerState(
     private var entryUntouched = true
     private var bannerFramePresented = false
     private var bannerHideJob: Job? = null
+    private var bannerOkGraceJob: Job? = null
+
+    /**
+     * OK reveals the controls without toggling pause while the Banner shows and for
+     * [LIVE_PLAYER_BANNER_OK_GRACE_MS] after its timeout hide; any other hide or layer
+     * change, and Back, end that grace.
+     */
+    val bannerTakesOk: Boolean
+        get() = bannerVisible || bannerOkGraceJob != null
 
     private var autoHideEligible = false
     private var autoHideJob: Job? = null
@@ -173,12 +184,23 @@ internal class LivePlayerLayerState(
             delay(bannerTimeoutMillis)
             bannerHideJob = null
             bannerVisible = false
+            bannerOkGraceJob = scope.launch {
+                delay(LIVE_PLAYER_BANNER_OK_GRACE_MS)
+                bannerOkGraceJob = null
+            }
         }
     }
 
     private fun cancelBannerHide() {
         bannerHideJob?.cancel()
         bannerHideJob = null
+        endBannerOkGrace()
+    }
+
+    /** Ends the OK grace after the Banner's timeout hide, e.g. when a channel number entry starts. */
+    fun endBannerOkGrace() {
+        bannerOkGraceJob?.cancel()
+        bannerOkGraceJob = null
     }
 
     fun showControls() = revealControls(PlayerControlsEntry.TRAVEL)
@@ -322,6 +344,7 @@ internal class LivePlayerLayerState(
         }
         if (event.type != KeyEventType.KeyDown) return false
         if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
+            endBannerOkGrace()
             if (event.nativeKeyEvent.repeatCount == 0) {
                 beginOpeningKeyCycle(keyCode)
                 onBack()

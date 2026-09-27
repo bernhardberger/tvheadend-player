@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.Locale
 
 enum class GlanceBadgeKind { RASTER, VIDEO, AUDIO, AD, SUB, TXT, SNR_PERCENT, SNR_DB }
@@ -36,14 +38,30 @@ fun glanceBadges(
     if (subtitles) add(GlanceBadge(GlanceBadgeKind.SUB, ""))
     if (teletext) add(GlanceBadge(GlanceBadgeKind.TXT, ""))
     if (liveFrontend) {
-        val percent = relativeSnrPercent?.takeIf { it.isFinite() && it in 0.0..100.0 }
-        val db = absoluteSnrDecibels?.takeIf(Double::isFinite)
-        when {
-            percent != null -> add(GlanceBadge(GlanceBadgeKind.SNR_PERCENT, String.format(locale, "%.0f", percent)))
-            db != null -> add(GlanceBadge(GlanceBadgeKind.SNR_DB, String.format(locale, "%.1f", db)))
+        glanceSnr(relativeSnrPercent, absoluteSnrDecibels)?.let { snr ->
+            val pattern = if (snr.kind == GlanceBadgeKind.SNR_PERCENT) "%.0f" else "%.1f"
+            add(GlanceBadge(snr.kind, String.format(locale, pattern, snr.value)))
         }
     }
 }.take(maxBadges.coerceAtLeast(0))
+
+/** The SNR one badge shows, already rounded to its displayed precision. */
+data class GlanceSnr(val kind: GlanceBadgeKind, val value: Double)
+
+/** Relative percent (0–100, whole percent) when reported, else absolute dB (one decimal). */
+fun glanceSnr(relativeSnrPercent: Double?, absoluteSnrDecibels: Double?): GlanceSnr? {
+    val percent = relativeSnrPercent?.takeIf { it.isFinite() && it in 0.0..100.0 }
+    val db = absoluteSnrDecibels?.takeIf(Double::isFinite)
+    return when {
+        percent != null -> GlanceSnr(GlanceBadgeKind.SNR_PERCENT, displayRounded(percent, 0))
+        db != null -> GlanceSnr(GlanceBadgeKind.SNR_DB, displayRounded(db, 1))
+        else -> null
+    }
+}
+
+// Formatter rounds HALF_UP on the shortest decimal form; BigDecimal.valueOf uses the same form.
+private fun displayRounded(value: Double, decimals: Int): Double =
+    BigDecimal.valueOf(value).setScale(decimals, RoundingMode.HALF_UP).toDouble()
 
 /** Keep a priority prefix, never skip an oversized high-priority badge for a later one. */
 fun glanceBadgeRows(widths: List<Int>, availableWidth: Int, gap: Int): List<List<Int>> {

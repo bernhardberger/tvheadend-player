@@ -88,6 +88,20 @@ class PlayerChromePolicyTest {
         assertEquals(GlanceBadgeKind.SNR_DB, glanceBadges(liveFrontend = true, relativeSnrPercent = 101.0, absoluteSnrDecibels = 12.3).single().kind)
     }
 
+    @Test fun snrValueChangesOnlyWhenTheDisplayedBadgeChanges() {
+        assertEquals(GlanceSnr(GlanceBadgeKind.SNR_PERCENT, 82.0), glanceSnr(82.2, null))
+        assertEquals(glanceSnr(82.2, 3.0), glanceSnr(81.8, 9.0))
+        assertNotEquals(glanceSnr(82.2, null), glanceSnr(82.6, null))
+        assertEquals(GlanceSnr(GlanceBadgeKind.SNR_DB, 12.3), glanceSnr(101.0, 12.34))
+        assertEquals(glanceSnr(null, 12.31), glanceSnr(null, 12.34))
+        assertNull(glanceSnr(Double.NaN, null))
+        assertNull(glanceSnr(null, Double.POSITIVE_INFINITY))
+        for (value in listOf(0.05, 0.15, 12.25, 12.35, 99.95)) {
+            assertEquals(String.format(Locale.ENGLISH, "%.1f", value),
+                glanceBadges(liveFrontend = true, absoluteSnrDecibels = glanceSnr(null, value)!!.value, locale = Locale.ENGLISH).single().value)
+        }
+    }
+
     @Test fun layoutRetainsOnlyPriorityPrefixInTwoRows() {
         assertEquals(listOf(listOf(0, 1), listOf(2, 3)), glanceBadgeRows(listOf(40, 40, 40, 40, 40), 84, 4))
         assertEquals(listOf(listOf(0), listOf(1)), glanceBadgeRows(listOf(52, 52, 52), 84, 4))
