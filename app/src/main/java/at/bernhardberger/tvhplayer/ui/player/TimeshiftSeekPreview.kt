@@ -30,6 +30,8 @@ internal fun TimeshiftSeekPreview(
     feedback: String? = null,
     feedbackIsError: Boolean = feedback != null,
     headerContent: (@Composable (Modifier) -> Unit)? = null,
+    /** New player design only: host-sized scrims and the passive info bar above the preview timeline. */
+    newInfoBar: (@Composable () -> Unit)? = null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
@@ -79,7 +81,9 @@ internal fun TimeshiftSeekPreview(
                 top = TvOverlayFooterGradientRunout,
                 bottom = playerSeekPreviewBottomPadding(channelsAvailable),
             ),
+        newDesign = newInfoBar != null,
     ) {
+        newInfoBar?.invoke()
         androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().testTag("timeshift-seek-preview")
             .clearAndSetSemantics {
                 contentDescription = (programmeWindow?.let {

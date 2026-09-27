@@ -6,6 +6,12 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.testTag
+import at.bernhardberger.tvhplayer.core.playerStatus
+import at.bernhardberger.tvhplayer.settings.PlayerChromeDesign
+import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
+import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -94,6 +100,7 @@ fun RecordingPlayerScreen(
     connectionState: ConnectionState,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
+    chromeDesign: PlayerChromeDesign = PlayerChromeDesign.CURRENT,
 ) {
     val playerClose = rememberPlayerClose(onClose)
     // First, before the route restore: a user stop since the last intent closes the screen.
@@ -366,6 +373,24 @@ fun RecordingPlayerScreen(
     val foregroundContext = currentPlayerForegroundContext()
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    // New player design: one status for the top cluster and the standalone chip.
+    val newChrome = chromeDesign == PlayerChromeDesign.NEW
+    val trialBufferingEligible = newChrome && bufferingStatusEligible(
+        playbackState, playWhenReady, activeTarget, AppPlaybackTarget.Recording(recordingId),
+        playbackAvailable && retainedSelection != null && retainedSelection.currentSession === currentSession,
+        foregroundBlocked = recordingLoading || foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible,
+    )
+    val trialBufferingVisible by rememberBufferingVisible(
+        AppPlaybackTarget.Recording(recordingId) to retainedSelection, trialBufferingEligible,
+    )
+    val trialStatus = if (newChrome && playbackAvailable) playerStatus(
+        live = false,
+        paused = !playWhenReady,
+        buffering = trialBufferingVisible && trialBufferingEligible,
+        growingRecording = growing,
+    ) else null
+    val trialTracks = if (newChrome) trackGlance(rememberPlayerTracks(player)) else TrackGlance()
+    val trialBadges = if (newChrome) playerTrialBadges(diagnostics, trialTracks) else emptyList()
     LaunchedEffect(foregroundLayer) {
         if (foregroundLayer != PlayerForegroundLayer.CONTROLS) markerNavigation.dismiss()
     }
@@ -600,6 +625,22 @@ fun RecordingPlayerScreen(
                     onInfoFocusRestored = { restoreInfoActionFocus = false },
                     onCommitSeek = timelineState::commitPendingSeek,
                     onOptionsFocusRestored = { restoreOptionsFocus = false },
+                    newHeader = if (newChrome) {
+                        { modifier -> PlayerTrialHeader(formatClock(nowSec), trialStatus, modifier) }
+                    } else null,
+                    newInfoBar = if (newChrome) {
+                        {
+                            val channel = entry.channelId?.let { targetObservation?.channel(it) }
+                            PlayerInfoBar(
+                                data = recordingInfoBarData(entry, channel?.number),
+                                badges = trialBadges,
+                                picon = channel?.icon,
+                                imageLoader = imageLoader,
+                                currentSession = retainedSelection?.currentSession,
+                                modifier = Modifier.padding(bottom = at.bernhardberger.tvhplayer.ui.TvOverlayStatusRowHeight).testTag("trial-info-bar"),
+                            )
+                        }
+                    } else null,
                 )
             }
 
@@ -654,7 +695,17 @@ fun RecordingPlayerScreen(
             }
 
         }
-        CompactBufferingStatus(
+        if (newChrome) {
+            PlayerStandaloneStatusChip(
+                status = trialStatus?.takeIf {
+                    foregroundLayer == PlayerForegroundLayer.NONE && it.kind in TRIAL_STANDALONE_STATUS_KINDS
+                },
+                modifier = Modifier.align(Alignment.BottomEnd)
+                    .padding(end = TvOverlaySidePadding, bottom = TvOverlayBottomPadding),
+            )
+        }
+        // New design: buffering moves to the status chip.
+        if (!newChrome) CompactBufferingStatus(
             state = playbackState,
             playWhenReady = playWhenReady,
             target = activeTarget,

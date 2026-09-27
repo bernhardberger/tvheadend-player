@@ -91,6 +91,10 @@ internal fun RecordingOverlayControls(
     restoreQuickListControl: String? = null,
     onQuickListFocusRestored: () -> Unit = {},
     onControlFocused: (String) -> Unit = {},
+    /** New player design only: replaces the identity header with the top status cluster. */
+    newHeader: (@Composable (Modifier) -> Unit)? = null,
+    /** New player design only: the passive info bar above the timeline. */
+    newInfoBar: (@Composable () -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val pauseFocus = remember { FocusRequester() }
@@ -151,8 +155,8 @@ internal fun RecordingOverlayControls(
             if (event.type == KeyEventType.KeyUp) relocatingKey = null
             true
         }
-    }, headerContent = { modifier ->
-        PlayerIdentityHeader(
+    }, newDesign = newHeader != null, headerContent = { modifier ->
+        if (newHeader != null) newHeader(modifier) else PlayerIdentityHeader(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
             eyebrow = channelName, title = title, support = subtitle,
             clock = formatClock(nowSec), clockSupport = null,
@@ -163,6 +167,7 @@ internal fun RecordingOverlayControls(
         )
     }) {
         Column {
+            newInfoBar?.invoke()
             when (presentation) {
                 is RecordingTimelinePresentation.Seekable -> if (canSeek) PlaybackSeekbar(
                     range = presentation.range,

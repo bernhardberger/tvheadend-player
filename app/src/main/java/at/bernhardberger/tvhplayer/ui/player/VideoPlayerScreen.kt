@@ -22,12 +22,18 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
+import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import at.bernhardberger.tvhplayer.settings.PlayerChromeDesign
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvhplayer.core.recordingNowStatus
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
@@ -376,9 +382,13 @@ fun VideoPlayerScreen(
     onReconnect: () -> Unit,
     onClose: () -> Unit,
     playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime = koinInject(),
+    /** Read once by the route from the UI settings; New swaps only the chrome slots. */
+    chromeDesign: PlayerChromeDesign = PlayerChromeDesign.CURRENT,
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
+    val newChrome = chromeDesign == PlayerChromeDesign.NEW
+    SideEffect { layerState.enableBanner(newChrome) }
     val playerClose = rememberPlayerClose(onClose)
     // First, before any playback effect: a user stop since the last intent closes the screen.
     val screenEntry = rememberPlayerEntry(playbackRuntime::enterPlayerScreen, playerClose)
@@ -1013,7 +1023,7 @@ fun VideoPlayerScreen(
     LaunchedEffect(channelUnavailable) {
         if (channelUnavailable) {
             timelineState.invalidateForSourceChange()
-            layerState.onChannelTuneRequested()
+            layerState.onChannelUnavailable()
         }
     }
     fun currentPlayerForegroundContext() =
@@ -1075,6 +1085,48 @@ fun VideoPlayerScreen(
                 compactTuningVisible = false
             }
         }
+    }
+
+    // New player design: one status for the top cluster and the standalone chip, the
+    // Banner's first-frame signal and the programme-change Banner. Current skips all.
+    val livePaused = !livePlayWhenReady(livePauseState, playWhenReady)
+    val trialBufferingEligible = newChrome && bufferingStatusEligible(
+        playbackState, playWhenReady, activeTarget, AppPlaybackTarget.Live(currentChannelId),
+        screenActive && currentSession != null && activeLivePlayback != null,
+        foregroundBlocked = statusPresentation != PlaybackStatusPresentation.NONE || compactTuningVisible,
+    )
+    val trialBufferingVisible by rememberBufferingVisible(
+        AppPlaybackTarget.Live(currentChannelId) to (currentSession to liveRequestToken), trialBufferingEligible,
+    )
+    val trialStatus = if (newChrome) liveTrialStatus(
+        timeshift = effectiveTimeshiftState,
+        paused = livePaused,
+        tuning = compactTuningVisible,
+        buffering = trialBufferingVisible && trialBufferingEligible,
+        presented = playbackState.presented,
+        unavailable = channelUnavailable,
+    ) else null
+    // The Banner stays while tuning and hides after the first frame of this tune;
+    // an audio-only service has no frame, so its playing state stands in.
+    val bannerFramePresented = confirmedPlayingChannelId != null &&
+        (videoPresentation.visible || (playbackState is AppPlaybackState.Playing && diagnostics.video == null))
+    SideEffect { layerState.onBannerFramePresented(bannerFramePresented) }
+    val airingEventId = nowEvent?.id?.value
+    var watchedProgramme by remember { mutableStateOf<Pair<ChannelId, Long?>?>(null) }
+    LaunchedEffect(newChrome, currentChannelId, airingEventId) {
+        val previous = watchedProgramme
+        watchedProgramme = currentChannelId to airingEventId
+        if (!newChrome || previous?.first != currentChannelId || confirmedPlayingChannelId == null) return@LaunchedEffect
+        val atLiveEdge = !effectiveTimeshiftState.available ||
+            (effectiveTimeshiftState.timingKnown && timeshiftPositionPresentation(effectiveTimeshiftState).atLiveEdge)
+        if (at.bernhardberger.tvhplayer.core.programmeChangeBannerDue(
+                previousEventId = previous.second,
+                currentEventId = airingEventId,
+                chromeHidden = foregroundLayer == PlayerForegroundLayer.NONE,
+                atLiveEdge = atLiveEdge,
+                seekPreview = visibleSeekPreview != null,
+            )
+        ) layerState.onProgrammeChanged()
     }
 
     LiveInfoRecordingValidityEffect(
@@ -1178,7 +1230,8 @@ fun VideoPlayerScreen(
             )
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
-            PlayerBackAction.CLOSE_INFO -> closeInfo()
+            PlayerBackAction.CLOSE_INFO ->
+                if (layerState.infoDetailsOpen) layerState.closeInfoDetails() else closeInfo()
             PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
                 layerState.quickList.restoreStart()
                 layerState.closeQuickList()
@@ -1191,7 +1244,8 @@ fun VideoPlayerScreen(
             }
             PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.dismissChannelDrawer()
-            PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
+            // New design: Back over the passive Banner hides it before it closes the player.
+            PlayerBackAction.CLOSE_PLAYER -> if (layerState.bannerVisible) layerState.hideBanner() else playerClose.close()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
@@ -1200,6 +1254,40 @@ fun VideoPlayerScreen(
         }
     }
     PlayerBackHandler(handlePlaybackBack)
+
+    // New player design slots; Current passes none of them.
+    val trialTracks = if (newChrome) trackGlance(rememberPlayerTracks(player)) else TrackGlance()
+    val trialBadges = if (newChrome) playerTrialBadges(diagnostics, trialTracks) else emptyList()
+    val trialUnavailableTitle = stringResource(R.string.player_info_unavailable_title)
+    val trialHeader: @Composable (Modifier) -> Unit = { modifier ->
+        PlayerTrialHeader(
+            clock = formatClock(nowSec),
+            status = trialStatus,
+            recording = recordingNowStatus(currentChannelId in recordingChannelIds),
+            modifier = modifier,
+        )
+    }
+    val trialInfoBar: @Composable (EpgEventEntry?, EpgEventEntry?) -> Unit = { event, next ->
+        PlayerInfoBar(
+            data = liveInfoBarData(
+                channelNumber = currentChannelNumber,
+                channelName = currentChannelName,
+                event = event,
+                next = next,
+                nextScheduled = next?.let { observation.dvrEntryForEvent(it.id) }?.state ==
+                    at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
+                nowSec = nowSec,
+                unavailableTitle = trialUnavailableTitle,
+            ),
+            badges = trialBadges,
+            picon = currentChannel?.icon,
+            imageLoader = imageLoader,
+            currentSession = currentSession,
+            modifier = Modifier.padding(bottom = at.bernhardberger.tvhplayer.ui.TvOverlayStatusRowHeight).testTag("trial-info-bar"),
+        )
+    }
+    val trialControlsEvent = infoEvent.takeUnless { channelUnavailable }
+    val trialControlsNext = displayedNextEvent.takeUnless { channelUnavailable || visibleSeekPreview != null }
 
     Box(
         modifier = Modifier
@@ -1303,7 +1391,10 @@ fun VideoPlayerScreen(
                     return@onPreviewKeyEvent false
                 }
 
-                val keyAction = playerKeyAction(keyContext, keyCode = keyCode)
+                val keyAction = at.bernhardberger.tvhplayer.core.bannerKeyAction(
+                    playerKeyAction(keyContext, keyCode = keyCode),
+                    bannerVisible = layerState.bannerVisible,
+                )
                 if (playerKeyActionStartsOpeningCycle(keyAction)) {
                     layerState.beginOpeningKeyCycle(keyCode)
                 }
@@ -1487,6 +1578,24 @@ fun VideoPlayerScreen(
                 restoreOptionsFocus = restoreOptionsFocus,
                 onOptionsFocusRestored = { restoreOptionsFocus = false },
                 channelId = currentChannelId,
+                newHeader = trialHeader.takeIf { newChrome },
+                newInfoBar = if (newChrome) {
+                    { trialInfoBar(trialControlsEvent, trialControlsNext) }
+                } else null,
+                newTrayPreview = if (newChrome) {
+                    {
+                        val focused = channels.firstOrNull { it.id == selectedId }
+                        QuickZapTrayPreview(
+                            channel = focused,
+                            event = focused?.let { channelsVm.nowEvent(it.id, nowSec) },
+                            next = focused?.let { channelsVm.nextEvent(it.id, nowSec) },
+                            nowSec = nowSec,
+                            imageLoader = imageLoader,
+                            currentSession = currentSession,
+                            modifier = Modifier.padding(horizontal = 64.dp),
+                        )
+                    }
+                } else null,
             )
         }
 
@@ -1504,7 +1613,10 @@ fun VideoPlayerScreen(
                 programmeWindow = displayedWindow,
                 channelsAvailable = channels.isNotEmpty(),
                 modifier = Modifier.align(Alignment.BottomCenter),
-                headerContent = { modifier ->
+                newInfoBar = if (newChrome) {
+                    { trialInfoBar(displayedWindow?.event, null) }
+                } else null,
+                headerContent = if (newChrome) trialHeader else { modifier ->
                     PlayerIdentityHeader(
                         imageLoader = imageLoader, currentSession = currentSession, piconPath = currentChannel?.icon,
                         eyebrow = at.bernhardberger.tvhplayer.ui.components.channelTitleText(currentChannelNumber, currentChannelName),
@@ -1520,6 +1632,27 @@ fun VideoPlayerScreen(
                         tags = PlayerHeaderTags(title = "player-programme-title"),
                     )
                 },
+            )
+        }
+
+        if (newChrome) {
+            PlayerBanner(
+                visible = layerState.bannerVisible && foregroundLayer == PlayerForegroundLayer.NONE && !channelUnavailable,
+                header = trialHeader,
+                infoBar = { trialInfoBar(trialControlsEvent, trialControlsNext) },
+                event = trialControlsEvent,
+                nowSec = nowSec,
+                channelId = currentChannelId,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+            // With the chrome hidden and no Banner: buffering (after its delay), tuning or paused.
+            PlayerStandaloneStatusChip(
+                status = trialStatus?.takeIf {
+                    foregroundLayer == PlayerForegroundLayer.NONE && !layerState.bannerVisible &&
+                        it.kind in TRIAL_STANDALONE_STATUS_KINDS
+                },
+                modifier = Modifier.align(Alignment.BottomEnd)
+                    .padding(end = TvOverlaySidePadding, bottom = TvOverlayBottomPadding),
             )
         }
 
@@ -1563,6 +1696,25 @@ fun VideoPlayerScreen(
                     )
                 },
                 onRecordFocusRestored = { restoreRecordFocus = false },
+                hero = if (newChrome) {
+                    {
+                        ProgrammeHero(
+                            image = infoEvent?.image,
+                            channelId = currentChannelId,
+                            channelNumber = currentChannelNumber?.toString().orEmpty(),
+                            picon = currentChannel?.icon,
+                            imageLoader = imageLoader,
+                            currentSession = currentSession,
+                            modifier = Modifier.size(PlayerTrialTokens.heroWidth, PlayerTrialTokens.heroHeight),
+                        )
+                    }
+                } else null,
+                streamSignalSummary = glanceSummary(trialBadges),
+                streamSignalDetailsOpen = layerState.infoDetailsOpen,
+                onOpenStreamSignal = layerState::openInfoDetails,
+                streamSignalDetails = if (newChrome) {
+                    { LiveStreamSignalPage(diagnostics) }
+                } else null,
             )
         }
 
@@ -1667,7 +1819,9 @@ fun VideoPlayerScreen(
                 }
             }
         }
-        CompactTuningStatus(
+        // New design: tuning and buffering move to the status chip; the centre keeps
+        // only channel unavailable and recovery.
+        if (!newChrome) CompactTuningStatus(
             visible = compactTuningVisible,
             label = stringResource(R.string.player_tuning_channel, currentChannelName),
             modifier = Modifier
@@ -1676,7 +1830,7 @@ fun VideoPlayerScreen(
                 .testTag("player-tuning-status"),
         )
 
-        CompactBufferingStatus(
+        if (!newChrome) CompactBufferingStatus(
             state = playbackState,
             playWhenReady = playWhenReady,
             target = activeTarget,

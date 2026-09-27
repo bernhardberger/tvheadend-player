@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -9,14 +10,19 @@ import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
+import at.bernhardberger.tvhplayer.settings.PlayerChromeDesign
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_FIXED_MILLIS
+import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 internal const val KEEP_CHANNEL_LEVEL = "keep-channel"
 
@@ -75,11 +81,39 @@ private fun startupBufferSeconds(millis: Int): String {
     return stringResource(R.string.startup_buffer_seconds, format.format(millis / 1000.0))
 }
 
+internal const val PLAYER_DESIGN_LEVEL = "player-design"
+
 @Composable
-internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): List<DepthLevel> {
+internal fun settingsPlayerDesignLevel(design: PlayerChromeDesign, onSelect: (PlayerChromeDesign) -> Unit): DepthLevel =
+    settingsLevel(PLAYER_DESIGN_LEVEL, stringResource(R.string.trial_design), PlayerChromeDesign.entries.map { value ->
+        settingsRow("player-design-${value.name.lowercase()}", playerDesignLabel(value),
+            selected = design == value, onClick = { onSelect(value) })
+    }, initialItemId = "player-design-${design.name.lowercase()}")
+
+@Composable
+private fun playerDesignLabel(design: PlayerChromeDesign): String = stringResource(
+    when (design) {
+        PlayerChromeDesign.CURRENT -> R.string.trial_design_current
+        PlayerChromeDesign.NEW -> R.string.trial_design_new
+    },
+)
+
+@Composable
+internal fun settingsPlayerLevels(
+    navigation: DepthNavigationState,
+    vm: SettingsPlayerViewModel = koinViewModel(),
+    uiSettingsStore: UiSettingsStore = koinInject(),
+): List<DepthLevel> {
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    val scope = rememberCoroutineScope()
     return listOf(settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onRefreshRateMatchingEnabledChanged,
-        vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged)) +
+        vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged,
+        playerDesign = uiSettings.playerChromeDesign)) +
+        settingsPlayerDesignLevel(uiSettings.playerChromeDesign) { design ->
+            scope.launch { uiSettingsStore.setPlayerChromeDesign(design) }
+            navigation.pop()
+        } +
         settingsAudioPreferenceLevels(ui,
             onAudioLanguageSelected = { slot, language -> vm.onAudioLanguageSelected(slot, language); navigation.pop() },
             onAudioFormatSelected = { vm.onAudioFormatSelected(it); navigation.pop() },
@@ -94,6 +128,7 @@ internal fun settingsPlayerLevel(
     onProfileSelected: (StreamProfileId?) -> Unit,
     onAudioPassthroughEnabledChanged: (Boolean) -> Unit,
     onAudioDescriptionChanged: (Boolean) -> Unit = {},
+    playerDesign: PlayerChromeDesign = PlayerChromeDesign.CURRENT,
 ): DepthLevel {
     val direct = stringResource(R.string.profile_direct_streaming)
     val profileSection = stringResource(R.string.profile)
@@ -111,6 +146,8 @@ internal fun settingsPlayerLevel(
             keepChannelLabel(ui.keepChannelMinutes), child = KEEP_CHANNEL_LEVEL, titleMaxLines = 2))
         add(settingsRow(STARTUP_BUFFER_LEVEL, stringResource(R.string.startup_buffer_setting),
             startupBufferLabel(ui.startupBufferMillis, ui.startupBufferLearnedMillis), child = STARTUP_BUFFER_LEVEL))
+        add(settingsRow(PLAYER_DESIGN_LEVEL, stringResource(R.string.trial_design),
+            playerDesignLabel(playerDesign), child = PLAYER_DESIGN_LEVEL))
         when (val profiles = ui.profiles) {
             StreamProfilesResult.NotReady -> add(settingsRow("profiles-status",
                 stringResource(if (ui.connected) R.string.loading_wait else R.string.not_connected), section = profileSection))

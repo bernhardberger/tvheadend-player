@@ -98,6 +98,11 @@ fun OverlayControlsTv(
     onPauseUnavailable: (reason: String) -> Unit = {},
     /** Channel whose identity the header and timeline motion follow; null keeps them keyed on the programme only. */
     channelId: ChannelId? = null,
+    /** New player design only: replaces the identity header with the top status cluster. */
+    newHeader: (@Composable (Modifier) -> Unit)? = null,
+    /** New player design only: the passive info bar above the status band and timeline. */
+    newInfoBar: (@Composable () -> Unit)? = null,
+    newTrayPreview: (@Composable () -> Unit)? = null,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
@@ -183,6 +188,7 @@ fun OverlayControlsTv(
         channelsAvailable = channelsAvailable,
         peekAlpha = { chromeAlpha.value },
         channelContent = channelRailContent,
+        preview = newTrayPreview,
     ) {
     PlayerOverlayChrome(
         modifier = Modifier.onPreviewKeyEvent { event ->
@@ -190,8 +196,8 @@ fun OverlayControlsTv(
             if (event.type == KeyEventType.KeyUp) relocatingKey = null
             true
         }
-    }, headerContent = { modifier ->
-        PlayerIdentityHeader(
+    }, newDesign = newHeader != null, headerContent = { modifier ->
+        if (newHeader != null) newHeader(modifier) else PlayerIdentityHeader(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
             eyebrow = channelTitleText(channelNumber, channelName),
             title = programmeTitle,
@@ -213,6 +219,7 @@ fun OverlayControlsTv(
             identity = PlayerHeaderIdentity(channelId, displayedEvent?.id),
         )
     }) {
+        newInfoBar?.invoke()
         val previewFeedback = timeshiftFeedback ?: if (previewing) {
             if (programmeWindow?.targetAvailable == false) stringResource(R.string.timeshift_target_expired)
             else programmeWindow?.event?.title

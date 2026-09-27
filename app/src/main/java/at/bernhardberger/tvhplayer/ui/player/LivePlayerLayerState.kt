@@ -32,11 +32,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
+private const val LIVE_PLAYER_BANNER_MS = 5_000L
 
 @Stable
 internal class LivePlayerLayerState(
     private val scope: CoroutineScope,
     private val autoHideTimeoutMillis: Long,
+    private val bannerTimeoutMillis: Long = LIVE_PLAYER_BANNER_MS,
 ) {
     var controlsVisible by mutableStateOf(true)
         private set
@@ -56,6 +58,10 @@ internal class LivePlayerLayerState(
     var infoOpen by mutableStateOf(false)
         private set
 
+    /** New design: the info panel shows its "Stream & signal" details page. */
+    var infoDetailsOpen by mutableStateOf(false)
+        private set
+
     var recordingConfirmationVisible by mutableStateOf(false)
         private set
 
@@ -68,6 +74,18 @@ internal class LivePlayerLayerState(
     /** How the most recent request revealed the controls: a zap fades them in place. */
     var controlsEntry by mutableStateOf(PlayerControlsEntry.TRAVEL)
         private set
+
+    /**
+     * New player design only: the passive Banner (info bar and top status cluster, no
+     * actions, nothing focusable) shown on player enter and on a zap while the controls
+     * are hidden. It hides [bannerTimeoutMillis] after the first frame is presented.
+     */
+    var bannerVisible by mutableStateOf(false)
+        private set
+    private var bannerEnabled = false
+    private var entryUntouched = true
+    private var bannerFramePresented = false
+    private var bannerHideJob: Job? = null
 
     private var autoHideEligible = false
     private var autoHideJob: Job? = null
@@ -92,13 +110,81 @@ internal class LivePlayerLayerState(
     }
 
     fun onChannelTuneRequested() {
+        if (bannerEnabled && chromeHidden()) {
+            showBanner()
+            return
+        }
         // Quick-zap owns focus until explicitly dismissed, including a failed tune.
         if (!channelDrawerOpen) revealControls(PlayerControlsEntry.FADE)
+    }
+
+    /** A failed tune: with the New design and hidden chrome the centre message replaces the Banner. */
+    fun onChannelUnavailable() {
+        if (bannerEnabled && chromeHidden()) hideBanner() else onChannelTuneRequested()
+    }
+
+    /**
+     * Enables the Banner for the New design. On player enter, before any key, the
+     * initial controls become the Banner.
+     */
+    fun enableBanner(enabled: Boolean) {
+        if (bannerEnabled == enabled) return
+        bannerEnabled = enabled
+        if (!enabled) {
+            hideBanner()
+            return
+        }
+        if (entryUntouched && controlsVisible && !channelDrawerOpen && !infoOpen && optionsPage == null) {
+            controlsVisible = false
+            cancelAutoHide()
+            showBanner()
+        }
+    }
+
+    /** A programme boundary on the watched channel at the live edge; the caller checks the policy. */
+    fun onProgrammeChanged() {
+        if (bannerEnabled && chromeHidden()) showBanner()
+    }
+
+    /** The first frame of the current tune is presented (true) or a new tune is pending (false). */
+    fun onBannerFramePresented(presented: Boolean) {
+        if (bannerFramePresented == presented) return
+        bannerFramePresented = presented
+        if (!bannerVisible) return
+        if (presented) restartBannerHide() else cancelBannerHide()
+    }
+
+    fun hideBanner() {
+        cancelBannerHide()
+        bannerVisible = false
+    }
+
+    private fun chromeHidden() = !controlsVisible && !channelDrawerOpen && !infoOpen && optionsPage == null
+
+    private fun showBanner() {
+        bannerVisible = true
+        // A tune keeps the Banner until its first frame; a programme change starts at once.
+        if (bannerFramePresented) restartBannerHide() else cancelBannerHide()
+    }
+
+    private fun restartBannerHide() {
+        cancelBannerHide()
+        bannerHideJob = scope.launch {
+            delay(bannerTimeoutMillis)
+            bannerHideJob = null
+            bannerVisible = false
+        }
+    }
+
+    private fun cancelBannerHide() {
+        bannerHideJob?.cancel()
+        bannerHideJob = null
     }
 
     fun showControls() = revealControls(PlayerControlsEntry.TRAVEL)
 
     private fun revealControls(entry: PlayerControlsEntry) {
+        hideBanner()
         controlsEntry = entry
         controlsVisible = true
         channelDrawerOpen = false
@@ -111,6 +197,7 @@ internal class LivePlayerLayerState(
     }
 
     fun openInfo() {
+        hideBanner()
         suspendAutoHide()
         controlsEntry = PlayerControlsEntry.TRAVEL
         controlsVisible = false
@@ -119,12 +206,23 @@ internal class LivePlayerLayerState(
         optionsQuickList = false
         recordingConfirmationVisible = false
         infoOpen = true
+        infoDetailsOpen = false
     }
 
     fun closeInfo() {
         recordingConfirmationVisible = false
         infoOpen = false
+        infoDetailsOpen = false
         showControls()
+    }
+
+    fun openInfoDetails() {
+        if (infoOpen && !recordingConfirmationVisible) infoDetailsOpen = true
+    }
+
+    /** Back from the details page returns to the info page. */
+    fun closeInfoDetails() {
+        infoDetailsOpen = false
     }
 
     fun showRecordingConfirmation() {
@@ -140,11 +238,13 @@ internal class LivePlayerLayerState(
     }
 
     fun showOptionsPage(page: PlaybackOptionsPage) {
+        hideBanner()
         suspendAutoHide()
         controlsEntry = PlayerControlsEntry.TRAVEL
         controlsVisible = true
         channelDrawerOpen = false
         infoOpen = false
+        infoDetailsOpen = false
         recordingConfirmationVisible = false
         optionsQuickList = false
         optionsPage = page
@@ -161,10 +261,12 @@ internal class LivePlayerLayerState(
             quickListReturnAction = (if (optionsPage != null) "player-settings" else lastFocusedAction)
                 .takeIf { controlsVisible }
         }
+        hideBanner()
         suspendAutoHide()
         controlsEntry = PlayerControlsEntry.TRAVEL
         channelDrawerOpen = false
         infoOpen = false
+        infoDetailsOpen = false
         recordingConfirmationVisible = false
         optionsQuickList = true
         optionsPage = page
@@ -253,6 +355,7 @@ internal class LivePlayerLayerState(
 
     /** Every key down while a quick list is open restarts its auto-close. */
     fun onKeyDown() {
+        entryUntouched = false
         if (optionsQuickList && optionsPage != null) quickList.onKeyDown()
     }
 
@@ -264,10 +367,12 @@ internal class LivePlayerLayerState(
     fun openChannelDrawer() {
         channelDrawerReturnAction = lastFocusedAction.takeIf { controlsVisible }
         restoreChannelAction = null
+        hideBanner()
         suspendAutoHide()
         controlsEntry = PlayerControlsEntry.TRAVEL
         controlsVisible = false
         infoOpen = false
+        infoDetailsOpen = false
         recordingConfirmationVisible = false
         optionsPage = null
         optionsQuickList = false
@@ -323,6 +428,7 @@ internal class LivePlayerLayerState(
         disposed = true
         autoHideEligible = false
         cancelAutoHide()
+        cancelBannerHide()
         revealingKeyCode = null
     }
 

@@ -27,6 +27,9 @@ import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreen
+import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import org.koin.compose.koinInject
 
 @Composable
 internal fun StartupGatedChannelsContent(
@@ -166,6 +169,8 @@ internal fun LivePlayerRouteContent(
     onReconnect: () -> Unit,
     onClose: () -> Unit,
 ) {
+    // The player design is read once here and passed down as a plain value.
+    val uiSettings by koinInject<UiSettingsStore>().settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     StartupGatedPlayerContent(contentAllowed = contentAllowed) {
         VideoPlayerScreen(
             channelsVm = channelsVm,
@@ -173,6 +178,7 @@ internal fun LivePlayerRouteContent(
             channelName = channelName,
             onReconnect = onReconnect,
             onClose = onClose,
+            chromeDesign = uiSettings.playerChromeDesign,
         )
     }
 }
@@ -205,6 +211,7 @@ internal fun RecordingPlayerRouteContent(
     onReconnect: () -> Unit,
     onClose: () -> Unit,
 ) {
+    val uiSettings by koinInject<UiSettingsStore>().settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     if (contentAllowed) {
         RecordingPlayerScreen(
             recordingId = recordingId,
@@ -212,6 +219,7 @@ internal fun RecordingPlayerRouteContent(
             connectionState = connectionState,
             onReconnect = onReconnect,
             onClose = onClose,
+            chromeDesign = uiSettings.playerChromeDesign,
         )
     }
 }

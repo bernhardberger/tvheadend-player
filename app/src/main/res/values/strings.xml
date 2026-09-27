@@ -602,4 +602,5 @@
     <string name="trial_db">%1$s dB</string>
     <string name="trial_dbm">%1$s dBm</string>
     <string name="trial_ms">%1$s ms</string>
+    <string name="trial_stream_signal">Stream &amp; signal</string>
 </resources>

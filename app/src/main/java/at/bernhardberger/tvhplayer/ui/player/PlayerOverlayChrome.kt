@@ -42,6 +42,8 @@ internal fun PlayerOverlayChrome(
         start = TvOverlaySidePadding, end = TvOverlaySidePadding,
         top = TvOverlayFooterGradientRunout, bottom = TvOverlayBottomPadding,
     ),
+    /** New player design: host-sized scrims; the header draws its own top-end fade. */
+    newDesign: Boolean = false,
     footerContent: @Composable ColumnScope.() -> Unit,
 ) {
     // Inside the controls layer, the header comes down and the footer up as they fade in;
@@ -59,24 +61,31 @@ internal fun PlayerOverlayChrome(
         }
     }
     Box(modifier = modifier.fillMaxSize()) {
+        if (newDesign) {
+            Box(Modifier.matchParentSize().graphicsLayer { enterFrom(PlayerMotion.ChromeOffset) }.background(PlayerTrialTokens.bottomScrim))
+        }
         headerContent(
-            Modifier
-                .align(Alignment.TopCenter)
-                .graphicsLayer { enterFrom(-PlayerMotion.ChromeOffset) }
-                .background(topGradient)
-                .padding(
-                    start = TvOverlaySidePadding,
-                    end = TvOverlaySidePadding,
-                    top = TvOverlayTopPadding,
-                    bottom = TvOverlayHeaderGradientRunout,
-                ),
+            if (newDesign) {
+                Modifier.matchParentSize().graphicsLayer { enterFrom(-PlayerMotion.ChromeOffset) }
+            } else {
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer { enterFrom(-PlayerMotion.ChromeOffset) }
+                    .background(topGradient)
+                    .padding(
+                        start = TvOverlaySidePadding,
+                        end = TvOverlaySidePadding,
+                        top = TvOverlayTopPadding,
+                        bottom = TvOverlayHeaderGradientRunout,
+                    )
+            },
         )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .graphicsLayer { enterFrom(PlayerMotion.ChromeOffset) }
-                .background(bottomGradient)
+                .then(if (newDesign) Modifier else Modifier.background(bottomGradient))
                 .testTag("player-footer")
                 .padding(footerPadding),
             content = footerContent,

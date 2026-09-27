@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +32,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -40,6 +42,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
@@ -102,10 +105,19 @@ internal fun LiveProgrammeInfoOverlay(
     modifier: Modifier = Modifier,
     piconContent: (@Composable () -> Unit)? = null,
     onRecordFocusRestored: () -> Unit = {},
+    /** New player design only: the programme hero in place of the picon row. */
+    hero: (@Composable () -> Unit)? = null,
+    /** New player design only: glance summary of the "Stream & signal" row. */
+    streamSignalSummary: String? = null,
+    streamSignalDetailsOpen: Boolean = false,
+    onOpenStreamSignal: () -> Unit = {},
+    /** New player design only: the details page "Stream & signal" opens; null omits the row. */
+    streamSignalDetails: (@Composable () -> Unit)? = null,
 ) {
     val closeFocus = remember { FocusRequester() }
     val recordFocus = remember { FocusRequester() }
     val readingFocus = remember { FocusRequester() }
+    val streamSignalFocus = remember { FocusRequester() }
     val showingRecordingDialog = confirmationVisible &&
         recordingState !is LiveInfoRecordingState.Idle
     val paneTitle = if (showingRecordingDialog) {
@@ -137,6 +149,18 @@ internal fun LiveProgrammeInfoOverlay(
         if (target.requestFocus()) onRecordFocusRestored()
     }
 
+    // Back from the details page returns to the info page with "Stream & signal" focused.
+    var detailsWereOpen by remember { mutableStateOf(streamSignalDetailsOpen) }
+    LaunchedEffect(streamSignalDetailsOpen) {
+        val returning = detailsWereOpen && !streamSignalDetailsOpen
+        detailsWereOpen = streamSignalDetailsOpen
+        if (!returning) return@LaunchedEffect
+        repeat(STREAM_SIGNAL_FOCUS_FRAMES) {
+            withFrameNanos { }
+            if (runCatching { streamSignalFocus.requestFocus() }.getOrDefault(false)) return@LaunchedEffect
+        }
+    }
+
     LaunchedEffect(recordAvailable, showingRecordingDialog) {
         val recordBecameUnavailable = previousRecordAvailable && !recordAvailable
         previousRecordAvailable = recordAvailable
@@ -164,115 +188,133 @@ internal fun LiveProgrammeInfoOverlay(
                     }
                     .padding(PlaybackInfoPanelPadding),
             ) {
-                // The confirmation replaces the details in place; the outgoing side keeps
-                // fading without focus or semantics. Each showing is composed afresh, so a
-                // side that returns while still leaving takes its initial focus again.
-                AnimatedContent(
-                    targetState = rememberVisit(showingRecordingDialog),
-                    transitionSpec = {
-                        (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) togetherWith
-                            fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
-                    },
-                    label = "live-info-confirmation",
-                ) { visit ->
-                    PlayerMotionFrame(leaving = leaving) {
-                        if (visit.value) {
-                            // The outgoing confirmation keeps its last state while it fades.
-                            val dialogState = rememberLastShown(
-                                recordingState.takeIf { showingRecordingDialog },
-                            ) ?: return@PlayerMotionFrame
-                            ProgrammeRecordingConfirmation(
-                                state = dialogState,
-                                onActivate = onRecordingActivate,
-                                onDismiss = onRecordingDismiss,
-                            )
-                        } else if (event == null) {
-                            UnavailableProgrammeInfo(
-                                channelIdentity = channelIdentity,
-                                channelName = channelName,
-                                closeFocus = closeFocus,
-                                onClose = onClose,
-                            )
-                        } else {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(TvSpacing24),
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(TvSpacing24),
-                                    verticalAlignment = Alignment.CenterVertically,
+                LiveInfoStreamSignalPages(
+                    details = streamSignalDetails,
+                    detailsOpen = streamSignalDetails != null && streamSignalDetailsOpen,
+                ) {
+                    // The confirmation replaces the details in place; the outgoing side keeps
+                    // fading without focus or semantics. Each showing is composed afresh, so a
+                    // side that returns while still leaving takes its initial focus again.
+                    AnimatedContent(
+                        targetState = rememberVisit(showingRecordingDialog),
+                        transitionSpec = {
+                            (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) togetherWith
+                                fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
+                        },
+                        label = "live-info-confirmation",
+                    ) { visit ->
+                        PlayerMotionFrame(leaving = leaving) {
+                            if (visit.value) {
+                                // The outgoing confirmation keeps its last state while it fades.
+                                val dialogState = rememberLastShown(
+                                    recordingState.takeIf { showingRecordingDialog },
+                                ) ?: return@PlayerMotionFrame
+                                ProgrammeRecordingConfirmation(
+                                    state = dialogState,
+                                    onActivate = onRecordingActivate,
+                                    onDismiss = onRecordingDismiss,
+                                )
+                            } else if (event == null) {
+                                UnavailableProgrammeInfo(
+                                    channelIdentity = channelIdentity,
+                                    channelName = channelName,
+                                    closeFocus = closeFocus,
+                                    onClose = onClose,
+                                )
+                            } else {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(TvSpacing24),
                                 ) {
-                                    piconContent?.invoke()
-                                    Text(
-                                        text = stringResource(R.string.player_current_broadcast),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        maxLines = 2,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                                PlayerInfoReadingContent(
-                                    title = event.title.orEmpty(),
-                                    body = at.bernhardberger.tvhplayer.core.programmeDetailsBody(event),
-                                    readingFocus = readingFocus,
-                                    subtitle = buildString {
-                                        append(channelIdentity)
-                                        append(" • ")
-                                        append(formatClock(event.start.epochSeconds))
-                                        append("–")
-                                        append(formatClock(event.stop.epochSeconds))
-                                        at.bernhardberger.tvhplayer.ui.common.programmeMetadata(event)
-                                            ?.takeIf(String::isNotBlank)?.let { append("\n"); append(it) }
-                                    },
-                                    modifier = Modifier.fillMaxWidth().weight(1f),
-                                    footer = {
-                                        if (recordingScheduled) {
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.recording_already_scheduled
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(TvSpacing24),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        if (hero != null) hero() else piconContent?.invoke()
+                                        if (hero == null) Text(
+                                            text = stringResource(R.string.player_current_broadcast),
+                                            style = MaterialTheme.typography.titleLarge,
+                                            maxLines = 2,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                    PlayerInfoReadingContent(
+                                        title = event.title.orEmpty(),
+                                        body = at.bernhardberger.tvhplayer.core.programmeDetailsBody(event),
+                                        readingFocus = readingFocus,
+                                        subtitle = buildString {
+                                            append(channelIdentity)
+                                            append(" • ")
+                                            append(formatClock(event.start.epochSeconds))
+                                            append("–")
+                                            append(formatClock(event.stop.epochSeconds))
+                                            at.bernhardberger.tvhplayer.ui.common.programmeMetadata(event)
+                                                ?.takeIf(String::isNotBlank)?.let { append("\n"); append(it) }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().weight(1f),
+                                        footer = {
+                                            if (recordingScheduled) {
+                                                Text(
+                                                    text = stringResource(
+                                                        R.string.recording_already_scheduled
+                                                    ),
+                                                    color = TvRecordingColor,
+                                                )
+                                            }
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(
+                                                    TvSpacing24,
+                                                    Alignment.End,
                                                 ),
-                                                color = TvRecordingColor,
-                                            )
-                                        }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(
-                                                TvSpacing24,
-                                                Alignment.End,
-                                            ),
-                                        ) {
-                                            if (!recordingScheduled && canRecord) {
-                                                Button(
-                                                    onClick = onRecord,
+                                            ) {
+                                                if (!recordingScheduled && canRecord) {
+                                                    Button(
+                                                        onClick = onRecord,
+                                                        modifier = Modifier
+                                                            .testTag("live-info-record")
+                                                            .focusRequester(recordFocus)
+                                                            .focusProperties {
+                                                                left = FocusRequester.Cancel
+                                                                right = closeFocus
+                                                            },
+                                                    ) {
+                                                        Text(stringResource(R.string.record))
+                                                    }
+                                                }
+                                                OutlinedButton(
+                                                    onClick = onClose,
                                                     modifier = Modifier
-                                                        .testTag("live-info-record")
-                                                        .focusRequester(recordFocus)
+                                                        .testTag("live-info-close")
+                                                        .focusRequester(closeFocus)
                                                         .focusProperties {
-                                                            left = FocusRequester.Cancel
-                                                            right = closeFocus
+                                                            left = if (!recordingScheduled && canRecord) {
+                                                                recordFocus
+                                                            } else {
+                                                                FocusRequester.Cancel
+                                                            }
+                                                            right = FocusRequester.Cancel
                                                         },
                                                 ) {
-                                                    Text(stringResource(R.string.record))
+                                                    Text(stringResource(R.string.player_info_close))
                                                 }
                                             }
-                                            OutlinedButton(
-                                                onClick = onClose,
-                                                modifier = Modifier
-                                                    .testTag("live-info-close")
-                                                    .focusRequester(closeFocus)
-                                                    .focusProperties {
-                                                        left = if (!recordingScheduled && canRecord) {
-                                                            recordFocus
-                                                        } else {
-                                                            FocusRequester.Cancel
-                                                        }
-                                                        right = FocusRequester.Cancel
+                                            if (streamSignalDetails != null) {
+                                                ListItem(
+                                                    selected = false,
+                                                    onClick = onOpenStreamSignal,
+                                                    headlineContent = { Text(stringResource(R.string.trial_stream_signal)) },
+                                                    supportingContent = streamSignalSummary?.takeIf(String::isNotBlank)?.let {
+                                                        { Text(it, maxLines = 1) }
                                                     },
-                                            ) {
-                                                Text(stringResource(R.string.player_info_close))
+                                                    modifier = Modifier
+                                                        .testTag("live-info-stream-signal")
+                                                        .focusRequester(streamSignalFocus),
+                                                )
                                             }
-                                        }
-                                    },
-                                )
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -491,3 +533,43 @@ private fun dvrFailureLabel(result: DvrMutationResult<*>): String = stringResour
         is DvrMutationResult.AcceptedButUnconfirmed -> R.string.recording_action_rejected
     }
 )
+
+private const val STREAM_SIGNAL_FOCUS_FRAMES = 4
+
+/**
+ * New design: the info page and its "Stream & signal" details page. The deeper page
+ * arrives from the end, the outgoing page leaves the other way without focus.
+ */
+@Composable
+private fun LiveInfoStreamSignalPages(
+    details: (@Composable () -> Unit)?,
+    detailsOpen: Boolean,
+    info: @Composable () -> Unit,
+) {
+    // The Current design has no details page and composes the info page as before.
+    if (details == null) {
+        info()
+        return
+    }
+    val pageTransition = updateTransition(rememberVisit(detailsOpen), label = "live-info-page")
+    pageTransition.AnimatedContent(
+        transitionSpec = {
+            (fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)) togetherWith
+                fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
+        },
+    ) { visit ->
+        val travel = animateShown(
+            enter = tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate),
+            exit = tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate),
+            label = "live-info-page-travel",
+        )
+        PlayerMotionFrame(
+            leaving = leaving,
+            modifier = Modifier.graphicsLayer {
+                val towardEnd = if (pageTransition.targetState.value) 1f else -1f
+                val side = if (leaving) -towardEnd else towardEnd
+                translationX = side * PlayerMotion.PageOffset.toPx() * (1f - travel.value)
+            },
+        ) { if (visit.value) details() else info() }
+    }
+}

@@ -21,7 +21,7 @@ import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 @Composable
-private fun badgeLabel(badge: GlanceBadge, spoken: Boolean): String = when (badge.kind) {
+internal fun badgeLabel(badge: GlanceBadge, spoken: Boolean): String = when (badge.kind) {
     GlanceBadgeKind.AD -> stringResource(if (spoken) R.string.trial_ad else R.string.trial_ad_short)
     GlanceBadgeKind.SUB -> stringResource(if (spoken) R.string.trial_sub else R.string.trial_sub_short)
     GlanceBadgeKind.TXT -> stringResource(if (spoken) R.string.trial_txt else R.string.trial_txt_short)
