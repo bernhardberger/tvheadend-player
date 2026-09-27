@@ -5,6 +5,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
+import at.bernhardberger.tvhplayer.core.bannerFramePresented
 import at.bernhardberger.tvhplayer.core.bannerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerStatusKind
 import at.bernhardberger.tvhplayer.core.programmeChangeBannerDue
@@ -240,6 +241,41 @@ class PlayerTrialBannerTest {
         assertNull(bare.remainingMinutes)
         assertNull(bare.next)
         assertFalse(bare.nextScheduled)
+    }
+
+    @Test
+    fun onlyAVisibleFrameOrAPositivelyAudioOnlyServicePresentsTheBannerFrame() {
+        assertTrue(bannerFramePresented(tuneConfirmed = true, videoFrameVisible = true, playing = false, audioOnly = false))
+        assertTrue("audio-only: playing is the picture", bannerFramePresented(true, videoFrameVisible = false, playing = true, audioOnly = true))
+        assertFalse("missing or cleared diagnostics never prove audio-only",
+            bannerFramePresented(true, videoFrameVisible = false, playing = true, audioOnly = false))
+        assertFalse(bannerFramePresented(true, videoFrameVisible = false, playing = false, audioOnly = true))
+        assertFalse("not this tune", bannerFramePresented(false, videoFrameVisible = true, playing = true, audioOnly = true))
+    }
+
+    @Test
+    fun aStopCancelsTheBannerAndItsTimerSoNoStaleBannerReturns() = runTest {
+        val state = LivePlayerLayerState(this, 5_000L)
+        state.enableBanner(true)
+        state.onBannerFramePresented(true)
+        advanceTimeBy(3_000L)
+        runCurrent()
+        // The screen stops: the Banner goes and its timer with it.
+        state.hideBanner()
+        state.onBannerFramePresented(false)
+        assertFalse(state.bannerVisible)
+        // Return and retune: a fresh Banner waits for the new frame; no old timer cuts it short.
+        state.onChannelTuneRequested()
+        assertTrue(state.bannerVisible)
+        advanceTimeBy(10_000L)
+        runCurrent()
+        assertTrue("no stale timer: the Banner waits for this tune's frame", state.bannerVisible)
+        state.onBannerFramePresented(true)
+        advanceTimeBy(5_001L)
+        runCurrent()
+        assertFalse(state.bannerVisible)
+        assertFalse(state.controlsVisible)
+        state.dispose()
     }
 
     private fun event(id: Long, start: Long, stop: Long, title: String, subtitle: String? = null) = EpgEvent.create(

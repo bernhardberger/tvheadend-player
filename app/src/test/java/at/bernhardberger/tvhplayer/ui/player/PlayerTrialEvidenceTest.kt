@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -123,6 +124,56 @@ class PlayerTrialEvidenceTest {
         compose.onAllNodes(hasClickAction(), useUnmergedTree = true).assertCountEquals(0)
     }
 
+    @Test fun chipWithoutIndicatorStartsItsLabelAtTheStartPadding() {
+        compose.setContent { TVHeadendPlayerTheme {
+            Column {
+                PlayerStatusChip(checkNotNull(playerStatus()), Modifier.testTag("live"))
+                PlayerStatusChip(checkNotNull(playerStatus(paused = true)), Modifier.testTag("paused"))
+                androidx.tv.material3.Text("Live", style = androidx.tv.material3.MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.testTag("live-label"))
+                androidx.tv.material3.Text("Paused", style = androidx.tv.material3.MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.testTag("paused-label"))
+            }
+        } }
+        fun boundsWidth(tag: String): Float = compose.onNodeWithTag(tag).getUnclippedBoundsInRoot().let { it.right.value - it.left.value }
+        // NONE: only the 8 dp paddings around the label; no 16 dp indicator box and 4 dp gap.
+        assertEquals(boundsWidth("live-label") + 16f, boundsWidth("live"), 0.6f)
+        assertEquals(boundsWidth("paused-label") + 16f + 16f + 4f, boundsWidth("paused"), 0.6f)
+    }
+
+    @Test fun quickZapPreviewCrossfadeKeepsTheOutgoingProgrammeAndOnlyTheIncomingIsAnnounced() {
+        fun snapshot(id: Long, title: String) = QuickZapPreviewSnapshot(ChannelId(id), title, "20:15–21:45", null, null, null)
+        var shown by mutableStateOf<QuickZapPreviewSnapshot?>(snapshot(1, "Old"))
+        val rendered = mutableMapOf<Long, String>()
+        val active = mutableSetOf<Long>()
+        compose.setContent { TVHeadendPlayerTheme {
+            QuickZapTrayPreviewFrame(shown) { preview ->
+                val id = preview.channelId.value
+                rendered[id] = preview.title
+                DisposableEffect(id) {
+                    active += id
+                    onDispose { active -= id }
+                }
+                androidx.tv.material3.Text(preview.title)
+            }
+        } }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle {
+            shown = snapshot(2, "New")
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(48)
+        assertEquals("mid-crossfade both previews are composed", setOf(1L, 2L), active.toSet())
+        assertEquals("the outgoing preview keeps its own programme", "Old", rendered[1L])
+        assertEquals("New", rendered[2L])
+        // The accessibility (merged) tree: the leaving preview's semantics are cleared.
+        compose.onAllNodesWithText("Old").assertCountEquals(0)
+        compose.onAllNodesWithText("New").assertCountEquals(1)
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        assertEquals(setOf(2L), active.toSet())
+    }
+
     @Test fun tickingSecondsDoNotChangeLiveRegionAnnouncementButKindDoes() {
         var status by mutableStateOf(checkNotNull(playerStatus(behindLiveSeconds = 203)))
         compose.setContent { TVHeadendPlayerTheme { PlayerStatusChip(status, Modifier.testTag("chip")) } }
@@ -181,9 +232,16 @@ class PlayerTrialEvidenceTest {
                 playerStatus(behindLiveSeconds = 3723), recordingNowStatus(true)).filterNotNull().forEach { PlayerStatusChip(it) }
         } } }
         compose.mainClock.advanceTimeBy(256)
-        val labels = listOf("Live", "Paused", "Tuning…", "Buffering…", "1h 2m behind live", "REC")
-        val starts = labels.map { compose.onNodeWithText(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left }
+        val labels = listOf("Paused", "Tuning…", "Buffering…", "1h 2m behind live", "REC")
+        fun start(label: String) = compose.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left
+        val starts = labels.map(::start)
+        // Labels behind an indicator align; the Live chip has no indicator, so its label
+        // starts at the chip's 8 dp start padding instead of after an empty 16 dp + 4 dp slot.
         assertEquals(1, starts.distinct().size)
+        with(compose.density) {
+            assertEquals(8.dp.toPx(), start("Live"), 0.5f)
+            assertEquals((8.dp + 16.dp + 4.dp).toPx(), starts.first(), 0.5f)
+        }
     }
 
     @Test fun scrimRetainsContrastUnderClusterAndFeathersToTransparentAtHostEdges() {

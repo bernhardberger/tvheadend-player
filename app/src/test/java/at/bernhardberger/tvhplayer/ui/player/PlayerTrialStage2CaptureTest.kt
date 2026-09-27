@@ -156,7 +156,7 @@ class PlayerTrialStage2CaptureTest {
             summary = glanceSummary(glanceBadges(1080, "video/avc", audioDescription = true, liveFrontend = true, relativeSnrPercent = 82.0))
         } }
         compose.waitForIdle()
-        assertEquals("1080 · H.264 · AD · SNR 82 %", summary)
+        assertEquals("1080 · H.264 · AD · SNR\u00A082\u00A0%", summary)
     }
 
     @Test fun english() = captures("en", 1f)
@@ -168,7 +168,7 @@ class PlayerTrialStage2CaptureTest {
 
     private enum class Scene {
         CONTROLS_LIVE, CONTROLS_NO_LOGO, CONTROLS_BEHIND, CONTROLS_PAUSED, BANNER_TUNING, TRAY_ART, TRAY_TEXT,
-        INFO, DETAILS_DVB, DETAILS_IPTV, BUFFERING_CHIP, CURRENT_CONTROLS_LIVE,
+        INFO, INFO_NO_EPG, DETAILS_DVB, DETAILS_IPTV, BUFFERING_CHIP, CURRENT_CONTROLS_LIVE,
     }
 
     private fun captures(locale: String, fontScale: Float) {
@@ -247,8 +247,8 @@ class PlayerTrialStage2CaptureTest {
                 QuickZapTrayPreview(channels[0], if (scene == Scene.TRAY_ART) programme else programme.copyWithoutImage(),
                     next, NOW, loader, session, Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(64f)))
             })
-            Scene.INFO, Scene.DETAILS_DVB, Scene.DETAILS_IPTV -> LiveProgrammeInfoOverlay(
-                event = programme,
+            Scene.INFO, Scene.INFO_NO_EPG, Scene.DETAILS_DVB, Scene.DETAILS_IPTV -> LiveProgrammeInfoOverlay(
+                event = programme.takeUnless { scene == Scene.INFO_NO_EPG },
                 channelIdentity = "101 • ORF 1 HD",
                 channelName = "ORF 1 HD",
                 recordingScheduled = false,
@@ -266,7 +266,7 @@ class PlayerTrialStage2CaptureTest {
                 },
                 streamSignalSummary = glanceSummary(playerTrialBadges(diagnostics(scene != Scene.DETAILS_IPTV),
                     TrackGlance(audioDescription = true, subtitles = true, teletext = true))),
-                streamSignalDetailsOpen = scene != Scene.INFO,
+                streamSignalDetailsOpen = scene != Scene.INFO && scene != Scene.INFO_NO_EPG,
                 streamSignalDetails = { LiveStreamSignalPage(diagnostics(scene != Scene.DETAILS_IPTV)) },
             )
             Scene.BUFFERING_CHIP -> PlayerStandaloneStatusChip(

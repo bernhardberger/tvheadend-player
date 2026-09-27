@@ -130,9 +130,15 @@ internal fun LiveProgrammeInfoOverlay(
         mutableStateOf(recordAvailable)
     }
 
+    // While the details page is shown the info page is not composed: its focus targets are
+    // detached, so the info page's own focus effects wait; Back focuses "Stream & signal".
+    val detailsShown = streamSignalDetails != null && streamSignalDetailsOpen
+    val latestDetailsShown by rememberUpdatedState(detailsShown)
+
     LaunchedEffect(event?.id, showingRecordingDialog) {
-        if (showingRecordingDialog || restoreRecordFocus) return@LaunchedEffect
+        if (showingRecordingDialog || restoreRecordFocus || latestDetailsShown) return@LaunchedEffect
         withFrameNanos { }
+        if (latestDetailsShown) return@LaunchedEffect
         (if (event != null) readingFocus else closeFocus).requestFocus()
     }
 
@@ -143,8 +149,9 @@ internal fun LiveProgrammeInfoOverlay(
         recordingScheduled,
         canRecord,
     ) {
-        if (!restoreRecordFocus || showingRecordingDialog) return@LaunchedEffect
+        if (!restoreRecordFocus || showingRecordingDialog || latestDetailsShown) return@LaunchedEffect
         withFrameNanos { }
+        if (latestDetailsShown) return@LaunchedEffect
         val target = if (recordAvailable) recordFocus else closeFocus
         if (target.requestFocus()) onRecordFocusRestored()
     }
@@ -164,9 +171,26 @@ internal fun LiveProgrammeInfoOverlay(
     LaunchedEffect(recordAvailable, showingRecordingDialog) {
         val recordBecameUnavailable = previousRecordAvailable && !recordAvailable
         previousRecordAvailable = recordAvailable
-        if (recordBecameUnavailable && !showingRecordingDialog) {
+        if (recordBecameUnavailable && !showingRecordingDialog && !latestDetailsShown) {
             withFrameNanos { }
-            closeFocus.requestFocus()
+            if (!latestDetailsShown) closeFocus.requestFocus()
+        }
+    }
+
+    // The details row does not depend on the programme: it also follows the unavailable info.
+    val streamSignalRow: (@Composable () -> Unit)? = if (streamSignalDetails == null) null else {
+        {
+            ListItem(
+                selected = false,
+                onClick = onOpenStreamSignal,
+                headlineContent = { Text(stringResource(R.string.trial_stream_signal)) },
+                supportingContent = streamSignalSummary?.takeIf(String::isNotBlank)?.let {
+                    { Text(it, maxLines = 2) }
+                },
+                modifier = Modifier
+                    .testTag("live-info-stream-signal")
+                    .focusRequester(streamSignalFocus),
+            )
         }
     }
 
@@ -190,7 +214,7 @@ internal fun LiveProgrammeInfoOverlay(
             ) {
                 LiveInfoStreamSignalPages(
                     details = streamSignalDetails,
-                    detailsOpen = streamSignalDetails != null && streamSignalDetailsOpen,
+                    detailsOpen = detailsShown,
                 ) {
                     // The confirmation replaces the details in place; the outgoing side keeps
                     // fading without focus or semantics. Each showing is composed afresh, so a
@@ -220,6 +244,7 @@ internal fun LiveProgrammeInfoOverlay(
                                     channelName = channelName,
                                     closeFocus = closeFocus,
                                     onClose = onClose,
+                                    streamSignalRow = streamSignalRow,
                                 )
                             } else {
                                 Column(
@@ -299,19 +324,7 @@ internal fun LiveProgrammeInfoOverlay(
                                                     Text(stringResource(R.string.player_info_close))
                                                 }
                                             }
-                                            if (streamSignalDetails != null) {
-                                                ListItem(
-                                                    selected = false,
-                                                    onClick = onOpenStreamSignal,
-                                                    headlineContent = { Text(stringResource(R.string.trial_stream_signal)) },
-                                                    supportingContent = streamSignalSummary?.takeIf(String::isNotBlank)?.let {
-                                                        { Text(it, maxLines = 1) }
-                                                    },
-                                                    modifier = Modifier
-                                                        .testTag("live-info-stream-signal")
-                                                        .focusRequester(streamSignalFocus),
-                                                )
-                                            }
+                                            streamSignalRow?.invoke()
                                         },
                                     )
                                 }
@@ -330,6 +343,7 @@ private fun UnavailableProgrammeInfo(
     channelName: String,
     closeFocus: FocusRequester,
     onClose: () -> Unit,
+    streamSignalRow: (@Composable () -> Unit)? = null,
 ) {
     val readingFocus = remember { FocusRequester() }
     PlayerInfoReadingContent(
@@ -346,7 +360,7 @@ private fun UnavailableProgrammeInfo(
                     .focusRequester(closeFocus)
                     .focusProperties {
                         up = readingFocus
-                        down = FocusRequester.Cancel
+                        if (streamSignalRow == null) down = FocusRequester.Cancel
                         left = FocusRequester.Cancel
                         right = FocusRequester.Cancel
                     },
@@ -354,6 +368,7 @@ private fun UnavailableProgrammeInfo(
                 Text(stringResource(R.string.player_info_close))
             }
           }
+          streamSignalRow?.invoke()
         },
     )
 }

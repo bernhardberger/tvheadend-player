@@ -615,6 +615,8 @@ fun VideoPlayerScreen(
                     // Its selection too, even when the start never reached the runtime; the
                     // restart registers it again.
                     liveIntent?.let(playbackRuntime::abandonLiveSelection)
+                    // New design: a Banner never outlives the stop, nor does its timer.
+                    layerState.hideBanner()
                 }
                 else -> Unit
             }
@@ -1095,9 +1097,9 @@ fun VideoPlayerScreen(
         screenActive && currentSession != null && activeLivePlayback != null,
         foregroundBlocked = statusPresentation != PlaybackStatusPresentation.NONE || compactTuningVisible,
     )
-    val trialBufferingVisible by rememberBufferingVisible(
+    val trialBufferingVisible = newChrome && rememberBufferingVisible(
         AppPlaybackTarget.Live(currentChannelId) to (currentSession to liveRequestToken), trialBufferingEligible,
-    )
+    ).value
     val trialStatus = if (newChrome) liveTrialStatus(
         timeshift = effectiveTimeshiftState,
         paused = livePaused,
@@ -1106,17 +1108,24 @@ fun VideoPlayerScreen(
         presented = playbackState.presented,
         unavailable = channelUnavailable,
     ) else null
-    // The Banner stays while tuning and hides after the first frame of this tune;
-    // an audio-only service has no frame, so its playing state stands in.
-    val bannerFramePresented = confirmedPlayingChannelId != null &&
-        (videoPresentation.visible || (playbackState is AppPlaybackState.Playing && diagnostics.video == null))
-    SideEffect { layerState.onBannerFramePresented(bannerFramePresented) }
+    val trialTracks = if (newChrome) trackGlance(rememberPlayerTracks(player)) else TrackGlance()
+    // The Banner stays while tuning and hides after the first frame of this tune; only a
+    // service whose tracks are positively audio-only lets its playing state stand in.
+    val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
+        tuneConfirmed = confirmedPlayingChannelId != null,
+        videoFrameVisible = videoPresentation.visible,
+        playing = playbackState is AppPlaybackState.Playing,
+        audioOnly = trialTracks.audioOnly,
+    )
+    if (newChrome) SideEffect { layerState.onBannerFramePresented(bannerFramePresented) }
     val airingEventId = nowEvent?.id?.value
     var watchedProgramme by remember { mutableStateOf<Pair<ChannelId, Long?>?>(null) }
-    LaunchedEffect(newChrome, currentChannelId, airingEventId) {
+    if (newChrome) LaunchedEffect(currentChannelId, airingEventId) {
         val previous = watchedProgramme
         watchedProgramme = currentChannelId to airingEventId
-        if (!newChrome || previous?.first != currentChannelId || confirmedPlayingChannelId == null) return@LaunchedEffect
+        if (previous?.first != currentChannelId || confirmedPlayingChannelId == null || !screenActive) {
+            return@LaunchedEffect
+        }
         val atLiveEdge = !effectiveTimeshiftState.available ||
             (effectiveTimeshiftState.timingKnown && timeshiftPositionPresentation(effectiveTimeshiftState).atLiveEdge)
         if (at.bernhardberger.tvhplayer.core.programmeChangeBannerDue(
@@ -1256,7 +1265,6 @@ fun VideoPlayerScreen(
     PlayerBackHandler(handlePlaybackBack)
 
     // New player design slots; Current passes none of them.
-    val trialTracks = if (newChrome) trackGlance(rememberPlayerTracks(player)) else TrackGlance()
     val trialBadges = if (newChrome) playerTrialBadges(diagnostics, trialTracks) else emptyList()
     val trialUnavailableTitle = stringResource(R.string.player_info_unavailable_title)
     val trialHeader: @Composable (Modifier) -> Unit = { modifier ->

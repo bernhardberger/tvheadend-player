@@ -62,8 +62,8 @@ fun PlayerStatusChip(status: PlayerStatus, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) { when (status.indicator) {
-            PlayerStatusIndicator.NONE -> Unit
+        // A chip without an indicator starts its label at the start padding.
+        if (status.indicator != PlayerStatusIndicator.NONE) Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) { when (status.indicator) {
             PlayerStatusIndicator.SPINNER -> CircularProgressIndicator(Modifier.size(12.dp), color = MaterialTheme.colorScheme.onSurface, strokeWidth = 2.dp)
             else -> Icon(
                 painterResource(when (status.indicator) {

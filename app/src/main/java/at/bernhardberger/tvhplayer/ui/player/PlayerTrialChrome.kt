@@ -91,6 +91,8 @@ internal data class TrackGlance(
     val audioDescription: Boolean = false,
     val subtitles: Boolean = false,
     val teletext: Boolean = false,
+    /** Positively audio-only: the player reports audio tracks and no video track. */
+    val audioOnly: Boolean = false,
 )
 
 internal fun trackGlance(tracks: Tracks): TrackGlance {
@@ -103,7 +105,14 @@ internal fun trackGlance(tracks: Tracks): TrackGlance {
         .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it).sampleMimeType } }
     // Tvheadend delivers its teletext subtitles as Media3 cues (see TrackLabelPolicy).
     val teletext = text.any { it == TELETEXT_CUES_MIME }
-    return TrackGlance(audioDescription, subtitles = text.any { it != TELETEXT_CUES_MIME }, teletext = teletext)
+    val audioOnly = tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO } &&
+        tracks.groups.none { it.type == C.TRACK_TYPE_VIDEO }
+    return TrackGlance(
+        audioDescription,
+        subtitles = text.any { it != TELETEXT_CUES_MIME },
+        teletext = teletext,
+        audioOnly = audioOnly,
+    )
 }
 
 private const val TELETEXT_CUES_MIME = "application/x-media3-cues"
@@ -249,6 +258,16 @@ internal fun trayPreviewMetadata(event: EpgEventEntry?, nowSec: Long): String = 
     event?.let(::programmeMetadata),
 ).joinToString(" · ")
 
+/** Everything one tray preview renders, so a leaving preview keeps showing its own card. */
+internal data class QuickZapPreviewSnapshot(
+    val channelId: ChannelId,
+    val title: String,
+    val metadata: String,
+    val summary: String?,
+    val next: String?,
+    val image: String?,
+)
+
 /** New design: passive preview of the focused quick-zap card; it crossfades between cards. */
 @Composable
 internal fun QuickZapTrayPreview(
@@ -260,25 +279,53 @@ internal fun QuickZapTrayPreview(
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
 ) {
-    AnimatedContent(
-        targetState = channel?.id,
-        transitionSpec = {
-            fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)) togetherWith
-                fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate))
-        },
-        modifier = modifier.focusProperties { canFocus = false }.testTag("trial-zap-preview"),
-        label = "quick-zap-preview",
-    ) { id ->
-        if (id == null || channel == null) return@AnimatedContent
-        QuickZapPreview(
-            title = event?.title?.takeIf(String::isNotBlank) ?: channel.name.orEmpty(),
+    val snapshot = channel?.let {
+        QuickZapPreviewSnapshot(
+            channelId = it.id,
+            title = event?.title?.takeIf(String::isNotBlank) ?: it.name.orEmpty(),
             metadata = trayPreviewMetadata(event, nowSec),
             summary = event?.summary?.takeIf(String::isNotBlank) ?: event?.description?.takeIf(String::isNotBlank),
-            next = next?.title?.takeIf(String::isNotBlank)?.let { "${formatClock(next.start.epochSeconds)} $it" },
+            next = next?.title?.takeIf(String::isNotBlank)?.let { title -> "${formatClock(next.start.epochSeconds)} $title" },
             image = event?.image,
+        )
+    }
+    QuickZapTrayPreviewFrame(snapshot, modifier) {
+        QuickZapPreview(
+            title = it.title,
+            metadata = it.metadata,
+            summary = it.summary,
+            next = it.next,
+            image = it.image,
             imageLoader = imageLoader,
             currentSession = currentSession,
         )
+    }
+}
+
+/**
+ * Crossfades between the focused cards' previews. Each side renders its own [snapshot];
+ * a new card crossfades, a changed programme of the same card updates in place, and the
+ * leaving side drops semantics and focus on its first exit frame.
+ */
+@Composable
+internal fun QuickZapTrayPreviewFrame(
+    snapshot: QuickZapPreviewSnapshot?,
+    modifier: Modifier = Modifier,
+    content: @Composable (QuickZapPreviewSnapshot) -> Unit,
+) {
+    AnimatedContent(
+        targetState = snapshot,
+        transitionSpec = {
+            (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)) togetherWith
+                fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate))).using(null)
+        },
+        contentKey = { it?.channelId },
+        modifier = modifier.focusProperties { canFocus = false }.testTag("trial-zap-preview"),
+        label = "quick-zap-preview",
+    ) { shown ->
+        PlayerMotionFrame(leaving = leaving) {
+            if (shown != null) content(shown)
+        }
     }
 }
 

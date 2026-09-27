@@ -35,6 +35,12 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.Player
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
@@ -58,6 +64,7 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
@@ -104,6 +111,17 @@ class NewPlayerChromeScreenTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
     private lateinit var view: View
+    private lateinit var runtime: AppPlaybackRuntime
+    private lateinit var session: FakeTvheadendSession
+    private val owner = object : LifecycleOwner {
+        override val lifecycle = LifecycleRegistry.createUnsafe(this)
+    }
+    /** Listeners on the runtime's player, so tests can drive states the fake stream never reaches. */
+    private val playerListeners = mutableListOf<Player.Listener>()
+    /** The player reports READY and playing, as when the tune's stream has started. */
+    private var forcedReady = false
+    /** Tracks the player reports, for services the fake stream never describes. */
+    private var forcedTracks: Tracks? = null
 
     @After fun after() {
         models.clear()
@@ -197,6 +215,128 @@ class NewPlayerChromeScreenTest {
         assertFalse(exists("live-info-panel"))
     }
 
+    @Test fun newBannerHidesFiveSecondsAfterThisTunesFirstFrame() {
+        screen(PlayerChromeDesign.NEW)
+        playerReady()
+        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        // Playing without a picture: no video diagnostics does not prove audio-only.
+        repeat(4) { settle() }
+        assertTrue("no frame of this tune yet: the Banner stays", exists("trial-banner"))
+
+        playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        compose.waitUntil(5_000) { runtime.videoPresentation.value.visible }
+        compose.mainClock.advanceTimeBy(4_800)
+        compose.waitForIdle()
+        assertTrue("before 5000 ms after the first frame", exists("trial-banner"))
+        settle()
+        assertFalse("5000 ms after the first frame the Banner hides", exists("trial-banner"))
+        assertFalse(exists("player-actions"))
+    }
+
+    @Test fun newAudioOnlyServiceStartsTheBannerTimerWhenPlaying() {
+        screen(PlayerChromeDesign.NEW)
+        val audioOnly = Tracks(listOf(Tracks.Group(
+            TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).build()),
+            false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
+        )))
+        assertTrue(trackGlance(audioOnly).audioOnly)
+        forcedTracks = audioOnly
+        playerListeners.toList().forEach { it.onTracksChanged(audioOnly) }
+        playerReady()
+        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        compose.mainClock.advanceTimeBy(4_000)
+        compose.waitForIdle()
+        assertTrue(exists("trial-banner"))
+        repeat(2) { settle() }
+        assertFalse("audio-only: playing starts the Banner's 5 s", exists("trial-banner"))
+    }
+
+    @Test fun aStoppedAndRestartedScreenShowsNoStaleBanner() {
+        screen(PlayerChromeDesign.NEW)
+        assertTrue(exists("trial-banner"))
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
+        settle()
+        assertFalse("the Banner does not outlive the stop", exists("trial-banner"))
+        compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+        repeat(8) { settle() }
+        assertFalse("no stale Banner on return", exists("trial-banner"))
+        assertFalse(exists("player-actions"))
+    }
+
+    @Test fun detailsSurviveAProgrammeBoundaryAndRecordAvailabilityChange() {
+        screen(PlayerChromeDesign.NEW)
+        openStreamSignalDetails()
+        val now = System.currentTimeMillis() / 1_000L
+        // Compose reports a focus request on a detached Info-page requester (which older
+        // Compose versions threw) as a "not initialized" warning on stdout; record it.
+        val stdout = System.out
+        val captured = java.io.ByteArrayOutputStream()
+        System.setOut(java.io.PrintStream(object : java.io.OutputStream() {
+            override fun write(b: Int) { captured.write(b); stdout.write(b) }
+        }, true))
+        try {
+            // The airing programme changes while the details page is shown.
+            session.publish(observation(now, listOf(
+                EpgEvent.create(EventId(21L), ChannelId(1L), Instant.fromEpochSeconds(now - 60L),
+                    Instant.fromEpochSeconds(now + 3_600L), title = "Next up", summary = "Summary"),
+            )))
+            repeat(2) { settle() }
+            assertTrue(exists("live-info-stream-signal-details"))
+            // Recording becomes unavailable while the details page is shown.
+            session.publish(observation(now, listOf(
+                EpgEvent.create(EventId(21L), ChannelId(1L), Instant.fromEpochSeconds(now - 60L),
+                    Instant.fromEpochSeconds(now + 3_600L), title = "Next up", summary = "Summary"),
+            ), dvrWrite = CapabilityAccess.DENIED))
+            repeat(2) { settle() }
+            assertTrue(exists("live-info-stream-signal-details"))
+        } finally {
+            System.setOut(stdout)
+        }
+        assertFalse("no focus request reaches the detached Info page",
+            captured.toString().contains("FocusRequester is not initialized"))
+        assertTrue("details keep focus",
+            compose.onAllNodes(hasAnyAncestor(hasTestTag("live-info-stream-signal-details")) and isFocused(), useUnmergedTree = true)
+                .fetchSemanticsNodes().isNotEmpty())
+
+        key(Key.Back)
+        assertTrue(exists("live-info-panel"))
+        assertEquals(listOf("live-info-stream-signal"), focused())
+    }
+
+    @Test fun withoutEpgStreamAndSignalIsStillReachable() {
+        screen(PlayerChromeDesign.NEW, epg = false)
+        key(Key.Info)
+        assertTrue(exists("live-info-panel"))
+        openStreamSignalDetails(alreadyOpen = true)
+        key(Key.Back)
+        assertTrue(exists("live-info-panel"))
+        assertEquals(listOf("live-info-stream-signal"), focused())
+    }
+
+    private fun openStreamSignalDetails(alreadyOpen: Boolean = false) {
+        if (!alreadyOpen) key(Key.Info)
+        assertTrue(exists("live-info-stream-signal"))
+        var presses = 0
+        while (focused() != listOf("live-info-stream-signal") && presses < 8) {
+            key(Key.DirectionDown)
+            presses++
+        }
+        assertEquals("Stream & signal is reachable by D-pad Down", listOf("live-info-stream-signal"), focused())
+        key(Key.DirectionCenter)
+        assertTrue(exists("live-info-stream-signal-details"))
+    }
+
+    private fun playerReady() {
+        forcedReady = true
+        compose.runOnIdle {
+            playerListeners.toList().forEach {
+                it.onPlaybackStateChanged(Player.STATE_READY)
+                it.onIsPlayingChanged(true)
+            }
+        }
+        compose.waitForIdle()
+    }
+
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun newUnavailableShowsOnlyTheCentreMessage() = unavailable("en", 1f)
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) fun newUnavailableShowsOnlyTheCentreMessageAtLargeText() = unavailable("en", 1.3f)
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE) @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -239,21 +379,30 @@ class NewPlayerChromeScreenTest {
         }
     }
 
-    private fun screen(design: PlayerChromeDesign, onClose: () -> Unit = {}, failing: Boolean = false, fontScale: Float = 1f) {
-        val now = System.currentTimeMillis() / 1_000L
-        val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+    private fun observation(now: Long, events: List<EpgEvent>, dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED) =
+        SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
                 (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) },
             )),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(
-                EpgEvent.create(EventId(11L), ChannelId(1L), Instant.fromEpochSeconds(now - 1_800L),
-                    Instant.fromEpochSeconds(now + 3_600L), title = "Now showing", summary = "Summary"),
-                EpgEvent.create(EventId(12L), ChannelId(1L), Instant.fromEpochSeconds(now + 3_600L),
-                    Instant.fromEpochSeconds(now + 7_200L), title = "Later"),
-            ))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = events)),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).apply {
+        )
+
+    private fun screen(
+        design: PlayerChromeDesign,
+        onClose: () -> Unit = {},
+        failing: Boolean = false,
+        fontScale: Float = 1f,
+        epg: Boolean = true,
+    ) {
+        val now = System.currentTimeMillis() / 1_000L
+        session = FakeTvheadendSession(observation(now, if (!epg) emptyList() else listOf(
+            EpgEvent.create(EventId(11L), ChannelId(1L), Instant.fromEpochSeconds(now - 1_800L),
+                Instant.fromEpochSeconds(now + 3_600L), title = "Now showing", summary = "Summary"),
+            EpgEvent.create(EventId(12L), ChannelId(1L), Instant.fromEpochSeconds(now + 3_600L),
+                Instant.fromEpochSeconds(now + 7_200L), title = "Later"),
+        ))).apply {
             // The subscription never becomes playable: the channel stays tuning, as on a slow tune.
             // Failing: the scripted stream cannot be decoded, so the channel becomes unavailable.
             if (failing) scriptLivePlaybackSuccess()
@@ -268,14 +417,25 @@ class NewPlayerChromeScreenTest {
         compose.waitUntil(10_000) { channels.channels.value.size == 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+        val base = player
+        val controlled = object : ExoPlayer by base {
+            override fun getPlaybackState(): Int = if (forcedReady) Player.STATE_READY else base.playbackState
+            override fun isPlaying(): Boolean = forcedReady || base.isPlaying
+            override fun getCurrentTracks(): Tracks = forcedTracks ?: base.currentTracks
+            override fun addListener(listener: Player.Listener) {
+                playerListeners += listener
+                base.addListener(listener)
+            }
+            override fun removeListener(listener: Player.Listener) {
+                playerListeners -= listener
+                base.removeListener(listener)
+            }
+        }
+        runtime = AppPlaybackRuntime(controlled, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
         val video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
-        val owner = object : LifecycleOwner {
-            override val lifecycle = LifecycleRegistry.createUnsafe(this)
-        }
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
         compose.waitForIdle()
         compose.setContent {

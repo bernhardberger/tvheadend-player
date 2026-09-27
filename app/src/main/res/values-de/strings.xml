@@ -452,8 +452,8 @@
     <string name="trial_ad">Audiodeskription</string>
     <string name="trial_sub">Untertitel</string>
     <string name="trial_txt">Teletext verfügbar</string>
-    <string name="trial_snr_percent">SNR %1$s %%</string>
-    <string name="trial_snr_db">SNR %1$s dB</string>
+    <string name="trial_snr_percent">SNR\u00A0%1$s\u00A0%%</string>
+    <string name="trial_snr_db">SNR\u00A0%1$s\u00A0dB</string>
     <string name="trial_snr_percent_spoken">Signal-Rausch-Verhältnis %1$s Prozent</string>
     <string name="trial_snr_db_spoken">Signal-Rausch-Verhältnis %1$s Dezibel</string>
     <string name="trial_raster_spoken">%1$s Zeilen</string>
