@@ -381,7 +381,7 @@ internal fun RecordingDetailsPanel(
                         }
                         .testTag("recording-details-delete"),
                 ) {
-                    Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_delete_outlined), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.delete_recording))
                 }

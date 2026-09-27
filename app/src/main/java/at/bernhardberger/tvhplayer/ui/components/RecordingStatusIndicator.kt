@@ -1,49 +1,56 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Icon
+import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
+/** Icon size for status marks set next to small text: chips, guide cells, list rows. */
+val StatusIconSize: Dp = 16.dp
+
+/** Recording now is the red dot; scheduled is a clock in the surrounding content colour. */
 @Composable
 fun RecordingStatusIndicator(
     state: DvrEntryState,
     modifier: Modifier = Modifier,
     announceState: Boolean = true,
 ) {
-    if (state != DvrEntryState.RECORDING && state != DvrEntryState.SCHEDULED) return
-    val accessibilityModifier = if (announceState) {
-        val description = stringResource(
-            if (state == DvrEntryState.RECORDING) {
-                R.string.recording_state_recording
-            } else {
-                R.string.recording_state_scheduled
-            }
-        )
-        Modifier.semantics { contentDescription = description }
-    } else {
-        Modifier
+    val recording = when (state) {
+        DvrEntryState.RECORDING -> true
+        DvrEntryState.SCHEDULED -> false
+        else -> return
     }
-    Box(
-        modifier = modifier
-            .size(12.dp)
-            .then(accessibilityModifier)
-            .then(
-                if (state == DvrEntryState.RECORDING) {
-                    Modifier.background(TvRecordingColor, CircleShape)
-                } else {
-                    Modifier.border(2.dp, TvRecordingColor, CircleShape)
-                }
-            )
+    val description = stringResource(
+        if (recording) R.string.recording_state_recording else R.string.recording_state_scheduled
+    )
+    Icon(
+        painter = painterResource(if (recording) R.drawable.ic_fiber_manual_record else R.drawable.ic_schedule),
+        contentDescription = description.takeIf { announceState },
+        modifier = modifier.size(StatusIconSize),
+        tint = if (recording) TvRecordingColor else LocalContentColor.current,
+    )
+}
+
+/** Scheduled mark for places that only know "scheduled", not a DVR entry state. */
+@Composable
+fun ScheduledIndicator(
+    modifier: Modifier = Modifier,
+    tint: Color = LocalContentColor.current,
+    contentDescription: String? = null,
+) {
+    Icon(
+        painter = painterResource(R.drawable.ic_schedule),
+        contentDescription = contentDescription,
+        modifier = modifier.size(StatusIconSize),
+        tint = tint,
     )
 }

@@ -313,26 +313,27 @@ class PlayerTrialEvidenceTest {
         compose.onNodeWithTag("trial-scheduled-marker", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    @Test fun scheduledMarkerIsHollowNotTheFilledRecGlyph() {
+    @Test fun scheduledMarkerIsANeutralClockNotTheRedRecGlyph() {
         lateinit var view: View
         compose.setContent { TVHeadendPlayerTheme {
             view = LocalView.current
             PlayerInfoBar(info(false), emptyList(), null, loader, session, Modifier.fillMaxWidth())
         } }
+        val marker = compose.onNodeWithTag("trial-scheduled-marker", useUnmergedTree = true)
+            .assertWidthIsEqualTo(16.dp).assertHeightIsEqualTo(16.dp)
+            .fetchSemanticsNode().boundsInRoot
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        fun red(x: Int, y: Int): Boolean {
+        fun red(pixel: Int) = android.graphics.Color.red(pixel) > 120 &&
+            android.graphics.Color.red(pixel) > android.graphics.Color.green(pixel) * 1.5
+        var drawn = 0
+        for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) {
             val pixel = bitmap.getPixel(x, y)
-            return android.graphics.Color.red(pixel) > 120 && android.graphics.Color.red(pixel) > android.graphics.Color.green(pixel) * 1.5
+            assertFalse("red pixel at $x,$y", red(pixel))
+            if (marker.contains(androidx.compose.ui.geometry.Offset(x + 0.5f, y + 0.5f)) &&
+                android.graphics.Color.green(pixel) > 120) drawn++
         }
-        val pixels = buildList { for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) if (red(x, y)) add(x to y) }
-        assertTrue(pixels.isNotEmpty())
-        val left = pixels.minOf { it.first }; val right = pixels.maxOf { it.first }
-        val top = pixels.minOf { it.second }; val bottom = pixels.maxOf { it.second }
-        assertTrue(right - left in 16..20)
-        assertTrue(bottom - top in 16..20)
-        assertFalse(red((left + right) / 2, (top + bottom) / 2))
-        assertTrue(red((left + right) / 2, top + 1))
+        assertTrue(drawn > 10)
         bitmap.recycle()
     }
 

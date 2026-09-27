@@ -21,8 +21,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.platform.LocalDensity
 import at.bernhardberger.tvhplayer.core.shouldComposeTimelineCell
@@ -42,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.Button
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -378,6 +383,7 @@ internal fun TimelineProgrammeCell(
     val startDate = remember(startSec, locale, formattingZone) { startSec.formatDateTime() }
     val startTime = remember(startSec, locale, formattingZone) { formatHm(startSec) }
     val stopTime = remember(stopSec, locale, formattingZone) { formatHm(stopSec) }
+    var focused by remember { mutableStateOf(false) }
     val description = stringResource(
         R.string.epg_cell_description,
         channel.name.orEmpty(),
@@ -419,19 +425,28 @@ internal fun TimelineProgrammeCell(
                 // library focus scale the surface applies outside this modifier.
                 .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
                 .focusRequester(focusRequester)
-                .onFocusChanged { if (it.isFocused) onFocused() }
+                .onFocusChanged {
+                    focused = it.isFocused
+                    if (it.isFocused) onFocused()
+                }
                 .semantics { contentDescription = description },
         )
         recording?.takeIf {
             it.state == DvrEntryState.RECORDING || it.state == DvrEntryState.SCHEDULED
         }?.let {
-            RecordingStatusIndicator(
+            // The overlaid mark follows the cell's content colour, which inverts on focus.
+            val contentColor = if (focused) {
+                MaterialTheme.colorScheme.inverseOnSurface
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
+            CompositionLocalProvider(LocalContentColor provides contentColor) { RecordingStatusIndicator(
                 state = checkNotNull(it.state),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .zIndex(2f)
                     .padding(6.dp),
-            )
+            ) }
         }
     }
 }

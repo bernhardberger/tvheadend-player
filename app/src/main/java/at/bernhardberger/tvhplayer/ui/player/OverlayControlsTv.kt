@@ -199,17 +199,18 @@ fun OverlayControlsTv(
             true
         }
     }, newDesign = newHeader != null, headerContent = { modifier ->
+        val endedSupport = endedProgrammeSupport(displayedEvent, nowSec)
+        val showsNext = programmeTimeKnown && programmeTitle.isNotBlank() && endedSupport == null && !previewing
         if (newHeader != null) newHeader(modifier) else PlayerIdentityHeader(
             imageLoader = imageLoader, currentSession = currentSession, piconPath = piconPath,
             eyebrow = channelTitleText(channelNumber, channelName),
             title = programmeTitle,
             support = if (!programmeTimeKnown) stringResource(R.string.player_programme_timing_unavailable)
             else if (programmeTitle.isBlank()) stringResource(R.string.player_info_unavailable_title)
-            else endedProgrammeSupport(displayedEvent, nowSec) ?: if (previewing) displayedEvent?.let { programmeWindowClockLabels(it).let { (start, end) -> "$start - $end" } }
+            else endedSupport ?: if (previewing) displayedEvent?.let { programmeWindowClockLabels(it).let { (start, end) -> "$start - $end" } }
             else nextEvent?.let {
                 stringResource(R.string.player_next_event_with_range,
-                    "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}", it.title.orEmpty()) +
-                    if (nextScheduled) " / " + stringResource(R.string.recording_state_scheduled) else ""
+                    "${formatClock(it.start.epochSeconds)} - ${formatClock(it.stop.epochSeconds)}", it.title.orEmpty())
             },
             clock = formatClock(nowSec), clockSupport = null,
             status = PlayerHeaderStatus(paused, timeshift = committedTimeshiftState,
@@ -219,6 +220,7 @@ fun OverlayControlsTv(
                 clockSupport = "player-clock-status"),
             modifier = modifier,
             identity = PlayerHeaderIdentity(channelId, displayedEvent?.id),
+            supportScheduled = showsNext && nextScheduled && nextEvent != null,
         )
     }) {
         newInfoBar?.invoke()

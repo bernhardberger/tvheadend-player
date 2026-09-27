@@ -47,6 +47,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -473,6 +474,33 @@ class PlayerMotionTest {
         zap(ChannelId(3), records = true, incoming = setOf("Live", "REC"), outgoing = setOf("Live"))
     }
 
+    @Test fun scheduledNextProgrammeShowsTheClockInsteadOfATextSuffix() {
+        fun event(id: Long, start: Long, stop: Long, title: String) = EpgEvent.create(
+            id = EventId(id), channelId = ChannelId(1),
+            start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(stop), title = title,
+        )
+        var scheduled by mutableStateOf(true)
+        compose.setContent {
+            val context = LocalContext.current
+            val loader = remember { ImageLoader(context) }
+            TVHeadendPlayerTheme {
+                liveControls(
+                    loader, optionsOpen = false, channelId = ChannelId(1), timeshiftState = atLive,
+                    nowEvent = event(5, 0, 3_600, "Evening news"),
+                    nextEvent = event(6, 3_600, 7_200, "Film"), nextScheduled = scheduled,
+                )
+            }
+        }
+        compose.waitForIdle()
+        val support = compose.onNodeWithTag("player-next-programme", useUnmergedTree = true)
+        assertFalse(support.fetchSemanticsNode().config[SemanticsProperties.Text].joinToString().contains("Scheduled"))
+        compose.onNodeWithContentDescription("Scheduled", useUnmergedTree = true).assertExists()
+        change { scheduled = false }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Scheduled", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-next-programme", useUnmergedTree = true).assertExists()
+    }
+
     @Test fun channelMotionFollowsTheChannelIdNotItsNumberOrName() {
         var channel by mutableStateOf(ChannelId(1))
         var name by mutableStateOf("News")
@@ -827,6 +855,8 @@ class PlayerMotionTest {
         nowSec: Long = 1_800,
         timeshiftState: AppTimeshiftState = AppTimeshiftState(),
         channelRecordingNow: Boolean = false,
+        nextEvent: EpgEvent? = null,
+        nextScheduled: Boolean = false,
     ) {
         OverlayControlsTv(
             imageLoader = loader,
@@ -834,7 +864,8 @@ class PlayerMotionTest {
             channelName = channelName,
             piconPath = null,
             nowEvent = nowEvent,
-            nextEvent = null,
+            nextEvent = nextEvent,
+            nextScheduled = nextScheduled,
             nowSec = nowSec,
             controlsVisible = true,
             optionsOpen = optionsOpen,

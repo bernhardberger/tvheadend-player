@@ -71,6 +71,7 @@ import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import coil3.ImageLoader
@@ -342,7 +343,7 @@ private fun CompactZapCard(
                 }
                 if (recording) Icon(painterResource(R.drawable.ic_fiber_manual_record),
                     contentDescription = stringResource(R.string.player_shelf_recording),
-                    tint = TvRecordingColor, modifier = Modifier.size(12.dp))
+                    tint = TvRecordingColor, modifier = Modifier.size(StatusIconSize))
             }
         },
         subtitle = {

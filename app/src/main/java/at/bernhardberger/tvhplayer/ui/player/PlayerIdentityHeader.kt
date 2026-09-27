@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -44,6 +46,7 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTextPrimaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import coil3.ImageLoader
 
@@ -91,6 +94,7 @@ fun PlayerIdentityHeader(
     compact: Boolean = false,
     status: PlayerHeaderStatus? = null,
     identity: PlayerHeaderIdentity? = null,
+    supportScheduled: Boolean = false,
 ) {
     val onSurface = MaterialTheme.colorScheme.onSurface
     Row(
@@ -116,7 +120,7 @@ fun PlayerIdentityHeader(
         }
         Spacer(Modifier.width(TvOverlayHeaderPiconGap))
         HeaderIdentityMotion(
-            state = HeaderIdentityText(identity, eyebrow, title, support),
+            state = HeaderIdentityText(identity, eyebrow, title, support, supportScheduled),
             animated = identity != null,
             key = { it.identity },
             modifier = Modifier.weight(1f).padding(end = TvOverlayHeaderColumnGap),
@@ -183,6 +187,7 @@ private data class HeaderIdentityText(
     val eyebrow: String?,
     val title: String,
     val support: String?,
+    val supportScheduled: Boolean = false,
 )
 
 @Composable
@@ -220,14 +225,21 @@ private fun HeaderIdentityColumn(
         }
         support?.let {
             if (text.eyebrow != null || title != null) Spacer(Modifier.height(TvOverlayHeaderTextGap))
-            HeaderText(
-                text = it,
-                color = onSurface.copy(alpha = TvOverlayTextTertiaryAlpha),
-                style = HeaderTextStyle.SUPPORT,
-                modifier = Modifier
-                    .then(if (text.eyebrow == null && title == null) anchor else Modifier)
-                    .optionalTestTag(tags.support),
-            )
+            val supportColor = onSurface.copy(alpha = TvOverlayTextTertiaryAlpha)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (text.supportScheduled) ScheduledIndicator(
+                    tint = supportColor,
+                    contentDescription = stringResource(R.string.recording_state_scheduled),
+                )
+                HeaderText(
+                    text = it,
+                    color = supportColor,
+                    style = HeaderTextStyle.SUPPORT,
+                    modifier = Modifier
+                        .then(if (text.eyebrow == null && title == null) anchor else Modifier)
+                        .optionalTestTag(tags.support),
+                )
+            }
         }
     }
 }

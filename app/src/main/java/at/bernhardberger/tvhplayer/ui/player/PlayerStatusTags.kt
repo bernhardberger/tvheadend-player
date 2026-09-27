@@ -74,6 +74,9 @@ internal fun PlayerStatusTags(
     }
 }
 
+/** One glyph size for every tag, so REC and the play state share a height. */
+private val TagIconSize = 14.dp
+
 @Composable
 private fun StatusTag(label: String, icon: Int, color: Color, modifier: Modifier, description: String) {
     Surface(modifier = modifier.clearAndSetSemantics { contentDescription = description },
@@ -81,7 +84,7 @@ private fun StatusTag(label: String, icon: Int, color: Color, modifier: Modifier
             containerColor = TvSurfaceColors.container.copy(alpha = 0.82f))) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+            Icon(painterResource(icon), contentDescription = null, tint = color, modifier = Modifier.size(TagIconSize))
             Text(label, color = color, style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
     }
@@ -97,7 +100,7 @@ private fun RecordingNowTag() {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Icon(painterResource(R.drawable.ic_fiber_manual_record), contentDescription = null,
-                tint = TvRecordingColor, modifier = Modifier.size(10.dp))
+                tint = TvRecordingColor, modifier = Modifier.size(TagIconSize))
             Text(stringResource(R.string.player_status_rec), color = TvRecordingColor,
                 style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }

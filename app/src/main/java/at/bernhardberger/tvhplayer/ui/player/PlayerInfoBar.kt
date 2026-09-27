@@ -1,11 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -19,8 +17,8 @@ import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.GlanceBadge
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 import coil3.ImageLoader
 
 /** Presentation strings follow the displayed programme/seek target. Callers pass no next for recordings. */
@@ -76,10 +74,8 @@ fun PlayerInfoBar(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f))
                 }
                 if (next != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (data.nextScheduled) Canvas(Modifier.size(10.dp).testTag("trial-scheduled-marker")) {
-                        val stroke = 2.dp.toPx()
-                        drawCircle(TvRecordingColor, radius = (size.minDimension - stroke) / 2, style = Stroke(stroke))
-                    }
+                    if (data.nextScheduled) ScheduledIndicator(Modifier.testTag("trial-scheduled-marker"),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f))
                     Text(next, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f))
                 }

@@ -25,6 +25,7 @@ import at.bernhardberger.tvhplayer.core.PlayerStatusKind
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 
 @Composable
 fun PlayerStatusChip(status: PlayerStatus, modifier: Modifier = Modifier) {
@@ -71,7 +72,7 @@ fun PlayerStatusChip(status: PlayerStatus, modifier: Modifier = Modifier) {
                     PlayerStatusIndicator.PAUSE -> R.drawable.ic_pause
                     PlayerStatusIndicator.RECORDING_DOT -> R.drawable.ic_fiber_manual_record
                     else -> R.drawable.ic_error_outlined
-                }), null, Modifier.size(if (recording) 8.dp else 16.dp),
+                }), null, Modifier.size(StatusIconSize),
                 tint = if (recording) TvRecordingColor else MaterialTheme.colorScheme.onSurface,
             )
         } }
