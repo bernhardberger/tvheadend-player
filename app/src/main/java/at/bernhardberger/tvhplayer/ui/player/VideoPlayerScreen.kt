@@ -1320,10 +1320,6 @@ fun VideoPlayerScreen(
                     PlayerKeyAction.REVEAL_CONTROLS -> {
                         if (timelineState.seekPending) {
                             timelineState.commitPendingSeek()
-                            if (event.key == Key.DirectionDown) {
-                                openChannelDrawer()
-                                return@onPreviewKeyEvent true
-                            }
                             restoreInfoFocus = event.key == Key.DirectionUp
                         }
                         layerState.showControls()

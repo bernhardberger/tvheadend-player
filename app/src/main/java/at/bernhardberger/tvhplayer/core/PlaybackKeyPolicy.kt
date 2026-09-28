@@ -260,8 +260,6 @@ fun playerKeyAction(
         KeyEvent.KEYCODE_DPAD_LEFT -> when {
             context.surface == PlayerSurface.RECORDING || context.timeshiftAvailable ->
                 PlayerKeyAction.SEEK_BACK
-            context.surface == PlayerSurface.LIVE ->
-                PlayerKeyAction.OPEN_CHANNELS
             else -> PlayerKeyAction.PASS_THROUGH
         }
         KeyEvent.KEYCODE_DPAD_RIGHT -> when {

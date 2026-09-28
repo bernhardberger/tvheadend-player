@@ -106,7 +106,7 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun liveWithoutTimeshiftUsesRevealAndChannelDrawer() {
+    fun liveWithoutTimeshiftRevealsOnVerticalKeysButDoesNotOpenChannelsOnLeft() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
             controlsVisible = false,
@@ -118,7 +118,7 @@ class PlaybackKeyPolicyTest {
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
         )
         assertEquals(
-            PlayerKeyAction.OPEN_CHANNELS,
+            PlayerKeyAction.PASS_THROUGH,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
         )
         assertEquals(
@@ -176,10 +176,10 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun startingTimeshiftKeepsSeekAndDrawerKeysTiedToAvailability() {
+    fun startingTimeshiftKeepsSeekKeysTiedToAvailability() {
         val ctx = PlayerKeyContext(PlayerSurface.LIVE, controlsVisible = false, seekbarFocused = false,
             timeshiftAvailable = false, livePause = LivePauseAvailability.STARTING)
-        assertEquals(PlayerKeyAction.OPEN_CHANNELS, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT))
+        assertEquals(PlayerKeyAction.PASS_THROUGH, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT))
         assertEquals(PlayerKeyAction.PASS_THROUGH, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_RIGHT))
         assertEquals(PlayerKeyAction.REVEAL_CONTROLS, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP))
     }
@@ -378,7 +378,7 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun nonTimeshiftLiveOpensTheShelfOnLeftAndListRemoteKeys() {
+    fun nonTimeshiftLiveOpensTheShelfOnlyOnDedicatedListRemoteKeys() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
             controlsVisible = false,
@@ -386,7 +386,7 @@ class PlaybackKeyPolicyTest {
             timeshiftAvailable = false,
         )
         assertEquals(
-            PlayerKeyAction.OPEN_CHANNELS,
+            PlayerKeyAction.PASS_THROUGH,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_LEFT),
         )
         assertEquals(
