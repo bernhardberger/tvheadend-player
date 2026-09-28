@@ -3,7 +3,7 @@ description: Writable TVHeadend Player implementer for one delegated, bounded co
 mode: subagent
 model: openai/gpt-6-astra
 variant: medium
-steps: 150
+steps: 300
 permission:
   edit: allow
   shell: allow
