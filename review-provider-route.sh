@@ -115,8 +115,9 @@ import json
 import math
 import sys
 
-FIVE_HOUR_MINIMUM = 20.0
-WEEKLY_MINIMUM = 5.0
+# Max 5x policy: one fifth of the former Pro percentage reserves (20% / 5%).
+FIVE_HOUR_MINIMUM = 4.0
+WEEKLY_MINIMUM = 1.0
 
 def reject_nonstandard_constant(value):
     raise ValueError(f"non-standard JSON constant: {value}")
