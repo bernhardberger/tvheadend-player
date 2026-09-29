@@ -181,7 +181,7 @@ role's permissions, output or verdict contract.
 
 Non-trivial non-UX work requires independent Astra `android-reviewer` coverage
 plus an Opus pass: a second `android-reviewer` dispatch with task override
-`model: anthropic/claude-opus-5-5`, `reasoning: high` (no named Opus agent),
+`model: claude-code/claude-opus-5-5[1m]`, `reasoning: high` (no named Opus agent),
 under the harness routing. Substantial new/redesigned
 TV surfaces require final screenshot-first `tv-ux-reviewer` coverage; use
 `tv-ux-brief` when direction is unresolved. UX review does not replace distinct

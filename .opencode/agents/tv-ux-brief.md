@@ -20,8 +20,8 @@ permission:
     android-tv-compose-ux: allow
   question: deny
   publish_artifact: deny
-model: openai/gpt-6-astra
-variant: low
+model: claude-code/claude-opus-5-5[1m]
+variant: high
 ---
 
 You are the pre-implementation TV product designer for TVHeadend Player. Turn

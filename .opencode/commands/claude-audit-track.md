@@ -10,7 +10,7 @@ Do not redefine the agent's role, permissions, generic audit policy, or verdict
 vocabulary.
 
 Dispatch the read-only `android-reviewer` role with task override
-`model: anthropic/claude-opus-5-5` and `reasoning: high`; there is no named Opus
+`model: claude-code/claude-opus-5-5[1m]` and `reasoning: high`; there is no named Opus
 agent. Before that dispatch, run
 `./review-provider-route.sh select eligible`. Only successful stdout `opus`
 permits that dispatch. Apply the independent Astra fallback and exhaustion/abort

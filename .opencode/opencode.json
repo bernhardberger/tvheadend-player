@@ -48,7 +48,7 @@
       "steps": 25
     },
     "tv-ux-brief": {
-      "model": "anthropic/claude-opus-5-5",
+      "model": "claude-code/claude-opus-5-5[1m]",
       "variant": "high",
       "steps": 35
     },
