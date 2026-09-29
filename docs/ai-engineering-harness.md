@@ -186,7 +186,7 @@ Opus review routing is unchanged.
 Before implementation, confirm that the dispatched session exposes an editing
 tool and Bash. If either is missing, report the capability gap rather than
 substituting analysis for implementation. Check the resolved agent configuration
-with `opencode debug agent app-implementer` and use a fresh session after a
+with `opencode debug agents` and use a fresh session after a
 configuration reload; changing models alone does not repair missing tool bindings.
 
 ## Review lifecycle and autonomous continuation
@@ -226,7 +226,8 @@ The guard returns `opus` or `astra`. Use Opus only on successful `opus` output;
 otherwise use independent Astra. Engineering uses a separate `android-reviewer`
 session for the second review. For a UX brief, dispatch the same `tv-ux-brief`
 role with an Astra model override (`openai/gpt-6-astra#xhigh`); do not
-substitute a source-only runtime review.
+substitute a source-only runtime review. `app-planner` also defaults to Opus;
+on fallback dispatch it with the same Astra override.
 Record the guard reason, actual reviewer/session/model and explicitly absent Opus
 coverage. An explicitly non-substitutable admitted Opus gate requires
 reconciliation with its authority owner (central for centrally admitted work);
@@ -405,8 +406,10 @@ treating the change as complete.
 
 OpenCode loads config-time files only at startup. After changing config, an
 agent, skill, command, or plugin, validate saved settings with a fresh loader.
-Use `opencode debug agent <role>` for affected agents, `opencode debug skill`
-for skill discovery/content, and the resolved command templates from
+Use `opencode debug agents` for affected agents (it asks the running
+service, which can report the pre-edit state once; repeat until it is current),
+`opencode debug skill` for skill discovery/content, and the resolved command
+templates from
 `opencode debug config` for changed commands. Inspect only relevant fields;
 resolved configuration can contain private global settings. Compare project
 configuration and agent/command frontmatter to the starting revision when the

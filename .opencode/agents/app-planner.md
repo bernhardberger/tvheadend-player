@@ -14,8 +14,8 @@ permission:
   skill: deny
   question: deny
   publish_artifact: deny
-model: openai/gpt-6-astra
-variant: medium
+model: claude-code/claude-opus-5-5[1m]
+variant: high
 ---
 
 Provide an optional senior Android TV planning second opinion for one coherent

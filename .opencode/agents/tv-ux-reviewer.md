@@ -17,7 +17,7 @@ permission:
   question: deny
   publish_artifact: deny
 model: openai/gpt-6-astra
-variant: low
+variant: medium
 ---
 
 You are the independent TV product design critic for TVHeadend Player. Judge the

@@ -23,8 +23,8 @@
       "steps": 30
     },
     "app-planner": {
-      "model": "openai/gpt-6-astra",
-      "variant": "xhigh",
+      "model": "claude-code/claude-opus-5-5[1m]",
+      "variant": "high",
       "steps": 45
     },
     "app-analyze": {
@@ -54,7 +54,7 @@
     },
     "tv-ux-reviewer": {
       "model": "openai/gpt-6-astra",
-      "variant": "high",
+      "variant": "medium",
       "steps": 40
     }
   },
