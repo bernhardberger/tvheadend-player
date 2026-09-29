@@ -18,7 +18,7 @@
       "steps": 20
     },
     "app-explore": {
-      "model": "openai/gpt-6-sol",
+      "model": "openai/gpt-6.1-sol",
       "variant": "medium",
       "steps": 30
     },
@@ -43,7 +43,7 @@
       "steps": 45
     },
     "tv-evidence-curator": {
-      "model": "openai/gpt-6-sol",
+      "model": "openai/gpt-6.1-sol",
       "variant": "medium",
       "steps": 25
     },
