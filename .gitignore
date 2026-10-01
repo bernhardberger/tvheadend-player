@@ -84,3 +84,6 @@ __pycache__/
 
 # Generated offline quick-zap visual evidence
 /artifacts/quick-zap/
+/artifacts/ui-trial/
+/artifacts/player-chrome/
+/artifacts/channels-standard/

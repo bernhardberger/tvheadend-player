@@ -47,6 +47,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -132,16 +133,17 @@ class PlayerMotionTest {
         )
     }
 
-    @Test fun closingLiveInfoHandsFocusAndKeysToInfoWhileThePanelFades() {
+    @Test fun closingLiveInfoHandsFocusAndKeysToTheCardWhileThePanelFades() {
         var infoPresses = 0
         checkPanelCloseHandsFocusBack(
             panelTag = "live-info-panel",
-            actionTag = "player-info",
+            actionTag = "player-identity-card",
             activations = { infoPresses },
-            controls = { loader, _, restore, restored ->
+            controls = { loader, open, restore, restored ->
                 liveControls(
                     loader,
                     optionsOpen = false,
+                    panelOpen = open,
                     restoreInfoFocus = restore,
                     onInfoFocusRestored = restored,
                     onOpenInfo = { infoPresses++ },
@@ -149,6 +151,7 @@ class PlayerMotionTest {
             },
             panel = {
                 LiveProgrammeInfoOverlay(
+                    hero = {},
                     event = null,
                     channelIdentity = "1 One",
                     channelName = "One",
@@ -166,20 +169,17 @@ class PlayerMotionTest {
         )
     }
 
-    @Test fun closingRecordingInfoHandsFocusAndKeysToInfoWhileThePanelFades() {
+    @Test fun closingRecordingInfoHandsFocusAndKeysToTheCardWhileThePanelFades() {
         var infoPresses = 0
         checkPanelCloseHandsFocusBack(
             panelTag = "recording-info-panel",
-            actionTag = "player-info",
+            actionTag = "player-identity-card",
             activations = { infoPresses },
-            controls = { loader, _, restore, restored ->
-                RecordingOverlayControls(
-                    imageLoader = loader, piconPath = null, title = "News", subtitle = null,
-                    channelName = "One", positionMs = 600_000, durationMs = 3_600_000,
-                    growing = false, nowSec = 1_800, canSeek = true, controlsVisible = true,
-                    optionsOpen = false, onTogglePlayPause = {}, onSeek = {}, onStopPlayback = {},
-                    onUserInteraction = {}, onOpenOptions = {}, onOpenInfo = { infoPresses++ },
-                    restoreInfoFocus = restore, onInfoFocusRestored = restored,
+            controls = { _, open, restore, restored ->
+                RecordingChromeFixture(
+                    positionMs = 600_000, panelOpen = open, onInfo = { infoPresses++ },
+                    restoreFocus = "player-identity-card".takeIf { restore },
+                    onFocusRestored = { if (restore) restored() },
                 )
             },
             panel = {
@@ -199,9 +199,7 @@ class PlayerMotionTest {
             val loader = remember { ImageLoader(context) }
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
-                    PlayerControlsLayer(visible = true, modalVisible = open) {
-                        liveControls(loader, optionsOpen = open, restoreOptionsFocus = restore, onOptionsFocusRestored = { restore = false })
-                    }
+                    liveControls(loader, optionsOpen = open, restoreOptionsFocus = restore, onOptionsFocusRestored = { restore = false })
                     PlayerPanelVisibility(Unit.takeIf { open }) {
                         optionsRoot(onPageChange = { pageRequests += it })
                     }
@@ -336,197 +334,7 @@ class PlayerMotionTest {
         assertEquals(0.9f, fill().fetchSemanticsNode().size.width / track, 0.01f)
     }
 
-    @Test fun channelChangeCrossfadesTheIdentityInPlaceWithoutDuplicatingTags() {
-        var identity by mutableStateOf(PlayerHeaderIdentity("1", 10L))
-        var eyebrow by mutableStateOf("1 One")
-        var status by mutableStateOf(recording)
-        lateinit var view: View
-        compose.setContent {
-            view = LocalView.current
-            val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme {
-                Box(Modifier.fillMaxSize().background(Color.Black)) {
-                    PlayerIdentityHeader(
-                        imageLoader = loader, piconPath = null, eyebrow = eyebrow, title = "News",
-                        support = null, clock = "20:00", clockSupport = null,
-                        tags = PlayerHeaderTags(picon = "picon", eyebrow = "eyebrow", title = "title"),
-                        status = status,
-                        identity = identity,
-                    )
-                }
-            }
-        }
-        compose.waitForIdle()
-        val settled = headerTops()
-        val oneRight = compose.onNodeWithTag("eyebrow").fetchSemanticsNode().boundsInRoot.right
-        // Where only the longer incoming name draws.
-        fun newOnly() = compose.onNodeWithTag("eyebrow").fetchSemanticsNode().boundsInRoot
-            .let { it.copy(left = oneRight + 8f) }
-
-        fun drawn(tag: String) =
-            compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().size
-
-        /**
-         * Steps the identity and samples 12 frames: nothing moves, one of each tag stays, the
-         * shown status is exactly the incoming one's and a fading copy exactly the outgoing one's.
-         * Returns whether text and status crossfaded, i.e. their outgoing content was still drawn.
-         */
-        fun step(next: PlayerHeaderIdentity, text: String, nextStatus: PlayerHeaderStatus): Pair<Boolean, Boolean> {
-            val previousStatus = status
-            compose.mainClock.autoAdvance = false
-            change {
-                identity = next
-                eyebrow = text
-                status = nextStatus
-            }
-            val crossfading = (1..12).map {
-                compose.mainClock.advanceTimeByFrame()
-                assertEquals("the header moved on frame $it", settled, headerTops())
-                compose.onAllNodesWithTag("eyebrow").assertCountEquals(1)
-                compose.onAllNodesWithTag("picon").assertCountEquals(1)
-                compose.onAllNodesWithTag(STATUS_TAG).assertCountEquals(1)
-                compose.onNodeWithTag("eyebrow").assertTextEquals(text)
-                compose.onNodeWithTag(STATUS_TAG).assertContentDescriptionEquals(statusDescription(nextStatus))
-                assertStatusCopies("frame $it", incoming = nextStatus, outgoing = previousStatus)
-                // Outgoing content is still drawn, without semantics, while it fades.
-                (drawn("eyebrow") == 2) to (drawn(STATUS_TAG) == 2)
-            }
-            compose.mainClock.advanceTimeBy(1_000)
-            assertEquals(settled, headerTops())
-            assertEquals(1, drawn("eyebrow"))
-            assertEquals(1, drawn(STATUS_TAG))
-            assertEquals(StatusCopies(statusTags(nextStatus)), statusCopies())
-            return crossfading.any { it.first } to crossfading.any { it.second }
-        }
-
-        // A channel change crossfades picon, text and status in place: the longer incoming
-        // name is drawn partly transparent where the outgoing one never was.
-        compose.mainClock.autoAdvance = false
-        change {
-            identity = PlayerHeaderIdentity("2", 20L)
-            eyebrow = "2 Two Longer Name"
-            status = live
-        }
-        val fadeInk = (1..6).map {
-            compose.mainClock.advanceTimeByFrame()
-            assertEquals("the header moved on frame $it", settled, headerTops())
-            assertStatusCopies("frame $it", incoming = live, outgoing = recording)
-            ink(view, newOnly())
-        }
-        compose.mainClock.advanceTimeBy(1_000)
-        val fullInk = ink(view, newOnly())
-        assertTrue("the incoming name did not fade in: $fadeInk of $fullInk",
-            fadeInk.any { it > 0.05f * fullInk && it < 0.95f * fullInk })
-        assertEquals(settled, headerTops())
-
-        // Back to the recording channel: REC arrives with the incoming status only.
-        assertEquals("a channel step crossfades text and status", true to true,
-            step(PlayerHeaderIdentity("1", 10L), "1 One", recording))
-        assertEquals("a programme change crossfades the text only", true to false,
-            step(PlayerHeaderIdentity("1", 11L), "1 One", recording.copy(paused = true)))
-    }
-
-    @Test fun outgoingStatusKeepsItsOwnChannelsTagsWhileItFades() {
-        var channel by mutableStateOf(ChannelId(1))
-        var recordingNow by mutableStateOf(true)
-        compose.setContent {
-            val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme {
-                liveControls(
-                    loader, optionsOpen = false, channelId = channel,
-                    timeshiftState = atLive, channelRecordingNow = recordingNow,
-                )
-            }
-        }
-        compose.waitForIdle()
-        assertEquals(StatusCopies(incoming = setOf("Live", "REC")), statusCopies())
-
-        /**
-         * Zaps and samples 8 frames: the shown status is always exactly the incoming channel's,
-         * and while both copies are drawn the fading one is exactly the outgoing channel's.
-         */
-        fun zap(to: ChannelId, records: Boolean, incoming: Set<String>, outgoing: Set<String>) {
-            compose.mainClock.autoAdvance = false
-            change {
-                channel = to
-                recordingNow = records
-            }
-            val overlap = (1..8).mapNotNull {
-                compose.mainClock.advanceTimeByFrame()
-                val copies = statusCopies()
-                assertEquals("incoming status on frame $it", incoming, copies.incoming)
-                copies.takeIf { copies.outgoing.isNotEmpty() }
-            }
-            assertTrue("the status did not crossfade", overlap.isNotEmpty())
-            overlap.forEachIndexed { frame, copies ->
-                assertEquals("status copies on overlap frame ${frame + 1}", StatusCopies(incoming, outgoing), copies)
-            }
-            compose.mainClock.advanceTimeBy(1_000)
-            assertEquals(StatusCopies(incoming), statusCopies())
-        }
-
-        // From a channel that records to one that does not, and back: REC stays with the
-        // channel that records, on the fading copy and on the incoming one.
-        zap(ChannelId(2), records = false, incoming = setOf("Live"), outgoing = setOf("Live", "REC"))
-        zap(ChannelId(3), records = true, incoming = setOf("Live", "REC"), outgoing = setOf("Live"))
-    }
-
-    @Test fun channelMotionFollowsTheChannelIdNotItsNumberOrName() {
-        var channel by mutableStateOf(ChannelId(1))
-        var name by mutableStateOf("News")
-        var now by mutableStateOf(1_200L)
-        val programme = EpgEvent.create(
-            id = EventId(5),
-            channelId = ChannelId(1),
-            start = Instant.fromEpochSeconds(0),
-            stop = Instant.fromEpochSeconds(3_600),
-            title = "Evening news",
-        )
-        compose.setContent {
-            val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme {
-                liveControls(
-                    loader, optionsOpen = false, channelId = channel, channelName = name,
-                    nowEvent = programme, nowSec = now,
-                )
-            }
-        }
-        compose.waitForIdle()
-        val settledTop = identityTop()
-        val track = fill().fetchSemanticsNode().size.width * 3f
-        fun identities() =
-            compose.onAllNodesWithTag("player-channel-identity", useUnmergedTree = true).fetchSemanticsNodes().size
-
-        // Another channel with the same number and name: the identity crossfades in place,
-        // the timeline snaps.
-        compose.mainClock.autoAdvance = false
-        change {
-            channel = ChannelId(2)
-            now = 2_400
-        }
-        repeat(2) { compose.mainClock.advanceTimeByFrame() }
-        assertEquals("an identical-looking channel did not crossfade", 2, identities())
-        assertEquals("the identity moved on a zap", settledTop, identityTop(), 0.01f)
-        assertEquals(2f / 3f, fill().fetchSemanticsNode().size.width / track, 0.01f)
-        compose.mainClock.advanceTimeBy(1_000)
-
-        // New metadata for the same channel: the identity updates in place, the timeline glides.
-        change {
-            name = "News HD"
-            now = 600
-        }
-        repeat(2) { compose.mainClock.advanceTimeByFrame() }
-        assertEquals("a renamed channel crossfaded", 1, identities())
-        assertEquals("a renamed channel moved", settledTop, identityTop(), 0.01f)
-        compose.mainClock.advanceTimeBy(64)
-        val gliding = fill().fetchSemanticsNode().size.width / track
-        assertTrue("a renamed channel snapped the timeline, was $gliding", gliding > 0.2f && gliding < 0.65f)
-    }
-
-    @Test fun controlsRevealedByAZapFadeInPlaceWhileAViewerRevealMovesThemIn() {
+    @Test fun aZapKeepsVisibleControlsInPlaceWhileAViewerRevealMovesThemIn() {
         lateinit var layers: LivePlayerLayerState
         var channel by mutableStateOf(ChannelId(1))
         compose.setContent {
@@ -535,19 +343,20 @@ class PlayerMotionTest {
             layers = rememberLivePlayerLayerState()
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
-                    PlayerControlsLayer(
-                        visible = layers.controlsVisible,
-                        modalVisible = false,
-                        entry = layers.controlsEntry,
-                    ) { liveControls(loader, optionsOpen = false, channelId = channel) }
+                    liveControls(
+                        loader, optionsOpen = false, channelId = channel,
+                        mode = if (layers.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
+                        entry = layers.chrome.controlsEntry,
+                    )
                 }
             }
         }
+        change { layers.showControls() }
         compose.waitForIdle()
         val settled = chromeTops()
         compose.mainClock.autoAdvance = false
         fun hide() {
-            change { layers.hideControls() }
+            change { layers.chrome.hideControls() }
             compose.mainClock.advanceTimeBy(1_000)
             compose.onNodeWithTag("player-footer").assertDoesNotExist()
         }
@@ -556,21 +365,7 @@ class PlayerMotionTest {
             layers.onChannelTuneRequested()
         }
 
-        // Hidden controls revealed by a zap fade in at their resting place.
-        hide()
-        zap(2)
-        var drawn = 0
-        repeat(14) {
-            compose.mainClock.advanceTimeByFrame()
-            if (compose.onAllNodesWithTag("player-footer").fetchSemanticsNodes().isNotEmpty()) {
-                drawn++
-                assertEquals("zap-revealed chrome moved on frame $it", settled, chromeTops())
-            }
-        }
-        assertTrue("the zap did not reveal the controls", drawn >= 12)
-
         // A zap while the controls are up does not restart their entry.
-        compose.mainClock.advanceTimeBy(1_000)
         zap(3)
         repeat(14) {
             compose.mainClock.advanceTimeByFrame()
@@ -594,10 +389,54 @@ class PlayerMotionTest {
         assertEquals(settled, chromeTops())
     }
 
-    @Test fun typedDigitsAppearAtOnceInAFixedBox() {
-        var number by mutableStateOf("1")
+    @Test fun revealingTheControlsFromTheBannerSlidesItsInfoUpInsteadOfFadingInASecondCopy() {
+        lateinit var layers: LivePlayerLayerState
+        lateinit var view: View
         compose.setContent {
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number, Modifier.testTag("number")) }
+            view = LocalView.current
+            val context = LocalContext.current
+            val loader = remember { ImageLoader(context) }
+            layers = rememberLivePlayerLayerState()
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize()) {
+                    // One chrome: the Banner and the controls are two of its modes.
+                    liveControls(
+                        loader, optionsOpen = false, channelId = ChannelId(1), title = "Programme",
+                        mode = playerChromeMode(layers.chrome.controlsVisible, layers.chrome.bannerVisible, stepPreview = false),
+                        entry = layers.chrome.controlsEntry,
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        fun tops() = compose.onAllNodesWithTag("player-info-bar", useUnmergedTree = true).fetchSemanticsNodes().map { it.boundsInRoot.top }
+        compose.onNodeWithTag("player-banner").assertExists()
+        val bannerTop = tops().single()
+        val infoArea = compose.onNodeWithTag("player-info-bar", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val bannerInk = ink(view, infoArea)
+        compose.mainClock.autoAdvance = false
+
+        change { layers.showControls() }
+        compose.mainClock.advanceTimeByFrame()
+        assertEquals("the Banner left at once, without a second copy", 1, tops().size)
+        assertEquals("the info jumped on reveal", bannerTop, tops().single(), 0.5f)
+        assertEquals("the taken-over info was not drawn on the first frame", bannerInk, ink(view, infoArea), bannerInk * 0.05f)
+        compose.mainClock.advanceTimeBy(PlayerMotion.PanelMs / 2L)
+        val rising = tops().single()
+        assertTrue("the info did not rise gradually, was $rising", rising < bannerTop - 0.5f)
+        compose.mainClock.advanceTimeBy(1_000)
+        val drop = with(compose.density) { PlayerBannerDrop.toPx() }
+        assertTrue("the info is not above the rising point", tops().single() < rising)
+        assertEquals("the info did not settle one action row higher", bannerTop - drop, tops().single(), 0.5f)
+    }
+
+    @Test fun typedDigitsAppearAtOnceInACompactEntry() {
+        var number by mutableStateOf("1")
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+        compose.setContent {
+            val context = LocalContext.current
+            val loader = remember { ImageLoader(context) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, loader, null, Modifier.testTag("number")) }
         }
         compose.waitForIdle()
         val width = compose.onNodeWithTag("number").fetchSemanticsNode().size.width
@@ -610,6 +449,106 @@ class PlayerMotionTest {
             compose.onNodeWithText(next.dropLast(1)).assertDoesNotExist()
             assertEquals(width, compose.onNodeWithTag("number").fetchSemanticsNode().size.width)
         }
+        val digits = compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot
+        // Only a known destination extends the badge; the number stays anchored in its slot.
+        change { target = ChannelNumberTarget.Channel("One", null) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("One").assertExists()
+        compose.mainClock.advanceTimeBy(200)
+        assertTrue(compose.onNodeWithTag("number").fetchSemanticsNode().size.width > width)
+        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
+        change { target = ChannelNumberTarget.None }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("No channel").assertExists()
+        compose.onNodeWithText("One").assertDoesNotExist()
+        assertTrue(compose.onNodeWithTag("number").fetchSemanticsNode().size.width >= width)
+        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
+        change { target = ChannelNumberTarget.Pending }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("channel-number-target").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(200)
+        assertEquals("pending has no empty destination compartment", width, compose.onNodeWithTag("number").fetchSemanticsNode().size.width)
+    }
+
+    @Test fun numberDestinationResizesWithoutMovingTheDigitsAndCanReverseMidway() {
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+        compose.setContent {
+            val context = LocalContext.current
+            val loader = remember { ImageLoader(context) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay("123", target, loader, null, Modifier.testTag("number")) }
+        }
+        compose.waitForIdle()
+        fun bounds() = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
+        val compact = bounds()
+        val digits = compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot
+        compose.mainClock.autoAdvance = false
+
+        change { target = ChannelNumberTarget.Channel("A long channel destination", null) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("A long channel destination").assertExists()
+        compose.mainClock.advanceTimeBy(48)
+        val growing = bounds()
+        compose.mainClock.advanceTimeBy(200)
+        val expanded = bounds()
+        assertTrue("the badge grows gradually", growing.width > compact.width && growing.width < expanded.width)
+        assertEquals(compact.left, growing.left, 0.5f)
+        assertEquals(compact.top, growing.top, 0.5f)
+        assertEquals(compact.height, growing.height, 0.5f)
+        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
+
+        change { target = ChannelNumberTarget.Pending }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("channel-number-target").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(48)
+        val shrinking = bounds()
+        assertTrue("the badge shrinks gradually", shrinking.width > compact.width && shrinking.width < expanded.width)
+
+        change { target = ChannelNumberTarget.None }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("No channel").assertExists()
+        compose.onNodeWithText("A long channel destination").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(200)
+        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
+        assertTrue(bounds().width > compact.width)
+
+        change { target = ChannelNumberTarget.Pending }
+        compose.mainClock.advanceTimeBy(200)
+        assertEquals(compact, bounds())
+    }
+
+    @Test fun numberEntryKeepsItsDestinationWhileLeavingAndReopensWithTheLatestDigits() {
+        var number by mutableStateOf("123")
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Channel("One", null))
+        compose.setContent {
+            val context = LocalContext.current
+            val loader = remember { ImageLoader(context) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, loader, null, Modifier.testTag("number")) }
+        }
+        compose.waitForIdle()
+        val shown = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
+        compose.mainClock.autoAdvance = false
+
+        change { number = ""; target = ChannelNumberTarget.Pending }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(32)
+        compose.onNodeWithText("123").assertExists()
+        compose.onNodeWithText("One").assertExists()
+        assertEquals("the complete badge fades without first collapsing", shown,
+            compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot)
+
+        change { number = "7"; target = ChannelNumberTarget.Channel("Seven", null) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("7").assertExists()
+        compose.onNodeWithText("Seven").assertExists()
+        compose.onNodeWithText("123").assertDoesNotExist()
+        compose.onNodeWithText("One").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithText("7").assertExists()
+
+        change { number = ""; target = ChannelNumberTarget.Pending }
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithText("7").assertDoesNotExist()
+        compose.onNodeWithText("Seven").assertDoesNotExist()
     }
 
     @Test fun recoveryFocusesRetryAsItStartsToAppearAndLetsGoAtOnce() {
@@ -639,23 +578,6 @@ class PlayerMotionTest {
         assertEquals(0, retries)
     }
 
-    @Test fun tuningStatusLeavesSemanticsOnItsFirstExitFrame() {
-        var visible by mutableStateOf(true)
-        compose.setContent {
-            TVHeadendPlayerTheme { CompactTuningStatus(visible = visible, label = "Tuning", Modifier.testTag("tuning")) }
-        }
-        compose.waitForIdle()
-        compose.onNodeWithTag("tuning").assertExists()
-        compose.mainClock.autoAdvance = false
-        change { visible = false }
-        compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithTag("tuning").assertDoesNotExist()
-        // The unmerged tree still lists cleared content, so it shows the surface is fading.
-        compose.onNodeWithTag("compact-tuning-surface", useUnmergedTree = true).assertExists()
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.onNodeWithTag("compact-tuning-surface", useUnmergedTree = true).assertDoesNotExist()
-    }
-
     /** Applies a state change so the next frame sees it even while the clock is paused. */
     private fun change(block: () -> Unit) = compose.runOnIdle {
         block()
@@ -665,40 +587,8 @@ class PlayerMotionTest {
     private fun fill(): SemanticsNodeInteraction =
         compose.onNodeWithTag("player-timeline-fill", useUnmergedTree = true)
 
-    /** Tops of picon, eyebrow and status: what a zap must keep still. */
-    /** Status tags drawn under the clock, split into the shown copy and a fading one. */
-    private data class StatusCopies(val incoming: Set<String>, val outgoing: Set<String> = emptySet())
-
-    /** Every frame shows exactly [incoming]'s tags; a fading copy, if drawn, exactly [outgoing]'s. */
-    private fun assertStatusCopies(frame: String, incoming: PlayerHeaderStatus, outgoing: PlayerHeaderStatus) {
-        val copies = statusCopies()
-        assertEquals("incoming status on $frame", statusTags(incoming), copies.incoming)
-        if (copies.outgoing.isNotEmpty()) {
-            assertEquals("outgoing status on $frame", statusTags(outgoing), copies.outgoing)
-        }
-    }
-
-    private fun statusCopies(): StatusCopies {
-        val tags = listOf(STATUS_TAG, "player-recording-now").flatMap { tag ->
-            compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes()
-        }
-        // A fading copy sits under a cleared ancestor; each tag clears its own semantics.
-        val (outgoing, incoming) = tags.partition { node ->
-            generateSequence(node.parent) { it.parent }.any { it.config.isClearingSemantics }
-        }
-        fun labels(nodes: List<SemanticsNode>) = nodes.map {
-            it.config[SemanticsProperties.ContentDescription].single().substringBefore(". ")
-                .replace("Recording now", "REC")
-        }.toSet()
-        return StatusCopies(labels(incoming), labels(outgoing))
-    }
-
-    private fun headerTops(): List<Float> = listOf("picon", "eyebrow", STATUS_TAG).map {
-        compose.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot.top
-    }
-
-    /** Header identity and footer tops of live controls. */
-    private fun chromeTops(): Pair<Float, Float> = identityTop() to
+    /** Header and footer tops of live controls. */
+    private fun chromeTops(): Pair<Float, Float> = headerTop() to
         compose.onNodeWithTag("player-footer").fetchSemanticsNode().boundsInRoot.top
 
     /** Summed brightness of [view] as drawn now inside [area] (mdpi: dp are pixels). */
@@ -737,9 +627,8 @@ class PlayerMotionTest {
             val loader = remember { ImageLoader(context) }
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
-                    PlayerControlsLayer(visible = true, modalVisible = open) {
-                        controls(loader, open, restore) { restore = false }
-                    }
+                    // The controls host their own layer, covered while the panel is open.
+                    controls(loader, open, restore) { restore = false }
                     PlayerPanelVisibility(Unit.takeIf { open }) {
                         DisposableEffect(Unit) { panelComposed = true; onDispose { panelComposed = false } }
                         panel()
@@ -808,13 +697,17 @@ class PlayerMotionTest {
     private fun SemanticsNodeInteraction.isFocusedNow(): Boolean =
         fetchSemanticsNode().config.getOrNull(SemanticsProperties.Focused) == true
 
-    private fun identityTop(): Float =
-        compose.onNodeWithTag("player-channel-identity").fetchSemanticsNode().boundsInRoot.top
+    private fun headerTop(): Float =
+        // The header slot fills the chrome, so its entry offset leaves the screen: read it unclipped.
+        compose.onNodeWithTag("player-header").fetchSemanticsNode().positionInRoot.y
 
     @Composable
     private fun liveControls(
         loader: ImageLoader,
         optionsOpen: Boolean,
+        panelOpen: Boolean = optionsOpen,
+        mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
+        entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
         restoreOptionsFocus: Boolean = false,
         onOptionsFocusRestored: () -> Unit = {},
         restoreInfoFocus: Boolean = false,
@@ -823,37 +716,34 @@ class PlayerMotionTest {
         onOpenInfo: () -> Unit = {},
         channelId: ChannelId? = null,
         channelName: String = "One",
+        title: String = "",
         nowEvent: EpgEvent? = null,
         nowSec: Long = 1_800,
         timeshiftState: AppTimeshiftState = AppTimeshiftState(),
-        channelRecordingNow: Boolean = false,
     ) {
-        OverlayControlsTv(
+        PlayerChrome(
+            mode = mode,
+            content = PlayerChromeContent("", liveInfoBarData(1, channelName, null, null, false, nowSec, title)),
+            timeline = PlayerChromeTimeline.Live(timeshiftState, nowSec, nowEvent, motionKey = channelId),
+            actions = PlayerChromeActions(
+                active = !optionsOpen,
+                restoreFocus = when {
+                    restoreInfoFocus -> "player-identity-card"
+                    restoreOptionsFocus -> "player-settings"
+                    else -> null
+                },
+            ),
             imageLoader = loader,
-            channelNumber = 1,
-            channelName = channelName,
-            piconPath = null,
-            nowEvent = nowEvent,
-            nextEvent = null,
-            nowSec = nowSec,
-            controlsVisible = true,
-            optionsOpen = optionsOpen,
-            onOpenChannels = {},
-            onOpenInfo = onOpenInfo,
-            onStopPlayback = {},
-            onUserInteraction = {},
-            onOpenOptions = onOpenOptions,
-            timeshiftState = timeshiftState,
-            channelRecordingNow = channelRecordingNow,
-            timeshiftFeedback = null,
-            onToggleTimeshiftPause = {},
-            onSeekTimeshift = {},
-            onGoLive = {},
-            restoreInfoFocus = restoreInfoFocus,
-            onInfoFocusRestored = onInfoFocusRestored,
-            restoreOptionsFocus = restoreOptionsFocus,
-            onOptionsFocusRestored = onOptionsFocusRestored,
-            channelId = channelId,
+            currentSession = null,
+            onTogglePause = {}, onSeek = {}, onStop = {}, onInteraction = {},
+            onInfo = onOpenInfo,
+            onOptions = onOpenOptions,
+            onFocusRestored = {
+                if (restoreInfoFocus) onInfoFocusRestored()
+                if (restoreOptionsFocus) onOptionsFocusRestored()
+            },
+            entry = entry,
+            panelOpen = panelOpen,
         )
     }
 
@@ -884,19 +774,5 @@ class PlayerMotionTest {
                 }
             }
         }
-    }
-
-    private companion object {
-        const val STATUS_TAG = "player-clock-status"
-        val atLive = AppTimeshiftState(available = true, timingKnown = true, bufferStartMs = -600_000)
-        val recording = PlayerHeaderStatus(paused = false, timeshift = atLive, recordingNow = true)
-        val live = PlayerHeaderStatus(paused = false, timeshift = atLive)
-
-        /** Header fixtures sit at the live edge, so the status tag reads Live. */
-        fun statusDescription(status: PlayerHeaderStatus) =
-            "Live. " + if (status.paused) "Paused" else "Playing"
-
-        fun statusTags(status: PlayerHeaderStatus) =
-            if (status.recordingNow) setOf("Live", "REC") else setOf("Live")
     }
 }

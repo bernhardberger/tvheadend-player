@@ -32,12 +32,9 @@ import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSurface
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
 import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
-import at.bernhardberger.tvhplayer.core.recordingKeyActionStartsOpeningCycle
-import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -115,7 +112,6 @@ class PlayerKeyCycleDispatcherTest {
                 AndroidKeyEvent.KEYCODE_TV_CONTENTS_MENU,
                 AndroidKeyEvent.KEYCODE_TV_NUMBER_ENTRY,
                 AndroidKeyEvent.KEYCODE_BOOKMARK,
-                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
             ),
         )
     }
@@ -413,26 +409,31 @@ private fun DispatcherHarness(
                     }
 
                     DispatcherMode.RECORDING -> {
-                        val action = recordingPlaybackKeyAction(
-                            controlsVisible = controlsVisible,
+                        val action = playerKeyAction(
+                            PlayerKeyContext(
+                                surface = PlayerSurface.RECORDING,
+                                controlsVisible = controlsVisible,
+                                seekbarFocused = false,
+                                timeshiftAvailable = false,
+                            ),
                             keyCode = keyCode,
                         )
-                        if (recordingKeyActionStartsOpeningCycle(action)) {
+                        if (playerKeyActionStartsOpeningCycle(action)) {
                             openingKeyCode = keyCode
                             counts.openingActions++
                         }
                         when (action) {
-                            RecordingPlaybackKeyAction.REVEAL_CONTROLS -> controlsVisible = true
-                            RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
+                            PlayerKeyAction.REVEAL_CONTROLS -> controlsVisible = true
+                            PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
                                 controlsVisible = true
                                 counts.playbackActions++
                             }
-                            RecordingPlaybackKeyAction.OPEN_INFO -> infoOpen = true
-                            RecordingPlaybackKeyAction.SEEK_BACK,
-                            RecordingPlaybackKeyAction.SEEK_FORWARD -> counts.seekActions++
+                            PlayerKeyAction.OPEN_INFO -> infoOpen = true
+                            PlayerKeyAction.SEEK_BACK,
+                            PlayerKeyAction.SEEK_FORWARD -> counts.seekActions++
                             else -> Unit
                         }
-                        action != RecordingPlaybackKeyAction.PASS_THROUGH
+                        action != PlayerKeyAction.PASS_THROUGH
                     }
                 }
             }

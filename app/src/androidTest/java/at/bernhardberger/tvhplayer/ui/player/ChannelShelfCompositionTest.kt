@@ -67,54 +67,61 @@ class ChannelShelfCompositionTest {
                         event.key == Key.Back -> {
                             if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                                 layers.beginOpeningKeyCycle(code)
-                                if (layers.channelDrawerOpen) layers.dismissChannelDrawer() else layers.hideControls()
+                                if (layers.channelDrawerOpen) layers.dismissChannelDrawer() else layers.chrome.hideControls()
                             }
                             true
                         }
                         else -> false
                     }
                 }) {
-                    PlayerControlsLayer(layers.controlsVisible || layers.channelDrawerOpen, modalVisible = false) {
-                        OverlayControlsTv(
-                            imageLoader = loader, channelNumber = 1, channelName = "Channel", piconPath = null,
-                            nowEvent = null, nextEvent = null, nowSec = 0, controlsVisible = layers.controlsVisible,
-                            optionsOpen = false, onOpenChannels = {
-                                layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
-                                layers.openChannelDrawer()
-                            },
-                            onOpenInfo = { activations++ }, onStopPlayback = { activations++ },
-                            onUserInteraction = {}, onOpenOptions = { activations++ },
-                            timeshiftState = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(
-                                available = true, bufferStartMs = -3_600_000, positionMs = -900_000, liveEdgeMs = 0),
-                            paused = pausedGuard,
+                    PlayerChrome(
+                        mode = if (layers.chrome.controlsVisible || layers.channelDrawerOpen) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
+                        content = PlayerChromeContent("", liveInfoBarData(1, "Channel", null, null, false, 0, "")),
+                        timeline = PlayerChromeTimeline.Live(
+                            at.bernhardberger.tvhplayer.playback.AppTimeshiftState(
+                            available = true, bufferStartMs = -3_600_000, positionMs = -900_000, liveEdgeMs = 0),
+                            nowSec = 0,
+                            programme = null,
                             programmeWindow = ProgrammeWindow(event("Programme"), Instant.fromEpochSeconds(900),
-                                0.25f, 0f, 0.75f, 0.75f, true),
-                            timeshiftFeedback = null, onToggleTimeshiftPause = { activations++ },
-                            onSeekTimeshift = {}, onGoLive = {},
-                            restoreChannelAction = layers.restoreChannelAction,
-                            onChannelActionRestored = layers::onChannelActionRestored,
-                            onActionFocused = layers::onActionFocused,
-                            channelRailOpen = layers.channelDrawerOpen,
-                            channelRailContent = {
-                                ChannelDrawer(
-                                    active = layers.channelDrawerOpen,
-                                    channels = if (empty) emptyList() else listOf(Channel.create(id = ChannelId(1), name = "Channel")),
-                                    selectedId = ChannelId(1), playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
-                                    nowEvent = { null }, imageLoader = loader,
-                                    onFocusChannel = {}, onPickChannel = { activations++ }, onCloseDrawer = { code ->
-                                        if (code != null) layers.beginOpeningKeyCycle(code)
-                                        layers.dismissChannelDrawer()
-                                    },
-                                )
-                            },
-                        )
-                    }
+                            0.25f, 0f, 0.75f, 0.75f, true),
+                        ),
+                        actions = PlayerChromeActions(active = layers.chrome.controlsVisible, paused = pausedGuard, restoreFocus = layers.restoreChannelAction),
+                        imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                        onDownFromActions = {
+                            layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
+                            layers.openChannelDrawer()
+                        },
+                        onStop = { activations++ },
+                        onInteraction = {},
+                        onOptions = { activations++ },
+                        onInfo = { activations++ },
+                        onTogglePause = { activations++ },
+                        onSeek = {},
+
+                        onActionFocused = layers::onActionFocused,
+                        onFocusRestored = layers::onChannelActionRestored,
+                        decorationCoversControls = layers.channelDrawerOpen,
+                        controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(expanded = layers.channelDrawerOpen, channelsAvailable = true, peekAlpha = emphasisAlpha, preview = {}, controls = controls, channelContent = {
+                            ChannelDrawer(
+                                active = layers.channelDrawerOpen,
+                                channels = if (empty) emptyList() else listOf(Channel.create(id = ChannelId(1), name = "Channel")),
+                                selectedId = ChannelId(1), playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
+                                nowEvent = { null }, imageLoader = loader,
+                                onFocusChannel = {}, onPickChannel = { activations++ }, onCloseDrawer = { code ->
+                                    if (code != null) layers.beginOpeningKeyCycle(code)
+                                    layers.dismissChannelDrawer()
+                                },
+                            )
+                        }) },
+                    )
                 }
             }
         }
+        // The player enters with the Banner; the shelf is opened from the revealed controls.
+        rule.runOnIdle { layers.showControls() }
         rule.waitForIdle()
         if (rapid) rule.mainClock.autoAdvance = false
-        for (invoker in listOf("player-info", "player-settings", "player-stop")) {
+        for (invoker in listOf("player-pause", "player-settings", "player-stop")) {
             val trackBefore = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             val fillBefore = rule.onNodeWithTag("player-timeline-interactive-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             val actionsBefore = rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot
@@ -140,7 +147,7 @@ class ChannelShelfCompositionTest {
             )))
             rule.onRoot().performKeyInput { keyUp(closeKey) }
             rule.onNodeWithTag(restored).assertIsFocused()
-            assertTrue(layers.controlsVisible)
+            assertTrue(layers.chrome.controlsVisible)
             if (pausedGuard) {
                 val trackAfter = rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val fillAfter = rule.onNodeWithTag("player-timeline-interactive-fill", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -153,7 +160,7 @@ class ChannelShelfCompositionTest {
             assertEquals(0, activations)
         }
         rule.onRoot().performKeyInput { pressKey(Key.Back) }
-        rule.runOnIdle { assertTrue(!layers.controlsVisible) }
+        rule.runOnIdle { assertTrue(!layers.chrome.controlsVisible) }
         rule.mainClock.autoAdvance = true
     }
 

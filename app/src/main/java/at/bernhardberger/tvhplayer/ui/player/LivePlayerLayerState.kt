@@ -27,20 +27,15 @@ import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
 import at.bernhardberger.tvhplayer.core.playbackOptionsKeyOutcome
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
 
 @Stable
 internal class LivePlayerLayerState(
-    private val scope: CoroutineScope,
-    private val autoHideTimeoutMillis: Long,
+    scope: CoroutineScope,
+    autoHideTimeoutMillis: Long,
+    bannerTimeoutMillis: Long = PLAYER_BANNER_MS,
 ) {
-    var controlsVisible by mutableStateOf(true)
-        private set
-
     var channelDrawerOpen by mutableStateOf(false)
         private set
 
@@ -65,21 +60,25 @@ internal class LivePlayerLayerState(
     var revealingKeyCode by mutableStateOf<Int?>(null)
         private set
 
-    /** How the most recent request revealed the controls: a zap fades them in place. */
-    var controlsEntry by mutableStateOf(PlayerControlsEntry.TRAVEL)
-        private set
+    /** The Banner and the controls; the drawer, info panel and options menu cover them. */
+    val chrome = PlayerChromeState(
+        scope = scope,
+        autoHideTimeoutMillis = autoHideTimeoutMillis,
+        bannerTimeoutMillis = bannerTimeoutMillis,
+        isCovered = { channelDrawerOpen || infoOpen || optionsPage != null },
+    )
 
-    private var autoHideEligible = false
-    private var autoHideJob: Job? = null
-    private var disposed = false
     private var lastFocusedAction: String? = null
+    /** The focused control a quick list returns to; unlike the drawer's, it may be Stop. */
+    private var lastFocusedControl: String? = null
     private var channelDrawerReturnAction: String? = null
     private var quickListReturnAction: String? = null
     var restoreChannelAction by mutableStateOf<String?>(null)
         private set
 
     fun onActionFocused(action: String) = profileTrace("P44:focus:control") {
-        lastFocusedAction = action.takeIf { it in setOf("player-pause", "player-info", "player-record", "player-settings") }
+        lastFocusedAction = action.takeIf { it in setOf("player-pause", PlayerIdentityCardTag, "player-record", "player-settings") }
+        lastFocusedControl = lastFocusedAction ?: action.takeIf { it == "player-stop" }
     }
 
     fun onChannelActionRestored() {
@@ -92,28 +91,32 @@ internal class LivePlayerLayerState(
     }
 
     fun onChannelTuneRequested() {
+        if (chrome.hidden) {
+            chrome.peekBanner()
+            return
+        }
         // Quick-zap owns focus until explicitly dismissed, including a failed tune.
-        if (!channelDrawerOpen) revealControls(PlayerControlsEntry.FADE)
+        if (!channelDrawerOpen) chrome.showControls(PlayerControlsEntry.FADE)
     }
 
-    fun showControls() = revealControls(PlayerControlsEntry.TRAVEL)
+    /** A failed tune: with hidden chrome the centre message replaces the Banner. */
+    fun onChannelUnavailable() {
+        if (chrome.hidden) chrome.hideBanner() else onChannelTuneRequested()
+    }
 
-    private fun revealControls(entry: PlayerControlsEntry) {
-        controlsEntry = entry
-        controlsVisible = true
+    /** A programme boundary on the watched channel at the live edge; the caller checks the policy. */
+    fun onProgrammeChanged() {
+        chrome.peekBanner()
+    }
+
+    /** Reveals the controls in place of the channel drawer. */
+    fun showControls() {
         channelDrawerOpen = false
-        restartAutoHideIfEligible()
-    }
-
-    fun hideControls() {
-        controlsVisible = false
-        suspendAutoHide()
+        chrome.showControls()
     }
 
     fun openInfo() {
-        suspendAutoHide()
-        controlsEntry = PlayerControlsEntry.TRAVEL
-        controlsVisible = false
+        chrome.yieldToLayer(controls = false)
         channelDrawerOpen = false
         optionsPage = null
         optionsQuickList = false
@@ -140,9 +143,7 @@ internal class LivePlayerLayerState(
     }
 
     fun showOptionsPage(page: PlaybackOptionsPage) {
-        suspendAutoHide()
-        controlsEntry = PlayerControlsEntry.TRAVEL
-        controlsVisible = true
+        chrome.yieldToLayer(controls = true)
         channelDrawerOpen = false
         infoOpen = false
         recordingConfirmationVisible = false
@@ -158,11 +159,10 @@ internal class LivePlayerLayerState(
     fun showQuickList(page: PlaybackOptionsPage) {
         if (!optionsQuickList) {
             // Over the full menu, focus returns to the gear the menu belongs to.
-            quickListReturnAction = (if (optionsPage != null) "player-settings" else lastFocusedAction)
-                .takeIf { controlsVisible }
+            quickListReturnAction = (if (optionsPage != null) "player-settings" else lastFocusedControl)
+                .takeIf { chrome.controlsVisible }
         }
-        suspendAutoHide()
-        controlsEntry = PlayerControlsEntry.TRAVEL
+        chrome.yieldToLayer()
         channelDrawerOpen = false
         infoOpen = false
         recordingConfirmationVisible = false
@@ -174,7 +174,7 @@ internal class LivePlayerLayerState(
     fun closeQuickList() {
         optionsPage = null
         optionsQuickList = false
-        restoreChannelAction = quickListReturnAction.takeIf { controlsVisible }
+        restoreChannelAction = quickListReturnAction.takeIf { chrome.controlsVisible }
         quickListReturnAction = null
     }
 
@@ -262,11 +262,9 @@ internal class LivePlayerLayerState(
     }
 
     fun openChannelDrawer() {
-        channelDrawerReturnAction = lastFocusedAction.takeIf { controlsVisible }
+        channelDrawerReturnAction = lastFocusedAction.takeIf { chrome.controlsVisible }
         restoreChannelAction = null
-        suspendAutoHide()
-        controlsEntry = PlayerControlsEntry.TRAVEL
-        controlsVisible = false
+        chrome.yieldToLayer(controls = false)
         infoOpen = false
         recordingConfirmationVisible = false
         optionsPage = null
@@ -290,16 +288,6 @@ internal class LivePlayerLayerState(
         if (revealingKeyCode == keyCode) revealingKeyCode = null
     }
 
-    fun updateAutoHideEligibility(eligible: Boolean) {
-        if (disposed || autoHideEligible == eligible) return
-        autoHideEligible = eligible
-        if (eligible) restartAutoHide() else cancelAutoHide()
-    }
-
-    fun onUserInteraction() {
-        restartAutoHideIfEligible()
-    }
-
     fun foregroundContext(
         numberEntryVisible: Boolean = false,
         recoveryVisible: Boolean = false,
@@ -311,43 +299,17 @@ internal class LivePlayerLayerState(
         optionsPage = optionsPage,
         optionsQuickList = optionsQuickList && optionsPage != null,
         numberEntryVisible = numberEntryVisible,
-        channelDrawerVisible = channelDrawerOpen && !controlsVisible && !infoOpen,
+        channelDrawerVisible = channelDrawerOpen && !chrome.controlsVisible && !infoOpen,
         recoveryVisible = recoveryVisible,
         terminalErrorVisible = terminalErrorVisible,
         seekPreviewPhase = seekPreviewPhase,
-        controlsVisible = controlsVisible,
+        controlsVisible = chrome.controlsVisible,
         statsEnabled = statsVisible,
     )
 
     fun dispose() {
-        disposed = true
-        autoHideEligible = false
-        cancelAutoHide()
+        chrome.dispose()
         revealingKeyCode = null
-    }
-
-    private fun suspendAutoHide() {
-        autoHideEligible = false
-        cancelAutoHide()
-    }
-
-    private fun restartAutoHideIfEligible() {
-        if (autoHideEligible) restartAutoHide()
-    }
-
-    private fun restartAutoHide() {
-        cancelAutoHide()
-        autoHideJob = scope.launch {
-            delay(autoHideTimeoutMillis)
-            autoHideJob = null
-            autoHideEligible = false
-            controlsVisible = false
-        }
-    }
-
-    private fun cancelAutoHide() {
-        autoHideJob?.cancel()
-        autoHideJob = null
     }
 }
 

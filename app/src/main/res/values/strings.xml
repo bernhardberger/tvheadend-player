@@ -17,15 +17,7 @@
     <string name="audio_format_stereo_help">Prefer AAC and MPEG audio, without limiting channels.</string>
     <string name="audio_description">Audio description</string>
     <string name="subtitle_follow_system">Follow system caption settings</string>
-    <string name="player_programme_ended_at">Ended at %1$s</string>
-    <string name="player_status_recording_playback">Recording in progress</string>
-    <string name="player_status_recording_now">Recording now</string>
     <string name="player_status_rec">REC</string>
-    <string name="player_status_playing">Playing</string>
-    <string name="player_status_hour">h</string>
-    <string name="player_status_minute">m</string>
-    <string name="player_status_second">s</string>
-    <string name="player_buffering">Buffering…</string>
     <string name="edit_connection">Edit connection</string>
     <string name="edit_connection_description">Server address, ports and credentials</string>
     <string name="connection_overview_status">Status</string>
@@ -64,7 +56,6 @@
     <string name="player_ends_in">Ends at %1$s</string>
     <string name="player_next_event">Up next: %1$s</string>
     <string name="player_next_event_at">Up next at %1$s: %2$s</string>
-    <string name="player_next_event_with_range">Next %1$s: %2$s</string>
 
     <string name="options">Options</string>
     <string name="no_epg">No EPG</string>
@@ -87,6 +78,7 @@
     <string name="show_epg_menu">Show Guide menu</string>
     <string name="show_epg_menu_description">Show Guide in the main navigation rail.</string>
     <string name="player_info">Info</string>
+    <string name="player_channel_number_none">No channel</string>
     <string name="player_shelf_playing">Playing</string>
     <string name="player_shelf_recording">Recording now</string>
     <string name="player_info_close">Close info</string>
@@ -155,7 +147,6 @@
     <string name="main_startup_action_retry">Retry</string>
     <string name="main_startup_action_connection_settings">Connection settings</string>
 
-    <string name="player_tuning_channel">Tuning %1$s…</string>
     <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
     <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>
     <string name="player_playback_recovering">Playback interrupted. Retrying automatically…</string>
@@ -473,7 +464,6 @@
     <string name="track_channels_count">%1$d channels</string>
     <string name="track_clear_dialogue">Clear dialogue</string>
     <string name="timeshift_behind_live">%1$s behind live</string>
-    <string name="timeshift_go_live">Go live</string>
     <string name="timeshift_seek_clamped">Reached the available buffer limit.</string>
     <string name="timeshift_reconnect_live">The server could not confirm the previous position. Returned to live television.</string>
     <string name="timeshift_unavailable">Timeshift is unavailable for this server or stream profile.</string>
@@ -487,7 +477,6 @@
     <string name="player_paused">Paused</string>
     <string name="player_buffer_summary">%1$s available</string>
     <string name="player_current_broadcast">Current broadcast</string>
-    <string name="player_programme_timing_unavailable">Programme timing unavailable</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Allow Tvheadend Player to request a live TV timeshift buffer from your server.</string>
     <string name="refresh_rate_matching_setting">Match content frame rate</string>
@@ -535,4 +524,40 @@
     <string name="background_live_stopped">Live TV was stopped while the app was in the background</string>
     <string name="background_tuner_lost">The tuner was needed elsewhere; live TV was restarted</string>
     <string name="background_live_interrupted">Live TV was interrupted in the background and was restarted</string>
+    <string name="player_live">Live</string>
+    <string name="player_behind">Behind live</string>
+    <string name="player_state_paused">Paused</string>
+    <string name="player_buffering">Buffering…</string>
+    <string name="player_tuning">Tuning</string>
+    <string name="player_recording">Recording now</string>
+    <string name="player_ad">Audio description</string>
+    <string name="player_sub">Subtitles</string>
+    <string name="player_txt">Teletext available</string>
+    <string name="player_raster_spoken">%1$s lines</string>
+    <string name="player_video_spoken">Video %1$s</string>
+    <string name="player_audio_spoken">Audio %1$s</string>
+    <string name="player_recorded_on">Recorded %1$s</string>
+    <string name="player_recorded_ends">Recorded %1$s · Ends %2$s</string>
+    <string name="player_recording_until">Recording until %1$s</string>
+    <string name="player_playing">Playing</string>
+    <string name="player_next">Next · %1$s</string>
+    <string name="player_minutes_left">%1$d min left</string>
+    <string name="player_scheduled">Recording scheduled</string>
+    <string name="player_channel_spoken">Channel %1$s, %2$s</string>
+    <string name="player_now_spoken">Now: %1$s, %2$s</string>
+    <string name="player_ad_short">AD</string>
+    <string name="player_sub_short">SUB</string>
+    <string name="player_txt_short">TXT</string>
+    <string name="player_time_range_spoken">%1$s to %2$s</string>
+    <string name="player_recorded_spoken">%1$s, recorded %2$s, %3$s</string>
+    <string name="player_recorded_date">%1$d %2$s</string>
+    <string-array name="player_month_short">
+        <item>Jan</item><item>Feb</item><item>Mar</item><item>Apr</item><item>May</item><item>Jun</item>
+        <item>Jul</item><item>Aug</item><item>Sep</item><item>Oct</item><item>Nov</item><item>Dec</item>
+    </string-array>
+    <plurals name="player_minutes_left_spoken">
+        <item quantity="one">%1$d minute left</item>
+        <item quantity="other">%1$d minutes left</item>
+    </plurals>
+    <string name="player_channel">Channel</string>
 </resources>

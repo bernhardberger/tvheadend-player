@@ -2,9 +2,11 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -15,8 +17,12 @@ import androidx.compose.ui.Modifier
 /** The controls layer's visibility, so the shared chrome can move its header and footer in. */
 internal val LocalPlayerControlsMotion = staticCompositionLocalOf<AnimatedVisibilityScope?> { null }
 
-/** How the controls enter: a viewer's reveal moves header and footer in, a zap fades them in place. */
-internal enum class PlayerControlsEntry { TRAVEL, FADE }
+/**
+ * How the controls enter: a viewer's reveal moves header and footer in, a zap fades them in place,
+ * and a reveal from the Banner takes over its info and timeline where they rest and slides them up
+ * over the incoming action row ([PlayerChrome] owns that handover; the layer never sees it).
+ */
+internal enum class PlayerControlsEntry { TRAVEL, FADE, FROM_BANNER }
 
 /** The entry style of the current show, fixed when the show began. */
 internal val LocalPlayerControlsEntry = compositionLocalOf { PlayerControlsEntry.TRAVEL }
@@ -42,14 +48,18 @@ internal fun PlayerControlsLayer(
     val showEntry = remember(shown) { entry }
     AnimatedVisibility(
         visible = shown,
-        enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate)),
+        // The fade in runs below, after the first frames. The exit fades here.
+        enter = EnterTransition.None,
         exit = fadeOut(
             if (modalVisible) tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)
             else tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
         ),
         modifier = modifier,
     ) {
-        PlayerMotionFrame(leaving = leaving) {
+        val appear = animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))
+        PlayerMotionFrame(leaving = leaving, modifier = Modifier.graphicsLayer {
+            if (transition.targetState == EnterExitState.Visible) alpha = appear.value
+        }) {
             CompositionLocalProvider(
                 LocalPlayerControlsMotion provides this,
                 LocalPlayerControlsEntry provides showEntry,

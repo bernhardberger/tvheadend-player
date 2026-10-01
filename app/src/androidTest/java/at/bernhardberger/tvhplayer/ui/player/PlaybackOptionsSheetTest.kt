@@ -334,27 +334,17 @@ class PlaybackOptionsSheetTest {
                     visible = true,
                     modalVisible = optionsOpen,
                 ) {
-                    RecordingOverlayControls(
-                        imageLoader = imageLoader,
-                        piconPath = null,
-                        title = "Recording",
-                        subtitle = null,
-                        channelName = "Channel",
+                    RecordingChromeFixture(
                         positionMs = 30_000L,
                         durationMs = 120_000L,
                         growing = false,
-                        nowSec = 0L,
                         canSeek = true,
-                        controlsVisible = true,
-                        optionsOpen = false,
-                        onTogglePlayPause = {},
+                        onTogglePause = {},
                         onSeek = {},
-                        onStopPlayback = {},
-                        onUserInteraction = {},
-                        onOpenOptions = { optionsOpen = true },
-                        onOpenInfo = {},
-                        restoreOptionsFocus = restoreOptionsFocus,
-                        onOptionsFocusRestored = { restoreOptionsFocus = false },
+                        onOptions = { optionsOpen = true },
+                        onInfo = {},
+                        restoreFocus = "player-settings".takeIf { restoreOptionsFocus },
+                        onFocusRestored = { restoreOptionsFocus = false },
                     )
                 }
                 if (optionsOpen) {
@@ -379,7 +369,7 @@ class PlaybackOptionsSheetTest {
             .requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
         composeRule.onNodeWithTag("player-settings").assertDoesNotExist()
-        composeRule.onNodeWithTag("recording-seekbar").assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
         composeRule.onNodeWithTag("playback-options-audio").assertIsFocused()
 
         composeRule.runOnIdle {
@@ -508,11 +498,12 @@ class PlaybackOptionsSheetTest {
         assertEquals(root.width, viewport.width, 1f)
         assertEquals(root.height, viewport.height, 1f)
         assertEquals(16f / 9f, viewport.width / viewport.height, 0.001f)
-        assertEquals(viewport.top, panel.top, 1f)
-        assertEquals(viewport.bottom, panel.bottom, 1f)
+        val inset = with(composeRule.density) { 24.dp.toPx() }
+        assertEquals(viewport.top + inset, panel.top, 1f)
+        assertEquals(viewport.bottom - inset, panel.bottom, 1f)
         assertTrue(panel.left >= viewport.left)
-        assertEquals(viewport.right, panel.right, 1f)
-        assertTrue(panel.width < viewport.width / 2f)
+        assertEquals(viewport.right - inset, panel.right, 1f)
+        assertEquals(with(composeRule.density) { 320.dp.toPx() }, panel.width, 1f)
     }
 
     private fun assertTrackInsidePanel(tag: String) {

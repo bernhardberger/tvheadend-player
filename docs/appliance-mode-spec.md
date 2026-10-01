@@ -151,16 +151,15 @@ fun adjacentChannelId(
   full available EPG metadata, and recording status/action. Back remains the
   canonical dismiss action even when an explicit Close action is also present.
 - The Player composition and remote/focus grammar are specified in
-  `DESIGN.md`. Identity and committed-programme Now/Next remain at top
-  left with start/end times and separate programme progress; the current wall
-  clock remains at top right. Stable Info, Settings, neutral Record and immediate
-  Stop icons sit above the capacity-based timeline with a reserved Live/Go live
-  footprint. EPG never sizes the buffer. Missing timing never becomes a measured
-  live position, and relative durations never establish wall-clock truth.
-- Ordinary channel tuning uses a delayed, non-focusable unboxed status indicator centered
-  over the video area. It must not compete with top metadata or bottom controls;
-  connection loss and genuine playback recovery continue to use the full recovery
-  presentation.
+  `DESIGN.md` §10 (Player chrome): a passive Banner with the programme and
+  timeline, full controls on Up/Down, the wall clock alone at top right, and
+  live distance on the timeline row instead of a Go live control. EPG never sizes
+  the buffer. Missing timing never becomes a measured live position, and relative
+  durations never establish wall-clock truth.
+- Ordinary channel tuning shows the passive Banner with a still timeline and a
+  `Tuning…` line with a small ring in the info bar; nothing is centred over the video. Unavailable
+  channels and failed tunes keep the centre message; connection loss and genuine
+  playback recovery continue to use the full recovery presentation.
 - Live and recording playback expose one **Settings** action in the main
   controls. An opaque full-height right-edge panel
   presents a structured root menu for Audio, Subtitles, Display, and Stats.

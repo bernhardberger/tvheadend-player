@@ -5,6 +5,8 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.MutableTransitionState
@@ -12,6 +14,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -31,8 +35,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 
 /**
- * Player motion tokens: durations, easing and travel. Exits are shorter than
- * enters; nothing springs; only alpha and translation animate.
+ * Player motion tokens: durations, easing and travel. Exits are no longer than
+ * enters; nothing springs. Large surfaces animate only alpha and translation;
+ * the compact number-entry badge also resizes.
  */
 internal object PlayerMotion {
     const val FastMs = 100
@@ -151,6 +156,26 @@ internal fun AnimatedVisibilityScope.animateShown(
     transitionSpec = { if (targetState == EnterExitState.Visible) enter else exit },
     label = label,
 ) { if (it == EnterExitState.Visible) 1f else 0f }
+
+/**
+ * Enter progress, 0 to 1, that starts once the entering content has drawn its first frames.
+ * On a slow TV the first composition of the controls takes about a quarter second; an enter
+ * timed from the state change was used up by then, so the controls jumped into place.
+ */
+@Composable
+internal fun AnimatedVisibilityScope.animateEnterAfterFirstFrames(enter: AnimationSpec<Float>): State<Float> {
+    val visible = transition.targetState == EnterExitState.Visible
+    val progress = remember {
+        Animatable(if (visible && transition.currentState == EnterExitState.Visible) 1f else 0f)
+    }
+    LaunchedEffect(visible) {
+        if (!visible) return@LaunchedEffect
+        withFrameNanos { }
+        withFrameNanos { }
+        progress.animateTo(1f, enter)
+    }
+    return progress.asState()
+}
 
 /**
  * Hosts content that may animate out. While [leaving], the content is removed from

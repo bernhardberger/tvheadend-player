@@ -515,7 +515,7 @@ private fun BrowseViewport(
         modifier = Modifier.fillMaxSize().zIndex(-1f).drawWithContent {
             drawContent()
             run {
-                // Shared overlap trial: a continuous, light falloff without a
+                // Shared overlap: a continuous, light falloff without a
                 // second stop at the drawer edge that reads as a vertical seam.
                 val railWidth = (width.toPx() + ClosedDrawerWidth.toPx() - size.width)
                     .coerceAtLeast(0f)

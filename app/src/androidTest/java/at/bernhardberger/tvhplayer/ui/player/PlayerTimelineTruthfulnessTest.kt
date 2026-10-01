@@ -79,23 +79,32 @@ class PlayerTimelineTruthfulnessTest {
         var previewing by mutableStateOf(false)
         val state = AppTimeshiftState(available = true, bufferStartMs = 0, positionMs = 2_000,
             liveEdgeMs = 10_000, serverBehindLiveMs = 0, displayLiveEdgeMs = 11_000)
+        var orange = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
+                orange = androidx.tv.material3.MaterialTheme.colorScheme.tertiary.toArgb()
                 Box(Modifier.size(400.dp, 100.dp).background(Color.Black)) {
                     PlaybackSeekbar(range = timeshiftSeekbarRange(state), onSeekTo = {},
+                        modifier = Modifier.testTag("server-live-seekbar"),
                         paused = paused, previewing = previewing,
                         timeshiftPosition = at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(state))
                 }
             }
         }
-        val orange = android.graphics.Color.rgb(250, 127, 0)
         fun pixel(fraction: Float): Int {
             val image = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
                 .captureToImage().asAndroidBitmap()
             return image.getPixel((image.width * fraction).toInt(), image.height / 2)
         }
         assertEquals(orange, pixel(0.95f))
+        val seekbar = composeRule.onNodeWithTag("server-live-seekbar").requestFocus()
+        assertEquals(1f, seekbar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current)
+        val track = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals(track.right, composeRule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.center.x, 1f)
+        assertEquals(listOf("−30 seconds"), accessibilityActionLabels("server-live-seekbar"))
         composeRule.runOnIdle { paused = true }
+        assertEquals(2f / 11f, seekbar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current, 0.001f)
         assertEquals(orange, pixel(0.1f))
         assertTrue(orange != pixel(0.95f))
         composeRule.runOnIdle { paused = false; previewing = true }
@@ -109,14 +118,15 @@ class PlayerTimelineTruthfulnessTest {
         var state by mutableStateOf(
             AppTimeshiftState(available = true, bufferStartMs = -60_000L, positionMs = -30_000L),
         )
+        var orange = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
+                orange = androidx.tv.material3.MaterialTheme.colorScheme.tertiary.toArgb()
                 Box(Modifier.size(400.dp, 100.dp).background(Color.Black)) {
                     PlaybackSeekbar(range = timeshiftSeekbarRange(state), onSeekTo = {}, paused = true)
                 }
             }
         }
-        val orange = android.graphics.Color.rgb(250, 127, 0)
         fun pixel(fraction: Float): Int {
             val image = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
                 .captureToImage().asAndroidBitmap()
@@ -140,8 +150,10 @@ class PlayerTimelineTruthfulnessTest {
     @Test
     fun focusedThumbIsSolidWhiteWithoutAColoredFocusRing() {
         var targetAvailable by mutableStateOf(true)
+        var white = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
+                white = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
                 Box(Modifier.size(200.dp, 40.dp).background(Color.Black)) {
                     PlayerTimelineBar(
                         progress = 0.5f,
@@ -157,8 +169,8 @@ class PlayerTimelineTruthfulnessTest {
             val image = composeRule.onNodeWithTag("recording-style-thumb", useUnmergedTree = true)
                 .captureToImage().asAndroidBitmap()
             val ringOffsetPx = with(composeRule.density) { 1.dp.toPx() }.toInt().coerceIn(0, image.height / 2 - 1)
-            assertEquals(android.graphics.Color.WHITE, image.getPixel(image.width / 2, ringOffsetPx))
-            assertEquals("Thumb must stay filled when availability changes", android.graphics.Color.WHITE,
+            assertEquals(white, image.getPixel(image.width / 2, ringOffsetPx))
+            assertEquals("Thumb must stay filled when availability changes", white,
                 image.getPixel(image.width / 2, image.height / 2))
         }
     }
@@ -217,16 +229,17 @@ class PlayerTimelineTruthfulnessTest {
             ProgrammeWindow(event, Instant.fromEpochSeconds(2700), 0.731f, 0.217f, 0.74f, 0.74f, true),
         )
         var white = 0
+        var orange = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 white = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
+                orange = androidx.tv.material3.MaterialTheme.colorScheme.tertiary.toArgb()
                 Box(Modifier.size(333.dp, 40.dp).background(Color.Black)) {
                     PlayerTimelineBlock(progress = 0f, tone = PlayerTimelineTone.INTERACTIVE,
                         programmeWindow = window)
                 }
             }
         }
-        val orange = android.graphics.Color.rgb(250, 127, 0)
         for (progress in listOf(0.731f, 0.742f, 0.749f, 0.757f)) {
             composeRule.runOnIdle { window = window.copy(positionFraction = progress) }
             val image = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
@@ -258,9 +271,11 @@ class PlayerTimelineTruthfulnessTest {
         )
         var tone by mutableStateOf(PlayerTimelineTone.ACTIVE)
         var nonInteractiveColor = 0
+        var orange = 0
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 nonInteractiveColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
+                orange = androidx.tv.material3.MaterialTheme.colorScheme.tertiary.toArgb()
                 Box(Modifier.size(400.dp, 40.dp).background(Color.Black)) {
                     PlayerTimelineBlock(
                         progress = 0f, tone = tone,
@@ -272,7 +287,6 @@ class PlayerTimelineTruthfulnessTest {
                 }
             }
         }
-        val orange = android.graphics.Color.rgb(250, 127, 0)
         fun pixel(fraction: Float): Int {
             val image = composeRule.onNodeWithTag("programme-bar").captureToImage().asAndroidBitmap()
             return image.getPixel((image.width * fraction).toInt(), image.height / 2)
@@ -338,7 +352,8 @@ class PlayerTimelineTruthfulnessTest {
         var positionMs by mutableLongStateOf(-5_000L)
         setLiveOverlay(positionMs = { positionMs })
 
-        composeRule.onNodeWithText("Live").assertIsDisplayed()
+        composeRule.onNodeWithTag("player-live-state").assertContentDescriptionEquals("Live").assertIsDisplayed()
+        composeRule.onNodeWithTag("player-distance", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
         composeRule.onNodeWithTag("player-seekbar")
             .assertContentDescriptionEquals(
@@ -347,8 +362,9 @@ class PlayerTimelineTruthfulnessTest {
 
         composeRule.runOnIdle { positionMs = -6_000L }
 
-        composeRule.onNodeWithText("0:06 behind live").assertIsDisplayed()
-        composeRule.onNodeWithTag("player-go-live").assertExists()
+        composeRule.onNodeWithTag("player-distance", useUnmergedTree = true)
+            .assert(androidx.compose.ui.test.hasText("−0:06", substring = true)).assertIsDisplayed()
+        composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
         composeRule.onNodeWithTag("player-seekbar")
             .assertContentDescriptionEquals(
                 "Timeshift position 0:06 behind live. Buffer starts 10:00 behind live."
@@ -371,7 +387,7 @@ class PlayerTimelineTruthfulnessTest {
                             positionMs = -90_000L,
                             liveEdgeMs = 0L,
                         )
-                        TimeshiftSeekPreview(
+                        QuickStepBanner(
                             state = state,
                             decision = TimeshiftSeekDecision(
                                 targetMs = -120_000L,
@@ -423,7 +439,7 @@ class PlayerTimelineTruthfulnessTest {
                     positionMs = -1_900_000L,
                     liveEdgeMs = 0L,
                 )
-                TimeshiftSeekPreview(
+                QuickStepBanner(
                     state = state,
                     decision = TimeshiftSeekDecision(
                         targetMs = -2_000_000L,
@@ -583,20 +599,24 @@ class PlayerTimelineTruthfulnessTest {
         var growing by mutableStateOf(true)
         setRecordingOverlay(durationMs = { durationMs }, growing = { growing })
 
-        composeRule.onNodeWithText("Still recording", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithTag("recording-seekbar").assertDoesNotExist()
+        composeRule.onNodeWithTag("recording-duration-status")
+            .assertContentDescriptionEquals("Elapsed 0:45. Still recording.").assertIsDisplayed()
+        composeRule.onNodeWithTag("player-end-clock", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
         assertEquals(0, progressSemanticsCount())
-        composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput {
+        // The passive timeline takes no focus: Up from the action row reaches the card.
+        composeRule.onNodeWithTag("player-settings").requestFocus().performKeyInput {
             pressKey(androidx.compose.ui.input.key.Key.DirectionUp)
         }
-        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
 
         composeRule.runOnIdle {
             growing = false
         }
-        composeRule.onNodeWithText("Duration unavailable", useUnmergedTree = true)
-            .assertIsDisplayed()
-        composeRule.onNodeWithTag("recording-seekbar").assertDoesNotExist()
+        composeRule.onNodeWithTag("recording-duration-status")
+            .assertContentDescriptionEquals("Elapsed 0:45. Duration unavailable.").assertIsDisplayed()
+        composeRule.onNodeWithTag("player-end-clock", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
         assertEquals(0, progressSemanticsCount())
 
         composeRule.runOnIdle { durationMs = 120_000L }
@@ -606,10 +626,10 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
 
         composeRule.runOnIdle { durationMs = 120_000L }
-        composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput {
+        composeRule.onNodeWithTag("player-settings").requestFocus().performKeyInput {
             pressKey(androidx.compose.ui.input.key.Key.DirectionUp)
         }
-        composeRule.onNodeWithTag("recording-seekbar").assertIsFocused()
+        composeRule.onNodeWithTag("player-seekbar").assertIsFocused()
         assertEquals(1, progressSemanticsCount())
 
         composeRule.runOnIdle { durationMs = C.TIME_UNSET }
@@ -623,7 +643,9 @@ class PlayerTimelineTruthfulnessTest {
         var growing by mutableStateOf(true)
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                RecordingSeekPreview(
+                RecordingChromeFixture(
+                    mode = PlayerChromeMode.BANNER_STEP,
+                    positionMs = 45_000L,
                     targetMs = 75_000L,
                     originMs = 45_000L,
                     durationMs = C.TIME_UNSET,
@@ -668,25 +690,15 @@ class PlayerTimelineTruthfulnessTest {
                             .size(960.dp, 540.dp)
                             .testTag("recording-timeline-viewport")
                     ) {
-                        RecordingOverlayControls(
-                            imageLoader = imageLoader,
-                            piconPath = null,
-                            title = "Eine außergewöhnlich lange Aufnahmebezeichnung",
-                            subtitle = null,
-                            channelName = "Das Erste",
+                        RecordingChromeFixture(
                             positionMs = 3_661_000L,
                             durationMs = C.TIME_UNSET,
                             growing = false,
-                            nowSec = 5_400L,
                             canSeek = true,
-                            controlsVisible = true,
-                            optionsOpen = false,
-                            onTogglePlayPause = {},
+                            onTogglePause = {},
                             onSeek = {},
-                            onStopPlayback = {},
-                            onUserInteraction = {},
-                            onOpenOptions = {},
-                            onOpenInfo = {},
+                            onOptions = {},
+                            onInfo = {},
                         )
                     }
                 }
@@ -697,8 +709,10 @@ class PlayerTimelineTruthfulnessTest {
             .fetchSemanticsNode().boundsInRoot
         val status = composeRule.onNodeWithTag("recording-duration-status")
             .fetchSemanticsNode().boundsInRoot
-        composeRule.onNodeWithText("Dauer nicht verfügbar", useUnmergedTree = true)
+        composeRule.onNodeWithTag("recording-duration-status")
+            .assert(androidx.compose.ui.test.hasContentDescription("Dauer nicht verfügbar", substring = true))
             .assertIsDisplayed()
+        composeRule.onNodeWithTag("player-end-clock", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("1:01:01", useUnmergedTree = true).assertIsDisplayed()
         assertTrue(status.left >= viewport.left)
         assertTrue(status.top >= viewport.top)
@@ -710,36 +724,33 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.setContent {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
-                OverlayControlsTv(
-                    imageLoader = imageLoader,
-                    channelNumber = 1,
-                    channelName = "Channel",
-                    piconPath = null,
-                    nowEvent = EpgEvent.create(
+                PlayerChrome(
+                    mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("", liveInfoBarData(1, "Channel", null, null, false, 0, "")),
+                    timeline = PlayerChromeTimeline.Live(
+                        AppTimeshiftState(
+                        available = true,
+                        bufferStartMs = -600_000L,
+                        positionMs = positionMs(),
+                        liveEdgeMs = 0L,
+                    ),
+                        nowSec = 5_400L,
+                        programme = EpgEvent.create(
                         id = EventId(1),
                         channelId = ChannelId(1),
                         start = Instant.fromEpochSeconds(3_600L),
                         stop = Instant.fromEpochSeconds(7_200L),
                         title = "Programme",
                     ),
-                    nextEvent = null,
-                    nowSec = 5_400L,
-                    controlsVisible = true,
-                    optionsOpen = false,
-                    onOpenChannels = {},
-                    onStopPlayback = {},
-                    onUserInteraction = {},
-                    onOpenOptions = {},
-                    timeshiftState = AppTimeshiftState(
-                        available = true,
-                        bufferStartMs = -600_000L,
-                        positionMs = positionMs(),
-                        liveEdgeMs = 0L,
                     ),
-                    timeshiftFeedback = null,
-                    onToggleTimeshiftPause = {},
-                    onSeekTimeshift = {},
-                    onGoLive = {},
+                    actions = PlayerChromeActions(active = true),
+                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    onStop = {},
+                    onInteraction = {},
+                    onOptions = {},
+                    onTogglePause = {},
+                    onSeek = {},
+                    onInfo = {},
                 )
             }
         }
@@ -749,25 +760,15 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.setContent {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
-                RecordingOverlayControls(
-                    imageLoader = imageLoader,
-                    piconPath = null,
-                    title = "Recording",
-                    subtitle = null,
-                    channelName = "Channel",
+                RecordingChromeFixture(
                     positionMs = 45_000L,
                     durationMs = durationMs(),
                     growing = growing(),
-                    nowSec = 5_400L,
                     canSeek = true,
-                    controlsVisible = true,
-                    optionsOpen = false,
-                    onTogglePlayPause = {},
+                    onTogglePause = {},
                     onSeek = {},
-                    onStopPlayback = {},
-                    onUserInteraction = {},
-                    onOpenOptions = {},
-                    onOpenInfo = {},
+                    onOptions = {},
+                    onInfo = {},
                 )
             }
         }

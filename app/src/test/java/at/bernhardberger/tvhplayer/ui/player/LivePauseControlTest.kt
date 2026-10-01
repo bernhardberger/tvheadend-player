@@ -72,7 +72,8 @@ class LivePauseControlTest {
             livePause = state
             show()
             compose.onNodeWithTag("player-pause").assertIsFocused().assertIsEnabled()
-            compose.onNodeWithTag("player-info").assertExists()
+            compose.onNodeWithTag("player-settings").assertExists()
+            compose.onNodeWithTag("player-info").assertDoesNotExist()
         }
     }
 
@@ -163,17 +164,14 @@ class LivePauseControlTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize().background(Color(0xFF24384A))) {
                         if (visible) Box(Modifier.align(Alignment.BottomCenter)) {
-                            OverlayControlsTv(
-                                imageLoader = loader, channelNumber = 7, channelName = "Documentary",
-                                piconPath = null, nowEvent = null, nextEvent = null, nowSec = 1_800,
-                                controlsVisible = true, optionsOpen = false,
-                                onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                                timeshiftState = AppTimeshiftState(),
-                                timeshiftFeedback = feedback,
-                                onToggleTimeshiftPause = { toggles++ },
-                                onSeekTimeshift = {}, onGoLive = {},
-                                paused = paused,
-                                livePause = livePause,
+                            PlayerChrome(
+                                mode = PlayerChromeMode.CONTROLS,
+                                content = PlayerChromeContent("", liveInfoBarData(7, "Documentary", null, null, false, 1_800, "")),
+                                timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800, feedback = feedback),
+                                actions = PlayerChromeActions(active = true, paused = paused, livePause = livePause),
+                                imageLoader = loader, currentSession = null,
+                                onTogglePause = { toggles++ },
+                                onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                                 onPauseUnavailable = { feedback = it },
                             )
                         }
@@ -204,7 +202,7 @@ class LivePauseControlTest {
             File(directory, "$name.txt").writeText(
                 "canvas=1920x1080\ndensity=2.0\nlocale=${name.substringBefore('-')}\nfontScale=$fontScale\n" +
                     "leanback=true\nfocus=player-pause\nlivePause=$livePause\npaused=$paused\nfeedback=${feedback.orEmpty()}\n" +
-                    "production OverlayControlsTv; fake state, no playback\n",
+                    "production PlayerChrome; fake state, no playback\n",
             )
             bitmap.recycle()
         }

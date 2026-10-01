@@ -2,20 +2,31 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 
 /** One motion value coordinates departing chrome and the persistent, peeking channel row. */
 @Composable
@@ -24,6 +35,7 @@ internal fun QuickZapPresentation(
     channelsAvailable: Boolean,
     channelContent: @Composable () -> Unit,
     peekAlpha: () -> Float = { 1f },
+    preview: @Composable () -> Unit,
     controls: @Composable () -> Unit,
 ) {
     val expansion = animateFloatAsState(
@@ -35,6 +47,7 @@ internal fun QuickZapPresentation(
         },
         label = "quick-zap-expansion",
     )
+    var previewHeight by remember { mutableIntStateOf(0) }
     Box(Modifier.fillMaxSize().clipToBounds()) {
         Box(
             Modifier.fillMaxSize()
@@ -52,12 +65,45 @@ internal fun QuickZapPresentation(
                     .graphicsLayer {
                         alpha = if (expanded) 1f else peekAlpha()
                         // 12dp focus reserve + 24dp of actual card remains at the bottom.
-                        translationY = (size.height - 36.dp.toPx()) * (1f - expansion.value)
+                        // The passive preview slot above the cards stays below the peek.
+                        val previewSlot = TvOverlayFooterGradientRunout.toPx() + previewHeight.toFloat()
+                        translationY = (size.height - 36.dp.toPx() - previewSlot) * (1f - expansion.value)
                     }
-                    .background(bottomGradient)
+                    // The preview sits above the cards, so the scrim keeps the info bar's
+                    // bottom-anchored stops instead of stretching over the tray. While peeking,
+                    // the tray's top reaches over the transport row, which already sits on the
+                    // controls' own scrim; only the open tray adds one.
+                    .drawBehind {
+                        val span = PlayerChromeTokens.bottomScrimSpan.toPx().coerceAtMost(size.height)
+                        drawRect(
+                            Brush.verticalGradient(
+                                *PlayerChromeTokens.bottomScrimStops,
+                                startY = size.height - span,
+                                endY = size.height,
+                            ),
+                            alpha = expansion.value,
+                        )
+                    }
                     .padding(bottom = 32.dp)
                     .testTag("player-zap-tray"),
-            ) { channelContent() }
+            ) {
+                Column {
+                    // The scrim's clear runout, so the preview text rests on the dark stops.
+                    Spacer(Modifier.height(TvOverlayFooterGradientRunout))
+                    Box(
+                        Modifier.fillMaxWidth()
+                            // Measured with the gap, so the peek offset keeps the cards' top edge.
+                            .onSizeChanged { previewHeight = it.height }
+                            .padding(bottom = PlayerChromeTokens.previewCardGap)
+                            .heightIn(min = PlayerChromeTokens.previewSlotHeight)
+                            .graphicsLayer { alpha = expansion.value }
+                            .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
+                            .testTag("player-zap-preview-slot"),
+                        contentAlignment = Alignment.BottomStart,
+                    ) { preview() }
+                    channelContent()
+                }
+            }
         }
     }
 }

@@ -295,69 +295,134 @@ window, timeshift and scene-marker behaviour are specified in
 `docs/player-ui-ux-overhaul-plan.md` and the playback safety skill; only the
 colour and indication rules above apply here. Remote keys follow §6.
 
-### Shared compact player footer (revised 2026-09-22)
+### Player chrome (revised 2026-09-30)
 
-- Live TV and recordings use the same timeline and seek-preview layout. Endpoint
-  labels sit inline on either side of the track; their values retain the domain's
-  clock-time or elapsed/duration meaning. Recording scene-marker targets use the
-  actual inset track coordinates. Pause is announced accessibly, never prefixed
-  to a visible time endpoint; live fallback offsets remain numeric. Without EPG,
-  endpoints describe the displayed buffer axis (oldest offset to `0:00`), while
-  the floating seek label describes the selected position on that same axis.
-  Server Live status must not override the sampled track fill.
-- One compact, right-aligned passive status row sits beneath the wall clock,
-  with subtle muted dark filled tags (tight padding, small corners, no outline or
-  focus). Blue identifies “Live”; amber identifies explicit localized behind-live
-  time (for example “3m 23s behind live”). A 14dp play/pause icon follows playback
-  intent; durations use localized units.
-  Status reflects committed playback, not a seek preview. Unavailable timing
-  must not claim Live, and enabling timeshift alone does not imply behind-live.
-  A separate red dot + “REC” tag on the same row independently indicates active
-  recording of the current live channel. Completed recording playback has no status.
-  Growing recording playback uses amber play/pause + “Recording in progress” alone, only while
-  current-session DVR state confirms recording. Accessibility retains full intent,
-  behind-live and “Recording now” descriptions without duplicate announcements.
-- Empty status content reserves no row. Go live, seek-target labels
-  and feedback occupy the gradient run-out above the timeline without moving the
-  timeline or action-row anchors. Go live remains above the timeline, reachable
-  from it with Up; it is not an action-row item.
-- Both footer gradients have a 56dp run-out. Plain status text has a local backing
-  for contrast over bright video. Action controls remain 48dp; a 4dp timeline/action
-  gap and 36dp bottom inset move the actions upward without moving the timeline.
-  Standalone seek previews use the same timeline anchor.
-- Live Pause always keeps its slot. While timeshift starts it acts (the server pause
-  follows once the first picture is ready); without a grant or with timeshift off it is dimmed but focusable,
-  and pressing it states the reason in the timeline feedback line.
-- Pause has a transparent idle container, like the other icon actions. Native
-  focused and pressed indication remains intact. The fading action layer reserves
-  8dp of rendering overflow so native focus growth is not cropped mid-animation;
-  measured control positions stay fixed.
+- Live TV and recordings share one chrome with four modes: hidden; the passive
+  **Banner** (clock, info bar, timeline; nothing focusable); the **Banner step**
+  (a quick step's preview inside the Banner, without a thumb); and the
+  **controls** (the Banner's layout plus a focusable seekbar with thumb and the
+  action row). Banner to controls is layout continuity: the info bar and timeline
+  stay, the group rises by one action row and the action row fades in; the bar
+  keeps its right end and grows left over the Banner's state glyph with the rise.
+  Reveal motion starts after the first frames. Hidden chrome is not kept composed and
+  nothing animates while idle.
+- Keys follow §6 and TV-PC: Center toggles pause and shows the Banner, which stays
+  while paused; where live cannot pause, Center shows the Banner with the reason.
+  Left/Right step inside the Banner; Up/Down open the controls; Back hides one
+  layer at a time (the Banner too, also while paused) and then closes. Entering
+  the player or a zap shows the Banner; it hides 5 s after the tune's first
+  presented frame (a positively audio-only service lets its playing state stand in).
+- The wall clock stands alone at the top right over its scrim; there are no status
+  tags. The info bar holds the identity card and the programme block.
+- The identity card is a 16:9 TV Material compact card, 160×90dp for every channel
+  and programme. The picon (or the channel name) is centred in it; the channel
+  number stands at its bottom start. Behind them is the channel's own colour or,
+  when the programme has artwork, that picture dimmed so the picon and the number
+  read over any of it.
+- The programme block has four lines that keep their places whether they have
+  content or not, so nothing moves between programmes. It is bottom-aligned with
+  the fixed-size card and may be slightly taller. The lines are a metadata row
+  (live: programme times and genre; recordings:
+  `Recorded <date> · Ends HH:MM`, or `Recording until HH:MM` while growing) with a
+  red `REC` badge while the channel or recording records and the stream badges,
+  the title, the subtitle, and Next. A recording's episode stands under its title
+  and its last line stays empty. Nothing in the info bar shows tuning or
+  buffering.
+- The programme block groups its title and subtitle closely: 4dp from the
+  metadata row to the title, 2dp from title to subtitle, and 8dp before Next.
+  The live subtitle uses body-medium type; Next and recording episodes use
+  label-large type, retaining their medium weight for scanning. Recordings retain the
+  same overall block height with the 8dp gap before their empty final line.
+- The timeline row is `[state] [start] bar [end]` and nothing else. The label boxes
+  have fixed widths (measured once per player kind from tabular-digit templates),
+  the end is end-aligned on the content edge, and the bar never moves within a
+  layer: not while tuning, stepping, scrubbing, ticking, falling behind live or
+  losing EPG.
+  - State: the Banner shows a passive play or pause glyph left of the start label.
+    The controls have none; the bar grows left into that space as the controls rise.
+  - Live with EPG: the bar is the current programme between its start and end clock
+    times. The rewindable span and live edge are drawn on the bar; within the 5 s
+    live-edge tolerance, or while the server confirms playback at live despite
+    decoder latency, the fill meets the edge. Paused playback and previews keep
+    their sampled or target position.
+  - Distance behind live: at the live edge the chrome draws no status, neither
+    `Live` nor a placeholder. Behind live, also while paused, the explicit label
+    (`3:23 behind live`, localized) stands in the bar's timeshift colour directly
+    above the end clock, flush with its right edge and 8dp above the row, on the
+    height of the info bar's last line. It is an overlay: no row of its own and no change to any
+    resting bounds. Its fixed box is always reserved, so the last info line (and
+    the feedback line) ends before it whether or not it shows. While the step
+    readout overlaps it, it is not drawn. The reserved width includes the localized
+    wording and an hours-length duration at the current font scale.
+  - Live without EPG but with timeshift: the bar is the local-clock half-hour slot
+    (`21:00`–`21:30`) with the buffer as its available span and the same distance. The
+    slot is never programme information: no title, no Next, no record or details
+    target. Without EPG and without timeshift there is no track.
+  - Recordings: the start label is the playback position, never a step target; the
+    end is the length. Completed recordings have no remaining-time label; their
+    information row retains `Ends HH:MM`. A growing recording shows its current
+    length and the same `3:23 behind live` annotation above it when behind its
+    recording head; the `REC` badge names it. At the head the annotation is hidden.
+    Without a known length there is no end or behind-live annotation.
+  - A zap shows the new channel's airing programme (bar, title, Next) from the
+    channel change until the committed programme window resolves; only a pause or
+    a timeshift command ends that. A change of axis snaps, so the fill never slides
+    back or drops to zero. While timeshift is available or expected and timing is
+    momentarily unknown, the row holds what this live request last presented; with
+    nothing held it is an empty track without a distance, never a borrowed
+    broadcast axis or a live claim.
+- The step readout is an opaque chip at the target. It shows the target (live:
+  distance behind live; recordings: position) led by rewind or fast-forward from
+  the step's net movement, and `▶ Live` when the target is the live edge. In the
+  controls it sits 8dp above the thumb and the info bar fades; in the Banner step
+  there is no thumb, it rests on the bar row and the info bar stays.
+- There is no Go live control: stepping or scrubbing forward reaches live.
+- The action row is Play/Pause and Stop, then Record and Settings at the right.
+  There is no Info button: the identity card opens Info. Controls focus starts on
+  Play/Pause. Seekbar: Left/Right scrub, Down to the last focused action, Up to
+  the card. Actions: Left/Right along the row without wrapping, Up to the seekbar,
+  or to the card where the timeline takes no focus. Center toggles pause on
+  Play/Pause and the seekbar. Where live cannot pause (no grant, timeshift off)
+  Play/Pause is dimmed but focusable and states the reason in the timeline
+  feedback line.
+- The card takes focus in the controls only; in the Banner it is a picture. OK
+  opens Info and closing Info returns focus to the card, also when the INFO key
+  opened it. Down leads to the seekbar, or to Play/Pause where the timeline takes
+  no focus; Left, Right and Up lead nowhere. Above a recording's markers, Up from
+  the seekbar opens the markers and Up again closes them and moves on to the card.
+- Numeric entry is a compact, single-line badge at the top left (56dp start,
+  48dp top). Digits are centred within a slot sized for at least three digits;
+  a known destination extends the badge with an optional picon and one-line name.
+  Pending input shows only the digit slot. The whole badge fades in and out over
+  100ms, without travel or scale. Destination-width changes settle over 150ms,
+  anchored at the start edge with fixed height; new digits and labels update
+  immediately, including during an interrupted transition. Cancel and commit use
+  the same exit, retaining the last complete badge while it fades. Tuning never
+  waits for animation. An unknown number shows `No channel` for two seconds before
+  dismissal; it has no shake, flash or success-style confirmation.
+- Tuning and buffering show as one thin ring centred over the video, without a
+  panel, scrim or text: 44dp, 3dp stroke with a fine dark outline, 180 ms fade. It
+  appears after 500 ms of an owned tune that has not presented and after 1 s of
+  continuous buffering, identically in every chrome layer, and layer changes do
+  not restart the delays. It is not focusable, moves nothing, is not composed while
+  idle and yields to the centre message of unavailable channels and failed tunes
+  and to the recovery presentation. A paused player with hidden chrome keeps a
+  small chip at the bottom left (`❚❚ −3:23`, `❚❚ Live` at the live edge).
+- Accessibility: the ring announces `Tuning` or `Buffering` once per start as a
+  polite live region; playback state and the live state are polite live regions
+  that announce each change (paused, playing, live, behind live) once, never the
+  ticking number, and the live state is announced at the live edge although nothing
+  is drawn there. Each clock is spoken once per layer. Progress semantics sit on
+  the track and exist only in the controls.
+- Scrims cover only what the chrome needs. The bottom scrim belongs to the footer:
+  clear 56dp above its first line, 0.60 black at that line, 0.80 52dp further
+  down, 0.92 at the bottom edge; it rises with the footer when the controls open.
+  The top fade behind the clock is 112dp (0.64 at the edge, 0.40 at 56dp). The
+  quick-zap tray keeps its own bottom-anchored scrim.
+- Action controls are 48dp. The reveal alpha is part of the focus-emphasis layer,
+  whose expanded bounds keep native focus growth uncropped mid-animation.
 - Channels rows and quick-zap cards share neutral content-colour play/pause
-  markers. An indeterminate spinner occupies the same slot during an owned
-  channel tune. Presented buffering is not a new tune; pause follows playback
-  intent. Recording indicators remain independent.
-- Timeline focus brightens endpoint labels to full emphasis and fades surrounding
-  actions and the passive channel peek to 0.55 over 180ms. The expanded
-  channel tray stays fully visible. Identity-header and quick-zap geometry remain
-  unchanged.
-- While actively seeking with timeline focus, actions and the passive channel
-  peek fade out fully. The top programme header and clock remain visible in both
-  full controls and standalone previews. Programme identity and schedule endpoints
-  follow the preview target; passive Live/behind-live status remains committed.
-   Ended programmes show “Ended at HH:mm” beneath the title, based on the current
-   server clock, in both full controls and standalone previews; timeline endpoint
-   labels retain their original meaning. Cancelling restores the actual playback
-   programme. Missing historical metadata
-  uses an unavailable-programme presentation and numeric buffer axis, never the
-  current broadcast's title or schedule. Leaving timeline focus restores the destination even if the seek is
-  still pending; hidden content exposes no accessibility actions. Back retains
-  the existing preview-cancel/dismiss and controls-hide sequence. Physical-TV
-  judgment of this treatment is still pending.
-- An uninterrupted playback stall shows the existing compact tuning-style spinner
-  with “Buffering…” after one second, for live and recording playback. Initial
-  tuning retains its own status. Pause, inactive playback and recovery/error
-  presentation suppress buffering feedback; target changes reset its delay. It
-  neither takes focus nor moves controls.
+  markers; an indeterminate spinner occupies the same slot during an owned tune.
 
 ### Retained programme history (revised 2026-09-22)
 

@@ -117,6 +117,9 @@ fun humanCodecName(sampleMimeType: String?): String? {
     val mime = sampleMimeType?.trim().orEmpty()
     if (mime.isEmpty()) return null
     return when {
+        mime.equals("video/avc", ignoreCase = true) -> "H.264"
+        mime.equals("video/hevc", ignoreCase = true) -> "HEVC"
+        mime.equals("video/mpeg2", ignoreCase = true) -> "MPEG-2"
         mime.contains("eac3", ignoreCase = true) -> "Dolby Digital Plus"
         mime.contains("ac3", ignoreCase = true) -> "Dolby Digital"
         mime.contains("ac4", ignoreCase = true) -> "Dolby AC-4"
@@ -135,3 +138,11 @@ fun humanCodecName(sampleMimeType: String?): String? {
     }
 }
 
+/** Compact display names share the MIME classification used by full track/detail labels. */
+fun shortCodecName(sampleMimeType: String?): String? = when (val name = humanCodecName(sampleMimeType)) {
+    "Dolby Digital Plus" -> "DD+"
+    "Dolby Digital" -> "DD"
+    "Dolby AC-4" -> "AC-4"
+    "MPEG-1 Layer II" -> "MP2"
+    else -> name
+}

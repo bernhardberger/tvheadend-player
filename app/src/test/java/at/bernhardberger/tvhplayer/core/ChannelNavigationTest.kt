@@ -151,6 +151,21 @@ class ChannelNavigationTest {
     }
 
     @Test
+    fun anEntryCanExtendOnlyTowardsANumberThatFitsTheDigitLimit() {
+        val numbered = listOf(cid(1), cid(2), cid(3))
+        val numbers = mapOf(cid(1) to 1L, cid(2) to 15L, cid(3) to 104L)
+        assertEquals(true, ChannelNavigation.canExtendToNumber(numbered, numbers, "1", 3))
+        assertEquals(true, ChannelNavigation.canExtendToNumber(numbered, numbers, "10", 3))
+        assertEquals("nothing starts with 2", false, ChannelNavigation.canExtendToNumber(numbered, numbers, "2", 3))
+        assertEquals("104 is complete", false, ChannelNavigation.canExtendToNumber(numbered, numbers, "15", 2))
+        assertEquals("a leading zero still leads to 15", true, ChannelNavigation.canExtendToNumber(numbered, numbers, "01", 3))
+        assertEquals("but not to 104 within three digits", false, ChannelNavigation.canExtendToNumber(numbered, numbers, "010", 3))
+        assertEquals("a complete entry extends to nothing", false, ChannelNavigation.canExtendToNumber(numbered, numbers, "104", 3))
+        assertEquals("positions stand in for missing numbers", true,
+            ChannelNavigation.canExtendToNumber(List(12) { cid(it + 1) }, emptyMap(), "1", 2))
+    }
+
+    @Test
     fun channelNumber_usesTvheadendChannelNumber() {
         assertEquals(1L, ChannelNavigation.numberForId(channels, channelNumbers, cid(10)))
         assertEquals(4L, ChannelNavigation.numberForId(channels, channelNumbers, cid(30)))

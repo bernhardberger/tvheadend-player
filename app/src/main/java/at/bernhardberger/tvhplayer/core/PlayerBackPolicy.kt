@@ -34,6 +34,8 @@ enum class PlayerBackAction {
     CLEAR_NUMBER_ENTRY,
     CLOSE_CHANNEL_DRAWER,
     CLOSE_PLAYER,
+    /** The passive Banner hides before Back closes the player, also while paused. */
+    HIDE_BANNER,
     CANCEL_PENDING_SEEK,
     DISMISS_SEEK_FEEDBACK,
     HIDE_CONTROLS,
@@ -98,6 +100,7 @@ fun playerBackAction(
     surface: PlayerSurface,
     foregroundLayer: PlayerForegroundLayer,
     seekPreviewPhase: PlayerSeekPreviewPhase = PlayerSeekPreviewPhase.NONE,
+    bannerVisible: Boolean = false,
 ): PlayerBackAction = when (foregroundLayer) {
     PlayerForegroundLayer.CONFIRMATION -> PlayerBackAction.DISMISS_CONFIRMATION
     PlayerForegroundLayer.INFO -> PlayerBackAction.CLOSE_INFO
@@ -106,9 +109,11 @@ fun playerBackAction(
     PlayerForegroundLayer.OPTIONS_ROOT -> PlayerBackAction.CLOSE_OPTIONS
     PlayerForegroundLayer.NUMBER_ENTRY -> PlayerBackAction.CLEAR_NUMBER_ENTRY
     PlayerForegroundLayer.CHANNEL_DRAWER -> PlayerBackAction.CLOSE_CHANNEL_DRAWER
+    // Recovery and errors cover the Banner: Back leaves at once.
     PlayerForegroundLayer.RECOVERY,
-    PlayerForegroundLayer.TERMINAL_ERROR,
-    PlayerForegroundLayer.NONE -> PlayerBackAction.CLOSE_PLAYER
+    PlayerForegroundLayer.TERMINAL_ERROR -> PlayerBackAction.CLOSE_PLAYER
+    PlayerForegroundLayer.NONE ->
+        if (bannerVisible) PlayerBackAction.HIDE_BANNER else PlayerBackAction.CLOSE_PLAYER
     PlayerForegroundLayer.PENDING_SEEK_PREVIEW -> PlayerBackAction.CANCEL_PENDING_SEEK
     PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW -> PlayerBackAction.DISMISS_SEEK_FEEDBACK
     PlayerForegroundLayer.CONTROLS -> when (seekPreviewPhase) {

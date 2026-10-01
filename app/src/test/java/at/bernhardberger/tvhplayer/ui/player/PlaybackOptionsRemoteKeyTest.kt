@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.core.playerKeyAction
+import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import android.app.Application
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.focusable
@@ -42,12 +44,10 @@ import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSurface
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.core.playbackOptionsKeyOutcome
 import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
-import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
@@ -556,7 +556,7 @@ class PlaybackOptionsRemoteKeyTest {
                                 quickListAvailable = targetAvailable,
                                 keyContext = PlayerKeyContext(
                                     surface = PlayerSurface.LIVE,
-                                    controlsVisible = state.controlsVisible,
+                                    controlsVisible = state.chrome.controlsVisible,
                                     seekbarFocused = false,
                                     timeshiftAvailable = true,
                                     optionsOpen = state.optionsPage != null,
@@ -624,9 +624,9 @@ class PlaybackOptionsRemoteKeyTest {
         showRecording(controlsVisible = true)
         for ((origin, close) in listOf(
             "player-stop" to Key.Back,
-            "player-info" to Key.DirectionCenter,
+            "player-identity-card" to Key.DirectionCenter,
             "player-settings" to null,
-            "recording-seekbar" to Key.Back,
+            "player-seekbar" to Key.Back,
         )) {
             compose.onNodeWithTag(origin).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
             frames()
@@ -683,8 +683,12 @@ class PlaybackOptionsRemoteKeyTest {
                                 }
                                 return@onPreviewKeyEvent true
                             }
-                            val action = recordingPlaybackKeyAction(controlsVisible = false, keyCode = keyCode)
-                            if (action != RecordingPlaybackKeyAction.OPEN_OPTIONS) return@onPreviewKeyEvent false
+                            val action = playerKeyAction(
+                                PlayerKeyContext(PlayerSurface.RECORDING, controlsVisible = false,
+                                    seekbarFocused = false, timeshiftAvailable = false),
+                                keyCode,
+                            )
+                            if (action != PlayerKeyAction.OPEN_OPTIONS) return@onPreviewKeyEvent false
                             revealingKeyCode = keyCode
                             when (
                                 val outcome = playbackOptionsKeyOutcome(
@@ -709,19 +713,16 @@ class PlaybackOptionsRemoteKeyTest {
                         .focusRequester(rootFocus)
                         .focusable(),
                 ) {
-                    PlayerControlsLayer(visible = controlsVisible, modalVisible = optionsPage != null) {
-                        RecordingOverlayControls(
-                            imageLoader = loader,
-                            piconPath = null, title = "Recording", subtitle = null, channelName = null,
-                            positionMs = 10_000, durationMs = 100_000, growing = false, nowSec = 0,
-                            canSeek = true, controlsVisible = controlsVisible, optionsOpen = optionsPage != null,
-                            onTogglePlayPause = {}, onSeek = {}, onStopPlayback = {}, onUserInteraction = {},
-                            onOpenOptions = {}, onOpenInfo = {},
-                            restoreQuickListControl = restoreControl,
-                            onQuickListFocusRestored = { restoreControl = null },
-                            onControlFocused = { lastControl = it },
-                        )
-                    }
+                    RecordingChromeFixture(
+                        mode = if (controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
+                        positionMs = 10_000, durationMs = 100_000,
+                        active = controlsVisible && optionsPage == null,
+                        panelOpen = optionsPage != null,
+                        restoreFocus = restoreControl,
+                        onFocusRestored = { restoreControl = null },
+                        onActionFocused = { lastControl = it },
+                        imageLoader = loader,
+                    )
                     optionsPage?.let { page ->
                         PlaybackOptionsSheet(
                             page = page,

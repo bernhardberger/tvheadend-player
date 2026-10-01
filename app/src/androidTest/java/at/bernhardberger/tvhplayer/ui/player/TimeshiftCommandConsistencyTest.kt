@@ -52,16 +52,25 @@ class TimeshiftCommandConsistencyTest {
         rule.setContent {
             input = LocalInputModeManager.current
             TVHeadendPlayerTheme {
-                OverlayControlsTv(
-                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
-                    channelName = "Fixture", channelNumber = 1, piconPath = null,
-                    nowEvent = null, nextEvent = null, nowSec = 0L,
-                    controlsVisible = true, optionsOpen = false,
-                    onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                    timeshiftState = state.value, paused = true,
-                    onSeekTimeshift = commands::add, timeshiftFeedback = feedback.value,
-                    timeshiftFeedbackIsError = feedbackIsError.value,
-                    onToggleTimeshiftPause = { toggles++ }, onGoLive = {},
+                PlayerChrome(
+                    mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("", liveInfoBarData(1, "Fixture", null, null, false, 0, "")),
+                    timeline = PlayerChromeTimeline.Live(
+                        state.value,
+                        nowSec = 0L,
+                        programme = null,
+                        feedback = feedback.value,
+                        feedbackIsError = feedbackIsError.value,
+                    ),
+                    actions = PlayerChromeActions(active = true, paused = true),
+                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    onStop = {},
+                    onInteraction = {},
+                    onOptions = {},
+                    onTogglePause = { toggles++ },
+                    onSeek = commands::add,
+
+                    onInfo = {},
                 )
             }
         }
@@ -110,16 +119,24 @@ class TimeshiftCommandConsistencyTest {
         rule.setContent {
             input = LocalInputModeManager.current
             TVHeadendPlayerTheme {
-                OverlayControlsTv(
-                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
-                    channelName = "Fixture", channelNumber = 1, piconPath = null,
-                    nowEvent = null, nextEvent = null, nowSec = 0L,
-                    controlsVisible = visible.value, optionsOpen = false,
-                    onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                    timeshiftState = AppTimeshiftState(available = true, bufferStartMs = 0L,
+                PlayerChrome(
+                    mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("", liveInfoBarData(1, "Fixture", null, null, false, 0, "")),
+                    timeline = PlayerChromeTimeline.Live(
+                        AppTimeshiftState(available = true, bufferStartMs = 0L,
                         positionMs = 500L, liveEdgeMs = 1_000L),
-                    onSeekTimeshift = commands::add,
-                    timeshiftFeedback = null, onToggleTimeshiftPause = {}, onGoLive = {},
+                        nowSec = 0L,
+                        programme = null,
+                    ),
+                    actions = PlayerChromeActions(active = visible.value),
+                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    onStop = {},
+                    onInteraction = {},
+                    onOptions = {},
+                    onTogglePause = {},
+                    onSeek = commands::add,
+
+                    onInfo = {},
                 )
             }
         }
@@ -153,23 +170,33 @@ class TimeshiftCommandConsistencyTest {
                     val preview = owner.previewForTimeline(sample.value.timeline)
                     if (reduced.value) {
                         preview?.let {
-                            TimeshiftSeekPreview(sample.value, it.decision, feedback = owner.feedback,
+                            QuickStepBanner(sample.value, it.decision, feedback = owner.feedback,
                                 feedbackIsError = owner.feedbackIsError,
                                 modifier = Modifier.align(Alignment.BottomCenter))
                         }
                     } else {
-                        OverlayControlsTv(
-                            imageLoader = ImageLoader.Builder(LocalContext.current).build(),
-                            channelName = "Fixture", channelNumber = 1, piconPath = null,
-                            nowEvent = null, nextEvent = null, nowSec = 0L,
-                            controlsVisible = true, optionsOpen = false,
-                            onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                            timeshiftState = preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
+                        PlayerChrome(
+                            mode = PlayerChromeMode.CONTROLS,
+                            content = PlayerChromeContent("", liveInfoBarData(1, "Fixture", null, null, false, 0, "")),
+                            timeline = PlayerChromeTimeline.Live(
+                                preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
                                 ?: sample.value,
-                            committedTimeshiftState = sample.value, paused = sample.value.paused,
-                            previewing = preview != null, timeshiftFeedback = owner.feedback,
-                            timeshiftFeedbackIsError = owner.feedbackIsError,
-                            onSeekTimeshift = {}, onToggleTimeshiftPause = { toggles++ }, onGoLive = {},
+                                nowSec = 0L,
+                                programme = null,
+                                committedTimeshift = sample.value,
+                                previewing = preview != null,
+                                feedback = owner.feedback,
+                                feedbackIsError = owner.feedbackIsError,
+                            ),
+                            actions = PlayerChromeActions(active = true, paused = sample.value.paused),
+                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            onStop = {},
+                            onInteraction = {},
+                            onOptions = {},
+                            onTogglePause = { toggles++ },
+                            onSeek = {},
+
+                            onInfo = {},
                         )
                     }
                 }
@@ -255,17 +282,25 @@ class TimeshiftCommandConsistencyTest {
             input = LocalInputModeManager.current
             TVHeadendPlayerTheme {
                 val preview = owner.previewForTimeline(sample.value.timeline)
-                OverlayControlsTv(
-                    imageLoader = ImageLoader.Builder(LocalContext.current).build(),
-                    channelName = "Fixture", channelNumber = 1, piconPath = null,
-                    nowEvent = null, nextEvent = null, nowSec = 0L,
-                    controlsVisible = true, optionsOpen = false,
-                    onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                    timeshiftState = preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
+                PlayerChrome(
+                    mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("", liveInfoBarData(1, "Fixture", null, null, false, 0, "")),
+                    timeline = PlayerChromeTimeline.Live(
+                        preview?.let { projectedTimeshiftState(sample.value, it.decision.targetMs) }
                         ?: sample.value,
-                    committedTimeshiftState = sample.value, paused = sample.value.paused,
-                    previewing = preview != null, timeshiftFeedback = owner.feedback,
-                    onSeekTimeshift = { delta ->
+                        nowSec = 0L,
+                        programme = null,
+                        committedTimeshift = sample.value,
+                        previewing = preview != null,
+                        feedback = owner.feedback,
+                    ),
+                    actions = PlayerChromeActions(active = true, paused = sample.value.paused),
+                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    onStop = {},
+                    onInteraction = {},
+                    onOptions = {},
+                    onTogglePause = { toggles++ },
+                    onSeek = { delta ->
                         owner.queueRelativeSeek(sample.value, delta,
                             "Unavailable", "Expired", "Replaced", "Uncertain") { selection ->
                             val target = selection.target
@@ -273,7 +308,8 @@ class TimeshiftCommandConsistencyTest {
                             fixture.completed(readerReached = null)
                         }
                     },
-                    onToggleTimeshiftPause = { toggles++ }, onGoLive = {},
+
+                    onInfo = {},
                 )
             }
         }
@@ -335,7 +371,7 @@ class TimeshiftCommandConsistencyTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
-                    TimeshiftSeekPreview(
+                    QuickStepBanner(
                         state = AppTimeshiftState(available = true, positionMs = 540_000L, liveEdgeMs = 600_000L),
                         decision = TimeshiftSeekDecision(510_000L, -30_000L, false),
                         feedback = "Seek result uncertain",
@@ -364,7 +400,7 @@ class TimeshiftCommandConsistencyTest {
         rule.setContent {
             TVHeadendPlayerTheme {
                 owner.previewForTimeline(state.timeline)?.let { preview ->
-                    TimeshiftSeekPreview(state, preview.decision, feedback = owner.feedback)
+                    QuickStepBanner(state, preview.decision, feedback = owner.feedback)
                 }
             }
         }

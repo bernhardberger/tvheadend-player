@@ -8,17 +8,20 @@ import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -96,16 +99,41 @@ class PlayerMotionCaptureTest {
 
     @Test fun headerRecording() {
         show { loader, _ ->
-            RecordingOverlayControls(
-                imageLoader = loader, piconPath = ArtworkId(2), title = "Zeit im Bild",
-                subtitle = "Eine Reise durch die Berge", channelName = "Documentary",
-                positionMs = 1_800_000, durationMs = 3_600_000, growing = true, nowSec = 1_800,
-                canSeek = true, controlsVisible = true, optionsOpen = false, paused = false,
-                onTogglePlayPause = {}, onSeek = {}, onStopPlayback = {}, onUserInteraction = {},
-                onOpenOptions = {}, onOpenInfo = {},
-            )
+            RecordingChromeFixture(growing = true, imageLoader = loader)
         }
         capture("header-recording")
+    }
+
+    @Test fun numberEntryTransitions() {
+        var number by mutableStateOf("")
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+        show { loader, session ->
+            Box(Modifier.fillMaxSize()) {
+                ChannelNumberOverlay(number, target, loader, session,
+                    Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp))
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        fun change(digits: String, destination: ChannelNumberTarget) = compose.runOnIdle {
+            number = digits
+            target = destination
+            Snapshot.sendApplyNotifications()
+        }
+        fun frames(name: String, frames: List<Int>) =
+            captureFrames(name, "number-entry-motion", frames, focus = "passive; no focus")
+
+        change("1", ChannelNumberTarget.Pending)
+        frames("entry", listOf(3, 5))
+        change("1", ChannelNumberTarget.Channel("Documentary", ArtworkId(1)))
+        frames("destination", listOf(3, 6, 9))
+        change("12", ChannelNumberTarget.Channel("Arts and Culture", null))
+        frames("digits-update", listOf(1, 3, 6))
+        change("", ChannelNumberTarget.Pending)
+        frames("commit-or-cancel", listOf(3, 5))
+        change("999", ChannelNumberTarget.None)
+        frames("no-channel", listOf(3, 5))
+        change("", ChannelNumberTarget.Pending)
+        frames("error-dismissal", listOf(3, 5))
     }
 
     /** Controls hand over to the options panel: frames 3, 6 and 9 after opening, then settled. */
@@ -113,9 +141,7 @@ class PlayerMotionCaptureTest {
         var open by mutableStateOf(false)
         show { loader, session ->
             Box(Modifier.fillMaxSize()) {
-                PlayerControlsLayer(visible = true, modalVisible = open) {
-                    live(loader, session, behind = false)
-                }
+                live(loader, session, behind = false, panelOpen = open)
                 PlayerPanelVisibility(Unit.takeIf { open }) {
                     PlaybackOptionsSheetContent(
                         page = PlaybackOptionsPage.ROOT,
@@ -149,9 +175,7 @@ class PlayerMotionCaptureTest {
     @Test fun zapWithControlsVisibleCrossfadesInPlace() {
         var zapped by mutableStateOf(false)
         show { loader, session ->
-            PlayerControlsLayer(visible = true, modalVisible = false) {
-                live(loader, session, behind = false, zapped = zapped)
-            }
+            live(loader, session, behind = false, zapped = zapped)
         }
         compose.mainClock.autoAdvance = false
         compose.runOnIdle {
@@ -167,15 +191,15 @@ class PlayerMotionCaptureTest {
         var zapped by mutableStateOf(false)
         show { loader, session ->
             layers = rememberLivePlayerLayerState()
-            PlayerControlsLayer(
-                visible = layers.controlsVisible,
-                modalVisible = false,
-                entry = layers.controlsEntry,
-            ) { live(loader, session, behind = false, zapped = zapped) }
+            live(
+                loader, session, behind = false, zapped = zapped,
+                mode = if (layers.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
+                entry = layers.chrome.controlsEntry,
+            )
         }
         compose.mainClock.autoAdvance = false
         compose.runOnIdle {
-            layers.hideControls()
+            layers.chrome.hideControls()
             Snapshot.sendApplyNotifications()
         }
         compose.mainClock.advanceTimeBy(1_000)
@@ -225,6 +249,9 @@ class PlayerMotionCaptureTest {
         session: CurrentSessionObservation,
         behind: Boolean,
         zapped: Boolean = false,
+        mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
+        entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
+        panelOpen: Boolean = false,
     ) {
         val timeshift = AppTimeshiftState(
             available = true,
@@ -238,32 +265,24 @@ class PlayerMotionCaptureTest {
             programme, Instant.fromEpochSeconds(if (behind) 1_770 else 1_800),
             if (behind) 0.49f else 0.5f, 0.33f, 0.5f, 0.5f, true,
         )
-        OverlayControlsTv(
+        PlayerChrome(
+            mode = mode,
+            content = PlayerChromeContent("", liveInfoBarData(if (zapped) 2 else 1,
+                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, "")),
+            timeline = PlayerChromeTimeline.Live(
+                timeshift = timeshift,
+                nowSec = 1_800,
+                programme = programme,
+                committedWindow = window,
+                programmeWindow = window,
+                motionKey = ChannelId(if (zapped) 2 else 1),
+            ),
+            actions = PlayerChromeActions(active = true, paused = behind),
             imageLoader = loader,
             currentSession = session,
-            channelId = ChannelId(if (zapped) 2 else 1),
-            channelNumber = if (zapped) 2 else 1,
-            channelName = if (zapped) "Science and Nature" else "Documentary",
-            piconPath = ArtworkId(if (zapped) 2 else 1),
-            nowEvent = programme,
-            nextEvent = next.takeUnless { zapped },
-            nowSec = 1_800,
-            channelRecordingNow = behind || zapped,
-            controlsVisible = true,
-            optionsOpen = false,
-            onOpenChannels = {},
-            onStopPlayback = {},
-            onUserInteraction = {},
-            onOpenOptions = {},
-            timeshiftState = timeshift,
-            timeshiftFeedback = null,
-            paused = behind,
-            committedTimeshiftState = timeshift,
-            programmeWindow = window,
-            committedWindow = window,
-            onToggleTimeshiftPause = {},
-            onSeekTimeshift = {},
-            onGoLive = {},
+            onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
+            entry = entry,
+            panelOpen = panelOpen,
         )
     }
 

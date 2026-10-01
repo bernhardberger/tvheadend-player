@@ -13,28 +13,34 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
+import at.bernhardberger.tvhplayer.core.stepDirection
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
+import at.bernhardberger.tvhplayer.core.liveStepReadout
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
-import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 
+/**
+ * The seek preview's timeline: target, delta and programme of a pending or dispatched step.
+ * [titleAsFeedback] repeats the target programme's title in the status slot; hosts that show
+ * the programme in an info bar pass false.
+ */
 @Composable
-internal fun TimeshiftSeekPreview(
+internal fun TimeshiftSeekPreviewTimeline(
     state: AppTimeshiftState,
     decision: TimeshiftSeekDecision,
-    modifier: Modifier = Modifier,
     programmeWindow: ProgrammeWindow? = null,
-    channelsAvailable: Boolean = true,
     feedback: String? = null,
     feedbackIsError: Boolean = feedback != null,
-    headerContent: (@Composable (Modifier) -> Unit)? = null,
+    titleAsFeedback: Boolean = true,
+    barStatus: PlayerBarStatus? = null,
+    /** The wall-clock second now; with [barStatus] the buffer's start clock is the leading label without programme clocks. */
+    nowSec: Long? = null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
-    val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it.event) }
-    val positionPresentation = if (programmeWindow == null) timeshiftPositionPresentation(range.positionMs, range.displayEndMs)
+    val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it) }
+    val positionPresentation = if (programmeWindow == null) timeshiftPositionPresentation(range.positionMs, range.endMs)
         else timeshiftPositionPresentation(targetState)
     val liveLabel = stringResource(R.string.timeshift_live)
     val behindLiveLabel = if (positionPresentation.atLiveEdge) {
@@ -45,15 +51,8 @@ internal fun TimeshiftSeekPreview(
             formatPlaybackDuration(positionPresentation.behindLiveMs),
         )
     }
-    val targetLabel = if (programmeWindow == null) {
-        timeshiftEndpointLabel(positionPresentation.atLiveEdge, positionPresentation.behindLiveMs)
-    } else if (
-        positionPresentation.atLiveEdge
-    ) {
-        liveLabel
-    } else {
-        "−${formatPlaybackDuration(positionPresentation.behindLiveMs)}"
-    }
+    val readout = liveStepReadout(positionPresentation.behindLiveMs, liveLabel)
+    val targetLabel = readout.text
     val deltaLabel = formatPlaybackDelta(decision.deltaMs)
     val bufferStartDescription = stringResource(
         R.string.timeshift_buffer_start_description,
@@ -70,46 +69,40 @@ internal fun TimeshiftSeekPreview(
     )
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
 
-    PlayerOverlayChrome(
-        modifier = modifier,
-        headerContent = { headerContent?.invoke(it) },
-        footerPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = TvOverlaySidePadding,
-                end = TvOverlaySidePadding,
-                top = TvOverlayFooterGradientRunout,
-                bottom = playerSeekPreviewBottomPadding(channelsAvailable),
-            ),
-    ) {
-        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().testTag("timeshift-seek-preview")
-            .clearAndSetSemantics {
-                contentDescription = (programmeWindow?.let {
-                    "${it.event.title.orEmpty()}. ${clockLabels?.first} - ${clockLabels?.second}. $description" +
-                        if (!it.targetAvailable) " $unavailableTarget" else ""
-                } ?: description) + feedback?.let { ". $it" }.orEmpty()
-                liveRegion = LiveRegionMode.Polite
-            }) {
-        PlayerTimelineBlock(
-            progress = range.displayProgress,
-            tone = PlayerTimelineTone.PREVIEW,
-            rewindableStartFraction = range.availableStartFraction,
-            rewindableStartOverflow = false,
-            liveEdgeFraction = 1f,
-            rewindableBoundaryTestTag = "timeshift-preview-rewindable-boundary",
-            rewindableOverflowTestTag = "timeshift-preview-rewindable-overflow",
-            progressSemantics = false,
-            programmeWindow = programmeWindow,
-            reserveLabelSpace = true,
-            leadingLabel = clockLabels?.first ?: timeshiftEndpointLabel(
-                false, (range.displayEndMs - range.displayStartMs).coerceAtLeast(0),
-            ).takeIf { range.positionKnown },
-            trailingLabel = clockLabels?.second ?: formatPlaybackDuration(0).takeIf { range.positionKnown },
-            leadingLabelTestTag = "timeshift-preview-buffer-start",
-            trailingLabelTestTag = "timeshift-preview-position",
-            previewLabel = targetLabel,
-            feedback = feedback ?: programmeWindow?.let { if (it.targetAvailable) it.event.title.orEmpty() else unavailableTarget },
-            feedbackIsError = if (feedback != null) feedbackIsError else programmeWindow?.targetAvailable == false,
-            feedbackTestTag = "timeshift-preview-programme",
-        )
-        }
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().testTag("timeshift-seek-preview")
+        .clearAndSetSemantics {
+            contentDescription = (programmeWindow?.let {
+                "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description" +
+                    if (!it.targetAvailable) " $unavailableTarget" else ""
+            } ?: description) + feedback?.let { ". $it" }.orEmpty()
+            liveRegion = LiveRegionMode.Polite
+        }) {
+    PlayerTimelineBlock(
+        progress = liveTimelineProgress(range, positionPresentation, paused = false, previewing = true),
+        tone = PlayerTimelineTone.PREVIEW,
+        rewindableStartFraction = range.availableStartFraction,
+        rewindableStartOverflow = false,
+        liveEdgeFraction = 1f,
+        rewindableBoundaryTestTag = "timeshift-preview-rewindable-boundary",
+        rewindableOverflowTestTag = "timeshift-preview-rewindable-overflow",
+        progressSemantics = false,
+        programmeWindow = programmeWindow,
+        reserveLabelSpace = true,
+        leadingLabel = clockLabels?.first ?: if (barStatus != null) {
+            nowSec?.takeIf { targetState.available && targetState.timingKnown }?.let { timeshiftStartClock(targetState, it) }
+        } else timeshiftEndpointLabel(
+            false, (range.displayEndMs - range.displayStartMs).coerceAtLeast(0),
+        ).takeIf { range.positionKnown },
+        trailingLabel = if (barStatus?.end != null) null else clockLabels?.second ?: formatPlaybackDuration(0).takeIf { range.positionKnown },
+        status = barStatus,
+        leadingLabelTestTag = "timeshift-preview-buffer-start",
+        trailingLabelTestTag = "timeshift-preview-position",
+        previewLabel = targetLabel,
+        previewAtLive = readout.atLive,
+        previewDirection = stepDirection(decision.deltaMs),
+        feedback = feedback ?: programmeWindow?.let { if (!it.targetAvailable) unavailableTarget else it.event?.title?.takeIf { titleAsFeedback } },
+        feedbackIsError = if (feedback != null) feedbackIsError else programmeWindow?.targetAvailable == false,
+        feedbackTestTag = "timeshift-preview-programme",
+    )
     }
 }

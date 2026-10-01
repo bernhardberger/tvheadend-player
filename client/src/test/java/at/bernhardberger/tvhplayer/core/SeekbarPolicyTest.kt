@@ -29,6 +29,39 @@ class SeekbarPolicyTest {
     }
 
     @Test
+    fun positionWithinTheLiveEdgeToleranceShowsPinnedAtTheEndOfAnExtrapolatedAxis() {
+        // The display edge runs ahead of the verified edge; playback lags the verified edge.
+        val state = AppTimeshiftState(
+            available = true, bufferStartMs = -60_000L, liveEdgeMs = 0L, displayLiveEdgeMs = 4_000L,
+        )
+        fun progress(positionMs: Long) = timeshiftSeekbarRange(state.copy(positionMs = positionMs)).displayProgress
+
+        assertEquals(1f, progress(0L), 0f)
+        assertEquals(1f, progress(-2_000L), 0f)
+        assertEquals(1f, progress(-TIMESHIFT_LIVE_EDGE_TOLERANCE_MS), 0f)
+        val beyond = -TIMESHIFT_LIVE_EDGE_TOLERANCE_MS - 1L
+        assertEquals((beyond + 60_000L).toFloat() / 64_000f, progress(beyond), 0.0001f)
+        assertEquals(0.5f * 60_000f / 64_000f, progress(-30_000L), 0.0001f)
+    }
+
+    @Test
+    fun forwardStepFromSlightlyBehindReachesTheLiveEdgeAndShowsItPinned() {
+        val state = AppTimeshiftState(
+            available = true, bufferStartMs = -60_000L, positionMs = -20_000L, liveEdgeMs = 0L, displayLiveEdgeMs = 3_000L,
+        )
+        val queue = queueTimeshiftSeek(TimeshiftSeekQueueState(), state, SEEKBAR_STEP_INITIAL_MS)
+        val decision = queuedTimeshiftSeekDecision(queue)
+
+        assertEquals(0L, decision.targetMs)
+        assertEquals(20_000L, decision.deltaMs)
+        assertEquals(1f, timeshiftSeekbarRange(projectedTimeshiftState(state, decision.targetMs)).displayProgress, 0f)
+        // The controls' scrub reaches it too.
+        val scrub = seekbarScrub(timeshiftSeekbarRange(state), 1, 0)
+        assertEquals(0L, scrub)
+        assertEquals(1f, timeshiftSeekbarRange(state.copy(positionMs = scrub)).displayProgress, 0f)
+    }
+
+    @Test
     fun unknownCapacityDoesNotReserveEmptyHistory() {
         val state = AppTimeshiftState(available = true, bufferStartMs = -60_000L)
         assertEquals(-60_000L, timeshiftSeekbarRange(state).displayStartMs)

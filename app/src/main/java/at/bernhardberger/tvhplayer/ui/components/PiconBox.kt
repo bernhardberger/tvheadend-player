@@ -32,6 +32,7 @@ fun PiconBox(
     modifier: Modifier = Modifier,
     currentSession: CurrentSessionObservation? = null,
     contentScale: ContentScale = ContentScale.Fit,
+    alignment: Alignment = Alignment.Center,
 ) = profileTrace("P1:compose:picon") {
     val piconUrl = remember(currentSession, piconPath) {
         currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
@@ -39,7 +40,7 @@ fun PiconBox(
 
     Box(
         modifier = modifier.profileLayout("picon"),
-        contentAlignment = Alignment.Center
+        contentAlignment = alignment
     ) {
         if (piconUrl == null) {
             PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f))
@@ -53,6 +54,7 @@ fun PiconBox(
                 imageLoader = imageLoader,
                 contentDescription = null,
                 contentScale = contentScale,
+                alignment = alignment,
                 modifier = Modifier.fillMaxSize(),
                 // Painter slots preserve loading/error appearance without image subcomposition.
                 placeholder = loading,

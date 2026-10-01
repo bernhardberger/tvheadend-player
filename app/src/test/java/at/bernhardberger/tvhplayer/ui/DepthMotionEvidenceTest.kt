@@ -136,7 +136,7 @@ class DepthMotionEvidenceTest {
     }
 
     /**
-     * The overlap trial lets departing columns remain visible beneath the rail.
+     * The overlap lets departing columns remain visible beneath the rail.
      * The protective gradient must dim them, and navigation remains on top.
      */
     @Test

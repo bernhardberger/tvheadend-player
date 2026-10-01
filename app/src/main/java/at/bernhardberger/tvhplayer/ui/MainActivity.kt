@@ -45,6 +45,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.koin.android.ext.android.inject
+import androidx.compose.runtime.CompositionLocalProvider
+import at.bernhardberger.tvhplayer.images.ChannelAccents
+import at.bernhardberger.tvhplayer.ui.components.LocalChannelAccents
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
 data class MainStartupActivityKeyContract(
@@ -113,6 +116,7 @@ class MainActivity : AppCompatActivity() {
     private val playbackRuntime: AppPlaybackRuntime by inject()
     private val notices: AppNoticeQueue by inject()
     private val tvheadendSession: TvheadendSession by inject()
+    private val channelAccents: ChannelAccents by inject()
     private val mediaSessionLifecycle = ActivityMediaSessionLifecycle()
     private val playbackLifecycle = MainActivityPlaybackLifecycle(
         owners = playbackOwners,
@@ -177,15 +181,17 @@ class MainActivity : AppCompatActivity() {
             val runtimeServerSettings by
                 startupViewModel.runtimeServerSettings.collectAsStateWithLifecycle()
             TVHeadendPlayerTheme {
-                AppRoot(
-                    startupState = startupState,
-                    runtimeServerSettings = runtimeServerSettings,
-                    applianceLaunchRequests = startupViewModel.applianceLaunchRequests,
-                    debugVideoBackdropVisible = debugVideoBackdropVisible,
-                    onPlayerVisibilityChanged = { isPlayerVisible = it },
-                    onRequestExit = ::requestRootExit,
-                    registerActivityKeyContract = ::registerMainStartupActivityKeyContract,
-                )
+                CompositionLocalProvider(LocalChannelAccents provides channelAccents) {
+                    AppRoot(
+                        startupState = startupState,
+                        runtimeServerSettings = runtimeServerSettings,
+                        applianceLaunchRequests = startupViewModel.applianceLaunchRequests,
+                        debugVideoBackdropVisible = debugVideoBackdropVisible,
+                        onPlayerVisibilityChanged = { isPlayerVisible = it },
+                        onRequestExit = ::requestRootExit,
+                        registerActivityKeyContract = ::registerMainStartupActivityKeyContract,
+                    )
+                }
             }
         }
     }

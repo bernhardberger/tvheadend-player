@@ -40,25 +40,40 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
             val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().onKeyEvent { leakedEvents++; false }) {
-                    if (recording) RecordingOverlayControls(
-                        imageLoader = imageLoader, piconPath = null, title = "Recording", subtitle = null,
-                        channelName = "Channel", positionMs = 30_000, durationMs = 120_000, growing = false,
-                        nowSec = 0, canSeek = true, controlsVisible = true, optionsOpen = false,
-                        onTogglePlayPause = {}, onSeek = {}, onStopPlayback = {}, onUserInteraction = {},
-                        onOpenOptions = {}, onOpenInfo = {}, onCommitSeek = { commits++ },
-                    ) else OverlayControlsTv(
-                        imageLoader = imageLoader, channelNumber = 1, channelName = "Channel", piconPath = null,
-                        nowEvent = null, nextEvent = null, nowSec = 0, controlsVisible = true, optionsOpen = false,
-                        onOpenChannels = { shelfOpens++ }, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                        channelsAvailable = channelsAvailable.value,
-                        timeshiftState = AppTimeshiftState(available = true, bufferStartMs = 0, positionMs = 60_000, liveEdgeMs = 120_000),
-                        timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
+                    if (recording) RecordingChromeFixture(
+                        positionMs = 30_000,
+                        durationMs = 120_000,
+                        growing = false,
+                        canSeek = true,
+                        onTogglePause = {},
+                        onSeek = {},
+                        onOptions = {},
+                        onInfo = {},
                         onCommitSeek = { commits++ },
+                    ) else PlayerChrome(
+                        mode = PlayerChromeMode.CONTROLS,
+                        content = PlayerChromeContent("", liveInfoBarData(1, "Channel", null, null, false, 0, "")),
+                        timeline = PlayerChromeTimeline.Live(
+                            AppTimeshiftState(available = true, bufferStartMs = 0, positionMs = 60_000, liveEdgeMs = 120_000),
+                            nowSec = 0,
+                            programme = null,
+                        ),
+                        actions = PlayerChromeActions(active = true),
+                        imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                        onDownFromActions = { if (channelsAvailable.value) ({ shelfOpens++ })() },
+                        onStop = {},
+                        onInteraction = {},
+                        onOptions = {},
+                        onTogglePause = {},
+                        onSeek = {},
+
+                        onCommitSeek = { commits++ },
+                        onInfo = {},
                     )
                 }
             }
         }
-        val timeline = if (recording) "recording-seekbar" else "player-seekbar"
+        val timeline = if (recording) "player-seekbar" else "player-seekbar"
         rule.onNodeWithTag("player-pause").assertIsFocused()
         rule.onNodeWithTag(timeline).requestFocus().assertIsFocused()
         rule.onRoot().performKeyInput { keyDown(Key.DirectionDown) }
@@ -87,18 +102,15 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
         rule.onNodeWithTag(timeline).assertIsFocused()
         rule.runOnIdle { assertEquals(1, commits); assertEquals(0, leakedEvents) }
         rule.onRoot().performKeyInput { keyDown(Key.DirectionUp) }
-        rule.onNodeWithTag(if (recording) "player-pause" else "player-go-live").assertIsFocused()
+        // Without recording markers, neither timeline has a destination above it.
+        rule.onNodeWithTag(timeline).assertIsFocused()
         InstrumentationRegistry.getInstrumentation().sendKeySync(
             KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 2),
         )
         rule.onRoot().performKeyInput { keyUp(Key.DirectionUp) }
-        rule.onNodeWithTag(if (recording) "player-pause" else "player-go-live").assertIsFocused()
+        rule.onNodeWithTag(timeline).assertIsFocused()
         rule.runOnIdle { assertEquals(2, commits); assertEquals(0, leakedEvents) }
-        if (!recording) {
-            rule.onRoot().performKeyInput { keyDown(Key.DirectionDown); keyUp(Key.DirectionDown) }
-            rule.onNodeWithTag(timeline).assertIsFocused()
-            rule.runOnIdle { assertEquals(2, commits); assertEquals(0, leakedEvents) }
-        }
+        rule.onNodeWithTag("player-go-live").assertDoesNotExist()
     }
 
     companion object {

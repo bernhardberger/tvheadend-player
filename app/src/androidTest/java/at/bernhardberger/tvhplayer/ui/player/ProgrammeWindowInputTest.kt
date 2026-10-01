@@ -85,16 +85,27 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                     Box(Modifier.fillMaxSize()) {
                         DebugVideoBackdrop(true, Modifier.fillMaxSize())
                         if (compactPreview && preview != null) {
-                            TimeshiftSeekPreview(state, preview.decision, Modifier.align(androidx.compose.ui.Alignment.BottomCenter), window)
-                        } else OverlayControlsTv(imageLoader = imageLoader, channelNumber = 1, channelName = "Fixture TV", piconPath = null,
-                            nowEvent = committed?.event ?: events[1], nextEvent = null, nowSec = (base + 90.minutes).epochSeconds,
-                            controlsVisible = true, optionsOpen = false, onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                            timeshiftState = preview?.let { projectedTimeshiftState(state, it.decision.targetMs) } ?: state,
-                            committedTimeshiftState = state, committedWindow = committed, programmeWindow = window,
-                            previewing = preview != null,
-                            timeshiftFeedback = owner.feedback, paused = paused, onToggleTimeshiftPause = { paused = !paused },
-                            onCommitSeek = owner::commitPendingSeek,
-                            onSeekTimeshift = { delta ->
+                            QuickStepBanner(state, preview.decision, Modifier.align(androidx.compose.ui.Alignment.BottomCenter), window)
+                        } else PlayerChrome(
+                            mode = PlayerChromeMode.CONTROLS,
+                            content = PlayerChromeContent("", liveInfoBarData(1, "Fixture TV", null, null, false, 0, "")),
+                            timeline = PlayerChromeTimeline.Live(
+                                preview?.let { projectedTimeshiftState(state, it.decision.targetMs) } ?: state,
+                                nowSec = (base + 90.minutes).epochSeconds,
+                                programme = committed?.event ?: events[1],
+                                committedTimeshift = state,
+                                committedWindow = committed,
+                                programmeWindow = window,
+                                previewing = preview != null,
+                                feedback = owner.feedback,
+                            ),
+                            actions = PlayerChromeActions(active = true, paused = paused),
+                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            onStop = {},
+                            onInteraction = {},
+                            onOptions = {},
+                            onTogglePause = { paused = !paused },
+                            onSeek = { delta ->
                                 owner.queueRelativeSeek(state, delta, unavailable, expired, replaced, uncertain) { selection ->
                                     val target = selection.target
                                     fixture.seek(target) {
@@ -104,11 +115,9 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                                     }
                                 }
                             },
-                            onGoLive = {
-                                owner.cancelPendingSeek()
-                                state = fixture.state.value.toAppPresentation(fixture.playbackPosition(90.minutes))
-                                paused = false
-                            })
+                            onCommitSeek = owner::commitPendingSeek,
+                            onInfo = {},
+                        )
                     }
                 }
                 }
@@ -140,17 +149,18 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             val target = requireNotNull(owner.preview).target
             assertEquals((if (shallow) 89.5.minutes else if (scenario == "held") 55.minutes else 59.5.minutes), target.position)
             if (!missing && scenario != "late") {
-                rule.onNodeWithTag("player-window-title").assertTextEquals(if (shallow) "Programme B" else "Programme A")
-                rule.onNodeWithTag("player-programme-title").assertTextEquals("Programme B")
+                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(
+                    if (shallow) "Programme B" else "Programme A", substring = true)
+                rule.onNodeWithTag("player-window-title").assertDoesNotExist()
                 if (!shallow && scenario != "midnight") {
                     rule.onNodeWithTag("player-window-start").assertTextEquals("19:00")
-                    rule.onNodeWithTag("player-window-end").assertTextEquals("20:00")
+                    rule.onNodeWithTag("player-end-clock", useUnmergedTree = true).assertTextEquals("20:00")
                 }
             }
             if (scenario == "late") {
                 rule.runOnIdle { metadata = true }
                 rule.mainClock.advanceTimeByFrame()
-                rule.onNodeWithTag("player-window-title").assertTextEquals("Programme A")
+                rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains("Programme A", substring = true)
                 assertSame(target, owner.preview!!.target)
             }
             if (scenario == "evicted") {
@@ -165,7 +175,8 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             if (scenario == "evicted") {
                 rule.onNodeWithTag("player-seekbar").assertContentDescriptionContains(
                     "That position is no longer in the buffer.", substring = true)
-                rule.onNodeWithText("That position is no longer in the buffer.").assertExists()
+                // The opaque target chip replaces feedback visually; the unavailable target is still spoken.
+                rule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
             }
             if (shallow || scenario == "held") {
                 val bar = rule.onNodeWithTag("player-seekbar").fetchSemanticsNode()
@@ -174,11 +185,13 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                     bar.config[SemanticsProperties.ProgressBarRangeInfo].current
                 rule.onNodeWithTag("player-seekbar-thumb", useUnmergedTree = true).assertExists()
                 assertEquals(fillEnd,
-                    rule.onNodeWithTag("timeshift-preview-target").fetchSemanticsNode().boundsInRoot.center.x, 1f)
+                    rule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.x, 1f)
             }
-            assertEquals(actionTop, rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top)
+            // While seeking, the actions fade out fully and leave; when present they never move.
+            rule.onAllNodesWithTag("player-actions", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
+                ?.let { assertEquals(actionTop, it.boundsInRoot.top) }
             assertEquals(trackCenter, rule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center.y)
-            if (!missing) rule.onNodeWithTag("timeshift-preview-target").assertExists()
+            if (!missing) rule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
             if (!missing) {
                 val expected = requireNotNull(programmeWindow(state, target, owner.preview!!.mappingTimeline) { time ->
                     events.singleOrNull { time >= it.start && time < it.stop }
@@ -186,17 +199,6 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 assertEquals(expected.positionFraction, rule.onNodeWithTag("player-seekbar").fetchSemanticsNode()
                     .config[SemanticsProperties.ProgressBarRangeInfo].current)
                 assertEquals(scenario != "evicted", expected.targetAvailable)
-            }
-            if (scenario == "go-live-pending") {
-                rule.onNodeWithTag("player-go-live").requestFocus().performKeyInput { pressKey(Key.Enter) }
-                rule.mainClock.advanceTimeBy(500)
-                rule.runOnIdle {
-                    assertTrue(dispatches.isEmpty())
-                    assertNull(owner.preview)
-                    assertEquals(90.minutes.inWholeMilliseconds, state.positionMs)
-                }
-                capture("live")
-                return
             }
             if (scenario == "held" || scenario == "evicted") {
                 rule.runOnIdle { compactPreview = true }
@@ -219,19 +221,13 @@ class ProgrammeWindowInputTest(private val scenario: String) {
             rule.mainClock.advanceTimeBy(1_000)
             rule.mainClock.autoAdvance = true
             capture("settled")
-            assertEquals(actionTop, rule.onNodeWithTag("player-actions").fetchSemanticsNode().boundsInRoot.top)
+            // Hidden while the dispatched step still shows; wherever present, the actions never move.
+            rule.onAllNodesWithTag("player-actions", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
+                ?.let { assertEquals(actionTop, it.boundsInRoot.top) }
             rule.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
             rule.onNodeWithTag("player-pause").assertIsFocused()
             rule.onNodeWithTag("player-seekbar-thumb").assertDoesNotExist()
-            rule.onRoot().performKeyInput { repeat(5) { pressKey(Key.DirectionRight) } }
-            rule.onNodeWithTag("player-go-live").assertIsFocused()
-            rule.onRoot().performKeyInput { pressKey(Key.Enter) }
-            rule.runOnIdle {
-                assertEquals(90.minutes.inWholeMilliseconds, state.positionMs)
-                assertNull(owner.preview)
-                assertFalse(paused)
-            }
-            capture("live")
+            rule.onNodeWithTag("player-go-live").assertDoesNotExist()
         } finally {
             rule.runOnIdle { owner.dispose() }
             TimeZone.setDefault(originalZone)
@@ -248,6 +244,6 @@ class ProgrammeWindowInputTest(private val scenario: String) {
 
     companion object {
         @JvmStatic @Parameterized.Parameters(name = "{0}")
-        fun scenarios() = listOf("essential", "shallow", "missing", "midnight", "paused", "held", "late", "evicted", "go-live-pending", "font-scaled")
+        fun scenarios() = listOf("essential", "shallow", "missing", "midnight", "paused", "held", "late", "evicted", "font-scaled")
     }
 }

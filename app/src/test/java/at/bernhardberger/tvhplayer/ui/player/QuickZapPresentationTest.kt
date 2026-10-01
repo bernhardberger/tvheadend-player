@@ -147,7 +147,7 @@ class QuickZapPresentationTest {
         compose.setContent {
             view = LocalView.current
             Box(Modifier.fillMaxSize().background(Color.White)) {
-                QuickZapPresentation(expanded = expanded, channelsAvailable = true,
+                QuickZapPresentation(preview = {}, expanded = expanded, channelsAvailable = true,
                     peekAlpha = { 0f }, channelContent = {
                         Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
                     }, controls = {})
@@ -162,6 +162,35 @@ class QuickZapPresentationTest {
         assertEquals(android.graphics.Color.WHITE, pixel(530))
         compose.runOnIdle { expanded = true }
         assertEquals(android.graphics.Color.RED, pixel(470))
+    }
+
+    @Test fun peekingNewTrayDoesNotDimControlsAboveTheRow() {
+        var expanded by mutableStateOf(false)
+        compose.setContent {
+            view = LocalView.current
+            Box(Modifier.fillMaxSize().background(Color.White)) {
+                QuickZapPresentation(expanded = expanded, channelsAvailable = true,
+                    peekAlpha = { 1f }, preview = {}, channelContent = {
+                        Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
+                    }, controls = { Box(Modifier.fillMaxSize().background(Color.White)) })
+            }
+        }
+        fun column(): IntArray {
+            compose.waitForIdle()
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            return IntArray(view.height) { bitmap.getPixel(480, it) }.also { bitmap.recycle() }
+        }
+        val peek = column()
+        val cardTop = peek.indexOfFirst { it == android.graphics.Color.RED }
+        assertTrue("the channel row peeks at the bottom edge: $cardTop", cardTop in 480 until 540)
+        assertTrue("controls above the peeking row keep full brightness",
+            (0 until cardTop).all { peek[it] == android.graphics.Color.WHITE })
+        compose.runOnIdle { expanded = true }
+        val open = column()
+        val openCardTop = open.indexOfFirst { it == android.graphics.Color.RED }
+        assertTrue("the open tray keeps its scrim behind the preview",
+            android.graphics.Color.red(open[openCardTop - 8]) < 80)
     }
     private val channels = (1L..12L).map {
         Channel.create(id = ChannelId(it), number = it, name = if (it == 4L) "Dokumentation und Zeitgeschichte HD" else "Channel $it",
@@ -179,7 +208,8 @@ class QuickZapPresentationTest {
         key(Key.DirectionDown)
         card(2).assertIsFocused()
         fun verify(state: String, expectedScale: Float) {
-            val native = card(1).fetchSemanticsNode().boundsInRoot
+            // The pinned rail keeps card 1 off-screen, left of the keyline; card 3 rests unfocused.
+            val native = card(3).fetchSemanticsNode().boundsInRoot
             val focused = card(2).fetchSemanticsNode().boundsInRoot
             val picon = compose.onNodeWithTag("player-channel-2-picon", useUnmergedTree = true)
                 .fetchSemanticsNode().boundsInRoot
@@ -194,14 +224,14 @@ class QuickZapPresentationTest {
                 abs(android.graphics.Color.red(a) - android.graphics.Color.red(b)) +
                     abs(android.graphics.Color.green(a) - android.graphics.Color.green(b)) +
                     abs(android.graphics.Color.blue(a) - android.graphics.Color.blue(b))
-            val background = pixel(native.left - 3, native.top - 3)
-            val fill = pixel(native.left + 20, native.top + 3)
+            val background = pixel(native.right + 3, native.top - 3)
+            val fill = pixel(native.right - 20, native.top + 3)
             // Recover the native corner from its painted silhouette. Fit many boundary
             // samples so a single antialiased pixel cannot determine the radius.
             val edge = (1..47).mapNotNull { row ->
                 val y = row / 4f + .125f
                 val x = (0..64).firstOrNull { col ->
-                    val sample = pixel(native.left + col / 4f + .125f, native.top + y)
+                    val sample = pixel(native.right - col / 4f - .125f, native.top + y)
                     colorDistance(sample, fill) < colorDistance(sample, background)
                 }?.let { it / 4f }
                 x?.takeIf { it > 0f }?.let { it to y }
@@ -252,10 +282,10 @@ class QuickZapPresentationTest {
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
     }
 
-    @Test fun tunedMiddleAndRightCardsKeepBoundsAcrossUpAndBack() = stableReentry(1f, "en-font1")
+    @Test fun tunedCardsKeepBoundsAcrossUpAndBack() = stableReentry(1f, "en-font1")
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun germanLargeTextTunedMiddleAndRightCardsKeepBoundsAcrossUpAndBack() = stableReentry(1.3f, "de-font1.3")
+    fun germanLargeTextTunedCardsKeepBoundsAcrossUpAndBack() = stableReentry(1.3f, "de-font1.3")
 
     private fun stableReentry(fontScale: Float, prefix: String) {
         content(fontScale = fontScale)
@@ -265,10 +295,9 @@ class QuickZapPresentationTest {
             card(id).assertIsFocused()
             key(Key.DirectionCenter)
             val before = card(id).fetchSemanticsNode().boundsInRoot
-            assertTrue("middle/right anchor: $before", before.left > 250f)
             capture("$prefix-tuned-$id-before", id, fontScale)
             key(close)
-            compose.onNodeWithTag("player-info").assertIsFocused()
+            compose.onNodeWithTag("player-pause").assertIsFocused()
             key(Key.DirectionDown)
             card(id).assertIsFocused()
             assertEquals(before, card(id).fetchSemanticsNode().boundsInRoot)
@@ -284,33 +313,12 @@ class QuickZapPresentationTest {
         val before = card(9).assertIsFocused().fetchSemanticsNode().boundsInRoot
         for (close in listOf(Key.DirectionUp, Key.Back)) {
             key(close)
-            compose.onNodeWithTag("player-info").assertIsFocused()
+            compose.onNodeWithTag("player-pause").assertIsFocused()
             key(Key.DirectionDown)
             card(9).assertIsFocused()
             assertEquals(before, card(9).fetchSemanticsNode().boundsInRoot)
         }
         assertEquals(ChannelId(2), playing)
-        assertEquals(0, picks)
-    }
-
-    @Test fun externalPlaybackChangeWhileClosedUsesNearestSafeAnchor() {
-        content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        val visible = card(4).fetchSemanticsNode().boundsInRoot
-        key(Key.DirectionUp)
-        compose.runOnIdle { playing = ChannelId(4) }
-        compose.onNodeWithTag("player-info").assertIsFocused()
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        val anchored = card(4).fetchSemanticsNode().boundsInRoot
-        assertEquals("only the 24px safe-edge correction", visible.left - 24f, anchored.left, 1f)
-        assertEquals(896f, anchored.right, 1f)
-        key(Key.Back)
-        compose.runOnIdle { playing = ChannelId(10) }
-        key(Key.DirectionDown)
-        val distant = card(10).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        assertEquals(896f, distant.right, 1f)
         assertEquals(0, picks)
     }
 
@@ -341,7 +349,7 @@ class QuickZapPresentationTest {
         val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
         key(Key.DirectionUp)
         compose.runOnIdle { playing = null }
-        compose.onNodeWithTag("player-info").assertIsFocused()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
         key(Key.DirectionDown)
         card(4).assertIsFocused()
         assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
@@ -363,10 +371,10 @@ class QuickZapPresentationTest {
         key(Key.DirectionRight)
         key(Key.Back)
         compose.runOnIdle { playing = ChannelId(10) }
-        compose.onNodeWithTag("player-info").assertIsFocused()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
         key(Key.DirectionDown)
         val distant = card(10).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        assertEquals(896f, distant.right, 1f)
+        assertTrue("distant card is brought on screen safely: $distant", distant.left >= 48f && distant.right <= 912f)
         // The different confirmation consumed the old intent: a later channel 3
         // confirmation is external now, not the still-pending local pick.
         key(Key.Back)
@@ -408,7 +416,7 @@ class QuickZapPresentationTest {
         key(Key.DirectionRight)
         card(5).assertIsFocused()
         key(Key.Back)
-        compose.onNodeWithTag("player-info").assertIsFocused()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
         key(Key.DirectionDown)
         val anchored = card(8).assertIsFocused().fetchSemanticsNode().boundsInRoot
         // Without a further change, reopening keeps the re-anchored card and viewport.
@@ -481,7 +489,7 @@ class QuickZapPresentationTest {
 
     @Test fun focusedOutlineMatchesNativeButtonColorAndKeepsProgressVisible() {
         content()
-        val button = compose.onNodeWithTag("player-info").fetchSemanticsNode().boundsInRoot
+        val button = compose.onNodeWithTag("player-pause").fetchSemanticsNode().boundsInRoot
         fun pixel(x: Float, y: Float): Int {
             compose.waitForIdle()
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -500,13 +508,13 @@ class QuickZapPresentationTest {
 
     @Test fun peekOpensWithoutTuningAndDifferentPickKeepsFocusUntilPlayingPick() {
         content()
-        compose.onNodeWithTag("player-info").assertIsFocused()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
         compose.onNodeWithTag("player-channel-card-2").assertDoesNotExist()
         capture("en-font1-peek")
         key(Key.DirectionDown)
         card(2).assertIsFocused()
         assertEquals(0, picks)
-        compose.onNodeWithTag("player-info").assertDoesNotExist()
+        compose.onNodeWithTag("player-pause").assertDoesNotExist()
         val focusedBounds = card(2).fetchSemanticsNode().boundsInRoot
         val progressBounds = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
@@ -541,7 +549,7 @@ class QuickZapPresentationTest {
         assertTrue(layers.channelDrawerOpen)
         key(Key.DirectionCenter)
         assertFalse(layers.channelDrawerOpen)
-        compose.onNodeWithTag("player-info").assertIsFocused()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
         assertEquals(1, picks)
     }
 
@@ -551,7 +559,7 @@ class QuickZapPresentationTest {
             key(Key.DirectionDown)
             card(2).assertIsFocused()
             key(close)
-            compose.onNodeWithTag("player-info").assertIsFocused()
+            compose.onNodeWithTag("player-pause").assertIsFocused()
             assertFalse(layers.channelDrawerOpen)
         }
         assertEquals(0, picks)
@@ -570,6 +578,52 @@ class QuickZapPresentationTest {
         assertTrue("bottom third: $focused", focused.top >= 360f)
         assertTrue("bottom focus overflow inside screen: $focused", focused.bottom <= 520f)
         capture("en-font1-scrolled")
+    }
+
+    @Test fun pinnedRailKeepsTheFocusedCardOnTheStartKeylineUntilTheListEnds() {
+        content()
+        key(Key.DirectionDown)
+        val keyline = card(2).assertIsFocused().fetchSemanticsNode().boundsInRoot.left
+        assertTrue("keyline is screen-safe: $keyline", keyline >= 48f)
+        key(Key.DirectionLeft)
+        assertEquals(keyline, card(1).assertIsFocused().fetchSemanticsNode().boundsInRoot.left, .5f)
+        repeat(4) { key(Key.DirectionRight) }
+        assertEquals(keyline, card(5).assertIsFocused().fetchSemanticsNode().boundsInRoot.left, .5f)
+        repeat(7) { key(Key.DirectionRight) }
+        val last = card(12).assertIsFocused().fetchSemanticsNode().boundsInRoot
+        assertTrue("the row stops at its end, so focus leaves the keyline: $last", last.left > keyline + 1f)
+        assertTrue("last card stays safe: $last", last.right <= 912f)
+    }
+
+    // A target that is not composed yet costs a synchronous beyond-bounds search per repeat.
+    @Test fun heldLeftFindsEachPinnedTargetAlreadyComposed() {
+        content()
+        key(Key.DirectionDown)
+        repeat(9) { key(Key.DirectionRight) }
+        card(11).assertIsFocused()
+        compose.mainClock.autoAdvance = false
+        for (target in 10 downTo 3) {
+            assertTrue("card $target is composed before Left", compose.onAllNodes(hasTestTag("player-channel-card-$target")).fetchSemanticsNodes().isNotEmpty())
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+            compose.mainClock.advanceTimeBy(16)
+            card(target).assertIsFocused()
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        card(3).assertIsFocused()
+    }
+
+    @Test fun browsingRailStepsFocusWithChannelKeysInsteadOfTuning() {
+        content()
+        key(Key.DirectionDown)
+        val keyline = card(2).assertIsFocused().fetchSemanticsNode().boundsInRoot.left
+        key(Key.ChannelUp)
+        assertEquals(keyline, card(3).assertIsFocused().fetchSemanticsNode().boundsInRoot.left, .5f)
+        key(Key.ChannelDown)
+        key(Key.ChannelDown)
+        card(1).assertIsFocused()
+        assertEquals(0, picks)
+        assertTrue(layers.channelDrawerOpen)
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -602,7 +656,10 @@ class QuickZapPresentationTest {
         card(2).assertIsFocused()
     }
 
-    private fun content(fontScale: Float = 1f, bright: Boolean = false) {
+    private fun content(
+        fontScale: Float = 1f,
+        bright: Boolean = false,
+    ) {
         compose.setContent {
             view = LocalView.current
             layers = rememberLivePlayerLayerState()
@@ -655,22 +712,29 @@ class QuickZapPresentationTest {
                                 else -> false
                             }
                         }) {
-                        OverlayControlsTv(
-                            imageLoader = loader, currentSession = session, channelNumber = playing?.value, channelName = playing?.let { "Channel ${it.value}" }.orEmpty(),
-                            piconPath = playing?.let { ArtworkId(it.value.toInt()) }, nowEvent = playing?.let(::event), nextEvent = null, nowSec = 900,
-                            controlsVisible = layers.controlsVisible, optionsOpen = false,
-                            onOpenChannels = {
+                        PlayerChrome(
+                            mode = PlayerChromeMode.CONTROLS,
+                            content = PlayerChromeContent("", liveInfoBarData(playing?.value,
+                                playing?.let { "Channel ${it.value}" }.orEmpty(), null, null, false, 900, "")),
+                            timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
+                            actions = PlayerChromeActions(active = layers.chrome.controlsVisible, restoreFocus = layers.restoreChannelAction),
+                            imageLoader = loader, currentSession = session,
+                            onDownFromActions = {
                                 layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
                                 layers.openChannelDrawer()
                             },
-                            onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                            timeshiftState = AppTimeshiftState(), timeshiftFeedback = null,
-                            onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
-                            restoreChannelAction = layers.restoreChannelAction,
-                            onChannelActionRestored = layers::onChannelActionRestored,
+                            onStop = {}, onInteraction = {}, onOptions = {}, onInfo = {},
+                            onTogglePause = {}, onSeek = {},
+                            onFocusRestored = layers::onChannelActionRestored,
                             onActionFocused = layers::onActionFocused,
-                            channelRailOpen = layers.channelDrawerOpen,
-                            channelRailContent = {
+                            decorationCoversControls = layers.channelDrawerOpen,
+                            controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(
+                              expanded = layers.channelDrawerOpen,
+                              channelsAvailable = true,
+                              peekAlpha = emphasisAlpha,
+                              preview = {},
+                              controls = controls,
+                              channelContent = {
                                 ChannelDrawer(
                                     channels = catalog, selectedId = playing, playingChannelId = playing,
                                     playbackIndicator = indicator,
@@ -688,12 +752,15 @@ class QuickZapPresentationTest {
                                         layers.dismissChannelDrawer()
                                     },
                                 )
-                            },
+                              },
+                            ) },
                         )
                     }
                 }
             }
         }
+        // The player enters with the Banner; these cases start from the revealed controls.
+        compose.runOnIdle { layers.showControls() }
         compose.waitForIdle()
     }
 

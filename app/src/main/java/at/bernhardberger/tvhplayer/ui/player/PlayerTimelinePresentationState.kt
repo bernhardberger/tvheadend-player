@@ -526,7 +526,11 @@ internal class RecordingTimelinePresentationState(
     private var seekToken = 0
     private var disposed = false
 
+    /** The shown position: a pending or dispatched seek's target, otherwise the playback position. */
     var positionMs by mutableLongStateOf(0L)
+        private set
+    /** Where playback is, also while a seek target is pending. */
+    var playbackPositionMs by mutableLongStateOf(0L)
         private set
     var durationMs by mutableLongStateOf(C.TIME_UNSET)
         private set
@@ -605,7 +609,8 @@ internal class RecordingTimelinePresentationState(
 
     suspend fun observePlayback(growing: Boolean = false) {
         while (true) {
-            positionMs = pendingTargetMs ?: currentPositionMs().coerceAtLeast(0L)
+            playbackPositionMs = currentPositionMs().coerceAtLeast(0L)
+            positionMs = pendingTargetMs ?: playbackPositionMs
             durationMs = currentDurationMs()
             displayDurationMs = displayEnd.update(durationMs, currentMonotonicMillis(), growing)
             isPlaying = currentIsPlaying()

@@ -74,6 +74,7 @@ import kotlinx.coroutines.Dispatchers
 import java.io.ByteArrayOutputStream
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -92,9 +93,9 @@ import kotlin.time.Instant
  * physical-TV gates.
  *
  * `en-font1.0-…-live-normal-focus-pause` — locale en, font 1.0, pause focused.
- * `en-font1.0-…-behind-live-focus-go-live` — locale en, font 1.0, Go live focused.
+ * `en-font1.0-…-behind-live-focus-seekbar` — locale en, font 1.0, seekbar focused.
  * `en-font1.0-…-seeking-preview-focus-seekbar` — locale en, font 1.0, seekbar focused.
- * `de-font1.3-…-error-go-live-peek` — locale de, font 1.3, Go live focused, peek visible.
+ * `de-font1.3-…-error-feedback-peek` — locale de, font 1.3, Pause focused, feedback and peek visible.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -148,7 +149,7 @@ class PlayerFooterLayoutEvidenceTest {
     }
 
     @Test
-    fun statusOverlayDoesNotMoveTimelineOrActionsAndGoLiveStaysAbove() {
+    fun statusOverlayDoesNotMoveTimelineOrActionsOrTheBarRowsEnds() {
         var behind by mutableStateOf(false)
         var feedback by mutableStateOf<String?>(null)
         var previewing by mutableStateOf(false)
@@ -162,36 +163,40 @@ class PlayerFooterLayoutEvidenceTest {
         val track = bounds("player-timeline-track")
         val actions = bounds("player-actions")
         val seekbar = bounds("player-seekbar")
-        assertEquals(px(56.dp).toDouble(), (seekbar.top - bounds("player-footer").top).toDouble(), 1.0)
+        // The focus/semantics node is the track, after the block's 8dp vertical padding.
+        assertEquals(px(56.dp + 8.dp).toDouble(),
+            (seekbar.top - bounds("player-footer").top - bounds("player-info-bar").height).toDouble(), 1.0)
         assertEquals(px(48.dp), bounds("player-pause").height, 1f)
         assertInline(track)
+        assertFalse("the controls have no state cell", exists("player-state"))
+        val end = bounds("player-end-clock")
+        val distance = bounds("player-live-state")
+        compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertDoesNotExist()
 
         compose.runOnIdle { behind = true }
         assertEquals(track, bounds("player-timeline-track"))
         assertEquals(actions, bounds("player-actions"))
-        val goLive = bounds("player-go-live")
-        assertTrue(goLive.bottom <= track.top + 1f)
-        assertEquals(actions.right, goLive.right, 1f)
-        assertTrue(
-            "focus overflow above Go live",
-            goLive.top - bounds("player-footer").top >= px(8.dp),
-        )
-        assertTrue(track.top - goLive.bottom >= px(4.dp))
+        assertEquals("the end clock keeps its place as playback falls behind", end, bounds("player-end-clock"))
+        assertEquals("the distance's box keeps its place as the distance appears", distance, bounds("player-live-state"))
+        compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-go-live").assertDoesNotExist()
 
         compose.runOnIdle { feedback = "Reached the available buffer limit" }
         assertEquals(track, bounds("player-timeline-track"))
         assertEquals(actions, bounds("player-actions"))
-        assertEquals(goLive, bounds("player-go-live"))
+        assertEquals(end, bounds("player-end-clock"))
+        assertEquals(distance, bounds("player-live-state"))
         val message = bounds("player-window-title")
-        assertTrue(message.right + px(8.dp) <= goLive.left)
-        assertTrue(message.center.y >= goLive.top && message.center.y <= goLive.bottom)
+        assertTrue("feedback ends before the distance: $message vs $distance", message.right <= distance.left)
+        assertTrue("feedback paints above the bar row", message.bottom <= track.top + 1f)
 
         compose.runOnIdle { feedback = null; previewing = true }
         key(Key.DirectionUp)
         assertEquals(track.top, bounds("player-timeline-track").top, 1f)
         assertEquals(track.bottom, bounds("player-timeline-track").bottom, 1f)
         compose.onNodeWithTag("player-actions").assertDoesNotExist()
-        compose.onNodeWithTag("player-go-live").assertDoesNotExist()
+        assertEquals("the end clock keeps its room during a step", end, bounds("player-end-clock"))
+        assertEquals("the distance keeps its place during a step", distance, bounds("player-live-state"))
         val target = bounds("timeshift-preview-target")
         val progress = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
             .config[SemanticsProperties.ProgressBarRangeInfo].current
@@ -204,7 +209,69 @@ class PlayerFooterLayoutEvidenceTest {
     }
 
     @Test
-    fun upFromTheTimelineReachesGoLiveWithoutMovingItIntoTheActionRow() {
+    fun theBarRowKeepsTheLeftLabelTheBarAndTheEndClockApartWithTheDistanceAboveTheEnd() {
+        show(behind = { true }, feedback = { null }, previewing = { false }, fontScale = 1f)
+        val track = bounds("player-timeline-track")
+        val start = bounds("player-window-start")
+        val end = bounds("player-end-clock")
+        val labels = bounds("player-timeline-labels")
+        assertFalse("the controls have no state cell", exists("player-state"))
+        assertEquals("the left label leads the row", labels.left, start.left, 1f)
+        assertTrue("the left label sits before the bar", start.right <= track.left + 1f)
+        assertTrue("the end clock does not overlap the bar: $end vs $track", end.left >= track.right - 1f)
+        assertTrue("the end clock ends the row", end.right <= labels.right + 1f && end.right >= labels.right - 1f)
+        for (cell in listOf(start, end)) {
+            assertTrue("centred on the bar", cell.center.y >= track.top - 1f && cell.center.y <= track.bottom + 1f)
+        }
+        compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertExists()
+        assertEquals("the explicit behind-live annotation", "0:30 behind live", compose.onNodeWithTag("player-distance", useUnmergedTree = true).fetchSemanticsNode()
+            .config[SemanticsProperties.Text].joinToString { it.text })
+        assertEquals("the end clock", "01:00", compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
+            .config[SemanticsProperties.Text].joinToString { it.text })
+        assertEquals("the end box starts one label gap after the bar",
+            track.right + px(8.dp), labels.right - px(requireNotNull(endpointWidths).trailing), 1f)
+        val distance = bounds("player-distance")
+        assertEquals("the distance's right edge is the end clock's", end.right, distance.right, 0.5f)
+        assertTrue("the distance sits above the bar row: $distance vs $labels", distance.bottom <= labels.top)
+        compose.onNodeWithTag("player-end-tag-slot", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun aLengthShorterThanItsBoxEndsTheRowAndLeavesItsRoomBesideTheBar() {
+        show(behind = { false }, feedback = { null }, previewing = { false }, fontScale = 1f, recording = true, recordingDurationMs = 2_700_000)
+        val track = bounds("player-timeline-track")
+        val end = bounds("player-end-clock")
+        val labels = bounds("player-timeline-labels")
+        val box = px(requireNotNull(endpointWidths).trailing)
+        assertEquals("45:00", compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
+            .config[SemanticsProperties.Text].joinToString { it.text })
+        assertTrue("the length is shorter than its box: $end vs $box", end.width < box - 1f)
+        assertEquals("the end box starts one label gap after the bar", track.right + px(8.dp), labels.right - box, 1f)
+        assertEquals("the length ends the row", labels.right, end.right, 1f)
+        assertTrue("its spare room lies beside the bar: $end vs $track", end.left > track.right + px(8.dp) + 1f)
+    }
+
+    @Test fun seekProgressKeepsStateLiveRegionsSeparate() = assertIndependentAnnouncements(timeshift = true)
+
+    @Test fun scheduleProgressKeepsStateLiveRegionsSeparate() = assertIndependentAnnouncements(timeshift = false)
+
+    private fun assertIndependentAnnouncements(timeshift: Boolean) {
+        show({ false }, { null }, { false }, 1f, timeshiftAvailable = timeshift)
+        val progressTag = if (timeshift) "player-seekbar" else "player-schedule-progress"
+        val descriptions = compose.onNodeWithTag(progressTag).fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription]
+        assertEquals(1, descriptions.size)
+        assertTrue(descriptions.none { it == "Playing" || it == "Live" })
+        assertFalse("the controls have no state cell", exists("player-state"))
+        for ((tag, description) in listOf("player-live-state" to "Live")) {
+            val config = compose.onNodeWithTag(tag).fetchSemanticsNode().config
+            assertEquals(listOf(description), config[SemanticsProperties.ContentDescription])
+            assertEquals(androidx.compose.ui.semantics.LiveRegionMode.Polite, config[SemanticsProperties.LiveRegion])
+        }
+    }
+
+    @Test
+    fun upFromTheTimelineReachesTheCardAndDownReturnsBehindLive() {
         val backdrop = mutableStateOf(Backdrop.WHITE)
         show(
             behind = { true },
@@ -217,10 +284,11 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
-        compose.onNodeWithTag("player-go-live").assertIsFocused()
-        assertTrue(bounds("player-go-live").bottom <= bounds("player-timeline-track").top + 1f)
-        assertTrue(bounds("player-go-live").bottom < bounds("player-actions").top)
-        recordPair("en-font1.0-960x540-mdpi-d1", "behind-live-focus-go-live", "player-go-live", backdrop)
+        compose.onNodeWithTag("player-identity-card").assertIsFocused()
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
+        compose.onNodeWithTag("player-go-live").assertDoesNotExist()
+        recordPair("en-font1.0-960x540-mdpi-d1", "behind-live-focus-seekbar", "player-seekbar", backdrop, expectPeek = false)
     }
 
     @Test
@@ -229,7 +297,6 @@ class PlayerFooterLayoutEvidenceTest {
         show(behind = { false }, feedback = { null }, previewing = { false }, fontScale = 1f, backdrop = { backdrop.value })
         compose.onNodeWithTag("player-pause").assertIsFocused()
         compose.onNodeWithTag("player-live-status").assertDoesNotExist()
-        compose.onNodeWithTag("player-clock-status").assertExists()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
         assertInline(bounds("player-timeline-track"))
         recordPair("en-font1.0-960x540-mdpi-d1", "live-normal-focus-pause", "player-pause", backdrop)
@@ -262,10 +329,10 @@ class PlayerFooterLayoutEvidenceTest {
             backdrop = { backdrop.value }, recording = recording, standalone = { standalone },
             onCommitSeek = { commits++ })
         val kind = if (recording) "recording" else "live"
-        val timelineTag = if (recording) "recording-seekbar" else "player-seekbar"
-        val actionsTag = if (recording) "recording-actions" else "player-actions"
+        val timelineTag = "player-seekbar"
+        val actionsTag = "player-actions"
         val resting = bounds("player-timeline-track")
-        assertEquals(4f, bounds(actionsTag).top - bounds(timelineTag).bottom, 1f)
+        assertEquals(px(4.dp + 8.dp), bounds(actionsTag).top - bounds(timelineTag).bottom, 1f)
         assertEquals(504f, bounds(actionsTag).bottom, 1f)
         recordPair("de-font1.3-960x540-mdpi-d1", "$kind-resting", "player-pause", backdrop, !recording)
         key(Key.DirectionUp)
@@ -281,14 +348,20 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals(1, commits)
         key(Key.DirectionUp)
         key(Key.DirectionUp)
-        compose.onNodeWithTag(if (recording) "player-pause" else "player-go-live").assertIsFocused()
+        // Without markers above it, Up reaches the card and Down returns to the timeline.
+        compose.onNodeWithTag("player-identity-card").assertIsFocused()
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
         assertTrue(previewing)
         assertEquals(2, commits)
         compose.runOnIdle { standalone = true }
         val previewTrack = bounds("player-timeline-track")
-        assertEquals(resting.top, previewTrack.top, 1f)
-        assertEquals(resting.bottom, previewTrack.bottom, 1f)
-        assertEquals(resting.left, previewTrack.left, 1f)
+        // A quick step plays in the Banner, which rests one action row lower than the controls.
+        val drop = with(compose.density) { PlayerBannerDrop.toPx() }
+        assertEquals(resting.top + drop, previewTrack.top, 1f)
+        assertEquals(resting.bottom + drop, previewTrack.bottom, 1f)
+        // The Banner keeps the state cell's room before the bar; the controls hand it to the bar.
+        assertEquals(resting.left + bounds("player-state").width + px(8.dp), previewTrack.left, 1f)
         assertEquals(resting.right, previewTrack.right, 1f)
     }
 
@@ -301,7 +374,7 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag("recording-marker-target").assertIsFocused()
         assertEquals(1, commits)
         key(Key.Back)
-        compose.onNodeWithTag("recording-seekbar").assertIsFocused()
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
     }
@@ -322,8 +395,9 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         val track = bounds("player-timeline-track")
-        assertTrue(track.left > bounds("recording-seekbar").left + 8f)
-        assertTrue(track.right < bounds("recording-seekbar").right - 8f)
+        assertTrue(track.left > bounds("player-timeline-labels").left + 8f)
+        assertTrue(track.right < bounds("player-timeline-labels").right - 8f)
+        assertEquals(track, bounds("player-seekbar"))
         fun assertMarker(fraction: Float) {
             compose.onNodeWithTag("recording-marker-target").assertIsFocused()
             assertEquals(42L, navigation.ownerRevision)
@@ -347,18 +421,24 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         assertMarker(3_599_999f / 3_600_000f)
+        // Up above the markers closes them and reaches the card; Down returns to the timeline.
         key(Key.DirectionUp)
-        assertMarker(3_599_999f / 3_600_000f)
+        assertFalse(navigation.open)
+        compose.onNodeWithTag("player-identity-card").assertIsFocused()
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
+        key(Key.DirectionUp)
+        assertMarker(0.75f)
         key(Key.Back)
-        compose.onNodeWithTag("recording-seekbar").assertIsFocused()
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
         assertMarker(0.75f)
         key(Key.DirectionDown)
-        compose.onNodeWithTag("recording-seekbar").assertIsFocused()
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
         key(Key.DirectionCenter)
         assertEquals(listOf(2_700_000L), seeks)
-        compose.onNodeWithTag("recording-seekbar").assertIsFocused()
+        compose.onNodeWithTag("player-seekbar").assertIsFocused()
     }
 
     @Test fun livePreviewDismissalRestoresChromeWithoutMovingTimelineFocus() = previewDismissal(false)
@@ -369,15 +449,12 @@ class PlayerFooterLayoutEvidenceTest {
         var preview by mutableStateOf(true)
         show(behind = { true }, feedback = { null }, previewing = { preview }, fontScale = 1.3f, recording = recording)
         key(Key.DirectionUp)
-        val timeline = if (recording) "recording-seekbar" else "player-seekbar"
-        val header = if (recording) "recording-title" else "player-programme-title"
+        val timeline = "player-seekbar"
         compose.onNodeWithTag(timeline).assertIsFocused()
-        compose.onNodeWithTag(header).assertExists()
         compose.onNodeWithTag("player-pause").assertDoesNotExist()
         // Both ancestor Back callbacks synchronously clear the presented preview.
         compose.runOnIdle { preview = false }
         compose.onNodeWithTag(timeline).assertIsFocused()
-        compose.onNodeWithTag(header).assertExists()
         compose.onNodeWithTag("player-pause").assertExists()
         compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertDoesNotExist()
         key(Key.DirectionDown)
@@ -507,7 +584,7 @@ class PlayerFooterLayoutEvidenceTest {
 
     @Test
     @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun germanLargeTextKeepsFeedbackDistinctFromGoLiveAndPeeksQuickZap() {
+    fun germanLargeTextKeepsFeedbackClearOfTheBarRowAndPeeksQuickZap() {
         val backdrop = mutableStateOf(Backdrop.WHITE)
         show(
             behind = { true },
@@ -517,25 +594,23 @@ class PlayerFooterLayoutEvidenceTest {
             error = true,
             backdrop = { backdrop.value },
         )
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
-        compose.onNodeWithTag("player-go-live").assertIsFocused()
-        compose.onNodeWithText("Zu Live").assertExists()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
         val feedback = compose.onNodeWithText("Diese Position ist nicht mehr im Puffer.")
         feedback.assertExists()
         val message = feedback.fetchSemanticsNode().boundsInRoot
-        val goLive = bounds("player-go-live")
         val track = bounds("player-timeline-track")
-        assertTrue(message.right + px(8.dp) <= goLive.left)
-        assertTrue(goLive.bottom <= track.top + 1f)
-        assertTrue(goLive.top >= 0f && goLive.bottom <= 540f)
+        val end = bounds("player-end-clock")
+        val distance = bounds("player-distance")
+        assertTrue("message $message track $track", message.bottom <= track.top + 1f)
+        assertTrue("the end clock keeps clear of the bar: $end $track", end.left >= track.right - 1f)
+        assertTrue("the message ends before the distance: $message $distance", message.right <= distance.left)
         assertTrue(message.top >= 0f && message.bottom <= 540f)
         val layouts = mutableListOf<TextLayoutResult>()
         feedback.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertTrue(!layouts.single().isLineEllipsized(0))
+        assertTrue("feedback ellipsized", !layouts.single().isLineEllipsized(0))
         assertEquals(1, layouts.single().lineCount)
         assertInline(track)
-        recordPair("de-font1.3-960x540-mdpi-d1", "error-go-live-peek", "player-go-live", backdrop)
+        recordPair("de-font1.3-960x540-mdpi-d1", "error-feedback-peek", "player-pause", backdrop)
     }
 
     @Test
@@ -553,7 +628,7 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals(original, text.fetchSemanticsNode().boundsInRoot)
         assertEquals(track, bounds("player-timeline-track"))
         assertTrue(labels.fetchSemanticsNode().boundsInRoot.width > 0)
-        val description = compose.onNodeWithTag("recording-seekbar").fetchSemanticsNode()
+        val description = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
             .config[SemanticsProperties.ContentDescription].joinToString()
         assertTrue(description.contains("Paused"))
         compose.onNodeWithText("Paused", substring = true).assertDoesNotExist()
@@ -589,22 +664,7 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals("−0:30", timeshiftEndpointLabel(false, 30_000))
     }
 
-    @Test
-    fun passiveClockUsesCommittedPositionNotOptimisticSeekTarget() {
-        var committedBehind by mutableStateOf(false)
-        var selectedBehind by mutableStateOf(true)
-        var known by mutableStateOf(true)
-        show({ selectedBehind }, { null }, { true }, 1f, committedBehind = { committedBehind },
-            paused = { true }, timingKnown = { known })
-        compose.onNodeWithText("Live", useUnmergedTree = true).assertExists()
-        compose.runOnIdle { committedBehind = true; selectedBehind = false }
-        compose.onNodeWithText("30s behind live", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-live-status").assertDoesNotExist()
-        compose.runOnIdle { known = false }
-        compose.onNodeWithTag("player-clock-status").assertDoesNotExist()
-    }
-
-    @Test fun missingEpgSampledGeometryDoesNotJumpWhenServerReportsLive() = missingEpgAxis("en", 1f)
+    @Test fun missingEpgServerLivePinsPlayingButNotPauseOrPreview() = missingEpgAxis("en", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun missingEpgAxisGermanLargeText() = missingEpgAxis("de", 1.3f)
 
@@ -620,7 +680,7 @@ class PlayerFooterLayoutEvidenceTest {
             view = LocalView.current
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) { TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().background(Color.White)) {
-                    if (standalone) TimeshiftSeekPreview(
+                    if (standalone) QuickStepBanner(
                         state = sample.copy(timingKnown = known,
                             bufferStartMs = if (pinned) 30_000 else 0,
                             displayLiveEdgeMs = if (pinned) 120_000 else null),
@@ -639,16 +699,17 @@ class PlayerFooterLayoutEvidenceTest {
                 }
             } }
         }
-        fun assertSample() {
+        fun assertSample(atLive: Boolean = false) {
+            val fraction = if (atLive) 1f else 2f / 3
             val node = compose.onNodeWithTag("sampled-seekbar").fetchSemanticsNode()
-            assertEquals(2f / 3, node.config[SemanticsProperties.ProgressBarRangeInfo].current, 0.00001f)
-            assertTrue(node.config[SemanticsProperties.ContentDescription].joinToString().contains("0:30"))
-            assertEquals(2f / 3, bounds("player-timeline-fill").width / bounds("player-timeline-track").width, 0.005f)
+            assertEquals(fraction, node.config[SemanticsProperties.ProgressBarRangeInfo].current, 0.00001f)
+            assertTrue(node.config[SemanticsProperties.ContentDescription].joinToString().contains(if (atLive) "Live" else "0:30"))
+            assertEquals(fraction, bounds("player-timeline-fill").width / bounds("player-timeline-track").width, 0.005f)
         }
-        assertSample()
+        assertSample(atLive = true)
         compose.onNodeWithText("−1:30").assertExists()
         compose.onNodeWithText("0:00").assertExists()
-        capture("$locale-font$fontScale-missing-epg-playing-sample60-history90", focus = "none")
+        capture("$locale-font$fontScale-missing-epg-playing-server-live-history90", focus = "none")
         compose.runOnIdle { paused = true }
         assertSample()
         capture("$locale-font$fontScale-missing-epg-paused-sample60-history90", focus = "none")
@@ -661,19 +722,21 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag("timeshift-seek-preview").assert(androidx.compose.ui.test.SemanticsMatcher("sampled thirty seconds behind") {
             it.config[SemanticsProperties.ContentDescription].joinToString().contains("0:30")
         })
-        compose.onNodeWithText("−1:30", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("0:00", useUnmergedTree = true).assertExists()
+        // The Banner step's bar row: the buffer's start clock (90 s before 00:30:00), no end label.
+        assertEquals("00:28", compose.onNodeWithTag("timeshift-preview-buffer-start", useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text].single().text)
+        compose.onNodeWithTag("timeshift-preview-position", useUnmergedTree = true).assertDoesNotExist()
         capture("$locale-font$fontScale-missing-epg-standalone-preview", focus = "none")
         compose.runOnIdle { standalone = false; pinned = true }
         compose.onNodeWithText("−2:00").assertExists()
         compose.onNodeWithText("0:00").assertExists()
-        compose.onNodeWithText("−1:00", useUnmergedTree = true).assertExists()
+        // The readout measures against the verified live edge (90 s), not the extrapolated axis end (120 s).
+        compose.onNodeWithText("−0:30", useUnmergedTree = true).assertExists()
         assertEquals(0.5f, compose.onNodeWithTag("sampled-seekbar").fetchSemanticsNode()
             .config[SemanticsProperties.ProgressBarRangeInfo].current, 0f)
         compose.runOnIdle { standalone = true }
         val oldest = compose.onNodeWithTag("timeshift-preview-buffer-start", useUnmergedTree = true).fetchSemanticsNode()
-        assertEquals("−2:00", oldest.config[SemanticsProperties.Text].single().text)
-        compose.onNodeWithText("0:00", useUnmergedTree = true).assertExists()
+        assertEquals("00:28", oldest.config[SemanticsProperties.Text].single().text)
         compose.runOnIdle { standalone = false }
         compose.runOnIdle { known = false }
         compose.onNodeWithText("−2:00").assertDoesNotExist()
@@ -683,25 +746,27 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag("timeshift-preview-position", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    @Test fun dismissedPausedPreviewWithUnknownCommittedTimingDoesNotBorrowBroadcastAxis() {
+    @Test fun dismissedPausedPreviewWithoutKnownTimingDoesNotBorrowBroadcastAxis() {
         var preview by mutableStateOf(true)
         show({ false }, { null }, { preview }, 1f, paused = { true }, timingKnown = { false },
             programmeWindowsAvailable = false)
         key(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         val track = bounds("player-timeline-track")
-        val slot = bounds("player-seekbar")
+        val slot = bounds("player-timeline-labels")
         compose.runOnIdle { preview = false }
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        compose.onNodeWithTag("player-clock-status").assertDoesNotExist()
-        compose.onNodeWithTag("player-programme-title").assertDoesNotExist()
         compose.onNodeWithText("00:00").assertDoesNotExist()
         compose.onNodeWithText("01:00").assertDoesNotExist()
+        compose.onNodeWithTag("player-timeline-fill", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertDoesNotExist()
+        assertFalse("unknown is not a claim of Live", compose.onNodeWithTag("player-live-state", useUnmergedTree = true)
+            .fetchSemanticsNode().config.contains(SemanticsProperties.ContentDescription))
         compose.onNodeWithTag("player-timeline-track", useUnmergedTree = true)
             .assert(androidx.compose.ui.test.SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
         compose.onNodeWithTag("player-seekbar")
             .assert(androidx.compose.ui.test.SemanticsMatcher.keyNotDefined(SemanticsProperties.ProgressBarRangeInfo))
-        assertEquals(slot, bounds("player-seekbar"))
+        assertEquals(slot, bounds("player-timeline-labels"))
         assertEquals(track.top, bounds("player-timeline-track").top, 0f)
         assertEquals(track.bottom, bounds("player-timeline-track").bottom, 0f)
         compose.onNodeWithTag("player-seekbar").assert(androidx.compose.ui.test.SemanticsMatcher("paused timing unavailable") {
@@ -716,7 +781,12 @@ class PlayerFooterLayoutEvidenceTest {
         show({ false }, { null }, { false }, 1f, programmeWindowsAvailable = false, timeshiftAvailable = false)
         compose.onNodeWithTag("player-schedule-progress").assertExists()
         compose.onNodeWithText("00:00", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("01:00", useUnmergedTree = true).assertExists()
+        // Without timeshift playback is at the live edge: no distance is drawn, the state is announced.
+        compose.onNodeWithTag("player-distance", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals(listOf("Live"), compose.onNodeWithTag("player-live-state", useUnmergedTree = true).fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription])
+        assertEquals("01:00", compose.onNodeWithTag("player-end-clock", useUnmergedTree = true).fetchSemanticsNode()
+            .config[SemanticsProperties.Text].joinToString { it.text })
     }
 
     @Test
@@ -752,76 +822,8 @@ class PlayerFooterLayoutEvidenceTest {
         mid.recycle(); settled.recycle()
     }
 
-    @Test
-    @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun clockStatusIsTruthfulAndDoesNotOverlapTitleAtLargeFont() {
-        var behind by mutableStateOf(false)
-        var known by mutableStateOf(true)
-        show({ behind }, { null }, { false }, 1.3f, timingKnown = { known })
-        compose.onNodeWithText("Live", useUnmergedTree = true).assertExists()
-        compose.runOnIdle { behind = true }
-        val status = compose.onNodeWithTag("player-clock-status")
-        val description = status.fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single()
-        assertTrue(description.contains("30Sek hinter Live"))
-        assertTrue(bounds("player-clock-status").top >= bounds("player-clock").bottom)
-        assertTrue(bounds("player-clock-status").left >= bounds("player-programme-title").right)
-        val layouts = mutableListOf<TextLayoutResult>()
-        compose.onNodeWithText("30Sek hinter Live", useUnmergedTree = true)
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertTrue(!layouts.single().isLineEllipsized(0))
-        capture("de-font1.3-960x540-mdpi-d1-white-clock-behind")
-        compose.runOnIdle { known = false }
-        compose.onNodeWithTag("player-clock-status").assertDoesNotExist()
-    }
-
-    @Test fun statusTagsEnglish() = captureStatusTags("en", 1f)
-    @Test fun recordingStatusEnglish() = captureRecordingStatus("en", 1f)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun recordingStatusGerman() = captureRecordingStatus("de", 1.3f)
-
-    private fun captureRecordingStatus(locale: String, scale: Float) {
-        var growing by mutableStateOf(true)
-        var paused by mutableStateOf(false)
-        val backdrop = mutableStateOf(Backdrop.WHITE)
-        show({ false }, { null }, { false }, scale, recording = true, paused = { paused },
-            growing = { growing }, backdrop = { backdrop.value }, title = "A journey through the mountains — Eine Reise durch die Berge und ihre Geschichte")
-        compose.onNodeWithTag("player-pause").assertIsFocused()
-        compose.onNodeWithContentDescription(if (locale == "de") "Aufnahme läuft. Wiedergabe" else "Recording in progress. Playing").assertExists()
-        compose.onNodeWithTag("player-recording-now").assertDoesNotExist()
-        assertTrue(bounds("player-clock-status").left >= bounds("recording-title").right)
-        recordPair("$locale-font$scale-status", "growing-playing", "player-pause", backdrop, false)
-        compose.runOnIdle { paused = true }
-        compose.onNodeWithContentDescription(if (locale == "de") "Aufnahme läuft. Pausiert" else "Recording in progress. Paused").assertExists()
-        recordPair("$locale-font$scale-status", "growing-paused", "player-pause", backdrop, false)
-        compose.runOnIdle { growing = false }
-        compose.onNodeWithTag("player-clock-status").assertDoesNotExist()
-        compose.onNodeWithTag("player-recording-now").assertDoesNotExist()
-        recordPair("$locale-font$scale-status", "completed", "player-pause", backdrop, false)
-    }
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun statusTagsGerman() = captureStatusTags("de", 1.3f)
-
-    private fun captureStatusTags(locale: String, scale: Float) {
-        var behind by mutableStateOf(false)
-        var paused by mutableStateOf(false)
-        var recordingNow by mutableStateOf(true)
-        var backdrop by mutableStateOf(Backdrop.WHITE)
-        show({ behind }, { null }, { false }, scale, paused = { paused },
-             recordingNow = { recordingNow }, backdrop = { backdrop },
-             title = "A journey through the mountains — Eine Reise durch die Berge und ihre Geschichte")
-        compose.onNodeWithTag("player-pause").assertIsFocused()
-        compose.onNodeWithTag("player-recording-now").assertExists()
-        assertEquals(bounds("player-recording-now").center.y, bounds("player-clock-status").center.y, 1f)
-        capture("$locale-font$scale-status-live-recording-bright")
-        compose.runOnIdle { behind = true; paused = true; backdrop = Backdrop.TEXTURED }
-        compose.onNodeWithTag("player-pause").assertIsFocused()
-        assertTrue(bounds("player-clock-status").left >= bounds("player-programme-title").right)
-        assertEquals(bounds("player-recording-now").center.y, bounds("player-clock-status").center.y, 1f)
-        capture("$locale-font$scale-status-paused-behind-recording-dark")
-        compose.runOnIdle { recordingNow = false }
-        compose.onNodeWithTag("player-recording-now").assertDoesNotExist()
-        compose.onNodeWithTag("player-pause").assertIsFocused()
-    }
+    /** The label boxes of the bar row [show] composed. */
+    private var endpointWidths: TimelineEndpointWidths? = null
 
     private fun show(
         behind: () -> Boolean,
@@ -842,9 +844,9 @@ class PlayerFooterLayoutEvidenceTest {
         committedBehind: () -> Boolean = behind,
         programmeWindowsAvailable: Boolean = true,
         timeshiftAvailable: Boolean = true,
-        recordingNow: () -> Boolean = { false },
         growing: () -> Boolean = { false },
         title: String = "Zeit im Bild",
+        recordingDurationMs: Long = 3_600_000,
     ) {
         val programme = EpgEvent.create(
             id = EventId(1),
@@ -872,6 +874,7 @@ class PlayerFooterLayoutEvidenceTest {
             val loader = remember { zapImageLoader(context) }
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                 TVHeadendPlayerTheme {
+                    endpointWidths = rememberTimelineEndpointWidths(if (recording) TimelineKind.RECORDING else TimelineKind.LIVE)
                     Box(Modifier.fillMaxSize()) {
                         if (backdrop() == Backdrop.TEXTURED) {
                             DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
@@ -879,64 +882,56 @@ class PlayerFooterLayoutEvidenceTest {
                             Box(Modifier.fillMaxSize().background(Color.White))
                         }
                         if (standalone()) {
-                            if (recording) RecordingSeekPreview(
-                                targetMs = 1_800_000, originMs = 1_700_000, durationMs = 3_600_000,
-                                growing = false, modifier = Modifier.align(Alignment.BottomCenter),
-                            ) else TimeshiftSeekPreview(
+                            if (recording) RecordingChromeFixture(
+                                mode = PlayerChromeMode.BANNER_STEP, positionMs = 1_700_000,
+                                targetMs = 1_800_000, originMs = 1_700_000,
+                                modifier = Modifier.align(Alignment.BottomCenter),
+                            ) else QuickStepBanner(
                                 state = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -30_000, liveEdgeMs = 0),
                                 decision = TimeshiftSeekDecision(-30_000, -30_000, false),
                                 programmeWindow = window, modifier = Modifier.align(Alignment.BottomCenter),
                             )
-                        } else if (recording) RecordingOverlayControls(
-                            imageLoader = loader, piconPath = null, title = title,
-                            subtitle = "Eine Reise durch die Berge", channelName = "Documentary",
-                            positionMs = 1_800_000, durationMs = 3_600_000, growing = growing(), nowSec = 1_800,
-                             canSeek = true, controlsVisible = true, optionsOpen = false,
-                             paused = paused(),
-                            onTogglePlayPause = {}, onSeek = {}, onStopPlayback = {}, onUserInteraction = {},
-                            onOpenOptions = {}, onOpenInfo = {}, previewing = previewing(),
+                        } else if (recording) RecordingChromeFixture(
+                            positionMs = 1_800_000, durationMs = recordingDurationMs, targetMs = 1_800_000L.takeIf { previewing() },
+                            growing = growing(), paused = paused(), info = fixtureRecordingInfo(title, growing(), durationMs = recordingDurationMs),
                             onCommitSeek = onCommitSeek, markers = markers,
                             markerNavigation = markerNavigation, markerRevision = markerRevision, onSeekMarker = onSeekMarker,
-                        ) else OverlayControlsTv(
+                        ) else PlayerChrome(
+                            mode = PlayerChromeMode.CONTROLS,
+                            content = PlayerChromeContent("", liveInfoBarData(1, "Documentary", programme, null, false, 1_800, "")),
+                            timeline = PlayerChromeTimeline.Live(
+                                timeshift = AppTimeshiftState(
+                                    available = timeshiftAvailable,
+                                    bufferStartMs = -600_000,
+                                    positionMs = if (behind()) -30_000 else 0,
+                                    liveEdgeMs = 0,
+                                    timingKnown = timingKnown(),
+                                ),
+                                nowSec = 1_800,
+                                programme = programme,
+                                committedTimeshift = AppTimeshiftState(
+                                    available = timeshiftAvailable, bufferStartMs = -600_000,
+                                    positionMs = if (committedBehind()) -30_000 else 0,
+                                    liveEdgeMs = 0, timingKnown = timingKnown(),
+                                ),
+                                committedWindow = window.takeIf { programmeWindowsAvailable },
+                                programmeWindow = window.takeIf { programmeWindowsAvailable },
+                                previewing = previewing(),
+                                feedback = feedback(),
+                                feedbackIsError = error && feedback() != null,
+                            ),
+                            actions = PlayerChromeActions(active = true, paused = paused()),
                             imageLoader = loader,
                             currentSession = session,
-                            channelNumber = 1,
-                            channelName = "Documentary",
-                            piconPath = null,
-                            nowEvent = programme,
-                            nextEvent = null,
-                             nowSec = 1_800,
-                            channelRecordingNow = recordingNow(),
-                            controlsVisible = true,
-                            optionsOpen = false,
-                            onOpenChannels = {},
-                            onStopPlayback = {},
-                            onUserInteraction = {},
-                            onOpenOptions = {},
-                            timeshiftState = AppTimeshiftState(
-                                available = timeshiftAvailable,
-                                bufferStartMs = -600_000,
-                                positionMs = if (behind()) -30_000 else 0,
-                                 liveEdgeMs = 0,
-                                 timingKnown = timingKnown(),
-                            ),
-                             timeshiftFeedback = feedback(),
-                            paused = paused(),
-                             committedTimeshiftState = AppTimeshiftState(
-                                 available = timeshiftAvailable, bufferStartMs = -600_000,
-                                 positionMs = if (committedBehind()) -30_000 else 0,
-                                 liveEdgeMs = 0, timingKnown = timingKnown(),
-                             ),
-                            timeshiftFeedbackIsError = error && feedback() != null,
-                            onToggleTimeshiftPause = {},
-                            onSeekTimeshift = {},
-                            onGoLive = {},
+                            onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             onCommitSeek = onCommitSeek,
-                            programmeWindow = window.takeIf { programmeWindowsAvailable },
-                            committedWindow = window.takeIf { programmeWindowsAvailable },
-                            previewing = previewing(),
-                            channelsAvailable = true,
-                            channelRailContent = {
+                            controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(
+                              expanded = false,
+                              channelsAvailable = true,
+                              peekAlpha = emphasisAlpha,
+                              preview = {},
+                              controls = controls,
+                              channelContent = {
                                 ChannelDrawer(
                                     channels = channels,
                                     selectedId = ChannelId(1),
@@ -959,7 +954,8 @@ class PlayerFooterLayoutEvidenceTest {
                                     onPickChannel = {},
                                     onCloseDrawer = {},
                                 )
-                            },
+                              },
+                            ) },
                         )
                     }
                 }
@@ -970,7 +966,7 @@ class PlayerFooterLayoutEvidenceTest {
 
     private fun assertInline(track: androidx.compose.ui.geometry.Rect) {
         val start = bounds("player-window-start")
-        val end = bounds("player-window-end")
+        val end = bounds("player-end-clock")
         assertTrue(start.center.y >= track.top - 1f && start.center.y <= track.bottom + 1f)
         assertTrue(end.center.y >= track.top - 1f && end.center.y <= track.bottom + 1f)
         assertTrue(start.right <= track.left + 1f)
@@ -982,6 +978,9 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }
+
+    private fun exists(tag: String) =
+        compose.onAllNodes(androidx.compose.ui.test.hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun bounds(tag: String) =
         compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -1121,5 +1120,26 @@ class PlayerFooterLayoutEvidenceTest {
         val trayVisualTop: Int,
         val cardPeekTop: Int?,
         val clearance: Float?,
+    )
+}
+
+/** A live quick step on the hidden player, as the screen composes it: the passive Banner's preview timeline. */
+@androidx.compose.runtime.Composable
+private fun QuickStepBanner(
+    state: AppTimeshiftState,
+    decision: TimeshiftSeekDecision,
+    modifier: Modifier = Modifier,
+    programmeWindow: ProgrammeWindow? = null,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    PlayerChrome(
+        mode = PlayerChromeMode.BANNER_STEP,
+        content = PlayerChromeContent("", liveInfoBarData(1, "Documentary", programmeWindow?.event, null, false, 1_800, "")),
+        timeline = PlayerChromeTimeline.Live(state, nowSec = 1_800, step = decision, programmeWindow = programmeWindow),
+        actions = PlayerChromeActions(active = false),
+        imageLoader = androidx.compose.runtime.remember { ImageLoader(context) },
+        currentSession = null,
+        onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
+        modifier = modifier,
     )
 }

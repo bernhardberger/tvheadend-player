@@ -193,7 +193,8 @@ class LiveProgrammeInfoOverlayTest {
             onRecordFocusRestored = { restoreRecordFocus = false },
         )
 
-        composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
+        // The panel opens on Record; the reading pane stays one Up away.
+        composeRule.onNodeWithTag("live-info-record").assertIsFocused()
         composeRule.onNodeWithTag("live-info-close").requestFocus()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("live-info-record").assertIsFocused()
@@ -381,43 +382,36 @@ class LiveProgrammeInfoOverlayTest {
     }
 
     @Test
-    fun closingInfoRecomposesControlsAndRestoresTheInfoAction() {
+    fun closingInfoRecomposesControlsAndRestoresTheIdentityCard() {
         var infoOpen by mutableStateOf(false)
         var restoreInfoFocus by mutableStateOf(false)
         composeRule.setContent {
             val context = LocalContext.current
             val imageLoader = remember(context) { ImageLoader.Builder(context).build() }
             TVHeadendPlayerTheme {
-                PlayerControlsLayer(
-                    visible = true,
-                    modalVisible = infoOpen,
-                ) {
-                    OverlayControlsTv(
-                        imageLoader = imageLoader,
-                        channelNumber = 7,
-                        channelName = "Das Erste",
-                        piconPath = null,
-                        nowEvent = event(id = 42),
-                        nextEvent = null,
+                PlayerChrome(
+                    mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("", liveInfoBarData(7, "Das Erste", null, null, false, 0, "")),
+                    timeline = PlayerChromeTimeline.Live(
+                        AppTimeshiftState(),
                         nowSec = 1_500L,
-                        controlsVisible = true,
-                        optionsOpen = false,
-                        onOpenChannels = {},
-                        onOpenInfo = { infoOpen = true },
-                        onStopPlayback = {},
-                        onUserInteraction = {},
-                        onOpenOptions = {},
-                        timeshiftState = AppTimeshiftState(),
-                        timeshiftFeedback = null,
-                        onToggleTimeshiftPause = {},
-                        onSeekTimeshift = {},
-                        onGoLive = {},
-                        restoreInfoFocus = restoreInfoFocus,
-                        onInfoFocusRestored = { restoreInfoFocus = false },
-                    )
-                }
+                        programme = event(id = 42),
+                    ),
+                    actions = PlayerChromeActions(active = true, restoreFocus = "player-identity-card".takeIf { restoreInfoFocus }),
+                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    onStop = {},
+                    onInteraction = {},
+                    onOptions = {},
+                    onInfo = { infoOpen = true },
+                    onTogglePause = {},
+                    onSeek = {},
+
+                    onFocusRestored = { restoreInfoFocus = false },
+                    panelOpen = infoOpen,
+                )
                 if (infoOpen) {
                     LiveProgrammeInfoOverlay(
+                        hero = {},
                         event = event(id = 42),
                         channelIdentity = "7 • Das Erste",
                         channelName = "Das Erste",
@@ -438,13 +432,13 @@ class LiveProgrammeInfoOverlayTest {
             }
         }
 
-        composeRule.onNodeWithTag("player-info").requestFocus()
+        composeRule.onNodeWithTag("player-identity-card").requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
-        composeRule.onNodeWithTag("player-info").assertDoesNotExist()
-        composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
+        composeRule.onNodeWithTag("player-identity-card").assertDoesNotExist()
+        composeRule.onNodeWithTag("live-info-record").assertIsFocused()
         composeRule.onNodeWithTag("live-info-close").requestFocus()
             .performKeyInput { pressKey(Key.Enter) }
-        composeRule.onNodeWithTag("player-info").assertIsFocused()
+        composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
         composeRule.runOnIdle { assertFalse(restoreInfoFocus) }
     }
 
@@ -479,6 +473,7 @@ class LiveProgrammeInfoOverlayTest {
                             .testTag("live-info-test-viewport")
                     ) {
                         LiveProgrammeInfoOverlay(
+                            hero = {},
                             event = event,
                             channelIdentity = "7 • Das Erste",
                             channelName = "Das Erste",
@@ -541,13 +536,6 @@ class LiveProgrammeInfoOverlayTest {
         )
     }
 
-    @Test
-    fun liveInfoIdentifiesCurrentBroadcastRatherThanHistoricalPlayback() {
-        setInfoOverlay(event = { event(1) })
-        composeRule.onNodeWithText("Current broadcast").assertIsDisplayed()
-        composeRule.onNodeWithText("Programme 1").assertIsDisplayed()
-    }
-
     private fun setInfoOverlay(
         event: () -> EpgEvent?,
         recordingState: () -> LiveInfoRecordingState = { LiveInfoRecordingState.Idle },
@@ -578,6 +566,7 @@ class LiveProgrammeInfoOverlayTest {
                         .testTag("live-info-test-viewport")
                 ) {
                     LiveProgrammeInfoOverlay(
+                        hero = {},
                         event = event(),
                         channelIdentity = "7 • Das Erste",
                         channelName = "Das Erste",

@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvhplayer.core.livePauseUnavailable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
@@ -62,13 +64,10 @@ import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
-import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_DELAY_MS
-import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_FADE_IN_MS
-import at.bernhardberger.tvhplayer.core.COMPACT_TUNING_MINIMUM_OPAQUE_MS
-import at.bernhardberger.tvhplayer.core.CompactTuningVisibilityAction
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.ChannelKeyAction
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
@@ -88,7 +87,6 @@ import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.liveInterrupted
 import at.bernhardberger.tvhplayer.core.liveInterruptionMessageShown
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
-import at.bernhardberger.tvhplayer.core.compactTuningVisibilityAction
 import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
@@ -134,13 +132,14 @@ import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.resolveLivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
+import at.bernhardberger.tvhplayer.core.liveBarEnd
+import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
@@ -160,6 +159,8 @@ import org.koin.compose.koinInject
 
 private const val CHANNEL_NUMBER_TIMEOUT_MS = 1_500L
 private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
+/** How long "No channel" stays readable after an entry that names no channel. */
+private const val NO_CHANNEL_HOLD_MS = 2_000L
 
 /**
  * A CH+/CH- press within this time of the previous one is a repeat: it waits this quiet time
@@ -215,7 +216,7 @@ internal suspend fun commitChannelNumberEntry(
     entryDelayMs: Long,
     readiness: Flow<ChannelNumberEntryReadiness>,
     readyBoundMs: Long = CHANNEL_NUMBER_READY_BOUND_MS,
-    commit: (atTimer: ChannelNumberEntryReadiness, settled: ChannelNumberEntryReadiness) -> Unit,
+    commit: suspend (atTimer: ChannelNumberEntryReadiness, settled: ChannelNumberEntryReadiness) -> Unit,
 ) {
     delay(entryDelayMs)
     val atTimer = readiness.first()
@@ -339,28 +340,6 @@ val bottomGradient = Brush.verticalGradient(
     1f to Color.Black.copy(alpha = 0.92f)
 )
 
-internal data class PlayerTopScrimTone(
-    val topAlpha: Float,
-    val middleStop: Float,
-    val middleAlpha: Float,
-    val endAlpha: Float,
-)
-
-internal val playerTopScrimTone = PlayerTopScrimTone(
-    topAlpha = 0.88f,
-    middleStop = 0.58f,
-    middleAlpha = 0.72f,
-    endAlpha = 0f,
-)
-
-val topGradient = Brush.verticalGradient(
-    0f to Color.Black.copy(alpha = playerTopScrimTone.topAlpha),
-    playerTopScrimTone.middleStop to Color.Black.copy(
-        alpha = playerTopScrimTone.middleAlpha,
-    ),
-    1f to Color.Black.copy(alpha = playerTopScrimTone.endAlpha),
-)
-
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(
@@ -457,21 +436,39 @@ fun VideoPlayerScreen(
     )
     val timelineState = rememberLiveTimelinePresentationState(player)
     var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }
-    // Key on the identity of the live target, not on the observation value. The observation
-    // carries subscription counters that change several times a second, and restarting the loop
-    // on those blanked the timeline and the distance behind live continuously.
-    LaunchedEffect(videoPlayerViewModel, activeLivePlayback != null, playingLiveChannelId) {
-        sampledTimeshiftState = AppTimeshiftState()
+    var liveRequestToken by remember { mutableLongStateOf(0L) }
+    // The command token a live start began with, until it pauses: its known timing does not end it.
+    var liveStartToken by remember { mutableStateOf<Long?>(0L) }
+    // Requests reset presentation synchronously, before their first frame. This effect only samples;
+    // it must not reinstate live start after a Pause already accepted for this request.
+    LaunchedEffect(videoPlayerViewModel, liveRequestToken) {
+        val requestToken = liveRequestToken
+        val requestedTarget = at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(currentChannelId)
         while (true) {
-            timelineState.sampleTimeshiftPresentation(videoPlayerViewModel::sampleTimeshiftPresentation)?.let {
-                sampledTimeshiftState = it.copy(
-                    displayLiveEdgeMs = timelineState.displayLiveEdgeMs,
-                    historyStartTimeline = timelineState.historyStartTimeline,
-                )
+            timelineState.sampleTimeshiftPresentation {
+                // Admission may leave the old channel installed. Its paused state and coordinates
+                // do not belong to this request, including across a suspended sample.
+                if (requestToken != liveRequestToken || playbackRuntime.activeTarget.value != requestedTarget) AppTimeshiftState()
+                else videoPlayerViewModel.sampleTimeshiftPresentation().takeIf {
+                    requestToken == liveRequestToken && playbackRuntime.activeTarget.value == requestedTarget
+                } ?: AppTimeshiftState()
+            }?.let {
+                if (requestToken == liveRequestToken) {
+                    sampledTimeshiftState = it.copy(
+                        displayLiveEdgeMs = timelineState.displayLiveEdgeMs,
+                        historyStartTimeline = timelineState.historyStartTimeline,
+                    )
+                    if (it.paused) liveStartToken = null
+                }
             }
             delay(250L)
         }
     }
+    // Plays the live edge since its start: no pause or timeshift command yet.
+    val undisturbedLiveStart = liveStartToken == timeshiftCommandToken
+    val livePaused = !livePlayWhenReady(livePauseState, playWhenReady)
+    // The bar's schedule and the info bar's programme both follow it (nowDescribesPlayback).
+    val liveStart = undisturbedLiveStart && !livePaused
     val effectiveTimeshiftState = if (confirmedPlayingChannelId != null) {
         sampledTimeshiftState
     } else {
@@ -484,7 +481,6 @@ fun VideoPlayerScreen(
         requestedSelection = requestedLiveSelection,
     )
     var initialPlaybackResolved by remember { mutableStateOf(false) }
-    var liveRequestToken by remember { mutableLongStateOf(0L) }
     // The viewing intent of the selection the next live start plays (entry, then each tune).
     var liveIntent by remember { mutableStateOf(screenEntry) }
     // The request token a key's own tune owns (started at once, or settling after a CH+/-
@@ -547,11 +543,16 @@ fun VideoPlayerScreen(
         timelineState.applyFeedback(timelineState.beginFeedbackOperation(), reason)
     }
 
+    fun showPauseUnavailable() = showPauseUnavailable(
+        if (livePauseAvailability == LivePauseAvailability.OFF) pauseTimeshiftOffText
+        else pauseUnavailableChannelText,
+    )
+
     LaunchedEffect(livePauseNotice) {
         val notice = livePauseNotice ?: return@LaunchedEffect
         // A pause pressed while timeshift was starting was dropped: no grant for this channel.
         showPauseUnavailable(pauseUnavailableChannelText)
-        layerState.showControls()
+        layerState.chrome.peekBanner()
         playbackRuntime.consumeLivePauseNotice(notice)
     }
 
@@ -571,10 +572,12 @@ fun VideoPlayerScreen(
         aspectRatio = settings.aspectRatio
     }
 
-    DisposableEffect(layerState.statsVisible) {
-        videoPlayerViewModel.setDiagnosticsEnabled(layerState.statsVisible)
+    // Only Stats for nerds needs full diagnostics; badges use the selected tracks.
+    val diagnosticsWanted = layerState.statsVisible
+    DisposableEffect(diagnosticsWanted) {
+        videoPlayerViewModel.setDiagnosticsEnabled(diagnosticsWanted)
         onDispose {
-            if (layerState.statsVisible) videoPlayerViewModel.setDiagnosticsEnabled(false)
+            if (diagnosticsWanted) videoPlayerViewModel.setDiagnosticsEnabled(false)
         }
     }
 
@@ -605,6 +608,8 @@ fun VideoPlayerScreen(
                     // Its selection too, even when the start never reached the runtime; the
                     // restart registers it again.
                     liveIntent?.let(playbackRuntime::abandonLiveSelection)
+                    // A Banner never outlives the stop, nor does its timer.
+                    layerState.chrome.hideBanner()
                 }
                 else -> Unit
             }
@@ -811,6 +816,8 @@ fun VideoPlayerScreen(
         timeshiftCommandToken += 1L
         timelineState.invalidateForSourceChange()
         liveRequestToken += 1L
+        sampledTimeshiftState = AppTimeshiftState()
+        liveStartToken = timeshiftCommandToken
         // Accepted now, played under this one intent (at once or after the burst settles):
         // a Stop from before loses, a Stop from after withdraws the delayed start.
         liveIntent = playbackRuntime.notePlaybackIntent()
@@ -878,6 +885,20 @@ fun VideoPlayerScreen(
         enteredNumber = channelNumberInput,
         playable = { currentLivePlaybackSelection(observation, it) != null },
     )
+    // Set while an entry that named no channel is still shown, after its commit.
+    var channelNumberUnknown by remember { mutableStateOf(false) }
+    val channelNumberTarget = remember(channelNumberInput, channels, channelNumberDigits, channelNumberUnknown) {
+        val channel = ChannelNavigation.idForNumber(orderedChannelIds, channelNumbers, channelNumberInput)
+            ?.let { id -> channels.firstOrNull { it.id == id } }
+        when {
+            channel != null -> ChannelNumberTarget.Channel(channel.name.orEmpty(), channel.icon)
+            channelNumberUnknown -> ChannelNumberTarget.None
+            orderedChannelIds.isEmpty() || ChannelNavigation.canExtendToNumber(
+                orderedChannelIds, channelNumbers, channelNumberInput, channelNumberDigits,
+            ) -> ChannelNumberTarget.Pending
+            else -> ChannelNumberTarget.None
+        }
+    }
     val latestChannelNumberEntryReadiness by rememberUpdatedState(channelNumberEntryReadiness)
     val latestChannelNumberDigits by rememberUpdatedState(channelNumberDigits)
     val latestTuneEnteredChannel by rememberUpdatedState<() -> Unit> { tuneEnteredChannel() }
@@ -891,6 +912,7 @@ fun VideoPlayerScreen(
         }
     }
     LaunchedEffect(channelNumberInput) {
+        channelNumberUnknown = false
         if (channelNumberInput.isEmpty()) return@LaunchedEffect
         val entered = channelNumberInput
         val enteredAt = SystemClock.uptimeMillis()
@@ -911,6 +933,12 @@ fun VideoPlayerScreen(
             } else if (settled == ChannelNumberEntryReadiness.NOT_READY) {
                 // Still not playable at the bound: drop the entry, keep the selection.
                 profileTrace("P49:zap:digit-dropped:not-ready") { }
+                channelNumberInput = ""
+            } else if (settled == ChannelNumberEntryReadiness.UNKNOWN) {
+                // The entry names no channel: say so long enough to read, then drop it. A further
+                // digit or Back replaces or clears it meanwhile.
+                channelNumberUnknown = true
+                delay(NO_CHANNEL_HOLD_MS)
                 channelNumberInput = ""
             } else {
                 latestTuneEnteredChannel()
@@ -943,10 +971,9 @@ fun VideoPlayerScreen(
             }
         } ?: committedWindow.takeIf { visibleSeekPreview == null }
     } else null
-    val displayedNextEvent = if (displayedWindow != null) {
-        observation.nextEvent(currentChannelId, displayedWindow.estimatedPosition)
-    } else nextEvent.takeIf { visibleSeekPreview == null &&
-        at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback(effectiveTimeshiftState) }
+    // A slot window (no programme at the position) is an axis only: it has no Next line.
+    val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
+        effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,
@@ -955,7 +982,7 @@ fun VideoPlayerScreen(
         )
     }
     val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
-        committedWindow, effectiveTimeshiftState, nowEvent)
+        committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
     val actionableInfoEvent = currentProgrammeEvent(observation, infoEvent)
     val currentRecording = remember(observation, infoEvent?.id) {
         infoEvent?.let { observation.dvrEntryForEvent(it.id) }
@@ -1013,7 +1040,7 @@ fun VideoPlayerScreen(
     LaunchedEffect(channelUnavailable) {
         if (channelUnavailable) {
             timelineState.invalidateForSourceChange()
-            layerState.onChannelTuneRequested()
+            layerState.onChannelUnavailable()
         }
     }
     fun currentPlayerForegroundContext() =
@@ -1021,7 +1048,7 @@ fun VideoPlayerScreen(
             numberEntryVisible = channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
             terminalErrorVisible = false,
-            seekPreviewPhase = timelineState.seekPreviewPhase(layerState.controlsVisible),
+            seekPreviewPhase = timelineState.seekPreviewPhase(layerState.chrome.controlsVisible),
         )
     val foregroundContext = currentPlayerForegroundContext()
     val confirmationVisible = foregroundContext.confirmationVisible
@@ -1031,7 +1058,7 @@ fun VideoPlayerScreen(
     val foregroundLayer = playerForegroundLayer(foregroundContext)
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
-            controlsVisible = layerState.controlsVisible,
+            controlsVisible = layerState.chrome.controlsVisible,
             playbackProgressing = timelineState.playbackProgressing &&
                 !effectiveTimeshiftState.paused,
             playbackStable = connState is ConnectionState.Connected &&
@@ -1048,33 +1075,65 @@ fun VideoPlayerScreen(
         )
     )
     SideEffect {
-        layerState.updateAutoHideEligibility(autoHideEligible)
+        layerState.chrome.updateAutoHideEligibility(autoHideEligible)
     }
     PlayerRootFocusEffect(foregroundLayer, rootFocus)
-    var compactTuningVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(screenActive, statusPresentation, compactTuningVisible) {
-        when (
-            compactTuningVisibilityAction(
-                screenActive = screenActive,
-                presentation = statusPresentation,
-                currentlyVisible = compactTuningVisible,
-            )
-        ) {
-            CompactTuningVisibilityAction.KEEP_HIDDEN -> Unit
-            CompactTuningVisibilityAction.SHOW_AFTER_DELAY -> {
-                delay(COMPACT_TUNING_DELAY_MS)
-                compactTuningVisible = true
-            }
-            CompactTuningVisibilityAction.KEEP_VISIBLE -> Unit
-            CompactTuningVisibilityAction.HIDE_AFTER_MINIMUM -> {
-                delay(COMPACT_TUNING_FADE_IN_MS + COMPACT_TUNING_MINIMUM_OPAQUE_MS)
-                compactTuningVisible = false
-            }
-            CompactTuningVisibilityAction.HIDE_IMMEDIATELY -> {
-                compactTuningVisible = false
-            }
+    val chromeState = playerStateCell(paused = livePaused)
+    val glanceTracks = trackGlance(rememberPlayerTracks(player))
+    // The Banner stays while tuning and hides after the first frame of this tune; only a
+    // service whose tracks are positively audio-only lets its playing state stand in.
+    val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
+        tuneConfirmed = confirmedPlayingChannelId != null,
+        videoFrameVisible = videoPresentation.visible,
+        playing = playbackState is AppPlaybackState.Playing,
+        audioOnly = glanceTracks.audioOnly,
+    )
+    val busyBlocked = channelUnavailable || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
+    val busyTarget = AppPlaybackTarget.Live(currentChannelId)
+    val busyKey = busyTarget to (currentSession to liveRequestToken)
+    var tunePresented by remember(busyKey) { mutableStateOf(false) }
+    LaunchedEffect(busyKey, bannerFramePresented) {
+        if (bannerFramePresented) tunePresented = true
+    }
+    val tuningEligible = tuningStatusEligible(
+        playbackState, !livePaused, activeTarget, busyTarget,
+        screenActive && currentSession != null, busyBlocked, tunePresented || bannerFramePresented,
+    )
+    val tuningVisible by rememberBusyVisible(busyKey, tuningEligible, PlayerBusyStatus.TUNING)
+    val bufferingEligible = bufferingStatusEligible(
+        playbackState, !livePaused, activeTarget, busyTarget,
+        screenActive && currentSession != null && activeLivePlayback != null,
+        foregroundBlocked = busyBlocked || tuningEligible,
+    )
+    val bufferingVisible by rememberBusyVisible(busyKey, bufferingEligible, PlayerBusyStatus.BUFFERING)
+    val busyStatus = when {
+        tuningVisible -> PlayerBusyStatus.TUNING
+        bufferingVisible -> PlayerBusyStatus.BUFFERING
+        else -> null
+    }
+    val compactTuning = tuningVisible && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
+    SideEffect {
+        layerState.chrome.onBannerFramePresented(bannerFramePresented)
+        layerState.chrome.holdBanner(livePaused)
+    }
+    val airingEventId = nowEvent?.id?.value
+    var watchedProgramme by remember { mutableStateOf<Pair<ChannelId, Long?>?>(null) }
+    LaunchedEffect(currentChannelId, airingEventId) {
+        val previous = watchedProgramme
+        watchedProgramme = currentChannelId to airingEventId
+        if (previous?.first != currentChannelId || confirmedPlayingChannelId == null || !screenActive) {
+            return@LaunchedEffect
         }
+        val atLiveEdge = !effectiveTimeshiftState.available ||
+            (effectiveTimeshiftState.timingKnown && timeshiftPositionPresentation(effectiveTimeshiftState).atLiveEdge)
+        if (at.bernhardberger.tvhplayer.core.programmeChangeBannerDue(
+                previousEventId = previous.second,
+                currentEventId = airingEventId,
+                chromeHidden = foregroundLayer == PlayerForegroundLayer.NONE,
+                atLiveEdge = atLiveEdge,
+                seekPreview = visibleSeekPreview != null,
+            )
+        ) layerState.onProgrammeChanged()
     }
 
     LiveInfoRecordingValidityEffect(
@@ -1172,13 +1231,16 @@ fun VideoPlayerScreen(
     val handlePlaybackBack: () -> Unit = {
         when (
             playerBackAction(
-                seekPreviewPhase = timelineState.seekPreviewPhase(layerState.controlsVisible),
+                seekPreviewPhase = timelineState.seekPreviewPhase(layerState.chrome.controlsVisible),
                 surface = PlayerSurface.LIVE,
                 foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
+                // The Banner as drawn: a failed tune replaces it with the centre message.
+                bannerVisible = layerState.chrome.bannerVisible && !channelUnavailable,
             )
         ) {
             PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
-            PlayerBackAction.CLOSE_INFO -> closeInfo()
+            PlayerBackAction.CLOSE_INFO ->
+                closeInfo()
             PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
                 layerState.quickList.restoreStart()
                 layerState.closeQuickList()
@@ -1192,14 +1254,45 @@ fun VideoPlayerScreen(
             PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.dismissChannelDrawer()
             PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
+            PlayerBackAction.HIDE_BANNER -> layerState.chrome.hideBanner()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
-            PlayerBackAction.HIDE_CONTROLS -> layerState.hideControls()
+            PlayerBackAction.HIDE_CONTROLS -> layerState.chrome.hideControls()
             PlayerBackAction.HIDE_STATS -> layerState.updateStatsVisibility(false)
         }
     }
     PlayerBackHandler(handlePlaybackBack)
+
+    // Until the displayed channel is confirmed playing, tracks and diagnostics may still
+    // describe the previous channel, so no badge is shown.
+    val badgesConfirmed = confirmedPlayingChannelId != null
+    val chromeBadges: @Composable () -> List<GlanceBadge> = {
+        if (badgesConfirmed) playerGlanceBadges(diagnostics, glanceTracks) else emptyList()
+    }
+    val unavailableTitle = stringResource(R.string.player_info_unavailable_title)
+    val controlsEvent = infoEvent.takeUnless { channelUnavailable }
+    // During a quick step the Next line follows the step's target programme, so the block keeps its height.
+    val controlsNext = infoNextEvent.takeUnless { channelUnavailable }
+    val chromeContent = PlayerChromeContent(
+        clock = formatClock(nowSec),
+        state = chromeState,
+        info = liveInfoBarData(
+            channelNumber = currentChannelNumber,
+            channelName = currentChannelName,
+            event = controlsEvent,
+            next = controlsNext,
+            nextScheduled = controlsNext?.let { observation.dvrEntryForEvent(it.id) }?.state ==
+                at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
+            nowSec = nowSec,
+            unavailableTitle = unavailableTitle,
+        ),
+        recordingNow = currentChannelId in recordingChannelIds,
+        badges = chromeBadges(),
+        picon = currentChannel?.icon,
+        artwork = controlsEvent?.image,
+        channelId = currentChannelId,
+    )
 
     Box(
         modifier = Modifier
@@ -1217,7 +1310,7 @@ fun VideoPlayerScreen(
                 }
                 val keyContext = PlayerKeyContext(
                     surface = PlayerSurface.LIVE,
-                    controlsVisible = layerState.controlsVisible,
+                    controlsVisible = layerState.chrome.controlsVisible,
                     seekbarFocused = false,
                     timeshiftAvailable = effectiveTimeshiftState.available,
                     optionsOpen = layerState.optionsPage != null,
@@ -1254,10 +1347,7 @@ fun VideoPlayerScreen(
                         }
                         LiveMediaKeyAction.REVEAL_WITH_REASON -> {
                             layerState.beginOpeningKeyCycle(keyCode)
-                            showPauseUnavailable(
-                                if (livePauseAvailability == LivePauseAvailability.OFF) pauseTimeshiftOffText
-                                else pauseUnavailableChannelText,
-                            )
+                            showPauseUnavailable()
                             layerState.showControls()
                             return@onPreviewKeyEvent true
                         }
@@ -1278,10 +1368,12 @@ fun VideoPlayerScreen(
                 ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)?.let { direction ->
                     zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
                     channelNumberInput = ""
-                    when (playbackChannelKeyAction(browserVisible = showDrawer)) {
+                    when (playbackChannelKeyAction(
+                        railBrowsesChannelKeys = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
+                    )) {
                         ChannelKeyAction.TUNE ->
                             return@onPreviewKeyEvent tuneAdjacentChannel(direction, event.nativeKeyEvent.eventTime)
-                        ChannelKeyAction.PAGE_LIST -> Unit
+                        ChannelKeyAction.BROWSE_LIST -> Unit
                     }
                 }
 
@@ -1327,7 +1419,13 @@ fun VideoPlayerScreen(
                     }
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
                         dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
-                        layerState.showControls()
+                        // Pausing shows the Banner, not the controls, so Left/Right keep stepping.
+                        layerState.chrome.peekBanner()
+                        return@onPreviewKeyEvent true
+                    }
+                    PlayerKeyAction.PEEK_BANNER -> {
+                        if (livePauseUnavailable(livePauseAvailability)) showPauseUnavailable()
+                        layerState.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_CHANNELS -> {
@@ -1342,14 +1440,17 @@ fun VideoPlayerScreen(
                     PlayerKeyAction.OPEN_OPTIONS -> Unit
                     PlayerKeyAction.SEEK_BACK -> {
                         queueTimeshiftSeek(-seekStepMs(event.nativeKeyEvent.repeatCount))
+                        // A quick step on the hidden player shows its preview in the Banner.
+                        layerState.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SEEK_FORWARD -> {
                         queueTimeshiftSeek(seekStepMs(event.nativeKeyEvent.repeatCount))
+                        layerState.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.HIDE_CONTROLS -> {
-                        layerState.hideControls()
+                        layerState.chrome.hideControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.CLOSE_PLAYER -> {
@@ -1364,160 +1465,144 @@ fun VideoPlayerScreen(
             .playerRootSemantics(stringResource(R.string.player_live_tv_surface))
             .focusable()
     ) {
-        PlayerControlsLayer(
-            visible = foregroundLayer == PlayerForegroundLayer.CONTROLS || foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-            modalVisible = layerState.optionsPage != null || layerState.infoOpen,
-            entry = layerState.controlsEntry,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            OverlayControlsTv(
-                channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-                channelRailContent = {
-                    ChannelDrawer(
-                        active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-                        channels = channels,
-                        selectedId = selectedId,
-                        playingChannelId = confirmedPlayingChannelId,
-                        playbackChannelId = currentChannelId,
-                        playbackIndicator = channelIndicator,
-                        recordingChannelIds = recordingChannelIds,
-                        nowEvent = { channelsVm.nowEvent(it, nowSec) },
-                        nowSec = nowSec,
-                        imageLoader = imageLoader,
-                        currentSession = currentSession,
-                        onFocusChannel = { selectedId = it },
-                        onPickChannel = { tuneChannel(it) },
-                        onCloseDrawer = { keyCode ->
-                            if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
-                            layerState.dismissChannelDrawer()
-                        },
-                    )
-                },
-                restoreChannelAction = layerState.restoreChannelAction,
-                onChannelActionRestored = layerState::onChannelActionRestored,
-                onActionFocused = layerState::onActionFocused,
-                imageLoader = imageLoader,
-                currentSession = currentSession,
-                channelNumber = currentChannelNumber,
-                channelName = currentChannelName,
-                piconPath = currentChannel?.icon,
-                nowEvent = displayedProgrammeEvent(false, null, committedWindow, effectiveTimeshiftState, nowEvent)
-                    .takeUnless { channelUnavailable },
-                nextEvent = displayedNextEvent.takeUnless { channelUnavailable },
-                committedTimeshiftState = effectiveTimeshiftState,
+        // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
+        val bannerSeekPreview = visibleSeekPreview?.takeIf {
+            foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
+                foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
+        }
+        val channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER
+        PlayerChrome(
+            mode = playerChromeMode(
+                controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen,
+                // A pending or dispatched step holds the Banner up after its own timer ran out.
+                banner = !channelUnavailable && (bannerSeekPreview != null ||
+                    (layerState.chrome.bannerVisible && foregroundLayer == PlayerForegroundLayer.NONE)),
+                stepPreview = bannerSeekPreview != null,
+            ),
+            content = chromeContent,
+            timeline = PlayerChromeTimeline.Live(
+                timeshift = visibleSeekPreview?.let {
+                    projectedTimeshiftState(effectiveTimeshiftState, it.decision.targetMs)
+                } ?: effectiveTimeshiftState,
+                nowSec = nowSec,
+                programme = nowEvent.takeUnless { channelUnavailable },
+                committedTimeshift = effectiveTimeshiftState,
+                timeshiftExpected = effectiveTimeshiftState.available ||
+                    livePauseAvailability == at.bernhardberger.tvhplayer.playback.LivePauseAvailability.STARTING ||
+                    livePauseAvailability == at.bernhardberger.tvhplayer.playback.LivePauseAvailability.READY,
                 committedWindow = committedWindow,
                 programmeWindow = displayedWindow,
                 previewing = visibleSeekPreview != null,
-                channelsAvailable = channels.isNotEmpty(),
-                nowSec = nowSec,
-                controlsVisible = layerState.controlsVisible,
-                optionsOpen = layerState.optionsPage != null,
-                onOpenChannels = {
-                    layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
-                    openChannelDrawer()
-                },
-                onOpenInfo = {
-                    openInfo()
-                },
-                onOpenRecord = { openInfo(fromRecord = true) },
-                onStopPlayback = stopAndClose,
-                onUserInteraction = layerState::onUserInteraction,
-                onCommitSeek = timelineState::commitPendingSeek,
-                onOpenOptions = {
-                    restoreOptionsFocus = false
-                    layerState.openOptions()
-                },
-                timeshiftState = visibleSeekPreview?.let {
-                    projectedTimeshiftState(effectiveTimeshiftState, it.decision.targetMs)
-                } ?: effectiveTimeshiftState,
+                step = bannerSeekPreview?.decision,
+                stepDeltaMs = visibleSeekPreview?.decision?.deltaMs,
+                liveStart = liveStart,
                 liveAvailable = !channelUnavailable,
-                playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering,
-                channelRecordingNow = currentChannelId in recordingChannelIds,
-                nextScheduled = displayedNextEvent?.let { observation.dvrEntryForEvent(it.id) }?.state ==
-                    at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
-                timeshiftFeedback = timelineState.feedback,
-                timeshiftFeedbackIsError = timelineState.feedbackIsError,
-                paused = !livePlayWhenReady(livePauseState, playWhenReady),
-                onToggleTimeshiftPause = {
-                    dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
-                },
-                livePause = livePauseAvailability,
-                onPauseUnavailable = ::showPauseUnavailable,
-                onSeekTimeshift = { deltaMs ->
-                    queueTimeshiftSeek(deltaMs)
-                },
-                onGoLive = {
-                    timelineState.cancelPendingSeek()
-                    timeshiftCommandToken += 1L
-                    val commandToken = timeshiftCommandToken
-                    val feedbackToken = timelineState.beginFeedbackOperation()
-                    scope.launch {
-                        val result = timelineState.positionCommand { videoPlayerViewModel.goLive() }
-                        if (commandToken != timeshiftCommandToken) return@launch
-                        val resumeResult = if (result.isAccepted) {
-                            videoPlayerViewModel.resumeTimeshift()
-                        } else {
-                            result
-                        }
-                        val completion = timeshiftCommandCompletion(
-                            commandToken = commandToken,
-                            currentToken = timeshiftCommandToken,
-                            feedbackToken = feedbackToken,
-                            currentFeedbackToken = timelineState.feedbackToken,
-                            result = resumeResult,
-                            unavailableText = timeshiftUnavailableText,
-                            rollbackPlayWhenReady = null,
-                        ) ?: return@launch
-                        if (completion.applyFeedback) {
-                            timelineState.applyFeedback(feedbackToken, completion.feedback)
-                        }
-                        if (resumeResult.isAccepted) {
-                            videoPlayerViewModel.play()
-                        }
-                    }
-                },
-                restoreInfoFocus = restoreInfoFocus,
-                onInfoFocusRestored = { restoreInfoFocus = false },
-                restoreRecordActionFocus = restoreRecordActionFocus,
-                onRecordActionFocusRestored = { restoreRecordActionFocus = false },
-                restoreOptionsFocus = restoreOptionsFocus,
-                onOptionsFocusRestored = { restoreOptionsFocus = false },
-                channelId = currentChannelId,
-            )
-        }
-
-        if (
-            visibleSeekPreview != null && (
-                foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
-                    foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
-                )
-        ) {
-            TimeshiftSeekPreview(
-                state = effectiveTimeshiftState,
-                decision = visibleSeekPreview.decision,
                 feedback = timelineState.feedback,
                 feedbackIsError = timelineState.feedbackIsError,
-                programmeWindow = displayedWindow,
-                channelsAvailable = channels.isNotEmpty(),
-                modifier = Modifier.align(Alignment.BottomCenter),
-                headerContent = { modifier ->
-                    PlayerIdentityHeader(
-                        imageLoader = imageLoader, currentSession = currentSession, piconPath = currentChannel?.icon,
-                        eyebrow = at.bernhardberger.tvhplayer.ui.components.channelTitleText(currentChannelNumber, currentChannelName),
-                        title = displayedWindow?.event?.title.orEmpty(),
-                        support = endedProgrammeSupport(displayedWindow?.event, nowSec)
-                            ?: displayedWindow?.let { programmeWindowClockLabels(it.event).let { (start, end) -> "$start - $end" } }
-                            ?: stringResource(R.string.player_programme_timing_unavailable),
-                        clock = at.bernhardberger.tvhplayer.ui.common.formatClock(nowSec), clockSupport = null,
-                        status = PlayerHeaderStatus(!playWhenReady, timeshift = effectiveTimeshiftState,
-                            recordingNow = currentChannelId in recordingChannelIds,
-                            playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering),
-                        modifier = modifier,
-                        tags = PlayerHeaderTags(title = "player-programme-title"),
-                    )
+                motionKey = currentChannelId to liveRequestToken,
+                tuning = compactTuning,
+            ),
+            actions = PlayerChromeActions(
+                active = layerState.chrome.controlsVisible && layerState.optionsPage == null,
+                paused = !livePlayWhenReady(livePauseState, playWhenReady),
+                livePause = livePauseAvailability,
+                restoreFocus = when {
+                    restoreInfoFocus -> PlayerIdentityCardTag
+                    restoreRecordActionFocus -> "player-record"
+                    restoreOptionsFocus -> "player-settings"
+                    else -> layerState.restoreChannelAction
                 },
-            )
-        }
+            ),
+            imageLoader = imageLoader,
+            currentSession = currentSession,
+            entry = layerState.chrome.controlsEntry,
+            panelOpen = layerState.optionsPage != null || layerState.infoOpen,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            onTogglePause = {
+                dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
+            },
+            onPauseUnavailable = ::showPauseUnavailable,
+            onSeek = { deltaMs ->
+                queueTimeshiftSeek(deltaMs)
+            },
+            onCommitSeek = timelineState::commitPendingSeek,
+            onStop = stopAndClose,
+            onInfo = {
+                openInfo()
+            },
+            onRecord = { openInfo(fromRecord = true) },
+            onOptions = {
+                restoreOptionsFocus = false
+                layerState.openOptions()
+            },
+            onInteraction = layerState.chrome::onUserInteraction,
+            onActionFocused = layerState::onActionFocused,
+            onFocusRestored = {
+                restoreInfoFocus = false
+                restoreRecordActionFocus = false
+                restoreOptionsFocus = false
+                layerState.onChannelActionRestored()
+            },
+            onDownFromActions = {
+                if (channels.isNotEmpty()) {
+                    layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
+                    openChannelDrawer()
+                }
+            },
+            decorationCoversControls = channelRailOpen,
+            controlsDecoration = { emphasisAlpha, controls ->
+                QuickZapPresentation(
+                    expanded = channelRailOpen,
+                    channelsAvailable = channels.isNotEmpty(),
+                    peekAlpha = emphasisAlpha,
+                    channelContent = {
+                        ChannelDrawer(
+                            active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
+                            channels = channels,
+                            selectedId = selectedId,
+                            playingChannelId = confirmedPlayingChannelId,
+                            playbackChannelId = currentChannelId,
+                            playbackIndicator = channelIndicator,
+                            recordingChannelIds = recordingChannelIds,
+                            nowEvent = { channelsVm.nowEvent(it, nowSec) },
+                            nowSec = nowSec,
+                            imageLoader = imageLoader,
+                            currentSession = currentSession,
+                            onFocusChannel = { selectedId = it },
+                            onPickChannel = { tuneChannel(it) },
+                            onCloseDrawer = { keyCode ->
+                                if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
+                                layerState.dismissChannelDrawer()
+                            },
+                        )
+                    },
+                    preview = {
+                        val focused = channels.firstOrNull { it.id == selectedId }
+                        QuickZapTrayPreview(
+                            channel = focused,
+                            event = focused?.let { channelsVm.nowEvent(it.id, nowSec) },
+                            next = focused?.let { channelsVm.nextEvent(it.id, nowSec) },
+                            nowSec = nowSec,
+                            imageLoader = imageLoader,
+                            currentSession = currentSession,
+                            modifier = Modifier.padding(horizontal = 64.dp),
+                        )
+                    },
+                    controls = controls,
+                )
+            },
+        )
+        // Full recovery and the unavailable message replace even an exiting ring.
+        if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center))
+        // With the chrome hidden and no Banner, only the paused chip remains.
+        PlayerHiddenStatusChip(
+            state = hiddenChipState(
+                chromeState, hidden = foregroundLayer == PlayerForegroundLayer.NONE && !layerState.chrome.bannerVisible,
+                available = !channelUnavailable,
+            ),
+            end = liveBarEnd(liveBehindMs(effectiveTimeshiftState, compactTuning, liveStart), end = null),
+            modifier = Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()),
+        )
 
         PlayerPanelVisibility(
             Unit.takeIf {
@@ -1550,15 +1635,18 @@ fun VideoPlayerScreen(
                 onRecordingActivate = ::activateInfoRecording,
                 onRecordingDismiss = ::dismissRecordingDialog,
                 onClose = ::closeInfo,
-                piconContent = {
-                    PiconBox(
+                onRecordFocusRestored = { restoreRecordFocus = false },
+                hero = {
+                    ProgrammeHero(
+                        image = infoEvent?.image,
+                        channelId = currentChannelId,
+                        channelNumber = currentChannelNumber?.toString().orEmpty(),
+                        picon = currentChannel?.icon,
                         imageLoader = imageLoader,
                         currentSession = currentSession,
-                        piconPath = currentChannel?.icon,
-                        modifier = Modifier.width(96.dp).height(54.dp),
+                        modifier = Modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight),
                     )
                 },
-                onRecordFocusRestored = { restoreRecordFocus = false },
             )
         }
 
@@ -1611,9 +1699,13 @@ fun VideoPlayerScreen(
 
         ChannelNumberOverlay(
             number = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty(),
+            target = channelNumberTarget,
+            maxDigits = channelNumberDigits,
+            imageLoader = imageLoader,
+            currentSession = currentSession,
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(48.dp),
+                .align(Alignment.TopStart)
+                .padding(start = 56.dp, top = 48.dp),
         )
 
         val unavailableShown = channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)
@@ -1663,26 +1755,6 @@ fun VideoPlayerScreen(
                 }
             }
         }
-        CompactTuningStatus(
-            visible = compactTuningVisible,
-            label = stringResource(R.string.player_tuning_channel, currentChannelName),
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 56.dp)
-                .testTag("player-tuning-status"),
-        )
-
-        CompactBufferingStatus(
-            state = playbackState,
-            playWhenReady = playWhenReady,
-            target = activeTarget,
-            expectedTarget = AppPlaybackTarget.Live(currentChannelId),
-            generation = currentSession to liveRequestToken,
-            screenActive = screenActive && currentSession != null && activeLivePlayback != null,
-            foregroundBlocked = statusPresentation != PlaybackStatusPresentation.NONE || compactTuningVisible,
-            modifier = Modifier.align(Alignment.Center).padding(horizontal = 56.dp),
-        )
-
         TvRecoveryOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.RECOVERY,
             message = stringResource(

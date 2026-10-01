@@ -21,6 +21,12 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProgrammeWindowTest {
+    private lateinit var originalZone: java.util.TimeZone
+    @org.junit.Before fun pinZone() {
+        originalZone = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
+    }
+    @org.junit.After fun restoreZone() { java.util.TimeZone.setDefault(originalZone) }
     private val live = Instant.parse("2026-09-07T20:30:00Z")
     private val a = event(1, "2026-09-07T19:00:00Z", "2026-09-07T20:00:00Z", "A")
     private val b = event(2, "2026-09-07T20:00:00Z", "2026-09-07T21:00:00Z", "B")
@@ -46,7 +52,10 @@ class ProgrammeWindowTest {
         val state = fixture.presentation(55)
         assertEquals(a, programmeWindow(state, eventAt = ::lookup)!!.event)
         val cold = SessionObservation.create(epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(b))))
-        assertNull(programmeWindow(state) { cold.eventAt(ChannelId(1), it) })
+        // Without the programme the axis is the half-hour slot; no programme is invented.
+        val slot = requireNotNull(programmeWindow(state) { cold.eventAt(ChannelId(1), it) })
+        assertNull(slot.event)
+        assertEquals(Instant.parse("2026-09-07T19:30:00Z") to Instant.parse("2026-09-07T20:00:00Z"), slot.start to slot.stop)
     }
 
     @Test fun adjacentRetainedProgrammesFillToTheirOwnEndAndSwitchAtExclusiveBoundary() {
@@ -93,6 +102,38 @@ class ProgrammeWindowTest {
             at.bernhardberger.tvhplayer.playback.AppTimeshiftState(), b))
     }
 
+    @Test fun aLiveStartShowsCurrentBroadcastBeforeTheFirstTimeshiftStatus() {
+        val granted = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, timingKnown = false)
+        assertNull(displayedProgrammeEvent(false, null, null, granted, b))
+        assertEquals(b, displayedProgrammeEvent(false, null, null, granted, b, liveStart = true))
+        assertNull(displayedProgrammeEvent(true, null, null, granted, b, liveStart = true))
+    }
+
+    @Test fun aLiveStartKeepsTheCurrentBroadcastAndItsNextOnceTimingIsKnownUntilTheWindow() {
+        // Known timing that alone does not describe playback at now (not yet at the live edge).
+        val known = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
+            positionMs = -300_000, liveEdgeMs = 0, timingKnown = true)
+        assertNull(displayedProgrammeEvent(false, null, null, known, b))
+        assertNull(displayedNextEvent(false, null, known, a, liveStart = false, currentProgramme = b) { a })
+        assertEquals(b, displayedProgrammeEvent(false, null, null, known, b, liveStart = true))
+        assertEquals(a, displayedNextEvent(false, null, known, a, liveStart = true, currentProgramme = b) { error("no window") })
+        assertNull("a step's preview has its own window", displayedNextEvent(true, null, known, a, liveStart = true, currentProgramme = b) { a })
+    }
+
+    @Test fun aFutureEventWithoutACurrentProgrammeDoesNotBecomeNextDuringALiveStart() {
+        val unknown = at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, timingKnown = false)
+        assertNull(displayedNextEvent(false, null, unknown, b, liveStart = true, currentProgramme = null) { b })
+    }
+
+    @Test fun programmeSlotsUseTheDefaultZonesQuarterHourOffset() {
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Kathmandu"))
+        val fixture = slotFixture()
+        val state = with(fixture) { state.value.toAppPresentation(playbackPosition(90.minutes)) }
+        val window = requireNotNull(programmeWindow(state, eventAt = ::noGuide))
+        assertEquals(Instant.parse("2026-09-07T20:15:00Z") to Instant.parse("2026-09-07T20:45:00Z"), window.start to window.stop)
+        assertEquals("02:00" to "02:30", programmeWindowClockLabels(window))
+    }
+
     @Test fun historicalBoundaryIgnoresEstimateWobbleButFollowsEvictionAndSegmentReplacement() = runTest {
         val fixture = fixture()
         fixture.updateHistory(80.minutes, 90.minutes, estimatedLiveEdgeTime = live)
@@ -134,18 +175,43 @@ class ProgrammeWindowTest {
         val fixture = fixture()
         val state = fixture.presentation()
         val current = requireNotNull(programmeWindow(state, eventAt = ::lookup))
-        assertEquals("B", current.event.title)
+        assertEquals("B", current.event?.title)
         assertEquals(5f / 60, current.positionFraction, 0.0001f)
         assertEquals(0f, current.availableStartFraction)
         assertEquals(0.5f, current.liveFraction!!, 0.0001f)
         val previous = requireNotNull(programmeWindow(state, state.timeline!!.select(55.minutes), eventAt = ::lookup))
-        assertEquals("A", previous.event.title)
+        assertEquals("A", previous.event?.title)
         assertEquals(50f / 60, previous.availableStartFraction, 0.0001f)
         assertEquals(1f, previous.availableEndFraction)
         assertNull(previous.liveFraction)
         assertTrue(previous.targetAvailable)
-        assertEquals("19:00" to "20:00", programmeWindowClockLabels(previous.event, ZoneId.of("UTC")))
+        assertEquals("19:00" to "20:00", programmeWindowClockLabels(previous, ZoneId.of("UTC")))
         assertNull(state.timeline!!.select(0.minutes))
+    }
+
+    @Test fun positionWithinTheLiveEdgeToleranceSitsOnTheProgrammeWindowsLiveEdge() {
+        val fixture = fixture()
+        fun window(position: kotlin.time.Duration) = requireNotNull(programmeWindow(
+            fixture.state.value.toAppPresentation(fixture.playbackPosition(position)), eventAt = ::lookup))
+        val edge = window(90.minutes).liveFraction!!
+        assertEquals(0.5f, edge, 0.0001f)
+        // Playback lags the edge by a little latency: the fill and thumb still coincide with the edge.
+        for (position in listOf(90.minutes, 89.minutes + 58.seconds, 89.minutes + 55.seconds)) {
+            assertEquals("$position", edge, window(position).positionFraction, 0f)
+        }
+        // Beyond the tolerance the position is its own estimate again.
+        val behind = window(89.minutes + 54.seconds)
+        assertTrue(behind.positionFraction < edge)
+        assertEquals(29f / 60 + 54f / 3_600, behind.positionFraction, 0.0001f)
+        assertEquals(5f / 60, window(65.minutes).positionFraction, 0.0001f)
+    }
+
+    @Test fun aProgrammeWindowWithoutTheLiveEdgeInsideItNeverPinsThePosition() {
+        val fixture = fixture()
+        val state = fixture.presentation()
+        val previous = requireNotNull(programmeWindow(state, state.timeline!!.select(89.minutes + 59.seconds - 30.minutes), eventAt = ::lookup))
+        assertNull(previous.liveFraction)
+        assertTrue(previous.positionFraction < 1f)
     }
 
     @Test fun validPresentedPositionAheadOfStatusEdgeDoesNotLookExpired() {
@@ -181,8 +247,12 @@ class ProgrammeWindowTest {
         fixture.updateHistory(89.minutes, 90.minutes, estimatedLiveEdgeTime = live)
         val state = fixture.presentation(90)
         assertEquals(29f / 60, programmeWindow(state, eventAt = ::lookup)!!.availableStartFraction, 0.0001f)
-        assertNull(programmeWindow(state) { null })
-        assertNull(programmeWindow(state) { a })
+        // Without a programme at the position (none, or one that does not contain it) the axis is the
+        // half-hour slot: at 20:30 exactly the next one, with no programme borrowed.
+        for (slot in listOf(programmeWindow(state) { null }, programmeWindow(state) { a })) {
+            assertNull(slot!!.event)
+            assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"), slot.start to slot.stop)
+        }
         fixture.updateHistory(50.minutes, 90.minutes)
         assertNull(programmeWindow(fixture.presentation(), eventAt = ::lookup))
         fixture.replaceSubscription()
@@ -216,7 +286,7 @@ class ProgrammeWindowTest {
 
         assertNull(programmeWindow(pending, eventAt = ::lookup))
         val selected = requireNotNull(programmeWindow(pending, target, mapping, ::lookup))
-        assertEquals("A", selected.event.title)
+        assertEquals("A", selected.event?.title)
         assertEquals(55f / 60, selected.positionFraction, 0.0001f)
         assertTrue(selected.targetAvailable)
 
@@ -242,11 +312,12 @@ class ProgrammeWindowTest {
         val preview = owner.preview!!
         assertSame(snapshot, preview.mappingTimeline)
         assertEquals(55.minutes, preview.target.position)
-        assertNull(programmeWindow(fixture.presentation(), preview.target, snapshot) { null })
+        // Without a programme at the target its window is the half-hour slot around it, never a programme.
+        assertNull(programmeWindow(fixture.presentation(), preview.target, snapshot) { null }!!.event)
         val availablePreview = requireNotNull(programmeWindow(fixture.presentation(), preview.target, snapshot, ::lookup))
-        assertEquals("A", availablePreview.event.title)
+        assertEquals("A", availablePreview.event?.title)
         assertTrue(availablePreview.targetAvailable)
-        assertEquals("B", programmeWindow(fixture.presentation(), eventAt = ::lookup)!!.event.title)
+        assertEquals("B", programmeWindow(fixture.presentation(), eventAt = ::lookup)!!.event?.title)
         fixture.updateHistory(56.minutes, 91.minutes, estimatedLiveEdgeTime = live)
         assertFalse(programmeWindow(fixture.presentation(), preview.target, snapshot, ::lookup)!!.targetAvailable)
         advanceTimeBy(400)
@@ -255,5 +326,68 @@ class ProgrammeWindowTest {
         assertEquals("expired", owner.feedback)
         assertEquals(55.minutes, preview.target.position)
         owner.dispose()
+    }
+
+    // Without a programme the axis is the half-hour slot around the position (AOSP placeholder programmes).
+
+    private val noGuide = SessionObservation.create(epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = emptyList())))
+    private fun noGuide(time: Instant) = noGuide.eventAt(ChannelId(1), time)
+    /** History 50–90 min of the segment, its live edge at 20:40. */
+    private fun slotFixture() = TimeshiftTestFixture(120.minutes).apply {
+        updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = Instant.parse("2026-09-07T20:40:00Z"))
+    }
+
+    @Test fun halfHourSlotsAlignToTheLocalClock() {
+        val utc = ZoneId.of("UTC")
+        assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"),
+            halfHourSlot(Instant.parse("2026-09-07T20:40:00Z"), utc))
+        assertEquals("a slot starts at its own boundary", Instant.parse("2026-09-07T21:00:00Z"),
+            halfHourSlot(Instant.parse("2026-09-07T21:00:00Z"), utc).first)
+        assertEquals(Instant.parse("2026-09-07T20:30:00Z"), halfHourSlot(Instant.parse("2026-09-07T20:59:59Z"), utc).first)
+        // Kathmandu is UTC+5:45: its 10:00 local is 04:15 UTC.
+        assertEquals(Instant.parse("2026-09-07T04:15:00Z") to Instant.parse("2026-09-07T04:45:00Z"),
+            halfHourSlot(Instant.parse("2026-09-07T04:22:00Z"), ZoneId.of("Asia/Kathmandu")))
+    }
+
+    @Test fun withoutAGuideTheSlotIsTheAxisAndTheBufferItsAvailableRange() {
+        val fixture = slotFixture()
+        val state = with(fixture) { state.value.toAppPresentation(playbackPosition(90.minutes)) }
+        val window = requireNotNull(programmeWindow(state, eventAt = ::noGuide))
+        assertNull("an axis, never a programme", window.event)
+        assertEquals(Instant.parse("2026-09-07T20:30:00Z") to Instant.parse("2026-09-07T21:00:00Z"), window.start to window.stop)
+        assertEquals("the live edge ten minutes into the slot", 1f / 3, window.liveFraction!!, 0.001f)
+        assertEquals("playback at live", 1f / 3, window.positionFraction, 0.001f)
+        assertEquals("the buffer began before the slot", 0f, window.availableStartFraction, 0f)
+        assertEquals(1f / 3, window.availableEndFraction, 0.001f)
+        assertEquals("the slot's clocks label the axis", "20:30" to "21:00", programmeWindowClockLabels(window, ZoneId.of("UTC")))
+        // A committed slot never lends programme information, not even the current broadcast on a fresh start.
+        assertNull(displayedProgrammeEvent(false, null, window, state, b, liveStart = true))
+    }
+
+    @Test fun steppingBackPastTheSlotStartMovesTheAxisToThePreviousSlot() {
+        val fixture = slotFixture()
+        val state = with(fixture) { state.value.toAppPresentation(playbackPosition(90.minutes)) }
+        val target = requireNotNull(state.timeline!!.select(75.minutes))
+        val previous = requireNotNull(programmeWindow(state, target, state.timeline, ::noGuide))
+        assertEquals(Instant.parse("2026-09-07T20:00:00Z") to Instant.parse("2026-09-07T20:30:00Z"), previous.start to previous.stop)
+        assertEquals("20:25 in the 20:00 slot", 25f / 30, previous.positionFraction, 0.001f)
+        assertNull("the live edge is not on this axis", previous.liveFraction)
+        assertEquals("the buffer reaches to its end", 1f, previous.availableEndFraction, 0f)
+        assertEquals(0f, previous.availableStartFraction, 0f)
+        assertNull(previous.event)
+    }
+
+    @Test fun theSlotRollsOverAtTheHalfHour() {
+        fun atLive(edge: String): ProgrammeWindow {
+            val fixture = TimeshiftTestFixture(120.minutes).apply { updateHistory(50.minutes, 90.minutes, estimatedLiveEdgeTime = Instant.parse(edge)) }
+            val state = with(fixture) { state.value.toAppPresentation(playbackPosition(90.minutes)) }
+            return requireNotNull(programmeWindow(state, eventAt = ::noGuide))
+        }
+        val before = atLive("2026-09-07T20:59:59Z")
+        val after = atLive("2026-09-07T21:00:01Z")
+        assertEquals(Instant.parse("2026-09-07T20:30:00Z"), before.start)
+        assertEquals(Instant.parse("2026-09-07T21:00:00Z"), after.start)
+        assertTrue("the fill ends the old slot", before.positionFraction > 0.99f)
+        assertTrue("and starts the next one: an identity change, so it jumps", after.positionFraction < 0.01f)
     }
 }

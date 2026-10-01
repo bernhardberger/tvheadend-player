@@ -1,6 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.res.painterResource
+import androidx.tv.material3.Icon
+import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.StepDirection
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
@@ -18,22 +26,30 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -69,15 +85,6 @@ private fun Modifier.paintAbove(): Modifier = layout { measurable, constraints -
     }
 }
 
-/** Gap between an inline endpoint label and the track. Matches on the preview row. */
-private val InlineEndpointGap = 8.dp
-
-/**
- * Caps a sentence stuffed into an endpoint slot so the track, and the seek label
- * aligned to it, keep a usable width. Clock and duration labels fit inside this.
- */
-private val InlineEndpointLabelMaxWidth = 240.dp
-
 /** Both ends use the same pixel rounding; animation is read only during layout. */
 private fun Modifier.timelineSpan(
     trackWidth: Dp,
@@ -92,83 +99,82 @@ private fun Modifier.timelineSpan(
         layout(child.width, child.height) { child.placeRelative(0, 0) }
     }
 
+/**
+ * Clear space between the step readout's bottom and the thumb's top, so the chip never reads as
+ * touching the focused bar's thumb (AOSP Live TV keeps its time label about 5dp clear of a 12dp one).
+ */
+internal val ReadoutThumbGap = 8.dp
+
+/**
+ * Where the step readout's chip and the distance's drawn text lie in the root, written when they are
+ * positioned and read only by the distance's layer: while the chip lies over any of the text, the
+ * text is not drawn, so none of it shows as a fragment beside the chip.
+ */
+@Stable
+internal class ReadoutCover {
+    var chip by mutableStateOf<Rect?>(null)
+    var distance by mutableStateOf<Rect?>(null)
+    val coversDistance: Boolean get() = chip?.let { distance?.overlaps(it) } == true
+}
+
+private fun LayoutCoordinates.unclippedBoundsInRoot(): Rect = findRootCoordinates().localBoundingBoxOf(this, clipBounds = false)
+
+/**
+ * The step readout at its place on the bar, on an opaque chip so nothing beneath shows through. Over
+ * a drawn thumb ([thumbDrawn]) its bottom sits [ReadoutThumbGap] above the thumb's top; without one
+ * (the Banner's preview) it rests on the bar row's top. It takes the bar row's width and no height:
+ * it paints above the row, over whatever sits there.
+ * [direction] leads it with ⏪ or ⏩: where the target lies from the playback position. At the live
+ * edge ([atLive]) it leads with ▶ instead.
+ */
 @Composable
 private fun TimelineTargetLabel(
     label: String,
     progress: Float,
     available: Boolean = true,
+    direction: StepDirection? = null,
+    atLive: Boolean = false,
+    thumbDrawn: Boolean = false,
+    cover: ReadoutCover,
 ) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else TvOverlayTextTertiaryAlpha),
-        maxLines = 1,
+    val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else TvOverlayTextTertiaryAlpha)
+    DisposableEffect(cover) { onDispose { cover.chip = null } }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .layout { measurable, constraints ->
                 val label = measurable.measure(constraints.copy(minWidth = 0))
-                layout(constraints.maxWidth, label.height) {
+                val thumbTop = (TvOverlayTimelineRowHeight - TvOverlayTimelineThumbSize) / 2
+                layout(constraints.maxWidth, 0) {
                     label.placeRelative(
                         (constraints.maxWidth * progress - label.width / 2f).roundToInt()
                             .coerceIn(0, constraints.maxWidth - label.width),
-                        0,
+                        (if (thumbDrawn) (thumbTop - ReadoutThumbGap).roundToPx() else 0) - label.height,
                     )
                 }
             }
-            .playerStatusScrim()
+            .onGloballyPositioned { cover.chip = it.unclippedBoundsInRoot() }
+            .background(TvSurfaceColors.containerHigh, PlayerChromeTokens.chipShape)
+            .heightIn(min = PlayerChromeTokens.chipHeight)
+            .padding(horizontal = 8.dp)
+            .semantics(mergeDescendants = true) { }
             .testTag("timeshift-preview-target"),
-    )
-}
-
-@Composable
-private fun TimelineEndpointLabel(
-    text: String,
-    color: Color,
-    testTag: String?,
-    visible: Boolean,
-    emphasis: State<Float>,
-) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = if (visible) color else Color.Transparent,
-        maxLines = 1,
-        softWrap = false,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .widthIn(max = InlineEndpointLabelMaxWidth)
-            .graphicsLayer { alpha = emphasis.value }
-            .then(if (visible) Modifier else Modifier.clearAndSetSemantics { })
-            .then(if (visible && testTag != null) Modifier.testTag(testTag) else Modifier),
-    )
-}
-
-/**
- * Same label widths and gaps as the inline track row, so a seek label measured in
- * [center] uses the track's coordinates and is not clipped by the inset.
- */
-@Composable
-private fun TimelineEndpointRow(
-    leading: String?,
-    trailing: String?,
-    leadingColor: Color,
-    trailingColor: Color,
-    leadingTag: String?,
-    trailingTag: String?,
-    labelsVisible: Boolean,
-    emphasis: State<Float>,
-    modifier: Modifier = Modifier,
-    center: @Composable () -> Unit,
-) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (leading != null) {
-            TimelineEndpointLabel(leading, leadingColor, leadingTag, labelsVisible, emphasis)
-            Spacer(Modifier.width(InlineEndpointGap))
-        }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { center() }
-        if (trailing != null) {
-            Spacer(Modifier.width(InlineEndpointGap))
-            TimelineEndpointLabel(trailing, trailingColor, trailingTag, labelsVisible, emphasis)
-        }
+    ) {
+        if (atLive) Icon(
+            painterResource(R.drawable.ic_play_arrow),
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(playerStateCellSize()).testTag("timeshift-preview-live"),
+        ) else if (direction != null) Icon(
+            painterResource(if (direction == StepDirection.BEHIND) R.drawable.ic_fast_rewind else R.drawable.ic_fast_forward),
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier
+                .size(playerStateCellSize())
+                .testTag(if (direction == StepDirection.BEHIND) "timeshift-preview-behind" else "timeshift-preview-ahead"),
+        )
+        Text(text = label, style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1)
     }
 }
 
@@ -197,7 +203,9 @@ fun PlayerTimelineBar(
     motionKey: Any? = null,
 ) {
     val currentProgress = progress?.coerceIn(0f, 1f)
-    val animatedProgress = key(motionKey, programmeWindow, currentProgress != null, programmeTargetAvailable) {
+    // The axis is part of the identity: schedule, buffer, programme window. A fraction on another axis
+    // is another quantity, so a change of axis snaps to it instead of sliding through a value between.
+    val animatedProgress = key(motionKey, programmeWindow, rewindableStartFraction != null, currentProgress != null, programmeTargetAvailable) {
         animateFloatAsState(currentProgress ?: 0f,
             animationSpec = tween(durationMillis = PlayerMotion.EmphasisMs, easing = LinearOutSlowInEasing),
             label = "player-timeline-position")
@@ -397,15 +405,24 @@ fun PlayerTimelineBlock(
     rewindableOverflowTestTag: String? = null,
     progressSemantics: Boolean = true,
     programmeWindow: ProgrammeWindow? = null,
+    /** False when the focusable track already speaks both clocks. */
+    endpointSemantics: Boolean = true,
     reserveLabelSpace: Boolean = false,
     previewLabel: String? = null,
+    /** Where [previewLabel]'s target lies from the playback position; null shows no direction. */
+    previewDirection: StepDirection? = null,
+    /** The step readout's target is the live edge: it leads with ▶ instead of a direction. */
+    previewAtLive: Boolean = false,
     fillColor: Color = MaterialTheme.colorScheme.tertiary,
     showTrack: Boolean = true,
     timelineModifier: Modifier = Modifier,
     feedback: String? = null,
     feedbackIsError: Boolean = false,
     feedbackTestTag: String = "player-window-title",
-    statusAction: (@Composable () -> Unit)? = null,
+    /** The state cell before the bar, the end after it (replacing [trailingLabel]) and a live end's distance behind live. */
+    status: PlayerBarStatus? = null,
+    /** Whose label widths the bar row keeps. */
+    kind: TimelineKind = TimelineKind.LIVE,
     collapsed: Boolean = false,
     markerFractions: List<Float> = emptyList(),
     trackOverlay: (@Composable BoxScope.() -> Unit)? = null,
@@ -416,9 +433,7 @@ fun PlayerTimelineBlock(
     motionKey: Any? = null,
 ) {
     val statusHeight = TvOverlayStatusRowHeight
-    val showStatus = !collapsed && (
-        feedback != null || statusAction != null || previewLabel != null
-        )
+    val showStatus = !collapsed && feedback != null
     val previewProgress = programmeWindow?.positionFraction ?: progress ?: 0f
     val previewAvailable = programmeWindow?.targetAvailable != false
     val endpointColor = MaterialTheme.colorScheme.onSurface
@@ -429,11 +444,14 @@ fun PlayerTimelineBlock(
     val leadingColor = leadingLabelColor ?: endpointColor
     val trailingColor = trailingLabelColor ?: endpointColor
     val inlineLabels = !collapsed &&
-        (reserveLabelSpace || leadingLabel != null || trailingLabel != null)
+        (reserveLabelSpace || leadingLabel != null || trailingLabel != null || status != null)
+    val widths = rememberTimelineEndpointWidths(kind)
+    val stateCell = LocalStateCellInset.current
     val labelLineHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
+    val readoutCover = remember { ReadoutCover() }
     @Composable
     fun Track() {
-        Box(Modifier.fillMaxWidth()) {
+        Box(timelineModifier.fillMaxWidth()) {
             PlayerTimelineBar(
                 progress = programmeWindow?.positionFraction ?: progress,
                 tone = tone,
@@ -453,26 +471,53 @@ fun PlayerTimelineBlock(
                 fillColor = fillColor,
                 showTrack = showTrack,
                 markerFractions = markerFractions,
-                motionKey = motionKey to programmeWindow?.event?.let { Triple(it.id, it.start, it.stop) },
+                motionKey = motionKey to programmeWindow?.let { Triple(it.event?.id, it.start, it.stop) },
             )
             trackOverlay?.invoke(this)
+            if (previewLabel != null && !collapsed) {
+                TimelineTargetLabel(previewLabel, previewProgress, previewAvailable, previewDirection, previewAtLive,
+                    thumbDrawn = tone == PlayerTimelineTone.ACTIVE && progress != null, cover = readoutCover)
+            }
         }
     }
+    // Live TV or a growing recording's distance behind live, above and flush with the end label.
+    val liveEnd = status?.end?.takeIf { inlineLabels && it.liveEnd }
     Box(modifier.fillMaxWidth()) {
-        Column(timelineModifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        // It takes no room: it paints above the block, on the info block's last line, at one offset
+        // above the bar row whatever that line is. Composed before the row, it lies beneath the step
+        // readout's opaque chip, and is not drawn while the chip lies over any of its text: the chip
+        // moves in steps, so the text cuts with it instead of fading beside it.
+        if (liveEnd != null) PlayerLiveDistance(
+            liveEnd, status.distance,
+            Modifier.align(Alignment.TopEnd).paintAbove().size(widths.distance, labelLineHeight),
+            textModifier = remember(readoutCover) {
+                Modifier
+                    .onGloballyPositioned { readoutCover.distance = it.unclippedBoundsInRoot() }
+                    .graphicsLayer { alpha = if (readoutCover.coversDistance) 0f else 1f }
+            },
+        )
+        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             if (inlineLabels) {
                 TimelineEndpointRow(
-                    leading = leadingLabel,
-                    trailing = trailingLabel,
-                    leadingColor = leadingColor,
-                    trailingColor = trailingColor,
-                    leadingTag = leadingLabelTestTag,
-                    trailingTag = trailingLabelTestTag,
-                    labelsVisible = true,
-                    emphasis = endpointEmphasis,
+                    widths = widths,
                     modifier = Modifier
                         .height(maxOf(TvOverlayTimelineRowHeight, labelLineHeight))
                         .testTag("player-timeline-labels"),
+                    state = status?.let { { PlayerStateCellView(it.state, announces = stateCell.announces) } },
+                    leading = {
+                        Box(if (endpointSemantics) Modifier else Modifier.clearAndSetSemantics { }) {
+                            leadingLabel?.let { TimelineEndpointLabel(it, leadingColor, leadingLabelTestTag, endpointEmphasis) }
+                        }
+                    },
+                    trailing = {
+                        Box(if (endpointSemantics) Modifier else Modifier.clearAndSetSemantics { }) {
+                            if (status?.end != null) {
+                                PlayerBarEndClock(status.end, endpointEmphasis)
+                            } else trailingLabel?.let {
+                                TimelineEndpointLabel(it, trailingColor, trailingLabelTestTag, endpointEmphasis)
+                            }
+                        }
+                    },
                 ) { Track() }
             } else {
                 Track()
@@ -482,19 +527,12 @@ fun PlayerTimelineBlock(
             // Measured height stays with the track. The slot paints into the run-out above.
             TimelineStatusSlot(
                 statusHeight = statusHeight,
-                previewLabel = previewLabel,
-                previewProgress = previewProgress,
-                previewAvailable = previewAvailable,
+                hidden = previewLabel != null,
+                // The feedback ends before the distance drawn at the end of its band.
+                endReserve = if (liveEnd != null) widths.distance + DistanceTextGap else 0.dp,
                 feedback = feedback,
                 feedbackIsError = feedbackIsError,
                 feedbackTestTag = feedbackTestTag,
-                statusAction = statusAction,
-                inlinePreview = inlineLabels,
-                leadingLabel = leadingLabel,
-                trailingLabel = trailingLabel,
-                leadingColor = leadingColor,
-                trailingColor = trailingColor,
-                endpointEmphasis = endpointEmphasis,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .paintAbove()
@@ -504,51 +542,27 @@ fun PlayerTimelineBlock(
     }
 }
 
+/**
+ * The feedback line above the bar. While the step readout shows [hidden], it keeps its place but
+ * stays out of sight and of accessibility.
+ */
 @Composable
 private fun TimelineStatusSlot(
     statusHeight: Dp,
-    previewLabel: String?,
-    previewProgress: Float,
-    previewAvailable: Boolean,
+    hidden: Boolean,
+    endReserve: Dp,
     feedback: String?,
     feedbackIsError: Boolean,
     feedbackTestTag: String,
-    statusAction: (@Composable () -> Unit)?,
-    inlinePreview: Boolean,
-    leadingLabel: String?,
-    trailingLabel: String?,
-    leadingColor: Color,
-    trailingColor: Color,
-    endpointEmphasis: State<Float>,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier.fillMaxWidth().height(statusHeight).testTag("player-timeline-status"),
         contentAlignment = Alignment.Center,
     ) {
-        if (previewLabel != null) {
-            if (inlinePreview) {
-                TimelineEndpointRow(
-                    leading = leadingLabel,
-                    trailing = trailingLabel,
-                    leadingColor = leadingColor,
-                    trailingColor = trailingColor,
-                    leadingTag = null,
-                    trailingTag = null,
-                    labelsVisible = false,
-                    emphasis = endpointEmphasis,
-                ) {
-                    TimelineTargetLabel(previewLabel, previewProgress, previewAvailable)
-                }
-            } else {
-                TimelineTargetLabel(previewLabel, previewProgress, previewAvailable)
-            }
-        }
-        // Keep the explicit Up destination mounted while the target label is shown.
-        // Its focus immediately restores the status row, including during a pending seek.
         Row(Modifier.fillMaxWidth()
-            .graphicsLayer { alpha = if (previewLabel == null) 1f else 0f }
-            .then(if (previewLabel != null) Modifier.clearAndSetSemantics { } else Modifier),
+            .graphicsLayer { alpha = if (hidden) 0f else 1f }
+            .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier),
             verticalAlignment = Alignment.CenterVertically) {
                 if (feedback != null) {
                     Text(
@@ -563,7 +577,7 @@ private fun TimelineStatusSlot(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(end = 24.dp)
+                            .padding(end = maxOf(24.dp, endReserve))
                             .wrapContentWidth(Alignment.Start)
                             .then(
                                 if (feedbackIsError) {
@@ -582,7 +596,6 @@ private fun TimelineStatusSlot(
                 } else {
                     Spacer(Modifier.weight(1f))
                 }
-                statusAction?.invoke()
         }
     }
 }

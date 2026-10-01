@@ -14,6 +14,7 @@ import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
+import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.images.buildImageLoader
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
@@ -26,6 +27,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
@@ -63,8 +65,10 @@ val appModule = module {
         }
     }
 
+    single(qualifier = named("application")) { CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate) }
+
     single {
-        val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val applicationScope = get<CoroutineScope>(qualifier = named("application"))
         val cacheRoot = androidContext().cacheDir
         val session = createTvheadendSession(
             GUIDE_EPG_COVERAGE_POLICY,
@@ -147,6 +151,18 @@ val appModule = module {
 
     single<ImageLoader> { buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session) }
 
+    single { ChannelAccentStore(androidContext()) }
+    single {
+        val session = get<SdkRuntimeOwner>().session
+        val imageLoader = get<ImageLoader>()
+        val context = androidContext()
+        ChannelAccents(get(), session.artwork::cacheKey).also { accents ->
+            get<CoroutineScope>(qualifier = named("application")).launch(Dispatchers.Default) {
+                accents.fillIn(session.observation, imageLoader, context)
+            }
+        }
+    }
+
     viewModel {
         AppConnectionViewModel(
             session = get(),
@@ -163,7 +179,7 @@ val appModule = module {
     }
     viewModel { VideoPlayerViewModel(playbackRuntime = get(), session = get()) }
     viewModel { ChannelsViewModel(session = get(), tagSettings = get()) }
-    viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache, get()) }
+    viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache, get(), get()) }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),

@@ -17,7 +17,7 @@ enum class ChannelPickAction {
 }
 
 enum class ChannelKeyAction {
-    PAGE_LIST,
+    BROWSE_LIST,
     TUNE,
 }
 
@@ -36,6 +36,8 @@ enum class PlayerKeyAction {
     PASS_THROUGH,
     REVEAL_CONTROLS,
     REVEAL_AND_TOGGLE_PAUSE,
+    /** Live Pause is unavailable: the Banner shows with the reason instead of the controls. */
+    PEEK_BANNER,
     HIDE_CONTROLS,
     OPEN_CHANNELS,
     OPEN_INFO,
@@ -106,6 +108,7 @@ fun playbackSuppressesRevealingKey(
 fun playerKeyActionStartsOpeningCycle(action: PlayerKeyAction): Boolean = when (action) {
     PlayerKeyAction.REVEAL_CONTROLS,
     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE,
+    PlayerKeyAction.PEEK_BANNER,
     PlayerKeyAction.OPEN_CHANNELS,
     PlayerKeyAction.OPEN_INFO,
     PlayerKeyAction.OPEN_OPTIONS -> true
@@ -182,7 +185,8 @@ fun playerStopKeyClosesScreen(keyCode: Int, repeatCount: Int, hasActiveTarget: B
  *
  * Center on seekable media both toggles pause/play and reveals controls; the
  * revealing key cycle must be suppressed so the same press cannot activate a
- * newly focused control.
+ * newly focused control. Where live Pause is unavailable Center explains why over
+ * the Banner; Up/Down still open the controls.
  */
 fun playerKeyAction(
     context: PlayerKeyContext,
@@ -253,7 +257,7 @@ fun playerKeyAction(
             context.surface == PlayerSurface.RECORDING ||
                 livePauseAccepted(context.timeshiftAvailable, context.livePause) ->
                 PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE
-            else -> PlayerKeyAction.REVEAL_CONTROLS
+            else -> PlayerKeyAction.PEEK_BANNER
         }
         KeyEvent.KEYCODE_DPAD_UP,
         KeyEvent.KEYCODE_DPAD_DOWN -> PlayerKeyAction.REVEAL_CONTROLS
@@ -278,8 +282,9 @@ fun channelPickAction(currentChannelId: ChannelId?, pickedChannelId: ChannelId):
         ChannelPickAction.TUNE
     }
 
-fun playbackChannelKeyAction(browserVisible: Boolean): ChannelKeyAction =
-    ChannelKeyAction.TUNE
+/** CH+/- tune, except in a rail that browses with them: there they step focus like Left/Right. */
+fun playbackChannelKeyAction(railBrowsesChannelKeys: Boolean): ChannelKeyAction =
+    if (railBrowsesChannelKeys) ChannelKeyAction.BROWSE_LIST else ChannelKeyAction.TUNE
 
 fun mediaPlaybackAction(
     keyCode: Int,

@@ -243,6 +243,26 @@ class PlayerBackPolicyTest {
     }
 
     @Test
+    fun backOverAVisibleBannerHidesItBeforeClosingThePlayer() {
+        assertEquals(PlayerBackAction.HIDE_BANNER,
+            playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.NONE, bannerVisible = true))
+        assertEquals(PlayerBackAction.CLOSE_PLAYER,
+            playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.NONE, bannerVisible = false))
+        // Recovery and errors cover the Banner: one Back leaves.
+        for (layer in listOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR)) {
+            assertEquals(layer.name, PlayerBackAction.CLOSE_PLAYER,
+                playerBackAction(PlayerSurface.LIVE, layer, bannerVisible = true))
+        }
+        // A layer over or inside the Banner keeps its own Back.
+        assertEquals(PlayerBackAction.HIDE_CONTROLS,
+            playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.CONTROLS, bannerVisible = true))
+        assertEquals(PlayerBackAction.CANCEL_PENDING_SEEK,
+            playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.PENDING_SEEK_PREVIEW, bannerVisible = true))
+        assertEquals(PlayerBackAction.HIDE_STATS,
+            playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.STATS, bannerVisible = true))
+    }
+
+    @Test
     fun terminalRecordingErrorAndLayerlessRecordingClose() {
         listOf(PlayerForegroundLayer.TERMINAL_ERROR, PlayerForegroundLayer.NONE).forEach { layer ->
             assertEquals(

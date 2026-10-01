@@ -1004,7 +1004,7 @@ private fun RecordingListRow(
                 }
                 if (problem) {
                     Icon(
-                        painter = painterResource(R.drawable.ic_warning),
+                        painter = painterResource(R.drawable.ic_error_outlined),
                         contentDescription = stringResource(R.string.recordings_problem_indicator),
                         tint = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.size(22.dp).background(

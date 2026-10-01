@@ -381,7 +381,7 @@ internal fun RecordingDetailsPanel(
                         }
                         .testTag("recording-details-delete"),
                 ) {
-                    Icon(painterResource(R.drawable.ic_delete), contentDescription = null)
+                    Icon(painterResource(R.drawable.ic_delete_outlined), contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(R.string.delete_recording))
                 }
@@ -391,7 +391,7 @@ internal fun RecordingDetailsPanel(
 }
 
 @Composable
-private fun recordingDurationForAccessibility(totalSeconds: Long): String {
+internal fun recordingDurationForAccessibility(totalSeconds: Long): String {
     val safeSeconds = totalSeconds.coerceAtLeast(0L)
     val hours = safeSeconds / 3_600L
     val minutes = safeSeconds % 3_600L / 60L

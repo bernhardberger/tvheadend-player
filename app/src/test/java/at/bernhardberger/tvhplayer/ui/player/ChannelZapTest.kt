@@ -7,6 +7,7 @@ import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness.UNKNOWN
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -17,6 +18,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -156,5 +158,21 @@ class ChannelZapTest {
         advanceUntilIdle()
 
         assertEquals(listOf(UNKNOWN to 250L), commits)
+    }
+
+    @Test
+    fun theCommitCanHoldAnUnknownEntryBeforeDroppingIt() = runTest {
+        var dropped = -1L
+        val entry = launch {
+            commitChannelNumberEntry(250, MutableStateFlow(UNKNOWN)) { _, _ ->
+                delay(2_000)
+                dropped = currentTime
+            }
+        }
+        advanceTimeBy(2_000)
+        runCurrent()
+        assertTrue("the entry is still held", entry.isActive)
+        advanceUntilIdle()
+        assertEquals(2_250L, dropped)
     }
 }

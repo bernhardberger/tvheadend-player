@@ -6,11 +6,15 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.testTag
+import at.bernhardberger.tvhplayer.core.playerStateCell
+import at.bernhardberger.tvhplayer.core.recordingBarEnd
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -26,7 +30,11 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.tv.material3.Button
@@ -48,7 +56,11 @@ import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.PlayerSurface
-import at.bernhardberger.tvhplayer.core.RecordingPlaybackKeyAction
+import at.bernhardberger.tvhplayer.core.PlayerKeyAction
+import at.bernhardberger.tvhplayer.core.PlayerKeyContext
+import at.bernhardberger.tvhplayer.core.playerKeyAction
+import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
+import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playerBackAction
@@ -59,9 +71,6 @@ import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsKeyOutcome
 import at.bernhardberger.tvhplayer.core.playbackOptionsKeyOutcome
 import at.bernhardberger.tvhplayer.core.playbackOptionsKeyRequest
-import at.bernhardberger.tvhplayer.core.recordingKeyActionStartsOpeningCycle
-import at.bernhardberger.tvhplayer.core.recordingPlaybackKeyAction
-import at.bernhardberger.tvhplayer.core.recordingPlaybackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -187,8 +196,6 @@ fun RecordingPlayerScreen(
     val isPlaying = timelineState.isPlaying
     val rootFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
-    var controlsVisible by remember { mutableStateOf(true) }
-    var interactionToken by remember { mutableIntStateOf(0) }
     var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
     var optionsQuickList by remember { mutableStateOf(false) }
     val quickList = remember { PlaybackQuickListSignals() }
@@ -201,6 +208,24 @@ fun RecordingPlayerScreen(
     var infoOpen by remember { mutableStateOf(false) }
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
+    // The Banner and the controls; the info panel and the options cover them.
+    val chrome = remember(scope) {
+        PlayerChromeState(
+            scope = scope,
+            autoHideTimeoutMillis = RECORDING_CONTROLS_AUTO_HIDE_MS,
+            isCovered = { infoOpen || optionsPage != null },
+        )
+    }
+    DisposableEffect(chrome) { onDispose(chrome::dispose) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, chrome) {
+        val observer = LifecycleEventObserver { _, event ->
+            // A Banner never outlives the stop, nor does its timer.
+            if (event == Lifecycle.Event.ON_STOP) chrome.hideBanner()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(settings.aspectRatio) {
         aspectRatio = settings.aspectRatio
@@ -222,15 +247,6 @@ fun RecordingPlayerScreen(
         }
     }
     CloseOnSessionStop(session.sessionStops, playerClose)
-
-    fun showControls() {
-        controlsVisible = true
-        interactionToken++
-    }
-
-    fun hideControls() {
-        controlsVisible = false
-    }
 
     fun togglePlayPause() {
         if (player.playWhenReady) {
@@ -260,73 +276,94 @@ fun RecordingPlayerScreen(
             PlaybackOptionsKeyOutcome.OpenMenu -> {
                 optionsQuickList = false
                 optionsPage = PlaybackOptionsPage.ROOT
-                controlsVisible = true
+                chrome.yieldToLayer(controls = true)
             }
             PlaybackOptionsKeyOutcome.MoveDown -> quickList.moveDown()
             // The short list leaves the controls as they are underneath.
             is PlaybackOptionsKeyOutcome.OpenQuickList -> {
-                if (!optionsQuickList) quickListReturnControl = lastFocusedControl.takeIf { controlsVisible }
+                if (!optionsQuickList) quickListReturnControl = lastFocusedControl.takeIf { chrome.controlsVisible }
                 optionsQuickList = true
                 optionsPage = outcome.page
+                chrome.yieldToLayer()
             }
         }
         return true
     }
 
     fun closeQuickList() {
-        restoreQuickListControl = quickListReturnControl.takeIf { controlsVisible }
+        restoreQuickListControl = quickListReturnControl.takeIf { chrome.controlsVisible }
         quickListReturnControl = null
         optionsPage = null
         optionsQuickList = false
-        interactionToken++
+        chrome.onUserInteraction()
     }
 
     fun applyKeyAction(
-        action: RecordingPlaybackKeyAction,
+        action: PlayerKeyAction,
         keyCode: Int,
         repeatCount: Int = 0,
     ): Boolean = when (action) {
-        RecordingPlaybackKeyAction.PASS_THROUGH -> false
-        RecordingPlaybackKeyAction.REVEAL_CONTROLS -> {
+        PlayerKeyAction.PASS_THROUGH,
+        PlayerKeyAction.OPEN_CHANNELS -> false
+        PlayerKeyAction.REVEAL_CONTROLS -> {
             if (timelineState.seekPending) {
                 timelineState.commitPendingSeek()
                 restoreInfoActionFocus = true
             }
-            showControls()
+            chrome.showControls()
             true
         }
-        RecordingPlaybackKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
+        PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
             togglePlayPause()
-            showControls()
+            // Pausing shows the Banner, not the controls, so Left/Right keep stepping.
+            chrome.peekBanner()
             true
         }
-        RecordingPlaybackKeyAction.HIDE_CONTROLS -> {
-            hideControls()
+        PlayerKeyAction.PEEK_BANNER -> {
+            chrome.peekBanner()
             true
         }
-        RecordingPlaybackKeyAction.CLOSE -> {
+        PlayerKeyAction.HIDE_CONTROLS -> {
+            chrome.hideControls()
+            true
+        }
+        PlayerKeyAction.CLOSE_PLAYER,
+        PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
             playerClose.close()
             true
         }
-        RecordingPlaybackKeyAction.OPEN_INFO -> {
-            controlsVisible = false
+        PlayerKeyAction.OPEN_INFO -> {
+            chrome.yieldToLayer(controls = false)
             infoOpen = true
             true
         }
-        RecordingPlaybackKeyAction.OPEN_OPTIONS -> openOptionsFromKey(keyCode)
-        RecordingPlaybackKeyAction.SEEK_BACK -> {
+        PlayerKeyAction.OPEN_OPTIONS -> openOptionsFromKey(keyCode)
+        PlayerKeyAction.SEEK_BACK -> {
             seekBy(-seekStepMs(repeatCount))
+            // A quick step on the hidden player shows its preview in the Banner.
+            chrome.peekBanner()
             true
         }
-        RecordingPlaybackKeyAction.SEEK_FORWARD -> {
+        PlayerKeyAction.SEEK_FORWARD -> {
             seekBy(seekStepMs(repeatCount))
+            chrome.peekBanner()
             true
         }
     }
 
+    fun recordingKeyAction(keyCode: Int): PlayerKeyAction = playerKeyAction(
+        PlayerKeyContext(
+            surface = PlayerSurface.RECORDING,
+            controlsVisible = chrome.controlsVisible,
+            seekbarFocused = false,
+            timeshiftAvailable = false,
+        ),
+        keyCode,
+    )
+
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
-            controlsVisible = controlsVisible,
+            controlsVisible = chrome.controlsVisible,
             playbackProgressing = isPlaying,
             playbackStable = playbackAvailable &&
                 playbackState is AppPlaybackState.Playing,
@@ -339,12 +376,9 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Failed)),
         )
     )
-    PlayerControlsAutoHideEffect(
-        eligible = autoHideEligible,
-        interactionToken = interactionToken,
-        timeoutMillis = RECORDING_CONTROLS_AUTO_HIDE_MS,
-        onHide = ::hideControls,
-    )
+    SideEffect {
+        chrome.updateAutoHideEligibility(autoHideEligible)
+    }
 
     fun currentPlayerForegroundContext() =
         PlayerForegroundContext(
@@ -359,13 +393,50 @@ fun RecordingPlayerScreen(
                 (recordingResolved &&
                     (!playbackAvailable ||
                         playbackState is AppPlaybackState.Failed)),
-            seekPreviewPhase = timelineState.seekPreviewPhase(controlsVisible),
-            controlsVisible = controlsVisible && playbackAvailable,
+            seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
+            controlsVisible = chrome.controlsVisible && playbackAvailable,
             statsEnabled = statsVisible,
         )
     val foregroundContext = currentPlayerForegroundContext()
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    // What the chrome draws. A quick step's preview plays inside the Banner and holds it up even
+    // after its timer ran out; the Banner is drawn only with playback available.
+    fun chromeMode(layer: PlayerForegroundLayer): PlayerChromeMode {
+        val bannerStep = layer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
+            layer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
+        return playerChromeMode(
+            controls = layer == PlayerForegroundLayer.CONTROLS,
+            banner = bannerStep || (chrome.bannerVisible && layer == PlayerForegroundLayer.NONE),
+            stepPreview = bannerStep,
+        )
+    }
+    // One playback state for the chrome's state cell and, hidden, the chip at its bottom-start place.
+    val bufferingEligible = bufferingStatusEligible(
+        playbackState, playWhenReady, activeTarget, AppPlaybackTarget.Recording(recordingId),
+        playbackAvailable && retainedSelection != null && retainedSelection.currentSession === currentSession,
+        foregroundBlocked = recordingLoading || foregroundContext.recoveryVisible || foregroundContext.terminalErrorVisible,
+    )
+    val bufferingVisible by rememberBusyVisible(
+        AppPlaybackTarget.Recording(recordingId) to retainedSelection, bufferingEligible, PlayerBusyStatus.BUFFERING,
+    )
+    val recordedLengthMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
+    val chromeState = playerStateCell(paused = !playWhenReady)
+    val glanceTracks = trackGlance(rememberPlayerTracks(player))
+    val chromeBadges = playerGlanceBadges(diagnostics, glanceTracks)
+    // The Banner hides after the first frame of the loaded recording; a newly loading one keeps it.
+    val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
+        tuneConfirmed = playbackAvailable &&
+            activeTarget == AppPlaybackTarget.Recording(recordingId) &&
+            retainedSelection != null && retainedSelection.currentSession === currentSession,
+        videoFrameVisible = videoPresentation.visible,
+        playing = playbackState is AppPlaybackState.Playing,
+        audioOnly = glanceTracks.audioOnly,
+    )
+    SideEffect {
+        chrome.onBannerFramePresented(bannerFramePresented)
+        chrome.holdBanner(!playWhenReady)
+    }
     LaunchedEffect(foregroundLayer) {
         if (foregroundLayer != PlayerForegroundLayer.CONTROLS) markerNavigation.dismiss()
     }
@@ -392,20 +463,25 @@ fun RecordingPlayerScreen(
     fun closeInfo() {
         infoOpen = false
         restoreInfoActionFocus = true
-        showControls()
+        chrome.showControls()
+    }
+
+    // Back hides a Banner only when one is drawn: not while the recording still loads.
+    fun currentBackAction(): PlayerBackAction {
+        val layer = playerForegroundLayer(currentPlayerForegroundContext())
+        return playerBackAction(
+            seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
+            surface = PlayerSurface.RECORDING,
+            foregroundLayer = layer,
+            bannerVisible = playbackAvailable && chromeMode(layer).isBanner,
+        )
     }
 
     val handlePlaybackBack: () -> Unit = {
         if (markerNavigation.open) {
             markerNavigation.dismiss()
-            interactionToken++
-        } else when (
-            playerBackAction(
-                seekPreviewPhase = timelineState.seekPreviewPhase(controlsVisible),
-                surface = PlayerSurface.RECORDING,
-                foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
-            )
-        ) {
+            chrome.onUserInteraction()
+        } else when (currentBackAction()) {
             PlayerBackAction.DISMISS_CONFIRMATION -> Unit
             PlayerBackAction.CLOSE_INFO -> closeInfo()
             PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
@@ -417,15 +493,16 @@ fun RecordingPlayerScreen(
                 optionsPage = null
                 optionsQuickList = false
                 restoreOptionsFocus = true
-                interactionToken++
+                chrome.onUserInteraction()
             }
             PlayerBackAction.CLEAR_NUMBER_ENTRY,
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> Unit
             PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
+            PlayerBackAction.HIDE_BANNER -> chrome.hideBanner()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
-            PlayerBackAction.HIDE_CONTROLS -> hideControls()
+            PlayerBackAction.HIDE_CONTROLS -> chrome.hideControls()
             PlayerBackAction.HIDE_STATS -> statsVisible = false
         }
     }
@@ -446,10 +523,10 @@ fun RecordingPlayerScreen(
                     quickList.onKeyDown()
                 }
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
-                    interactionToken++
+                    chrome.onUserInteraction()
                     return@onPreviewKeyEvent true
                 }
-                if (recordingPlaybackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
+                if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
                     return@onPreviewKeyEvent true
                 }
@@ -482,11 +559,8 @@ fun RecordingPlayerScreen(
                 if (playbackOptionsKeyRequest(keyCode) != null) {
                     // Menu, audio-track and captions keys reach the options from Info or
                     // another options page as well as from plain playback.
-                    val optionsKeyAction = recordingPlaybackKeyAction(
-                        controlsVisible = controlsVisible,
-                        keyCode = keyCode,
-                    )
-                    if (recordingKeyActionStartsOpeningCycle(optionsKeyAction)) {
+                    val optionsKeyAction = recordingKeyAction(keyCode)
+                    if (playerKeyActionStartsOpeningCycle(optionsKeyAction)) {
                         revealingKeyCode = keyCode
                     }
                     return@onPreviewKeyEvent applyKeyAction(optionsKeyAction, keyCode)
@@ -516,26 +590,25 @@ fun RecordingPlayerScreen(
                         MediaPlaybackAction.TOGGLE -> togglePlayPause()
                         MediaPlaybackAction.NONE -> Unit
                     }
-                    showControls()
+                    chrome.showControls()
                     return@onPreviewKeyEvent true
                 }
 
                 when (keyCode) {
                     AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
                         seekBy(-RECORDING_SHORT_SEEK_MS)
+                        chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
                         seekBy(RECORDING_SHORT_SEEK_MS)
+                        chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                 }
 
-                val keyAction = recordingPlaybackKeyAction(
-                    controlsVisible = controlsVisible,
-                    keyCode = keyCode,
-                )
-                if (recordingKeyActionStartsOpeningCycle(keyAction)) {
+                val keyAction = recordingKeyAction(keyCode)
+                if (playerKeyActionStartsOpeningCycle(keyAction)) {
                     revealingKeyCode = keyCode
                 }
                 applyKeyAction(
@@ -550,58 +623,72 @@ fun RecordingPlayerScreen(
     ) {
         if (playbackAvailable) {
             val entry = requireNotNull(entry)
-            PlayerControlsLayer(
-                visible = foregroundLayer == PlayerForegroundLayer.CONTROLS,
-                modalVisible = optionsPage != null || infoOpen,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                RecordingOverlayControls(
-                    imageLoader = imageLoader,
-                    currentSession = retainedSelection?.currentSession,
-                    piconPath = entry.channelId?.let { targetObservation?.channel(it)?.icon },
-                    title = entry.title.orEmpty(),
-                    subtitle = entry.subtitle,
-                    channelName = entry.channelName,
-                    positionMs = positionMs,
-                    durationMs = durationMs,
-                    displayDurationMs = displayDurationMs,
-                    markers = markers,
-                    markerPositionMs = timelineState.pendingTargetMs ?: positionMs,
-                    markerNavigation = markerNavigation,
-                    markerRevision = markerRevision,
-                    onSeekMarker = ::seekMarker,
+            val channel = entry.channelId?.let { targetObservation?.channel(it) }
+            PlayerChrome(
+                mode = chromeMode(foregroundLayer),
+                content = PlayerChromeContent(
+                    clock = formatClock(nowSec),
+                    info = recordingInfoBarData(entry, channel?.number, nowSec, timelineState.playbackPositionMs,
+                        recordedLengthMs, growing),
+                    state = chromeState,
+                    recordingNow = growing,
+                    badges = chromeBadges,
+                    picon = channel?.icon,
+                    artwork = entry.image ?: entry.fanartImage,
+                    channelId = entry.channelId,
+                ),
+                timeline = PlayerChromeTimeline.Recording(
+                    positionMs = timelineState.playbackPositionMs,
+                    durationMs = recordedLengthMs,
+                    displayDurationMs = displayDurationMs.takeIf { it != C.TIME_UNSET && it > 0L },
                     growing = growing,
-                    nowSec = nowSec,
                     canSeek = timelineState.canSeek,
+                    targetMs = timelineState.pendingTargetMs,
+                    originMs = timelineState.pendingOriginMs,
+                    markers = markers,
+                    markerRevision = markerRevision,
+                    motionKey = recordingId,
+                ),
+                actions = PlayerChromeActions(
+                    active = chrome.controlsVisible && optionsPage == null,
                     paused = !playWhenReady,
-                    playbackPresented = playbackState is AppPlaybackState.Playing || playbackState is AppPlaybackState.Buffering,
-                    previewing = timelineState.pendingTargetMs != null,
-                    controlsVisible = controlsVisible,
-                    optionsOpen = optionsPage != null,
-                    onTogglePlayPause = ::togglePlayPause,
-                    onSeek = ::seekBy,
-                    onStopPlayback = ::stopAndClose,
-                    onUserInteraction = { interactionToken++ },
-                    onOpenOptions = {
-                        restoreOptionsFocus = false
-                        optionsQuickList = false
-                        optionsPage = PlaybackOptionsPage.ROOT
-                        controlsVisible = true
+                    record = false,
+                    restoreFocus = when {
+                        restoreQuickListControl != null -> restoreQuickListControl
+                        restoreInfoActionFocus -> PlayerIdentityCardTag
+                        restoreOptionsFocus -> "player-settings"
+                        else -> null
                     },
-                    onOpenInfo = {
-                        controlsVisible = false
-                        infoOpen = true
-                    },
-                    restoreOptionsFocus = restoreOptionsFocus,
-                    restoreQuickListControl = restoreQuickListControl,
-                    onQuickListFocusRestored = { restoreQuickListControl = null },
-                    onControlFocused = { lastFocusedControl = it },
-                    restoreInfoFocus = restoreInfoActionFocus,
-                    onInfoFocusRestored = { restoreInfoActionFocus = false },
-                    onCommitSeek = timelineState::commitPendingSeek,
-                    onOptionsFocusRestored = { restoreOptionsFocus = false },
-                )
-            }
+                ),
+                imageLoader = imageLoader,
+                currentSession = retainedSelection?.currentSession,
+                entry = chrome.controlsEntry,
+                panelOpen = optionsPage != null || infoOpen,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                onTogglePause = ::togglePlayPause,
+                onSeek = ::seekBy,
+                onStop = ::stopAndClose,
+                onInfo = {
+                    chrome.yieldToLayer(controls = false)
+                    infoOpen = true
+                },
+                onOptions = {
+                    restoreOptionsFocus = false
+                    optionsQuickList = false
+                    optionsPage = PlaybackOptionsPage.ROOT
+                    chrome.yieldToLayer(controls = true)
+                },
+                onInteraction = chrome::onUserInteraction,
+                onCommitSeek = timelineState::commitPendingSeek,
+                onActionFocused = { lastFocusedControl = it },
+                onFocusRestored = {
+                    restoreQuickListControl = null
+                    restoreInfoActionFocus = false
+                    restoreOptionsFocus = false
+                },
+                markerNavigation = markerNavigation,
+                onSeekMarker = ::seekMarker,
+            )
 
             PlayerPanelVisibility(Unit.takeIf { foregroundLayer == PlayerForegroundLayer.INFO }) {
                 PlaybackOptionsOverlayFrame(
@@ -639,32 +726,17 @@ fun RecordingPlayerScreen(
                 )
             }
 
-            if (
-                foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
-                foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
-            ) {
-                RecordingSeekPreview(
-                    targetMs = requireNotNull(timelineState.pendingTargetMs),
-                    originMs = timelineState.pendingOriginMs,
-                    durationMs = durationMs,
-                    displayDurationMs = displayDurationMs,
-                    growing = growing,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            }
-
         }
-        CompactBufferingStatus(
-            state = playbackState,
-            playWhenReady = playWhenReady,
-            target = activeTarget,
-            expectedTarget = AppPlaybackTarget.Recording(recordingId),
-            generation = retainedSelection,
-            screenActive = playbackAvailable && retainedSelection != null &&
-                retainedSelection.currentSession === currentSession,
-            foregroundBlocked = recordingLoading || foregroundContext.recoveryVisible ||
-                foregroundContext.terminalErrorVisible,
-            modifier = Modifier.align(Alignment.Center).padding(horizontal = 56.dp),
+        if (!recordingLoading && !foregroundContext.recoveryVisible && !foregroundContext.terminalErrorVisible) {
+            PlayerBusyIndicator(PlayerBusyStatus.BUFFERING.takeIf { bufferingVisible }, Modifier.align(Alignment.Center))
+        }
+        PlayerHiddenStatusChip(
+            state = hiddenChipState(
+                chromeState, hidden = foregroundLayer == PlayerForegroundLayer.NONE && !chrome.bannerVisible,
+                available = playbackAvailable,
+            ),
+            end = recordingBarEnd(timelineState.playbackPositionMs, recordedLengthMs, growing),
+            modifier = Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()),
         )
         TvRecoveryOverlay(
             visible = recordingLoading,

@@ -123,7 +123,7 @@ class PlayerBackDispatcherTest {
                     }
                     PlayerBackAction.HIDE_CONTROLS -> {
                         trace += "controls"
-                        layerState.hideControls()
+                        layerState.chrome.hideControls()
                     }
                     PlayerBackAction.CLOSE_PLAYER -> trace += "player"
                     else -> error("Unexpected rapid Back action for $layer")

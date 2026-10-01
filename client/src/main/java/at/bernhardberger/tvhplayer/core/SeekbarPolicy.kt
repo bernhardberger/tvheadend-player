@@ -38,7 +38,14 @@ data class SeekbarRange(
         get() = if (durationMs <= 0L) 0f
         else ((positionMs - startMs).toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
 
-    val displayProgress: Float get() = displayFraction(positionMs)
+    /**
+     * Timeshift playback always lags the true edge by a little latency, and [displayEndMs] runs a
+     * little ahead of [endMs], so a position within the live-edge tolerance shows pinned at the end.
+     */
+    val displayProgress: Float
+        get() = if (domain == SeekbarDomain.TIMESHIFT && displayEndMs > displayStartMs &&
+            endMs - positionMs <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
+        ) 1f else displayFraction(positionMs)
     val availableStartFraction: Float get() = displayFraction(startMs)
 
     private fun displayFraction(position: Long): Float =

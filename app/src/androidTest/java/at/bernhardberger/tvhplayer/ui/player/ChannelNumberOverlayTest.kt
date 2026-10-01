@@ -1,22 +1,23 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.runtime.mutableStateOf
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
-import android.graphics.Bitmap
-import java.io.File
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import coil3.ImageLoader
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -24,6 +25,7 @@ import org.junit.Test
 class ChannelNumberOverlayTest {
     @get:Rule
     val composeRule = createComposeRule()
+    private val loader = ImageLoader(InstrumentationRegistry.getInstrumentation().targetContext)
 
     @Test
     fun clearingAcceptedDigitsKeepsOutgoingContentSizeUntilFadeCompletes() {
@@ -32,7 +34,8 @@ class ChannelNumberOverlayTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(true, Modifier.fillMaxSize())
-                    ChannelNumberOverlay(number.value, Modifier.align(Alignment.TopEnd).padding(48.dp))
+                    ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, loader, null,
+                        Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp))
                 }
             }
         }
@@ -41,7 +44,7 @@ class ChannelNumberOverlayTest {
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle { number.value = "" }
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(100)
+        composeRule.mainClock.advanceTimeBy(32)
         val during = composeRule.onNodeWithText("123").assertIsDisplayed()
             .fetchSemanticsNode().boundsInRoot
         assertEquals(before.size, during.size)
@@ -55,12 +58,12 @@ class ChannelNumberOverlayTest {
     fun newDigitsDuringExitReplaceOldEntry() {
         val number = mutableStateOf("123")
         composeRule.setContent {
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number.value) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, loader, null) }
         }
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle { number.value = "" }
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.advanceTimeBy(100)
+        composeRule.mainClock.advanceTimeBy(32)
         composeRule.runOnIdle { number.value = "4" }
         composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.onNodeWithText("4").assertIsDisplayed()

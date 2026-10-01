@@ -38,7 +38,7 @@ internal fun livePauseAvailability(
 internal fun LivePauseAvailability.acceptsPause(): Boolean =
     this == LivePauseAvailability.STARTING || this == LivePauseAvailability.READY
 
-internal fun liveDiagnosticsForTarget(
+fun liveDiagnosticsForTarget(
     activeTarget: AppPlaybackTarget?,
     diagnostics: LiveSubscriptionDiagnostics?,
 ): LiveSubscriptionDiagnostics? = diagnostics.takeIf { activeTarget is AppPlaybackTarget.Live }

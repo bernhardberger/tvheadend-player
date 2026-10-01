@@ -106,7 +106,7 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun liveWithoutTimeshiftRevealsOnVerticalKeysButDoesNotOpenChannelsOnLeft() {
+    fun liveWithoutTimeshiftShowsTheBannerOnCenterRevealsOnVerticalKeysAndIgnoresLeft() {
         val ctx = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
             controlsVisible = false,
@@ -114,7 +114,7 @@ class PlaybackKeyPolicyTest {
             timeshiftAvailable = false,
         )
         assertEquals(
-            PlayerKeyAction.REVEAL_CONTROLS,
+            PlayerKeyAction.PEEK_BANNER,
             playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_CENTER),
         )
         assertEquals(
@@ -162,7 +162,7 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun hiddenCenterTogglesWhileTimeshiftStartsAndOnlyRevealsWhenPauseIsUnavailable() {
+    fun hiddenCenterTogglesWhileTimeshiftStartsAndExplainsOverTheBannerWhenPauseIsUnavailable() {
         fun center(livePause: LivePauseAvailability, available: Boolean = false) = playerKeyAction(
             PlayerKeyContext(PlayerSurface.LIVE, controlsVisible = false, seekbarFocused = false,
                 timeshiftAvailable = available, livePause = livePause),
@@ -170,9 +170,17 @@ class PlaybackKeyPolicyTest {
         )
         assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, center(LivePauseAvailability.READY, available = true))
         assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, center(LivePauseAvailability.STARTING))
-        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, center(LivePauseAvailability.UNAVAILABLE))
-        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, center(LivePauseAvailability.OFF))
-        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, center(LivePauseAvailability.NONE))
+        assertEquals(PlayerKeyAction.PEEK_BANNER, center(LivePauseAvailability.UNAVAILABLE))
+        assertEquals(PlayerKeyAction.PEEK_BANNER, center(LivePauseAvailability.OFF))
+        assertEquals(PlayerKeyAction.PEEK_BANNER, center(LivePauseAvailability.NONE))
+        assertTrue(playerKeyActionStartsOpeningCycle(PlayerKeyAction.PEEK_BANNER))
+        // D-pad first: Up/Down still open the controls where Pause is unavailable.
+        for (livePause in listOf(LivePauseAvailability.UNAVAILABLE, LivePauseAvailability.OFF)) {
+            val ctx = PlayerKeyContext(PlayerSurface.LIVE, controlsVisible = false, seekbarFocused = false,
+                timeshiftAvailable = false, livePause = livePause)
+            assertEquals(PlayerKeyAction.REVEAL_CONTROLS, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_UP))
+            assertEquals(PlayerKeyAction.REVEAL_CONTROLS, playerKeyAction(ctx, KeyEvent.KEYCODE_DPAD_DOWN))
+        }
     }
 
     @Test
@@ -497,9 +505,9 @@ class PlaybackKeyPolicyTest {
     }
 
     @Test
-    fun channelKeysTuneInTheShelfAndFullscreenPlayback() {
-        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = true))
-        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(browserVisible = false))
+    fun channelKeysTuneUnlessTheRailBrowsesWithThem() {
+        assertEquals(ChannelKeyAction.BROWSE_LIST, playbackChannelKeyAction(railBrowsesChannelKeys = true))
+        assertEquals(ChannelKeyAction.TUNE, playbackChannelKeyAction(railBrowsesChannelKeys = false))
     }
 
     @Test
@@ -520,5 +528,60 @@ class PlaybackKeyPolicyTest {
             KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
             KeyEvent.KEYCODE_CAPTIONS,
         )
+    }
+
+    private fun recordingKey(controlsVisible: Boolean, keyCode: Int, seekbarFocused: Boolean = false) = playerKeyAction(
+        PlayerKeyContext(PlayerSurface.RECORDING, controlsVisible, seekbarFocused, timeshiftAvailable = false),
+        keyCode,
+    )
+
+    @Test
+    fun hiddenRecordingPlayerStepsPausesAndRevealsLikeLive() {
+        assertEquals(PlayerKeyAction.SEEK_BACK, recordingKey(false, KeyEvent.KEYCODE_DPAD_LEFT))
+        assertEquals(PlayerKeyAction.SEEK_FORWARD, recordingKey(false, KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, recordingKey(false, KeyEvent.KEYCODE_DPAD_UP))
+        assertEquals(PlayerKeyAction.REVEAL_CONTROLS, recordingKey(false, KeyEvent.KEYCODE_DPAD_DOWN))
+        assertEquals(PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE, recordingKey(false, KeyEvent.KEYCODE_DPAD_CENTER))
+        assertEquals(PlayerKeyAction.HIDE_CONTROLS, recordingKey(true, KeyEvent.KEYCODE_BACK))
+        assertEquals(PlayerKeyAction.CLOSE_PLAYER, recordingKey(false, KeyEvent.KEYCODE_BACK))
+        // The live channel list keys have nothing to open on a recording.
+        assertEquals(PlayerKeyAction.PASS_THROUGH, recordingKey(false, KeyEvent.KEYCODE_TV_CONTENTS_MENU))
+    }
+
+    @Test
+    fun visibleRecordingControlsKeepDirectionKeysForTheirFocus() {
+        listOf(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+        ).forEach { keyCode ->
+            assertEquals(PlayerKeyAction.PASS_THROUGH, recordingKey(true, keyCode))
+        }
+    }
+
+    @Test
+    fun recordingStopKeyIsTheSessionsWithATargetAndClosesTheScreenWithout() {
+        for (controlsVisible in listOf(false, true)) {
+            assertEquals(PlayerKeyAction.PASS_THROUGH, recordingKey(controlsVisible, KeyEvent.KEYCODE_MEDIA_STOP))
+        }
+        // Without one the first key down closes the screen and opens a Stop key cycle,
+        // which the screen's suppression consumes until the matching key up.
+        assertTrue(playerStopKeyClosesScreen(KeyEvent.KEYCODE_MEDIA_STOP, repeatCount = 0, hasActiveTarget = false))
+        assertTrue(playbackSuppressesRevealingKey(KeyEvent.KEYCODE_MEDIA_STOP, KeyEvent.KEYCODE_MEDIA_STOP))
+    }
+
+    @Test
+    fun recordingOptionKeysOpenOptionsWithControlsHiddenOrVisible() {
+        for (keyCode in listOf(
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK,
+            KeyEvent.KEYCODE_CAPTIONS,
+        )) {
+            for (controlsVisible in listOf(false, true)) {
+                assertEquals("$keyCode visible=$controlsVisible", PlayerKeyAction.OPEN_OPTIONS, recordingKey(controlsVisible, keyCode))
+            }
+            assertEquals(PlayerKeyAction.OPEN_OPTIONS, recordingKey(true, keyCode, seekbarFocused = true))
+        }
     }
 }

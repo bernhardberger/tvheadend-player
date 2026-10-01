@@ -42,6 +42,9 @@ internal class RecordingMarkerNavigation {
         private set
     var ownerRevision: Long = 0L
         private set
+    /** The last close was Up's: focus moves on to what stands above the timeline. */
+    var closedUpward: Boolean = false
+        private set
     private val heldKeys = mutableSetOf<Key>()
 
     fun show(markers: List<Long>, positionMs: Long, openingKey: Key? = null, revision: Long = 0L) {
@@ -50,9 +53,10 @@ internal class RecordingMarkerNavigation {
         openingKey?.let(heldKeys::add)
     }
 
-    fun dismiss() {
+    fun dismiss(upward: Boolean = false) {
         if (!open) return
         selectedMs = null
+        closedUpward = upward
         restoration++
     }
 
@@ -85,6 +89,7 @@ internal class RecordingMarkerNavigation {
                         dismiss()
                     }
                     Key.DirectionDown, Key.Back -> dismiss()
+                    Key.DirectionUp -> dismiss(upward = true)
                     else -> Unit
                 }
             }

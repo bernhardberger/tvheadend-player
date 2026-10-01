@@ -17,15 +17,7 @@
     <string name="audio_format_stereo_help">AAC und MPEG-Audio bevorzugen, ohne Kanalbegrenzung.</string>
     <string name="audio_description">Audiodeskription</string>
     <string name="subtitle_follow_system">Untertiteleinstellungen des Systems verwenden</string>
-    <string name="player_programme_ended_at">Endete um %1$s</string>
-    <string name="player_status_recording_playback">Aufnahme läuft</string>
-    <string name="player_status_recording_now">Aufnahme läuft</string>
     <string name="player_status_rec">REC</string>
-    <string name="player_status_playing">Wiedergabe</string>
-    <string name="player_status_hour">Std</string>
-    <string name="player_status_minute">Min</string>
-    <string name="player_status_second">Sek</string>
-    <string name="player_buffering">Puffern…</string>
     <string name="edit_connection">Verbindung bearbeiten</string>
     <string name="edit_connection_description">Serveradresse, Ports und Zugangsdaten</string>
     <string name="connection_overview_status">Status</string>
@@ -62,7 +54,6 @@
     <string name="player_ends_in">Endet um %1$s</string>
     <string name="player_next_event">Als Nächstes: %1$s</string>
     <string name="player_next_event_at">Als Nächstes um %1$s: %2$s</string>
-    <string name="player_next_event_with_range">Als Nächstes: %1$s • %2$s</string>
 
     <string name="options">Optionen</string>
     <string name="no_epg">Keine Programmdaten</string>
@@ -82,6 +73,7 @@
     <string name="show_epg_menu">Programmführer-Menü</string>
     <string name="show_epg_menu_description">Programmführer in der Hauptnavigation anzeigen.</string>
     <string name="player_info">Info</string>
+    <string name="player_channel_number_none">Kein Sender</string>
     <string name="player_shelf_playing">Wiedergabe</string>
     <string name="player_shelf_recording">Aufnahme läuft</string>
     <string name="player_info_close">Info schließen</string>
@@ -150,7 +142,6 @@
     <string name="main_startup_action_retry">Erneut versuchen</string>
     <string name="main_startup_action_connection_settings">Verbindungseinstellungen</string>
 
-    <string name="player_tuning_channel">%1$s wird eingestellt…</string>
     <string name="player_programme_progress_description">Programmfortschritt, %1$s von %2$s</string>
     <string name="player_connection_recovering">Verbindung unterbrochen. Sie wird automatisch wiederhergestellt…</string>
     <string name="player_playback_recovering">Wiedergabe unterbrochen. Erneuter Versuch läuft automatisch…</string>
@@ -372,7 +363,6 @@
     <string name="track_channels_count">%1$d Kanäle</string>
     <string name="track_clear_dialogue">Klare Sprache</string>
     <string name="timeshift_behind_live">%1$s hinter Live</string>
-    <string name="timeshift_go_live">Zu Live</string>
     <string name="timeshift_seek_clamped">Grenze des verfügbaren Puffers erreicht.</string>
     <string name="timeshift_reconnect_live">Der Server konnte die vorherige Position nicht bestätigen. Zur Live-Sendung zurückgekehrt.</string>
     <string name="timeshift_unavailable">Timeshift ist für diesen Server oder dieses Stream-Profil nicht verfügbar.</string>
@@ -386,7 +376,6 @@
     <string name="player_paused">Pausiert</string>
     <string name="player_buffer_summary">%1$s verfügbar</string>
     <string name="player_current_broadcast">Aktuelle Sendung</string>
-    <string name="player_programme_timing_unavailable">Sendungszeit nicht verfügbar</string>
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Tvheadend Player erlauben, für Live-TV einen Timeshift-Puffer von Ihrem Server anzufordern.</string>
     <string name="refresh_rate_matching_setting">Bildwiederholrate anpassen</string>
@@ -438,4 +427,40 @@
     <string name="background_live_stopped">Live-TV wurde im Hintergrund beendet</string>
     <string name="background_tuner_lost">Der Tuner wurde anderweitig benötigt; Live-TV wurde neu gestartet</string>
     <string name="background_live_interrupted">Live-TV wurde im Hintergrund unterbrochen und neu gestartet</string>
+    <string name="player_live">Live</string>
+    <string name="player_behind">Zeitversetzt</string>
+    <string name="player_state_paused">Pausiert</string>
+    <string name="player_buffering">Puffern…</string>
+    <string name="player_tuning">Sender wird eingestellt</string>
+    <string name="player_recording">Aufnahme läuft</string>
+    <string name="player_ad">Audiodeskription</string>
+    <string name="player_sub">Untertitel</string>
+    <string name="player_txt">Teletext verfügbar</string>
+    <string name="player_raster_spoken">%1$s Zeilen</string>
+    <string name="player_video_spoken">Video %1$s</string>
+    <string name="player_audio_spoken">Audio %1$s</string>
+    <string name="player_recorded_on">Aufgenommen am %1$s</string>
+    <string name="player_recorded_ends">Aufgenommen am %1$s · Endet %2$s</string>
+    <string name="player_recording_until">Aufnahme bis %1$s</string>
+    <string name="player_playing">Wiedergabe</string>
+    <string name="player_next">Danach · %1$s</string>
+    <string name="player_minutes_left">Noch %1$d Min.</string>
+    <string name="player_scheduled">Aufnahme geplant</string>
+    <string name="player_channel_spoken">Sender %1$s, %2$s</string>
+    <string name="player_now_spoken">Jetzt: %1$s, %2$s</string>
+    <string name="player_ad_short">AD</string>
+    <string name="player_sub_short">UT</string>
+    <string name="player_txt_short">VT</string>
+    <string name="player_time_range_spoken">%1$s bis %2$s</string>
+    <string name="player_recorded_spoken">%1$s, aufgenommen am %2$s, %3$s</string>
+    <string name="player_recorded_date">%1$d. %2$s</string>
+    <string-array name="player_month_short">
+        <item>Jan.</item><item>Feb.</item><item>März</item><item>Apr.</item><item>Mai</item><item>Juni</item>
+        <item>Juli</item><item>Aug.</item><item>Sep.</item><item>Okt.</item><item>Nov.</item><item>Dez.</item>
+    </string-array>
+    <plurals name="player_minutes_left_spoken">
+        <item quantity="one">Noch %1$d Minute</item>
+        <item quantity="other">Noch %1$d Minuten</item>
+    </plurals>
+    <string name="player_channel">Sender</string>
 </resources>

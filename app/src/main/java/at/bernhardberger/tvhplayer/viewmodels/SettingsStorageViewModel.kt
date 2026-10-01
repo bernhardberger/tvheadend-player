@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.SessionCache
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
 import kotlinx.coroutines.CancellationException
@@ -17,7 +18,12 @@ import kotlinx.coroutines.launch
 
 enum class CacheClearState { IDLE, CLEARING, CLEARED, FAILED }
 
-class SettingsStorageViewModel(private val cache: SessionCache, private val notices: AppNoticeQueue) : ViewModel() {
+class SettingsStorageViewModel(
+    private val cache: SessionCache,
+    private val notices: AppNoticeQueue,
+    /** Derived from cached picons, so cleared with them. */
+    private val channelAccents: ChannelAccentStore,
+) : ViewModel() {
     val statistics = cache.statistics
     private val mutableClearState = MutableStateFlow(CacheClearState.IDLE)
     val clearState = mutableClearState.asStateFlow()
@@ -33,6 +39,7 @@ class SettingsStorageViewModel(private val cache: SessionCache, private val noti
                 try {
                     // Finish and publish the accepted outcome even after leaving Settings.
                     cache.clear()
+                    channelAccents.clear()
                     mutableClearState.value = CacheClearState.CLEARED
                     notices.post("cache-clear", R.string.cache_notice_cleared, AppNoticeKind.SUCCESS, context)
                 } catch (cancelled: CancellationException) {

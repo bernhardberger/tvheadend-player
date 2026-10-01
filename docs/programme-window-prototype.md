@@ -25,8 +25,9 @@ No physical device is mutated by the offline fixture test.
    existing steps; it never snaps to a programme boundary.
 4. Before dispatch, Back cancels preview. Otherwise release the remote and let
    the existing 400ms idle debounce dispatch. Pause remains unchanged by seeking.
-5. Press Down from the timeline, then Right through Stop, Info, Record and Settings
-   to Go live. Press Center. Go live is independent of the window's right edge.
+5. From the timeline, step forward (hold Right to accelerate) until the readout
+   shows `▶ Live`, then let it settle. Reaching live is independent of the
+   window's right edge; there is no separate Go live control.
 6. Repeat while paused, with a shallow buffer, missing EPG, and a midnight
    programme. Missing mapping/EPG uses relative history; midnight edges include
    dates. Late metadata must not change the selected media target. If it is
@@ -40,8 +41,7 @@ stability, late metadata and eviction using the published SDK fixture.
 `ProgrammeWindowInputTest` renders production composables and drives the real
 preview owner with remote input. It captures initial, preview, settled and live
 states for essential/shallow/missing/midnight/paused/held/late/evicted scenarios,
-plus compact held/evicted previews, a 1.5 font-scale case, and Go Live while a seek
-is still pending. Native repeat
+plus compact held/evicted previews and a 1.5 font-scale case. Native repeat
 counts 12/13 exercise held acceleration. The essential input uses eleven 30-second
 steps; held input uses two 5-minute steps. Assertions protect fixed control/track
 positions across preview and feedback, matching visual/accessibility progress,
@@ -55,8 +55,8 @@ recording elapsed/duration and no-capability semantics coverage.
 The offline canvas is 1920x1080 at 320dpi, English, font scale 1.0 (1.5 in the
 scaled case), UTC and a bright
 synthetic backdrop. Generated captures remain ignored. The programme title and
-scheduled edges explain the window change; Go live remains reachable without
-crossing back through every programme. This is a practical prototype, not proof
+scheduled edges explain the window change; live remains reachable by stepping
+forward, with held Right accelerating across programmes. This is a practical prototype, not proof
 that a jumping window is preferable. Physical readability over motion, remote
 feel, SurfaceView visibility, overscan and programme-time accuracy are unclaimed.
 
@@ -72,7 +72,7 @@ visible available-duration label; orange progress before the timeshift-start tic
 does not grant seek permission.
 
 The lower layout aligns the full-width track above left transport and right
-utilities, with Go live above the track and the Channels-down cue below actions.
+utilities, with the Channels-down cue below actions.
 Hidden and focused previews keep the same track anchor. Each compact channel card
 contains its own Now/Next, and the duplicate header
 progress strip is removed. The synthetic backdrop intentionally includes a

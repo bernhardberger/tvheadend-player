@@ -5,6 +5,7 @@ import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvheadend.sdk.core.SessionCache
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.cacheSizeMegabytes
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
 import java.io.IOException
@@ -37,7 +38,7 @@ class SettingsStorageViewModelTest {
                 }
             }
             val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
-            val model = SettingsStorageViewModel(cache, notices)
+            val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore())
             val store = ViewModelStore().apply { put("storage", model) }
             model.clearCache()
             runCurrent()
@@ -66,12 +67,15 @@ class SettingsStorageViewModelTest {
             val cache = FakeTvheadendSession().cache
             cache.scriptStatistics(CacheStatistics(500_000, 12_000_000, 340))
             val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
-            val model = SettingsStorageViewModel(cache, notices)
+            val accents = ChannelAccentStore().apply { put("picon", 0x336699) }
+            val model = SettingsStorageViewModel(cache, notices, accents)
             assertEquals(340, model.statistics.value.artworkEntryCount)
             model.clearCache()
             assertEquals(CacheClearState.CLEARING, model.clearState.value)
             runCurrent()
             assertEquals(CacheStatistics.EMPTY, model.statistics.value)
+            assertEquals("the channel colours go with the cache", null, accents["picon"])
+            assertEquals("and a fill-in pass is told", 1, accents.clears.value)
             assertEquals(CacheClearState.CLEARED, model.clearState.value)
             assertEquals(1, notices.state.value.pending.size)
             advanceTimeBy(4_000)
@@ -100,7 +104,7 @@ class SettingsStorageViewModelTest {
                 }
             }
             val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
-            val model = SettingsStorageViewModel(cache, notices)
+            val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore())
             model.clearCache()
             runCurrent()
             model.clearCache()

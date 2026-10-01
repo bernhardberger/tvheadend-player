@@ -99,8 +99,9 @@ internal fun LiveProgrammeInfoOverlay(
     onRecordingActivate: () -> Unit,
     onRecordingDismiss: () -> Unit,
     onClose: () -> Unit,
+    /** The programme hero above the reading pane. */
+    hero: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    piconContent: (@Composable () -> Unit)? = null,
     onRecordFocusRestored: () -> Unit = {},
 ) {
     val closeFocus = remember { FocusRequester() }
@@ -118,10 +119,15 @@ internal fun LiveProgrammeInfoOverlay(
         mutableStateOf(recordAvailable)
     }
 
+    // The panel opens on Record (else Close) instead of the reading pane, which stays reachable with Up.
     LaunchedEffect(event?.id, showingRecordingDialog) {
         if (showingRecordingDialog || restoreRecordFocus) return@LaunchedEffect
         withFrameNanos { }
-        (if (event != null) readingFocus else closeFocus).requestFocus()
+        when {
+            event == null -> closeFocus
+            recordAvailable -> recordFocus
+            else -> closeFocus
+        }.requestFocus()
     }
 
     LaunchedEffect(
@@ -202,13 +208,7 @@ internal fun LiveProgrammeInfoOverlay(
                                     horizontalArrangement = Arrangement.spacedBy(TvSpacing24),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    piconContent?.invoke()
-                                    Text(
-                                        text = stringResource(R.string.player_current_broadcast),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        maxLines = 2,
-                                        modifier = Modifier.weight(1f),
-                                    )
+                                    hero()
                                 }
                                 PlayerInfoReadingContent(
                                     title = event.title.orEmpty(),
@@ -249,6 +249,8 @@ internal fun LiveProgrammeInfoOverlay(
                                                         .focusProperties {
                                                             left = FocusRequester.Cancel
                                                             right = closeFocus
+                                                            up = readingFocus
+                                                            down = FocusRequester.Cancel
                                                         },
                                                 ) {
                                                     Text(stringResource(R.string.record))
@@ -266,6 +268,8 @@ internal fun LiveProgrammeInfoOverlay(
                                                             FocusRequester.Cancel
                                                         }
                                                         right = FocusRequester.Cancel
+                                                        up = readingFocus
+                                                        down = FocusRequester.Cancel
                                                     },
                                             ) {
                                                 Text(stringResource(R.string.player_info_close))
@@ -296,22 +300,22 @@ private fun UnavailableProgrammeInfo(
         body = stringResource(R.string.player_info_unavailable_message, channelName),
         readingFocus = readingFocus,
         footer = {
-          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            OutlinedButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .testTag("live-info-close")
-                    .focusRequester(closeFocus)
-                    .focusProperties {
-                        up = readingFocus
-                        down = FocusRequester.Cancel
-                        left = FocusRequester.Cancel
-                        right = FocusRequester.Cancel
-                    },
-            ) {
-                Text(stringResource(R.string.player_info_close))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                OutlinedButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .testTag("live-info-close")
+                        .focusRequester(closeFocus)
+                        .focusProperties {
+                            up = readingFocus
+                            down = FocusRequester.Cancel
+                            left = FocusRequester.Cancel
+                            right = FocusRequester.Cancel
+                        },
+                ) {
+                    Text(stringResource(R.string.player_info_close))
+                }
             }
-          }
         },
     )
 }

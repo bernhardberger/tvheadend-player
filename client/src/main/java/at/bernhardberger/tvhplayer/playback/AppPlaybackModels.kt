@@ -161,6 +161,9 @@ data class AppPlaybackFormatDiagnostics(
     val language: String? = null,
     val channelCount: Int? = null,
     val sampleRateHz: Int? = null,
+    val sampleMimeType: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 )
 data class AppPlaybackDiagnostics(
     val source: AppPlaybackSource = AppPlaybackSource.NONE,

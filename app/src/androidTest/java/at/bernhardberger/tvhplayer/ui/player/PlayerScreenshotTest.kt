@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
@@ -127,6 +128,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                         )
                     } else if (scenario.startsWith("info") || infoOpen) {
                         LiveProgrammeInfoOverlay(
+                            hero = {},
                             event = if (scenario == "info-missing") null else programme(long = scenario.startsWith("info-long")), channelIdentity = "1 Documentary HD", channelName = "Documentary HD",
                             recordingScheduled = false, canRecord = true, recordingState = LiveInfoRecordingState.Idle,
                             confirmationVisible = false, restoreRecordFocus = false, onRecord = {},
@@ -144,7 +146,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                         }
                     } else if (scenario.startsWith("seek")) {
                         val history = if (scenario == "seek-shallow") 60_000L else 5_400_000L
-                        TimeshiftSeekPreview(
+                        QuickStepBanner(
                             state = AppTimeshiftState(available = true, bufferStartMs = -history,
                                 positionMs = -30_000L, liveEdgeMs = 0L),
                             decision = TimeshiftSeekDecision(if (scenario == "seek-live") 0L else -history / 2, -30_000L, false),
@@ -153,17 +155,28 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                     } else if (scenario.startsWith("shelf")) {
                         val window = ProgrammeWindow(programme(long = large), Instant.fromEpochSeconds(1_783_020_600L),
                             if (scenario == "shelf-paused") 0.25f else 0.5f, 0f, 0.5f, 0.5f, true)
-                        OverlayControlsTv(
-                            imageLoader = imageLoader, currentSession = currentSession,
-                            channelNumber = 12, channelName = "Documentary 12", piconPath = ArtworkId(12),
-                            nowEvent = programme(long = large), nextEvent = null, nowSec = 1_783_020_600L,
-                            controlsVisible = false, optionsOpen = false, onOpenChannels = {}, onStopPlayback = {},
-                            onUserInteraction = {}, onOpenOptions = {},
-                            timeshiftState = AppTimeshiftState(available = true, bufferStartMs = -3_600_000,
+                        PlayerChrome(
+                            mode = PlayerChromeMode.CONTROLS,
+                            content = PlayerChromeContent("", liveInfoBarData(12, "Documentary 12", null, null, false, 0, "")),
+                            timeline = PlayerChromeTimeline.Live(
+                                AppTimeshiftState(available = true, bufferStartMs = -3_600_000,
                                 positionMs = if (scenario == "shelf-paused") -900_000 else 0, liveEdgeMs = 0),
-                            timeshiftFeedback = null, onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
-                            paused = scenario == "shelf-paused", programmeWindow = window, committedWindow = window,
-                            channelRailOpen = true, channelRailContent = {
+                                nowSec = 1_783_020_600L,
+                                programme = programme(long = large),
+                                committedWindow = window,
+                                programmeWindow = window,
+                            ),
+                            actions = PlayerChromeActions(active = false, paused = scenario == "shelf-paused"),
+                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            onStop = {},
+                            onInteraction = {},
+                            onOptions = {},
+                            onTogglePause = {},
+                            onSeek = {},
+
+                            onInfo = {},
+                            decorationCoversControls = true,
+                            controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(expanded = true, channelsAvailable = true, peekAlpha = emphasisAlpha, preview = {}, controls = controls, channelContent = {
                             ChannelDrawer(
                                 channels = if (scenario == "shelf-empty") emptyList() else List(15) {
                                     Channel.create(id = ChannelId(it + 1L), icon = ArtworkId(it + 1), name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
@@ -173,31 +186,27 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                  nowSec = 1_783_020_600L, imageLoader = imageLoader,
                                  onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {}, currentSession = currentSession,
                             )
-                        })
+                        }) },
+                        )
                     } else if (scenario.startsWith("recording")) {
-                        RecordingOverlayControls(
-                            imageLoader = imageLoader, piconPath = ArtworkId(13), currentSession = currentSession,
-                            title = "A journey through the Alps", subtitle = "The high mountains",
-                            channelName = "Documentary HD", positionMs = 1_200_000L,
+                        RecordingChromeFixture(
+                            positionMs = 1_200_000L,
                             durationMs = if (scenario == "recording-unknown") androidx.media3.common.C.TIME_UNSET else 5_400_000L,
-                            growing = scenario == "recording-unknown", nowSec = 1_783_020_600L,
-                            canSeek = scenario != "recording-unknown", controlsVisible = true,
-                            optionsOpen = false, onTogglePlayPause = {}, onSeek = {},
-                            onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {}, onOpenInfo = {},
+                            growing = scenario == "recording-unknown",
+                            canSeek = scenario != "recording-unknown",
+                            onTogglePause = {},
+                            onSeek = {},
+                            onOptions = {},
+                            onInfo = {},
                         )
                     } else {
-                        OverlayControlsTv(
-                            imageLoader = imageLoader, channelNumber = 1, channelName = "Documentary HD",
-                            piconPath = ArtworkId(12), currentSession = currentSession,
-                             nowEvent = if (scenario == "missing" || scenario.endsWith("-missing")) null else programme(long = large),
-                            nextEvent = EpgEvent.create(id = EventId(2), channelId = ChannelId(1),
-                                start = Instant.fromEpochSeconds(1_783_022_400L),
-                                stop = Instant.fromEpochSeconds(1_783_024_200L), title = "The world beneath the ice"),
-                            nowSec = 1_783_020_600L, controlsVisible = true, optionsOpen = false,
-                            onOpenChannels = {}, onStopPlayback = {}, onUserInteraction = {}, onOpenOptions = {},
-                            onOpenInfo = { infoOpen = true }, restoreInfoFocus = restoreInfo,
-                            onInfoFocusRestored = { restoreInfo = false },
-                            timeshiftState = remember(scenario, tuningComplete) {
+                        PlayerChrome(
+                            mode = PlayerChromeMode.CONTROLS,
+                            content = PlayerChromeContent("", liveInfoBarData(1, "Documentary HD",
+                                programme(long = large).takeUnless { scenario == "missing" || scenario.endsWith("-missing") },
+                                null, false, 1_783_020_600L, "Programme unavailable")),
+                            timeline = PlayerChromeTimeline.Live(
+                                remember(scenario, tuningComplete) {
                                  if ((scenario.startsWith("field-") && !tuningComplete) || scenario in listOf("live", "long", "missing", "return-info", "timeline-passive-large")) AppTimeshiftState() else {
                                     val fixture = TimeshiftTestFixture(7_200.seconds)
                                     fixture.updateHistory(if (scenario.endsWith("deep")) 0.seconds else 3_000.seconds, 3_600.seconds)
@@ -211,12 +220,9 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                     ))
                                 }
                             },
-                             timeshiftFeedback = "Reached the available buffer limit".takeIf { scenario == "timeline-clamped" },
-                             timeshiftFeedbackIsError = false,
-                             onToggleTimeshiftPause = {}, onSeekTimeshift = {}, onGoLive = {},
-                              paused = scenario.startsWith("paused") || scenario == "timeline-clamped",
-                             previewing = scenario.startsWith("timeline-preview"),
-                             programmeWindow = if (scenario.startsWith("timeline-preview") && !scenario.endsWith("-missing")) {
+                                nowSec = 1_783_020_600L,
+                                programme = if (scenario == "missing" || scenario.endsWith("-missing")) null else programme(long = large),
+                                programmeWindow = if (scenario.startsWith("timeline-preview") && !scenario.endsWith("-missing")) {
                                  ProgrammeWindow(programme(long = large), Instant.fromEpochSeconds(1_783_020_600L),
                                      0.5f, 0.25f, 0.75f, 0.75f, !scenario.endsWith("-expired"))
                               } else if (scenario.startsWith("timeline-overnight")) {
@@ -227,6 +233,20 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                       title = "Across midnight"), Instant.fromEpochSeconds(start + 1_800L),
                                       0.5f, 0.25f, 0.75f, 0.75f, true)
                               } else null,
+                                previewing = scenario.startsWith("timeline-preview"),
+                                feedback = "Reached the available buffer limit".takeIf { scenario == "timeline-clamped" },
+                                feedbackIsError = false,
+                            ),
+                            actions = PlayerChromeActions(active = true, paused = scenario.startsWith("paused") || scenario == "timeline-clamped", restoreFocus = "player-identity-card".takeIf { restoreInfo }),
+                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            onStop = {},
+                            onInteraction = {},
+                            onOptions = {},
+                            onInfo = { infoOpen = true },
+                            onTogglePause = {},
+                            onSeek = {},
+
+                            onFocusRestored = { restoreInfo = false },
                         )
                     }
                 }
@@ -239,13 +259,20 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         if (scenario.endsWith("-focused")) composeRule.onNodeWithTag("player-seekbar").requestFocus().assertIsFocused()
         if (scenario == "shelf-empty") composeRule.onNodeWithTag("player-shelf-close").assertIsFocused()
         if (scenario == "return-info") {
-            composeRule.onNodeWithTag("player-info").requestFocus().performKeyInput { pressKey(Key.Enter) }
+            composeRule.onNodeWithTag("player-identity-card").requestFocus().performKeyInput { pressKey(Key.Enter) }
+            composeRule.onNodeWithTag("live-info-record").assertIsFocused()
+                .performKeyInput { pressKey(Key.DirectionUp) }
             composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
             composeRule.onNodeWithTag("live-info-close").requestFocus().performKeyInput { pressKey(Key.Enter) }
-            composeRule.onNodeWithTag("player-info").assertIsFocused()
+            composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
         }
         if (scenario == "info-long-end") {
+            composeRule.onNodeWithTag("live-info-record").assertIsFocused()
+                .performKeyInput { pressKey(Key.DirectionUp) }
+            composeRule.onNodeWithTag("player-info-reading").assertIsFocused()
             repeat(80) { composeRule.onRoot().performKeyInput { pressKey(Key.DirectionDown) } }
+            composeRule.onNodeWithTag("live-info-stream-signal").assertIsFocused()
+                .performKeyInput { pressKey(Key.DirectionUp) }
             composeRule.onNodeWithTag("live-info-record").assertIsFocused()
         }
         if (scenario == "shelf-browse") {
@@ -255,26 +282,28 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         if (scenario.startsWith("shelf") && scenario != "shelf-empty") {
             val id = if (scenario == "shelf-browse") 13 else 12
             val card = composeRule.onNodeWithTag("player-channel-card-$id").assertIsFocused().fetchSemanticsNode().boundsInRoot
-            for (part in listOf("now", "next")) {
-                val programme = composeRule.onNodeWithTag("player-channel-$id-$part", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            composeRule.onNodeWithTag("player-channel-$id-next", useUnmergedTree = true).assertDoesNotExist()
+            run {
+                val programme = composeRule.onNodeWithTag("player-channel-$id-now", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 assertTrue(programme.left >= card.left && programme.right <= card.right)
                 assertTrue(programme.top >= card.top && programme.bottom <= card.bottom)
                 if (scenario == "shelf-long") {
                     val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                    composeRule.onNodeWithTag("player-channel-$id-$part", useUnmergedTree = true)
+                    composeRule.onNodeWithTag("player-channel-$id-now", useUnmergedTree = true)
                         .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
                     val layout = layouts.single()
-                    assertTrue("$part: line bottom ${layout.getLineBottom(layout.lineCount - 1)} must fit text height ${layout.size.height}",
+                    assertTrue("Now: line bottom ${layout.getLineBottom(layout.lineCount - 1)} must fit text height ${layout.size.height}",
                         layout.getLineBottom(layout.lineCount - 1) <= layout.size.height)
-                     if (part == "now") assertTrue("Now title remains one line", layout.lineCount == 1)
+                    assertTrue("Now title remains one line", layout.lineCount == 1)
                 }
             }
         }
         if (scenario == "live") {
-            composeRule.onNodeWithText("A journey through the Alps").assertExists()
-            composeRule.onNodeWithTag("player-next-programme").assertExists()
-            composeRule.onNodeWithTag("player-info").requestFocus()
-            composeRule.onNodeWithTag("player-info").assertIsFocused()
+            // The info bar speaks for its title in one description.
+            composeRule.onNodeWithTag("player-info-bar")
+                .assert(androidx.compose.ui.test.hasContentDescription("A journey through the Alps", substring = true))
+            composeRule.onNodeWithTag("player-identity-card").requestFocus()
+            composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
         }
         composeRule.mainClock.advanceTimeBy(if (scenario in listOf("timing-unavailable", "timeline-unavailable-large", "timeline-unavailable-focused")) 1_600L else 500L)
         composeRule.waitForIdle()
@@ -283,7 +312,8 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         fun capture(name: String) {
             val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
             if (scenario.startsWith("field-")) {
-                val status = composeRule.onNodeWithTag("player-live-status").fetchSemanticsNode().boundsInRoot
+                // The controls have no state cell; the bar row is what the pixel is sampled beside.
+                val status = composeRule.onNodeWithTag("player-timeline-track", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val background = bitmap.getPixel(bitmap.width - 1, status.center.y.toInt())
                 val contrast = androidx.core.graphics.ColorUtils.calculateContrast(
                     android.graphics.Color.rgb(227, 227, 232), background,

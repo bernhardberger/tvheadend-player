@@ -101,6 +101,26 @@ object ChannelNavigation {
         } else null
     }
 
+    /** Whether more digits after [enteredNumber], within [maxDigits], could still name a channel. */
+    fun canExtendToNumber(
+        orderedIds: List<ChannelId>,
+        channelNumbers: Map<ChannelId, Long?>,
+        enteredNumber: String,
+        maxDigits: Int,
+    ): Boolean {
+        if (enteredNumber.length >= maxDigits) return false
+        val prefix = enteredNumber.trimStart('0')
+        val numbers = if (orderedIds.none { channelNumbers[it] != null }) {
+            (1L..orderedIds.size).asSequence()
+        } else {
+            orderedIds.asSequence().mapNotNull { channelNumbers[it] }
+        }
+        return numbers.map(Long::toString).any { number ->
+            number.length > prefix.length && number.startsWith(prefix) &&
+                enteredNumber.length + number.length - prefix.length <= maxDigits
+        }
+    }
+
     fun numberForId(
         orderedIds: List<ChannelId>,
         channelNumbers: Map<ChannelId, Long?>,

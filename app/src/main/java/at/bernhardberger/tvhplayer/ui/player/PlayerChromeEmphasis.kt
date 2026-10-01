@@ -29,10 +29,16 @@ internal fun rememberPlayerChromeAlpha(timelineFocused: Boolean, previewing: Boo
 
 // Keep explicit D-pad destinations mounted and focusable. Receiving focus ends the
 // focus view, even when the playback owner still has an asynchronous seek pending.
+/**
+ * [revealAlpha] is a fade of the same content, such as the action row fading in under the Banner
+ * taken over. It multiplies into this one layer: a second alpha layer around the content would
+ * render into a buffer of the unexpanded bounds and clip the focused control's scale and glow.
+ */
 internal fun Modifier.playerChromeEmphasis(
     alpha: State<Float>,
     hidden: Boolean,
     focusOverflow: Dp = 0.dp,
+    revealAlpha: () -> Float = { 1f },
 ): Modifier =
     // Alpha < 1 creates an offscreen buffer even with clip=false. Expand only that
     // buffer, not the measured action strip or its stable 48dp control positions.
@@ -43,6 +49,6 @@ internal fun Modifier.playerChromeEmphasis(
             child.placeRelative(-reserve, -reserve)
         }
     }
-        .graphicsLayer { this.alpha = alpha.value }
+        .graphicsLayer { this.alpha = alpha.value * revealAlpha() }
         .padding(focusOverflow)
         .then(if (hidden) Modifier.clearAndSetSemantics { } else Modifier)

@@ -113,17 +113,13 @@ take precedence over completed-work narrative.
   remains warm. Explicit Stop and natural end tear down the session and return to
   the recordings library. Preserve the previous recordings mode, folder, scroll,
   and focused item across that navigation.
-- Keep transient player identity separate from transport: a large picon and
-  programme or recording metadata occupy the top-left under a broad top scrim,
-  with the wall clock at top-right on a shared first-baseline anchor. The bottom
-  scrim presents one timeline first and a left-grouped
-  navigation/transport/utility row beneath it, with Stop separated at the end.
-  Timeshift keeps a programme-anchored axis in every focus and playback state,
-  overlays the rewindable window and live edge, and exposes **Go live** in the
-  transport cluster only while behind live. Successful return to live is conveyed
-  by the timeline without a text notice. Keep **Up next** and its start time with
-  top metadata, pair the clock with the programme end time, and center delayed
-  unboxed ordinary tuning status over video.
+- The player chrome follows `DESIGN.md` §10 (Player chrome): a passive Banner
+  (clock alone at top right; identity, programme and Next above one timeline
+  row) and full controls with the action row on Up/Down. Timeshift keeps a
+  programme-anchored axis with the rewindable window and live edge; the timeline
+  row shows the distance to live, and stepping forward returns to live without a
+  separate Go live control or text notice. Tuning shows the Banner with a
+  `Tuning…` line, not a centred indicator.
   Map standard hardware Info to programme details and TV Contents Menu/TV Number
   Entry to the channel drawer. The G10 List/123 button is physically confirmed as
   app-visible `KEYCODE_BOOKMARK` and opens that drawer; validate other remote
