@@ -1549,10 +1549,10 @@ fun VideoPlayerScreen(
                         }
                     }
                     PlayerKeyAction.REVEAL_CONTROLS -> {
-                        if (timelineState.seekPending) {
-                            timelineState.commitPendingSeek()
-                            restoreInfoFocus = event.key == Key.DirectionUp
-                        }
+                        if (timelineState.seekPending) timelineState.commitPendingSeek()
+                        // Trial: the Banner stands for the timeline row; Up reveals onto the channel
+                        // card above it, Down onto the action row below it.
+                        restoreInfoFocus = event.key == Key.DirectionUp
                         layerState.showControls()
                         return@onPreviewKeyEvent true
                     }
