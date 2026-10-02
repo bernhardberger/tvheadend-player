@@ -156,10 +156,10 @@ internal fun LiveProgrammeInfoOverlay(
         modifier = modifier
             .fillMaxSize(),
     ) {
-        PlaybackOptionsOverlayFrame(
+        // Trial: a full-screen sheet replaces the side panel.
+        ProgrammeInfoSheetFrame(
             paneTitle = paneTitle,
             panelTag = "live-info-panel",
-            panelWidth = PlaybackInfoPanelWidth,
         ) {
             Box(
                 modifier = Modifier
@@ -167,8 +167,7 @@ internal fun LiveProgrammeInfoOverlay(
                     .semantics {
                         this.paneTitle = paneTitle
                         if (showingRecordingDialog) dialog()
-                    }
-                    .padding(PlaybackInfoPanelPadding),
+                    },
             ) {
                 // The confirmation replaces the details in place; the outgoing side keeps
                 // fading without focus or semantics. Each showing is composed afresh, so a
@@ -200,16 +199,10 @@ internal fun LiveProgrammeInfoOverlay(
                                 onClose = onClose,
                             )
                         } else {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(TvSpacing24),
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(TvSpacing56),
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(TvSpacing24),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    hero()
-                                }
+                                hero()
                                 PlayerInfoReadingContent(
                                     title = event.title.orEmpty(),
                                     body = at.bernhardberger.tvhplayer.core.programmeDetailsBody(event),
@@ -223,7 +216,7 @@ internal fun LiveProgrammeInfoOverlay(
                                         at.bernhardberger.tvhplayer.ui.common.programmeMetadata(event)
                                             ?.takeIf(String::isNotBlank)?.let { append("\n"); append(it) }
                                     },
-                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    modifier = Modifier.weight(1f),
                                     footer = {
                                         if (recordingScheduled) {
                                             Text(

@@ -46,7 +46,6 @@ import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderStatusGap
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
@@ -143,7 +142,7 @@ internal fun PlayerChromeHeader(clock: String, modifier: Modifier = Modifier) {
     Box(modifier) {
         Box(Modifier.fillMaxWidth().height(PlayerChromeTokens.topScrimHeight).background(PlayerChromeTokens.topScrim))
         Text(clock, style = MaterialTheme.typography.titleLarge, maxLines = 1, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = TvOverlayTopPadding, end = TvOverlaySidePadding)
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = TvOverlayTopPadding, end = PlayerChromeTokens.gridMargin)
                 .testTag("player-top-cluster"))
     }
 }
@@ -165,6 +164,7 @@ internal data class QuickZapPreviewSnapshot(
     val summary: String?,
     val next: String?,
     val image: String?,
+    val subtitle: String? = null,
 )
 
 /** How long focus must rest on a quick-zap card before its preview fades in. */
@@ -172,11 +172,11 @@ internal const val QuickZapPreviewSettleMs = 250L
 
 /**
  * [value] once it has stayed unchanged for [settleMs], otherwise null. The initial value is
- * settled immediately; every later change waits the full delay again.
+ * settled immediately, unless [settleFirst]; every later change waits the full delay again.
  */
 @Composable
-internal fun <T : Any> rememberSettled(value: T?, settleMs: Long): T? {
-    var settled by remember { mutableStateOf(value) }
+internal fun <T : Any> rememberSettled(value: T?, settleMs: Long, settleFirst: Boolean = false): T? {
+    var settled by remember { mutableStateOf(value.takeUnless { settleFirst }) }
     LaunchedEffect(value) {
         if (value != settled) {
             settled = null
@@ -201,16 +201,21 @@ internal fun QuickZapTrayPreview(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
+    /** Without artwork and summary. */
+    compact: Boolean = false,
+    /** Trial: a rail that opens with a step waits for it to settle, as any later step does. */
+    settleFirst: Boolean = false,
 ) {
-    val settledId = rememberSettled(channel?.id, QuickZapPreviewSettleMs)
+    val settledId = rememberSettled(channel?.id, QuickZapPreviewSettleMs, settleFirst)
     val snapshot = channel?.takeIf { it.id == settledId }?.let {
         QuickZapPreviewSnapshot(
             channelId = it.id,
             title = event?.title?.takeIf(String::isNotBlank) ?: it.name.orEmpty(),
             metadata = trayPreviewMetadata(event, nowSec),
-            summary = event?.summary?.takeIf(String::isNotBlank) ?: event?.description?.takeIf(String::isNotBlank),
+            summary = if (compact) null else event?.summary?.takeIf(String::isNotBlank) ?: event?.description?.takeIf(String::isNotBlank),
+            subtitle = event?.subtitle?.takeIf(String::isNotBlank),
             next = next?.title?.takeIf(String::isNotBlank)?.let { title -> "${formatClock(next.start.epochSeconds)} $title" },
-            image = event?.image,
+            image = if (compact) null else event?.image,
         )
     }
     Box(modifier, contentAlignment = Alignment.BottomStart) {
@@ -224,6 +229,7 @@ internal fun QuickZapTrayPreview(
                 image = it.image,
                 imageLoader = imageLoader,
                 currentSession = currentSession,
+                subtitle = it.subtitle,
             )
         }
     }

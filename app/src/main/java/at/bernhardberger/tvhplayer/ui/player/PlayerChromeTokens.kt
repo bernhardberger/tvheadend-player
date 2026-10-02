@@ -25,6 +25,21 @@ internal object PlayerChromeTokens {
     val previewSlotHeight = 96.dp
     val previewCardGap = 16.dp
 
+    /** Trial: Google TV's 960×540dp layout grid: 58dp side margins, 20dp gutters. */
+    val gridMargin = 58.dp
+    val gridGutter = 20.dp
+    /** Trial: the channel card and the rail's cards, three grid columns wide. */
+    val channelCardWidth = 196.dp
+    val channelCardHeight = 110.dp
+    /** Trial: a wide standard card's text, 16dp beside the card. */
+    val identityTextGap = 16.dp
+    /** Trial: the lane the text makes beside the focused channel card; the › is centred in it. */
+    val arrowLane = 48.dp
+    /** Trial: the channel cards' focus growth; 1.05 stays clear of the margin and the arrow lanes. */
+    const val cardFocusedScale = 1.05f
+    /** Trial: a row title's height above a card row. */
+    val rowTitleGap = 8.dp
+
     /** Full-width top fade behind the clock: 0.64 at the edge, 0.40 at 56dp, clear at 112dp. */
     val topScrimHeight = 112.dp
     val topScrim = Brush.verticalGradient(

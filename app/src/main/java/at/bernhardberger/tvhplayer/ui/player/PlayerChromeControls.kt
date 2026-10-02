@@ -3,6 +3,12 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -83,6 +89,9 @@ internal fun PlayerChromeControls(
     decoration: @Composable (emphasisAlpha: () -> Float, controls: @Composable () -> Unit) -> Unit,
     markerNavigation: RecordingMarkerNavigation,
     onSeekMarker: (Long) -> Unit,
+    onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
+    downHint: String? = null,
+    onRecent: (() -> Unit)? = null,
 ) {
     val live = timeline as? PlayerChromeTimeline.Live
     val recording = timeline as? PlayerChromeTimeline.Recording
@@ -263,12 +272,31 @@ internal fun PlayerChromeControls(
                 down = cardBelow
             }
             .onPreviewKeyEvent { event ->
-                if (event.key != Key.DirectionDown) false else {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        relocatingKey = event.key
-                        cardBelow.requestFocus()
+                when {
+                    event.key == Key.DirectionDown -> {
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            relocatingKey = event.key
+                            cardBelow.requestFocus()
+                        }
+                        true
                     }
-                    true
+                    // Trial: Up focuses the last channel's card above this one.
+                    onRecent != null && event.key == Key.DirectionUp -> {
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            onInteraction()
+                            onRecent()
+                        }
+                        true
+                    }
+                    // Trial: Left/Right open the rail on the previous or next channel.
+                    onChannelStep != null && (event.key == Key.DirectionLeft || event.key == Key.DirectionRight) -> {
+                        if (event.type == KeyEventType.KeyDown) {
+                            onInteraction()
+                            onChannelStep(if (event.key == Key.DirectionRight) 1 else -1, event.nativeKeyEvent.eventTime)
+                        }
+                        true
+                    }
+                    else -> false
                 }
             }
         if (recording != null) {
@@ -366,6 +394,7 @@ internal fun PlayerChromeControls(
         }
         }
         Spacer(Modifier.height(TvOverlayTimelineActionGap))
+        Box {
         PlayerActionRow(
             settingsFocus = settingsFocus,
             onSettings = onOptions, onRecord = onRecord.takeIf { actions.record },
@@ -410,6 +439,20 @@ internal fun PlayerChromeControls(
                     }
                 },
         )
+        // Trial: what Down opens, centred between the start and end groups.
+        if (downHint != null) PlayerDownHint(downHint, Modifier.align(Alignment.Center)
+            .graphicsLayer { alpha = actionsAlpha() * chromeAlpha.value }.testTag("player-down-hint"))
+        }
     }
+    }
+}
+
+@Composable
+private fun PlayerDownHint(text: String, modifier: Modifier = Modifier) {
+    val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        androidx.tv.material3.Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
+            modifier = Modifier.size(24.dp).rotate(90f))
+        Text(text, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
     }
 }

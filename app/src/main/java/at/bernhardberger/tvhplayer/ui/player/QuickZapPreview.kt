@@ -30,6 +30,7 @@ fun QuickZapPreview(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
 ) {
     val artwork = ArtworkId.parse(image)
     var artworkFailed by remember(artwork, currentSession) { mutableStateOf(false) }
@@ -44,7 +45,12 @@ fun QuickZapPreview(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f))
             Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface)
-            summary?.takeIf(String::isNotBlank)?.let {
+            // A sports title says which event; its subtitle says which session.
+            subtitle?.let {
+                Text(it, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f))
+            }
+            summary?.takeIf { it.isNotBlank() && it != subtitle }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f))
             }
@@ -63,6 +69,7 @@ internal fun QuickZapPreviewReserve(modifier: Modifier = Modifier) {
     ) {
         Text("", style = MaterialTheme.typography.labelLarge, minLines = 1)
         Text("", style = MaterialTheme.typography.titleLarge, minLines = 1)
+        Text("", style = MaterialTheme.typography.bodyLarge, minLines = 1)
         Text("", style = MaterialTheme.typography.bodyMedium, minLines = 2)
         Text("", style = MaterialTheme.typography.labelLarge, minLines = 1)
     }

@@ -343,11 +343,11 @@ class PlayerChromeEvidenceTest {
         } }
         compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-identity-number", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
         compose.runOnIdle { withLogo = false }
         compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-identity-number", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")

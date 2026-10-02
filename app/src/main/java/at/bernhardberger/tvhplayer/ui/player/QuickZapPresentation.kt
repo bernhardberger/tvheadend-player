@@ -22,10 +22,24 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import kotlin.math.roundToInt
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 
 /** One motion value coordinates departing chrome and the persistent, peeking channel row. */
@@ -37,6 +51,11 @@ internal fun QuickZapPresentation(
     peekAlpha: () -> Float = { 1f },
     preview: @Composable () -> Unit,
     controls: @Composable () -> Unit,
+    /**
+     * Trial: the channel card's bounds in root coordinates. With it, the rail opens out of the card:
+     * its cards on the card's line, revealed sideways from the card, and nothing travels up.
+     */
+    inPlaceAnchor: (() -> Rect?)? = null,
 ) {
     val expansion = animateFloatAsState(
         if (expanded) 1f else 0f,
@@ -48,6 +67,10 @@ internal fun QuickZapPresentation(
         label = "quick-zap-expansion",
     )
     var previewHeight by remember { mutableIntStateOf(0) }
+    if (inPlaceAnchor != null) {
+        InPlaceRail(expanded, expansion::value, inPlaceAnchor, channelContent, preview, controls)
+        return
+    }
     Box(Modifier.fillMaxSize().clipToBounds()) {
         Box(
             Modifier.fillMaxSize()
@@ -107,3 +130,102 @@ internal fun QuickZapPresentation(
         }
     }
 }
+
+/** Trial: the cards' top focus reserve inside the rail, above the first card's top edge. */
+private val RailTopInset = 12.dp
+
+@Composable
+private fun InPlaceRail(
+    expanded: Boolean,
+    expansion: () -> Float,
+    anchor: () -> Rect?,
+    channelContent: @Composable () -> Unit,
+    preview: @Composable () -> Unit,
+    controls: @Composable () -> Unit,
+) {
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    var previewTop by remember { mutableIntStateOf(0) }
+    Box(Modifier.fillMaxSize().clipToBounds().onGloballyPositioned { origin = it.positionInRoot() }) {
+        Box(
+            Modifier.fillMaxSize()
+                .focusProperties { canFocus = !expanded }
+                .then(if (expanded) Modifier.clearAndSetSemantics { } else Modifier)
+                .testTag("player-zap-controls"),
+        ) {
+            // The controls' footer gives way to the rail; their header (clock, top scrim) stays.
+            CompositionLocalProvider(LocalInPlaceRailExpansion provides expansion) { controls() }
+        }
+        if (!expanded && expansion() == 0f) return@Box
+        Layout(
+            content = {
+                Box(
+                    Modifier.padding(bottom = PlayerChromeTokens.previewCardGap)
+                        .graphicsLayer { alpha = expansion() }
+                        .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
+                        .testTag("player-zap-preview-slot"),
+                    contentAlignment = Alignment.BottomStart,
+                ) { preview() }
+                Box(Modifier.testTag("player-zap-tray")) { channelContent() }
+            },
+            modifier = Modifier.fillMaxSize()
+                .drawBehind {
+                    // Clear above the preview, dark from the cards down.
+                    val top = (previewTop - TvOverlayFooterGradientRunout.toPx()).coerceAtLeast(0f)
+                    val runout = TvOverlayFooterGradientRunout.toPx() / (size.height - top).coerceAtLeast(1f)
+                    drawRect(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            runout.coerceAtMost(1f) to Color.Black.copy(alpha = 0.60f),
+                            1f to Color.Black.copy(alpha = 0.92f),
+                            startY = top, endY = size.height,
+                        ),
+                        alpha = expansion(),
+                    )
+                }
+                .graphicsLayer {
+                    alpha = (expansion() * 2.5f).coerceAtMost(1f)
+                    compositingStrategy = CompositingStrategy.Offscreen
+                }
+                .drawWithContent {
+                    drawContent()
+                    // Revealed sideways from the card's own bounds, its growing edges faded.
+                    val e = expansion()
+                    val card = anchor() ?: return@drawWithContent
+                    val left = (card.left - origin.x) * (1f - e)
+                    val right = (card.right - origin.x) + (size.width - (card.right - origin.x)) * e
+                    val feather = RevealFeather.toPx()
+                    val from = left - feather
+                    val span = (right + feather) - from
+                    drawRect(
+                        Brush.horizontalGradient(
+                            0f to Color.Transparent,
+                            (feather / span) to Color.Black,
+                            ((span - feather) / span) to Color.Black,
+                            1f to Color.Transparent,
+                            startX = from, endX = right + feather,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                },
+        ) { measurables, constraints ->
+            val loose = constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
+            val previewPlaceable = measurables[0].measure(loose)
+            val railPlaceable = measurables[1].measure(loose)
+            val card = anchor()
+            // Without a card to open from, the rail keeps the card's usual line above the timeline.
+            val top = card?.let { (it.top - origin.y).roundToInt() - RailTopInset.roundToPx() }
+                ?: (constraints.maxHeight - railPlaceable.height - 96.dp.roundToPx())
+            previewTop = top - previewPlaceable.height
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                previewPlaceable.place(0, top - previewPlaceable.height)
+                railPlaceable.place(0, top)
+            }
+        }
+    }
+}
+
+/** Trial: how far the in-place rail has opened, for the controls' footer to give way to it. */
+internal val LocalInPlaceRailExpansion = compositionLocalOf<() -> Float> { { 0f } }
+
+/** Trial: the soft edge of the rail's sideways reveal. */
+private val RevealFeather = 96.dp

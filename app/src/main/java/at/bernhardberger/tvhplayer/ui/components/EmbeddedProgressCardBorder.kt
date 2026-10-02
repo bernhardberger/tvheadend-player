@@ -9,10 +9,13 @@ import androidx.tv.material3.CardBorder
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 
-/** Native card outline, displaced outward so embedded edge content remains visible. */
+/**
+ * Native card outline, displaced outward so embedded edge content remains visible. [held] keeps
+ * the focused outline without focus, for a card that stands in for a focused one.
+ */
 @Composable
-internal fun embeddedProgressCardBorder(): CardBorder = CardDefaults.border(
-    focusedBorder = Border(
+internal fun embeddedProgressCardBorder(held: Boolean = false): CardBorder {
+    val focused = Border(
         // Match TV Material ButtonDefaults' focused container.
         border = BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface),
         // TV Material expands the outline by this distance; the 3dp stroke is centered on it.
@@ -21,5 +24,6 @@ internal fun embeddedProgressCardBorder(): CardBorder = CardDefaults.border(
         // SurfaceBorder expands bounds, not radii: add the 2dp outward inset
         // to keep concentric corners and a 0.5dp gap inside the centered stroke.
         shape = RoundedCornerShape(8.dp + 2.dp),
-    ),
-)
+    )
+    return CardDefaults.border(border = if (held) focused else Border.None, focusedBorder = focused)
+}

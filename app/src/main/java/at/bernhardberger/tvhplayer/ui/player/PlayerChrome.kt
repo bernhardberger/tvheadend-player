@@ -7,8 +7,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -17,7 +23,10 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import coil3.ImageLoader
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /**
  * The player chrome of one screen: header, info bar, timeline and, with the controls, the action
@@ -63,6 +72,19 @@ internal fun PlayerChrome(
     /** A recording's marker navigation, opened from its timeline. */
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     onSeekMarker: (Long) -> Unit = {},
+    /** Trial: Left/Right on the focused identity card change channel (-1 previous, +1 next). */
+    onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
+    /** Trial: OK on the identity card; without it the card opens Info. */
+    onCardClick: (() -> Unit)? = null,
+    /** Trial: what Down from the action row opens, shown centred in the row. */
+    downHint: String? = null,
+    /** Trial: the last other channel, a row above the identity card that Up focuses; OK on it switches. */
+    recentPeek: RecentChannelPeek? = null,
+    onRecent: (() -> Unit)? = null,
+    /** Trial: the rail stands in for the channel card, which keeps its focused look meanwhile. */
+    channelCardHeld: Boolean = false,
+    /** Trial: where the identity card is, in root coordinates, for the rail to open from. */
+    onCardPlaced: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
     PlayerControlsLayer(
@@ -88,6 +110,25 @@ internal fun PlayerChrome(
         }
         val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
         val header: @Composable (Modifier) -> Unit = { PlayerChromeHeader(content.clock, it.testTag("player-header")) }
+        // Trial: Up on the channel card focuses the last channel's card above it.
+        val recentFocus = remember { FocusRequester() }
+        // Trial: the text makes room for the › only while the channel card has focus.
+        var cardFocused by remember { mutableStateOf(false) }
+        // Held from the rail's opening until focus is back on the card, so it never blinks out in between.
+        var cardHeld by remember { mutableStateOf(false) }
+        LaunchedEffect(channelCardHeld) {
+            if (channelCardHeld) cardHeld = true
+            else if (cardHeld) {
+                delay(PlayerMotion.PanelMs.toLong())
+                cardHeld = false
+            }
+        }
+        val identityGap by animateDpAsState(
+            if (onChannelStep != null && (cardFocused || cardHeld) && shown == PlayerChromeMode.CONTROLS) PlayerChromeTokens.arrowLane
+            else PlayerChromeTokens.identityTextGap,
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+            label = "identityGap",
+        )
         // The identity card takes focus in the controls only, which place it in their focus graph.
         val infoBar: @Composable (contentAlpha: () -> Float, card: Modifier) -> Unit = { contentAlpha, card ->
             PlayerInfoBar(
@@ -97,9 +138,18 @@ internal fun PlayerChrome(
                 recordingNow = content.recordingNow,
                 contentAlpha = contentAlpha,
                 lastLineEndReserve = lastLineEndReserve,
+                identityGap = identityGap,
             ) { faded ->
-                PlayerIdentityCard(content, imageLoader, currentSession, faded.then(card),
-                    onClick = { onInteraction(); onInfo() }.takeIf { shown == PlayerChromeMode.CONTROLS })
+                val placed = onCardPlaced?.let { sink -> Modifier.onGloballyPositioned { sink(it.boundsInRoot()) } } ?: Modifier
+                PlayerIdentityCard(content, imageLoader, currentSession,
+                    faded.then(card).then(placed).onFocusChanged {
+                        cardFocused = it.isFocused
+                        if (it.isFocused && !channelCardHeld) cardHeld = false
+                    },
+                    onClick = { onInteraction(); (onCardClick ?: onInfo)() }.takeIf { shown == PlayerChromeMode.CONTROLS },
+                    channelCard = onChannelStep != null, recent = recentPeek.takeIf { onRecent != null },
+                    recentFocus = recentFocus, onRecentClick = { onInteraction(); onRecent?.invoke() },
+                    held = cardHeld && shown == PlayerChromeMode.CONTROLS)
             }
         }
         CompositionLocalProvider(LocalStateCellInset provides stateCell) {
@@ -129,6 +179,9 @@ internal fun PlayerChrome(
                 decoration = controlsDecoration,
                 markerNavigation = markerNavigation,
                 onSeekMarker = onSeekMarker,
+                onChannelStep = onChannelStep,
+                downHint = downHint,
+                onRecent = { recentFocus.requestFocus(); Unit }.takeIf { recentPeek != null && onRecent != null },
             )
         } else {
             // Passive: nothing in the Banner takes focus. Without the action row its info and

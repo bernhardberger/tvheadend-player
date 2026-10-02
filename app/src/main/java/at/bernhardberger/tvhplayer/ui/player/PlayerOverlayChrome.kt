@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
 
@@ -39,7 +38,7 @@ internal fun PlayerOverlayChrome(
     headerContent: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
     footerPadding: PaddingValues = PaddingValues(
-        start = TvOverlaySidePadding, end = TvOverlaySidePadding,
+        start = PlayerChromeTokens.gridMargin, end = PlayerChromeTokens.gridMargin,
         top = TvOverlayFooterGradientRunout, bottom = TvOverlayBottomPadding,
     ),
     /**
@@ -53,6 +52,7 @@ internal fun PlayerOverlayChrome(
     // Inside the controls layer, the header comes down and the footer up as they fade in;
     // controls revealed by a zap fade in where they rest.
     val motion = LocalPlayerControlsMotion.current
+    val railExpansion = LocalInPlaceRailExpansion.current
     val travels = LocalPlayerControlsEntry.current == PlayerControlsEntry.TRAVEL
     val entering = motion?.animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))
     fun GraphicsLayerScope.enterFrom(offset: Dp) {
@@ -71,7 +71,7 @@ internal fun PlayerOverlayChrome(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .graphicsLayer { enterFrom(PlayerMotion.ChromeOffset); riseFromBanner() }
+                .graphicsLayer { enterFrom(PlayerMotion.ChromeOffset); riseFromBanner(); alpha = 1f - railExpansion() }
                 .testTag("player-footer")
                 .drawWithCache {
                     val scrim = PlayerChromeTokens.bottomScrim(size.height, this)

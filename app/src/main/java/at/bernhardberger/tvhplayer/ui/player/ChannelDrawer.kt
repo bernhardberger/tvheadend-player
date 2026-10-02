@@ -47,6 +47,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -56,6 +60,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.CompactCard
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -94,6 +100,12 @@ fun ChannelDrawer(
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: (Int?) -> Unit,
+    // Trial: the card's first Left/Right opens the rail on this channel, then steps it once.
+    entryFocusId: ChannelId? = null,
+    entryStep: Int = 0,
+    // Trial: the rail opens in place of the channel card: card-sized tiles on its keyline, Down
+    // closes it, Up has nowhere to go.
+    inPlace: Boolean = false,
 ) {
     val ids = remember(channels) { channels.map { it.id } }
     val numbers = remember(channels) { channels.associate { it.id to it.visibleChannelNumber } }
@@ -106,10 +118,14 @@ fun ChannelDrawer(
     var pendingPickId by remember { mutableStateOf<ChannelId?>(null) }
     var confirmedId by remember { mutableStateOf(playingChannelId) }
     var reanchorId by remember { mutableStateOf<ChannelId?>(null) }
+    // Trial: the entry card is focused from its first frame, standing in for the channel card,
+    // until focus leaves it.
+    var entryLeft by remember { mutableStateOf(false) }
     val emptyFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    // 48dp screen-safe space plus native card enlargement/outline overflow.
-    val edgeInset = 64.dp
+    // 48dp screen-safe space plus native card enlargement/outline overflow; in place, the
+    // channel card's own keyline.
+    val edgeInset = if (inPlace) PlayerChromeTokens.gridMargin else 64.dp
     // The viewport reaches this far past both screen edges so the next cards of a held
     // D-pad are already composed and placed; otherwise each step past the edge runs a
     // synchronous beyond-bounds search inside key dispatch and the rail stalls.
@@ -124,7 +140,7 @@ fun ChannelDrawer(
                 offset - edgeInsetPx
         }
     }
-    LaunchedEffect(ids, active, playingChannelId) {
+    LaunchedEffect(ids, active, playingChannelId, entryFocusId) {
         if (playingChannelId != observedPlayingId) {
             // Null means awaiting presentation, not a different channel selection.
             // Preserve the local pick until a non-null confirmation resolves it.
@@ -146,6 +162,7 @@ fun ChannelDrawer(
         }
         if (!active) {
             entered = false
+            entryLeft = false
             reanchorId?.let { focusedId = it }
             reanchorId = null
         }
@@ -157,6 +174,7 @@ fun ChannelDrawer(
             }
             return@LaunchedEffect
         }
+        if (active && !entered && entryFocusId != null && entryFocusId in ids) focusedId = entryFocusId
         if (entered && focusedId in ids && focusedCatalog == ids) return@LaunchedEffect
         val target = focusedId?.takeIf { it in ids }
             ?: playingChannelId?.takeIf { it in ids }
@@ -176,6 +194,11 @@ fun ChannelDrawer(
         requesters.getValue(target).requestFocus()
         focusedCatalog = ids
         entered = true
+        // Trial: the step the key asked for slides in at once, while the rail opens.
+        if (entryStep != 0 && target == entryFocusId) {
+            withFrameNanos { }
+            if (focusedId == target) focusManager.moveFocus(if (entryStep > 0) FocusDirection.Right else FocusDirection.Left)
+        }
     }
     Column(
         Modifier.fillMaxWidth()
@@ -186,6 +209,13 @@ fun ChannelDrawer(
                 val channelStep = ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)
                     .takeIf { active }
                 when {
+                    inPlace && event.key == Key.DirectionUp -> true
+                    inPlace && event.key == Key.DirectionDown -> {
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            onCloseDrawer(event.nativeKeyEvent.keyCode)
+                        }
+                        true
+                    }
                     event.key == Key.DirectionUp -> {
                         if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                             onCloseDrawer(event.nativeKeyEvent.keyCode)
@@ -224,10 +254,14 @@ fun ChannelDrawer(
             },
             state = listState,
             contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (inPlace) PlayerChromeTokens.gridGutter else 24.dp),
         ) {
             items(channels, key = { it.id.value }) { channel ->
                 CompactZapCard(
+                    inPlace = inPlace,
+                    // Opening, the entry card stands in for the channel card; closing, the focused
+                    // one keeps its look while the rail folds back into the card.
+                    held = inPlace && (if (active) channel.id == entryFocusId && !entryLeft else channel.id == focusedId),
                     channel = channel,
                     number = ChannelNavigation.numberForId(ids, numbers, channel.id),
                     event = nowEvent(channel.id),
@@ -251,13 +285,88 @@ fun ChannelDrawer(
                             if (it.isFocused && active) {
                                 profileTrace("P44:focus:rail") {
                                     focusedId = channel.id
-                                    onFocusChannel(channel.id)
+                                    if (channel.id != entryFocusId) entryLeft = true
+                                    // The entry card a step leaves at once doesn't name itself in between.
+                                    val stepping = entryStep != 0 && channel.id == entryFocusId && !entryLeft
+                                    if (!stepping) onFocusChannel(channel.id)
                                 }
                             }
                         },
                 )
             }
         }
+        }
+    }
+}
+
+
+/**
+ * Trial: a standard card the size of the player's channel card. Its face is the channel's colour,
+ * picon and "number name", with the programme's progress along its bottom edge; the programme's
+ * title and subtitle stand below it.
+ */
+@Composable
+private fun InPlaceZapTile(
+    channel: Channel,
+    number: Long?,
+    event: EpgEvent?,
+    nowSec: Long,
+    playbackIndicator: ChannelPlaybackIndicator,
+    recording: Boolean,
+    imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    held: Boolean = false,
+) {
+    val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
+    val interactions = remember { MutableInteractionSource() }
+    val focused = interactions.collectIsFocusedAsState().value || held
+    Column(Modifier.width(PlayerChromeTokens.channelCardWidth), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        CompactCard(
+            onClick = onClick,
+            interactionSource = interactions,
+            border = embeddedProgressCardBorder(held),
+            scale = channelCardScale(held),
+            scrimBrush = SolidColor(Color.Transparent),
+            modifier = modifier.size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight),
+            image = {
+                ChannelCardFace(channel.icon, channel.id, channel.name.orEmpty(), imageLoader, currentSession,
+                    logoTag = "player-channel-${channel.id.value}-picon", nameTag = "player-channel-${channel.id.value}-name")
+                ChannelCardLabel(number?.toString(), channel.name.takeIf { channel.icon != null },
+                    tag = "player-channel-${channel.id.value}-identity") {
+                    if (playbackIndicator != ChannelPlaybackIndicator.NONE) ChannelPlaybackMarker(playbackIndicator, size = 14.dp)
+                    if (recording) Icon(painterResource(R.drawable.ic_fiber_manual_record),
+                        contentDescription = stringResource(R.string.player_shelf_recording),
+                        tint = TvRecordingColor, modifier = Modifier.size(14.dp))
+                }
+                // Along the bottom edge; the focus outline stands outside it.
+                if (currentEvent != null) ProgressStrip(
+                    progress = ((nowSec - currentEvent.start.epochSeconds).toDouble() /
+                        (currentEvent.stop.epochSeconds - currentEvent.start.epochSeconds)).toFloat(),
+                    height = 3.dp,
+                    modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                        .testTag("player-channel-${channel.id.value}-progress"),
+                )
+            },
+            title = {},
+        )
+        // Both lines always, so every card's text block is as tall.
+        Column(Modifier.padding(horizontal = 2.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                currentEvent?.title ?: stringResource(R.string.no_epg),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 1f else 0.72f),
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("player-channel-${channel.id.value}-title"),
+            )
+            Text(
+                currentEvent?.subtitle?.takeIf { it.isNotBlank() }.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 0.88f else 0.6f),
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("player-channel-${channel.id.value}-subtitle"),
+            )
         }
     }
 }
@@ -274,7 +383,13 @@ private fun CompactZapCard(
     currentSession: CurrentSessionObservation?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    inPlace: Boolean = false,
+    held: Boolean = false,
 ) {
+    if (inPlace) {
+        InPlaceZapTile(channel, number, event, nowSec, playbackIndicator, recording, imageLoader, currentSession, onClick, modifier, held)
+        return
+    }
     val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
     // Preserve the kit's 54dp picon region; let the two text baselines grow with font scale.
     val cardHeight = with(LocalDensity.current) {
