@@ -918,6 +918,10 @@ class BackgroundPlaybackRuntimeTest {
         var forcedPlayerError: ExoPlaybackException? = null
         /** A video format the runtime reads from the player, for formats the fake stream never reports. */
         var forcedVideoFormat: androidx.media3.common.Format? = null
+        /** Actual player evidence can advance while a UI consumer deliberately lags it. */
+        var forcedPlaying: Boolean? = null
+        var forcedPlaybackState: Int? = null
+        var forcedTracks: androidx.media3.common.Tracks? = null
         /** Runs inside a live target install, before the session binds the channel. */
         var beforeLiveBinding: () -> Unit = {}
         private val runtimeSession = object : TvheadendSession by session {
@@ -929,6 +933,9 @@ class BackgroundPlaybackRuntimeTest {
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
             override fun getPlayerError(): ExoPlaybackException? = forcedPlayerError ?: player.playerError
             override fun getVideoFormat(): androidx.media3.common.Format? = forcedVideoFormat ?: player.videoFormat
+            override fun isPlaying(): Boolean = forcedPlaying ?: player.isPlaying
+            override fun getPlaybackState(): Int = forcedPlaybackState ?: player.playbackState
+            override fun getCurrentTracks(): androidx.media3.common.Tracks = forcedTracks ?: player.currentTracks
             override fun pause() {
                 player.pause()
                 afterPause()

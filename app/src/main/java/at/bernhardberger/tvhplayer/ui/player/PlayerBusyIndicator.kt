@@ -44,26 +44,32 @@ internal fun PlayerBusyIndicator(status: PlayerBusyStatus?, modifier: Modifier =
                 liveRegion = LiveRegionMode.Polite
             }
         }) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(44.dp).drawWithCache {
-                    val outline = 1.dp.toPx()
-                    val paint = Paint().apply { colorFilter = ColorFilter.tint(Color.Black.copy(alpha = 0.65f)) }
-                    onDrawWithContent {
-                        // Dilate only the moving arc, not its bounding circle: no disk or track
-                        // behind the ring, even on bright video. One indeterminate animation.
-                        drawContext.canvas.saveLayer(Rect(-outline, -outline, size.width + outline, size.height + outline), paint)
-                        translate(left = -outline) { this@onDrawWithContent.drawContent() }
-                        translate(left = outline) { this@onDrawWithContent.drawContent() }
-                        translate(top = -outline) { this@onDrawWithContent.drawContent() }
-                        translate(top = outline) { this@onDrawWithContent.drawContent() }
-                        drawContext.canvas.restore()
-                        drawContent()
-                    }
-                }.clearAndSetSemantics { },
-                color = Color.White,
-                trackColor = Color.Transparent,
-                strokeWidth = 3.dp,
-            )
+            PlayerBusyRing()
         }
     }
+}
+
+/** Shared visual only; visibility, timing and announcements remain caller-owned. */
+@Composable
+internal fun PlayerBusyRing(modifier: Modifier = Modifier) {
+    CircularProgressIndicator(
+        modifier = modifier.size(44.dp).drawWithCache {
+            val outline = 1.dp.toPx()
+            val paint = Paint().apply { colorFilter = ColorFilter.tint(Color.Black.copy(alpha = 0.65f)) }
+            onDrawWithContent {
+                // Dilate only the moving arc, not its bounding circle: no disk or track
+                // behind the ring, even on bright video. One indeterminate animation.
+                drawContext.canvas.saveLayer(Rect(-outline, -outline, size.width + outline, size.height + outline), paint)
+                translate(left = -outline) { this@onDrawWithContent.drawContent() }
+                translate(left = outline) { this@onDrawWithContent.drawContent() }
+                translate(top = -outline) { this@onDrawWithContent.drawContent() }
+                translate(top = outline) { this@onDrawWithContent.drawContent() }
+                drawContext.canvas.restore()
+                drawContent()
+            }
+        },
+        color = Color.White,
+        trackColor = Color.Transparent,
+        strokeWidth = 3.dp,
+    )
 }

@@ -127,23 +127,37 @@
     <string name="open_accessibility_settings">Open accessibility settings</string>
     <string name="appliance_accessibility_service_label">Tvheadend Player appliance entry</string>
     <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
-    <string name="appliance_starting_tv">Starting television…</string>
+    <string name="appliance_starting_tv">Starting playback</string>
     <string name="appliance_connection_recovering">Television is currently unavailable. Reconnecting automatically…</string>
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
     <!-- Startup status screen -->
-    <string name="main_startup_passive_title">Starting Tvheadend Player</string>
     <string name="main_startup_actionable_title">Action needed</string>
-    <string name="main_startup_message_preparing">Preparing Tvheadend Player…</string>
-    <string name="main_startup_message_connecting">Connecting to your Tvheadend server…</string>
-    <string name="main_startup_message_syncing_channels">Loading channel information…</string>
-    <string name="main_startup_message_waiting_for_current_channel_metadata">Preparing channel information…</string>
-    <string name="main_startup_message_reconnecting">Reconnecting to your Tvheadend server…</string>
-    <string name="main_startup_message_starting_television">Starting television…</string>
-    <string name="main_startup_message_no_channels">No channels are available for this account.</string>
-    <string name="main_startup_message_retryable_failure">Couldn’t connect to your Tvheadend server. Try again.</string>
+    <string name="main_startup_message_preparing">Preparing app</string>
+    <string name="main_startup_message_connecting">Connecting</string>
+    <string name="main_startup_message_syncing_metadata">Syncing channels and guide</string>
+    <string name="main_startup_message_waiting_for_current_channel_metadata">Preparing channels</string>
+    <string name="main_startup_message_reconnecting">Reconnecting</string>
+    <string name="main_startup_message_starting_television">Starting playback</string>
+    <string name="main_startup_message_resuming_playback">Resuming playback</string>
+    <string name="main_startup_title_no_channels">No channels available</string>
+    <string name="main_startup_message_no_channels">Check the channels and access permissions for this account, then try again.</string>
+    <string name="main_startup_title_retryable_failure">Can’t connect to Tvheadend</string>
+    <string name="main_startup_message_retryable_failure">Make sure the server is running and reachable, then try again.</string>
+    <string name="main_startup_title_authentication_failure">Sign-in failed</string>
+    <string name="main_startup_message_authentication_failure">Check your username and password in connection settings.</string>
+    <string name="main_startup_title_permission_denied">Access denied</string>
+    <string name="main_startup_message_permission_denied">Check this account’s access permissions in Tvheadend.</string>
+    <string name="main_startup_title_incompatible_server">Server not supported</string>
+    <string name="main_startup_message_incompatible_server">This server does not support the required connection. Check its version and connection settings.</string>
+    <string name="main_startup_title_timeout_failure">TV data took too long to load</string>
+    <string name="main_startup_message_timeout_failure">Try again. If loading keeps timing out, check your Tvheadend server.</string>
+    <string name="main_startup_title_synchronization_failure">Couldn’t load TV data</string>
+    <string name="main_startup_message_synchronization_failure">Try again, or check your connection settings if the problem continues.</string>
+    <string name="main_startup_title_configuration_required">Set up your connection</string>
     <string name="main_startup_message_configuration_required">Set up your Tvheadend server connection to load channels.</string>
-    <string name="main_startup_message_credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
+    <string name="main_startup_title_credential_unavailable">Saved sign-in unavailable</string>
+    <string name="main_startup_message_credential_unavailable">Open connection settings and enter your sign-in again.</string>
     <string name="main_startup_action_retry">Retry</string>
     <string name="main_startup_action_connection_settings">Connection settings</string>
 
@@ -527,7 +541,7 @@
     <string name="player_live">Live</string>
     <string name="player_behind">Behind live</string>
     <string name="player_state_paused">Paused</string>
-    <string name="player_buffering">Buffering…</string>
+    <string name="player_buffering">Buffering</string>
     <string name="player_tuning">Tuning</string>
     <string name="player_recording">Recording now</string>
     <string name="player_ad">Audio description</string>

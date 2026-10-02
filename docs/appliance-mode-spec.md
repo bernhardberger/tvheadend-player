@@ -127,8 +127,17 @@ fun adjacentChannelId(
   continue to resume the last successfully played channel, falling back to the
   first available current channel if the remembered channel is absent. Enabled
   startup autoplay takes precedence over retained cached browsing: keep the
-  startup presentation until current channel data is ready, including automatic
-  reconnect. Never expose cached browsing and then autoplay unexpectedly. Back
+  startup presentation through current-channel readiness and initial tuning,
+  including automatic reconnect. Compose only the exact entering live route under
+  the opaque cover, with chrome, focus and keys inactive. Complete the current
+  request only when its session/tune presents the first video frame, or positively
+  audio-only playback is playing; route existence or video Playing is insufficient.
+  Fade only the presentation layer over 200ms once presented, with no minimum
+  dwell or video remount. Already-playing matching warm targets are adopted without
+  retuning or another frame; reduced motion skips the fade. Failure/recovery,
+  Back and cancellation remove the blocking cover immediately, including during
+  reveal; later buffering never restores startup. Never expose cached browsing
+  and then autoplay unexpectedly. Back
   and explicit navigation cancel the one-shot request; profile replacement also
   cancels it, and later readiness cannot revive it. Channels uses one channel list with a persistent
   programme-details pane. The playback channel shelf uses a compact horizontal

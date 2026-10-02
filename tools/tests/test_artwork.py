@@ -83,7 +83,12 @@ class ArtworkTest(unittest.TestCase):
             ROOT
             / "app/src/main/java/at/bernhardberger/tvhplayer/ui/startup/MainStartupScreen.kt"
         ).read_text()
-        self.assertIn("painterResource(R.drawable.startup_brand_symbol)", startup)
+        self.assertIn("StartupBrandSymbol(", startup)
+        startup_animation = (
+            ROOT
+            / "app/src/main/java/at/bernhardberger/tvhplayer/ui/startup/StartupBrandSymbol.kt"
+        ).read_text()
+        self.assertIn("resources.getXml(R.drawable.startup_brand_symbol)", startup_animation)
         symbol = ElementTree.parse(ROOT / "artwork/tvheadend-player-symbol.svg")
         startup_symbol = ElementTree.parse(ROOT / "app/src/main/res/drawable/startup_brand_symbol.xml")
         android = "{http://schemas.android.com/apk/res/android}"

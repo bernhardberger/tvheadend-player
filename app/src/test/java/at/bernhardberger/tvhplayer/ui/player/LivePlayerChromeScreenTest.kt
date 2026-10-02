@@ -84,6 +84,13 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
+import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
+import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
+import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -93,12 +100,16 @@ import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.PlaybackTrace
+import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.AppRootPlaybackOrchestrator
+import at.bernhardberger.tvhplayer.ui.performMainStartupBack
+import at.bernhardberger.tvhplayer.ui.ChannelsKey
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import coil3.ImageLoader
@@ -192,6 +203,218 @@ class LivePlayerChromeScreenTest {
         compose.waitUntil(5_000) { idleMainLooper(); scope.coroutineContext[Job]!!.isCompleted }
     }
 
+    @Test fun startupPlayerTunesBehindCoverWithoutChromeFocusOrKeysAndWaitsForItsFrame() {
+        val allowed = mutableStateOf(false)
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(contentAllowed = { allowed.value }, startup = true, onStartupOutcome = { outcomes += it })
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(exists("player-root"))
+        assertFalse(exists("player-banner"))
+        assertEquals(emptyList<String>(), focused())
+        assertTrue("route alone is not presentation", outcomes.isEmpty())
+        key(Key.DirectionDown)
+        key(Key.ChannelUp)
+        key(Key.DirectionCenter)
+        assertEquals("covered keys cannot zap", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(exists("player-actions"))
+        playerReady()
+        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        settle()
+        assertTrue("Playing alone is not a video frame", outcomes.isEmpty())
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        settle()
+        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.PRESENTED) }
+        assertFalse(exists("player-banner"))
+        compose.runOnIdle { allowed.value = true }
+        settle()
+        key(Key.DirectionDown)
+        assertTrue("controls become reachable after reveal", exists("player-actions"))
+    }
+
+    @Test fun startupAudioOnlyPlayingHandsOffWithoutAVideoFrame() {
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
+        val audioOnly = Tracks(listOf(Tracks.Group(
+            TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).build()),
+            false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
+        )))
+        compose.runOnIdle {
+            forcedTracks = audioOnly
+            playerListeners.toList().forEach { it.onTracksChanged(audioOnly) }
+        }
+        playerReady()
+        settle()
+        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.PRESENTED) }
+        assertFalse(runtime.videoPresentation.value.visible)
+    }
+
+    @Test fun startupPlayerReportsItsExistingUnavailableOutcomeSoCoverCanRelease() {
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(failing = true, contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
+        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
+        assertFalse(exists("player-banner"))
+    }
+
+    @Test fun startupWarmEntryAdoptsPlayingMatchingTuneWithoutAnotherFrameOrRetune() {
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
+        playerReady()
+        settle()
+        compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        settle()
+        assertEquals(listOf(MainStartupPlaybackOutcome.PRESENTED), outcomes)
+        outcomes.clear()
+        val epoch = runtime.videoPresentation.value.epoch
+        assertTrue(runtime.videoPresentation.value.visible)
+        compose.runOnIdle { screenVisible.value = false }
+        settle()
+        compose.runOnIdle { screenVisible.value = true }
+        settle()
+        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.ALREADY_PLAYING) }
+        assertEquals("warm adoption does not install another tune", epoch, runtime.videoPresentation.value.epoch)
+        assertTrue("the already-presented frame is retained", runtime.videoPresentation.value.visible)
+    }
+
+    @Test fun aNewStartupRequestOnTheSameWarmRouteOwnsFreshIntentWithoutRetuning() {
+        val requestId = mutableStateOf(1L)
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(contentAllowed = { false }, startup = true, startupRequestId = { requestId.value },
+            onStartupOutcome = { outcomes += it })
+        playerReady()
+        settle()
+        compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
+        settle()
+        assertEquals(listOf(MainStartupPlaybackOutcome.PRESENTED), outcomes)
+        outcomes.clear()
+        val epoch = runtime.videoPresentation.value.epoch
+        assertTrue(outcomes.isEmpty())
+        compose.runOnIdle {
+            runtime.notePlaybackIntent() // The launch owner notes new intent before resolving this route.
+            requestId.value = 2L
+        }
+        settle()
+        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.ALREADY_PLAYING) }
+        assertEquals(epoch, runtime.videoPresentation.value.epoch)
+        assertTrue(runtime.videoPresentation.value.visible)
+    }
+
+    @Test fun cancellingCommittedStartupBeforeItsFrameStopsOnlyItsTuneAndDisarmsWarmReturn() {
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
+        playerReady()
+        settle()
+        assertTrue(outcomes.isEmpty())
+        val root = AppRootPlaybackOrchestrator().apply { activePlaybackChanged(ChannelId(1), null) }
+        val requests = ApplianceLaunchRequests().apply { request() }
+        val pending = requests.state.value as ApplianceLaunchState.Pending
+        requests.resolve(pending.request, CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1), name = "Name 1"))), ChannelId(1))
+        compose.runOnIdle {
+            performMainStartupBack(requests, requests.state.value) { destination ->
+                assertEquals(ChannelsKey, destination)
+                screenVisible.value = false
+            }
+            assertEquals(ApplianceLaunchState.Idle, requests.state.value)
+        }
+        settle()
+        compose.waitUntil(5_000) { idleMainLooper(); runtime.state.value is AppPlaybackState.Idle }
+        assertEquals(null, runtime.activeTarget.value)
+        assertFalse(player.playWhenReady)
+        root.activePlaybackChanged(null, null)
+        assertEquals(WarmReturnOpportunity(), root.warmReturn)
+        assertNotNull("cleanup is not the user's Stop intent", runtime.enterPlayerScreen())
+        assertTrue(outcomes.isEmpty())
+    }
+
+    @Test fun startupWarmAdoptionWithoutAPresentedFrameWaitsButCancellationPreservesTheWarmTune() {
+        val startup = mutableStateOf(false)
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(contentAllowed = { !startup.value }, startupEnabled = { startup.value }, onStartupOutcome = { outcomes += it })
+        playerReady()
+        settle()
+        val epoch = runtime.videoPresentation.value.epoch
+        compose.runOnIdle { screenVisible.value = false }
+        settle()
+        compose.runOnIdle { startup.value = true; screenVisible.value = true }
+        settle()
+        assertTrue("Playing without this tune's frame cannot dismiss startup", outcomes.isEmpty())
+        assertFalse(exists("player-banner"))
+        assertEquals(emptyList<String>(), focused())
+        assertEquals(epoch, runtime.videoPresentation.value.epoch)
+        compose.runOnIdle { screenVisible.value = false }
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertTrue(runtime.state.value is AppPlaybackState.Playing)
+        assertEquals("an adopted tune is not owned by cancelled startup", epoch, runtime.videoPresentation.value.epoch)
+    }
+
+    @Test fun ordinaryWarmReturnDoesNotRequireStartupSessionProofOrRetune() {
+        screen()
+        playerReady()
+        settle()
+        val epoch = runtime.videoPresentation.value.epoch
+        compose.runOnIdle { session.replaceGeneration(session.observation.value) }
+        settle()
+        val selection = requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))
+        assertEquals(null, runtime.liveTargetPresentation(selection))
+        compose.runOnIdle { screenVisible.value = false }
+        settle()
+        compose.runOnIdle { screenVisible.value = true }
+        settle()
+        key(Key.DirectionDown)
+        assertTrue(exists("player-actions"))
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals("ordinary adoption keeps its previous contract", epoch, runtime.videoPresentation.value.epoch)
+    }
+
+    @Test fun ordinaryUnresolvedChannelKeepsWaitingInsteadOfReportingStartupFailure() {
+        screen(missingRequestedChannel = true, settleOnEntry = false)
+        settle()
+        assertNotNull(session.observation.value.currentSession)
+        assertEquals(null, runtime.activeTarget.value)
+        assertFalse(exists("player-channel-unavailable"))
+        assertTrue(runtime.state.value is AppPlaybackState.Idle)
+    }
+
+    @Test fun successfulStartupWithoutAnOwnedReceiptReportsRecoveryInsteadOfWaitingForever() {
+        val startup = mutableStateOf(true)
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(settleOnEntry = false, contentAllowed = { !startup.value }, startupEnabled = { startup.value },
+            afterTargetPlay = {
+                // Supersede attribution at the committed tune, before the initial start returns.
+                runtime.notePlaybackIntent().also(runtime::notePlaybackIntentServed)
+            }, onStartupOutcome = { outcomes += it; startup.value = false })
+        settle()
+        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertTrue("existing recovery is actionable after startup releases", exists("player-channel-unavailable"))
+    }
+
+    @Test fun backgroundCancellationAtCommitBeforeReceiptRetiresTheUndeliveredStartupTune() {
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(settleOnEntry = false, contentAllowed = { false }, startup = true,
+            afterTargetPlay = { owner.lifecycle.currentState = Lifecycle.State.CREATED },
+            onStartupOutcome = { outcomes += it })
+        settle()
+        compose.waitUntil(5_000) { idleMainLooper(); runtime.state.value is AppPlaybackState.Idle }
+        assertEquals(null, runtime.activeTarget.value)
+        assertFalse(player.playWhenReady)
+        assertTrue(outcomes.isEmpty())
+        assertNotNull(runtime.enterPlayerScreen())
+    }
+
+    @Test fun rejectedStartupRecoveryCannotTransferItsUnpresentedTuneAfterOwnerCancellation() {
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        screen(contentAllowed = { false }, startup = true, acceptStartupOutcome = { false },
+            onStartupOutcome = { outcomes += it; screenVisible.value = false })
+        compose.runOnIdle { session.replaceGeneration(session.observation.value) }
+        settle()
+        assertEquals(listOf(MainStartupPlaybackOutcome.RECOVERY), outcomes)
+        compose.waitUntil(5_000) { idleMainLooper(); runtime.state.value is AppPlaybackState.Idle }
+        assertEquals(null, runtime.activeTarget.value)
+        assertFalse(player.playWhenReady)
+    }
+
     @Test fun playerEntersWithAPassiveBannerAndDownLandsOnTheControls() {
         screen()
         assertTrue("Banner on entry", exists("player-banner"))
@@ -277,7 +500,7 @@ class LivePlayerChromeScreenTest {
         }
         compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Buffering }
         settle()
-        assertEquals("a stall after a presented tune is not another tune", "Buffering…", description("player-busy-indicator"))
+        assertEquals("a stall after a presented tune is not another tune", "Buffering", description("player-busy-indicator"))
         val ring = compose.onNodeWithTag("player-busy-indicator", useUnmergedTree = true).fetchSemanticsNode()
         key(Key.DirectionDown)
         assertTrue(exists("player-actions"))
@@ -1104,11 +1327,12 @@ class LivePlayerChromeScreenTest {
         now: Long,
         events: List<EpgEvent>,
         recordings: List<DvrEntry> = emptyList(),
+        missingRequestedChannel: Boolean = false,
     ) =
         SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
-                (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) },
+                (if (missingRequestedChannel) 2..3L else 1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) },
             )),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = events)),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = recordings)),
@@ -1123,6 +1347,14 @@ class LivePlayerChromeScreenTest {
         recordingScheduled: Boolean = false,
         settingsData: DataStore<Preferences> = InMemoryData(),
         settleOnEntry: Boolean = true,
+        contentAllowed: () -> Boolean = { true },
+        startup: Boolean = false,
+        startupEnabled: () -> Boolean = { startup },
+        startupRequestId: () -> Long = { 1L },
+        missingRequestedChannel: Boolean = false,
+        afterTargetPlay: () -> Unit = {},
+        acceptStartupOutcome: () -> Boolean = { true },
+        onStartupOutcome: (MainStartupPlaybackOutcome) -> Unit = {},
     ) {
         val now = System.currentTimeMillis() / 1_000L
         session = FakeTvheadendSession(observation(now, if (!epg) emptyList() else listOf(
@@ -1131,7 +1363,7 @@ class LivePlayerChromeScreenTest {
             EpgEvent.create(EventId(12L), ChannelId(1L), Instant.fromEpochSeconds(now + 3_600L),
                 Instant.fromEpochSeconds(now + 7_200L), title = "Later"),
         ), recordings = if (recordingScheduled) listOf(DvrEntry.create(DvrEntryId(1L), eventId = EventId(11L)))
-            else emptyList())).apply {
+            else emptyList(), missingRequestedChannel = missingRequestedChannel)).apply {
             // The subscription never becomes playable: the channel stays tuning, as on a slow tune.
             // Failing: the scripted stream cannot be decoded, so the channel becomes unavailable.
             if (opener != null) scriptLivePlaybackSuccess(opener)
@@ -1144,7 +1376,7 @@ class LivePlayerChromeScreenTest {
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()))
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.channels.value.size == 3 }
+        compose.waitUntil(10_000) { channels.channels.value.size == if (missingRequestedChannel) 2 else 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val base = player
@@ -1154,6 +1386,10 @@ class LivePlayerChromeScreenTest {
             override fun getCurrentTracks(): Tracks = forcedTracks ?: base.currentTracks
             override fun getVideoFormat(): Format? = forcedVideoFormat ?: base.videoFormat
             override fun getAudioFormat(): Format? = forcedAudioFormat ?: base.audioFormat
+            override fun play() {
+                base.play()
+                afterTargetPlay()
+            }
             override fun addListener(listener: Player.Listener) {
                 playerListeners += listener
                 base.addListener(listener)
@@ -1180,7 +1416,10 @@ class LivePlayerChromeScreenTest {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
-                            channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime)
+                            channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
+                            contentAllowed = contentAllowed(),
+                            startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
+                            onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                     }
                 }
             }

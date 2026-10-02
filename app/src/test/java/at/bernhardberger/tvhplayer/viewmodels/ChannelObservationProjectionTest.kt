@@ -148,37 +148,54 @@ class ChannelObservationProjectionTest {
         val model = AppConnectionViewModel(session, owner)
         models.put("connection", model)
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Ready(catalog.channels), model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Ready(catalog.channels), model.uiState.value.currentChannelReadiness)
 
         publishUnrelatedMetadata(session) {
             runCurrent()
-            assertEquals(CurrentChannelReadiness.Ready(catalog.channels), model.currentChannelReadiness.value)
+            assertEquals(CurrentChannelReadiness.Ready(catalog.channels), model.uiState.value.currentChannelReadiness)
         }
 
         session.publish(observation(ChannelRepositoryState.Current(catalog), SessionState.Disconnected))
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Waiting, model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Waiting, model.uiState.value.currentChannelReadiness)
         session.publish(observation(ChannelRepositoryState.Current(catalog)))
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Ready(catalog.channels), model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Ready(catalog.channels), model.uiState.value.currentChannelReadiness)
 
         session.publish(observation(ChannelRepositoryState.Stale(catalog), SessionState.Disconnected))
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Browsable(catalog.channels), model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Browsable(catalog.channels), model.uiState.value.currentChannelReadiness)
         session.publish(observation(ChannelRepositoryState.Synchronizing(catalog)))
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Browsable(catalog.channels), model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Browsable(catalog.channels), model.uiState.value.currentChannelReadiness)
 
         val replacement = ChannelCatalog.create(channels = listOf(seven))
         session.publish(observation(ChannelRepositoryState.Current(replacement)))
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Ready(listOf(seven)), model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Ready(listOf(seven)), model.uiState.value.currentChannelReadiness)
         session.publish(observation(ChannelRepositoryState.Empty))
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Waiting, model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Waiting, model.uiState.value.currentChannelReadiness)
         session.publish(observation(ChannelRepositoryState.Current(ChannelCatalog.create())))
         runCurrent()
-        assertEquals(CurrentChannelReadiness.Ready(emptyList()), model.currentChannelReadiness.value)
+        assertEquals(CurrentChannelReadiness.Ready(emptyList()), model.uiState.value.currentChannelReadiness)
+
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Synchronizing,
+            channelState = ChannelRepositoryState.Synchronizing(catalog),
+        ))
+        runCurrent()
+        assertEquals(CurrentChannelReadiness.Browsable(catalog.channels), model.uiState.value.currentChannelReadiness)
+        session.publish(observation(ChannelRepositoryState.Stale(catalog), SessionState.Connecting))
+        runCurrent()
+        assertEquals(CurrentChannelReadiness.Browsable(catalog.channels), model.uiState.value.currentChannelReadiness)
+        // An owner replacement withdraws the retained catalog atomically.
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Connecting,
+            channelState = ChannelRepositoryState.Empty,
+        ))
+        runCurrent()
+        assertEquals(CurrentChannelReadiness.Waiting, model.uiState.value.currentChannelReadiness)
     }
 
     // These are propagation checks, not invocation counts: stateIn also conflates equal outputs.

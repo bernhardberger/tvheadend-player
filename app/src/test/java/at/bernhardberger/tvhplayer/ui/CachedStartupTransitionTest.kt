@@ -9,6 +9,8 @@ import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
+import at.bernhardberger.tvhplayer.core.MainStartupLoadingFeedback
+import at.bernhardberger.tvhplayer.core.mainStartupLoadingFeedback
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.core.StartupBootstrapCoordinator
 import at.bernhardberger.tvhplayer.core.mainStartupPresentation
@@ -36,8 +38,11 @@ class CachedStartupTransitionTest {
         val channels = listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2)))
         for (connection in listOf(ConnectionUiState.SyncingChannels, ConnectionUiState.Reconnecting)) {
             val cached = CurrentChannelReadiness.Browsable(channels)
-            assertTrue(mainStartupPresentation(bootstrap.state.value, requests.state.value, connection, cached)
-                is MainStartupPresentation.Passive)
+            val presentation = mainStartupPresentation(bootstrap.state.value, requests.state.value, connection, cached)
+                as MainStartupPresentation.Passive
+            assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(presentation, 399L))
+            assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(presentation, 400L))
+            assertEquals(MainStartupLoadingFeedback.WAITING, mainStartupLoadingFeedback(presentation, 2_000L))
             assertNull(requests.resolve(pending.request, cached, ChannelId(2)))
         }
         val current = CurrentChannelReadiness.Ready(channels)
@@ -45,6 +50,17 @@ class CachedStartupTransitionTest {
             mainStartupPresentation(bootstrap.state.value, requests.state.value, ConnectionUiState.Ready, current))
         assertEquals(ChannelId(2), requests.resolve(pending.request, current, ChannelId(2))?.channelId)
         assertNull(requests.resolve(pending.request, current, ChannelId(2)))
+    }
+
+    @Test
+    fun usableCachedBrowseWithNoLaunchRequestNeverAddsLoadingDwell() {
+        val startup = MainStartupState.Ready(ServerSettings(), autoStartPlayback = false)
+        val retained = CurrentChannelReadiness.Browsable(listOf(Channel.create(ChannelId(1))))
+        for (connection in listOf(ConnectionUiState.Connecting, ConnectionUiState.SyncingChannels, ConnectionUiState.Reconnecting)) {
+            val presentation = mainStartupPresentation(startup, ApplianceLaunchState.Idle, connection, retained)
+            assertEquals(MainStartupPresentation.Inactive, presentation)
+            assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(presentation, 0L))
+        }
     }
 
     @Test

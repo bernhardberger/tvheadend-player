@@ -145,13 +145,17 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -355,6 +359,9 @@ fun VideoPlayerScreen(
     onReconnect: () -> Unit,
     onClose: () -> Unit,
     playbackRuntime: at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime = koinInject(),
+    contentAllowed: Boolean = true,
+    startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
+    onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -481,6 +488,15 @@ fun VideoPlayerScreen(
         requestedSelection = requestedLiveSelection,
     )
     var initialPlaybackResolved by remember { mutableStateOf(false) }
+    var initialPlaybackSelection by remember { mutableStateOf<LivePlaybackSelection?>(null) }
+    var initialPlaybackEpoch by remember { mutableStateOf<Long?>(null) }
+    var initialPlaybackIntent by remember { mutableStateOf<Long?>(null) }
+    var initialPlaybackToken by remember { mutableLongStateOf(-1L) }
+    var initialStartupTarget by remember { mutableStateOf<at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget?>(null) }
+    var admittedStartupTarget by remember { mutableStateOf(startupTarget) }
+    var initialPlaybackAdopted by remember { mutableStateOf(false) }
+    var startupOutcomeDelivered by remember { mutableStateOf(false) }
+    var adoptedPlaying by remember { mutableStateOf(false) }
     // The viewing intent of the selection the next live start plays (entry, then each tune).
     var liveIntent by remember { mutableStateOf(screenEntry) }
     // The request token a key's own tune owns (started at once, or settling after a CH+/-
@@ -622,33 +638,81 @@ fun VideoPlayerScreen(
         onDispose { liveIntent?.let(playbackRuntime::abandonLiveSelection) }
     }
 
+    suspend fun retireCancelledStartup(selection: LivePlaybackSelection, intent: Long, epoch: Long? = null) {
+        // Cleanup must finish after this route/effect is removed; the runtime serializes and fences it.
+        withContext(NonCancellable) {
+            val installedEpoch = epoch ?: playbackRuntime.installedLiveTargetEpoch(selection, intent)
+            if (installedEpoch != null) playbackRuntime.stopAfterLoss(selection, installedEpoch, intent)
+        }
+    }
+
+    LaunchedEffect(startupTarget) {
+        val target = startupTarget ?: return@LaunchedEffect
+        try {
+            awaitCancellation()
+        } finally {
+            val selection = initialPlaybackSelection
+            val intent = initialPlaybackIntent
+            if (initialStartupTarget == target && !initialPlaybackAdopted && !startupOutcomeDelivered &&
+                selection != null && intent != null
+            ) retireCancelledStartup(selection, intent, initialPlaybackEpoch)
+        }
+    }
+
     /** Starts [requestToken]'s selection; a newer request supersedes its outcome. */
     suspend fun runLiveStart(
         playbackSelection: LivePlaybackSelection,
         requestToken: Long,
         requestIntent: Long?,
     ) {
-        startInitialLivePlayback(
-            startPlayback = {
-                profileTrace("P49:zap:tune-start:token:$requestToken") { }
-                videoPlayerViewModel.playChannel(playbackSelection, requestIntent)
-            },
-            isCurrent = { requestToken == liveRequestToken },
-            onRejected = {
-                requestedChannelFailed = true
-                lastPlayedChannelId = null
-                videoPlayerViewModel.stopAfterLoss()
-            },
-            onResolved = { result ->
-                initialPlaybackResolved = true
-                if (result?.isStarted == true) {
-                    lastPlayedChannelId = currentChannelId
-                    requestedChannelFailed = false
-                }
-                requestedLiveSelection = null
-            },
-            withdrawn = { requestIntent != null && playbackRuntime.isPlaybackIntentStopped(requestIntent) },
-        )
+        val startupOwner = startupTarget
+        if (startupOwner != null) {
+            initialPlaybackSelection = playbackSelection
+            initialPlaybackIntent = requestIntent
+            initialPlaybackEpoch = null
+            initialPlaybackToken = requestToken
+            initialStartupTarget = startupOwner
+            initialPlaybackAdopted = false
+            startupOutcomeDelivered = false
+        }
+        try {
+            startInitialLivePlayback(
+                startPlayback = {
+                    profileTrace("P49:zap:tune-start:token:$requestToken") { }
+                    videoPlayerViewModel.playChannel(playbackSelection, requestIntent)
+                },
+                isCurrent = { requestToken == liveRequestToken },
+                onRejected = {
+                    requestedChannelFailed = true
+                    lastPlayedChannelId = null
+                    videoPlayerViewModel.stopAfterLoss()
+                },
+                onResolved = { result ->
+                    initialPlaybackResolved = true
+                    if (result?.isStarted == true) {
+                        lastPlayedChannelId = currentChannelId
+                        requestedChannelFailed = false
+                        initialPlaybackSelection = playbackSelection
+                        initialPlaybackIntent = requestIntent
+                        initialPlaybackEpoch = requestIntent?.let { playbackRuntime.installedLiveTargetEpoch(playbackSelection, it) }
+                        initialPlaybackToken = requestToken
+                        initialStartupTarget = startupOwner
+                        initialPlaybackAdopted = false
+                        adoptedPlaying = false
+                        if (startupOwner != null && (initialPlaybackEpoch == null ||
+                                playbackRuntime.liveTargetPresentation(playbackSelection, requestIntent) == null)
+                        ) requestedChannelFailed = true
+                    }
+                    requestedLiveSelection = null
+                },
+                withdrawn = { requestIntent != null && playbackRuntime.isPlaybackIntentStopped(requestIntent) },
+            )
+        } finally {
+            // A commit can precede cancellation before onResolved obtains its receipt.
+            if (startupOwner != null && !kotlinx.coroutines.currentCoroutineContext().isActive && requestIntent != null) {
+                retireCancelledStartup(playbackSelection, requestIntent)
+            }
+        }
     }
 
     LaunchedEffect(
@@ -659,12 +723,20 @@ fun VideoPlayerScreen(
         requestedLiveSelection,
         liveRequestToken,
         directLiveToken,
+        startupTarget,
     ) {
         if (screenEntry == null) return@LaunchedEffect
         // ON_STOP cancelled the outstanding start; the next ON_START restarts it here.
         if (!screenActive) return@LaunchedEffect
+        if (startupTarget != null && admittedStartupTarget != startupTarget) {
+            // A new launch can reuse this exact route; its adoption owns fresh viewing intent.
+            liveIntent = playbackRuntime.notePlaybackIntent()
+            admittedStartupTarget = startupTarget
+        }
 
-        if (lastPlayedChannelId == currentChannelId) return@LaunchedEffect
+        if (lastPlayedChannelId == currentChannelId &&
+            (startupTarget == null || initialStartupTarget == startupTarget)
+        ) return@LaunchedEffect
         if (directLiveToken == liveRequestToken) {
             if (pendingZap.value != null || directLiveSelection == authorizedLiveSelection) return@LaunchedEffect
             // The session changed under the key's start: this effect restarts it.
@@ -672,16 +744,27 @@ fun VideoPlayerScreen(
             directLiveToken = NO_DIRECT_LIVE_TOKEN
             return@LaunchedEffect
         }
+        val adoptionPresentation = if (startupTarget != null) {
+            authorizedLiveSelection?.let(playbackRuntime::liveTargetPresentation)
+        } else null
         if (
-            playingLiveChannelId == currentChannelId &&
-            playbackState !is AppPlaybackState.Idle &&
-            playbackState !is AppPlaybackState.Failed
+            if (startupTarget != null) adoptionPresentation != null else
+                playingLiveChannelId == currentChannelId &&
+                    playbackState !is AppPlaybackState.Idle && playbackState !is AppPlaybackState.Failed
         ) {
             lastPlayedChannelId = currentChannelId
             requestedLiveSelection = null
             initialPlaybackResolved = true
             // A warm entry adopted the playing channel: it serves this screen's intent.
             liveIntent?.let(playbackRuntime::notePlaybackIntentServed)
+            initialPlaybackSelection = authorizedLiveSelection
+            initialPlaybackIntent = liveIntent
+            initialPlaybackEpoch = adoptionPresentation?.epoch
+            initialPlaybackToken = liveRequestToken
+            initialStartupTarget = startupTarget
+            initialPlaybackAdopted = true
+            startupOutcomeDelivered = false
+            adoptedPlaying = adoptionPresentation?.let { it.playing && (it.visible || it.audioOnly) } == true
             return@LaunchedEffect
         }
 
@@ -689,7 +772,10 @@ fun VideoPlayerScreen(
             return@LaunchedEffect
         }
         if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
-        val playbackSelection = authorizedLiveSelection ?: return@LaunchedEffect
+        val playbackSelection = authorizedLiveSelection ?: run {
+            if (startupTarget != null && currentSession != null) requestedChannelFailed = true
+            return@LaunchedEffect
+        }
         // This start supersedes a key's running one and is superseded by the next key's.
         val superseded = directStart.value
         directStart.value = coroutineContext.job
@@ -1077,9 +1163,30 @@ fun VideoPlayerScreen(
     SideEffect {
         layerState.chrome.updateAutoHideEligibility(autoHideEligible)
     }
-    PlayerRootFocusEffect(foregroundLayer, rootFocus)
     val chromeState = playerStateCell(paused = livePaused)
     val glanceTracks = trackGlance(rememberPlayerTracks(player))
+    val initialPresentation = if (startupTarget == null) null else initialPlaybackSelection?.let {
+        playbackRuntime.liveTargetPresentation(it, liveIntent)
+    }
+    val startupOutcome = at.bernhardberger.tvhplayer.core.mainStartupPlaybackOutcome(
+        expectedEpoch = initialPlaybackEpoch.takeIf {
+            initialPlaybackToken == liveRequestToken && initialStartupTarget == startupTarget
+        },
+        presentation = initialPresentation,
+        recovery = requestedChannelFailed || currentSubscriptionFailure != null ||
+            (initialPlaybackSelection != null && currentSession !== initialPlaybackSelection?.currentSession) ||
+            currentLiveInterrupted || recoveryVisible || channelUnavailable ||
+            playbackState is AppPlaybackState.Recovering || playbackState is AppPlaybackState.Failed,
+        adoptedPlaying = adoptedPlaying,
+    )
+    val latestStartupOutcome by rememberUpdatedState(onStartupOutcome)
+    LaunchedEffect(startupTarget, startupOutcome) {
+        val target = startupTarget ?: return@LaunchedEffect
+        if (target.matchesPlayer(currentChannelId, channelName) && startupOutcome != null) {
+            // Only the current owner can hand recovery to this player; a stale callback cannot.
+            startupOutcomeDelivered = latestStartupOutcome(target, startupOutcome)
+        }
+    }
     // The Banner stays while tuning and hides after the first frame of this tune; only a
     // service whose tracks are positively audio-only lets its playing state stand in.
     val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
@@ -1227,6 +1334,10 @@ fun VideoPlayerScreen(
             }
         }
     }
+
+    // Playback/recovery effects above stay mounted. No chrome, focus or key target exists under startup.
+    if (!contentAllowed) return
+    PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     val handlePlaybackBack: () -> Unit = {
         when (

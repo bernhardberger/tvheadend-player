@@ -15,6 +15,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
+import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
@@ -39,9 +41,10 @@ internal fun StartupGatedChannelsContent(
 @Composable
 internal fun StartupGatedPlayerContent(
     contentAllowed: Boolean,
+    enteringPlayer: Boolean = false,
     playerContent: @Composable () -> Unit,
 ) {
-    if (contentAllowed) playerContent()
+    if (contentAllowed || enteringPlayer) playerContent()
 }
 
 @Composable
@@ -165,14 +168,22 @@ internal fun LivePlayerRouteContent(
     channelName: String,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
+    startupTarget: ApplianceLaunchTarget? = null,
+    onStartupOutcome: (ApplianceLaunchTarget, MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
 ) {
-    StartupGatedPlayerContent(contentAllowed = contentAllowed) {
+    StartupGatedPlayerContent(
+        contentAllowed = contentAllowed,
+        enteringPlayer = startupTarget?.matchesPlayer(channelId, channelName) == true,
+    ) {
         VideoPlayerScreen(
             channelsVm = channelsVm,
             channelId = channelId,
             channelName = channelName,
             onReconnect = onReconnect,
             onClose = onClose,
+            contentAllowed = contentAllowed,
+            startupTarget = startupTarget,
+            onStartupOutcome = onStartupOutcome,
         )
     }
 }

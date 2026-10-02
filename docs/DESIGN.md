@@ -65,6 +65,107 @@ Meaning of colour:
 Typography is the TV Material scale with Roboto; no custom scale. Logos are
 drawn artwork and do not follow font scale.
 
+### Startup
+
+**Scope (2026-10-02):** app launch, returning to the app and the handoff to
+usable content. Destination-level loading is separate, deferred design work.
+Channels is the current non-autoplay landing destination, not a permanent
+assumption of the startup experience; a future Home destination remains an
+option rather than an approved routing change.
+
+Startup branding uses a silent, calmer 1850ms adaptation of the selected
+hybrid-synced choreography (accepted 2026-10-01). Keep the 80dp symbol, 14dp gap and
+28sp/36sp Outfit 550 wordmark (not font-scaled). On the 960×540dp reference
+canvas, the passive symbol starts at y=156dp, independent of feedback.
+Under the content, one original creative cyan/orange diagonal light-sweep frame
+is graded to light-only values above `#0F1014`, with feathered edges so it cannot
+darken the field or reveal a rectangular rim. The light fades in gently, drifts
+diagonally, then settles at 16% opacity for the remaining startup wait without
+looping or further drift. It fades out with the startup layer at first picture.
+Recovery and reduced motion retain the exact flat field. The shared-clock choreography,
+asset recipe and provenance are recorded in
+[`artwork/README.md`](../artwork/README.md#startup-artwork).
+Motion belongs only to the first non-restored foreground Activity opportunity
+in a process, when a real startup wait continues past the 400ms request-owned grace.
+Connection stage and retained disk cache do not decide admission: Connecting,
+local preparation and cached cold entry can all animate while a wait remains.
+A terminated intro cannot later start assembly.
+This is never an extra screen or delay. The native splash remains static, with a maximum 1000ms
+local-bootstrap hold. Android owns its splash removal; Activity entrance-animation
+completion enables the intro once resumed/focused;
+static entry uses fully opaque logo/wordmark and an immediately held glow once
+its image is prepared, without an app-owned arrival fade.
+The pending opening frame uses the final branded layout, never a spinner-only
+intermediate layout or a settled-to-opening rewind.
+It skips entirely if no wait remains. Disabled motion means static branding.
+Startup does not play audio or
+request audio focus.
+Presented content, recovery, navigation, background or window-focus loss ends it;
+warm resume, recreation, later Activities, reconnect and retry never replay it.
+A return waiting for existing playback uses the stable ring and status over the
+same settled 16% ambient glow, without logo or sweep replay. The glow appears with
+visible waiting feedback; the hidden grace period remains flat. Recovery focus, Back and key
+consumption keep their existing contracts.
+
+Startup is one compact centered title card on the native-splash field
+`#0F1014`, within 48dp horizontal/32dp vertical safe bounds. No footer or
+dashboard. Branded waiting preserves the accepted symbol/wordmark composition,
+with a larger 44dp circular indicator, 3dp stroke and theme-primary colour 32dp
+below the wordmark, then 16dp to centered native TV titleMedium status (max
+560dp, two lines). On the reference canvas its centre is (480,340dp). A brand-free
+playback return keeps the player's white 44dp ring at (480,270dp); aligning that
+return must not move the branded startup composition. There is no linear bar,
+counter line or visual promotion. Recovery may
+move the lockup up to fit: typed TV titleLarge 22/28 problem, short bodyLarge
+16/24 guidance, then 32dp to the existing TV Retry/Outlined Settings actions,
+16dp apart. Credential/configuration guidance is not generic network advice;
+action policy, focus restoration, directional boundaries and Back are unchanged.
+
+Status follows the connection stage, not each interleaved metadata domain or
+record update. Hide spinner and status for the first 400ms of any blocking wait.
+Feedback is independent of the assembly clock, including static/no-intro and
+reduced-motion entry. Readiness,
+recovery and Back are never deferred; retain the same visible indicator through
+connecting, synchronization and tuning.
+One launch request owns the real uptime clock across bootstrap, phase, automatic
+reconnection and metadata changes; a server reconnect does not hide already-visible
+feedback. Recovery, request replacement, navigation and Back retire the clock;
+an explicit retry starts a fresh grace period. This UI timer uses no SDK progress
+counters or session identity; playback readiness keeps its separate session/tune fences.
+Reduced motion uses settled branding and truthful status on the same
+deadline, with no frozen spinner. Announce stage changes politely, not individual
+metadata changes. Do not invent a percentage, record ceiling or ETA.
+Relevant loading labels have no ellipsis: Preparing app, Connecting, Syncing
+channels and guide, Preparing channels, Starting playback for initial autoplay,
+Reconnecting, Tuning and Buffering. Resuming playback requires an existing service
+captured at request entry; a fresh tune is not a resume.
+
+Cached browse may enter without dwell under existing rules, but only current
+authoritative channels authorize autoplay. For initial autoplay, mount only the
+exact entering live route and persistent video surface under the opaque title
+card; its chrome, focus and keys remain inactive. Route existence or video Playing
+alone does not release startup. The current request/session/tune must present its
+first video frame, or positively audio-only playback must be playing. Then fade
+only the opaque presentation layer over 200ms, with no extra hold or surface
+remount. Retain the outgoing message, feedback/branding visibility and exact
+assembly frame; dismissal does not introduce text, reveal hidden feedback or
+complete assembly. A visible indeterminate ring may keep rotating. Reduced motion
+skips the fade. An already-playing matching warm target
+is adopted without retuning, another frame or startup fade. Recovery, failure,
+cancellation and Back release the blocking layer immediately. Later buffering
+never reintroduces startup.
+
+#### Deferred destination-loading direction
+
+Revisit Channels loading with its unfinished layout, and apply the same principles
+to whichever destination eventually receives the startup handoff. Evaluate
+layout-matched skeletons or equivalent placeholders once that layout is settled;
+the placeholder design is not decided here. Show usable cached content while
+refreshing, keep available navigation and recovery accessible, and preserve stable
+layout and D-pad focus as content arrives. Distinguish browsable cached data from
+content that can currently be activated. This follow-up does not extend the
+branded startup wait or change internal screen loading in the present work.
+
 ## 3. Components and indication
 
 Focus, pressed, selected and disabled indication come from the TV Material

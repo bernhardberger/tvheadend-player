@@ -89,12 +89,68 @@ all representing 160×90dp. Family/contextual lockups have 960×300 and 1920×60
 PNGs; the symbol has 512×512 and 1024×1024 PNGs. Each also has a portable SVG.
 The 1280×640 social preview is a prepared asset, not an upload.
 
-The existing app-owned startup surface uses the original symbol tightly framed
-at 96dp above a single-line Outfit 550 wordmark at 32sp/40sp line height. Its
-16dp symbol/name gap, 32dp status gap and 24dp indicator/action gap preserve the
-accepted hierarchy. Status, circular progress and recovery actions retain their
-existing behavior. The native system splash remains symbol-only with its
-original adaptive safe zone; no extra intro or delay is added.
+## Startup artwork
+
+The silent **1850ms hybrid-synced adaptation** uses native Canvas paths and a
+single background image. The final ring/play reuse the canonical generated
+Android artwork; traces retain unclipped overflow. Layout, lifecycle, loading,
+recovery and readiness behavior are owned by
+[`docs/DESIGN.md`](../docs/DESIGN.md#startup).
+
+The timeline has a quiet opening, slower assembly and a 370ms settled hold
+after the play finishes at 1480ms, but never delays readiness. Traces fade in
+250–450ms and extend 250–880ms (cubic-out); bands fill 460–970ms (smoothstep),
+gaps converge 700–1120ms (cubic-out), ring fills 970–1240ms (smoothstep), trace
+stroke retires 1030–1270ms (smoothstep), play appears 1000–1330ms (smoothstep),
+and play scale 1.1→1 / dy −6→0 settle 1000–1480ms (cubic-out). Wordmark appears
+400–940ms (cubic-out), retaining the 2dp rise. No sound asset is packaged.
+Assembly is admitted for a continuing startup wait after the real 400ms grace
+at the first non-restored process-entry opportunity, regardless of connection
+stage or retained disk cache. The pending opening frame already occupies the final
+branded layout; an existing-player return stays spinner-only and never replays it.
+Feedback has no 1200–1400ms brand-clock delay. At readiness the outgoing
+visual frame freezes for dismissal, without completing unfinished assembly.
+On 960×540dp the 80dp symbol starts at y=156dp, followed by a 14dp gap and unscaled
+28sp/36sp Outfit 550 wordmark.
+The theme-primary busy ring is 44dp/stroke3dp, 32dp below the wordmark at
+(480,340); native TV status begins 16dp below the ring. Brand-free playback returns
+keep their separate player-centred indicator without moving this composition.
+Once return feedback is visible, it uses the same settled 16% glow at the final
+drift position, independent of the brand clock; it does not replay the sweep.
+Ring placement does not depend on status text or font scale.
+
+The original background-only plate supplies one light-only graded frame beneath
+startup content, not a second video decoder. Source in the creative-assets project
+(batch-relative path, original GPL provenance):
+`batches/grok-broadcast-20260911T004615Z/startup-motion/production-a/plates/background-only.mp4`.
+Source SHA256: `c131ab2730873fe3aa0fa625803a0e72abc8b0b8efe12af7ac36cc694792188b`.
+Recipe: FFmpeg `-ss 0.1 -frames:v 1 -vf scale=960:540:flags=lanczos` extracts
+the original frame. In RGB float, let `field=(15,16,20)` and
+`light=max(source-field,0)` per channel. Let `d` be the minimum pixel distance
+to the four edges, `t=clamp(d/(540*0.08),0,1)` and feather `t*t*(3-2*t)`.
+Encode `round(field+light*feather)` as lossless Pillow WebP
+(`lossless=True, method=6`). Every channel stays at or above the flat field,
+removing the dark rim without brightening gain or inventing a new sweep. The density-independent
+resource is `app/src/main/res/drawable-nodpi/startup_background_plate.webp`:
+960×540 pixels, 79,650 compressed bytes and 2,073,600 decoded ARGB8888 bytes
+(1.98MiB; below 2MiB).
+Resource SHA256: `ddf49691ce5612c1e148a823623af0b666c35194b671d784a9c7356d940e81a3`.
+One asynchronous decode prepares the image; draw reads use the same `brandMillis`
+as the logo/wordmark, outside safe content padding. Opacity is zero through
+120ms, smoothsteps to 0.5 at 950ms, then to 0.16 at 1850ms and holds there;
+on animated entry a decoded image fades in over 200ms independently of the brand
+clock, including when preparation completes after that clock has stopped. Static
+entry displays the held 0.16 glow immediately when prepared, without an arrival fade. Center
+crop uses 1.12× cover scale and diagonal travel of 4% screen width over
+100–1850ms. No new dwell is introduced. Once motion settles, including static
+entry, the glow stays at its final position for the remaining passive wait and
+leaves with the startup layer on readiness or cancellation.
+Recovery and reduced motion remain exactly `#0F1014`.
+
+Source choreography/provenance in creative batch `grok-broadcast-20260911T004615Z`:
+`startup-motion/hybrid-synced/{HANDOFF.md,timings.json,build_hybrid_synced.py}`;
+segment geometry: `startup-motion/soft-tv-finalists/build_soft_tv_finalists.py`.
+Physical-TV motion acceptance remains a separate gate.
 
 ## Font provenance
 

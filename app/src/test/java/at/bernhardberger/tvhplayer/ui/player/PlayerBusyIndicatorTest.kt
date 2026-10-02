@@ -115,7 +115,7 @@ class PlayerBusyIndicatorTest {
         for (reason in listOf(PlayerBusyStatus.TUNING, PlayerBusyStatus.BUFFERING, PlayerBusyStatus.BUFFERING)) {
             compose.runOnIdle { status = reason }
             settle()
-            val description = if (reason == PlayerBusyStatus.TUNING) "Tuning" else "Buffering…"
+            val description = if (reason == PlayerBusyStatus.TUNING) "Tuning" else "Buffering"
             val id = ring().fetchSemanticsNode().id
             repeat(3) {
                 compose.runOnIdle { tick++ }

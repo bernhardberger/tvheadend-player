@@ -184,6 +184,14 @@ data class AppVideoPresentation(
     val visible: Boolean = false,
 )
 
+/** One installed live target's presentation evidence, read together under the target access lock. */
+data class AppLiveTargetPresentation(
+    val epoch: Long,
+    val visible: Boolean,
+    val playing: Boolean,
+    val audioOnly: Boolean,
+)
+
 internal fun AppVideoPresentation.beginTarget(epoch: Long) =
     AppVideoPresentation(epoch = epoch)
 

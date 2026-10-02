@@ -18,10 +18,15 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** Connection and channel readiness come from one atomic SDK observation. */
+data class AppConnectionPresentation(
+    val connection: ConnectionUiState = ConnectionUiState.Connecting,
+    val currentChannelReadiness: CurrentChannelReadiness = CurrentChannelReadiness.Waiting,
+)
 
 class AppConnectionViewModel(
     private val session: TvheadendSession,
@@ -30,32 +35,24 @@ class AppConnectionViewModel(
     val connectionState: StateFlow<ConnectionState> = session.observation
         .map { it.sessionState.toConnectionState() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, ConnectionState.Disconnected)
-    val uiState: StateFlow<ConnectionUiState> = combine(
+    val uiState: StateFlow<AppConnectionPresentation> = combine(
         profileOwner.serverProfile,
         session.observation,
     ) { profile, observation ->
-        when (profile) {
-            null -> ConnectionUiState.Connecting
-            ServerProfileReadResult.Missing -> ConnectionUiState.NeedsConfiguration
-            ServerProfileReadResult.Unavailable -> ConnectionUiState.CredentialUnavailable
-            is ServerProfileReadResult.Available -> observation.sessionState.toConnectionUiState()
-        }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, ConnectionUiState.Connecting)
-
-    val currentChannelReadiness: StateFlow<CurrentChannelReadiness> = session.observation.map {
-            observation ->
-        Triple(
-            observation.sessionState is SessionState.Ready,
-            observation.channelCatalogAuthority,
-            observation.channelCatalogForDisplay?.channels.orEmpty(),
+        AppConnectionPresentation(
+            connection = when (profile) {
+                null -> ConnectionUiState.Connecting
+                ServerProfileReadResult.Missing -> ConnectionUiState.NeedsConfiguration
+                ServerProfileReadResult.Unavailable -> ConnectionUiState.CredentialUnavailable
+                is ServerProfileReadResult.Available -> observation.sessionState.toConnectionUiState()
+            },
+            currentChannelReadiness = deriveCurrentChannelReadiness(
+                connected = observation.sessionState is SessionState.Ready,
+                authority = observation.channelCatalogAuthority,
+                channels = observation.channelCatalogForDisplay?.channels.orEmpty(),
+            ),
         )
-    }.distinctUntilChanged().map { (connected, authority, channels) ->
-        deriveCurrentChannelReadiness(
-            connected = connected,
-            authority = authority,
-            channels = channels,
-        )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, CurrentChannelReadiness.Waiting)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AppConnectionPresentation())
 
     fun reconnectNow() {
         viewModelScope.launch {

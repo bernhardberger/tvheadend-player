@@ -44,7 +44,11 @@ class MainStartupPresentationTest {
             ConnectionUiState.Reconnecting,
             ConnectionUiState.Ready,
         )) {
-            assertEquals(presentation(connection, CurrentChannelReadiness.Waiting), presentation(connection, readiness))
+            val uncached = presentation(connection, CurrentChannelReadiness.Waiting) as MainStartupPresentation.Passive
+            val cached = presentation(connection, readiness) as MainStartupPresentation.Passive
+            assertEquals(uncached.messageKind, cached.messageKind)
+            assertEquals(uncached, cached)
+            assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(cached, 0L))
         }
         val requests = ApplianceLaunchRequests()
         requests.request()
@@ -99,7 +103,7 @@ class MainStartupPresentationTest {
             presentation(connectionState = ConnectionUiState.Connecting),
         )
         assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_CHANNELS),
+            MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA),
             presentation(connectionState = ConnectionUiState.SyncingChannels),
         )
         assertEquals(
@@ -118,6 +122,15 @@ class MainStartupPresentationTest {
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Waiting,
             ),
+        )
+    }
+
+    @Test
+    fun retainedInventoryNeverChangesTheCurrentMetadataStage() {
+        val retained = CurrentChannelReadiness.Browsable(listOf(Channel.create(ChannelId(1))))
+        assertEquals(
+            MainStartupPresentation.Passive(MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA),
+            presentation(ConnectionUiState.Ready, retained),
         )
     }
 
@@ -189,7 +202,7 @@ class MainStartupPresentationTest {
     fun sessionFailureActionsFollowSdkRecoveryGuidanceInNormalMode() {
         assertEquals(
             MainStartupPresentation.Actionable(
-                MainStartupMessageKind.RETRYABLE_FAILURE,
+                MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
                 normalActions,
             ),
             presentation(
@@ -201,7 +214,7 @@ class MainStartupPresentationTest {
         )
         assertEquals(
             MainStartupPresentation.Actionable(
-                MainStartupMessageKind.RETRYABLE_FAILURE,
+                MainStartupMessageKind.AUTHENTICATION_FAILURE,
                 listOf(MainStartupActionId.CONNECTION_SETTINGS),
             ),
             presentation(
@@ -220,6 +233,37 @@ class MainStartupPresentationTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun typedFailureCopyDoesNotChangeSdkActionPolicy() {
+        val kinds = mapOf(
+            ConnectionFailureKind.AUTHENTICATION to MainStartupMessageKind.AUTHENTICATION_FAILURE,
+            ConnectionFailureKind.PERMISSION_DENIED to MainStartupMessageKind.PERMISSION_DENIED,
+            ConnectionFailureKind.INCOMPATIBLE_SERVER to MainStartupMessageKind.INCOMPATIBLE_SERVER,
+            ConnectionFailureKind.TIMEOUT to MainStartupMessageKind.TIMEOUT_FAILURE,
+            ConnectionFailureKind.OTHER to MainStartupMessageKind.SYNCHRONIZATION_FAILURE,
+        )
+        for ((kind, message) in kinds) {
+            assertEquals(
+                MainStartupPresentation.Actionable(message, normalActions),
+                presentation(ConnectionUiState.Error(kind, SessionRecoveryDisposition.EXPLICIT_RETRY)),
+            )
+            assertEquals(
+                MainStartupPresentation.Actionable(message, listOf(MainStartupActionId.CONNECTION_SETTINGS)),
+                presentation(ConnectionUiState.Error(kind, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)),
+            )
+        }
+    }
+
+    @Test
+    fun emptyRetainedInventoryCannotAuthorizeReadyEntry() {
+        val emptyRetained = CurrentChannelReadiness.Browsable(emptyList())
+        val syncing = presentation(ConnectionUiState.SyncingChannels, emptyRetained) as MainStartupPresentation.Passive
+        assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA), syncing)
+        val current = CurrentChannelReadiness.Ready(listOf(Channel.create(ChannelId(1))))
+        val ready = presentation(ConnectionUiState.Ready, current)
+        assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(ready, 0L))
     }
 
 

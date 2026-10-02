@@ -220,6 +220,8 @@ class AppPlaybackRuntime(
     val recordingMarkerRevision = recordingMarkers.recordingMarkerRevision
     @Volatile
     private var activeTargetEpoch: Long? = null
+    @Volatile
+    private var activeLiveSelection: LivePlaybackSelection? = null
     /**
      * The epoch of the target the active one continues: a live recovery retune of the same
      * channel keeps it, every other commit begins its own. Written after [activeTargetEpoch], so a
@@ -404,6 +406,37 @@ class AppPlaybackRuntime(
         }
     }
 
+    /** The installed live tune's presentation, not independently consumed UI state/track snapshots. */
+    fun liveTargetPresentation(selection: LivePlaybackSelection, intent: Long? = null): AppLiveTargetPresentation? =
+        targetCommands.readIfOpen {
+            val frame = videoPresentation.value
+            if (installedLiveTargetEpochLocked(selection, intent) != frame.epoch ||
+                session.observation.value.currentSession !== selection.currentSession ||
+                intent != null && (intent != playbackRequests.get() || isPlaybackIntentStopped(intent))
+            ) return@readIfOpen null
+            val tracks = player.currentTracks
+            AppLiveTargetPresentation(
+                epoch = frame.epoch,
+                visible = frame.visible,
+                playing = state.value is AppPlaybackState.Playing && player.isPlaying && player.playerError == null,
+                audioOnly = tracks.groups.any { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO && it.isSelected } &&
+                    tracks.groups.none { it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO },
+            )
+        }
+
+    /** Installation receipt for cleanup, even if the profile or a newer intent withdrew visibility. */
+    fun installedLiveTargetEpoch(selection: LivePlaybackSelection, intent: Long): Long? =
+        targetCommands.readIfOpen { installedLiveTargetEpochLocked(selection, intent) }
+
+    private fun installedLiveTargetEpochLocked(selection: LivePlaybackSelection, intent: Long?): Long? =
+        activeTargetEpoch?.takeIf {
+            !targetInstallationInProgress &&
+                _activeTarget.value == AppPlaybackTarget.Live(selection.channelId) &&
+                activeLiveSelection?.channelId == selection.channelId &&
+                activeLiveSelection?.currentSession === selection.currentSession &&
+                (intent == null || intent == servedIntent.get())
+        }
+
     private suspend fun startLiveSelection(
         selection: LivePlaybackSelection,
         intent: Long?,
@@ -553,6 +586,7 @@ class AppPlaybackRuntime(
                         activeTargetEpoch == expectedPresentationEpoch &&
                         _activeTarget.value == AppPlaybackTarget.Live(selection.channelId)
                     activeTargetEpoch = epoch
+                    activeLiveSelection = selection
                     if (!continuesTarget) targetContinuity = epoch
                     servedGeneration?.let(servedIntent::set)
                     livePauseController.dropPendingLivePauseLocked()
@@ -979,6 +1013,25 @@ class AppPlaybackRuntime(
     suspend fun stopAfterLoss(): PlaybackStopResult = targetCommands.serialize(
         onClosed = { PlaybackStopResult.ShutDown },
     ) {
+        noteRecordingInterruptionLocked()
+        targetCommands.runIfOpen { pendingRecordingRecovery = null }
+        explicitStopLocked()
+    }
+
+    /** A cancelled startup can retire only its own still-unpresented install, never a replacement. */
+    suspend fun stopAfterLoss(
+        selection: LivePlaybackSelection,
+        epoch: Long,
+        intent: Long,
+    ): PlaybackStopResult? = targetCommands.serialize(onClosed = { PlaybackStopResult.ShutDown }) {
+        val ownsInstall = targetCommands.readIfOpen { installedLiveTargetEpochLocked(selection, intent) == epoch } == true
+        if (!ownsInstall) return@serialize null
+        val frame = videoPresentation.value
+        val tracks = player.currentTracks
+        val audioOnlyPlaying = state.value is AppPlaybackState.Playing && player.isPlaying && player.playerError == null &&
+            tracks.groups.any { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO && it.isSelected } &&
+            tracks.groups.none { it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO }
+        if (frame.epoch == epoch && frame.visible || audioOnlyPlaying) return@serialize null
         noteRecordingInterruptionLocked()
         targetCommands.runIfOpen { pendingRecordingRecovery = null }
         explicitStopLocked()

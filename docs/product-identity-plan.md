@@ -51,10 +51,11 @@ The paired launcher banner stacks the two words beside the original symbol;
 the horizontal family uses the accepted single-line marquee proportions.
 Avatars and app icons contain only the symbol. A separate contextual
 **for Android TV** lockup is available; family artwork has no platform suffix.
-The existing in-app startup shows a 96dp original symbol above a single-line
-32sp/40sp wordmark, specific status and the existing circular indicator or TV
-recovery actions. Its routing and timing are unchanged; the native splash remains
-symbol-only. This update preserves all identifiers and existing app data.
+The native splash is symbol-only; in-app startup pairs the symbol with the
+single-line family wordmark and silent hybrid-synced motion. Startup layout,
+loading, recovery and playback-handoff behavior are defined in
+[`DESIGN.md`](DESIGN.md#startup). Asset construction and provenance live in
+[`artwork/README.md`](../artwork/README.md#startup-artwork).
 
 Public copy distinguishes **Tvheadend Player** (this app) from **Tvheadend**
 (upstream) and **your Tvheadend server** (the backend). German uses
