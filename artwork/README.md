@@ -115,7 +115,7 @@ On 960×540dp the 80dp symbol starts at y=156dp, followed by a 14dp gap and unsc
 The theme-primary busy ring is 44dp/stroke3dp, 32dp below the wordmark at
 (480,340); native TV status begins 16dp below the ring. Brand-free playback returns
 keep their separate player-centred indicator without moving this composition.
-Once return feedback is visible, it uses the same settled 16% glow at the final
+Once return feedback is visible, it uses the same gently pulsing glow at the final
 drift position, independent of the brand clock; it does not replay the sweep.
 Ring placement does not depend on status text or font scale.
 
@@ -137,14 +137,17 @@ resource is `app/src/main/res/drawable-nodpi/startup_background_plate.webp`:
 Resource SHA256: `ddf49691ce5612c1e148a823623af0b666c35194b671d784a9c7356d940e81a3`.
 One asynchronous decode prepares the image; draw reads use the same `brandMillis`
 as the logo/wordmark, outside safe content padding. Opacity is zero through
-120ms, smoothsteps to 0.5 at 950ms, then to 0.16 at 1850ms and holds there;
+120ms, smoothsteps to 0.5 at 950ms, then to a 0.16 baseline at 1850ms;
 on animated entry a decoded image fades in over 200ms independently of the brand
 clock, including when preparation completes after that clock has stopped. Static
-entry displays the held 0.16 glow immediately when prepared, without an arrival fade. Center
+entry displays the 0.16 base glow immediately when prepared, without an arrival fade. Center
 crop uses 1.12× cover scale and diagonal travel of 4% screen width over
 100–1850ms. No new dwell is introduced. Once motion settles, including static
-entry, the glow stays at its final position for the remaining passive wait and
-leaves with the startup layer on readiness or cancellation.
+entry, the glow stays at its final position. A composition-owned infinite reverse
+tween gently raises opacity from 0.16 to 0.18 over 3000ms, then returns over 3000ms.
+It starts only after the plate is prepared and assembly is settled, with its value
+read in the draw phase. The pulse leaves with the startup layer on readiness or
+cancellation; it neither replays assembly nor delays the handoff.
 Recovery and reduced motion remain exactly `#0F1014`.
 
 Source choreography/provenance in creative batch `grok-broadcast-20260911T004615Z`:

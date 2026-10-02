@@ -30,7 +30,7 @@ class StartupBrandBackgroundTest {
         }
     }
 
-    @Test fun disabledBackgroundHasNoPlateWhileFinishedIntroKeepsStaticGlow() {
+    @Test fun disabledBackgroundHasNoPlateWhileFinishedIntroKeepsTheBaseGlow() {
         assertNull(startupBrandBackgroundFrame(100f, enabled = false))
         assertNull(startupBrandBackgroundFrame(0f, enabled = false))
         val intro = StartupBrandIntro(eligible = true)
@@ -75,7 +75,7 @@ class StartupBrandBackgroundTest {
         }
     }
 
-    @Test fun longWaitNeverLoopsOrMovesTheSettledBackground() {
+    @Test fun settledEnvelopeNeverReplaysTheSweepOrMovesThePlate() {
         val settled = startupBrandBackgroundFrame(StartupBrandDurationMillis)
         listOf(2000f, 10_000f, 60_000f).forEach {
             assertEquals(settled, startupBrandBackgroundFrame(it))

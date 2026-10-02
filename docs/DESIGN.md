@@ -80,8 +80,9 @@ canvas, the passive symbol starts at y=156dp, independent of feedback.
 Under the content, one original creative cyan/orange diagonal light-sweep frame
 is graded to light-only values above `#0F1014`, with feathered edges so it cannot
 darken the field or reveal a rectangular rim. The light fades in gently, drifts
-diagonally, then settles at 16% opacity for the remaining startup wait without
-looping or further drift. It fades out with the startup layer at first picture.
+diagonally, then gently pulses between 16% and 18% opacity over a six-second cycle
+for the remaining startup wait. The plate and logo stay still; the sweep does not
+replay. It fades out with the startup layer at first picture.
 Recovery and reduced motion retain the exact flat field. The shared-clock choreography,
 asset recipe and provenance are recorded in
 [`artwork/README.md`](../artwork/README.md#startup-artwork).
@@ -103,7 +104,7 @@ request audio focus.
 Presented content, recovery, navigation, background or window-focus loss ends it;
 warm resume, recreation, later Activities, reconnect and retry never replay it.
 A return waiting for existing playback uses the stable ring and status over the
-same settled 16% ambient glow, without logo or sweep replay. The glow appears with
+same gently pulsing ambient glow, without logo or sweep replay. The glow appears with
 visible waiting feedback; the hidden grace period remains flat. Recovery focus, Back and key
 consumption keep their existing contracts.
 

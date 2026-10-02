@@ -2,11 +2,17 @@ package at.bernhardberger.tvhplayer.ui.startup
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -35,7 +41,7 @@ internal fun startupBrandBackgroundFrame(millis: Float, enabled: Boolean = true)
     )
 }
 
-/** One off-main decode, no player, clock, readiness gate, or per-frame allocations of images. */
+/** One off-main decode; settled waiting animates only the plate's opacity. */
 @Composable
 internal fun StartupBrandBackground(millis: () -> Float, enabled: Boolean) {
     if (!enabled) return
@@ -61,6 +67,19 @@ internal fun StartupBrandBackground(millis: () -> Float, enabled: Boolean) {
         animationSpec = tween(200),
         label = "startup-background-arrival",
     )
+    val settled by remember {
+        derivedStateOf { plate.value != null && latestMillis.value() >= StartupBrandDurationMillis }
+    }
+    // Start at the existing 16% glow, then breathe between 16–18% every six seconds.
+    // Entering this animation only after assembly avoids a jump at the handoff.
+    val ambientPulse = if (settled) {
+        rememberInfiniteTransition(label = "startup-ambient").animateFloat(
+            initialValue = 1f,
+            targetValue = 1.125f,
+            animationSpec = infiniteRepeatable(tween(3_000), RepeatMode.Reverse),
+            label = "startup-ambient-opacity",
+        )
+    } else null
     Canvas(Modifier.fillMaxSize().testTag(if (plate.value != null) {
         "startup-background-prepared"
     } else "startup-background-pending")) {
@@ -80,7 +99,8 @@ internal fun StartupBrandBackground(millis: () -> Float, enabled: Boolean) {
             srcSize = IntSize(image.width, image.height),
             dstOffset = IntOffset(((size.width - width) / 2f + drift).roundToInt(), ((size.height - height) / 2f + drift).roundToInt()),
             dstSize = IntSize(width, height),
-            alpha = frame.alpha * if (animateArrival) arrivalAlpha.value else 1f,
+            alpha = frame.alpha * (if (animateArrival) arrivalAlpha.value else 1f) *
+                (ambientPulse?.value ?: 1f),
         )
     }
 }
