@@ -137,14 +137,16 @@ resource is `app/src/main/res/drawable-nodpi/startup_background_plate.webp`:
 Resource SHA256: `ddf49691ce5612c1e148a823623af0b666c35194b671d784a9c7356d940e81a3`.
 One asynchronous decode prepares the image; draw reads use the same `brandMillis`
 as the logo/wordmark, outside safe content padding. Opacity is zero through
-120ms, smoothsteps to 0.5 at 950ms, then to a 0.16 baseline at 1850ms;
+120ms, smoothsteps to 0.5 at 950ms, then to a 0.20 baseline at 1850ms;
 on animated entry a decoded image fades in over 200ms independently of the brand
 clock, including when preparation completes after that clock has stopped. Static
-entry displays the 0.16 base glow immediately when prepared, without an arrival fade. Center
+entry displays the 0.20 base glow immediately when prepared, without an arrival fade. Center
 crop uses 1.12× cover scale and diagonal travel of 4% screen width over
 100–1850ms. No new dwell is introduced. Once motion settles, including static
 entry, the glow stays at its final position. A composition-owned infinite reverse
-tween gently raises opacity from 0.16 to 0.18 over 3000ms, then returns over 3000ms.
+tween raises opacity from 0.20 to 0.30 over 2000ms, then returns over 2000ms.
+Each half uses `(1 - cos(π × fraction)) / 2` easing, producing a continuous
+four-second breathing cycle with rounded turns and no hold at either end.
 It starts only after the plate is prepared and assembly is settled, with its value
 read in the draw phase. The pulse leaves with the startup layer on readiness or
 cancellation; it neither replays assembly nor delays the handoff.

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.startup
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,9 +27,16 @@ import androidx.compose.ui.unit.IntSize
 import at.bernhardberger.tvhplayer.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.roundToInt
 
 internal data class StartupBrandBackgroundFrame(val drift: Float, val alpha: Float)
+
+// A half-cosine gives inhale and exhale matching, rounded turns without a hold.
+private val BreathingEasing = Easing { fraction ->
+    ((1.0 - cos(PI * fraction)) / 2.0).toFloat()
+}
 
 /** One light-only original plate, with a quiet opening and a gentle diagonal drift. */
 internal fun startupBrandBackgroundFrame(millis: Float, enabled: Boolean = true): StartupBrandBackgroundFrame? {
@@ -37,7 +45,7 @@ internal fun startupBrandBackgroundFrame(millis: Float, enabled: Boolean = true)
     return StartupBrandBackgroundFrame(
         drift = ((millis - 100f) / (StartupBrandDurationMillis - 100f)).coerceIn(0f, 1f),
         alpha = if (millis <= 950f) 0.5f * smooth((millis - 120f) / 830f)
-            else 0.5f - 0.34f * smooth((millis - 950f) / (StartupBrandDurationMillis - 950f)),
+            else 0.5f - 0.30f * smooth((millis - 950f) / (StartupBrandDurationMillis - 950f)),
     )
 }
 
@@ -70,13 +78,15 @@ internal fun StartupBrandBackground(millis: () -> Float, enabled: Boolean) {
     val settled by remember {
         derivedStateOf { plate.value != null && latestMillis.value() >= StartupBrandDurationMillis }
     }
-    // Start at the existing 16% glow, then breathe between 16–18% every six seconds.
+    // Start at the 20% resting glow, then breathe between 20–30% every four seconds.
     // Entering this animation only after assembly avoids a jump at the handoff.
     val ambientPulse = if (settled) {
         rememberInfiniteTransition(label = "startup-ambient").animateFloat(
             initialValue = 1f,
-            targetValue = 1.125f,
-            animationSpec = infiniteRepeatable(tween(3_000), RepeatMode.Reverse),
+            targetValue = 1.5f,
+            animationSpec = infiniteRepeatable(
+                tween(2_000, easing = BreathingEasing), RepeatMode.Reverse,
+            ),
             label = "startup-ambient-opacity",
         )
     } else null

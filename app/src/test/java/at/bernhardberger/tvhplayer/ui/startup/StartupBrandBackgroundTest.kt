@@ -22,9 +22,9 @@ class StartupBrandBackgroundTest {
         assertEquals(0f, startupBrandBackgroundFrame(120f)!!.alpha, 0f)
         assertEquals(0.25f, startupBrandBackgroundFrame(535f)!!.alpha, 0f)
         assertEquals(0.5f, startupBrandBackgroundFrame(950f)!!.alpha, 0f)
-        assertEquals(0.33f, startupBrandBackgroundFrame(1400f)!!.alpha, 0.0001f)
+        assertEquals(0.35f, startupBrandBackgroundFrame(1400f)!!.alpha, 0.0001f)
         assertEquals(0.5f, startupBrandBackgroundFrame(975f)!!.drift, 0f)
-        assertEquals(0.16f, startupBrandBackgroundFrame(1849f)!!.alpha, 0.0001f)
+        assertEquals(0.20f, startupBrandBackgroundFrame(1849f)!!.alpha, 0.0001f)
         listOf(-1f, Float.NaN, Float.POSITIVE_INFINITY).forEach {
             assertNull(startupBrandBackgroundFrame(it))
         }
@@ -44,7 +44,7 @@ class StartupBrandBackgroundTest {
             intro.finish()
             val settled = startupBrandBackgroundFrame(intro.millis)!!
             assertEquals(1f, settled.drift, 0f)
-            assertEquals(0.16f, settled.alpha, 0.0001f)
+            assertEquals(0.20f, settled.alpha, 0.0001f)
             intro.passive(true)
             intro.entranceReady()
             assertEquals(settled, startupBrandBackgroundFrame(intro.millis))

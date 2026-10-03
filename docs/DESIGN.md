@@ -80,8 +80,9 @@ canvas, the passive symbol starts at y=156dp, independent of feedback.
 Under the content, one original creative cyan/orange diagonal light-sweep frame
 is graded to light-only values above `#0F1014`, with feathered edges so it cannot
 darken the field or reveal a rectangular rim. The light fades in gently, drifts
-diagonally, then gently pulses between 16% and 18% opacity over a six-second cycle
-for the remaining startup wait. The plate and logo stay still; the sweep does not
+diagonally, then breathes between 20% and 30% opacity over a four-second cycle
+for the remaining startup wait. Each two-second rise and fall uses sinusoidal easing,
+with softly rounded turns and no pause. The plate and logo stay still; the sweep does not
 replay. It fades out with the startup layer at first picture.
 Recovery and reduced motion retain the exact flat field. The shared-clock choreography,
 asset recipe and provenance are recorded in
