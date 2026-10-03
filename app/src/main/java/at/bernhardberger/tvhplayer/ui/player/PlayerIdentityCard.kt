@@ -1,12 +1,24 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.Dp
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.width
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.Surface
+import androidx.tv.material3.ClickableSurfaceDefaults
+import androidx.tv.material3.Border
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
@@ -36,8 +48,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -63,7 +75,6 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
-import at.bernhardberger.tvhplayer.ui.components.rememberChannelAccent
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 
@@ -90,11 +101,14 @@ internal fun PlayerIdentityCard(
     onClick: (() -> Unit)? = null,
     /** Trial: Left/Right on the focused card open the channel rail. */
     channelCard: Boolean = false,
-    /** Trial: the last other channel, a row of its own above the focused card. */
-    recent: RecentChannelPeek? = null,
-    /** Trial: focuses the recent card; Up on the channel card requests it. */
-    recentFocus: FocusRequester? = null,
-    onRecentClick: () -> Unit = {},
+    /** Trial: the recent channels, newest first, a row above the card that Up opens. */
+    recents: List<RecentChannelPeek> = emptyList(),
+    recentOpen: Boolean = false,
+    onRecentOpenChange: (Boolean) -> Unit = {},
+    /** Trial: OK on a recent chip, by its index in [recents]. */
+    onRecentClick: (Int) -> Unit = {},
+    /** Trial: a key moving through the recent row, which keeps the controls up. */
+    onRecentInteraction: () -> Unit = {},
     /** Trial: keeps the focused look while the rail stands in for the card. */
     held: Boolean = false,
 ) {
@@ -102,7 +116,6 @@ internal fun PlayerIdentityCard(
     val interactions = remember { MutableInteractionSource() }
     val focused by interactions.collectIsFocusedAsState()
     val mainFocus = remember { FocusRequester() }
-    var recentFocused by remember { mutableStateOf(false) }
     // The tag stands before anything that clears semantics, which would drop it with the rest.
     val tagged = modifier.testTag(PlayerIdentityCardTag).size(CardWidth, CardHeight)
     Box {
@@ -132,53 +145,192 @@ internal fun PlayerIdentityCard(
         },
         title = {},
     )
-    if (channelCard && onClick != null && recent != null && recentFocus != null) {
-        // A row of its own above the card, without taking room in the info bar.
-        Box(Modifier.align(Alignment.TopStart).layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 1200.dp.roundToPx(),
-                maxHeight = Constraints.Infinity))
-            layout(0, 0) { placeable.place(0, -placeable.height) }
-        }) {
-            AnimatedVisibility(
-                visible = focused || recentFocused || held,
-                enter = fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)),
-                exit = fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)),
+    if (channelCard && onClick != null && recents.isNotEmpty()) {
+        RecentRow(recents, recentOpen, onRecentOpenChange, onRecentClick, onRecentInteraction, mainFocus, imageLoader,
+            currentSession, hint = focused && !held)
+    }
+    }
+}
+
+/**
+ * Trial: the recent channels, a row of logo chips above the channel card. Up on the card opens it onto
+ * the newest; Left/Right move along it, OK switches, Down or Back return to the card, and it closes
+ * once focus leaves it.
+ */
+@Composable
+private fun BoxScope.RecentRow(
+    recents: List<RecentChannelPeek>,
+    open: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    onPick: (Int) -> Unit,
+    onInteraction: () -> Unit,
+    cardFocus: FocusRequester,
+    imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
+    /** Whether the card has focus: a quiet "⌃ Recent" above it says what Up opens. */
+    hint: Boolean,
+) {
+    val first = remember { FocusRequester() }
+    var hadFocus by remember { mutableStateOf(false) }
+    var hasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(open) {
+        if (open) {
+            withFrameNanos { }
+            runCatching { first.requestFocus() }
+        }
+    }
+    // Focus passing from one card to the next leaves the row for a moment: it closes only if focus
+    // is still elsewhere a frame later.
+    LaunchedEffect(hasFocus) {
+        if (!hasFocus && hadFocus) {
+            withFrameNanos { }
+            hadFocus = false
+            onOpenChange(false)
+        }
+    }
+    // Above the card, without taking room in the info bar. The row's own bounds reach past the chips by
+    // their zoom and outline, which a fading layer would otherwise cut off.
+    Box(Modifier.align(Alignment.TopStart).layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 1200.dp.roundToPx(),
+            maxHeight = Constraints.Infinity))
+        layout(0, 0) { placeable.place(-RecentOverflow.roundToPx(), -placeable.height) }
+    }, contentAlignment = Alignment.BottomStart) {
+        AnimatedVisibility(
+            visible = hint && !open,
+            enter = fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)),
+            exit = fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)),
+        ) {
+            // Full strength and shadowed: it stands higher than the controls, where the scrim is thin.
+            val tint = MaterialTheme.colorScheme.onSurface
+            Row(Modifier.padding(start = RecentOverflow, bottom = RecentHintGap).testTag("player-identity-recent-hint")
+                .clearAndSetSemantics {},
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
+                    modifier = Modifier.size(24.dp).rotate(-90f))
+                Text(stringResource(R.string.player_row_recent), color = tint, maxLines = 1,
+                    style = MaterialTheme.typography.titleSmall.copy(shadow = HintShadow))
+            }
+        }
+        AnimatedVisibility(
+            visible = open,
+            enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.StandardDecelerate)) +
+                slideInVertically(tween(PlayerMotion.MediumMs, easing = PlayerMotion.StandardDecelerate)) { it / 4 },
+            exit = fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)),
+        ) {
+            Column(
+                Modifier.padding(start = RecentOverflow, end = RecentOverflow, top = RecentOverflow,
+                    bottom = PlayerChromeTokens.gridGutter).testTag("player-identity-recent-row")
+                    .onFocusChanged { state ->
+                        hasFocus = state.hasFocus
+                        if (state.hasFocus) hadFocus = true
+                    },
             ) {
-                Column(Modifier.padding(bottom = PlayerChromeTokens.gridGutter).testTag("player-identity-recent-row")) {
-                    Text(stringResource(R.string.player_row_last_channel), style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
-                        modifier = Modifier.padding(bottom = PlayerChromeTokens.rowTitleGap).clearAndSetSemantics {})
-                    CompactCard(
-                        onClick = { onRecentClick(); mainFocus.requestFocus() },
-                        border = embeddedProgressCardBorder(),
-                        scale = channelCardScale(),
-                        scrimBrush = SolidColor(Color.Transparent),
-                        modifier = Modifier.size(CardWidth, CardHeight).focusRequester(recentFocus)
-                            .onFocusChanged { recentFocused = it.isFocused }
-                            .onPreviewKeyEvent { event ->
-                                when (event.key) {
-                                    Key.DirectionDown -> {
-                                        if (event.type == KeyEventType.KeyDown) mainFocus.requestFocus()
-                                        true
+                Text(stringResource(R.string.player_row_recent), color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+                    style = MaterialTheme.typography.titleSmall.copy(shadow = HintShadow),
+                    modifier = Modifier.padding(bottom = PlayerChromeTokens.rowTitleGap).clearAndSetSemantics {})
+                Row(horizontalArrangement = Arrangement.spacedBy(RecentChipGap)) {
+                    recents.forEachIndexed { index, recent ->
+                        RecentChip(
+                            recent, imageLoader, currentSession,
+                            modifier = (if (index == 0) Modifier.focusRequester(first) else Modifier)
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type == KeyEventType.KeyDown) onInteraction()
+                                    when (event.key) {
+                                        Key.DirectionDown -> {
+                                            if (event.type == KeyEventType.KeyDown) cardFocus.requestFocus()
+                                            true
+                                        }
+                                        Key.DirectionUp -> true
+                                        Key.DirectionLeft -> index == 0
+                                        Key.DirectionRight -> index == recents.lastIndex
+                                        else -> false
                                     }
-                                    Key.DirectionUp, Key.DirectionLeft, Key.DirectionRight -> true
-                                    else -> false
                                 }
-                            }
-                            .semantics { contentDescription = listOf(recent.number, recent.name).filter(String::isNotBlank).joinToString(" ") }
-                            .testTag("player-identity-recent"),
-                        image = {
-                            ChannelCardFace(recent.picon, recent.channelId, recent.name, imageLoader, currentSession)
-                            ChannelCardLabel(recent.number, recent.name.takeIf { recent.picon != null }, tag = "player-identity-recent-label")
-                        },
-                        title = {},
-                    )
+                                .testTag("player-identity-recent-$index"),
+                            onClick = { onPick(index); cardFocus.requestFocus() },
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * Trial: a recent channel as a mini wide card: a small near-black tile with its picon (or name), and
+ * beside it its number and name over what is on now. The tile takes focus, as a wide card's image does.
+ */
+@Composable
+private fun RecentChip(
+    recent: RecentChannelPeek,
+    imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val label = listOf(recent.number, recent.name).filter(String::isNotBlank).joinToString(" ")
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    Row(Modifier.width(RecentItemWidth), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(RecentTextGap)) {
+        Surface(
+            onClick = onClick,
+            interactionSource = interaction,
+            shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = TvSurfaceColors.containerLowest, contentColor = onSurface,
+                focusedContainerColor = TvSurfaceColors.containerLowest, focusedContentColor = onSurface,
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(BorderStroke(3.dp, onSurface), inset = 2.dp, shape = RoundedCornerShape(10.dp)),
+            ),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = PlayerChromeTokens.cardFocusedScale),
+            modifier = modifier.size(RecentTileWidth, RecentTileHeight).semantics { contentDescription = label },
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (recent.picon != null) {
+                    PiconBox(imageLoader, recent.picon, Modifier.size(RecentMarkWidth, RecentMarkHeight)
+                        .testTag("player-identity-recent-logo"), currentSession)
+                } else {
+                    Text(recent.name, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 6.dp).testTag("player-identity-recent-name"))
+                }
+            }
+        }
+        Column(Modifier.weight(1f).graphicsLayer { alpha = if (focused) 1f else 0.72f }
+            .clearAndSetSemantics {}) {
+            Text(label, style = MaterialTheme.typography.titleSmall.copy(shadow = HintShadow), color = onSurface,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            recent.now?.takeIf(String::isNotBlank)?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall.copy(shadow = HintShadow), color = onSurface.copy(alpha = 0.80f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
+
+/** Trial: the hint's distance above the card, clear of its focus outline and zoom. */
+private val RecentHintGap = 12.dp
+
+/**
+ * Trial: the recent mini wide cards: a 16:9 tile and its text, each a third of the row between the
+ * margins (844dp at 960dp wide), so long names end inside it.
+ */
+private val RecentItemWidth = 260.dp
+private val RecentTileWidth = 96.dp
+private val RecentTileHeight = 54.dp
+private val RecentTextGap = 12.dp
+private val RecentChipGap = 32.dp
+private val RecentMarkWidth = 72.dp
+private val RecentMarkHeight = 32.dp
+
+/** Trial: how far a focused chip's zoom and outline reach past it. */
+private val RecentOverflow = 8.dp
+
+/** Trial: lifts the hint and the row's title off a bright picture. */
+private val HintShadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 8f)
 
 /** Trial: the channel cards' scale; [held] keeps the focused size without focus, so nothing grows or shrinks. */
 internal fun channelCardScale(held: Boolean = false) = CardDefaults.scale(
@@ -216,7 +368,7 @@ internal fun BoxScope.ChannelCardLabel(
 /** The label's distance from the card's bottom edge: the progress's 3dp and the gap above it. */
 private val ChannelCardLabelBottom = 12.dp
 
-/** Trial: the last other channel, shown above the channel card. */
+/** Trial: a recent channel, shown in the row above the channel card. */
 internal data class RecentChannelPeek(
     val picon: ArtworkId?,
     val number: String,
@@ -232,8 +384,8 @@ private val PiconHeight = 60.dp
 private val PiconLift = 12.dp
 
 /**
- * Trial: a channel card's face, shared by the player's channel card and the rail's: the channel's
- * own colour behind its picon, or its name without one.
+ * Trial: a channel card's face, shared by the player's channel card and the rail's: its picon, or its
+ * name without one, on a plain surface.
  */
 @Composable
 internal fun BoxScope.ChannelCardFace(
@@ -245,13 +397,14 @@ internal fun BoxScope.ChannelCardFace(
     logoTag: String = "player-identity-logo",
     nameTag: String = "player-identity-name",
     backdrop: Boolean = true,
+    markWidth: Dp = PiconWidth,
+    markHeight: Dp = PiconHeight,
+    lift: Dp = PiconLift,
 ) {
-    val tint = channelId?.let { rememberChannelAccent(imageLoader, currentSession, picon, it) }
-    // Fills the card, which sizes the slot the mark is centred in.
-    Box(Modifier.fillMaxSize().then(if (!backdrop) Modifier else Modifier.background(TvSurfaceColors.containerLow).then(
-        if (tint != null) Modifier.background(Brush.verticalGradient(listOf(tint.copy(alpha = 0.48f), tint.copy(alpha = 0.16f)))) else Modifier,
-    )))
-    val mark = Modifier.align(Alignment.Center).padding(bottom = PiconLift).size(PiconWidth, PiconHeight)
+    // Fills the card, which sizes the slot the mark is centred in. Trial: a plain surface for every
+    // channel; the picon carries the colour.
+    Box(Modifier.fillMaxSize().then(if (!backdrop) Modifier else Modifier.background(TvSurfaceColors.containerLowest)))
+    val mark = Modifier.align(Alignment.Center).padding(bottom = lift).size(markWidth, markHeight)
     if (picon != null) {
         PiconBox(imageLoader, picon, mark.testTag(logoTag), currentSession)
     } else {

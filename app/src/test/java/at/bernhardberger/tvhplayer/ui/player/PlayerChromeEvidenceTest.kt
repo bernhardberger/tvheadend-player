@@ -406,8 +406,8 @@ class PlayerChromeEvidenceTest {
             assertEquals("$height: 0.60 where the content starts", 102.0, grey(bitmap, top + 112), 4.0)
             assertEquals("$height: 0.80 52dp into the content", 51.0, grey(bitmap, top + 216), 4.0)
             assertEquals("$height: 0.92 at the bottom edge", 20.0, grey(bitmap, 1079), 4.0)
-            assertEquals("$height: the top fade is 0.64 at the edge", 92.0, grey(bitmap, 0), 4.0)
-            assertEquals("$height: 0.40 at 56dp", 153.0, grey(bitmap, 112), 4.0)
+            assertEquals("$height: the top fade is 0.72 at the edge", 71.0, grey(bitmap, 0), 4.0)
+            assertEquals("$height: 0.48 at 56dp", 133.0, grey(bitmap, 112), 4.0)
             assertEquals("$height: clear from 112dp", 255.0, grey(bitmap, 226), 1.0)
             bitmap.recycle()
         }

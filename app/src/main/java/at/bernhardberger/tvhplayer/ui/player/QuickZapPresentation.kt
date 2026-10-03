@@ -169,15 +169,20 @@ private fun InPlaceRail(
             },
             modifier = Modifier.fillMaxSize()
                 .drawBehind {
-                    // Clear above the preview, dark from the cards down.
-                    val top = (previewTop - TvOverlayFooterGradientRunout.toPx()).coerceAtLeast(0f)
-                    val runout = TvOverlayFooterGradientRunout.toPx() / (size.height - top).coerceAtLeast(1f)
+                    // The picture dims a little below the header's own fade, so no clear band shows
+                    // between that fade and this one, while the clock stays as it was; dark from the
+                    // preview down.
+                    val runout = TvOverlayFooterGradientRunout.toPx()
+                    val header = PlayerChromeTokens.topScrimHeight.toPx() / size.height.coerceAtLeast(1f)
+                    val top = (previewTop - runout).coerceAtLeast(0f) / size.height.coerceAtLeast(1f)
+                    val preview = previewTop.toFloat() / size.height.coerceAtLeast(1f)
                     drawRect(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
-                            runout.coerceAtMost(1f) to Color.Black.copy(alpha = 0.60f),
+                            header.coerceIn(0f, top.coerceIn(0f, 1f)) to Color.Black.copy(alpha = RailVeil),
+                            top.coerceIn(0f, 1f) to Color.Black.copy(alpha = RailVeil),
+                            preview.coerceIn(top.coerceIn(0f, 1f), 1f) to Color.Black.copy(alpha = 0.60f),
                             1f to Color.Black.copy(alpha = 0.92f),
-                            startY = top, endY = size.height,
                         ),
                         alpha = expansion(),
                     )
@@ -229,3 +234,6 @@ internal val LocalInPlaceRailExpansion = compositionLocalOf<() -> Float> { { 0f 
 
 /** Trial: the soft edge of the rail's sideways reveal. */
 private val RevealFeather = 96.dp
+
+/** Trial: how far the open rail dims the picture above its preview. */
+private const val RailVeil = 0.36f

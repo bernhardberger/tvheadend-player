@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -12,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.testTag
@@ -79,9 +80,11 @@ internal fun PlayerChrome(
     onCardClick: (() -> Unit)? = null,
     /** Trial: what Down from the action row opens, shown centred in the row. */
     downHint: String? = null,
-    /** Trial: the last other channel, a row above the identity card that Up focuses; OK on it switches. */
-    recentPeek: RecentChannelPeek? = null,
-    onRecent: (() -> Unit)? = null,
+    /** Trial: the recent channels, newest first: a row above the channel card that Up opens; OK switches. */
+    recents: List<RecentChannelPeek> = emptyList(),
+    onRecentPick: ((Int) -> Unit)? = null,
+    recentRowOpen: Boolean = false,
+    onRecentRowOpenChange: (Boolean) -> Unit = {},
     /** Trial: the rail stands in for the channel card, which keeps its focused look meanwhile. */
     channelCardHeld: Boolean = false,
     /** Trial: where the identity card is, in root coordinates, for the rail to open from. */
@@ -111,8 +114,6 @@ internal fun PlayerChrome(
         }
         val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
         val header: @Composable (Modifier) -> Unit = { PlayerChromeHeader(content.clock, it.testTag("player-header")) }
-        // Trial: Up on the channel card focuses the last channel's card above it.
-        val recentFocus = remember { FocusRequester() }
         // Held from the rail's opening until focus is back on the card, so it never blinks out in between.
         var cardHeld by remember { mutableStateOf(false) }
         LaunchedEffect(channelCardHeld) {
@@ -139,14 +140,26 @@ internal fun PlayerChrome(
                         if (it.isFocused && !channelCardHeld) cardHeld = false
                     },
                     onClick = { onInteraction(); (onCardClick ?: onInfo)() }.takeIf { shown == PlayerChromeMode.CONTROLS },
-                    channelCard = onChannelStep != null, recent = recentPeek.takeIf { onRecent != null },
-                    recentFocus = recentFocus, onRecentClick = { onInteraction(); onRecent?.invoke() },
+                    channelCard = onChannelStep != null,
+                    recents = if (onRecentPick != null) recents else emptyList(),
+                    recentOpen = recentRowOpen && shown == PlayerChromeMode.CONTROLS,
+                    onRecentOpenChange = onRecentRowOpenChange,
+                    onRecentClick = { onInteraction(); onRecentPick?.invoke(it) },
+                    onRecentInteraction = onInteraction,
                     held = cardHeld && shown == PlayerChromeMode.CONTROLS)
             }
         }
         CompositionLocalProvider(LocalStateCellInset provides stateCell) {
+        // Trial: the footer's scrim rises behind the open Recent row so it reads over a bright picture.
+        val recentRise by animateDpAsState(
+            if (recentRowOpen && shown == PlayerChromeMode.CONTROLS && recents.isNotEmpty()) RecentRowScrimRise else 0.dp,
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+            label = "recentRise",
+        )
+        val density = LocalDensity.current
         if (shown == PlayerChromeMode.CONTROLS) {
             PlayerChromeControls(
+                scrimRise = { with(density) { recentRise.toPx() } },
                 timeline = timeline,
                 liveBar = liveBar,
                 actions = actions,
@@ -174,7 +187,7 @@ internal fun PlayerChrome(
                 onChannelStep = onChannelStep,
                 onChannelZap = onChannelZap,
                 downHint = downHint,
-                onRecent = { recentFocus.requestFocus(); Unit }.takeIf { recentPeek != null && onRecent != null },
+                onRecent = { onRecentRowOpenChange(true) }.takeIf { recents.isNotEmpty() && onRecentPick != null },
             )
         } else {
             // Passive: nothing in the Banner takes focus. Without the action row its info and
@@ -285,3 +298,6 @@ internal fun PlayerPresentedLiveTimeline(
         timelineModifier = modifier,
     )
 }
+
+/** Trial: the open Recent row's height above the channel card, which the footer's scrim covers. */
+private val RecentRowScrimRise = 124.dp

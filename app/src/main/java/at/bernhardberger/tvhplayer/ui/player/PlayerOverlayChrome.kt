@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
@@ -47,6 +48,8 @@ internal fun PlayerOverlayChrome(
      * stays put.
      */
     bannerDrop: () -> Float = { 0f },
+    /** Trial: how far, in px, the footer's scrim reaches above it, for content standing on top of it. */
+    scrimRise: () -> Float = { 0f },
     footerContent: @Composable ColumnScope.() -> Unit,
 ) {
     // Inside the controls layer, the header comes down and the footer up as they fade in;
@@ -75,7 +78,13 @@ internal fun PlayerOverlayChrome(
                 .testTag("player-footer")
                 .drawWithCache {
                     val scrim = PlayerChromeTokens.bottomScrim(size.height, this)
-                    onDrawBehind { drawRect(scrim) }
+                    onDrawBehind {
+                        val rise = scrimRise()
+                        if (rise <= 0f) drawRect(scrim) else {
+                            val tall = PlayerChromeTokens.bottomScrim(size.height + rise, this)
+                            translate(top = -rise) { drawRect(tall, size = size.copy(height = size.height + rise)) }
+                        }
+                    }
                 }
                 .padding(footerPadding),
             content = footerContent,

@@ -41,8 +41,8 @@ internal object PlayerChromeTokens {
     /** Full-width top fade behind the clock: 0.64 at the edge, 0.40 at 56dp, clear at 112dp. */
     val topScrimHeight = 112.dp
     val topScrim = Brush.verticalGradient(
-        0f to Color.Black.copy(alpha = 0.64f),
-        0.5f to Color.Black.copy(alpha = 0.40f),
+        0f to Color.Black.copy(alpha = 0.72f),
+        0.5f to Color.Black.copy(alpha = 0.48f),
         1f to Color.Transparent,
     )
 

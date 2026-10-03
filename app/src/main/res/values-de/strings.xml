@@ -477,8 +477,8 @@
         <item quantity="other">Noch %1$d Minuten</item>
     </plurals>
     <string name="player_channel">Sender</string>
-    <string name="player_row_last_channel">Letzter Sender</string>
-    <string name="player_channel_card_hint">Sender. Links oder rechts wechselt den Sender, gedrückt halten öffnet die Senderliste, oben führt zum letzten Sender, OK öffnet die Senderliste.</string>
+    <string name="player_row_recent">Zuletzt gesehen</string>
+    <string name="player_channel_card_hint">Sender. Links oder rechts wechselt den Sender, gedrückt halten öffnet die Senderliste, oben zeigt zuletzt gesehene Sender, OK öffnet die Senderliste.</string>
     <string name="player_down_programme_info">Sendungsinfo</string>
     <string name="player_rail_watching">Läuft</string>
 </resources>

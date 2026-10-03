@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -252,6 +253,8 @@ class PlayerChromeCaptureTest {
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE, CONTROLS_CARD_FOCUSED,
+        // Trial channel card: focused with the Recent hint, Recent open, the rail opened in place.
+        CHANNEL_CARD, CHANNEL_RECENT, CHANNEL_RAIL,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -290,6 +293,7 @@ class PlayerChromeCaptureTest {
                 compose.waitForIdle()
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
+            if (next == Scene.CHANNEL_CARD) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
             if (next == Scene.CONTROLS_CARD_FOCUSED) {
                 compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
             }
@@ -348,6 +352,12 @@ class PlayerChromeCaptureTest {
             Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO, Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
             Scene.CONTROLS_CARD_FOCUSED -> Controls(timeshift, behind, paused, content, focus = PlayerIdentityCardTag)
+            Scene.CHANNEL_CARD, Scene.CHANNEL_RECENT -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag,
+                channelCard = true, recentOpen = scene == Scene.CHANNEL_RECENT)
+            Scene.CHANNEL_RAIL -> Controls(timeshift, false, false, content, channelCard = true, inPlaceRail = true, tray = {
+                QuickZapTrayPreview(channels[1], trayProgramme, null, NOW, loader, session,
+                    Modifier.padding(horizontal = PlayerChromeTokens.gridMargin))
+            })
             Scene.BANNER_TUNING -> Banner(PlayerChromeMode.BANNER, content,
                 PlayerChromeTimeline.Live(AppTimeshiftState(), NOW, programme, motionKey = ChannelId(1), tuning = true))
             Scene.BANNER_LIVE -> Banner(PlayerChromeMode.BANNER, content, PlayerChromeTimeline.Live(timeshift, NOW, programme,
@@ -549,7 +559,14 @@ class PlayerChromeCaptureTest {
         /** The step target's window; by default 3:53 behind live in [window]'s programme. */
         shown: ProgrammeWindow? = null,
         focus: String? = null,
+        /** Trial: the channel card, with three recent channels above it. */
+        channelCard: Boolean = false,
+        recentOpen: Boolean = false,
+        /** Trial: [tray] is the rail opened in place of the channel card. */
+        inPlaceRail: Boolean = false,
     ) {
+        var cardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+        Box(Modifier.fillMaxSize()) {
         val shown = shown ?: if (step != null) window.copy(positionFraction = 0.51f, estimatedPosition = Instant.fromEpochSeconds(NOW - 233)) else window
         PlayerChrome(
             mode = PlayerChromeMode.CONTROLS,
@@ -569,6 +586,19 @@ class PlayerChromeCaptureTest {
             imageLoader = loader,
             currentSession = session,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
+            onChannelStep = if (channelCard) { _, _ -> } else null,
+            onChannelZap = if (channelCard) { _, _ -> } else null,
+            onCardClick = if (channelCard) ({}) else null,
+            downHint = "Programme info".takeIf { channelCard },
+            recents = if (channelCard) listOf(
+                RecentChannelPeek(null, "102", "ORF 2 HD", ChannelId(2), now = "Universum: Wildes Österreich"),
+                RecentChannelPeek(LOGO, "101", "ORF 1 HD", ChannelId(1), now = "Zeit im Bild"),
+                RecentChannelPeek(null, "103", "ServusTV HD Oesterreich", ChannelId(3), now = "Servus Nachrichten 19:20"),
+            ) else emptyList(),
+            onRecentPick = if (channelCard) ({}) else null,
+            recentRowOpen = recentOpen,
+            channelCardHeld = inPlaceRail,
+            onCardPlaced = { cardBounds = it },
             decorationCoversControls = tray != null,
             controlsDecoration = { emphasisAlpha, controls ->
                 QuickZapPresentation(
@@ -581,13 +611,19 @@ class PlayerChromeCaptureTest {
                             recordingChannelIds = emptySet(), nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
                             imageLoader = loader, currentSession = session, active = true, nowSec = NOW,
                             onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
+                            entryFocusId = ChannelId(1).takeIf { inPlaceRail },
+                            inPlace = inPlaceRail,
                         )
                     },
                     preview = { tray?.invoke() },
                     controls = controls,
+                    inPlaceAnchor = if (inPlaceRail) ({ cardBounds }) else null,
                 )
             },
         )
+        if (inPlaceRail) PlayingChannelChip(visible = true, channelLabel = "101 · ORF 1 HD", title = programme?.title,
+            modifier = Modifier.align(Alignment.TopStart))
+        }
     }
 
     @OptIn(SubscriptionInfrastructureApi::class)

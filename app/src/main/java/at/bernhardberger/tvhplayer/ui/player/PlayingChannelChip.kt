@@ -5,6 +5,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -41,23 +44,28 @@ internal fun PlayingChannelChip(
         exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)),
     ) {
         Box(Modifier.fillMaxWidth().focusProperties { canFocus = false }) {
-            val watching = stringResource(R.string.player_rail_watching)
-            val accent = MaterialTheme.colorScheme.tertiary
-            Text(
-                buildAnnotatedString {
-                    withStyle(SpanStyle(color = accent)) { append(watching) }
-                    append("  ")
-                    append(listOfNotNull(channelLabel.takeIf { it.isNotBlank() }, title?.takeIf { it.isNotBlank() })
-                        .joinToString(" · "))
-                },
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.80f),
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                // On the clock's line, clear of it.
-                modifier = Modifier.align(Alignment.TopStart)
-                    .padding(top = TvOverlayTopPadding + 6.dp, start = PlayerChromeTokens.gridMargin, end = 240.dp)
+            val onSurface = MaterialTheme.colorScheme.onSurface
+            // On the clock's baseline: an empty run in the clock's style sets it, the rest stands on it.
+            Row(
+                Modifier.align(Alignment.TopStart)
+                    .padding(top = TvOverlayTopPadding, start = PlayerChromeTokens.gridMargin, end = 240.dp)
                     .testTag("player-playing-chip"),
-            )
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text("", style = MaterialTheme.typography.titleLarge, modifier = Modifier.width(0.dp).alignByBaseline())
+                Text(stringResource(R.string.player_rail_watching), style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.tertiary, maxLines = 1, modifier = Modifier.alignByBaseline())
+                Text(
+                    buildAnnotatedString {
+                        append(channelLabel)
+                        title?.takeIf { it.isNotBlank() }?.let {
+                            withStyle(SpanStyle(color = onSurface.copy(alpha = 0.72f))) { append(if (channelLabel.isBlank()) it else "  ·  $it") }
+                        }
+                    },
+                    style = MaterialTheme.typography.titleMedium, color = onSurface,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.alignByBaseline(),
+                )
+            }
         }
     }
 }

@@ -93,6 +93,8 @@ internal fun PlayerChromeControls(
     onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
     downHint: String? = null,
     onRecent: (() -> Unit)? = null,
+    /** Trial: the footer scrim reaches up behind the open Recent row. */
+    scrimRise: () -> Float = { 0f },
 ) {
     val live = timeline as? PlayerChromeTimeline.Live
     val recording = timeline as? PlayerChromeTimeline.Recording
@@ -193,6 +195,7 @@ internal fun PlayerChromeControls(
     decoration({ chromeAlpha.value }) {
     PlayerOverlayChrome(
         bannerDrop = bannerDrop,
+        scrimRise = scrimRise,
         modifier = Modifier.onPreviewKeyEvent { event ->
             recording != null && markerNavigation.handle(event, recording.markers, onSeekMarker)
         }.onPreviewKeyEvent { event ->
@@ -283,7 +286,7 @@ internal fun PlayerChromeControls(
                         }
                         true
                     }
-                    // Trial: Up focuses the last channel's card above this one.
+                    // Trial: Up opens the recent channels' row above this card.
                     onRecent != null && event.key == Key.DirectionUp -> {
                         if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                             onInteraction()

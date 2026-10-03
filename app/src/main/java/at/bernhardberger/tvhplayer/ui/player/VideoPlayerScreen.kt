@@ -1072,10 +1072,16 @@ fun VideoPlayerScreen(
     // A slot window (no programme at the position) is an axis only: it has no Next line.
     val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
         effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
-    // Trial: the channel Up on the card returns to.
-    val recentChannel = remember(recentChannelIds, channels, currentChannelId) {
-        recentChannelIds.firstNotNullOfOrNull { id -> channels.firstOrNull { it.id == id && it.id != currentChannelId } }
+    // Trial: the recent channels Up on the card offers, newest first, from every channel rather than
+    // only the current list's.
+    // Only the group the player steps through, so picking one never leaves it; none in it, no row.
+    val recentChannels = remember(recentChannelIds, channels, currentChannelId) {
+        recentChannelIds.filter { it != currentChannelId }
+            .mapNotNull { id -> channels.firstOrNull { it.id == id } }.take(RecentChannelCount)
     }
+    var recentRowOpen by remember { mutableStateOf(false) }
+    // The row closes with the controls, so they reopen on the card.
+    LaunchedEffect(layerState.chrome.controlsVisible) { if (!layerState.chrome.controlsVisible) recentRowOpen = false }
     // Trial: a channel as the card shows it above itself or while switching to it.
     val recentPeekOf: (Channel) -> RecentChannelPeek = { channel ->
         RecentChannelPeek(
@@ -1367,6 +1373,13 @@ fun VideoPlayerScreen(
     PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     val handlePlaybackBack: () -> Unit = handle@{
+        // Trial: Back in the recent row returns to the channel card.
+        if (recentRowOpen && layerState.chrome.controlsVisible) {
+            recentRowOpen = false
+            restoreInfoFocus = true
+            layerState.chrome.onUserInteraction()
+            return@handle
+        }
         when (
             playerBackAction(
                 seekPreviewPhase = timelineState.seekPreviewPhase(layerState.chrome.controlsVisible),
@@ -1717,8 +1730,10 @@ fun VideoPlayerScreen(
             // Trial: a short Left/Right on the card changes channel like CH+/-: the first at once, a burst settles.
             onChannelZap = { direction, keyTimeMs -> tuneAdjacentChannel(direction, keyTimeMs) },
             // Trial: Up on the card focuses the last other channel's card above it; OK there switches.
-            recentPeek = recentChannel?.let { recentPeekOf(it) },
-            onRecent = { recentChannel?.let { tuneChannel(it) } },
+            recents = recentChannels.map(recentPeekOf),
+            onRecentPick = { index -> recentChannels.getOrNull(index)?.let { tuneChannel(it) } },
+            recentRowOpen = recentRowOpen,
+            onRecentRowOpenChange = { recentRowOpen = it },
             onCardPlaced = { channelCardBounds = it },
             channelCardHeld = channelRailOpen && railFromCard,
             decorationCoversControls = channelRailOpen,
@@ -1982,3 +1997,6 @@ private fun SessionObservation.dvrEntries(): List<DvrEntry> =
     dvrSnapshotForDisplay?.entries.orEmpty().takeIf {
         dvrSnapshotAuthority == RetainedMetadataAuthority.CURRENT
     }.orEmpty()
+
+/** Trial: how many recent channels the row above the channel card offers. */
+private const val RecentChannelCount = 3
