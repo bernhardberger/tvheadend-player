@@ -576,6 +576,6 @@
     <string name="player_channel">Channel</string>
     <string name="player_row_recent">Recent</string>
     <string name="player_channel_card_hint">Channel. Left or right changes channel, holding them opens the channel list, up shows recent channels, OK opens the channel list.</string>
-    <string name="player_down_programme_info">Programme info</string>
+    <string name="player_down_programme_info">Program info</string>
     <string name="player_rail_watching">Watching</string>
 </resources>

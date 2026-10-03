@@ -589,7 +589,7 @@ class PlayerChromeCaptureTest {
             onChannelStep = if (channelCard) { _, _ -> } else null,
             onChannelZap = if (channelCard) { _, _ -> } else null,
             onCardClick = if (channelCard) ({}) else null,
-            downHint = "Programme info".takeIf { channelCard },
+            downHint = "Program info".takeIf { channelCard },
             recents = if (channelCard) listOf(
                 RecentChannelPeek(null, "102", "ORF 2 HD", ChannelId(2), now = "Universum: Wildes Österreich"),
                 RecentChannelPeek(LOGO, "101", "ORF 1 HD", ChannelId(1), now = "Zeit im Bild"),
