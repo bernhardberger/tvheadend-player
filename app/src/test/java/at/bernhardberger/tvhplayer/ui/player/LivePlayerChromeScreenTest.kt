@@ -1122,7 +1122,7 @@ class LivePlayerChromeScreenTest {
     private fun assertUnknownProgramme() {
         val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().config
             .getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.joinToString(" ")
-        assertTrue("unknown playback does not claim the airing programme: $info", info.contains("Programme information unavailable"))
+        assertTrue("unknown playback does not claim the airing programme: $info", info.contains("Program information unavailable"))
         assertFalse("unknown playback has no Next: $info", info.contains("Next 1") || info.contains("Next 2"))
     }
 
