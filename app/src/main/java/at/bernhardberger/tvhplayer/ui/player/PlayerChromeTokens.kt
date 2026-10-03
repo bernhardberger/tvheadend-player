@@ -33,8 +33,6 @@ internal object PlayerChromeTokens {
     val channelCardHeight = 110.dp
     /** Trial: a wide standard card's text, 16dp beside the card. */
     val identityTextGap = 16.dp
-    /** Trial: the lane the text makes beside the focused channel card; the › is centred in it. */
-    val arrowLane = 48.dp
     /** Trial: the channel cards' focus growth; 1.05 stays clear of the margin and the arrow lanes. */
     const val cardFocusedScale = 1.05f
     /** Trial: a row title's height above a card row. */

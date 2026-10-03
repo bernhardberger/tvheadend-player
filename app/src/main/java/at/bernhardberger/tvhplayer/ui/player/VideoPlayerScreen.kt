@@ -421,7 +421,6 @@ fun VideoPlayerScreen(
     var infoOpenedFromRecord by remember { mutableStateOf(false) }
     var restoreRecordActionFocus by remember { mutableStateOf(false) }
     // Trial: the channel card's placeholder and the action Down opened Info from.
-    var channelProgrammeOpen by remember { mutableStateOf(false) }
     // Trial: the channel the card's first Left/Right stepped to, focused as the rail opens.
     var railEntryId by remember { mutableStateOf<ChannelId?>(null) }
     var railEntryStep by remember { mutableStateOf(0) }
@@ -1617,6 +1616,21 @@ fun VideoPlayerScreen(
                 restoreInfoFocus = true
             }
         }
+        // Trial: the rail opens from the channel card on its channel, stepping [direction] once it stands.
+        // A held key's further repeats are not swallowed: they run on through the rail.
+        val openRailFromCard: (Int) -> Unit = { direction ->
+            if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) {
+                openChannelDrawer()
+                railFromCard = true
+                // The rail opens on this channel, where the card was, and then slides the step in.
+                railEntryId = currentChannelId
+                railEntryStep = direction
+                // The preview names where the step lands from the start; at a list end it stays.
+                val index = channels.indexOfFirst { it.id == currentChannelId }
+                (channels.getOrNull(index + direction)?.takeIf { index >= 0 }?.id ?: currentChannelId)
+                    ?.let { selectedId = it }
+            }
+        }
         PlayerChrome(
             mode = playerChromeMode(
                 controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen,
@@ -1691,34 +1705,17 @@ fun VideoPlayerScreen(
                 restoreOptionsFocus = false
                 layerState.onChannelActionRestored()
             },
-            // Trial: Down from the action row opens Info; the card changes channel and OK on it
-            // opens this channel's programme (a placeholder).
+            // Trial: Down from the action row opens Info.
             onDownFromActions = {
                 layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
                 openInfo(returnTo = lastChromeAction ?: "player-pause")
             },
             downHint = stringResource(R.string.player_down_programme_info),
-            // Trial stand-in for the card-to-rail morph: Left/Right on the card opens the rail.
-            onChannelStep = { direction, _ ->
-                if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) {
-                    layerState.beginOpeningKeyCycle(
-                        if (direction > 0) AndroidKeyEvent.KEYCODE_DPAD_RIGHT else AndroidKeyEvent.KEYCODE_DPAD_LEFT
-                    )
-                    openChannelDrawer()
-                    railFromCard = true
-                    // The rail opens on this channel, where the card was, and then slides the step in.
-                    railEntryId = currentChannelId
-                    railEntryStep = direction
-                    // The preview names where the step lands from the start; at a list end it stays.
-                    val index = channels.indexOfFirst { it.id == currentChannelId }
-                    (channels.getOrNull(index + direction)?.takeIf { index >= 0 }?.id ?: currentChannelId)
-                        ?.let { selectedId = it }
-                }
-            },
-            onCardClick = {
-                layerState.chrome.yieldToLayer(controls = true)
-                channelProgrammeOpen = true
-            },
+            // Trial: a held Left/Right on the card opens the rail stepping that way; OK opens it in place.
+            onChannelStep = { direction, _ -> openRailFromCard(direction) },
+            onCardClick = { openRailFromCard(0) },
+            // Trial: a short Left/Right on the card changes channel like CH+/-: the first at once, a burst settles.
+            onChannelZap = { direction, keyTimeMs -> tuneAdjacentChannel(direction, keyTimeMs) },
             // Trial: Up on the card focuses the last other channel's card above it; OK there switches.
             recentPeek = recentChannel?.let { recentPeekOf(it) },
             onRecent = { recentChannel?.let { tuneChannel(it) } },
@@ -1837,17 +1834,6 @@ fun VideoPlayerScreen(
                         currentSession = currentSession,
                         modifier = Modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight),
                     )
-                },
-            )
-        }
-
-        if (channelProgrammeOpen) {
-            ChannelProgrammePlaceholder(
-                channelName = currentChannelName,
-                onDismiss = {
-                    channelProgrammeOpen = false
-                    restoreInfoFocus = true
-                    layerState.showControls()
                 },
             )
         }

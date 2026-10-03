@@ -90,6 +90,7 @@ internal fun PlayerChromeControls(
     markerNavigation: RecordingMarkerNavigation,
     onSeekMarker: (Long) -> Unit,
     onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
+    onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
     downHint: String? = null,
     onRecent: (() -> Unit)? = null,
 ) {
@@ -258,6 +259,8 @@ internal fun PlayerChromeControls(
         // The card stands above everything else that takes focus: Down leads to the timeline or,
         // when that takes no focus, to the action row's entry; nothing else is reachable from it.
         val cardBelow = if (timelineFocusable) timelineFocus else initialFocus
+        // Trial: the Left/Right press on the card still undecided between a zap (released) and the rail (held).
+        var cardPressKey by remember { mutableStateOf<Key?>(null) }
         val cardModifier = Modifier.focusRequester(cardFocus)
             .onFocusChanged {
                 if (it.isFocused) {
@@ -288,11 +291,24 @@ internal fun PlayerChromeControls(
                         }
                         true
                     }
-                    // Trial: Left/Right open the rail on the previous or next channel.
-                    onChannelStep != null && (event.key == Key.DirectionLeft || event.key == Key.DirectionRight) -> {
-                        if (event.type == KeyEventType.KeyDown) {
-                            onInteraction()
-                            onChannelStep(if (event.key == Key.DirectionRight) 1 else -1, event.nativeKeyEvent.eventTime)
+                    // Trial: a Left/Right press changes channel when released; held, it opens the rail
+                    // stepping that way, and the held key's repeats run on through the rail.
+                    onChannelZap != null && (event.key == Key.DirectionLeft || event.key == Key.DirectionRight) -> {
+                        val direction = if (event.key == Key.DirectionRight) 1 else -1
+                        val native = event.nativeKeyEvent
+                        when (event.type) {
+                            KeyEventType.KeyDown -> when {
+                                native.repeatCount == 0 -> { onInteraction(); cardPressKey = event.key }
+                                cardPressKey == event.key -> {
+                                    cardPressKey = null
+                                    onChannelStep?.invoke(direction, native.eventTime)
+                                }
+                            }
+                            KeyEventType.KeyUp -> if (cardPressKey == event.key) {
+                                cardPressKey = null
+                                onInteraction()
+                                onChannelZap(direction, native.downTime)
+                            }
                         }
                         true
                     }

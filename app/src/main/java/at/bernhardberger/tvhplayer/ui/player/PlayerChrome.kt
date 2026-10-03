@@ -12,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusProperties
@@ -72,8 +71,10 @@ internal fun PlayerChrome(
     /** A recording's marker navigation, opened from its timeline. */
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     onSeekMarker: (Long) -> Unit = {},
-    /** Trial: Left/Right on the focused identity card change channel (-1 previous, +1 next). */
+    /** Trial: holding Left/Right on the focused channel card opens the rail stepping that way (-1, +1). */
     onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
+    /** Trial: a short Left/Right press on the focused channel card changes channel (-1, +1). */
+    onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
     /** Trial: OK on the identity card; without it the card opens Info. */
     onCardClick: (() -> Unit)? = null,
     /** Trial: what Down from the action row opens, shown centred in the row. */
@@ -112,8 +113,6 @@ internal fun PlayerChrome(
         val header: @Composable (Modifier) -> Unit = { PlayerChromeHeader(content.clock, it.testTag("player-header")) }
         // Trial: Up on the channel card focuses the last channel's card above it.
         val recentFocus = remember { FocusRequester() }
-        // Trial: the text makes room for the › only while the channel card has focus.
-        var cardFocused by remember { mutableStateOf(false) }
         // Held from the rail's opening until focus is back on the card, so it never blinks out in between.
         var cardHeld by remember { mutableStateOf(false) }
         LaunchedEffect(channelCardHeld) {
@@ -123,12 +122,6 @@ internal fun PlayerChrome(
                 cardHeld = false
             }
         }
-        val identityGap by animateDpAsState(
-            if (onChannelStep != null && (cardFocused || cardHeld) && shown == PlayerChromeMode.CONTROLS) PlayerChromeTokens.arrowLane
-            else PlayerChromeTokens.identityTextGap,
-            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
-            label = "identityGap",
-        )
         // The identity card takes focus in the controls only, which place it in their focus graph.
         val infoBar: @Composable (contentAlpha: () -> Float, card: Modifier) -> Unit = { contentAlpha, card ->
             PlayerInfoBar(
@@ -138,12 +131,11 @@ internal fun PlayerChrome(
                 recordingNow = content.recordingNow,
                 contentAlpha = contentAlpha,
                 lastLineEndReserve = lastLineEndReserve,
-                identityGap = identityGap,
+                identityGap = PlayerChromeTokens.identityTextGap,
             ) { faded ->
                 val placed = onCardPlaced?.let { sink -> Modifier.onGloballyPositioned { sink(it.boundsInRoot()) } } ?: Modifier
                 PlayerIdentityCard(content, imageLoader, currentSession,
                     faded.then(card).then(placed).onFocusChanged {
-                        cardFocused = it.isFocused
                         if (it.isFocused && !channelCardHeld) cardHeld = false
                     },
                     onClick = { onInteraction(); (onCardClick ?: onInfo)() }.takeIf { shown == PlayerChromeMode.CONTROLS },
@@ -180,6 +172,7 @@ internal fun PlayerChrome(
                 markerNavigation = markerNavigation,
                 onSeekMarker = onSeekMarker,
                 onChannelStep = onChannelStep,
+                onChannelZap = onChannelZap,
                 downHint = downHint,
                 onRecent = { recentFocus.requestFocus(); Unit }.takeIf { recentPeek != null && onRecent != null },
             )

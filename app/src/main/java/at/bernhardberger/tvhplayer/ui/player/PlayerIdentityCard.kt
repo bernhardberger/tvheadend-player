@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -119,19 +118,20 @@ internal fun PlayerIdentityCard(
         image = {
             IdentityCardImage(content, imageLoader, currentSession, cue = onClick != null && !channelCard, focused = focused)
             ChannelCardLabel(content.info.channelNumber, content.info.channelName.takeIf { content.picon != null })
+            if (channelCard && onClick != null && (focused || held)) {
+                // Inside the card beside the logo, on its line: the card steps through channels. In the
+                // card's own slot they zoom with it and stay above the focused card's raised surface.
+                val tint = MaterialTheme.colorScheme.onSurface
+                Icon(painterResource(R.drawable.ic_keyboard_arrow_left), contentDescription = null, tint = tint,
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = ArrowInset, bottom = PiconLift)
+                        .size(24.dp).testTag("player-identity-previous"))
+                Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = ArrowInset, bottom = PiconLift)
+                        .size(24.dp).testTag("player-identity-next"))
+            }
         },
         title = {},
     )
-    if (channelCard && onClick != null && (focused || held)) {
-        // Centred in the lanes beside the card: the margin on the left, the text's room on the right.
-        val tint = MaterialTheme.colorScheme.onSurface
-        Icon(painterResource(R.drawable.ic_keyboard_arrow_left), contentDescription = null, tint = tint,
-            modifier = Modifier.align(Alignment.CenterStart).offset(x = -ArrowOffset).size(24.dp)
-                .testTag("player-identity-previous"))
-        Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
-            modifier = Modifier.align(Alignment.CenterEnd).offset(x = ArrowOffset).size(24.dp)
-                .testTag("player-identity-next"))
-    }
     if (channelCard && onClick != null && recent != null && recentFocus != null) {
         // A row of its own above the card, without taking room in the info bar.
         Box(Modifier.align(Alignment.TopStart).layout { measurable, constraints ->
@@ -186,8 +186,8 @@ internal fun channelCardScale(held: Boolean = false) = CardDefaults.scale(
     focusedScale = PlayerChromeTokens.cardFocusedScale,
 )
 
-/** Trial: an arrow's offset from the card's edge, centring its 24dp in a [PlayerChromeTokens.arrowLane]. */
-private val ArrowOffset = PlayerChromeTokens.arrowLane / 2 + 12.dp
+/** Trial: an arrow's inset from the card's edge, in the room beside the logo. */
+private val ArrowInset = 4.dp
 
 /**
  * Trial: "number name" along a channel card's bottom, in the player and in the rail alike. It stands

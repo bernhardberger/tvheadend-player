@@ -478,9 +478,7 @@
     </plurals>
     <string name="player_channel">Sender</string>
     <string name="player_row_last_channel">Letzter Sender</string>
-    <string name="player_channel_card_hint">Sender. Links oder rechts öffnet die Senderliste, oben führt zum letzten Sender, OK zeigt das Programm dieses Senders.</string>
+    <string name="player_channel_card_hint">Sender. Links oder rechts wechselt den Sender, gedrückt halten öffnet die Senderliste, oben führt zum letzten Sender, OK öffnet die Senderliste.</string>
     <string name="player_down_programme_info">Sendungsinfo</string>
     <string name="player_rail_watching">Läuft</string>
-    <string name="player_channel_programme_title">Senderprogramm</string>
-    <string name="player_channel_programme_placeholder">Hier erscheint das Programm dieses Senders. Dies ist ein Platzhalter im Senderkarten-Test.</string>
 </resources>
