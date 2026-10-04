@@ -96,11 +96,6 @@ internal class PlayerPageScrim {
 
 private data class PlayerScrimStop(val height: Float, val alpha: Float)
 
-private fun PlayerScrimStop.interpolate(to: PlayerScrimStop, fraction: Float) = PlayerScrimStop(
-    height + (to.height - height) * fraction,
-    alpha + (to.alpha - alpha) * fraction,
-)
-
 internal fun Modifier.playerScrim(
     scrim: PlayerPageScrim,
     progress: () -> Float = { 0f },
@@ -116,7 +111,7 @@ internal fun Modifier.playerScrim(
     fun topAlpha(y: Float): Float = if (y <= header / 2f) {
         0.72f + (0.48f - 0.72f) * y / (header / 2f)
     } else (0.48f * (1f - (y - header / 2f) / (header / 2f))).coerceAtLeast(0f)
-    // Thirteen stops in every state. Four samples per half-header approximate the old
+    // Four samples per half-header approximate the old
     // two-gradient SRC_OVER curve; below the header all segments are exactly linear.
     val headerStops = List(9) { header * it / 8f }
     val controls = headerStops.map { PlayerScrimStop(it, topAlpha(it)) } + listOf(
@@ -134,20 +129,33 @@ internal fun Modifier.playerScrim(
         }
         PlayerScrimStop(y, 1f - (1f - topAlpha(y)) * (1f - veil))
     }
-    val details = (headerStops + List(4) { height }).map { y ->
+    val details = (headerStops + height).map { y ->
         val backdrop = 0.84f + 0.08f * y / height
         PlayerScrimStop(y, 1f - (1f - topAlpha(y)) * (1f - backdrop))
     }
+    fun List<PlayerScrimStop>.alphaAt(y: Float): Float {
+        val index = indexOfFirst { it.height >= y }
+        if (index <= 0) return if (index == 0) first().alpha else last().alpha
+        val from = this[index - 1]
+        val to = this[index]
+        return from.alpha + (to.alpha - from.alpha) * (y - from.height) / (to.height - from.height)
+    }
+    // Keep every state's edges fixed. Only their ink fades; moving matched stop indices
+    // sweeps the footer/preview boundaries through the picture and briefly brightens it.
+    val heights = (controls + rail + details).map { it.height }.distinct().sorted()
+    val controlsAlpha = heights.map { controls.alphaAt(it) }
+    val railAlpha = heights.map { rail.alphaAt(it) }
+    val detailsAlpha = heights.map { details.alphaAt(it) }
     onDrawBehind {
         val chrome = scrim.alpha()
         val page = (progress() * BrowseMotionPolicy.pageDownMs / 300f).coerceIn(0f, 1f)
         val detail = if (railHeader) page else BrowseMotionPolicy.pageStandardDecelerate.transform(page)
         if (chrome > 0f || detail > 0f) {
             val expansion = scrim.expansion().coerceIn(0f, 1f)
-            val stops = controls.indices.map { index ->
-                val base = controls[index].interpolate(rail[index], expansion)
-                val stop = base.copy(alpha = base.alpha * chrome).interpolate(details[index], detail)
-                (stop.height / height) to Color.Black.copy(alpha = stop.alpha)
+            val stops = heights.indices.map { index ->
+                val base = (controlsAlpha[index] + (railAlpha[index] - controlsAlpha[index]) * expansion) * chrome
+                val alpha = base + (detailsAlpha[index] - base) * detail
+                (heights[index] / height) to Color.Black.copy(alpha = alpha)
             }.toTypedArray()
             drawRect(Brush.verticalGradient(*stops, endY = height))
         }

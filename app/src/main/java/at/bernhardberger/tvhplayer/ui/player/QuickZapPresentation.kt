@@ -235,7 +235,8 @@ private fun InPlaceRail(
             // Without a card to open from, the rail keeps the card's usual line above the timeline.
             val top = card?.let { (it.top - origin.y).roundToInt() - RailTopInset.roundToPx() }
                 ?: (constraints.maxHeight - railPlaceable.height - 96.dp.roundToPx())
-            previewTop = top - previewPlaceable.height
+            // The card travels with the departing footer; its scrim stays at the rail's rest.
+            if (!leavingPage) previewTop = top - previewPlaceable.height
             railBottom = top + railPlaceable.height
             layout(constraints.maxWidth, constraints.maxHeight) {
                 previewPlaceable.place(0, top - previewPlaceable.height)

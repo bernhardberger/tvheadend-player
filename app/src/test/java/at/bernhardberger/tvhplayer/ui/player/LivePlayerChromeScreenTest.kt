@@ -16,6 +16,11 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import android.view.View
 import android.os.Looper
 import java.io.File
@@ -1593,6 +1598,64 @@ class LivePlayerChromeScreenTest {
         assertTrue(exists("player-actions"))
     }
 
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun controlsPageScrimFadesMonotonicallyDownAndBack() = pageScrimSeries(rail = false)
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun railPageScrimFadesMonotonicallyDownAndBack() = pageScrimSeries(rail = true)
+
+    private val scrimUnderTest = mutableStateOf<Modifier?>(null)
+
+    private fun pageScrimSeries(rail: Boolean) {
+        screen()
+        if (rail) {
+            publishRailProgrammes()
+            openInfoRail()
+        } else key(Key.DirectionDown)
+        compose.mainClock.autoAdvance = false
+        // Mirror the actual viewport draw modifier over white, without chrome/content occluding
+        // the sample points. It reads the production screen's live scrim inputs and page clock.
+        val drawModifier = compose.onNodeWithTag("player-page-scrim").fetchSemanticsNode()
+            .layoutInfo.getModifierInfo().single {
+                (it.modifier as? androidx.compose.ui.platform.InspectableValue)?.nameFallback == "drawWithCache"
+            }.modifier
+        compose.runOnIdle {
+            scrimUnderTest.value = drawModifier
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        fun sample(): List<Float> {
+            compose.waitForIdle()
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            return listOf(0.1f, 0.3f, 0.5f, 0.7f, 0.9f).map {
+                1f - android.graphics.Color.red(bitmap.getPixel(bitmap.width / 2, (bitmap.height * it).toInt())) / 255f
+            }
+        }
+        val failures = mutableListOf<String>()
+        for (down in listOf(true, false)) {
+            val frames = mutableListOf(sample())
+            compose.onRoot().performKeyInput { pressKey(if (down) Key.DirectionDown else Key.Back) }
+            repeat(36) {
+                compose.mainClock.advanceTimeBy(16)
+                frames += sample()
+            }
+            println("SCRIM rail=$rail down=$down " + frames.filterIndexed { index, _ -> index % 2 == 0 }
+                .mapIndexed { index, values -> "${index * 32}:" + values.joinToString(",") { "%.3f".format(java.util.Locale.ROOT, it) } }.joinToString(";"))
+            assertTrue("the sampled scrim actually changes between the two rests",
+                if (down) frames.last()[1] > frames.first()[1] + 0.1f else frames.last()[1] < frames.first()[1] - 0.1f)
+            frames.zipWithNext().forEachIndexed { index, (from, to) ->
+                from.indices.forEach { y ->
+                    if (if (down) to[y] < from[y] - 1.01f / 255 else to[y] > from[y] + 1.01f / 255)
+                        failures += "rail=$rail down=$down at ${(index + 1) * 16}ms y=${y * 20 + 10}%: ${from[y]} -> ${to[y]}"
+                }
+            }
+        }
+        bitmap.recycle()
+        compose.mainClock.autoAdvance = true
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+    }
+
     /** Read the actual layer via Compose's inspector, without a production test seam. */
     private fun pageAlpha(node: androidx.compose.ui.semantics.SemanticsNode): Float =
         node.layoutInfo.getModifierInfo().mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
@@ -1931,6 +1994,7 @@ class LivePlayerChromeScreenTest {
                             contentAllowed = contentAllowed(), notices = notices,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
+                        scrimUnderTest.value?.let { Box(Modifier.fillMaxSize().background(Color.White).then(it)) }
                     }
                 }
             }
