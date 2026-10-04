@@ -34,6 +34,8 @@ import at.bernhardberger.tvhplayer.viewmodels.CacheClearState
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -45,6 +47,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Category(VisualCapture::class)
 class SettingsVisualEvidenceTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View

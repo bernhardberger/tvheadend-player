@@ -50,6 +50,8 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -413,10 +415,14 @@ class PlayerChromeEvidenceTest {
         }
     }
 
+    @Category(VisualCapture::class)
     @Test fun english() = captures("en", 1f)
+    @Category(VisualCapture::class)
     @Test fun englishLargeText() = captures("en", 1.3f)
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun german() = captures("de", 1f)
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = captures("de", 1.3f)
 

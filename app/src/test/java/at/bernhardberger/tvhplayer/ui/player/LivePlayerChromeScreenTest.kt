@@ -1405,7 +1405,8 @@ class LivePlayerChromeScreenTest {
         video = VideoPlayerViewModel(runtime, session)
         models.put("video", video)
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
-        compose.waitForIdle()
+        // setContent synchronizes the first composition. Waiting before a Compose root exists
+        // instead incurs the test framework's two-second root-discovery wait on every entry.
         if (!settleOnEntry) compose.mainClock.autoAdvance = false
         compose.setContent {
             if (screenVisible.value) {

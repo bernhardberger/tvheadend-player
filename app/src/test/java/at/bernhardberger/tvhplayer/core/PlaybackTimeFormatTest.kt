@@ -1,10 +1,18 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvhplayer.ui.player.timeshiftEndpointLabel
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PlaybackTimeFormatTest {
+    @Test
+    fun fallbackTimeshiftEndpointsAreNumericAndDoNotShowNegativeZero() {
+        assertEquals("0:00", timeshiftEndpointLabel(true, 800))
+        assertEquals("0:00", timeshiftEndpointLabel(false, 999))
+        assertEquals("−0:30", timeshiftEndpointLabel(false, 30_000))
+    }
+
     @Test
     fun subMinutePositionUsesMinuteSecondForm() {
         assertEquals("0:00", formatPlaybackDuration(0L))

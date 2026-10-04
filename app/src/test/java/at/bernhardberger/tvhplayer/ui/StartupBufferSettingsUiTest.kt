@@ -25,6 +25,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -49,7 +51,9 @@ class StartupBufferSettingsUiTest {
     }
 
     @Test fun english() = level("en", 1f)
+    @Category(VisualCapture::class)
     @Test fun englishLargeText() = level("en", 1.3f)
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun german() = level("de", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")

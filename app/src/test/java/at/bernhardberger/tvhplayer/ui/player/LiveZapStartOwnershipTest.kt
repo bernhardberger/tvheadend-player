@@ -257,7 +257,7 @@ class LiveZapStartOwnershipTest {
         }
         lifecycle = owner.lifecycle
         lifecycle.currentState = Lifecycle.State.RESUMED
-        compose.waitForIdle()
+        // setContent synchronizes the first composition; there is no Compose root to idle yet.
         if (entryHeld) settingsData.open.value = false
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {

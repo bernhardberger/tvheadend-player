@@ -461,7 +461,7 @@ class RecordingPlayerChromeScreenTest {
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
             PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
         owner.lifecycle.currentState = Lifecycle.State.RESUMED
-        compose.waitForIdle()
+        // setContent synchronizes the first composition; there is no Compose root to idle yet.
         if (listed) {
             // The recordings screen starts the recording before the player opens.
             val install = scope.async {

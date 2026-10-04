@@ -80,26 +80,18 @@ class PlaybackRuntimePolicyTest {
         }
     }
 
-    @Test fun enabledTraceSeesFirstVideoFrameOncePerActiveEpoch() {
-        val trace = RecordingTrace(enabled = true)
-        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
-            live()
-            val epoch = runtime.videoPresentation.value.epoch
-            renderFirstFrame()
-            assertTrue(runtime.videoPresentation.value.visible)
-            assertEquals(listOf(epoch), trace.frames)
-            renderFirstFrame()
-            assertEquals(listOf(epoch), trace.frames)
-        }
-    }
-
-    @Test fun enabledTraceSeesCoverShownAtInstallAndLiftedAfterTheFirstFrame() {
+    @Test fun enabledTraceSeesCoverShownAndFirstFrameLiftedOncePerActiveEpoch() {
         val trace = RecordingTrace(enabled = true)
         exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
             live()
             val epoch = runtime.videoPresentation.value.epoch
             assertEquals(listOf("cover"), trace.events)
             renderFirstFrame()
+            assertTrue(runtime.videoPresentation.value.visible)
+            assertEquals(listOf(epoch), trace.frames)
+            assertEquals(listOf("cover", "frame:$epoch", "lifted:$epoch"), trace.events)
+            renderFirstFrame()
+            assertEquals(listOf(epoch), trace.frames)
             assertEquals(listOf("cover", "frame:$epoch", "lifted:$epoch"), trace.events)
         }
     }
