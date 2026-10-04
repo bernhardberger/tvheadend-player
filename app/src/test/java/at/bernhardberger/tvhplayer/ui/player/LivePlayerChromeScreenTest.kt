@@ -1608,7 +1608,7 @@ class LivePlayerChromeScreenTest {
 
     @Test fun channelUpBrowsesTheOpenRailInsteadOfTuning() {
         screen()
-        openRail()
+        openInfoRail()
         assertEquals(listOf("player-channel-card-1"), focused())
         key(Key.ChannelUp)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
@@ -1620,15 +1620,6 @@ class LivePlayerChromeScreenTest {
         screen()
         key(Key.ChannelUp)
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-    }
-
-    private fun openRail() {
-        var presses = 0
-        while (!exists("player-channel-shelf") && presses < 3) {
-            key(Key.DirectionDown)
-            presses++
-        }
-        assertTrue("Down opens the rail", exists("player-channel-shelf"))
     }
 
     private fun playerReady() {
