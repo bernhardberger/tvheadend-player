@@ -23,6 +23,25 @@ entry points are exhausted; avoid asking them to rediscover this table.
 | SDK public playback behavior | Owned by `tvheadend-sdk`; the app calls `TvheadendPlaybackCoordinator` through `AppPlaybackRuntime` and must not reproduce SDK state machines |
 | HTSP wire behavior | Owned by `tvheadend-htsp`; do not add an application workaround for an attributed protocol defect |
 
+## Reuse starting points
+
+Before adding a UI helper, check the installed TV Material component and these
+existing implementations. This table names reusable owners, not mandatory
+wrappers around library APIs.
+
+| Need | Existing implementation and boundary |
+|---|---|
+| Selectable list row | `androidx.tv.material3.ListItem`; examples in `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/SettingsSwitchRow.kt` and `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/settings/SettingsDepthRows.kt`. Keep browse-owner activation and focus guards at the integration boundary. |
+| Labelled on/off row | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/SettingsSwitchRow.kt`: whole-row activation, passive switch, enabled state, supporting text and toggle semantics. Check caller-specific wrapping and child semantics before substitution. |
+| Recording/scheduled status icon | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/RecordingStatusIndicator.kt`. This does not own the full status-label/color mapping or failure presentation. |
+| Nested settings navigation | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/depth/DepthNavigation.kt` and `DepthStack.kt`; product destinations live in `ui/screens/settings/`. |
+| Browse-content transitions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/BrowseContentMotion.kt`; retain the current-owner boundaries described below. |
+
+When consolidating callers, preserve user-visible behavior rather than source
+spelling. A test requiring an expression in a particular screen must not force
+that screen to duplicate a shared implementation. Verify the shared policy and
+the relevant caller behavior instead.
+
 ## Browsing state boundaries
 
 Tag input updates the shared in-memory scope synchronously. DataStore loads it
@@ -83,5 +102,6 @@ Channels root cannot rely on NavDisplay's pop handler to unwind focus layers.
   No workflow ledger, sibling checkout or diagnostic child is required.
 - Authorized offline emulator work uses `docs/android-tooling.md`; the physical
   device wrapper is not required for ordinary explicit-serial install and capture.
-- `./tools/verify` remains the final application gate. Device, credential,
-  signing, and release authorization remain separate.
+- `AGENTS.md` defines verification scope: focused checks finish small local changes;
+  `./tools/verify` covers batch integration, release, and broader-risk changes.
+  Device, credential, signing, and release authorization remain separate.

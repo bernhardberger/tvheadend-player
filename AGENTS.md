@@ -84,12 +84,20 @@ repository-local domain overlays, then the focused skill, then local style.
   recovery behavior and session/permission guards remain separate requirements.
   This policy does not authorize automatic data clearing or device resets;
   SDK and HTSP repository changes remain with their respective owners.
-- For behavior changes, add a focused regression test. Keep pure policy outside
-  Android UI where practical so JVM tests can cover it.
-- Run focused checks while iterating and `./tools/verify` once for the final code
-  state. For docs/config-only edits use relevant static checks instead. Reuse
-  unchanged successful evidence; a review or administrative stage is not a reason
-  to run it again. Do not add tests for model names or prompt wording.
+- Cover changed behavior with focused existing tests; add or extend a test for a
+  real regression or meaningful uncovered contract. Equivalent reuse, mechanical
+  refactoring, and reversible low-impact edits do not automatically need new tests.
+  Keep pure policy outside Android UI where practical so JVM tests can cover it.
+- Small, localized changes finish with the affected tests and owning compilation
+  (test tasks already compile their dependencies). Run `./tools/verify` once for
+  integration of a completed batch, before release, or for broad/cross-module,
+  build/dependency, or high-risk runtime changes. A task ending or local checkpoint
+  commit alone does not trigger the full gate. Batch related cleanup before it.
+  For docs/config-only edits use relevant static checks instead. Preserve explicit
+  device, signing, SDK and release gates. Reuse unchanged successful evidence;
+  broaden checks only for changed scope, failures, or an unresolved risk. Report
+  which checks passed without describing focused evidence as full verification.
+  Do not add tests for model names or prompt wording.
 - External review is risk-based, not an automatic approval loop. Non-trivial
   non-UX work needs independent Astra and Opus reviews of the same bounded
   evidence, subject to the local review routing below. Follow up only on unresolved
