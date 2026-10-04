@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,11 +19,15 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
+import at.bernhardberger.tvhplayer.ui.notifications.LocalAppNoticeBottomObstruction
 
 /** How much lower the Banner's info and timeline rest than the controls', which sit above the action row. */
 internal val PlayerBannerDrop = TvOverlayActionButtonSize + TvOverlayTimelineActionGap
@@ -52,6 +57,11 @@ internal fun PlayerOverlayChrome(
     scrimRise: () -> Float = { 0f },
     footerContent: @Composable ColumnScope.() -> Unit,
 ) {
+    val noticeObstruction = LocalAppNoticeBottomObstruction.current
+    val density = LocalDensity.current
+    DisposableEffect(noticeObstruction) {
+        onDispose { noticeObstruction?.value = 0.dp }
+    }
     // Inside the controls layer, the header comes down and the footer up as they fade in;
     // controls revealed by a zap fade in where they rest.
     val motion = LocalPlayerControlsMotion.current
@@ -76,6 +86,12 @@ internal fun PlayerOverlayChrome(
                 .align(Alignment.BottomCenter)
                 .graphicsLayer { enterFrom(PlayerMotion.ChromeOffset); riseFromBanner(); alpha = 1f - railExpansion() }
                 .testTag("player-footer")
+                .onSizeChanged { size ->
+                    // Ignore the empty gradient runout; keep content and bottom safe area clear.
+                    noticeObstruction?.value = with(density) {
+                        (size.height.toDp() - footerPadding.calculateTopPadding()).coerceAtLeast(0.dp)
+                    }
+                }
                 .drawWithCache {
                     val scrim = PlayerChromeTokens.bottomScrim(size.height, this)
                     onDrawBehind {

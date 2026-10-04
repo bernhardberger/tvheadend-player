@@ -1,11 +1,19 @@
 package at.bernhardberger.tvhplayer.ui.notifications
 
+import android.animation.ValueAnimator
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -15,8 +23,10 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,25 +40,30 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.R
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
+
+/** Shell-owned geometry only; dialog windows deliberately do not consume this inset. */
+internal val LocalAppNoticeBottomObstruction = staticCompositionLocalOf<MutableState<Dp>?> { null }
 
 @Composable
 internal fun AppShellNoticeHost(
     queue: AppNoticeQueue = koinInject(),
     profileOwner: AppProfileOwner = koinInject(),
     session: TvheadendSession = koinInject(),
+    bottomObstruction: Dp = 0.dp,
 ) {
     val generation by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
     val observation by session.observation.collectAsStateWithLifecycle()
-    AppNoticeHost(queue, AppNoticeContext(generation, observation.currentSession?.generationIdentity))
+    AppNoticeHost(queue, AppNoticeContext(generation, observation.currentSession?.generationIdentity), bottomObstruction)
 }
 
 /** Only the focused window presents. The shell and guide dialog share one queue and display budget. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any) {
+internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any, bottomObstruction: Dp = 0.dp) {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     val allowed = lifecycle == Lifecycle.State.RESUMED &&
         LocalWindowInfo.current.isWindowFocused && !WindowInsets.isImeVisible
@@ -75,16 +90,33 @@ internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any) {
         it.notice.context == context && queue.remaining(it.expiresAt) > 0
     }?.let {
         AppNoticePresentation(stringResource(it.notice.message),
-            it.notice.detail ?: it.notice.detailMessage?.let { resource -> stringResource(resource) }, it.notice.icon)
+            it.notice.detail ?: it.notice.detailMessage?.let { resource -> stringResource(resource) }, it.notice.icon,
+            bottomObstruction)
     }
 }
 
 /** Plain kit variant, bottom center. No focus node, click semantics, or key handler. */
 @Composable
-internal fun AppNoticePresentation(message: String, detail: String? = null, icon: AppNoticeIcon? = null) {
-    Box(Modifier.fillMaxSize().padding(TvFullScreenPadding), contentAlignment = Alignment.BottomCenter) {
+internal fun AppNoticePresentation(
+    message: String,
+    detail: String? = null,
+    icon: AppNoticeIcon? = null,
+    bottomObstruction: Dp = 0.dp,
+) {
+    val lift = animateDpAsState(bottomObstruction.coerceAtLeast(0.dp),
+        animationSpec = if (ValueAnimator.areAnimatorsEnabled())
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard) else snap(), label = "notice clearance")
+    val largeText = LocalDensity.current.fontScale > 1f
+    // Keep the kit's complete 20sp line boxes, including for a single-line Text.
+    val labelStyle = MaterialTheme.typography.labelLarge.copy(
+        lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None))
+    val direction = LocalLayoutDirection.current
+    Box(Modifier.fillMaxSize().padding(start = TvFullScreenPadding.calculateStartPadding(direction),
+        end = TvFullScreenPadding.calculateEndPadding(direction), bottom = 28.dp),
+        contentAlignment = Alignment.BottomCenter) {
         Surface(modifier = Modifier
-            .widthIn(max = if (icon == null && detail.isNullOrBlank()) 324.dp else 480.dp)
+            .offset { IntOffset(0, -lift.value.roundToPx()) }
+            .widthIn(max = 556.dp)
             .heightIn(min = 44.dp)
             .testTag("app-notice")
             .semantics(mergeDescendants = true) {
@@ -94,9 +126,12 @@ internal fun AppNoticePresentation(message: String, detail: String? = null, icon
             shape = RoundedCornerShape(12.dp),
             colors = SurfaceDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseSurface,
                 contentColor = MaterialTheme.colorScheme.inverseOnSurface)) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (icon != null) Icon(painterResource(when (icon) {
+            Row(Modifier.padding(start = 16.dp, top = 12.dp, end = 24.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (icon != null) Box(Modifier.size(32.dp)
+                    .background(LocalContentColor.current.copy(alpha = .12f), CircleShape)
+                    .testTag("app-notice-icon"), contentAlignment = Alignment.Center) {
+                    Icon(painterResource(when (icon) {
                     AppNoticeIcon.SCHEDULE -> R.drawable.ic_schedule
                     AppNoticeIcon.RECORDING -> R.drawable.ic_fiber_manual_record
                     AppNoticeIcon.CHECK -> R.drawable.ic_check
@@ -104,13 +139,15 @@ internal fun AppNoticePresentation(message: String, detail: String? = null, icon
                     AppNoticeIcon.WARNING -> R.drawable.ic_error_outlined
                     AppNoticeIcon.CANCEL -> R.drawable.ic_close
                     AppNoticeIcon.DELETE -> R.drawable.ic_delete_outlined
-                }), contentDescription = null, modifier = Modifier.size(24.dp),
+                }), contentDescription = null, modifier = Modifier.size(16.dp),
                     tint = if (icon == AppNoticeIcon.RECORDING) TvRecordingColor else LocalContentColor.current)
-                Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(message, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    if (!detail.isNullOrBlank()) Text(detail, style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Column(Modifier.weight(1f, fill = false)) {
+                    Text(message, style = labelStyle,
+                        maxLines = if (detail.isNullOrBlank()) 2 else 1, overflow = TextOverflow.Ellipsis)
+                    if (!detail.isNullOrBlank()) Text(detail, style = labelStyle,
+                        color = LocalContentColor.current.copy(alpha = .76f),
+                        maxLines = if (largeText) 2 else 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

@@ -135,8 +135,8 @@ class SettingsVisualEvidenceTest {
                 notice.assertIsDisplayed()
                 val noticeBounds = notice.fetchSemanticsNode().boundsInRoot
                 assertEquals(480f, noticeBounds.center.x, .5f) // Odd pixel widths round at placement.
-                assertEquals(508f, noticeBounds.bottom)
-                assertTrue(noticeBounds.width <= 324f)
+                assertEquals(512f, noticeBounds.bottom)
+                assertTrue(noticeBounds.width <= 556f)
             }
             capture("$prefix-cache-${state.name.lowercase()}")
             if (state == CacheClearState.FAILED) {

@@ -328,10 +328,14 @@ Accepted 2026-09-15; static design in Penpot page
 ## 8. Global snackbar
 
 One passive host in the app shell, above ordinary destinations including
-playback. **Bottom centre**, inside the safe margins, content-sized up to 324dp
-with natural wrapping. Kit appearance: `inverseSurface`/`inverseOnSurface`,
-12dp corners, `labelLarge`, 16/12dp padding. No focus target, action, key
-interception, relocation or collision avoidance; it may overlap content. Notices
+playback. **Bottom centre**, bottom edge 28dp above the screen edge,
+content-sized up to 556dp (eight grid columns) with natural wrapping. TV Design
+Kit appearance: `inverseSurface`/`inverseOnSurface`, 12dp corners, `labelLarge`
+14/20, padding 16 start · 12 top · 24 end · 12 bottom, 8dp gap; optional
+leading icon in a 32dp round badge (16dp glyph); no trailing action. One line
+is 44dp, headline plus detail 64dp. While the player footer is visible the
+notice rises above it, measured from the footer; otherwise no relocation or
+collision avoidance. No focus target, action or key interception. Notices
 survive navigation with one identity and deadline; expiry never alters domain
 state or removes durable recovery content. Cache clearing is the first producer.
 

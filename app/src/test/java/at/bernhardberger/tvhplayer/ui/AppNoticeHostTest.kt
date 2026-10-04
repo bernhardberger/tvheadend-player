@@ -2,6 +2,9 @@ package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
 import android.os.SystemClock
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -9,6 +12,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.AccessibilityManager
 import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -19,6 +23,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.SessionCache
@@ -29,6 +35,7 @@ import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.notifications.*
+import at.bernhardberger.tvhplayer.ui.player.PlayerOverlayChrome
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsGeneralLevels
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
@@ -187,17 +194,88 @@ class AppNoticeHostTest {
         compose.onAllNodes(isFocused()).assertCountEquals(1)
     }
 
-    @Test fun simpleNoticesStayCompactWhileRecordingDetailsHaveRoom() {
+    @Test fun kitNoticesHugContentAndShareTheEightColumnMaximum() {
         var details by mutableStateOf(false)
+        var message by mutableStateOf("Cache cleared")
         compose.setContent {
             TVHeadendPlayerTheme {
-                AppNoticePresentation("A long notice headline that needs enough room to remain readable",
+                AppNoticePresentation(message,
                     detail = if (details) "A long programme title · Documentary, Tomorrow 18:30" else null,
                     icon = if (details) AppNoticeIcon.SCHEDULE else null)
             }
         }
-        assertEquals(324f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.width, .5f)
+        val plain = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot
+        assertTrue(plain.width < 324f)
+        assertEquals(44f, plain.height, .5f)
+        assertEquals(512f, plain.bottom, .5f)
+        assertEquals(480f, plain.center.x, .5f)
+        compose.runOnIdle { message = "A long notice headline that needs enough room to remain readable ".repeat(3) }
+        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
         compose.runOnIdle { details = true }
-        assertEquals(480f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.width, .5f)
+        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
+        compose.onNodeWithTag("app-notice-icon", useUnmergedTree = true)
+            .assertWidthIsEqualTo(32.dp).assertHeightIsEqualTo(32.dp)
+    }
+
+    @Test fun largeTextDetailsMayWrapButRemainBoundedAndKeepFullAnnouncement() {
+        val detail = "A long programme title with additional descriptive information ".repeat(4)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                TVHeadendPlayerTheme { AppNoticePresentation("Recording scheduled", detail, AppNoticeIcon.SCHEDULE) }
+            }
+        }
+        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp)
+            .assertContentDescriptionEquals("Recording scheduled. $detail")
+        val bounds = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot
+        assertEquals(105f, bounds.height, .5f) // Android 34 font scaling: 24dp + three 27dp line boxes.
+        assertEquals(512f, bounds.bottom, .5f)
+    }
+
+    @Test fun measuredPlayerFooterLiftsShellNoticeAndDisposalRestoresBottomAnchor() {
+        var footerVisible by mutableStateOf(true)
+        var footerHeight by mutableStateOf(100.dp)
+        val queue = AppNoticeQueue({ 0L }, { Unit })
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                MainStartupComposition(MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true),
+                    onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
+                    navigation = { _, _ ->
+                        if (footerVisible) PlayerOverlayChrome(headerContent = {}, footerPadding = PaddingValues(0.dp)) {
+                            Box(Modifier.height(footerHeight))
+                        }
+                    },
+                    notices = { AppNoticeHost(queue, Unit, LocalAppNoticeBottomObstruction.current!!.value) })
+            }
+        }
+        compose.runOnIdle { queue.post("cache", R.string.cache_notice_cleared, AppNoticeKind.SUCCESS, Unit) }
+        fun assertBottom(expected: Float) {
+            assertEquals(expected, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)
+        }
+        assertBottom(412f)
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { footerHeight = 150.dp }
+        repeat(6) {
+            compose.mainClock.advanceTimeBy(16)
+            compose.waitForIdle()
+        }
+        val movingBottom = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("Inset changes should animate, not jump: $movingBottom", movingBottom > 362f && movingBottom < 412f)
+        compose.mainClock.autoAdvance = true
+        assertBottom(362f)
+        compose.runOnIdle { footerVisible = false }
+        assertBottom(512f)
+        compose.runOnIdle { footerVisible = true }
+        assertBottom(362f)
+    }
+
+    @Test fun independentWindowHostDoesNotInheritTheShellObstruction() {
+        val queue = AppNoticeQueue({ 0L }, { Unit })
+        compose.setContent {
+            CompositionLocalProvider(LocalAppNoticeBottomObstruction provides remember { mutableStateOf(150.dp) }) {
+                TVHeadendPlayerTheme { AppNoticeHost(queue, Unit) }
+            }
+        }
+        compose.runOnIdle { queue.post("cache", R.string.cache_notice_cleared, AppNoticeKind.SUCCESS, Unit) }
+        assertEquals(512f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)
     }
 }
