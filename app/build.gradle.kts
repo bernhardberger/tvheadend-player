@@ -47,8 +47,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 144
-        versionName = "0.2.90-channel-card-trial.38"
+        versionCode = 145
+        versionName = "0.2.90-channel-card-trial.39"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
