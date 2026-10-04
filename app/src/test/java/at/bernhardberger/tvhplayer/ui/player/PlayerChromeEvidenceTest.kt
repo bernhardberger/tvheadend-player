@@ -390,7 +390,13 @@ class PlayerChromeEvidenceTest {
         compose.setContent { TVHeadendPlayerTheme {
             view = LocalView.current
             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)) {
-                PlayerOverlayChrome(headerContent = { PlayerChromeHeader("", it) }) { Spacer(Modifier.height(content)) }
+                PlayerPage<Unit>(details = null, player = {
+                    PlayerControlsLayer(visible = true, modalVisible = false) {
+                        PlayerOverlayChrome(headerContent = { PlayerChromeHeader("", it) }) {
+                            Spacer(Modifier.height(content))
+                        }
+                    }
+                }, programme = {})
             }
         } }
         // Over white a black scrim of alpha a reads 255 * (1 - a); sampled left of the clock, 2px per dp.
@@ -413,6 +419,37 @@ class PlayerChromeEvidenceTest {
             assertEquals("$height: clear from 112dp", 255.0, grey(bitmap, 226), 1.0)
             bitmap.recycle()
         }
+    }
+
+    @Test fun viewportScrimPreservesRailShadingAndClearsWhenNothingIsShown() {
+        lateinit var view: View
+        var opacity by mutableStateOf(1f)
+        val scrim = PlayerPageScrim().apply {
+            alpha = { opacity }
+            previewTop = { 600f }
+            expansion = { 1f }
+        }
+        compose.setContent { TVHeadendPlayerTheme {
+            view = LocalView.current
+            Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)) {
+                Box(Modifier.fillMaxSize().playerScrim(scrim))
+            }
+        } }
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        // The clock's fade and rail veil are encoded in one gradient, not stacked paint.
+        listOf(0 to 0.72f, 112 to 0.5736f, 224 to 0.36f,
+            488 to 0.36f, 600 to 0.60f, 1079 to 0.92f).forEach { (y, alpha) ->
+            assertEquals("rail alpha at $y", 255.0 * (1f - alpha),
+                android.graphics.Color.red(bitmap.getPixel(200, y)).toDouble(), 2.0)
+        }
+        compose.runOnIdle { opacity = 0f }
+        compose.waitForIdle()
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        listOf(0, 112, 224, 488, 600, 1079).forEach { y ->
+            assertEquals("hidden at $y", android.graphics.Color.WHITE, bitmap.getPixel(200, y))
+        }
+        bitmap.recycle()
     }
 
     @Category(VisualCapture::class)

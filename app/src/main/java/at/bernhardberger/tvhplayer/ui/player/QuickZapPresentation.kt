@@ -38,7 +38,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -162,24 +161,14 @@ private fun InPlaceRail(
     val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
     val revealed by remember(expansion) { derivedStateOf { expansion() == 1f } }
     val viewport = LocalPlayerPageScrim.current
-    val railScrim: androidx.compose.ui.graphics.drawscope.DrawScope.(Float) -> ShaderBrush? = { opacity ->
-        val alpha = opacity * expansion()
-        if (alpha > 0f) {
-            val header = PlayerChromeTokens.topScrimHeight.toPx() / size.height.coerceAtLeast(1f)
-            val top = ((previewTop - TvOverlayFooterGradientRunout.toPx()) / size.height.coerceAtLeast(1f)).coerceIn(0f, 1f)
-            val preview = (previewTop / size.height.coerceAtLeast(1f)).coerceIn(top, 1f)
-            Brush.verticalGradient(
-                0f to Color.Transparent,
-                header.coerceIn(0f, top) to Color.Black.copy(alpha = RailVeil * alpha),
-                top to Color.Black.copy(alpha = RailVeil * alpha),
-                preview to Color.Black.copy(alpha = 0.60f * alpha),
-                1f to Color.Black.copy(alpha = 0.92f * alpha),
-            ) as ShaderBrush
-        } else null
+    val scrim = viewport ?: remember { PlayerPageScrim().apply { alpha = { 1f } } }
+    androidx.compose.runtime.SideEffect {
+        scrim.previewTop = { previewTop.toFloat() }
+        scrim.expansion = expansion
     }
-    androidx.compose.runtime.SideEffect { viewport?.rail = railScrim }
-    androidx.compose.runtime.DisposableEffect(viewport) { onDispose { viewport?.rail = { null } } }
+    androidx.compose.runtime.DisposableEffect(scrim) { onDispose { scrim.expansion = { 0f } } }
     Box(Modifier.fillMaxSize().clipToBounds().onGloballyPositioned { origin = it.positionInRoot() }) {
+        if (viewport == null) Box(Modifier.matchParentSize().playerScrim(scrim))
         Box(
             Modifier.fillMaxSize()
                 .focusProperties { canFocus = !expanded }
@@ -187,7 +176,8 @@ private fun InPlaceRail(
                 .testTag("player-zap-controls"),
         ) {
             // The controls' footer gives way to the rail; their header (clock, top scrim) stays.
-            CompositionLocalProvider(LocalInPlaceRailExpansion provides expansion) { controls() }
+            CompositionLocalProvider(LocalInPlaceRailExpansion provides expansion,
+                LocalPlayerPageScrim provides scrim) { controls() }
         }
         if (!expanded && expansion() == 0f) return@Box
         // Revealed sideways from the card's own bounds, its growing edges faded. Masked per child,
@@ -236,8 +226,7 @@ private fun InPlaceRail(
                     .then(reveal())
                     .testTag("player-zap-tray")) { channelContent() }
             },
-            modifier = Modifier.fillMaxSize()
-                .then(if (viewport == null) Modifier.drawBehind { railScrim(1f)?.let { drawRect(it) } } else Modifier),
+            modifier = Modifier.fillMaxSize(),
         ) { measurables, constraints ->
             val loose = constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
             val previewPlaceable = measurables[0].measure(loose)
@@ -261,6 +250,3 @@ internal val LocalInPlaceRailExpansion = compositionLocalOf<() -> Float> { { 0f 
 
 /** Trial: the soft edge of the rail's sideways reveal. */
 private val RevealFeather = 96.dp
-
-/** Trial: how far the open rail dims the picture above its preview. */
-private const val RailVeil = 0.36f

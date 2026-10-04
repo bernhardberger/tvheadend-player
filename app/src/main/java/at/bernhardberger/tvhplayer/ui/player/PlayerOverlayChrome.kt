@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -84,13 +83,7 @@ internal fun PlayerOverlayChrome(
     val pageActive = LocalPlayerPageActive.current
     SideEffect { noticeObstruction?.value = if (pageActive) footerObstruction else 0.dp }
     SideEffect {
-        viewport?.bottom = { opacity ->
-            val height = footerHeight + scrimRise()
-            val alpha = opacity * (1f - railExpansion())
-            if (alpha > 0f) translate(top = size.height - height) {
-                drawRect(PlayerChromeTokens.bottomScrim(height, this), size = Size(size.width, height), alpha = alpha)
-            }
-        }
+        viewport?.footerHeight = { footerHeight + scrimRise() }
     }
     val travels = LocalPlayerControlsEntry.current == PlayerControlsEntry.TRAVEL
     val entering = motion?.animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))

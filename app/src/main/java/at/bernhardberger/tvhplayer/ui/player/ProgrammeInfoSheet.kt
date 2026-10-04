@@ -29,8 +29,6 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.paneTitle
@@ -45,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
+import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 
 /** Only the section at rest may request focus. Outside the player page nothing changes. */
 internal val LocalPlayerPageActive = compositionLocalOf { true }
@@ -87,11 +86,72 @@ internal fun Modifier.pageMotion(
     }
 }
 
-/** Chrome supplies its measured gradients; the page draws them in the stationary viewport. */
+/** Chrome supplies geometry, not paint: one stationary viewport owns all player shading. */
 internal class PlayerPageScrim {
     var alpha by mutableStateOf<() -> Float>({ 0f })
-    var bottom by mutableStateOf<DrawScope.(Float) -> Unit>({})
-    var rail by mutableStateOf<DrawScope.(Float) -> ShaderBrush?>({ null })
+    var footerHeight by mutableStateOf<() -> Float>({ 0f })
+    var previewTop by mutableStateOf<() -> Float>({ 0f })
+    var expansion by mutableStateOf<() -> Float>({ 0f })
+}
+
+private data class PlayerScrimStop(val height: Float, val alpha: Float)
+
+private fun PlayerScrimStop.interpolate(to: PlayerScrimStop, fraction: Float) = PlayerScrimStop(
+    height + (to.height - height) * fraction,
+    alpha + (to.alpha - alpha) * fraction,
+)
+
+internal fun Modifier.playerScrim(
+    scrim: PlayerPageScrim,
+    progress: () -> Float = { 0f },
+    railHeader: Boolean = false,
+): Modifier = drawWithCache {
+    val height = size.height.coerceAtLeast(1f)
+    val header = PlayerChromeTokens.topScrimHeight.toPx()
+    val runout = TvOverlayFooterGradientRunout.toPx()
+    val footer = (height - scrim.footerHeight()).coerceIn(header.coerceAtMost(height), height)
+    val preview = scrim.previewTop().coerceIn(0f, height)
+    val railTop = (preview - runout).coerceAtLeast(0f)
+    val railHeaderEnd = header.coerceAtMost(railTop)
+    fun topAlpha(y: Float): Float = if (y <= header / 2f) {
+        0.72f + (0.48f - 0.72f) * y / (header / 2f)
+    } else (0.48f * (1f - (y - header / 2f) / (header / 2f))).coerceAtLeast(0f)
+    // Thirteen stops in every state. Four samples per half-header approximate the old
+    // two-gradient SRC_OVER curve; below the header all segments are exactly linear.
+    val headerStops = List(9) { header * it / 8f }
+    val controls = headerStops.map { PlayerScrimStop(it, topAlpha(it)) } + listOf(
+        PlayerScrimStop(footer, 0f),
+        PlayerScrimStop((footer + runout).coerceAtMost(height), 0.60f),
+        PlayerScrimStop((footer + runout + 52.dp.toPx()).coerceAtMost(height), 0.80f),
+        PlayerScrimStop(height, 0.92f),
+    )
+    val rail = (headerStops + listOf(railHeaderEnd, railTop, preview, height)).sorted().map { y ->
+        val veil = when {
+            y < railHeaderEnd -> 0.36f * y / railHeaderEnd
+            y <= railTop -> 0.36f
+            y < preview -> 0.36f + 0.24f * (y - railTop) / (preview - railTop)
+            else -> 0.60f + 0.32f * ((y - preview) / (height - preview).coerceAtLeast(1f))
+        }
+        PlayerScrimStop(y, 1f - (1f - topAlpha(y)) * (1f - veil))
+    }
+    val details = (headerStops + List(4) { height }).map { y ->
+        val backdrop = 0.84f + 0.08f * y / height
+        PlayerScrimStop(y, 1f - (1f - topAlpha(y)) * (1f - backdrop))
+    }
+    onDrawBehind {
+        val chrome = scrim.alpha()
+        val page = (progress() * BrowseMotionPolicy.pageDownMs / 300f).coerceIn(0f, 1f)
+        val detail = if (railHeader) page else BrowseMotionPolicy.pageStandardDecelerate.transform(page)
+        if (chrome > 0f || detail > 0f) {
+            val expansion = scrim.expansion().coerceIn(0f, 1f)
+            val stops = controls.indices.map { index ->
+                val base = controls[index].interpolate(rail[index], expansion)
+                val stop = base.copy(alpha = base.alpha * chrome).interpolate(details[index], detail)
+                (stop.height / height) to Color.Black.copy(alpha = stop.alpha)
+            }.toTypedArray()
+            drawRect(Brush.verticalGradient(*stops, endY = height))
+        }
+    }
 }
 
 /** One reversible clock, stationary sections and scrims, independently choreographed elements. */
@@ -124,36 +184,8 @@ internal fun <T : Any> PlayerPage(
     CompositionLocalProvider(LocalPlayerPageProgress provides readProgress, LocalPlayerPageScrim provides scrim,
         LocalPlayerRailPeek provides railPeek) {
         Box(modifier.fillMaxSize().clipToBounds()) {
-            // Gradients do not need four viewport-sized alpha layer stacks. Multiply their paint
-            // alpha in one draw node, and skip invisible passes; frame-rate reads stay in draw.
-            Box(Modifier.matchParentSize().testTag("player-page-scrim").drawWithCache {
-                val top = PlayerChromeTokens.topScrimHeight.toPx()
-                val topBrush = Brush.verticalGradient(*PlayerChromeTokens.topScrimStops, endY = top)
-                val detailsBrush = Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.84f),
-                    1f to Color.Black.copy(alpha = 0.92f))
-                onDrawBehind {
-                    val ms = readProgress() * BrowseMotionPolicy.pageDownMs
-                    val chrome = scrim.alpha()
-                    val railFade = (ms / 300f).coerceIn(0f, 1f)
-                    val bottomAlpha = chrome * (1f - ((ms - 200f) / 150f).coerceIn(0f, 1f))
-                    val railAlpha = chrome * (1f - railFade)
-                    val rail = if (railAlpha > 0f) scrim.rail(this, railAlpha) else null
-                    if (rail != null) {
-                        // Both gradients are black: SrcOver preserves their exact overlap without
-                        // painting the top band twice. The rail veil has ink across the viewport.
-                        val topOverRail = Brush.verticalGradient(*PlayerChromeTokens.topScrimStops.map { (stop, color) ->
-                            stop to color.copy(alpha = color.alpha * chrome)
-                        }.toTypedArray(), endY = top) as ShaderBrush
-                        drawRect(ShaderBrush(android.graphics.ComposeShader(
-                            rail.createShader(size), topOverRail.createShader(size), android.graphics.PorterDuff.Mode.SRC_OVER)))
-                    } else if (chrome > 0f) {
-                        drawRect(topBrush, size = androidx.compose.ui.geometry.Size(size.width, top), alpha = chrome)
-                    }
-                    if (bottomAlpha > 0f) scrim.bottom(this, bottomAlpha)
-                    val detailsAlpha = if (header != null) railFade else BrowseMotionPolicy.pageStandardDecelerate.transform(railFade)
-                    if (detailsAlpha > 0f) drawRect(detailsBrush, alpha = detailsAlpha)
-                }
-            })
+            Box(Modifier.matchParentSize().testTag("player-page-scrim")
+                .playerScrim(scrim, readProgress, railHeader = header != null))
             PlayerMotionFrame(leaving = open || !settled, modifier = Modifier.fillMaxSize().testTag("player-page-first")) {
                 Box(Modifier.fillMaxSize()) {
                     CompositionLocalProvider(LocalPlayerPageActive provides (!open && settled)) { player(composed) }
