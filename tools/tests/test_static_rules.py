@@ -129,6 +129,27 @@ class StaticRulesTest(unittest.TestCase):
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(content, encoding="utf-8")
 
+    def test_transient_feedback_rejects_parallel_presentations_and_owners(self):
+        for source in ("Toast.makeText()", "SnackbarHost()", "SnackbarHostState()",
+                       "AppNoticePresentation()", "val center = NoticeCenter(clock, context)",
+                       "val label = entry.subscriptionError ?. name",
+                       'val label = "${entry.subscriptionError?.name}"'):
+            with self.subTest(source=source):
+                self.write("app/src/main/java/example/Screen.kt", source)
+                self.assertTrue(any("TransientFeedback: app/src/main/java/example/Screen.kt:1" in item
+                                    for item in find_static_rule_violations(self.root)))
+
+    def test_transient_feedback_allows_owners_and_persistent_semantics(self):
+        self.write("app/src/main/java/example/ui/notifications/Host.kt", "fun host() = AppNoticePresentation()\n")
+        self.write("app/src/main/java/example/di/Module.kt", "val center = NoticeCenter(clock, context)\n")
+        self.write("client/src/main/java/example/notices/NoticeCenter.kt", "class NoticeCenter(clock: Clock)\n")
+        self.write("app/src/main/java/example/Screen.kt", '// Toast SnackbarHost\nval note = "AppNoticePresentation()"\nval liveRegion = polite\n')
+        self.assertEqual([], find_static_rule_violations(self.root))
+
+    def test_transient_feedback_also_checks_client_sources(self):
+        self.write("client/src/main/java/example/Producer.kt", "val center = NoticeCenter(clock, context)\n")
+        self.assertTrue(any("TransientFeedback" in item for item in find_static_rule_violations(self.root)))
+
 
 if __name__ == "__main__":
     unittest.main()

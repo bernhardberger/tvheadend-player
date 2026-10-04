@@ -34,8 +34,8 @@ import kotlinx.coroutines.Job
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
@@ -122,7 +122,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var startupBrandIntro: StartupBrandIntro
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
-    private val notices: AppNoticeQueue by inject()
+    private val notices: NoticeCenter by inject()
     private val tvheadendSession: TvheadendSession by inject()
     private val channelAccents: ChannelAccents by inject()
     private val mediaSessionLifecycle = ActivityMediaSessionLifecycle()
@@ -174,11 +174,7 @@ class MainActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 playbackRuntime.backgroundNotice.collect { notice ->
                     if (notice != null) {
-                        notices.post("background-playback", when (notice) {
-                            BackgroundPlaybackNotice.LIMIT_EXPIRED -> R.string.background_live_stopped
-                            BackgroundPlaybackNotice.TUNER_LOST -> R.string.background_tuner_lost
-                            BackgroundPlaybackNotice.INTERRUPTED -> R.string.background_live_interrupted
-                        }, AppNoticeKind.SUCCESS, notices.context())
+                        notices.post(Notice.BackgroundPlayback(notice), notices.context())
                         playbackRuntime.consumeBackgroundNotice(notice)
                     }
                 }

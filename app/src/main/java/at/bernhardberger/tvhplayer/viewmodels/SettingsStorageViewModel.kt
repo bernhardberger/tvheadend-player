@@ -3,10 +3,9 @@ package at.bernhardberger.tvhplayer.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.SessionCache
-import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -20,7 +19,7 @@ enum class CacheClearState { IDLE, CLEARING, CLEARED, FAILED }
 
 class SettingsStorageViewModel(
     private val cache: SessionCache,
-    private val notices: AppNoticeQueue,
+    private val notices: NoticeCenter,
     /** Derived from cached picons, so cleared with them. */
     private val channelAccents: ChannelAccentStore,
 ) : ViewModel() {
@@ -41,12 +40,12 @@ class SettingsStorageViewModel(
                     cache.clear()
                     channelAccents.clear()
                     mutableClearState.value = CacheClearState.CLEARED
-                    notices.post("cache-clear", R.string.cache_notice_cleared, AppNoticeKind.SUCCESS, context)
+                    notices.post(Notice.CacheClear(success = true), context)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
                     mutableClearState.value = CacheClearState.FAILED
-                    notices.post("cache-clear", R.string.cache_notice_failed, AppNoticeKind.FAILURE, context)
+                    notices.post(Notice.CacheClear(success = false), context)
                 }
             }
             delay(4_000)

@@ -10,8 +10,10 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
+import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -33,6 +35,46 @@ class RecordingConfirmationStateTest {
     @Test fun cancelRechecksLatestObservationBeforeDispatch() = transition(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, true)
     @Test fun stopRechecksLatestObservationBeforeDispatch() = transition(DvrEntryState.RECORDING, DvrEntryState.COMPLETED, true)
 
+    @Test fun actionFailureIsPostedAfterDetailsClose() = delayedFailure(reopen = false)
+    @Test fun actionFailureIsPostedAfterDetailsReopen() = delayedFailure(reopen = true)
+
+    private fun delayedFailure(reopen: Boolean) {
+        val session = FakeTvheadendSession(observation(DvrEntryState.SCHEDULED))
+        val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
+        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
+        val result = CompletableDeferred<DvrMutationResult<Unit>>()
+        var calls = 0
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
+            stopEntry = { _, _ -> DvrMutationResult.NotReady },
+            cancelEntry = { _, _ -> calls++; result.await() },
+            deleteEntry = { _, _ -> DvrMutationResult.NotReady },
+        )
+        val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreenContent(
+                    observation = session.observation.collectAsState().value,
+                    currentObservation = { session.observation.value },
+                    state = state, imageLoader = loader, dvrMutationActions = actions, notices = notices,
+                )
+            }
+        }
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(1, calls) }
+        compose.onNodeWithTag("recording-details-close").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-details-cancel").assertDoesNotExist()
+        if (reopen) compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            assertEquals(Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.PERMISSION_DENIED),
+                notices.state.value.candidate?.notice)
+        }
+    }
+
     private fun transition(before: DvrEntryState, after: DvrEntryState?, clickBeforeRecomposition: Boolean = false) {
         val session = FakeTvheadendSession(observation(before))
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
@@ -44,12 +86,16 @@ class RecordingConfirmationStateTest {
             cancelEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
             deleteEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
         )
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(0, session.observation.value.currentSession?.generationIdentity)
+        }
         compose.setContent {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
                     state = state, imageLoader = loader, dvrMutationActions = actions,
+                    notices = notices,
                 )
             }
         }

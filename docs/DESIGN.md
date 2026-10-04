@@ -327,13 +327,38 @@ Accepted 2026-09-15; static design in Penpot page
 
 ## 8. Global snackbar
 
-One passive host in the app shell, above ordinary destinations including
-playback. **Bottom centre**, inside the safe margins, content-sized up to 324dp
-with natural wrapping. Kit appearance: `inverseSurface`/`inverseOnSurface`,
-12dp corners, `labelLarge`, 16/12dp padding. No focus target, action, key
-interception, relocation or collision avoidance; it may overlap content. Notices
-survive navigation with one identity and deadline; expiry never alters domain
-state or removes durable recovery content. Cache clearing is the first producer.
+Transient feedback has one owner: typed `Notice` and `NoticeCenter` in `:client`;
+`NoticeFormatter` and `AppNoticeHost` in `:app` own copy, icons and presentation.
+Post notices, not Toasts, local snackbars or inline action-result labels. Persistent
+status stays on its owning surface; a blocking failure uses `TvRecoveryOverlay`.
+`TransientFeedback` static checks enforce the presentation/construction boundary
+and reject raw DVR subscription-error names (use their shared localized label).
+
+One passive host in the app shell, above ordinary destinations including playback;
+independent dialog windows use the same center and deadline. **Bottom centre**, 28dp
+from the bottom, content-sized up to 556dp (eight kit columns), 44dp one-line or
+64dp two-line minimum. Kit appearance: `inverseSurface`/`inverseOnSurface`, 12dp
+corners, `labelLarge`, 16dp start/24dp end and 12dp vertical padding; optional 32dp
+icon badge with a 16dp icon and 8dp gap. Details are ellipsized (two detail lines at
+large font scale); the merged polite announcement retains the complete text.
+No focus target, action or key interception. Player notices rise above the measured
+footer content, animating changes; they do not cover its controls. Dialog-window
+hosts do not inherit the shell's footer obstruction.
+
+FIFO with per-key pending replacement, at most eight pending entries and a 30s
+pending lifetime. INFO displays for 4s, FAILURE for 6s, extended by accessibility
+timeouts. Display waits for the resumed, focused window with no IME. Notices
+survive navigation with one identity and deadline; context changes invalidate them.
+Expiry never alters domain state or removes durable recovery content.
+
+DVR successes come only from SDK server changes, including this client's actions;
+command failures post a separate failure notice. Same-rule series scheduling groups
+distinct entries within 2s. External removal of an archive recording is silent;
+removing a scheduled entry announces cancellation. Connection loss is debounced 3s
+after a Ready baseline, restoration only follows a posted loss, and login rejection
+only follows Ready in the same profile generation. Startup and profile changes are
+silent. Cache clearing and background-playback outcomes use the same center;
+tuner loss and interruption are failures, limit expiry is informational.
 
 ## 9. Lists, cards, progress
 

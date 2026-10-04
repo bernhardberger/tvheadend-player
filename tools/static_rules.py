@@ -109,6 +109,23 @@ def find_static_rule_violations(root: Path) -> list[str]:
                     f"NoConnectionProbe: {path.relative_to(root)}:"
                     f"{line_number(code, match.start())} uses {label}"
                 )
+        feedback_patterns = [
+            ("raw subscription error name", r"\bsubscriptionError\s*\?*\.\s*name\b"),
+        ]
+        relative_path = path.relative_to(root).as_posix()
+        if "/ui/notifications/" not in relative_path:
+            feedback_patterns.append(("local transient presentation", r"\b(?:Toast|Snackbar\w*|AppNoticePresentation)\b"))
+        if "/di/" not in relative_path:
+            feedback_patterns.append(("NoticeCenter construction outside DI", r"\bNoticeCenter\s*\("))
+        for label, pattern in feedback_patterns:
+            for match in re.finditer(pattern, code):
+                # A declaration defines the shared owner; it does not construct another one.
+                if label == "NoticeCenter construction outside DI" and re.search(r"\bclass\s+$", code[:match.start()]):
+                    continue
+                violations.append(
+                    f"TransientFeedback: {relative_path}:"
+                    f"{line_number(code, match.start())} uses {label}"
+                )
 
     resource_paths = [path for production_root in production_roots
                       for path in sorted((production_root / "res").rglob("*.xml"))]

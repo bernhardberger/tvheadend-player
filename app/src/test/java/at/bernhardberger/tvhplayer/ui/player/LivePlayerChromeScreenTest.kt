@@ -6,6 +6,9 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+
 import android.app.Application
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -1408,6 +1411,9 @@ class LivePlayerChromeScreenTest {
         // setContent synchronizes the first composition. Waiting before a Compose root exists
         // instead incurs the test framework's two-second root-discovery wait on every entry.
         if (!settleOnEntry) compose.mainClock.autoAdvance = false
+        val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+            NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
+        }
         compose.setContent {
             if (screenVisible.value) {
                 CompositionLocalProvider(
@@ -1418,7 +1424,8 @@ class LivePlayerChromeScreenTest {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                             channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
-                            contentAllowed = contentAllowed(),
+                             contentAllowed = contentAllowed(),
+                             notices = notices,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                     }

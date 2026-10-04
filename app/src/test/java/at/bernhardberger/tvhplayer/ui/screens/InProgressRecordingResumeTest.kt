@@ -94,6 +94,9 @@ class InProgressRecordingResumeTest {
             deleteEntry = { _, _ -> DvrMutationResult.NotReady },
         )
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
+        }
         compose.setContent {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(
@@ -101,6 +104,7 @@ class InProgressRecordingResumeTest {
                     state = state,
                     imageLoader = loader,
                     dvrMutationActions = actions,
+                    notices = notices,
                     onPlayRecording = { _, start -> starts += start },
                 )
             }

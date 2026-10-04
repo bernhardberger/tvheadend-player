@@ -64,7 +64,7 @@ class GuideHistoryCompositionTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
                     if (details) ProgrammeDetailsPanel(PaddingValues(), a, null, null, { 4000 }, false,
-                        null, {}, { details = false }, liveProgrammeActions = false)
+                        {}, { details = false }, liveProgrammeActions = false)
                     else Column(Modifier.fillMaxSize()) {
                         listOf(1L, 2L).forEach { channel -> TimelineChannelRow(
                             channel = Channel.create(ChannelId(channel), name = "Documentary $channel"),
@@ -102,7 +102,7 @@ class GuideHistoryCompositionTest {
         var recording by mutableStateOf<DvrEntry?>(null)
         compose.setContent { TVHeadendPlayerTheme {
             ProgrammeDetailsPanel(PaddingValues(), selected, null, recording, { 4000 }, true,
-                null, {}, {}, liveProgrammeActions = live)
+                {}, {}, liveProgrammeActions = live)
         } }
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.runOnIdle { live = true }

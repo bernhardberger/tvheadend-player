@@ -1,5 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
+
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 
@@ -362,6 +367,7 @@ fun VideoPlayerScreen(
     contentAllowed: Boolean = true,
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
+    notices: NoticeCenter = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -1265,6 +1271,7 @@ fun VideoPlayerScreen(
         ) {
             is LiveInfoRecordingDecision.Dispatch -> {
                 infoRecordingState = LiveInfoRecordingState.Dispatching(decision.target)
+                val noticeContext = notices.context()
                 scope.launch {
                     val result = session.dvrRepository.scheduleEntry(
                         decision.target.currentSession,
@@ -1279,7 +1286,14 @@ fun VideoPlayerScreen(
                         infoOpen = layerState.infoOpen,
                     )
                     infoRecordingState = completion.state
-                    if (completion.showResult) layerState.showRecordingConfirmation()
+                    if (completion.showResult) {
+                        layerState.dismissRecordingConfirmation()
+                        restoreRecordFocus = true
+                    }
+                    val feedback = result.toDvrMutationFeedback()
+                    if (feedback.isFailure) notices.post(
+                        Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, feedback), noticeContext,
+                    )
                 }
             }
             LiveInfoRecordingDecision.Invalidate -> {

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -187,12 +189,12 @@ internal fun RecordingsScreenContent(
     state: RecordingsScreenState? = null,
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
+    notices: NoticeCenter = koinInject(),
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val currentSession = observation.currentSession
-    val latestSession by rememberUpdatedState(currentSession)
     val latestObservationProvider by rememberUpdatedState(currentObservation)
     val preparationAuthority = currentSession ?: observation.dvrSnapshotForDisplay
     var retainedPreparation by remember(preparationAuthority) {
@@ -220,7 +222,6 @@ internal fun RecordingsScreenContent(
     var folderPreviewRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
     var detailsOpenedFromFolderPreview by remember { mutableStateOf(false) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
-    var detailsGeneration by remember { mutableIntStateOf(0) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var detailsInitialAction by remember {
         mutableStateOf<RecordingDetailsAction?>(null)
@@ -228,7 +229,6 @@ internal fun RecordingsScreenContent(
     var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
     var confirmationKey by remember { mutableStateOf<Key?>(null) }
-    var actionResult by remember { mutableStateOf<DvrMutationFeedback?>(null) }
     var pendingDetailsReturn by remember {
         mutableStateOf<RecordingDetailsReturnTarget?>(null)
     }
@@ -617,9 +617,7 @@ internal fun RecordingsScreenContent(
                                     detailsOpenedFromFolderPreview = false
                                     detailsInitialAction = null
                                     detailsEntry = it
-                                    detailsGeneration++
                                     detailsObservation = observation
-                                    actionResult = null
                                 },
                                 imageLoader = imageLoader,
                                 currentSession = currentSession,
@@ -660,9 +658,7 @@ internal fun RecordingsScreenContent(
                                     detailsOpenedFromFolderPreview = true
                                     detailsInitialAction = null
                                     detailsEntry = it
-                                    detailsGeneration++
                                     detailsObservation = observation
-                                    actionResult = null
                                 },
                             )
                             else -> RecordingMetadataPane(
@@ -699,9 +695,7 @@ internal fun RecordingsScreenContent(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
-                                detailsGeneration++
                                 detailsObservation = observation
-                                actionResult = null
                             },
                             imageLoader = imageLoader,
                             currentSession = currentSession,
@@ -740,9 +734,7 @@ internal fun RecordingsScreenContent(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
-                                detailsGeneration++
                                 detailsObservation = observation
-                                actionResult = null
                             },
                             imageLoader = imageLoader,
                             currentSession = currentSession,
@@ -779,7 +771,6 @@ internal fun RecordingsScreenContent(
             detailsEntry = null
             detailsObservation = null
             detailsInitialAction = null
-            actionResult = null
             pendingDetailsReturn = RecordingDetailsReturnTarget.CONTENT
         }
     }
@@ -787,7 +778,6 @@ internal fun RecordingsScreenContent(
         RecordingDetailsPanel(
             contentPadding = contentPadding,
             entry = opened,
-            actionResult = actionResult,
             canModifyRecordings = selectedCapability != null,
             playbackEligible = selectedCapability != null,
             initialAction = when (detailsInitialAction) {
@@ -805,7 +795,6 @@ internal fun RecordingsScreenContent(
                     detailsEntry = null
                     detailsObservation = null
                     detailsInitialAction = null
-                    actionResult = null
                     requestContentFocus = true
                     onPlayRecording(
                         RecordingPlaybackSelection(capability, opened.id),
@@ -853,7 +842,6 @@ internal fun RecordingsScreenContent(
                 detailsEntry = null
                 detailsObservation = null
                 detailsInitialAction = null
-                actionResult = null
             },
         )
     }
@@ -865,7 +853,6 @@ internal fun RecordingsScreenContent(
         if (action != null && (selectedCapability == null || !mutationStateCurrent)) {
             pendingAction = null
             pendingMutation = null
-            if (selectedCapability == null) actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE
         }
     }
     if (action != null && target != null && selectedCapability != null && mutationStateCurrent) {
@@ -881,23 +868,16 @@ internal fun RecordingsScreenContent(
                 pendingAction = null
                 val mutation = pendingMutation
                 pendingMutation = null
-                val mutationEntry = detailsEntry
                 val mutationObservation = detailsObservation
-                val mutationGeneration = detailsGeneration
                 scope.launch {
                     val latestObservation = latestObservationProvider()
                     if (mutation == null ||
                         mutationObservation?.currentSession !== latestObservation.currentSession ||
                         !mutation.recordingStateIsCurrent(latestObservation)
                     ) return@launch
+                    val noticeContext = notices.context()
                     val result = dvrMutationActions.execute(mutation)
-                    if (
-                        detailsGeneration == mutationGeneration &&
-                        detailsEntry === mutationEntry && detailsObservation === mutationObservation &&
-                        latestSession != null && mutationObservation?.currentSession === latestSession
-                    ) {
-                        actionResult = result
-                    }
+                    notices.postDvrFailure(mutation, result, noticeContext)
                 }
             },
         )

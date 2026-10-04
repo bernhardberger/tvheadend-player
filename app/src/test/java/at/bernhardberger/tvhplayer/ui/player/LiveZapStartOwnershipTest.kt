@@ -3,6 +3,9 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+
 import android.app.Application
 import android.os.Looper
 import androidx.compose.runtime.CompositionLocalProvider
@@ -259,11 +262,15 @@ class LiveZapStartOwnershipTest {
         lifecycle.currentState = Lifecycle.State.RESUMED
         // setContent synchronizes the first composition; there is no Compose root to idle yet.
         if (entryHeld) settingsData.open.value = false
+        val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+            NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
+        }
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
                 TVHeadendPlayerTheme {
                     VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
-                        channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, {}, runtime)
+                        channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, {}, runtime,
+                        notices = notices)
                 }
             }
         }

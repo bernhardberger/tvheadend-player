@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
+import at.bernhardberger.tvhplayer.ui.notifications.label
+
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import androidx.compose.foundation.background
 
@@ -607,7 +609,7 @@ internal fun RecordingMetadataPane(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        entry.subscriptionError?.name?.let {
+        entry.subscriptionError?.label()?.let {
             Text(text = it, color = MaterialTheme.colorScheme.error, maxLines = 2)
         }
         entry.playCount?.takeIf { it > 0 }?.let {
@@ -961,7 +963,7 @@ private fun RecordingListRow(
 ) {
     val problem = kind == RecordingRowKind.PROBLEM
     val active = kind == RecordingRowKind.SCHEDULE && entry.state == DvrEntryState.RECORDING
-    val metadata = recordingListMetadata(entry, problem = problem)
+    val metadata = recordingListMetadata(entry, problemLabel = entry.subscriptionError?.takeIf { problem }?.label())
     TvListRow(
         selected = selected,
         onClick = onClick,

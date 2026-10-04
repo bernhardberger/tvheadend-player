@@ -44,6 +44,9 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 - `stores/`: `LastPlayedChannelStore` (owns `tvhplayer_appliance`), `ChannelSelectionStore`.
 - `profiling/`: `ProfileTrace`, `ProfilePlayback`, `ProfilePlaybackTrace`.
 - `data/FrontendModels`.
+- `notices/`: typed `Notice`, the FIFO `NoticeCenter` and generation-fenced
+  `NoticeContext`, plus SDK DVR-change and connection notice sources. These own
+  transient-feedback policy without Android resources or presentation.
 - `core/` domain policy: connection state, channel readiness, DVR library,
   growing timeline end, last-played channel, live-info recording, metadata
   cache, programme actions and recording targets, recording markers, seekbar,
@@ -51,7 +54,7 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 
 ## What stays app-owned and why
 
-- Compose UI, screens, view models, notifications, theme and resources: UI.
+- Compose UI, screens, view models, notice formatting/presentation, theme and resources: UI.
 - `di/AppModule` (Koin wiring) and `profiling/ProfileLayout` (Compose).
 - Key, focus, Back, navigation, appliance, accent, label, formatting and
   presentation policies: TV interaction and product UX.
@@ -67,7 +70,7 @@ SDK. Anything that needs Compose, `R`, views, Koin or TV interaction stays in `:
 
 ## Tooling
 
-`tools/static_rules.py` applies the connection-probe rule to `client/src/main`
+`tools/static_rules.py` applies the connection-probe and transient-feedback rules to `client/src/main`
 as well; theme rules stay app-only. `:app:verifyExternalSdkConsumption` checks
 both modules' debug, release, profile and profileServer compile/runtime classpaths
 and inherited dependency declarations. Only the in-repo `:client` project
