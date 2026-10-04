@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -22,6 +24,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -57,6 +65,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingConfirmationDialog
 import kotlin.time.Instant
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -133,11 +142,44 @@ class OverlayInitialFocusDrawTest {
         hasText(string(R.string.display_mode_16_9)) and isSelected(),
     )
 
-    @Test fun statsPage() = optionsPage(
-        PlaybackOptionsPage.STATS,
-        hasText(string(R.string.stats_for_nerds)) and
-            SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch),
-    )
+    @OptIn(ExperimentalTestApi::class)
+    @Test fun statsPage() {
+        val checked = mutableStateOf(false)
+        var toggles = 0
+        var destination: PlaybackOptionsPage? = null
+        val switchRole = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch)
+        val expected = hasText(string(R.string.stats_for_nerds)) and switchRole
+        assertInitialFocusDrawn(expected) {
+            PlaybackOptionsSheetContent(
+                page = PlaybackOptionsPage.STATS,
+                audioTracks = emptyList(),
+                subtitleTracks = emptyList(),
+                tracksResolving = false,
+                aspectRatio = AspectRatioMode.FORCE_16_9,
+                statsVisible = checked.value,
+                onPageChange = { destination = it },
+                onAudioTrackSelected = {},
+                onSubtitleTrackSelected = {},
+                onAspectRatioChange = {},
+                onStatsVisibleChange = {
+                    checked.value = it
+                    toggles++
+                },
+            )
+        }
+        compose.onAllNodes(switchRole).assertCountEquals(1)
+        val row = compose.onNode(expected)
+        row.assertIsFocused().assertIsOff()
+        row.performKeyInput { pressKey(Key.DirectionCenter) }
+        row.assertIsOn()
+        compose.runOnIdle { assertEquals(1, toggles) }
+        row.performKeyInput { pressKey(Key.DirectionUp) }
+        val back = compose.onNodeWithTag("playback-options-header-back")
+        back.assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        row.assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        back.performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(PlaybackOptionsPage.ROOT, destination) }
+    }
 
     /** The selected track's row, reached through the list's scroll-and-wait branch. */
     @Test fun audioTrackPage() = optionsPage(

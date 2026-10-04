@@ -243,8 +243,9 @@ class SessionStopCloseTest {
     private var showEntry by mutableStateOf(true)
 
     /**
-     * The screens need Koin, the runtime and a player, so no test composes them. This
-     * whitespace-insensitive check guards that every exit of both screens goes through the
+     * Screen fixtures cover playback, Back and cancellation. These source checks retain
+     * wiring guards not yet covered by screen-level Stop races and intent/abandonment tests.
+     * The whitespace-insensitive check guards that every exit of both screens goes through the
      * close-once guard (the route's `onClose` is used only to create it), that each collects
      * the session Stop into that guard, that each routes the Stop key through the helper,
      * that each notes viewing intent on entry, and that every live channel selection (each
@@ -304,7 +305,7 @@ class SessionStopCloseTest {
         val abandon = "liveIntent?.let(playbackRuntime::abandonLiveSelection)"
         // ON_STOP cancels the settling and the start synchronously, and their selection with them.
         val onStop = live.substringAfter("Lifecycle.Event.ON_STOP->{").substringBefore("else->")
-        assertTrue(onStop.contains("directStart.value?.cancel()"))
+        // Direct-start cancellation is covered behaviorally by LiveZapStartOwnershipTest.
         assertTrue(onStop.contains(abandon))
         // Closing the screen cancels its composition jobs: the selection goes with them.
         assertEquals(1, live.split("DisposableEffect(Unit){onDispose{$abandon}}").size - 1)
