@@ -577,7 +577,7 @@ internal fun ConfirmProgrammeActionDialog(
 }
 
 @Composable
-private fun programmeActionLabel(action: ProgrammeAction): String = stringResource(
+internal fun programmeActionLabel(action: ProgrammeAction): String = stringResource(
     when (action) {
         ProgrammeAction.WATCH -> R.string.watch
         ProgrammeAction.RECORD -> R.string.record

@@ -20,13 +20,11 @@ import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
-import at.bernhardberger.tvhplayer.ui.TvSpacing48
 
 /** Share of the screen height the sheet's content takes, from the bottom. */
-private const val ProgrammeInfoSheetHeightFraction = 0.66f
 
 /**
  * Trial: programme info as a full-screen sheet. A scrim that deepens towards the bottom
@@ -38,6 +36,7 @@ internal fun ProgrammeInfoSheetFrame(
     modifier: Modifier = Modifier,
     paneTitle: String? = null,
     panelTag: String = "live-info-panel",
+    bottomPadding: Dp = 40.dp,
     content: @Composable () -> Unit,
 ) {
     val motion = LocalPlayerPanelMotion.current
@@ -63,9 +62,9 @@ internal fun ProgrammeInfoSheetFrame(
                     .matchParentSize()
                     .graphicsLayer { alpha = scrimShown?.value ?: 1f }
                     .background(
+                        // Trial: the program details read over the whole picture, still dimly visible.
                         Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.55f),
-                            0.4f to Color.Black.copy(alpha = 0.80f),
+                            0f to Color.Black.copy(alpha = 0.84f),
                             1f to Color.Black.copy(alpha = 0.92f),
                         )
                     )
@@ -73,14 +72,14 @@ internal fun ProgrammeInfoSheetFrame(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(ProgrammeInfoSheetHeightFraction)
+                    .fillMaxHeight()
                     .graphicsLayer {
                         val shown = sheetShown?.value ?: 1f
                         alpha = shown
                         translationY = PlayerMotion.PanelOffset.toPx() * (1f - shown)
                     }
-                    .padding(horizontal = TvOverlaySidePadding)
-                    .padding(bottom = TvSpacing48)
+                    .padding(horizontal = PlayerChromeTokens.gridMargin)
+                    .padding(top = 32.dp, bottom = bottomPadding)
                     .testTag(panelTag)
                     .semantics {
                         dialog()

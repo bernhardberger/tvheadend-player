@@ -164,7 +164,7 @@ class PlaybackPanelCaptureTest {
                             quickList = PlaybackQuickListSignals(),
                         )
                         Surface.PROGRAMME_INFO -> LiveProgrammeInfoOverlay(
-                            hero = {},
+                            details = { _, _ -> },
                             event = EpgEvent.create(
                                 id = EventId(42L),
                                 channelId = ChannelId(1L),

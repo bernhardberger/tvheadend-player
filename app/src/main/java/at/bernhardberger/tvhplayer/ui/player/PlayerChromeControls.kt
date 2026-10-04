@@ -467,11 +467,11 @@ internal fun PlayerChromeControls(
 }
 
 @Composable
-private fun PlayerDownHint(text: String, modifier: Modifier = Modifier) {
+internal fun PlayerDownHint(text: String, modifier: Modifier = Modifier, up: Boolean = false) {
     val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         androidx.tv.material3.Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
-            modifier = Modifier.size(24.dp).rotate(90f))
+            modifier = Modifier.size(24.dp).rotate(if (up) -90f else 90f))
         Text(text, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
     }
 }

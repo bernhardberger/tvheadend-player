@@ -151,7 +151,7 @@ class PlayerMotionTest {
             },
             panel = {
                 LiveProgrammeInfoOverlay(
-                    hero = {},
+                    details = { _, _ -> },
                     event = null,
                     channelIdentity = "1 One",
                     channelName = "One",

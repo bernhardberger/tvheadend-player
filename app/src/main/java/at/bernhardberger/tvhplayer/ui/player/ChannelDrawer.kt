@@ -1,7 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
-import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
+import at.bernhardberger.tvhplayer.ui.components.ChannelNowIndicators
+import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExitTransition
@@ -47,14 +48,14 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.CompactCard
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -73,15 +73,14 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.profiling.profileTrace
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import coil3.ImageLoader
 import kotlinx.coroutines.flow.first
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -100,11 +99,12 @@ fun ChannelDrawer(
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: (Int?) -> Unit,
+    onOpenSchedule: ((Channel, Int) -> Unit)? = null,
     // Trial: the card's first Left/Right opens the rail on this channel, then steps it once.
     entryFocusId: ChannelId? = null,
     entryStep: Int = 0,
     // Trial: the rail opens in place of the channel card: card-sized tiles on its keyline, Down
-    // closes it, Up has nowhere to go.
+    // opens its schedule, Up has nowhere to go.
     inPlace: Boolean = false,
 ) {
     val ids = remember(channels) { channels.map { it.id } }
@@ -212,7 +212,9 @@ fun ChannelDrawer(
                     inPlace && event.key == Key.DirectionUp -> true
                     inPlace && event.key == Key.DirectionDown -> {
                         if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                            onCloseDrawer(event.nativeKeyEvent.keyCode)
+                            val channel = channels.firstOrNull { it.id == focusedId }
+                            if (channel != null && onOpenSchedule != null) onOpenSchedule(channel, event.nativeKeyEvent.keyCode)
+                            else onCloseDrawer(event.nativeKeyEvent.keyCode)
                         }
                         true
                     }
@@ -296,6 +298,21 @@ fun ChannelDrawer(
             }
         }
         }
+        if (inPlace && active) channels.firstOrNull { it.id == focusedId }?.let { channel ->
+            val identity = listOfNotNull(channel.visibleChannelNumber?.toString(), channel.name).joinToString(" · ")
+            Box(Modifier.fillMaxWidth().layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, 0) {
+                    val position = coordinates
+                    val bottom = position?.findRootCoordinates()?.size?.height ?: 0
+                    val top = position?.positionInRoot()?.y ?: 0f
+                    placeable.place(0, (bottom - top).roundToInt() - 14.dp.roundToPx())
+                }
+            }) {
+                PlayerDownHint("$identity · ${stringResource(R.string.details_tab_schedule)}",
+                    Modifier.padding(horizontal = edgeInset).testTag("player-rail-schedule-peek"))
+            }
+        }
     }
 }
 
@@ -333,12 +350,13 @@ private fun InPlaceZapTile(
             image = {
                 ChannelCardFace(channel.icon, channel.id, channel.name.orEmpty(), imageLoader, currentSession,
                     logoTag = "player-channel-${channel.id.value}-picon", nameTag = "player-channel-${channel.id.value}-name")
-                ChannelCardLabel(number?.toString(), channel.name.takeIf { channel.icon != null },
-                    tag = "player-channel-${channel.id.value}-identity") {
-                    if (playbackIndicator != ChannelPlaybackIndicator.NONE) ChannelPlaybackMarker(playbackIndicator, size = 14.dp)
-                    if (recording) Icon(painterResource(R.drawable.ic_fiber_manual_record),
-                        contentDescription = stringResource(R.string.player_shelf_recording),
-                        tint = TvRecordingColor, modifier = Modifier.size(14.dp))
+                Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ChannelTitle(number, channel.name.takeIf { channel.icon != null }.orEmpty(),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.weight(1f).testTag("player-channel-${channel.id.value}-identity"))
+                    ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
+                        recordingNow = recording, playbackIndicator = playbackIndicator)
                 }
                 // Along the bottom edge; the focus outline stands outside it.
                 if (currentEvent != null) ProgressStrip(
@@ -425,11 +443,9 @@ private fun CompactZapCard(
                     },
                     label = "zap-card-marker",
                 ) { indicator ->
-                    if (!leaving) ChannelPlaybackMarker(indicator, size = 16.dp)
+                    if (!leaving) ChannelNowIndicators(playingNow = indicator == ChannelPlaybackIndicator.PLAYING,
+                        recordingNow = recording, playbackIndicator = indicator)
                 }
-                if (recording) Icon(painterResource(R.drawable.ic_fiber_manual_record),
-                    contentDescription = stringResource(R.string.player_shelf_recording),
-                    tint = TvRecordingColor, modifier = Modifier.size(StatusIconSize))
             }
         },
         subtitle = {

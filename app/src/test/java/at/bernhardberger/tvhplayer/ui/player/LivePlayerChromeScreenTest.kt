@@ -26,6 +26,9 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
@@ -59,6 +62,10 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -83,6 +90,7 @@ import kotlinx.coroutines.runBlocking
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequest
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
@@ -158,6 +166,7 @@ class LivePlayerChromeScreenTest {
     private lateinit var view: View
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var session: FakeTvheadendSession
+    private val notices = AppNoticeQueue({ 0L }, { "player-test" })
     private lateinit var video: VideoPlayerViewModel
     private val owner = object : LifecycleOwner {
         override val lifecycle = LifecycleRegistry.createUnsafe(this)
@@ -698,11 +707,11 @@ class LivePlayerChromeScreenTest {
         assertTrue(texts("live-info-panel").contains("Next up"))
         assertEquals(listOf("live-info-record"), focused())
         session.publish(observation(now, listOf(nextProgramme), recordings = listOf(
-            DvrEntry.create(DvrEntryId(2L), eventId = nextProgramme.id),
+            DvrEntry.create(DvrEntryId(2L), eventId = nextProgramme.id, state = DvrEntryState.RECORDING),
         )))
         repeat(2) { settle() }
-        assertFalse(exists("live-info-record"))
-        assertEquals(listOf("live-info-close"), focused())
+        assertEquals("Stop recording", texts("live-info-record"))
+        assertEquals(listOf("live-info-record"), focused())
         key(Key.Back)
         assertFalse(exists("live-info-panel"))
     }
@@ -714,10 +723,21 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("live-info-close"), focused())
         key(Key.DirectionDown)
         assertEquals(listOf("live-info-close"), focused())
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-info-reading"), focused())
+        listOf(Key.DirectionLeft, Key.DirectionRight).forEach(::key)
+        assertEquals(listOf("player-info-reading"), focused())
+        key(Key.DirectionDown)
+        assertEquals(listOf("live-info-close"), focused())
         assertFalse(exists("live-info-stream-signal"))
         key(Key.Back)
         assertFalse(exists("live-info-panel"))
         assertTrue(exists("player-actions"))
+        key(Key.Info)
+        assertEquals("Back to TV", texts("details-player-hint"))
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        assertFalse(exists("live-info-panel"))
     }
 
     @Test fun playerBadgesComeFromTheSelectedTracksWithoutDiagnostics() {
@@ -1165,23 +1185,371 @@ class LivePlayerChromeScreenTest {
         screen()
         key(Key.Info)
         assertEquals("The first action takes focus", listOf("live-info-record"), focused())
-        key(Key.DirectionDown)
+        assertFalse(exists("details-schedule"))
+        assertFalse(exists("live-info-close"))
+        key(Key.DirectionLeft)
         assertEquals(listOf("live-info-record"), focused())
         key(Key.DirectionRight)
-        assertEquals(listOf("live-info-close"), focused())
-        key(Key.DirectionDown)
-        assertEquals(listOf("live-info-close"), focused())
+        assertEquals(listOf("live-info-record"), focused())
+        repeat(3) { key(Key.DirectionDown) }
+        assertEquals(listOf("details-more-info"), focused())
+        key(Key.DirectionCenter)
+        assertEquals(listOf("player-info-reading"), focused())
+        key(Key.Back)
+        assertEquals("Back returns to the action that opened reading", listOf("details-more-info"), focused())
+        repeat(3) { key(Key.DirectionUp) }
         key(Key.DirectionUp)
-        assertEquals("the description stays reachable with Up", listOf("player-info-reading"), focused())
+        assertEquals("Up goes to the selected tab, not the nearest tab", listOf("details-tab-0"), focused())
+        key(Key.DirectionLeft)
+        assertEquals("tab edges cannot leave the layer", listOf("details-tab-0"), focused())
+        key(Key.DirectionDown)
+        assertEquals(listOf("live-info-record"), focused())
+        key(Key.Back)
+        assertFalse(exists("live-info-panel"))
     }
 
-    @Test fun playerInfoStartsOnCloseWithoutRecording() {
-        // The airing programme is already scheduled, so Record is not offered.
+    @Test fun playerInfoStartsOnRecordingWhenAlreadyScheduled() {
         screen(recordingScheduled = true)
         key(Key.Info)
-        assertEquals(listOf("live-info-close"), focused())
+        assertEquals(listOf("live-info-record"), focused())
+        assertEquals("Cancel recording", texts("live-info-record"))
         key(Key.DirectionDown)
-        assertEquals(listOf("live-info-close"), focused())
+        assertEquals(listOf("details-record-series"), focused())
+        key(Key.Back)
+        assertFalse(exists("live-info-panel"))
+    }
+
+    @Test fun playerInfoTabDownRestoresItsLastAction() {
+        screen()
+        key(Key.Info)
+        repeat(2) { key(Key.DirectionDown) }
+        assertEquals(listOf("details-other-airings"), focused())
+        compose.onNodeWithTag("details-tab-0").performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        key(Key.DirectionDown)
+        assertEquals(listOf("details-other-airings"), focused())
+    }
+
+    @Test fun playerInfoOmitsMissingProgrammeTitleAndSubtitle() {
+        screen()
+        val now = System.currentTimeMillis() / 1_000L
+        session.publish(observation(now, listOf(EpgEvent.create(EventId(31), ChannelId(1),
+            Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600)))))
+        settle()
+        key(Key.Info)
+        assertEquals(listOf("live-info-record"), focused())
+        assertFalse(exists("details-title"))
+        assertFalse(exists("details-tab-1"))
+    }
+
+    @Test fun playerInfoConsumesItsOpeningDownAndRestoresTheControlThatOpenedIt() {
+        screen()
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-pause"), focused())
+        key(Key.DirectionDown)
+        assertEquals(listOf("live-info-record"), focused())
+        assertFalse(exists("details-schedule"))
+        val playing = player.playWhenReady
+        listOf(Key.ChannelUp, Key.ChannelDown, Key.MediaStop, Key.MediaPause, Key.Menu, Key.Info).forEach(::key)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(playing, player.playWhenReady)
+        assertEquals(listOf("live-info-record"), focused())
+        key(Key.Back)
+        assertEquals(listOf("player-pause"), focused())
+        key(Key.DirectionDown)
+        assertEquals("a new visit resets Details and its action", listOf("live-info-record"), focused())
+    }
+
+    @Test fun playerInfoScheduleOpensAProgrammeAndBackRestoresTheRowThenDetails() {
+        screen()
+        key(Key.Info)
+        assertTrue("both known programs expose Schedule", exists("details-tab-1"))
+        key(Key.DirectionUp)
+        assertEquals(listOf("details-tab-0"), focused())
+        key(Key.DirectionRight)
+        assertEquals("changing tabs keeps focus on the tab", listOf("details-tab-1"), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("details-tab-1"), focused())
+        key(Key.DirectionDown)
+        assertEquals(listOf("details-schedule-11"), focused())
+        key(Key.DirectionUp)
+        assertEquals(listOf("details-tab-1"), focused())
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        assertEquals(listOf("details-schedule-12"), focused())
+        key(Key.DirectionCenter)
+        assertEquals(listOf("details-record"), focused())
+        assertFalse("a schedule selection pushes details without tabs", exists("details-tab-0"))
+        assertFalse(exists("details-tab-1"))
+        assertTrue(texts("details-title").contains("Later"))
+        repeat(4) { key(Key.DirectionDown) }
+        assertEquals(listOf("details-more-info"), focused())
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        assertEquals(listOf("details-more-info"), focused())
+        key(Key.Back)
+        assertEquals(listOf("details-schedule-12"), focused())
+        key(Key.Back)
+        assertEquals("Back from Schedule returns to Details", listOf("live-info-record"), focused())
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        assertEquals("the tab remembers its content target", listOf("details-schedule-12"), focused())
+        key(Key.Back)
+        key(Key.DirectionUp)
+        key(Key.Back)
+        assertEquals("Back from the first tab returns to its first action", listOf("live-info-record"), focused())
+        key(Key.Back)
+        assertFalse(exists("live-info-panel"))
+    }
+
+    @Test fun playerInfoConfirmsCurrentRecordingThenOffersStopFromObservedState() {
+        screen()
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
+        key(Key.Info)
+        key(Key.DirectionCenter)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        compose.onNodeWithText("Back").assertIsFocused()
+        confirmInfoAction()
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        publishInfoRecording(DvrEntryState.RECORDING)
+        assertEquals("Stop recording", texts("live-info-record"))
+        assertEquals(listOf("live-info-record"), focused())
+        assertEquals(AppNoticeKind.SUCCESS, notices.state.value.pending.single().kind)
+        assertFalse("the shared queue replaces the local notice", exists("programme-recording-notice"))
+        session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
+        key(Key.DirectionCenter)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        confirmInfoAction()
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
+        assertEquals(listOf("live-info-record"), focused())
+    }
+
+    @Test fun playerInfoConfirmationBackIsSafeAndDoesNotCloseDetails() {
+        screen()
+        key(Key.Info)
+        key(Key.DirectionCenter)
+        compose.onNodeWithText("Back").assertIsFocused()
+        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.Back) }
+        settle()
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        assertTrue(exists("live-info-panel"))
+        assertEquals(listOf("live-info-record"), focused())
+        assertTrue(notices.state.value.pending.isEmpty())
+    }
+
+    @Test fun playerInfoRecordIgnoresASecondPressBeforeRecomposition() {
+        screen()
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
+        key(Key.Info)
+        val click = compose.onNodeWithTag("live-info-record").fetchSemanticsNode()
+            .config[SemanticsActions.OnClick].action!!
+        compose.runOnIdle { click(); click() }
+        settle()
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        confirmInfoAction()
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        assertEquals(listOf("live-info-record"), focused())
+    }
+
+    @Test fun playerInfoConfirmsFutureRecordingThenCanCancelTheSchedule() {
+        screen()
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(8)))
+        key(Key.Info)
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        confirmInfoAction()
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        publishInfoRecording(DvrEntryState.SCHEDULED, EventId(12))
+        assertEquals("Cancel recording", texts("details-record"))
+        assertEquals(listOf("details-record"), focused())
+        session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
+        key(Key.DirectionCenter)
+        confirmInfoAction()
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
+        key(Key.Back)
+        assertEquals(listOf("details-schedule-12"), focused())
+    }
+
+    @Test fun playerInfoRecordingFailureKeepsRecordAndShowsANonFocusableNotice() {
+        screen()
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.AccessDenied)
+        key(Key.Info)
+        key(Key.DirectionCenter)
+        confirmInfoAction()
+        assertEquals("Record", texts("live-info-record"))
+        assertEquals(listOf("live-info-record"), focused())
+        assertEquals(AppNoticeKind.FAILURE, notices.state.value.pending.single().kind)
+        assertFalse(exists("programme-recording-notice"))
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+    }
+
+    @Test fun playerInfoUpOnEitherTabClosesAndRestoresTheInvokingControl() {
+        screen()
+        key(Key.DirectionDown)
+        for (tab in 0..1) {
+            assertEquals(listOf("player-pause"), focused())
+            key(Key.DirectionDown)
+            assertTrue("the shared pill is always visible", exists("details-player-hint"))
+            key(Key.DirectionUp)
+            if (tab == 1) key(Key.DirectionRight)
+            assertTrue(exists("details-player-hint"))
+            key(Key.DirectionUp)
+            assertFalse(exists("live-info-panel"))
+            assertEquals(listOf("player-pause"), focused())
+        }
+    }
+
+    @Test fun playerInfoMoreInfoKeepsIdentityAndAddsUntruncatedMetadata() {
+        screen()
+        val now = System.currentTimeMillis() / 1_000L
+        val description = "A full description with its own ending. ".repeat(24)
+        session.publish(observation(now, listOf(EpgEvent.create(EventId(11), ChannelId(1),
+            Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "Now showing",
+            description = description, summary = "A separate summary", genre = "Drama",
+            categories = listOf("Documentary"), keywords = listOf("Mountains"), copyrightYear = 2024,
+            episode = at.bernhardberger.tvheadend.sdk.core.EpgEpisode(null, null, 2, null, 3, 6, null, null, null)))))
+        settle()
+        key(Key.Info)
+        repeat(3) { key(Key.DirectionDown) }
+        key(Key.DirectionCenter)
+        assertEquals(listOf("player-info-reading"), focused())
+        assertTrue(texts("details-title").contains("Now showing"))
+        assertTrue("facts use one separator and non-breaking episodes", texts("details-facts").contains("Drama · S2\u00a0E3/6"))
+        assertFalse(texts("details-facts").contains("•"))
+        val text = texts("details-full-description")
+        listOf(description.trim(), "Summary", "A separate summary", "Categories", "Documentary", "Keywords", "Mountains", "Copyright year", "2024")
+            .forEach { assertTrue("reading includes $it", text.contains(it)) }
+        assertFalse("the visual heading is not repeated inside the reader", text.contains("More info"))
+        assertEquals("More info", compose.onNodeWithTag("player-info-reading").fetchSemanticsNode()
+            .config[SemanticsProperties.PaneTitle])
+        key(Key.DirectionUp)
+        key(Key.DirectionLeft)
+        key(Key.DirectionRight)
+        assertEquals("reading boundaries contain focus", listOf("player-info-reading"), focused())
+        repeat(8) { key(Key.DirectionDown) }
+        assertEquals(listOf("player-info-reading"), focused())
+        key(Key.Back)
+        assertEquals(listOf("details-more-info"), focused())
+    }
+
+    @Test fun playerInfoRailDownOpensFocusedChannelsScheduleAndBackRestoresTheRail() {
+        screen()
+        publishRailProgrammes()
+        openInfoRail()
+        assertFalse(exists("player-rail-key-hints"))
+        assertTrue(texts("player-rail-schedule-peek").contains("Name 1"))
+        key(Key.DirectionRight)
+        assertTrue(texts("player-rail-schedule-peek").contains("Name 2"))
+        assertEquals(listOf("player-channel-card-2"), focused())
+        key(Key.DirectionDown)
+        assertEquals(listOf("details-schedule-21"), focused())
+        assertFalse(exists("details-tab-0"))
+        assertFalse(exists("details-tab-1"))
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        repeat(8) { settle() }
+        assertTrue("the layer cannot time out with the rail", exists("live-info-panel"))
+        key(Key.DirectionCenter)
+        assertEquals(listOf("details-watch"), focused())
+        key(Key.Back)
+        assertEquals(listOf("details-schedule-21"), focused())
+        key(Key.Back)
+        assertFalse(exists("live-info-panel"))
+        assertEquals(listOf("player-channel-card-2"), focused())
+    }
+
+    @Test fun playerInfoRailKeepsWatchHiddenForThePlayingChannel() {
+        screen()
+        openInfoRail()
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        assertFalse(exists("details-watch"))
+        assertEquals(listOf("live-info-record"), focused())
+        key(Key.Back)
+        assertEquals(listOf("details-schedule-11"), focused())
+    }
+
+    @Test fun playerInfoRailScheduleUpRestoresTheFocusedChannel() {
+        screen()
+        publishRailProgrammes()
+        openInfoRail()
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        key(Key.DirectionUp)
+        assertFalse(exists("live-info-panel"))
+        assertEquals(listOf("player-channel-card-2"), focused())
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun playerInfoWatchTunesTheRailChannelAndClosesTheLayers() {
+        screen()
+        publishRailProgrammes()
+        openInfoRail()
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(exists("live-info-panel"))
+        assertFalse(exists("player-channel-shelf"))
+    }
+
+    @Test fun playerInfoRailWithoutEpgOffersWatchAndReturnsToTheSameChannel() {
+        screen()
+        openInfoRail()
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        assertEquals(listOf("details-watch"), focused())
+        assertTrue(texts("live-info-panel").contains("Name 2"))
+        assertEquals("Channels", texts("details-player-hint"))
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-info-reading"), focused())
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-channel-card-2"), focused())
+        key(Key.DirectionDown)
+        key(Key.Back)
+        assertEquals(listOf("player-channel-card-2"), focused())
+        key(Key.DirectionDown)
+        key(Key.DirectionCenter)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(exists("live-info-panel"))
+    }
+
+    private fun openInfoRail() {
+        key(Key.DirectionDown)
+        compose.onNodeWithTag(PlayerIdentityCardTag).performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        key(Key.DirectionCenter)
+        assertEquals(listOf("player-channel-card-1"), focused())
+    }
+
+    private fun confirmInfoAction() {
+        compose.onNodeWithText("Back").assertIsFocused()
+        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionCenter) }
+        settle()
+    }
+
+    private fun publishInfoRecording(state: DvrEntryState, eventId: EventId = EventId(11)) {
+        val current = session.observation.value.epgState as EpgRepositoryState.Current
+        session.publish(observation(System.currentTimeMillis() / 1_000, current.snapshot.events,
+            recordings = listOf(DvrEntry.create(DvrEntryId(7), eventId = eventId, state = state))))
+        settle()
+    }
+
+    private fun publishRailProgrammes() {
+        val now = System.currentTimeMillis() / 1_000L
+        session.publish(observation(now, listOf(
+            EpgEvent.create(EventId(21), ChannelId(2), Instant.fromEpochSeconds(now - 600),
+                Instant.fromEpochSeconds(now + 600), title = "Second channel now"),
+            EpgEvent.create(EventId(22), ChannelId(2), Instant.fromEpochSeconds(now + 600),
+                Instant.fromEpochSeconds(now + 1800), title = "Second channel later"),
+        )))
+        settle()
     }
 
     private fun idleMainLooper() = shadowOf(Looper.getMainLooper()).idle()
@@ -1362,7 +1730,7 @@ class LivePlayerChromeScreenTest {
                 Instant.fromEpochSeconds(now + 3_600L), title = "Now showing", summary = "Summary"),
             EpgEvent.create(EventId(12L), ChannelId(1L), Instant.fromEpochSeconds(now + 3_600L),
                 Instant.fromEpochSeconds(now + 7_200L), title = "Later"),
-        ), recordings = if (recordingScheduled) listOf(DvrEntry.create(DvrEntryId(1L), eventId = EventId(11L)))
+        ), recordings = if (recordingScheduled) listOf(DvrEntry.create(DvrEntryId(1L), eventId = EventId(11L), state = DvrEntryState.SCHEDULED))
             else emptyList(), missingRequestedChannel = missingRequestedChannel)).apply {
             // The subscription never becomes playable: the channel stays tuning, as on a slow tune.
             // Failing: the scripted stream cannot be decoded, so the channel becomes unavailable.
@@ -1417,7 +1785,7 @@ class LivePlayerChromeScreenTest {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                             channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
-                            contentAllowed = contentAllowed(),
+                            contentAllowed = contentAllowed(), notices = notices,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                     }

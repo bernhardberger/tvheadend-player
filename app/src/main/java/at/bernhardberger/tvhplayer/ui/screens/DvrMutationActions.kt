@@ -48,15 +48,15 @@ internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObser
     is DvrMutationAction.Delete -> true
 }
 
-internal enum class DvrMutationFeedback(val isFailure: Boolean) {
-    CONFIRMED(false),
-    ACCEPTED_UNCONFIRMED(false),
-    PERMISSION_DENIED(true),
-    CONNECTION_LIMIT(true),
-    REJECTED(true),
-    NOT_SUPPORTED(true),
-    TIMEOUT(true),
-    CONNECTION_UNAVAILABLE(true),
+internal enum class DvrMutationFeedback(val isFailure: Boolean, @param:androidx.annotation.StringRes val message: Int) {
+    CONFIRMED(false, R.string.recording_action_confirmed),
+    ACCEPTED_UNCONFIRMED(false, R.string.recording_action_accepted),
+    PERMISSION_DENIED(true, R.string.recording_action_permission),
+    CONNECTION_LIMIT(true, R.string.recording_action_conn_limit),
+    REJECTED(true, R.string.recording_action_rejected),
+    NOT_SUPPORTED(true, R.string.recording_action_not_supported),
+    TIMEOUT(true, R.string.recording_action_timeout),
+    CONNECTION_UNAVAILABLE(true, R.string.recording_action_connection),
 }
 
 internal class DvrMutationActions(
@@ -126,15 +126,4 @@ internal fun DvrMutationResult<*>.toDvrMutationFeedback(): DvrMutationFeedback =
 }
 
 @Composable
-internal fun DvrMutationFeedback.label(): String = stringResource(
-    when (this) {
-        DvrMutationFeedback.CONFIRMED -> R.string.recording_action_confirmed
-        DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> R.string.recording_action_accepted
-        DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
-        DvrMutationFeedback.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
-        DvrMutationFeedback.REJECTED -> R.string.recording_action_rejected
-        DvrMutationFeedback.NOT_SUPPORTED -> R.string.recording_action_not_supported
-        DvrMutationFeedback.TIMEOUT -> R.string.recording_action_timeout
-        DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
-    },
-)
+internal fun DvrMutationFeedback.label(): String = stringResource(message)
