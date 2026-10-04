@@ -150,6 +150,33 @@ class StaticRulesTest(unittest.TestCase):
         self.write("client/src/main/java/example/Producer.kt", "val center = NoticeCenter(clock, context)\n")
         self.assertTrue(any("TransientFeedback" in item for item in find_static_rule_violations(self.root)))
 
+    def test_shared_tabs_rejects_parallel_rows_and_motion(self):
+        for source in (
+            "import androidx.tv.material3.TabRow as NativeRow",
+            "import androidx.tv.material3.Tab",
+            "TabRow(selectedTabIndex = 0)", "Tab(selected = true)",
+            "val motion = BrowseMotionPolicy.tabTransform(1)",
+            "import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy.tabTransform as slide",
+            "AnimatedContent(targetState = state.tab) {}",
+            "AnimatedContent(selectedTab) {}",
+            "import androidx.compose.animation.AnimatedContent as Animate\nAnimate(targetState = tab) {}",
+        ):
+            with self.subTest(source=source):
+                self.write("app/src/main/java/example/Screen.kt", source)
+                self.assertTrue(any("SharedTabs: app/src/main/java/example/Screen.kt:" in item
+                                    for item in find_static_rule_violations(self.root)))
+
+    def test_shared_tabs_allows_shared_owners_and_unrelated_motion(self):
+        components = "app/src/main/java/at/bernhardberger/tvhplayer/ui/components/"
+        self.write(components + "AppTabRow.kt",
+                   "import androidx.tv.material3.TabRow\nimport androidx.tv.material3.Tab\nTabRow { Tab() }")
+        self.write(components + "TabContent.kt",
+                   "AnimatedContent(targetState = tab) { BrowseMotionPolicy.tabTransform(1) }")
+        self.write("app/src/main/java/example/Screen.kt",
+                   '// TabRow() AnimatedContent(tab)\nval note = "Tab() BrowseMotionPolicy.tabTransform(1)"\n'
+                   'AppTabRow {}\nTabContent()\nAnimatedContent(targetState = page) {}')
+        self.assertEqual([], find_static_rule_violations(self.root))
+
 
 if __name__ == "__main__":
     unittest.main()

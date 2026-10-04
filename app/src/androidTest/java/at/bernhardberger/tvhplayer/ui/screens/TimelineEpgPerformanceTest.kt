@@ -35,9 +35,9 @@ import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.components.BrowseContentMotion
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.TabContentMotion
+import at.bernhardberger.tvhplayer.ui.components.TabContent
+import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelHeader
@@ -66,13 +66,13 @@ class TimelineEpgPerformanceTest {
         val selected = mutableStateOf(0)
         val requesters = mutableMapOf<EventId, FocusRequester>()
         val focused = mutableListOf<EventId>()
-        lateinit var motion: BrowseContentMotion
+        lateinit var motion: TabContentMotion
         composeRule.setContent {
             val context = LocalContext.current
             val loader = remember(context) { ImageLoader.Builder(context).build() }
             TVHeadendPlayerTheme {
-                motion = rememberBrowseContentMotion(selected.value)
-                BrowseTabContent(
+                motion = rememberTabContentMotion(selected.value)
+                TabContent(
                     motion, selected.value, state = { pages[selected.value] },
                     modifier = Modifier.width(794.dp).height(76.dp),
                 ) { events, owner ->

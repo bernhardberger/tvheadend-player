@@ -31,8 +31,8 @@ class BrowseContentRetentionTest {
         val payload = mutableStateOf(Payload(0))
         val obsolete = mutableListOf<WeakReference<Payload>>()
         compose.setContent {
-            val motion = rememberBrowseContentMotion("channels")
-            BrowseTabContent(motion, "channels", state = { payload.value }) { frame, _ ->
+            val motion = rememberTabContentMotion("channels")
+            TabContent(motion, "channels", state = { payload.value }) { frame, _ ->
                 BasicText("Revision ${frame.revision}")
             }
         }
@@ -51,11 +51,11 @@ class BrowseContentRetentionTest {
         val selected = mutableIntStateOf(0)
         val payload = mutableStateOf(Payload(0))
         val obsolete = mutableListOf<WeakReference<Payload>>()
-        val owners = mutableSetOf<BrowseTabOwner>()
-        lateinit var motion: BrowseContentMotion
+        val owners = mutableSetOf<TabOwner>()
+        lateinit var motion: TabContentMotion
         compose.setContent {
-            motion = rememberBrowseContentMotion(selected.intValue)
-            BrowseTabContent(motion, selected.intValue, state = { payload.value }) { frame, owner ->
+            motion = rememberTabContentMotion(selected.intValue)
+            TabContent(motion, selected.intValue, state = { payload.value }) { frame, owner ->
                 SideEffect { owners += owner }
                 BasicText("Revision ${frame.revision}")
             }

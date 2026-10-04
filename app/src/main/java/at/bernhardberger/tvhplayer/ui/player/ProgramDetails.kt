@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -74,7 +73,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
-import androidx.tv.material3.Tab
 import androidx.tv.material3.Text
 import androidx.tv.material3.WideButton
 import androidx.tv.material3.WideCardContainer
@@ -86,11 +84,15 @@ import at.bernhardberger.tvhplayer.core.programmeDetailsBody
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.programmeActions
-import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabRow
+import at.bernhardberger.tvhplayer.ui.components.AppTabRow
+import at.bernhardberger.tvhplayer.ui.components.AppTabStyle
+import at.bernhardberger.tvhplayer.ui.components.TabContent
+import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
+import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
+import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
@@ -198,47 +200,41 @@ internal fun ProgramDetails(
     val event = state.opened ?: current
     val isCurrent = event.id == current.id
     val tabs = schedule.size > 1 && !state.scheduleEntry && state.opened == null
-    val tabFocus = remember { List(2) { FocusRequester() } }
+    val tabFocus = remember { FocusRequester() }
+    val tabMotion = rememberTabContentMotion(state.tab) { state.tab }
     val recording = recordingFor(event)
     // Inset one grid column from the margins on both sides (columns 2–11 of 12).
     Column(modifier.fillMaxSize().padding(horizontal = DetailsInset), verticalArrangement = Arrangement.spacedBy(32.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
         if (tabs) {
-            BrowseTabRow(
+            AppTabRow(
                 selectedTabIndex = state.tab,
+                style = AppTabStyle.Section,
+                selectedTabFocus = tabFocus,
                 modifier = Modifier.testTag("details-tabs"),
+                onUp = onClose,
+                onMoveToContent = {
+                    state.lastAction = null
+                    state.returnRow = schedule.firstOrNull { airingProgress(it, nowSec) != null }?.id
+                    state.focusContent()
+                    true
+                },
             ) {
                 listOf(R.string.details_tab_details, R.string.details_tab_schedule).forEachIndexed { index, label ->
-                    Tab(
+                    AppTab(
                         selected = index == state.tab,
-                        onFocus = { state.tabFocused = true; state.tab = index },
-                        modifier = Modifier
-                            .testTag("details-tab-$index")
-                            .focusRequester(tabFocus[index])
-                         .focusProperties {
-                                canFocus = !state.readMore
-                                up = FocusRequester.Cancel
-                                left = if (index == 0) FocusRequester.Cancel else tabFocus[0]
-                                right = if (index == 1) FocusRequester.Cancel else tabFocus[1]
-                            }
-                            .onPreviewKeyEvent {
-                                when (it.key) {
-                                    Key.DirectionUp -> {
-                                        if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onClose()
-                                        true
-                                    }
-                                    Key.DirectionDown -> {
-                                        if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) state.focusContent()
-                                        true
-                                    }
-                                    else -> false
-                                }
-                            },
-                    ) {
-                        Text(stringResource(label), style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
-                    }
+                        label = stringResource(label),
+                        onFocus = {
+                            tabMotion.select(index, listOf(0, 1))
+                            state.tabFocused = true
+                            state.tab = index
+                        },
+                        canFocus = !state.readMore,
+                        first = index == 0,
+                        last = index == 1,
+                        modifier = Modifier.testTag("details-tab-$index"),
+                    )
                 }
             }
         } else {
@@ -268,7 +264,7 @@ internal fun ProgramDetails(
                     recordFocus = recordFocus,
                     firstFocus = firstFocus,
                     state = state,
-                    tabFocus = if (tabs) tabFocus[0] else FocusRequester.Cancel,
+                    tabFocus = if (tabs) tabFocus else FocusRequester.Cancel,
                     onReadMore = { state.readMore = true },
                     onUp = if (tabs) null else onClose,
                 )
@@ -276,10 +272,8 @@ internal fun ProgramDetails(
             when {
                 state.opened != null -> detailsContent()
                 state.scheduleEntry -> Schedule(state, schedule, nowSec, tile, recordingFor, FocusRequester.Cancel, onClose)
-                else -> AnimatedContent(targetState = state.tab,
-                    transitionSpec = { BrowseMotionPolicy.tabTransform(if (targetState > initialState) 1 else -1).using(null) },
-                    label = "programme-tabs") { tab ->
-                    if (tab == 1) Schedule(state, schedule, nowSec, tile, recordingFor, tabFocus[1])
+                else -> TabContent(tabMotion, state.tab, state = { state.tab }) { tab, _ ->
+                    if (tab == 1) Schedule(state, schedule, nowSec, tile, recordingFor, tabFocus)
                     else detailsContent()
                 }
             }
@@ -337,9 +331,12 @@ private fun DetailsTab(
         stringResource(R.string.details_read_more), onClick = onReadMore)
     val tags = shownActions.map { it.tag }
     val focusTargets = remember(tags) { tags.associateWith { FocusRequester() } }
+    val owner = LocalTabOwner.current
     LaunchedEffect(event.id, state.focusRequest, tags, state.tab) {
+        if (owner?.isCurrent == false) return@LaunchedEffect
         if (state.tabFocused || state.opened == null && state.tab != 0) return@LaunchedEffect
         withFrameNanos { }
+        if (owner?.isCurrent == false) return@LaunchedEffect
         focusTargets[state.lastAction]?.requestFocus() ?: firstFocus.requestFocus()
     }
     // On the 12-column grid: reading in columns 2–5 (text as wide as the tile), actions in columns 8–11.
@@ -349,13 +346,13 @@ private fun DetailsTab(
             horizontalAlignment = Alignment.CenterHorizontally) {
             shownActions.forEachIndexed { index, action ->
                 WideButton(
-                    onClick = action.onClick,
+                    onClick = { if (owner?.isCurrent != false) action.onClick() },
                     // TV Material 1.1's stock 240dp background and 1.1 focus scale fit this slot.
-                    modifier = Modifier.width(240.dp).testTag(action.tag)
+                    modifier = Modifier.tabFocus().width(240.dp).testTag(action.tag)
                         .focusRequester(focusTargets.getValue(action.tag))
-                        .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier)
-                        .then(if (action.record) Modifier.focusRequester(recordFocus) else Modifier)
-                        .onFocusChanged { if (it.isFocused) { state.lastAction = action.tag; state.tabFocused = false } }
+                        .then(if (owner?.isCurrent != false && index == 0) Modifier.focusRequester(firstFocus) else Modifier)
+                        .then(if (owner?.isCurrent != false && action.record) Modifier.focusRequester(recordFocus) else Modifier)
+                        .onFocusChanged { if (owner?.isCurrent != false && it.isFocused) { state.lastAction = action.tag; state.tabFocused = false } }
                          .focusProperties {
                             canFocus = state.opened != null || state.tab == 0
                             left = FocusRequester.Cancel
@@ -432,6 +429,7 @@ private fun Schedule(
     tabFocus: FocusRequester,
     onUp: (() -> Unit)? = null,
 ) {
+    val owner = LocalTabOwner.current
     val list = rememberLazyListState(
         initialFirstVisibleItemIndex = schedule.indexOfFirst { it.id == state.returnRow }.coerceAtLeast(0))
     val rows = remember(schedule.map { it.id }) { schedule.associate { it.id to FocusRequester() } }
@@ -445,8 +443,10 @@ private fun Schedule(
         val bottomRoom = (maxHeight - ScheduleFocusPadding - (rowHeight + ScheduleGap) * anchorRows - rowHeight)
             .coerceAtLeast(ScheduleFocusPadding)
         suspend fun focusRow(index: Int) {
+            if (owner?.isCurrent == false) return
             list.scrollToItem((index - anchorRows).coerceAtLeast(0))
             withFrameNanos { }
+            if (owner?.isCurrent == false) return
             rows.getValue(schedule[index].id).requestFocus()
         }
         LaunchedEffect(state.focusRequest, state.tab) {
@@ -483,15 +483,15 @@ private fun Schedule(
                 modifier = Modifier.fillMaxWidth().height(rowHeight),
                 imageCard = { interaction ->
                     CompactCard(
-                        onClick = { state.open(event) },
+                        onClick = { if (owner?.isCurrent != false) state.open(event) },
                         interactionSource = interaction,
                         border = embeddedProgressCardBorder(),
                         shape = CardDefaults.shape(PlayerChromeTokens.heroShape),
                         colors = CardDefaults.compactCardColors(containerColor = Color.Transparent),
                         scale = CardDefaults.scale(focusedScale = PlayerChromeTokens.cardFocusedScale),
-                        modifier = Modifier.size(ScheduleTileWidth, ScheduleTileHeight)
+                        modifier = Modifier.tabFocus().size(ScheduleTileWidth, ScheduleTileHeight)
                             .focusRequester(rows.getValue(event.id)).testTag("details-schedule-${event.id.value}")
-                            .onFocusChanged { if (it.isFocused) { state.returnRow = event.id; state.tabFocused = false } }
+                            .onFocusChanged { if (owner?.isCurrent != false && it.isFocused) { state.returnRow = event.id; state.tabFocused = false } }
                              .focusProperties {
                                  canFocus = state.tab == 1
                                 up = if (index == 0) tabFocus else FocusRequester.Cancel

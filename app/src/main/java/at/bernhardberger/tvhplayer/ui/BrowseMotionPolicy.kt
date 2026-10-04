@@ -12,7 +12,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 
-/** Page motion belongs to the two browse hosts, never to individual screen bodies. */
+/** Tab body motion belongs to the shared TabContent, for both pages and sections. */
 internal object BrowseMotionPolicy {
     const val slideFraction = 1f / 3f
 

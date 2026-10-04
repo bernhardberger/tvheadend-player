@@ -78,11 +78,11 @@ import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
+import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.BrowsePreparationPending
 import at.bernhardberger.tvhplayer.ui.components.PreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveList
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveListItem
 import at.bernhardberger.tvhplayer.ui.screens.recordings.FolderMetadataPane
@@ -438,7 +438,7 @@ internal fun RecordingsScreenContent(
         }
     }
 
-    val modeMotion = rememberBrowseContentMotion(mode) { screenState.mode.value }
+    val modeMotion = rememberTabContentMotion(mode) { screenState.mode.value }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -508,7 +508,7 @@ internal fun RecordingsScreenContent(
                     .testTag("recordings-mode-tabs"),
             )
         }
-        BrowseTabContent(
+        TabContent(
             motion = modeMotion,
             selectedKey = mode,
             state = {

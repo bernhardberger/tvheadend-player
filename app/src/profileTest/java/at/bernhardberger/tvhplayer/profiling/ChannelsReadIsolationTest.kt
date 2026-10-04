@@ -42,7 +42,7 @@ class ChannelsReadIsolationTest {
                         "at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen",
                         "at.bernhardberger.tvhplayer.ui.screens.ChannelsScreenContent" -> roots += info
                         "at.bernhardberger.tvhplayer.ui.screens.EpgDetailPane" -> details++
-                        "at.bernhardberger.tvhplayer.ui.components.BrowseTabContent" -> bodies++
+                        "at.bernhardberger.tvhplayer.ui.components.TabContent" -> bodies++
                     }
                 }
                 override fun traceEventEnd() = Unit

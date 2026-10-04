@@ -16,35 +16,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
-import androidx.tv.material3.Tab
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.ChannelScopeItemMaxWidth
 import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvSpacing16
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
 
 @Composable
 fun ChannelTagSelector(
@@ -69,16 +58,13 @@ fun ChannelTagSelector(
     val activeIndex = scopes.indexOfFirst { it.first == activeTagId }.coerceAtLeast(0)
     val layoutDirection = LocalLayoutDirection.current
     val edgeFadeState = remember(scopes) { TabEdgeFadeState() }
-    BrowseTabRow(
+    AppTabRow(
         selectedTabIndex = activeIndex,
+        style = AppTabStyle.Page,
+        selectedTabFocus = activeFocusRequester,
+        onMoveToContent = onMoveToContent,
         modifier = modifier
             .fillMaxWidth()
-            .focusRestorer(activeFocusRequester)
-            .onPreviewKeyEvent { event ->
-                event.type == KeyEventType.KeyDown &&
-                    event.key == Key.DirectionDown &&
-                    onMoveToContent()
-            }
             .onGloballyPositioned(edgeFadeState::updateViewportBounds)
             .navigationEdgeFadeMask(
                 width = TvNavigationRailGradientRunout,
@@ -100,8 +86,10 @@ fun ChannelTagSelector(
     ) {
         scopes.forEachIndexed { index, (tagId, label) ->
             val selected = index == activeIndex
-            Tab(
+            AppTab(
                 selected = selected,
+                label = label,
+                labelModifier = Modifier.widthIn(max = ChannelScopeItemMaxWidth),
                 onFocus = {
                     onTagFocus()
                     edgeFadeState.updateFocusedIndex(index)
@@ -114,28 +102,8 @@ fun ChannelTagSelector(
                 modifier = Modifier
                     .onGloballyPositioned { coordinates ->
                         edgeFadeState.updateTabBounds(index, coordinates)
-                    }
-                    .then(
-                        if (index == activeIndex) {
-                            Modifier.focusRequester(activeFocusRequester)
-                        } else {
-                            Modifier
-                        },
-                    ),
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(
-                            horizontal = TvSpacing16,
-                            vertical = TvSpacing8,
-                        )
-                        .widthIn(max = ChannelScopeItemMaxWidth),
-                )
-            }
+                    },
+            )
         }
     }
 }
@@ -219,7 +187,7 @@ fun UnavailableTagNotice(
                 text = stringResource(R.string.active_tag_unavailable),
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.browseTabFocus()) {
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.tabFocus()) {
                 Text(stringResource(R.string.dismiss))
             }
         }

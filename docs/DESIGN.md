@@ -203,8 +203,8 @@ Pressed feedback needs the component to receive the key: parents do not consume
 OK/DPAD_CENTER/ENTER on KeyDown and activate on the component's behalf. Parents
 may own direction keys, Back and key-cycle relocation.
 
-Page-level scopes (Channels, Guide, Recordings) use `TabRow` with the default
-`PillIndicator`. Content slides in the tab's direction, honours RTL order, and
+All tabs use `AppTabRow` + `TabContent`: Page/pill for page navigation, Section/underline within a content area.
+Content slides in the tab's direction, honours RTL order, and
 rapid changes interrupt toward the latest target. Headers stay stationary.
 
 ## 4. Shell, safe area and background

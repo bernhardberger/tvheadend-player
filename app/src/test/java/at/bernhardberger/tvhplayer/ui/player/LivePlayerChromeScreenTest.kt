@@ -1199,6 +1199,11 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("details-more-info"), focused())
         key(Key.DirectionCenter)
         assertEquals(listOf("player-info-reading"), focused())
+        for (index in 0..1) {
+            compose.onNodeWithTag("details-tab-$index").performSemanticsAction(SemanticsActions.RequestFocus)
+            settle()
+            assertEquals("tabs cannot take focus while More info is open", listOf("player-info-reading"), focused())
+        }
         key(Key.Back)
         assertEquals("Back returns to the action that opened reading", listOf("details-more-info"), focused())
         repeat(3) { key(Key.DirectionUp) }
@@ -1223,7 +1228,7 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("live-info-panel"))
     }
 
-    @Test fun playerInfoTabDownRestoresItsLastAction() {
+    @Test fun playerInfoTabDownStartsAtTheFirstAction() {
         screen()
         key(Key.Info)
         repeat(2) { key(Key.DirectionDown) }
@@ -1231,7 +1236,7 @@ class LivePlayerChromeScreenTest {
         compose.onNodeWithTag("details-tab-0").performSemanticsAction(SemanticsActions.RequestFocus)
         settle()
         key(Key.DirectionDown)
-        assertEquals(listOf("details-other-airings"), focused())
+        assertEquals(listOf("live-info-record"), focused())
     }
 
     @Test fun playerInfoOmitsMissingProgrammeTitleAndSubtitle() {
@@ -1298,7 +1303,7 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         key(Key.DirectionDown)
-        assertEquals("the tab remembers its content target", listOf("details-schedule-12"), focused())
+        assertEquals("tab Down starts at Now; opened programme Back still restores its row", listOf("details-schedule-11"), focused())
         key(Key.Back)
         key(Key.DirectionUp)
         key(Key.Back)

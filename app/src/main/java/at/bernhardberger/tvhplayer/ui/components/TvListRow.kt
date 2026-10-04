@@ -34,7 +34,7 @@ fun TvListRow(
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
     val listItemColors = ListItemDefaults.colors()
-    val owner = LocalBrowseTabOwner.current
+    val owner = LocalTabOwner.current
     Surface(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
@@ -54,7 +54,7 @@ fun TvListRow(
             pressedSelectedContainerColor = listItemColors.pressedSelectedContainerColor,
             pressedSelectedContentColor = listItemColors.pressedSelectedContentColor,
         ),
-        modifier = Modifier.browseTabFocus().then(modifier).height(TvListRowHeight),
+        modifier = Modifier.tabFocus().then(modifier).height(TvListRowHeight),
     ) {
         Row(
             modifier = Modifier

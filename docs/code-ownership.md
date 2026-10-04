@@ -36,7 +36,7 @@ wrappers around library APIs.
 | Labelled on/off row | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/SettingsSwitchRow.kt`: whole-row activation, passive switch, enabled state, supporting text and toggle semantics. Check caller-specific wrapping and child semantics before substitution. |
 | Recording/scheduled status icon | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/RecordingStatusIndicator.kt`. This does not own the full status-label/color mapping or failure presentation. |
 | Nested settings navigation | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/depth/DepthNavigation.kt` and `DepthStack.kt`; product destinations live in `ui/screens/settings/`. |
-| Browse-content transitions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/BrowseContentMotion.kt`; retain the current-owner boundaries described below. |
+| Tab rows and content transitions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/AppTabRow.kt` and `app/src/main/java/at/bernhardberger/tvhplayer/ui/components/TabContent.kt`; retain the current-owner boundaries described below. |
 
 When consolidating callers, preserve user-visible behavior rather than source
 spelling. A test requiring an expression in a particular screen must not force
@@ -77,9 +77,9 @@ native focus in the key dispatch, while new windows retain the viewport bridge.
 Guide, Recordings and Settings. Settings owns a saveable arbitrary-depth stack in
 `ui/components/depth/DepthNavigation.kt` / `DepthStack.kt`; its product levels live
 in `ui/screens/settings/`, including the dedicated Connection-editor exception.
-`BrowseContentMotion.kt`
-supplies horizontal outgoing/incoming motion below Channels, Guide and Recordings
-tabs. Its direction history and retained render values are presentation-only:
+`TabContent.kt`
+supplies horizontal outgoing/incoming motion below page and section tabs, including
+Channels, Guide, Recordings and programme details. Its direction history and retained render values are presentation-only:
 existing scope/mode owners synchronously publish the accepted or fallback key;
 its rows may render later. Only the current rendered visit may
 act; outgoing lists use private viewport state and cannot register shared focus
