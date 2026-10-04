@@ -12,11 +12,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -41,6 +41,9 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.notices.NoticeSeverity
 import at.bernhardberger.tvhplayer.R
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
@@ -50,20 +53,20 @@ internal val LocalAppNoticeBottomObstruction = staticCompositionLocalOf<MutableS
 
 @Composable
 internal fun AppShellNoticeHost(
-    queue: AppNoticeQueue = koinInject(),
+    queue: NoticeCenter = koinInject(),
     profileOwner: AppProfileOwner = koinInject(),
     session: TvheadendSession = koinInject(),
     bottomObstruction: Dp = 0.dp,
 ) {
     val generation by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
     val observation by session.observation.collectAsStateWithLifecycle()
-    AppNoticeHost(queue, AppNoticeContext(generation, observation.currentSession?.generationIdentity), bottomObstruction)
+    AppNoticeHost(queue, NoticeContext(generation, observation.currentSession?.generationIdentity), bottomObstruction)
 }
 
-/** Only the focused window presents. The shell and guide dialog share one queue and display budget. */
+/** One persistent shell consumer. Navigation never controls delivery or restarts a display budget. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any, bottomObstruction: Dp = 0.dp) {
+internal fun AppNoticeHost(queue: NoticeCenter, context: NoticeContext, bottomObstruction: Dp = 0.dp) {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     val allowed = lifecycle == Lifecycle.State.RESUMED &&
         LocalWindowInfo.current.isWindowFocused && !WindowInsets.isImeVisible
@@ -82,16 +85,16 @@ internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any, bottomObstructio
     LaunchedEffect(queue, next?.id, state.active?.notice?.id, allowed, context) {
         queue.prune()
         if (next == null || state.active != null || !allowed) return@LaunchedEffect
-        val timeout = accessibility?.calculateRecommendedTimeoutMillis(next.kind.displayMillis,
-            containsIcons = next.icon != null, containsText = true, containsControls = false) ?: next.kind.displayMillis
+        val displayMillis = when (next.notice.severity) { NoticeSeverity.INFO -> 4_000L; NoticeSeverity.FAILURE -> 6_000L }
+        val timeout = accessibility?.calculateRecommendedTimeoutMillis(displayMillis,
+            containsIcons = true, containsText = true, containsControls = false) ?: displayMillis
         queue.show(next.id, timeout)
     }
     if (allowed) state.active?.takeIf {
         it.notice.context == context && queue.remaining(it.expiresAt) > 0
     }?.let {
-        AppNoticePresentation(stringResource(it.notice.message),
-            it.notice.detail ?: it.notice.detailMessage?.let { resource -> stringResource(resource) }, it.notice.icon,
-            bottomObstruction)
+        val formatted = NoticeFormatter(LocalContext.current).format(it.notice.notice)
+        AppNoticePresentation(formatted.headline, detail = formatted.detail, icon = formatted.icon, bottomObstruction = bottomObstruction)
     }
 }
 
@@ -99,6 +102,7 @@ internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any, bottomObstructio
 @Composable
 internal fun AppNoticePresentation(
     message: String,
+    modifier: Modifier = Modifier,
     detail: String? = null,
     icon: AppNoticeIcon? = null,
     bottomObstruction: Dp = 0.dp,
@@ -107,11 +111,10 @@ internal fun AppNoticePresentation(
         animationSpec = if (ValueAnimator.areAnimatorsEnabled())
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard) else snap(), label = "notice clearance")
     val largeText = LocalDensity.current.fontScale > 1f
-    // Keep the kit's complete 20sp line boxes, including for a single-line Text.
     val labelStyle = MaterialTheme.typography.labelLarge.copy(
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None))
     val direction = LocalLayoutDirection.current
-    Box(Modifier.fillMaxSize().padding(start = TvFullScreenPadding.calculateStartPadding(direction),
+    Box(modifier.fillMaxSize().padding(start = TvFullScreenPadding.calculateStartPadding(direction),
         end = TvFullScreenPadding.calculateEndPadding(direction), bottom = 28.dp),
         contentAlignment = Alignment.BottomCenter) {
         Surface(modifier = Modifier
@@ -132,15 +135,15 @@ internal fun AppNoticePresentation(
                     .background(LocalContentColor.current.copy(alpha = .12f), CircleShape)
                     .testTag("app-notice-icon"), contentAlignment = Alignment.Center) {
                     Icon(painterResource(when (icon) {
-                    AppNoticeIcon.SCHEDULE -> R.drawable.ic_schedule
-                    AppNoticeIcon.RECORDING -> R.drawable.ic_fiber_manual_record
-                    AppNoticeIcon.CHECK -> R.drawable.ic_check
-                    AppNoticeIcon.STOP -> R.drawable.ic_stop
-                    AppNoticeIcon.WARNING -> R.drawable.ic_error_outlined
-                    AppNoticeIcon.CANCEL -> R.drawable.ic_close
-                    AppNoticeIcon.DELETE -> R.drawable.ic_delete_outlined
-                }), contentDescription = null, modifier = Modifier.size(16.dp),
-                    tint = if (icon == AppNoticeIcon.RECORDING) TvRecordingColor else LocalContentColor.current)
+                        AppNoticeIcon.SCHEDULE -> R.drawable.ic_schedule
+                        AppNoticeIcon.RECORDING -> R.drawable.ic_fiber_manual_record
+                        AppNoticeIcon.CHECK -> R.drawable.ic_check
+                        AppNoticeIcon.STOP -> R.drawable.ic_stop
+                        AppNoticeIcon.WARNING -> R.drawable.ic_error_outlined
+                        AppNoticeIcon.CANCEL -> R.drawable.ic_close
+                        AppNoticeIcon.DELETE -> R.drawable.ic_delete_outlined
+                    }), contentDescription = null, modifier = Modifier.size(16.dp),
+                        tint = if (icon == AppNoticeIcon.RECORDING) TvRecordingColor else LocalContentColor.current)
                 }
                 Column(Modifier.weight(1f, fill = false)) {
                     Text(message, style = labelStyle,

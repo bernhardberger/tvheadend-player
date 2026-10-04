@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -60,16 +62,6 @@ class EpgSearchObservationPolicyTest {
             DvrEntry.create(id = DvrEntryId(32), eventId = event.id),
         ))
         assertNull(observation.dvrEntryForProgramme(event))
-    }
-
-    @Test
-    fun delayedDetailsFeedbackRequiresSameOpeningAndSession() {
-        val observation = observation()
-        val opening = Any()
-        assertTrue(guideDetailsFeedbackIsCurrent(opening, opening, observation, observation))
-        assertFalse(guideDetailsFeedbackIsCurrent(opening, Any(), observation, observation))
-        assertFalse(guideDetailsFeedbackIsCurrent(opening, null, observation, observation))
-        assertFalse(guideDetailsFeedbackIsCurrent(opening, opening, observation, observation()))
     }
 
     @Test

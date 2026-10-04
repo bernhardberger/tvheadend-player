@@ -63,8 +63,12 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.notices.NoticeSeverity
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
@@ -166,7 +170,7 @@ class LivePlayerChromeScreenTest {
     private lateinit var view: View
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var session: FakeTvheadendSession
-    private val notices = AppNoticeQueue({ 0L }, { "player-test" })
+    private val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
     private lateinit var video: VideoPlayerViewModel
     private val owner = object : LifecycleOwner {
         override val lifecycle = LifecycleRegistry.createUnsafe(this)
@@ -1384,11 +1388,10 @@ class LivePlayerChromeScreenTest {
         confirmInfoAction()
         assertEquals("Record", texts("live-info-record"))
         assertEquals(listOf("live-info-record"), focused())
-        assertEquals(AppNoticeKind.FAILURE, notices.state.value.pending.single().kind)
-        assertEquals(at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon.WARNING, notices.state.value.pending.single().icon)
-        assertEquals(at.bernhardberger.tvhplayer.R.string.recording_action_failed, notices.state.value.pending.single().message)
-        assertEquals(at.bernhardberger.tvhplayer.R.string.recording_action_permission, notices.state.value.pending.single().detailMessage)
-        assertEquals("dvr-action", notices.state.value.pending.single().key)
+        val notice = notices.state.value.pending.single().notice
+        assertEquals(NoticeSeverity.FAILURE, notice.severity)
+        assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED), notice)
+        assertEquals("dvr-action", notice.key)
         assertFalse(exists("programme-recording-notice"))
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
     }
@@ -1791,7 +1794,6 @@ class LivePlayerChromeScreenTest {
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                             channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
                             contentAllowed = contentAllowed(), notices = notices,
-                            dvrIntents = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.core.RecentDvrIntents() },
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                     }

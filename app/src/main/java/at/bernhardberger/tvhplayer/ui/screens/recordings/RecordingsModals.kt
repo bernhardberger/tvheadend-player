@@ -54,6 +54,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.notifications.label
 
 internal enum class PendingRecordingAction {
     STOP,
@@ -194,16 +195,18 @@ internal fun RecordingDetailsPanel(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("recording-details-metadata-anchor"),
             )
-            val failureReason = entry.subscriptionError?.name
-            if (!failureReason.isNullOrBlank()) {
-                Text(
+            val failureReason = entry.subscriptionError?.label()
+            when {
+                !failureReason.isNullOrBlank() -> Text(
                     failureReason,
                     color = MaterialTheme.colorScheme.error,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (failureReason.isNullOrBlank()) {
+            if (
+                failureReason.isNullOrBlank()
+            ) {
                 val synopsis = entry.summary?.takeIf(String::isNotBlank)
                     ?: entry.description?.takeIf(String::isNotBlank)
                 synopsis?.let {

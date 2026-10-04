@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,8 +84,6 @@ import at.bernhardberger.tvhplayer.ui.components.PreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveList
-import at.bernhardberger.tvhplayer.core.RecentDvrIntents
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveListItem
 import at.bernhardberger.tvhplayer.ui.screens.recordings.FolderMetadataPane
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
@@ -156,12 +156,10 @@ fun RecordingsScreen(
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
-    notices: AppNoticeQueue = koinInject(),
-    dvrIntents: RecentDvrIntents = koinInject(),
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
-    val dvrMutationActions = remember(session.dvrRepository, dvrIntents) {
-        DvrMutationActions(session.dvrRepository, dvrIntents)
+    val dvrMutationActions = remember(session.dvrRepository) {
+        DvrMutationActions(session.dvrRepository)
     }
     RecordingsScreenContent(
         observation = observation,
@@ -175,7 +173,6 @@ fun RecordingsScreen(
         state = state,
         dvrMutationActions = dvrMutationActions,
         currentObservation = { session.observation.value },
-        notices = notices,
     )
 }
 
@@ -192,13 +189,12 @@ internal fun RecordingsScreenContent(
     state: RecordingsScreenState? = null,
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
-    notices: AppNoticeQueue = koinInject(),
+    notices: NoticeCenter = koinInject(),
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
     val currentSession = observation.currentSession
-    val latestSession by rememberUpdatedState(currentSession)
     val latestObservationProvider by rememberUpdatedState(currentObservation)
     val preparationAuthority = currentSession ?: observation.dvrSnapshotForDisplay
     var retainedPreparation by remember(preparationAuthority) {
@@ -226,7 +222,6 @@ internal fun RecordingsScreenContent(
     var folderPreviewRecordingId by remember { mutableStateOf<DvrEntryId?>(null) }
     var detailsOpenedFromFolderPreview by remember { mutableStateOf(false) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
-    var detailsGeneration by remember { mutableIntStateOf(0) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var detailsInitialAction by remember {
         mutableStateOf<RecordingDetailsAction?>(null)
@@ -622,7 +617,6 @@ internal fun RecordingsScreenContent(
                                     detailsOpenedFromFolderPreview = false
                                     detailsInitialAction = null
                                     detailsEntry = it
-                                    detailsGeneration++
                                     detailsObservation = observation
                                 },
                                 imageLoader = imageLoader,
@@ -664,7 +658,6 @@ internal fun RecordingsScreenContent(
                                     detailsOpenedFromFolderPreview = true
                                     detailsInitialAction = null
                                     detailsEntry = it
-                                    detailsGeneration++
                                     detailsObservation = observation
                                 },
                             )
@@ -702,7 +695,6 @@ internal fun RecordingsScreenContent(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
-                                detailsGeneration++
                                 detailsObservation = observation
                             },
                             imageLoader = imageLoader,
@@ -742,7 +734,6 @@ internal fun RecordingsScreenContent(
                                 detailsOpenedFromFolderPreview = false
                                 detailsInitialAction = null
                                 detailsEntry = it
-                                detailsGeneration++
                                 detailsObservation = observation
                             },
                             imageLoader = imageLoader,
@@ -877,24 +868,16 @@ internal fun RecordingsScreenContent(
                 pendingAction = null
                 val mutation = pendingMutation
                 pendingMutation = null
-                val mutationEntry = detailsEntry
                 val mutationObservation = detailsObservation
-                val mutationGeneration = detailsGeneration
-                val noticeContext = notices.context()
                 scope.launch {
                     val latestObservation = latestObservationProvider()
                     if (mutation == null ||
                         mutationObservation?.currentSession !== latestObservation.currentSession ||
                         !mutation.recordingStateIsCurrent(latestObservation)
                     ) return@launch
+                    val noticeContext = notices.context()
                     val result = dvrMutationActions.execute(mutation)
-                    if (
-                        detailsGeneration == mutationGeneration &&
-                        detailsEntry === mutationEntry && detailsObservation === mutationObservation &&
-                        latestSession != null && mutationObservation?.currentSession === latestSession
-                    ) {
-                        notices.postDvrFailure(result, noticeContext)
-                    }
+                    notices.postDvrFailure(mutation, result, noticeContext)
                 }
             },
         )

@@ -19,9 +19,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
-import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.DvrEvent
-import at.bernhardberger.tvhplayer.core.DvrEventKind
+import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.notifications.*
 import at.bernhardberger.tvhplayer.ui.player.*
@@ -46,33 +44,34 @@ class AppNoticeCaptureTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var originalZone: TimeZone
     private val now = Instant.parse("2026-10-04T18:30:00Z")
-
     @Before fun setZone() { originalZone = TimeZone.getDefault(); TimeZone.setDefault(TimeZone.getTimeZone("UTC")) }
     @After fun restoreZone() { TimeZone.setDefault(originalZone) }
     @Test fun english() = captureVariants("en", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = captureVariants("de", 1.3f)
 
-    private data class Variant(val name: String, val headline: String, val detail: String, val icon: AppNoticeIcon)
-
     private fun captureVariants(locale: String, fontScale: Float) {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val title = if (locale == "de") "Die Bergwelt im Herbst" else "Mountains in Autumn"
         val entry = DvrEntry.create(DvrEntryId(1), title = title, channelName = "Documentary HD",
             start = now + 1_800.seconds, subscriptionError = DvrSubscriptionError.NO_DISK_SPACE)
-        val variants = DvrEventKind.entries.map { kind ->
-            val event = DvrEvent(kind, entry, count = 5)
-            Variant(kind.name.lowercase(), context.getString(event.headline()), event.detail(context, now), event.icon())
+        val formatter = NoticeFormatter(context)
+        val variants = DvrChangeKind.entries.map { kind ->
+            kind.name.lowercase() to formatter.format(Notice.Dvr(kind, entry, DvrChangeOrigin.External), now)
         } + listOf(
-            Variant("long-title", context.getString(R.string.recording_notice_scheduled),
-                DvrEvent(DvrEventKind.SCHEDULED, DvrEntry.create(DvrEntryId(2),
-                    title = if (locale == "de") "Eine außergewöhnliche Reise durch die verborgenen Landschaften und die faszinierende Tierwelt unserer Erde"
-                        else "An extraordinary journey through the hidden landscapes and the fascinating wildlife of our planet",
-                    channelName = "International Documentary HD", start = now + 86_400.seconds)).detail(context, now), AppNoticeIcon.SCHEDULE),
-            Variant("action-failure", context.getString(R.string.recording_action_failed),
-                context.getString(R.string.recording_action_permission), AppNoticeIcon.WARNING),
-        )
-        var variant by mutableStateOf(variants.first())
+            "series" to formatter.format(Notice.Dvr(DvrChangeKind.SCHEDULED, entry, DvrChangeOrigin.External, 5), now),
+            "series-canceled" to formatter.format(Notice.Dvr(DvrChangeKind.REMOVED,
+                DvrEntry.create(DvrEntryId(1), title = title, state = DvrEntryState.SCHEDULED), DvrChangeOrigin.External, 5), now),
+            "canceled" to formatter.format(Notice.Dvr(DvrChangeKind.REMOVED, entry,
+                DvrChangeOrigin.ThisClient(DvrMutationKind.CANCEL)), now),
+            "long-title" to formatter.format(Notice.Dvr(DvrChangeKind.SCHEDULED, DvrEntry.create(DvrEntryId(2),
+                title = if (locale == "de") "Eine außergewöhnliche Reise durch die verborgenen Landschaften und die faszinierende Tierwelt unserer Erde"
+                    else "An extraordinary journey through the hidden landscapes and the fascinating wildlife of our planet",
+                channelName = "International Documentary HD", start = now + 86_400.seconds), DvrChangeOrigin.External), now),
+            "action-failure" to formatter.format(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED), now),
+            "action-timeout" to formatter.format(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.TIMEOUT), now),
+        ) + ConnectionNoticeKind.entries.map { "connection-${it.name.lowercase()}" to formatter.format(Notice.Connection(it), now) }
+        var variant by mutableStateOf(variants.first().second)
         var overPlayer by mutableStateOf(false)
         var controlsVisible by mutableStateOf(false)
         lateinit var view: View
@@ -82,8 +81,7 @@ class AppNoticeCaptureTest {
             view = LocalView.current
             val loader = remember { ImageLoader.Builder(context).diskCache(null).build() }
             val obstruction = remember { mutableStateOf(0.dp) }
-            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale),
-                LocalAppNoticeBottomObstruction provides obstruction) {
+            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale), LocalAppNoticeBottomObstruction provides obstruction) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize().background(if (overPlayer) Color(0xFFF2EEDC) else Color(0xFF111822))) {
                         if (overPlayer) PlayerChrome(
@@ -95,38 +93,27 @@ class AppNoticeCaptureTest {
                             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
-                        AppNoticePresentation(variant.headline, variant.detail, variant.icon, obstruction.value)
+                        AppNoticePresentation(variant.headline, detail = variant.detail, icon = variant.icon, bottomObstruction = obstruction.value)
                     }
                 }
             }
         }
-        for (next in variants) {
+        fun settle() { repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() } }
+        for ((name, next) in variants) {
             compose.runOnIdle { variant = next }
-            compose.waitForIdle()
-            repeat(6) {
-                compose.mainClock.advanceTimeBy(100)
-                compose.waitForIdle()
-            }
+            settle()
             compose.onNodeWithTag("app-notice").assertIsDisplayed()
-                .assertContentDescriptionEquals("${next.headline}. ${next.detail}")
+                .assertContentDescriptionEquals(listOfNotNull(next.headline, next.detail).joinToString(". "))
             compose.onAllNodes(isFocused()).assertCountEquals(0)
-            capture(view, "$locale-font$fontScale-${next.name}", locale, fontScale, "notice only")
+            capture(view, "$locale-font$fontScale-$name", locale, fontScale, "notice only")
         }
-        compose.runOnIdle { variant = variants.first { it.icon == AppNoticeIcon.RECORDING }; overPlayer = true }
-        compose.waitForIdle()
-        repeat(6) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
+        compose.runOnIdle { variant = variants.first { it.second.icon == AppNoticeIcon.RECORDING }.second; overPlayer = true }
+        settle()
         capture(view, "$locale-font$fontScale-over-player", locale, fontScale, "production player banner over a bright synthetic still; no SurfaceView")
         compose.runOnIdle { controlsVisible = true }
-        repeat(6) {
-            compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
-        }
+        settle()
         val noticeBottom = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom
         val footerTop = compose.onNodeWithTag("player-footer").fetchSemanticsNode().boundsInRoot.top
-        // The notice may occupy the empty gradient runout, but never the footer's content.
         check(noticeBottom <= footerTop + (TvOverlayFooterGradientRunout.value - 28f) * 2f + 1f)
         capture(view, "$locale-font$fontScale-over-player-chrome-visible", locale, fontScale,
             "production player controls over a bright synthetic still; no SurfaceView; noticeBottomPx=$noticeBottom; footerTopPx=$footerTop")

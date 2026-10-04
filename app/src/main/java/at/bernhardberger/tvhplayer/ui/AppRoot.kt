@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.ui.notifications.LocalAppNoticeBottomObstruction
 import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -74,7 +75,6 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
-import at.bernhardberger.tvhplayer.ui.notifications.LocalAppNoticeBottomObstruction
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
@@ -221,34 +221,34 @@ internal fun MainStartupComposition(
 
     val noticeObstruction = remember { mutableStateOf(0.dp) }
     CompositionLocalProvider(LocalAppNoticeBottomObstruction provides noticeObstruction) {
-        Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            persistentSurface()
-            if (showWarmPlaybackScrim) WarmPlaybackScrim(targetAlpha = warmPlaybackScrimAlpha)
-            val startDestination = state.navigationStartDestination
-            if (state.navigationAllowed && startDestination != null) {
-                navigation(
-                    startDestination,
-                    state.contentAllowed,
-                )
-            }
-            if (renderedPresentation != MainStartupPresentation.Inactive) {
-                MainStartupScreen(
-                    presentation = renderedPresentation,
-                    contentPadding = TvFullScreenPadding,
-                    onAction = onAction,
-                    modifier = Modifier.fillMaxSize().graphicsLayer {
-                        alpha = if (revealRequestId != null) revealAlpha.value else 1f
-                    },
-                    brandMillis = { retained?.brandMillis ?: brandIntro?.millis ?: StartupBrandDurationMillis },
-                    loadingFeedback = retained?.feedback ?: loadingFeedback,
-                    // Pending cold art has zero-alpha tracks, but keeps its final layout.
-                    // Only the existing-playback classification removes branding.
-                    brandingVisible = retained?.brandingVisible ?: !state.hideBranding,
-                    motionEnabled = motionEnabled,
-                )
-            }
-            notices()
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        persistentSurface()
+        if (showWarmPlaybackScrim) WarmPlaybackScrim(targetAlpha = warmPlaybackScrimAlpha)
+        val startDestination = state.navigationStartDestination
+        if (state.navigationAllowed && startDestination != null) {
+            navigation(
+                startDestination,
+                state.contentAllowed,
+            )
         }
+        if (renderedPresentation != MainStartupPresentation.Inactive) {
+            MainStartupScreen(
+                presentation = renderedPresentation,
+                contentPadding = TvFullScreenPadding,
+                onAction = onAction,
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    alpha = if (revealRequestId != null) revealAlpha.value else 1f
+                },
+                brandMillis = { retained?.brandMillis ?: brandIntro?.millis ?: StartupBrandDurationMillis },
+                loadingFeedback = retained?.feedback ?: loadingFeedback,
+                // Pending cold art has zero-alpha tracks, but keeps its final layout.
+                // Only the existing-playback classification removes branding.
+                brandingVisible = retained?.brandingVisible ?: !state.hideBranding,
+                motionEnabled = motionEnabled,
+            )
+        }
+        notices()
+    }
     }
 
     BackHandler(

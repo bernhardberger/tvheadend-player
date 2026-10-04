@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost
+
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
@@ -95,7 +98,6 @@ import at.bernhardberger.tvhplayer.core.guidePendingNavigationAction
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
-import at.bernhardberger.tvhplayer.core.RecentDvrIntents
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
@@ -127,8 +129,6 @@ import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeHost
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
 import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
@@ -276,8 +276,6 @@ fun EpgGridScreen(
     playerSession: AppPlaybackRuntime = koinInject(),
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
     guidePositionStore: GuidePositionStore = koinInject(),
-    notices: AppNoticeQueue = koinInject(),
-    dvrIntents: RecentDvrIntents = koinInject(),
     imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     playerReturn: PlayerReturnFocus? = null,
@@ -285,6 +283,7 @@ fun EpgGridScreen(
     onOpenConnectionSettings: () -> Unit = {},
     onClearCategory: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection) -> Unit = {},
+    notices: NoticeCenter = koinInject(),
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -296,8 +295,8 @@ fun EpgGridScreen(
         layoutDirection = layoutDirection,
     )
     val coroutineScope = rememberCoroutineScope()
-    val dvrMutationActions = remember(session.dvrRepository, dvrIntents) {
-        DvrMutationActions(session.dvrRepository, dvrIntents)
+    val dvrMutationActions = remember(session.dvrRepository) {
+        DvrMutationActions(session.dvrRepository)
     }
     val epgSearchActions = remember(session.epgRepository) {
         EpgSearchActions(session.epgRepository)
@@ -2045,7 +2044,6 @@ fun EpgGridScreen(
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForProgramme(event)
             if (pendingAction == null) ProgrammeDetailsPanel(
-                notice = { AppNoticeHost(notices, notices.context()) },
                 onPreviewKeyEvent = confirmationKeyHandler,
                 contentPadding = contentPadding,
                 event = event,
@@ -2054,6 +2052,7 @@ fun EpgGridScreen(
                 nowSecProvider = nowSecProvider,
                 canModifyRecordings = selectedCapability != null && (liveEvent != null || recording != null),
                 liveProgrammeActions = liveEvent != null,
+                notices = { AppShellNoticeHost(queue = notices) },
                 onAction = actionHandler@{ action ->
                     if (
                         selectedObservation.currentSession == null ||
@@ -2174,18 +2173,13 @@ fun EpgGridScreen(
                     pendingMutation = null
                     pendingRecordingTarget = null
                     if (mutation != null) {
-                        val opening = detailsOpening
                         val openingObservation = detailsObservation
-                        val noticeContext = notices.context()
                         coroutineScope.launch {
                             val currentMutation = currentDvrMutation(mutation, openingObservation, observationState.value)
                                 ?: return@launch
+                            val noticeContext = notices.context()
                             val feedback = dvrMutationActions.execute(currentMutation)
-                            if (guideDetailsFeedbackIsCurrent(
-                                opening, detailsOpening, openingObservation, observationState.value,
-                            )) {
-                                notices.postDvrFailure(feedback, noticeContext)
-                            }
+                            notices.postDvrFailure(currentMutation, feedback, noticeContext)
                         }
                     }
                 },
@@ -2253,15 +2247,6 @@ internal fun currentGuideRecordingTarget(target: ProgrammeRecordingTarget?, obse
         observation.currentSession === selected.currentSession &&
             observation.event(selected.eventId)?.programmeRecordingTarget(selected.currentSession) == selected
     }
-
-internal fun guideDetailsFeedbackIsCurrent(
-    opening: Any?,
-    currentOpening: Any?,
-    openingObservation: SessionObservation?,
-    currentObservation: SessionObservation,
-): Boolean = opening != null && opening === currentOpening &&
-    openingObservation?.currentSession != null &&
-    openingObservation.currentSession === currentObservation.currentSession
 
 internal fun SessionObservation.dvrEntryForProgramme(event: EpgEventEntry): DvrEntry? =
     dvrSnapshotForDisplay?.entries?.singleOrNull { entry ->

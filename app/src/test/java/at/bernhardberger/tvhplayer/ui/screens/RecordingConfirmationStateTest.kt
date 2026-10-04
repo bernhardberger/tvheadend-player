@@ -10,15 +10,11 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
-import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeContext
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
+import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,49 +34,45 @@ class RecordingConfirmationStateTest {
     @Test fun stopDismissesWhenEntryRemoved() = transition(DvrEntryState.RECORDING, null)
     @Test fun cancelRechecksLatestObservationBeforeDispatch() = transition(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, true)
     @Test fun stopRechecksLatestObservationBeforeDispatch() = transition(DvrEntryState.RECORDING, DvrEntryState.COMPLETED, true)
-    @Test fun stopFailureUsesGlobalNoticeWithoutInlineResult() = actionFeedback(DvrMutationResult.AccessDenied)
-    @Test fun acceptedStopWaitsForServerEvent() = actionFeedback(DvrMutationResult.AcceptedButUnconfirmed(Unit))
-    @Test fun confirmedStopWaitsForServerEvent() = actionFeedback(DvrMutationResult.Confirmed(Unit))
-    @Test fun dismissedDetailsDiscardLateActionFailure() = actionFeedback(DvrMutationResult.AccessDenied, dismiss = true)
 
-    private fun actionFeedback(result: DvrMutationResult<Unit>, dismiss: Boolean = false) {
-        val context = ApplicationProvider.getApplicationContext<Application>()
-        val session = FakeTvheadendSession(observation(DvrEntryState.RECORDING))
+    @Test fun actionFailureIsPostedAfterDetailsClose() = delayedFailure(reopen = false)
+    @Test fun actionFailureIsPostedAfterDetailsReopen() = delayedFailure(reopen = true)
+
+    private fun delayedFailure(reopen: Boolean) {
+        val session = FakeTvheadendSession(observation(DvrEntryState.SCHEDULED))
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
-        val loader = ImageLoader.Builder(context).build()
-        val notices = AppNoticeQueue({ 0L }, { AppNoticeContext(1, session.observation.value.currentSession?.generationIdentity) })
-        val response = CompletableDeferred<DvrMutationResult<Unit>>()
+        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
+        val result = CompletableDeferred<DvrMutationResult<Unit>>()
+        var calls = 0
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
-            stopEntry = { _, _ -> response.await() },
-            cancelEntry = { _, _ -> DvrMutationResult.NotReady },
+            stopEntry = { _, _ -> DvrMutationResult.NotReady },
+            cancelEntry = { _, _ -> calls++; result.await() },
             deleteEntry = { _, _ -> DvrMutationResult.NotReady },
         )
+        val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         compose.setContent {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(observation = session.observation.collectAsState().value,
-                    currentObservation = { session.observation.value }, state = state, imageLoader = loader,
-                    dvrMutationActions = actions, notices = notices)
+                RecordingsScreenContent(
+                    observation = session.observation.collectAsState().value,
+                    currentObservation = { session.observation.value },
+                    state = state, imageLoader = loader, dvrMutationActions = actions, notices = notices,
+                )
             }
         }
-        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-stop").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        if (dismiss) {
-            compose.onNodeWithTag("recording-details-close").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-            compose.onNodeWithTag("recording-details-panel").assertDoesNotExist()
-        }
-        compose.runOnIdle { response.complete(result) }
+        compose.runOnIdle { assertEquals(1, calls) }
+        compose.onNodeWithTag("recording-details-close").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-details-cancel").assertDoesNotExist()
+        if (reopen) compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }
         compose.waitForIdle()
-        if (!dismiss && result == DvrMutationResult.AccessDenied) {
-            val notice = notices.state.value.pending.single()
-            assertEquals(R.string.recording_action_failed, notice.message)
-            assertEquals(R.string.recording_action_permission, notice.detailMessage)
-            assertEquals(AppNoticeIcon.WARNING, notice.icon)
-            compose.onNodeWithText(context.getString(R.string.recording_action_permission)).assertDoesNotExist()
-            compose.onNodeWithTag("recording-details-stop").assertIsFocused()
-        } else assertTrue(notices.state.value.pending.isEmpty())
+        compose.runOnIdle {
+            assertEquals(Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.PERMISSION_DENIED),
+                notices.state.value.candidate?.notice)
+        }
     }
 
     private fun transition(before: DvrEntryState, after: DvrEntryState?, clickBeforeRecomposition: Boolean = false) {
@@ -94,13 +86,16 @@ class RecordingConfirmationStateTest {
             cancelEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
             deleteEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
         )
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(0, session.observation.value.currentSession?.generationIdentity)
+        }
         compose.setContent {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
                     state = state, imageLoader = loader, dvrMutationActions = actions,
-                    notices = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue({ 0L }, {}) },
+                    notices = notices,
                 )
             }
         }

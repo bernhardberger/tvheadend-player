@@ -1,15 +1,30 @@
 ---
 name: android-tv-device-testing
-description: Use for physical TV or emulator operations including ADB, device screenshots, test-device credential provisioning, APK installation, playback checks, key injection, HOME, GUIDE, standby/wake, reboot, and device diagnostics. Not for source-only UI or key-handler edits.
+description: Use for physical TV or emulator operations, Notebook032 interactive/fullscreen previews, ADB, device screenshots, test-device credential provisioning, APK installation, playback checks, key injection, HOME, GUIDE, standby/wake, reboot, and device diagnostics. Not for source-only UI or key-handler edits.
 ---
 
 # Android TV Device Testing
 
 Use official Android CLI with explicit `--device` for ordinary install/capture
-on physical TVs and the authorized existing LXC119 emulator. Follow
+on physical TVs and the authorized existing Notebook032 and LXC119 emulators. Follow
 `docs/android-tooling.md`; use explicit-serial ADB only for capabilities the CLI
 lacks. Keep specialized credential, signed-release and instrumentation acceptance
 gates. No route permits broad ADB dumps or automatic uninstall/data clearing.
+
+## Choose the iteration lane
+
+- Local tests and fake-state production captures: deterministic logic and layout.
+- Notebook032: integrated, human-visible TV UI iteration, launcher/Home/Back and
+  fullscreen keyboard interaction. Read the repository-root
+  `docs/notebook-tv-preview.md` for the reusable AVD/viewer, target routing,
+  install/capture commands and known pitfalls.
+- LXC119: existing automated emulator capture/instrumentation lane in
+  `docs/android-tooling.md`; identity-pinned tests are not portable to Notebook032.
+- G10: physical-TV acceptance, including remote feel, video and motion.
+
+Use one operation owner. The primary owns Notebook032 SSH and host-service
+setup; a child receives only the bounded operations its existing permissions and
+dispatch cover. This capability does not extend a child's infrastructure access.
 
 ## Before touching the device
 
@@ -36,8 +51,9 @@ gates. No route permits broad ADB dumps or automatic uninstall/data clearing.
 
 ## Safe sequence
 
-Prefer `./tools/device status` as the first diagnostic call: identity, installed
-version/hash, focus, playback and a 0.5 s frame sample. Use `--frames-window` to
+For a configured physical-device profile, prefer `./tools/device status` as the
+first diagnostic call: identity, installed version/hash, focus, playback and a
+0.5 s frame sample. Use `--frames-window` to
 adjust the sample or `--no-frames` to skip it; an identity mismatch exits nonzero.
 
 For an authorized test device, install only when the required verified APK is not

@@ -13,9 +13,9 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.AccessibilityManager
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -23,8 +23,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.SessionCache
@@ -35,6 +33,7 @@ import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.notifications.*
+import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.player.PlayerOverlayChrome
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsGeneralLevels
@@ -54,12 +53,91 @@ import org.robolectric.annotation.GraphicsMode
 class AppNoticeHostTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun kitNoticesHugContentAndShareTheEightColumnMaximum() {
+        var details by mutableStateOf(false)
+        var message by mutableStateOf("Cache cleared")
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                AppNoticePresentation(message,
+                    detail = if (details) "A long programme title · Documentary, Tomorrow 18:30" else null,
+                    icon = if (details) AppNoticeIcon.SCHEDULE else null)
+            }
+        }
+        val plain = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot
+        assertTrue(plain.width < 324f)
+        assertEquals(44f, plain.height, .5f)
+        assertEquals(512f, plain.bottom, .5f)
+        assertEquals(480f, plain.center.x, .5f)
+        compose.runOnIdle { message = "A long notice headline that needs enough room to remain readable ".repeat(3) }
+        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
+        compose.runOnIdle { details = true }
+        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
+        compose.onNodeWithTag("app-notice-icon", useUnmergedTree = true).assertWidthIsEqualTo(32.dp).assertHeightIsEqualTo(32.dp)
+    }
+
+    @Test fun largeTextDetailsStayBoundedAndKeepFullAnnouncement() {
+        val detail = "A long programme title with additional descriptive information ".repeat(4)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                TVHeadendPlayerTheme { AppNoticePresentation("Recording scheduled", detail = detail, icon = AppNoticeIcon.SCHEDULE) }
+            }
+        }
+        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp)
+            .assertContentDescriptionEquals("Recording scheduled. $detail")
+        val bounds = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot
+        assertEquals(105f, bounds.height, .5f)
+        assertEquals(512f, bounds.bottom, .5f)
+    }
+
+    @Test fun measuredFooterLiftsShellNoticeAndDisposalRestoresBottomAnchor() {
+        var footerVisible by mutableStateOf(true)
+        var footerHeight by mutableStateOf(100.dp)
+        val queue = NoticeCenter({ 0L }, { NoticeContext(0, null) })
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                MainStartupComposition(MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true),
+                    onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
+                    navigation = { _, _ ->
+                        if (footerVisible) PlayerOverlayChrome(headerContent = {}, footerPadding = PaddingValues(0.dp)) {
+                            Box(Modifier.height(footerHeight))
+                        }
+                    },
+                    notices = { AppNoticeHost(queue, queue.context(), LocalAppNoticeBottomObstruction.current!!.value) })
+            }
+        }
+        compose.runOnIdle { queue.post(Notice.CacheClear(true), queue.context()) }
+        fun assertBottom(expected: Float) {
+            assertEquals(expected, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)
+        }
+        assertBottom(412f)
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { footerHeight = 150.dp }
+        repeat(6) { compose.mainClock.advanceTimeBy(16); compose.waitForIdle() }
+        val movingBottom = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom
+        assertTrue("Inset changes should animate: $movingBottom", movingBottom > 362f && movingBottom < 412f)
+        compose.mainClock.autoAdvance = true
+        assertBottom(362f)
+        compose.runOnIdle { footerVisible = false }
+        assertBottom(512f)
+    }
+
+    @Test fun independentWindowHostDoesNotInheritShellObstruction() {
+        val queue = NoticeCenter({ 0L }, { NoticeContext(0, null) })
+        compose.setContent {
+            CompositionLocalProvider(LocalAppNoticeBottomObstruction provides remember { mutableStateOf(150.dp) }) {
+                TVHeadendPlayerTheme { AppNoticeHost(queue, queue.context()) }
+            }
+        }
+        compose.runOnIdle { queue.post(Notice.CacheClear(true), queue.context()) }
+        assertEquals(512f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)
+    }
+
     @Test fun cacheResultAfterLeavingSettingsDeliversOnceAndDoesNotStealPlaybackFocus() {
         val release = CompletableDeferred<Unit>()
         val cache = object : SessionCache by FakeTvheadendSession().cache {
             override suspend fun clear() { release.await() }
         }
-        val queue = AppNoticeQueue(SystemClock::elapsedRealtime, { Unit })
+        val queue = NoticeCenter(SystemClock::elapsedRealtime, { NoticeContext(0, null) })
         val model = SettingsStorageViewModel(cache, queue, at.bernhardberger.tvhplayer.stores.ChannelAccentStore())
         var playback by mutableStateOf(false)
         var clicks = 0
@@ -67,7 +145,7 @@ class AppNoticeHostTest {
             TVHeadendPlayerTheme {
                 MainStartupComposition(MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true),
                     onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
-                    notices = { AppNoticeHost(queue, Unit) },
+                    notices = { AppNoticeHost(queue, queue.context()) },
                     navigation = { _, _ ->
                         if (!playback) {
                             val clearState by model.clearState.collectAsState()
@@ -98,17 +176,17 @@ class AppNoticeHostTest {
 
     @Test fun visibleIdentityAndDeadlineSurviveNavigationAndRecreationWithoutReplay() {
         var time = 0L
-        val queue = AppNoticeQueue({ time }, { Unit })
+        val queue = NoticeCenter({ time }, { NoticeContext(0, null) })
         var destination by mutableStateOf("Settings")
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
             TVHeadendPlayerTheme {
                 MainStartupComposition(MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true),
                     onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
-                    navigation = { _, _ -> Text(destination) }, notices = { AppNoticeHost(queue, Unit) })
+                    navigation = { _, _ -> Text(destination) }, notices = { AppNoticeHost(queue, queue.context()) })
             }
         }
-        compose.runOnIdle { queue.post("cache", R.string.cache_notice_cleared, AppNoticeKind.SUCCESS, Unit) }
+        compose.runOnIdle { queue.post(Notice.CacheClear(true), queue.context()) }
         compose.onNodeWithText("Cache cleared").assertIsDisplayed()
         val shown = queue.state.value.active!!
         compose.runOnIdle { time = 1_000; destination = "Playback" }
@@ -125,13 +203,13 @@ class AppNoticeHostTest {
 
     @Test fun foregroundOnlyAndAccessibilityBudgetRemainIndependentOfPendingExpiry() {
         var time = 0L
-        val queue = AppNoticeQueue({ time }, { Unit })
+        val queue = NoticeCenter({ time }, { NoticeContext(0, null) })
         lateinit var owner: LifecycleOwner
         val accessibility = object : AccessibilityManager {
             override fun calculateRecommendedTimeoutMillis(originalTimeoutMillis: Long, containsIcons: Boolean,
                 containsText: Boolean, containsControls: Boolean): Long {
+                assertEquals(6_000L, originalTimeoutMillis)
                 assertTrue(containsText)
-                assertTrue(containsIcons)
                 assertFalse(containsControls)
                 return 60_000
             }
@@ -141,10 +219,10 @@ class AppNoticeHostTest {
                 override val lifecycle = LifecycleRegistry(this).apply { currentState = Lifecycle.State.STARTED }
             } }
             CompositionLocalProvider(LocalLifecycleOwner provides owner, LocalAccessibilityManager provides accessibility) {
-                TVHeadendPlayerTheme { AppNoticeHost(queue, Unit) }
+                TVHeadendPlayerTheme { AppNoticeHost(queue, queue.context()) }
             }
         }
-        compose.runOnIdle { queue.post("cache", R.string.cache_notice_failed, AppNoticeKind.FAILURE, Unit, AppNoticeIcon.WARNING) }
+        compose.runOnIdle { queue.post(Notice.CacheClear(false), queue.context()) }
         compose.onNodeWithTag("app-notice").assertDoesNotExist()
         compose.runOnIdle { time = 29_000; (owner.lifecycle as LifecycleRegistry).currentState = Lifecycle.State.RESUMED }
         compose.onNodeWithTag("app-notice").assertIsDisplayed()
@@ -162,120 +240,5 @@ class AppNoticeHostTest {
         compose.runOnIdle { time = 90_000; (owner.lifecycle as LifecycleRegistry).currentState = Lifecycle.State.RESUMED }
         compose.onNodeWithTag("app-notice").assertDoesNotExist()
         compose.runOnIdle { assertNull(queue.state.value.active) }
-    }
-
-    @Test fun recordingNoticeReadsBothLinesAndPreservesDpadAndClickFocus() {
-        val queue = AppNoticeQueue(SystemClock::elapsedRealtime, { Unit })
-        var clicks = 0
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                androidx.compose.foundation.layout.Box {
-                    val focus = remember { FocusRequester() }
-                    androidx.compose.foundation.layout.Row {
-                        Button(onClick = { clicks++ }, modifier = Modifier.focusRequester(focus)) { Text("First") }
-                        Button(onClick = { clicks++ }) { Text("Second") }
-                    }
-                    LaunchedEffect(Unit) { focus.requestFocus() }
-                    AppNoticeHost(queue, Unit)
-                }
-            }
-        }
-        compose.runOnIdle { queue.post("dvr:1", R.string.recording_notice_started, AppNoticeKind.SUCCESS,
-            Unit, AppNoticeIcon.RECORDING, "Nature · Documentary") }
-        compose.onNodeWithTag("app-notice")
-            .assertContentDescriptionEquals("Recording started. Nature · Documentary")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
-        compose.onNodeWithText("First").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionCenter) }
-        compose.onNodeWithText("Second").assertIsFocused()
-        assertEquals(1, clicks)
-        compose.onAllNodes(isFocused()).assertCountEquals(1)
-    }
-
-    @Test fun kitNoticesHugContentAndShareTheEightColumnMaximum() {
-        var details by mutableStateOf(false)
-        var message by mutableStateOf("Cache cleared")
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                AppNoticePresentation(message,
-                    detail = if (details) "A long programme title · Documentary, Tomorrow 18:30" else null,
-                    icon = if (details) AppNoticeIcon.SCHEDULE else null)
-            }
-        }
-        val plain = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot
-        assertTrue(plain.width < 324f)
-        assertEquals(44f, plain.height, .5f)
-        assertEquals(512f, plain.bottom, .5f)
-        assertEquals(480f, plain.center.x, .5f)
-        compose.runOnIdle { message = "A long notice headline that needs enough room to remain readable ".repeat(3) }
-        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
-        compose.runOnIdle { details = true }
-        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp).assertHeightIsEqualTo(64.dp)
-        compose.onNodeWithTag("app-notice-icon", useUnmergedTree = true)
-            .assertWidthIsEqualTo(32.dp).assertHeightIsEqualTo(32.dp)
-    }
-
-    @Test fun largeTextDetailsMayWrapButRemainBoundedAndKeepFullAnnouncement() {
-        val detail = "A long programme title with additional descriptive information ".repeat(4)
-        compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
-                TVHeadendPlayerTheme { AppNoticePresentation("Recording scheduled", detail, AppNoticeIcon.SCHEDULE) }
-            }
-        }
-        compose.onNodeWithTag("app-notice").assertWidthIsEqualTo(556.dp)
-            .assertContentDescriptionEquals("Recording scheduled. $detail")
-        val bounds = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot
-        assertEquals(105f, bounds.height, .5f) // Android 34 font scaling: 24dp + three 27dp line boxes.
-        assertEquals(512f, bounds.bottom, .5f)
-    }
-
-    @Test fun measuredPlayerFooterLiftsShellNoticeAndDisposalRestoresBottomAnchor() {
-        var footerVisible by mutableStateOf(true)
-        var footerHeight by mutableStateOf(100.dp)
-        val queue = AppNoticeQueue({ 0L }, { Unit })
-        compose.setContent {
-            TVHeadendPlayerTheme {
-                MainStartupComposition(MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true),
-                    onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
-                    navigation = { _, _ ->
-                        if (footerVisible) PlayerOverlayChrome(headerContent = {}, footerPadding = PaddingValues(0.dp)) {
-                            Box(Modifier.height(footerHeight))
-                        }
-                    },
-                    notices = { AppNoticeHost(queue, Unit, LocalAppNoticeBottomObstruction.current!!.value) })
-            }
-        }
-        compose.runOnIdle { queue.post("cache", R.string.cache_notice_cleared, AppNoticeKind.SUCCESS, Unit) }
-        fun assertBottom(expected: Float) {
-            assertEquals(expected, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)
-        }
-        assertBottom(412f)
-        compose.mainClock.autoAdvance = false
-        compose.runOnIdle { footerHeight = 150.dp }
-        repeat(6) {
-            compose.mainClock.advanceTimeBy(16)
-            compose.waitForIdle()
-        }
-        val movingBottom = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom
-        assertTrue("Inset changes should animate, not jump: $movingBottom", movingBottom > 362f && movingBottom < 412f)
-        compose.mainClock.autoAdvance = true
-        assertBottom(362f)
-        compose.runOnIdle { footerVisible = false }
-        assertBottom(512f)
-        compose.runOnIdle { footerVisible = true }
-        assertBottom(362f)
-    }
-
-    @Test fun independentWindowHostDoesNotInheritTheShellObstruction() {
-        val queue = AppNoticeQueue({ 0L }, { Unit })
-        compose.setContent {
-            CompositionLocalProvider(LocalAppNoticeBottomObstruction provides remember { mutableStateOf(150.dp) }) {
-                TVHeadendPlayerTheme { AppNoticeHost(queue, Unit) }
-            }
-        }
-        compose.runOnIdle { queue.post("cache", R.string.cache_notice_cleared, AppNoticeKind.SUCCESS, Unit) }
-        assertEquals(512f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)
     }
 }

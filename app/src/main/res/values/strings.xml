@@ -360,7 +360,15 @@
     <string name="cancel_recording">Cancel recording</string>
     <string name="stop_recording">Stop recording</string>
     <string name="record_confirm_title">Record “%1$s”?</string>
+    <string name="record_confirm_message">Your Tvheadend server will add this program to your recordings.</string>
+    <string name="record_confirm_pane_title">Confirm recording</string>
+    <string name="record_confirm_cancel">Cancel</string>
+    <string name="recording_request_busy_title">Scheduling “%1$s”…</string>
+    <string name="recording_request_busy_message">Waiting for your Tvheadend server to answer. Closing this message does not cancel the request.</string>
     <string name="recording_request_busy_action">Scheduling…</string>
+    <string name="recording_request_success_title">Recording scheduled</string>
+    <string name="recording_request_success_message">Your Tvheadend server accepted the recording request for “%1$s”.</string>
+    <string name="recording_request_failure_title">Recording request failed</string>
     <string name="recording_request_failure_message">“%1$s” was not scheduled. %2$s</string>
     <string name="recording_config_title">Choose a recording configuration</string>
     <string name="recording_config_message">This server has several available recording configurations.</string>
@@ -381,6 +389,7 @@
     <string name="recording_notice_started">Recording started</string>
     <string name="recording_notice_finished">Recording finished</string>
     <string name="recording_notice_stopped">Recording stopped</string>
+    <string name="recording_notice_aborted">Recording canceled</string>
     <string name="recording_notice_failed">Recording failed</string>
     <string name="recording_notice_missed">Recording missed</string>
     <string name="recording_notice_canceled">Recording canceled</string>
@@ -391,11 +400,22 @@
     <string name="recording_notice_access">Access denied</string>
     <string name="recording_notice_limit">Account limit reached</string>
     <string name="recording_notice_weak_stream">Weak stream</string>
+    <string name="recording_notice_subscription_overridden">Recording interrupted by another subscription</string>
+    <string name="recording_notice_invalid_target">Recording target unavailable</string>
+    <string name="recording_notice_unknown_error">Unknown recording error</string>
     <plurals name="recording_notice_count">
         <item quantity="one">%1$d recording</item>
         <item quantity="other">%1$d recordings</item>
     </plurals>
     <string name="recording_action_failed">Recording action failed</string>
+    <string name="recording_action_not_confirmed">Recording action not confirmed</string>
+    <plurals name="recording_notice_canceled_count">
+        <item quantity="one">%d recording canceled</item>
+        <item quantity="other">%d recordings canceled</item>
+    </plurals>
+    <string name="connection_notice_lost">Connection lost</string>
+    <string name="connection_notice_restored">Connection restored</string>
+    <string name="connection_notice_login_rejected">Login rejected</string>
     <string name="recording_action_permission">This account is not allowed to manage recordings.</string>
     <string name="recording_action_conn_limit">Your Tvheadend server refused the request: too many connections. Try again shortly.</string>
     <string name="recording_action_conflict">Your Tvheadend server reported a recording or tuner conflict.</string>

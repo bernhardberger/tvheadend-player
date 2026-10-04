@@ -75,6 +75,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
+import at.bernhardberger.tvhplayer.ui.notifications.label
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import java.time.ZoneId
 
@@ -355,8 +356,8 @@ internal fun ProgrammeDetailsPanel(
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
     liveProgrammeActions: Boolean = true,
+    notices: @Composable () -> Unit = {},
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
-    notice: (@Composable () -> Unit)? = null,
 ) {
     val nowSec = nowSecProvider()
     val actions = programmeActions(
@@ -396,7 +397,7 @@ internal fun ProgrammeDetailsPanel(
         onPreviewKeyEvent = onPreviewKeyEvent,
         wide = true,
         contentPadding = contentPadding,
-        overlay = notice,
+        overlay = notices,
     ) {
         ProgrammeContentDetails(
             event = event,
@@ -425,7 +426,7 @@ internal fun ProgrammeDetailsPanel(
                             },
                         )
                     }
-                    it.subscriptionError?.name?.let { reason ->
+                    it.subscriptionError?.label()?.let { reason ->
                         Text(
                             text = stringResource(R.string.recording_failure_reason, reason),
                             color = MaterialTheme.colorScheme.error,
@@ -598,7 +599,7 @@ private fun DialogScrim(
     wide: Boolean = false,
     contentPadding: PaddingValues = PaddingValues(),
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
-    overlay: (@Composable () -> Unit)? = null,
+    overlay: @Composable () -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -636,7 +637,7 @@ private fun DialogScrim(
                     content = content,
                 )
             }
-            overlay?.invoke()
+            overlay()
         }
     }
 }
