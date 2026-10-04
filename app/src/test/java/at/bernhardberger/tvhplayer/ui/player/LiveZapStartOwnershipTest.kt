@@ -263,7 +263,8 @@ class LiveZapStartOwnershipTest {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
                 TVHeadendPlayerTheme {
                     VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
-                        channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, {}, runtime)
+                        channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, {}, runtime,
+                        dvrIntents = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.core.RecentDvrIntents() })
                 }
             }
         }

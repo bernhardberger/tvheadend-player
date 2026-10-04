@@ -19,6 +19,12 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
+import at.bernhardberger.tvhplayer.core.DvrLocalIntentKind
+import at.bernhardberger.tvhplayer.core.RecentDvrIntents
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeContext
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -139,6 +145,46 @@ class DvrMutationActionsTest {
 
         assertEquals(DvrMutationFeedback.CONNECTION_UNAVAILABLE, feedback)
         assertEquals(0, dispatchCount)
+    }
+
+    @Test
+    fun stopAndDeleteRegisterOnlyNonFailureResultsIncludingAcceptedUnconfirmed() = runTest {
+        val capability = currentSession()
+        val intents = RecentDvrIntents()
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
+            stopEntry = { _, _ -> DvrMutationResult.Confirmed(Unit) },
+            cancelEntry = { _, _ -> DvrMutationResult.Confirmed(Unit) },
+            deleteEntry = { _, id -> if (id == DvrEntryId(3)) DvrMutationResult.AccessDenied else DvrMutationResult.AcceptedButUnconfirmed(Unit) },
+            localIntents = intents,
+        )
+        actions.execute(DvrMutationAction.Stop(capability, DvrEntryId(1)))
+        actions.execute(DvrMutationAction.Delete(capability, DvrEntryId(2)))
+        actions.execute(DvrMutationAction.Delete(capability, DvrEntryId(3)))
+        actions.execute(DvrMutationAction.Cancel(capability, DvrEntryId(4)))
+        val captured = intents.capture(capability.generationIdentity)
+        assertEquals(listOf(DvrLocalIntentKind.STOP, DvrLocalIntentKind.DELETE), captured.map { it.intent.kind })
+        assertEquals(listOf(DvrEntryId(1), DvrEntryId(2)), captured.map { it.intent.id })
+        assertTrue(captured.all { it.accepted.await() })
+    }
+
+    @Test
+    fun sharedActionNoticePostsOnlyFailuresWithTheSameWarningPresentation() {
+        val context = AppNoticeContext(1, currentSession().generationIdentity)
+        DvrMutationFeedback.entries.forEach { feedback ->
+            val queue = AppNoticeQueue({ 0L }, { context })
+            queue.postDvrFailure(feedback, context)
+            if (feedback.isFailure) {
+                val notice = queue.state.value.pending.single()
+                assertEquals("dvr-action", notice.key)
+                assertEquals(at.bernhardberger.tvhplayer.R.string.recording_action_failed, notice.message)
+                assertEquals(feedback.message, notice.detailMessage)
+                assertEquals(AppNoticeKind.FAILURE, notice.kind)
+                assertEquals(AppNoticeIcon.WARNING, notice.icon)
+            } else {
+                assertTrue(queue.state.value.pending.isEmpty())
+            }
+        }
     }
 
     @Test

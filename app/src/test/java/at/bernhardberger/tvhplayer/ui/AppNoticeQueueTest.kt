@@ -10,16 +10,35 @@ class AppNoticeQueueTest {
     private val queue = AppNoticeQueue({ time }, { context })
     private fun post(key: String = "cache") = queue.post(key, 1, AppNoticeKind.SUCCESS, context)
 
-    @Test fun oneVisibleAndTwoPendingWithLatestPendingKeyWinning() {
+    @Test fun oneVisibleAndEightPendingWithReplacementKeepingItsPosition() {
         post()
         val first = queue.state.value.pending.single()
         assertTrue(queue.show(first.id, 4_000))
         post("a"); post("b"); post("a")
-        assertEquals(listOf("b", "a"), queue.state.value.pending.map { it.key })
-        post("c")
-        assertEquals(listOf("a", "c"), queue.state.value.pending.map { it.key })
+        assertEquals(listOf("a", "b"), queue.state.value.pending.map { it.key })
+        ('c'..'i').forEach { post(it.toString()) }
+        assertEquals(('b'..'i').map { it.toString() }, queue.state.value.pending.map { it.key })
         assertEquals(first.id, queue.state.value.active!!.notice.id)
         assertFalse(queue.show(first.id, 4_000))
+    }
+
+    @Test fun pendingSameRecordingReplacesContentButNeverInterruptsActiveNotice() {
+        post("dvr:1")
+        val active = queue.state.value.pending.single()
+        queue.show(active.id, 4_000)
+        queue.post("dvr:1", 2, AppNoticeKind.SUCCESS, context, AppNoticeIcon.STOP, "Nature")
+        post("dvr:2")
+        queue.post("dvr:1", 3, AppNoticeKind.FAILURE, context, AppNoticeIcon.WARNING, "Nature · Disk full")
+        assertEquals(active, queue.state.value.active!!.notice)
+        assertEquals(listOf("dvr:1", "dvr:2"), queue.state.value.pending.map { it.key })
+        val replacement = queue.state.value.pending.first()
+        assertEquals(3, replacement.message)
+        assertEquals(AppNoticeIcon.WARNING, replacement.icon)
+        assertEquals("Nature · Disk full", replacement.detail)
+        time = 4_000
+        queue.prune()
+        assertTrue(queue.show(replacement.id, replacement.kind.displayMillis))
+        assertEquals(replacement, queue.state.value.active!!.notice)
     }
 
     @Test fun pendingExpiryDoesNotCapAccessibilityExtendedDisplayOrRestartIt() {

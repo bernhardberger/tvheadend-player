@@ -197,6 +197,8 @@ class GuidePlayerReturnFocusTest {
                 EpgGridScreen(
                     initialFocusEnabled = focusEnabled,
                     channelViewModel = model, session = session, playerSession = runtime,
+                    notices = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue({ 0L }, {}) },
+                    dvrIntents = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.core.RecentDvrIntents() },
                     selection = ChannelSelectionStore(), guidePositionStore = position,
                     lastPlayedStore = LastPlayedChannelStore(context),
                     imageLoader = ImageLoader.Builder(context).diskCache(null).build(),

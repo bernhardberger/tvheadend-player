@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 enum class AppNoticeKind(val displayMillis: Long) { SUCCESS(4_000), FAILURE(6_000) }
+enum class AppNoticeIcon { SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE }
 
 data class AppNotice(
     val id: Long,
@@ -13,9 +14,12 @@ data class AppNotice(
     val kind: AppNoticeKind,
     internal val context: Any,
     internal val pendingUntil: Long,
+    val icon: AppNoticeIcon? = null,
+    val detail: String? = null,
+    @param:StringRes val detailMessage: Int? = null,
 )
 
-/** Single shell consumer. Pending and presented lifetimes are separate, with no persisted inbox. */
+/** One active notice. Pending and presented lifetimes are separate, with no persisted inbox. */
 class AppNoticeQueue(
     private val now: () -> Long,
     private val currentContext: () -> Any,
@@ -27,12 +31,16 @@ class AppNoticeQueue(
     fun context(): Any = currentContext()
 
     @Synchronized
-    fun post(key: String, @StringRes message: Int, kind: AppNoticeKind, context: Any) {
+    fun post(key: String, @StringRes message: Int, kind: AppNoticeKind, context: Any,
+        icon: AppNoticeIcon? = null, detail: String? = null, @StringRes detailMessage: Int? = null) {
         prune()
         if (context != currentContext()) return
-        val notice = AppNotice(++nextId, key, message, kind, context, now() + 30_000)
+        val notice = AppNotice(++nextId, key, message, kind, context, now() + 30_000, icon, detail, detailMessage)
+        val pending = mutableState.value.pending.toMutableList()
+        val index = pending.indexOfFirst { it.key == key }
+        if (index >= 0) pending[index] = notice else pending.add(notice)
         mutableState.value = mutableState.value.copy(
-            pending = (mutableState.value.pending.filterNot { it.key == key } + notice).takeLast(2),
+            pending = pending.takeLast(8),
         )
     }
 

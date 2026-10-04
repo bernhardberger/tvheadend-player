@@ -75,8 +75,6 @@ import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
-import at.bernhardberger.tvhplayer.ui.screens.DvrMutationFeedback
-import at.bernhardberger.tvhplayer.ui.screens.label
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import java.time.ZoneId
 
@@ -354,11 +352,11 @@ internal fun ProgrammeDetailsPanel(
     recording: DvrEntry?,
     nowSecProvider: () -> Long,
     canModifyRecordings: Boolean,
-    actionResult: DvrMutationFeedback?,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
     liveProgrammeActions: Boolean = true,
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
+    notice: (@Composable () -> Unit)? = null,
 ) {
     val nowSec = nowSecProvider()
     val actions = programmeActions(
@@ -398,6 +396,7 @@ internal fun ProgrammeDetailsPanel(
         onPreviewKeyEvent = onPreviewKeyEvent,
         wide = true,
         contentPadding = contentPadding,
+        overlay = notice,
     ) {
         ProgrammeContentDetails(
             event = event,
@@ -432,16 +431,6 @@ internal fun ProgrammeDetailsPanel(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                }
-                actionResult?.let {
-                    Text(
-                        text = it.label(),
-                        color = if (it.isFailure) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
                 }
                 if (actions.isEmpty()) {
                     Text(
@@ -609,6 +598,7 @@ private fun DialogScrim(
     wide: Boolean = false,
     contentPadding: PaddingValues = PaddingValues(),
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
+    overlay: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(
@@ -646,6 +636,7 @@ private fun DialogScrim(
                     content = content,
                 )
             }
+            overlay?.invoke()
         }
     }
 }

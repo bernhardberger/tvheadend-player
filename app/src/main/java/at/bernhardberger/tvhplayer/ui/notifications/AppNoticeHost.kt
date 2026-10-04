@@ -9,20 +9,28 @@ import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Icon
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.Text
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.R
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 
@@ -34,10 +42,10 @@ internal fun AppShellNoticeHost(
 ) {
     val generation by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
     val observation by session.observation.collectAsStateWithLifecycle()
-    AppNoticeHost(queue, AppNoticeContext(generation, observation.currentSession))
+    AppNoticeHost(queue, AppNoticeContext(generation, observation.currentSession?.generationIdentity))
 }
 
-/** One persistent shell consumer. Navigation never controls delivery or restarts a display budget. */
+/** Only the focused window presents. The shell and guide dialog share one queue and display budget. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any) {
@@ -60,27 +68,51 @@ internal fun AppNoticeHost(queue: AppNoticeQueue, context: Any) {
         queue.prune()
         if (next == null || state.active != null || !allowed) return@LaunchedEffect
         val timeout = accessibility?.calculateRecommendedTimeoutMillis(next.kind.displayMillis,
-            containsIcons = false, containsText = true, containsControls = false) ?: next.kind.displayMillis
+            containsIcons = next.icon != null, containsText = true, containsControls = false) ?: next.kind.displayMillis
         queue.show(next.id, timeout)
     }
     if (allowed) state.active?.takeIf {
         it.notice.context == context && queue.remaining(it.expiresAt) > 0
     }?.let {
-        AppNoticePresentation(stringResource(it.notice.message))
+        AppNoticePresentation(stringResource(it.notice.message),
+            it.notice.detail ?: it.notice.detailMessage?.let { resource -> stringResource(resource) }, it.notice.icon)
     }
 }
 
 /** Plain kit variant, bottom center. No focus node, click semantics, or key handler. */
 @Composable
-internal fun AppNoticePresentation(message: String) {
+internal fun AppNoticePresentation(message: String, detail: String? = null, icon: AppNoticeIcon? = null) {
     Box(Modifier.fillMaxSize().padding(TvFullScreenPadding), contentAlignment = Alignment.BottomCenter) {
-        Surface(modifier = Modifier.widthIn(max = 324.dp).heightIn(min = 44.dp).testTag("app-notice"),
+        Surface(modifier = Modifier
+            .widthIn(max = if (icon == null && detail.isNullOrBlank()) 324.dp else 480.dp)
+            .heightIn(min = 44.dp)
+            .testTag("app-notice")
+            .semantics(mergeDescendants = true) {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = listOfNotNull(message, detail).joinToString(". ")
+            },
             shape = RoundedCornerShape(12.dp),
             colors = SurfaceDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseSurface,
                 contentColor = MaterialTheme.colorScheme.inverseOnSurface)) {
-            Text(message, style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.align(Alignment.Center).padding(horizontal = 16.dp, vertical = 12.dp)
-                    .semantics { liveRegion = LiveRegionMode.Polite })
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (icon != null) Icon(painterResource(when (icon) {
+                    AppNoticeIcon.SCHEDULE -> R.drawable.ic_schedule
+                    AppNoticeIcon.RECORDING -> R.drawable.ic_fiber_manual_record
+                    AppNoticeIcon.CHECK -> R.drawable.ic_check
+                    AppNoticeIcon.STOP -> R.drawable.ic_stop
+                    AppNoticeIcon.WARNING -> R.drawable.ic_error_outlined
+                    AppNoticeIcon.CANCEL -> R.drawable.ic_close
+                    AppNoticeIcon.DELETE -> R.drawable.ic_delete_outlined
+                }), contentDescription = null, modifier = Modifier.size(24.dp),
+                    tint = if (icon == AppNoticeIcon.RECORDING) TvRecordingColor else LocalContentColor.current)
+                Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(message, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (!detail.isNullOrBlank()) Text(detail, style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     }
 }

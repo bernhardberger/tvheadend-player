@@ -71,9 +71,12 @@ class GuideHistoryScreenTest {
     @Test fun airingRecordUsesExistingConfirmationAndScheduleExecution() = exercise("en", 1f, "airing-record")
     @Test fun airingStopUsesExistingConfirmationAndKeepsPartialRecording() = exercise("en", 1f, "airing-stop")
     @Test fun airingScheduledEntryUsesExistingCancelConfirmation() = exercise("en", 1f, "airing-cancel")
+    @Test fun recordingFailureUsesGlobalNoticeWithoutInlineFeedback() = exercise("en", 1f, "airing-record", scheduleResult = DvrMutationResult.AccessDenied)
+    @Test fun acceptedRecordingWaitsForServerEvent() = exercise("en", 1f, "airing-record", scheduleResult = DvrMutationResult.AcceptedButUnconfirmed(DvrEntryId(42)))
 
     private fun exercise(locale: String, scale: Float, transition: String? = null, replaceSession: Boolean = false,
-        activationKeyCode: Int = android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
+        activationKeyCode: Int = android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+        scheduleResult: DvrMutationResult<DvrEntryId> = DvrMutationResult.Confirmed(DvrEntryId(42))) {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
         val hour = System.currentTimeMillis() / 3_600_000 * 3600
         val channels = listOf(Channel.create(ChannelId(1), name = "Documentary", number = 1),
@@ -116,10 +119,13 @@ class GuideHistoryScreenTest {
         val position = GuidePositionStore()
         val lastPlayed = LastPlayedChannelStore(context)
         val loader = ImageLoader.Builder(context).diskCache(null).build()
+        val notices = at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue({ 0L }, {})
         compose.setContent {
             view = LocalView.current
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme { EpgGridScreen(channelViewModel = model, session = session,
+                    notices = notices,
+                    dvrIntents = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.core.RecentDvrIntents() },
                     playerSession = runtime, selection = selection, guidePositionStore = position,
                     lastPlayedStore = lastPlayed, imageLoader = loader, onPlay = { _, _ -> }) }
             }
@@ -143,7 +149,7 @@ class GuideHistoryScreenTest {
             when (transition) {
                 "airing-stop" -> session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
                 "airing-cancel" -> session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
-                else -> session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(42)))
+                else -> session.dvrRepository.scriptScheduleEntry(scheduleResult)
             }
             val call = when (transition) {
                 "airing-stop" -> FakeSessionCall.DVR_STOP_ENTRY
@@ -155,6 +161,23 @@ class GuideHistoryScreenTest {
             assertEquals(0, session.calls.count { it == call })
             compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
             compose.waitUntil(5_000) { session.calls.count { it == call } == 1 }
+            compose.waitForIdle()
+            if (scheduleResult == DvrMutationResult.AccessDenied) {
+                compose.runOnIdle {
+                    val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+                    val root = org.robolectric.util.ReflectionHelpers.callInstanceMethod<Any>(decor, "getViewRootImpl")
+                    org.robolectric.shadow.api.Shadow.extract<org.robolectric.shadows.ShadowViewRootImpl>(root)
+                        .callWindowFocusChanged(true)
+                }
+                compose.waitForIdle()
+                val notice = requireNotNull(notices.state.value.active).notice
+                assertEquals(R.string.recording_action_failed, notice.message)
+                assertEquals(R.string.recording_action_permission, notice.detailMessage)
+                assertEquals(at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon.WARNING, notice.icon)
+                compose.onNodeWithTag("app-notice").assertIsDisplayed()
+                compose.onAllNodes(hasText(context.getString(R.string.recording_action_permission)) and
+                    !hasAnyAncestor(hasTestTag("app-notice")), useUnmergedTree = true).assertCountEquals(0)
+            } else assertTrue(notices.state.value.pending.isEmpty())
             if (transition == "airing-stop") assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
             return
         }

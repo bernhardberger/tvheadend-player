@@ -22,7 +22,7 @@ class SemanticColorUsageTest {
             "ui/screens/guide/EpgGridModals.kt",
             "DvrEntryState.RECORDING -> TvRecordingColor",
         )
-        assertContains("ui/player/LiveProgrammeInfoOverlay.kt", "color = TvRecordingColor")
+        assertContains("ui/player/PlayerBarStatusView.kt", "color = TvRecordingColor")
 
         val scopedSources = listOf(
             "ui/screens/OnboardingScreen.kt",

@@ -10,6 +10,8 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.AccessibilityManager
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -122,6 +124,7 @@ class AppNoticeHostTest {
             override fun calculateRecommendedTimeoutMillis(originalTimeoutMillis: Long, containsIcons: Boolean,
                 containsText: Boolean, containsControls: Boolean): Long {
                 assertTrue(containsText)
+                assertTrue(containsIcons)
                 assertFalse(containsControls)
                 return 60_000
             }
@@ -134,7 +137,7 @@ class AppNoticeHostTest {
                 TVHeadendPlayerTheme { AppNoticeHost(queue, Unit) }
             }
         }
-        compose.runOnIdle { queue.post("cache", R.string.cache_notice_failed, AppNoticeKind.FAILURE, Unit) }
+        compose.runOnIdle { queue.post("cache", R.string.cache_notice_failed, AppNoticeKind.FAILURE, Unit, AppNoticeIcon.WARNING) }
         compose.onNodeWithTag("app-notice").assertDoesNotExist()
         compose.runOnIdle { time = 29_000; (owner.lifecycle as LifecycleRegistry).currentState = Lifecycle.State.RESUMED }
         compose.onNodeWithTag("app-notice").assertIsDisplayed()
@@ -152,5 +155,49 @@ class AppNoticeHostTest {
         compose.runOnIdle { time = 90_000; (owner.lifecycle as LifecycleRegistry).currentState = Lifecycle.State.RESUMED }
         compose.onNodeWithTag("app-notice").assertDoesNotExist()
         compose.runOnIdle { assertNull(queue.state.value.active) }
+    }
+
+    @Test fun recordingNoticeReadsBothLinesAndPreservesDpadAndClickFocus() {
+        val queue = AppNoticeQueue(SystemClock::elapsedRealtime, { Unit })
+        var clicks = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                androidx.compose.foundation.layout.Box {
+                    val focus = remember { FocusRequester() }
+                    androidx.compose.foundation.layout.Row {
+                        Button(onClick = { clicks++ }, modifier = Modifier.focusRequester(focus)) { Text("First") }
+                        Button(onClick = { clicks++ }) { Text("Second") }
+                    }
+                    LaunchedEffect(Unit) { focus.requestFocus() }
+                    AppNoticeHost(queue, Unit)
+                }
+            }
+        }
+        compose.runOnIdle { queue.post("dvr:1", R.string.recording_notice_started, AppNoticeKind.SUCCESS,
+            Unit, AppNoticeIcon.RECORDING, "Nature · Documentary") }
+        compose.onNodeWithTag("app-notice")
+            .assertContentDescriptionEquals("Recording started. Nature · Documentary")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        compose.onNodeWithText("First").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionCenter) }
+        compose.onNodeWithText("Second").assertIsFocused()
+        assertEquals(1, clicks)
+        compose.onAllNodes(isFocused()).assertCountEquals(1)
+    }
+
+    @Test fun simpleNoticesStayCompactWhileRecordingDetailsHaveRoom() {
+        var details by mutableStateOf(false)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                AppNoticePresentation("A long notice headline that needs enough room to remain readable",
+                    detail = if (details) "A long programme title · Documentary, Tomorrow 18:30" else null,
+                    icon = if (details) AppNoticeIcon.SCHEDULE else null)
+            }
+        }
+        assertEquals(324f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.width, .5f)
+        compose.runOnIdle { details = true }
+        assertEquals(480f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.width, .5f)
     }
 }

@@ -140,7 +140,8 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
+import at.bernhardberger.tvhplayer.core.RecentDvrIntents
+import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrMutation
@@ -367,6 +368,7 @@ fun VideoPlayerScreen(
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: AppNoticeQueue? = null,
+    dvrIntents: RecentDvrIntents = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -442,7 +444,7 @@ fun VideoPlayerScreen(
     var infoMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
     var infoMutationTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
     var infoMutationObservation by remember { mutableStateOf<SessionObservation?>(null) }
-    val dvrMutationActions = remember(session) { DvrMutationActions(session.dvrRepository) }
+    val dvrMutationActions = remember(session, dvrIntents) { DvrMutationActions(session.dvrRepository, dvrIntents) }
     val infoNotices = if (layerState.infoOpen) notices ?: koinInject<AppNoticeQueue>() else null
     val rootFocus = remember { FocusRequester() }
 
@@ -1333,8 +1335,7 @@ fun VideoPlayerScreen(
                     layerState.infoOpen, selectionVersion == programDetails.selectionVersion) &&
                 session.observation.value.currentSession === target.currentSession) {
                 infoMutation = null
-                queue.post("programme-recording", feedback.message,
-                    if (feedback.isFailure) AppNoticeKind.FAILURE else AppNoticeKind.SUCCESS, noticeContext)
+                queue.postDvrFailure(feedback, noticeContext)
             }
         }
     }

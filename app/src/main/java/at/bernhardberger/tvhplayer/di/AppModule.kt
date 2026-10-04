@@ -13,6 +13,8 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
+import at.bernhardberger.tvhplayer.core.RecentDvrIntents
+import at.bernhardberger.tvhplayer.ui.notifications.DvrEventNotices
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.images.buildImageLoader
@@ -55,13 +57,20 @@ val appModule = module {
     single { PlayerSettingsStore(androidContext()) }
     single { ChannelTagSettingsStore(androidContext()) }
     single { UiSettingsStore(androidContext()) }
+    single { RecentDvrIntents() }
+    single { DvrEventNotices(androidContext(), get()) }
     single {
         val owner = get<AppProfileOwner>()
         val session = get<SdkRuntimeOwner>().session
         at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue(android.os.SystemClock::elapsedRealtime) {
             at.bernhardberger.tvhplayer.ui.notifications.AppNoticeContext(
-                owner.configurationGeneration.value, session.observation.value.currentSession,
+                owner.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity,
             )
+        }.also { notices ->
+            val events = get<DvrEventNotices>()
+            get<CoroutineScope>(qualifier = named("application")).launch {
+                events.collect(session.observation, notices)
+            }
         }
     }
 

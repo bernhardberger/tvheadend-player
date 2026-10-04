@@ -54,8 +54,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.screens.DvrMutationFeedback
-import at.bernhardberger.tvhplayer.ui.screens.label
 
 internal enum class PendingRecordingAction {
     STOP,
@@ -87,7 +85,6 @@ internal fun recordingEndAction(state: DvrEntryState?): RecordingDetailsAction? 
 internal fun RecordingDetailsPanel(
     contentPadding: PaddingValues,
     entry: DvrEntry,
-    actionResult: DvrMutationFeedback?,
     canModifyRecordings: Boolean,
     playbackEligible: Boolean,
     initialAction: RecordingDetailsAction?,
@@ -198,28 +195,15 @@ internal fun RecordingDetailsPanel(
                 modifier = Modifier.testTag("recording-details-metadata-anchor"),
             )
             val failureReason = entry.subscriptionError?.name
-            when {
-                actionResult == null && !failureReason.isNullOrBlank() -> Text(
+            if (!failureReason.isNullOrBlank()) {
+                Text(
                     failureReason,
                     color = MaterialTheme.colorScheme.error,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                actionResult != null -> Text(
-                    actionResult.label(),
-                    color = if (actionResult.isFailure) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
-            if (
-                failureReason.isNullOrBlank() &&
-                actionResult == null
-            ) {
+            if (failureReason.isNullOrBlank()) {
                 val synopsis = entry.summary?.takeIf(String::isNotBlank)
                     ?: entry.description?.takeIf(String::isNotBlank)
                 synopsis?.let {

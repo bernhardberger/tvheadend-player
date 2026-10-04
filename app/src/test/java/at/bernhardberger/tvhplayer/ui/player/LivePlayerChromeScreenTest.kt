@@ -1315,7 +1315,7 @@ class LivePlayerChromeScreenTest {
         publishInfoRecording(DvrEntryState.RECORDING)
         assertEquals("Stop recording", texts("live-info-record"))
         assertEquals(listOf("live-info-record"), focused())
-        assertEquals(AppNoticeKind.SUCCESS, notices.state.value.pending.single().kind)
+        assertTrue("command success never posts a notice", notices.state.value.pending.isEmpty())
         assertFalse("the shared queue replaces the local notice", exists("programme-recording-notice"))
         session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
         key(Key.DirectionCenter)
@@ -1385,6 +1385,10 @@ class LivePlayerChromeScreenTest {
         assertEquals("Record", texts("live-info-record"))
         assertEquals(listOf("live-info-record"), focused())
         assertEquals(AppNoticeKind.FAILURE, notices.state.value.pending.single().kind)
+        assertEquals(at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon.WARNING, notices.state.value.pending.single().icon)
+        assertEquals(at.bernhardberger.tvhplayer.R.string.recording_action_failed, notices.state.value.pending.single().message)
+        assertEquals(at.bernhardberger.tvhplayer.R.string.recording_action_permission, notices.state.value.pending.single().detailMessage)
+        assertEquals("dvr-action", notices.state.value.pending.single().key)
         assertFalse(exists("programme-recording-notice"))
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
     }
@@ -1786,6 +1790,7 @@ class LivePlayerChromeScreenTest {
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                             channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
                             contentAllowed = contentAllowed(), notices = notices,
+                            dvrIntents = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.core.RecentDvrIntents() },
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                     }

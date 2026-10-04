@@ -101,6 +101,7 @@ class InProgressRecordingResumeTest {
                     state = state,
                     imageLoader = loader,
                     dvrMutationActions = actions,
+                    notices = androidx.compose.runtime.remember { at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue({ 0L }, {}) },
                     onPlayRecording = { _, start -> starts += start },
                 )
             }
