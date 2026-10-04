@@ -37,6 +37,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -52,6 +53,9 @@ import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeHost
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
@@ -117,6 +121,10 @@ class RecordingsScreenTest {
                 deleteEntry = onDeleteRecording,
             )
         }
+        val noticeContext = rememberUpdatedState(NoticeContext(0,
+            (sessionObservation ?: generatedObservation).currentSession?.generationIdentity))
+        val notices = remember { NoticeCenter(android.os.SystemClock::elapsedRealtime) { noticeContext.value } }
+        Box {
         RecordingsScreenContent(
             observation = sessionObservation ?: generatedObservation,
             contentPadding = contentPadding,
@@ -128,7 +136,10 @@ class RecordingsScreenTest {
             onPlayRecording = onPlayRecording,
             state = state,
             dvrMutationActions = dvrMutationActions,
+            notices = notices,
         )
+        AppNoticeHost(notices, noticeContext.value)
+        }
     }
 
     @Test
@@ -1599,7 +1610,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun delayedMutationFeedbackDoesNotLeakIntoReopenedDetails() {
+    fun delayedMutationFailureIsShownAfterDetailsReopenWithoutMovingFocus() {
         val entries = listOf(recording(7, "Saved Film", path = "saved.ts"))
         val result = CompletableDeferred<DvrMutationResult<Unit>>()
         composeRule.setContent {
@@ -1624,11 +1635,11 @@ class RecordingsScreenTest {
         dispatchBack()
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().pressCenter()
         composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
-        composeRule.runOnIdle { result.complete(DvrMutationResult.Confirmed(Unit)) }
+        composeRule.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }
         composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
         composeRule.onAllNodesWithText(
-            composeRule.activity.getString(R.string.recording_action_accepted)
-        ).assertCountEquals(0)
+            composeRule.activity.getString(R.string.recording_action_failed)
+        ).assertCountEquals(1)
     }
 
     @Test
@@ -1661,20 +1672,20 @@ class RecordingsScreenTest {
             observation.value = session.observation.value
         }
         composeRule.onNodeWithTag("recording-details-close").assertIsFocused()
-        composeRule.runOnIdle { result.complete(DvrMutationResult.Confirmed(Unit)) }
+        composeRule.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }
         composeRule.onAllNodesWithText(
-            composeRule.activity.getString(R.string.recording_action_accepted)
+            composeRule.activity.getString(R.string.recording_action_failed)
         ).assertCountEquals(0)
         composeRule.onNodeWithTag("recording-details-close").assertIsFocused()
     }
 
     @Test
-    fun sessionReplacementDismissesConfirmationWithExplicitFeedback() {
+    fun sessionReplacementSilentlyDismissesUndispatchedConfirmation() {
         assertSessionReplacementFeedback(failedRecording = false)
     }
 
     @Test
-    fun sessionReplacementFeedbackOutranksAnExistingRecordingFailure() {
+    fun sessionReplacementKeepsPersistentRecordingFailureWithoutTransientFeedback() {
         assertSessionReplacementFeedback(failedRecording = true)
     }
 
@@ -1700,7 +1711,7 @@ class RecordingsScreenTest {
         }
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().pressCenter()
         if (failedRecording) {
-            composeRule.onNode(hasText("NO_FREE_ADAPTER") and
+            composeRule.onNode(hasText(composeRule.activity.getString(R.string.tvh_no_free_adapter)) and
                 hasAnyAncestor(hasTestTag("recording-details-panel"))).assertIsDisplayed()
             composeRule.onNodeWithTag("recording-details-delete").assertIsFocused().pressCenter()
         } else {
@@ -1716,8 +1727,7 @@ class RecordingsScreenTest {
             observation.value = session.observation.value
         }
         composeRule.onAllNodesWithTag("recording-confirmation-back").assertCountEquals(0)
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.recording_action_connection))
-            .assertIsDisplayed()
+        composeRule.onAllNodesWithTag("app-notice").assertCountEquals(0)
         composeRule.onNodeWithTag("recording-details-close").assertIsFocused()
         composeRule.runOnIdle { assertEquals(0, mutations) }
     }

@@ -58,10 +58,16 @@ val appModule = module {
     single {
         val owner = get<AppProfileOwner>()
         val session = get<SdkRuntimeOwner>().session
-        at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue(android.os.SystemClock::elapsedRealtime) {
-            at.bernhardberger.tvhplayer.ui.notifications.AppNoticeContext(
-                owner.configurationGeneration.value, session.observation.value.currentSession,
+        val scope = get<CoroutineScope>(qualifier = named("application"))
+        at.bernhardberger.tvhplayer.notices.NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(
+                owner.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity,
             )
+        }.also { center ->
+            scope.launch { at.bernhardberger.tvhplayer.notices.DvrChangeNoticeSource(session.dvrRepository, center).run() }
+            scope.launch { at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(
+                session.observation, owner.configurationGeneration, center,
+            ).run() }
         }
     }
 

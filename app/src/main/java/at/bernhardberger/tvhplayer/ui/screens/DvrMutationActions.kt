@@ -1,7 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -11,7 +9,12 @@ import at.bernhardberger.tvheadend.sdk.core.DvrRepository
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.dvrMutationStateIsCurrent
 
@@ -46,17 +49,6 @@ internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObser
     )
     is DvrMutationAction.CreateProgramme,
     is DvrMutationAction.Delete -> true
-}
-
-internal enum class DvrMutationFeedback(val isFailure: Boolean) {
-    CONFIRMED(false),
-    ACCEPTED_UNCONFIRMED(false),
-    PERMISSION_DENIED(true),
-    CONNECTION_LIMIT(true),
-    REJECTED(true),
-    NOT_SUPPORTED(true),
-    TIMEOUT(true),
-    CONNECTION_UNAVAILABLE(true),
 }
 
 internal class DvrMutationActions(
@@ -112,29 +104,13 @@ internal class DvrMutationActions(
     }
 }
 
-internal fun DvrMutationResult<*>.toDvrMutationFeedback(): DvrMutationFeedback = when (this) {
-    is DvrMutationResult.Confirmed -> DvrMutationFeedback.CONFIRMED
-    is DvrMutationResult.AcceptedButUnconfirmed -> DvrMutationFeedback.ACCEPTED_UNCONFIRMED
-    DvrMutationResult.AccessDenied -> DvrMutationFeedback.PERMISSION_DENIED
-    DvrMutationResult.ConnectionLimit -> DvrMutationFeedback.CONNECTION_LIMIT
-    DvrMutationResult.ServerRejected -> DvrMutationFeedback.REJECTED
-    DvrMutationResult.NotSupported -> DvrMutationFeedback.NOT_SUPPORTED
-    DvrMutationResult.Timeout -> DvrMutationFeedback.TIMEOUT
-    DvrMutationResult.NotReady,
-    DvrMutationResult.ObservationExpired,
-    DvrMutationResult.TransportUnavailable -> DvrMutationFeedback.CONNECTION_UNAVAILABLE
+internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, feedback: DvrMutationFeedback, context: NoticeContext) {
+    if (!feedback.isFailure) return
+    val kind = when (action) {
+        is DvrMutationAction.CreateProgramme -> DvrMutationKind.SCHEDULE
+        is DvrMutationAction.Stop -> DvrMutationKind.STOP
+        is DvrMutationAction.Cancel -> DvrMutationKind.CANCEL
+        is DvrMutationAction.Delete -> DvrMutationKind.DELETE
+    }
+    post(Notice.DvrActionFailed(kind, feedback), context)
 }
-
-@Composable
-internal fun DvrMutationFeedback.label(): String = stringResource(
-    when (this) {
-        DvrMutationFeedback.CONFIRMED -> R.string.recording_action_confirmed
-        DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> R.string.recording_action_accepted
-        DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
-        DvrMutationFeedback.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
-        DvrMutationFeedback.REJECTED -> R.string.recording_action_rejected
-        DvrMutationFeedback.NOT_SUPPORTED -> R.string.recording_action_not_supported
-        DvrMutationFeedback.TIMEOUT -> R.string.recording_action_timeout
-        DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
-    },
-)

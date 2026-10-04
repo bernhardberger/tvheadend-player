@@ -201,9 +201,9 @@ fun recordingFocusTargetKey(
 
 fun recordingListMetadata(
     entry: DvrEntry,
-    problem: Boolean = false,
+    problemLabel: String? = null,
 ): String = buildList {
-    if (problem) entry.subscriptionError?.name?.let(::add)
+    problemLabel?.let(::add)
     entry.subtitle
         ?.takeIf { it.isNotBlank() && !it.equals(entry.title.orEmpty(), ignoreCase = true) }
         ?.let(::add)

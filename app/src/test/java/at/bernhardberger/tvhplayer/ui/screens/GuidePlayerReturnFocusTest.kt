@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -192,6 +195,9 @@ class GuidePlayerReturnFocusTest {
             save(GuidePosition(ChannelId(1), event(1, -2).id, hour - 2 * 3600, hour - 2 * 3600, 0))
         }
         playerReturn = request
+        val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+            NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
+        }
         compose.setContent {
             TVHeadendPlayerTheme {
                 EpgGridScreen(
@@ -201,6 +207,7 @@ class GuidePlayerReturnFocusTest {
                     lastPlayedStore = LastPlayedChannelStore(context),
                     imageLoader = ImageLoader.Builder(context).diskCache(null).build(),
                     playerReturn = playerReturn, onPlay = { _, _ -> },
+                    notices = notices,
                 )
             }
         }

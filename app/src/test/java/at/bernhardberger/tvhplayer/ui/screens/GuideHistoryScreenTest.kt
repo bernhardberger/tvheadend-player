@@ -19,6 +19,8 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.*
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
@@ -30,6 +32,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
+import org.koin.compose.KoinApplication
+import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -113,12 +117,23 @@ class GuideHistoryScreenTest {
         val position = GuidePositionStore()
         val lastPlayed = LastPlayedChannelStore(context)
         val loader = ImageLoader.Builder(context).diskCache(null).build()
+        val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+            NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
+        }
+        // Programme details own a dialog-window notice host using the shell dependencies.
+        val noticeModule = module {
+            single { notices }
+            single { profiles }
+            single<TvheadendSession> { session }
+        }
         compose.setContent {
             view = LocalView.current
-            CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
-                TVHeadendPlayerTheme { EpgGridScreen(channelViewModel = model, session = session,
-                    playerSession = runtime, selection = selection, guidePositionStore = position,
-                    lastPlayedStore = lastPlayed, imageLoader = loader, onPlay = { _, _ -> }) }
+            KoinApplication(application = { modules(noticeModule) }) {
+                CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
+                    TVHeadendPlayerTheme { EpgGridScreen(channelViewModel = model, session = session,
+                        playerSession = runtime, selection = selection, guidePositionStore = position,
+                        lastPlayedStore = lastPlayed, imageLoader = loader, onPlay = { _, _ -> }) }
+                }
             }
         }
         fun focused(title: String) {

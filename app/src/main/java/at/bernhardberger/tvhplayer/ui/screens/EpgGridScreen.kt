@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost
+
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
@@ -280,6 +283,7 @@ fun EpgGridScreen(
     onOpenConnectionSettings: () -> Unit = {},
     onClearCategory: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection) -> Unit = {},
+    notices: NoticeCenter = koinInject(),
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
@@ -404,7 +408,6 @@ fun EpgGridScreen(
     var configChoices by remember { mutableStateOf<List<DvrConfiguration>?>(null) }
     var pendingRecordingTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
-    var actionResult by remember { mutableStateOf<DvrMutationFeedback?>(null) }
     var showJumpDialog by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -1518,7 +1521,6 @@ fun EpgGridScreen(
                 pendingMutation = null
                 pendingRecordingTarget = null
                 configChoices = null
-                actionResult = null
             }
             closeSearch()
         }
@@ -1950,7 +1952,6 @@ fun EpgGridScreen(
                                 detailsOpening = Any()
                                 detailsObservation = observation
                                 detailsFromSearch = false
-                                actionResult = null
                             },
                             visibleRowWidthPx = LocalBrowseVisibleWidthPx.current?.minus(
                                 with(LocalDensity.current) {
@@ -2010,7 +2011,6 @@ fun EpgGridScreen(
                             detailsObservation = resultObservation
                             detailsFromSearch = true
                             restoreSearchResultFocus = null
-                            actionResult = null
                         }
                     }
                 },
@@ -2052,7 +2052,7 @@ fun EpgGridScreen(
                 nowSecProvider = nowSecProvider,
                 canModifyRecordings = selectedCapability != null && (liveEvent != null || recording != null),
                 liveProgrammeActions = liveEvent != null,
-                actionResult = actionResult,
+                notices = { AppShellNoticeHost(queue = notices) },
                 onAction = actionHandler@{ action ->
                     if (
                         selectedObservation.currentSession == null ||
@@ -2148,9 +2148,6 @@ fun EpgGridScreen(
                 pendingMutation = null
                 pendingRecordingTarget = null
                 configChoices = null
-                if (currentSession == null || detailsObservation?.currentSession !== currentSession) {
-                    actionResult = DvrMutationFeedback.CONNECTION_UNAVAILABLE
-                }
             }
         }
         if (
@@ -2176,17 +2173,13 @@ fun EpgGridScreen(
                     pendingMutation = null
                     pendingRecordingTarget = null
                     if (mutation != null) {
-                        val opening = detailsOpening
                         val openingObservation = detailsObservation
                         coroutineScope.launch {
                             val currentMutation = currentDvrMutation(mutation, openingObservation, observationState.value)
                                 ?: return@launch
+                            val noticeContext = notices.context()
                             val feedback = dvrMutationActions.execute(currentMutation)
-                            if (guideDetailsFeedbackIsCurrent(
-                                opening, detailsOpening, openingObservation, observationState.value,
-                            )) {
-                                actionResult = feedback
-                            }
+                            notices.postDvrFailure(currentMutation, feedback, noticeContext)
                         }
                     }
                 },
@@ -2254,15 +2247,6 @@ internal fun currentGuideRecordingTarget(target: ProgrammeRecordingTarget?, obse
         observation.currentSession === selected.currentSession &&
             observation.event(selected.eventId)?.programmeRecordingTarget(selected.currentSession) == selected
     }
-
-internal fun guideDetailsFeedbackIsCurrent(
-    opening: Any?,
-    currentOpening: Any?,
-    openingObservation: SessionObservation?,
-    currentObservation: SessionObservation,
-): Boolean = opening != null && opening === currentOpening &&
-    openingObservation?.currentSession != null &&
-    openingObservation.currentSession === currentObservation.currentSession
 
 internal fun SessionObservation.dvrEntryForProgramme(event: EpgEventEntry): DvrEntry? =
     dvrSnapshotForDisplay?.entries?.singleOrNull { entry ->

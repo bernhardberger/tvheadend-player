@@ -37,7 +37,7 @@ class ProgrammeDetailsPanelTest {
                 ProgrammeDetailsPanel(
                     contentPadding = PaddingValues(), event = event, channel = null,
                     recording = recording.value, nowSecProvider = { 1_000 },
-                    canModifyRecordings = canModify.value, actionResult = null,
+                    canModifyRecordings = canModify.value,
                     onAction = {}, onClose = {},
                 )
             }

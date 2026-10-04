@@ -6,8 +6,9 @@ import at.bernhardberger.tvheadend.sdk.core.SessionCache
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.cacheSizeMegabytes
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeQueue
-import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeKind
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.notices.NoticeSeverity
 import java.io.IOException
 import java.util.Locale
 import kotlinx.coroutines.CompletableDeferred
@@ -37,7 +38,7 @@ class SettingsStorageViewModelTest {
                     sdkCache.clear()
                 }
             }
-            val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
+            val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
             val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore())
             val store = ViewModelStore().apply { put("storage", model) }
             model.clearCache()
@@ -46,7 +47,7 @@ class SettingsStorageViewModelTest {
             release.complete(Unit)
             runCurrent()
             assertEquals(CacheStatistics.EMPTY, sdkCache.statistics.value)
-            assertEquals(AppNoticeKind.SUCCESS, notices.state.value.pending.single().kind)
+            assertEquals(NoticeSeverity.INFO, notices.state.value.pending.single().notice.severity)
         } finally {
             Dispatchers.resetMain()
         }
@@ -66,7 +67,7 @@ class SettingsStorageViewModelTest {
         try {
             val cache = FakeTvheadendSession().cache
             cache.scriptStatistics(CacheStatistics(500_000, 12_000_000, 340))
-            val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
+            val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
             val accents = ChannelAccentStore().apply { put("picon", 0x336699) }
             val model = SettingsStorageViewModel(cache, notices, accents)
             assertEquals(340, model.statistics.value.artworkEntryCount)
@@ -103,7 +104,7 @@ class SettingsStorageViewModelTest {
                     sdkCache.clear()
                 }
             }
-            val notices = AppNoticeQueue({ testScheduler.currentTime }, { Unit })
+            val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
             val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore())
             model.clearCache()
             runCurrent()
@@ -112,7 +113,7 @@ class SettingsStorageViewModelTest {
             release.complete(Unit)
             runCurrent()
             assertEquals(CacheClearState.FAILED, model.clearState.value)
-            assertEquals(AppNoticeKind.FAILURE, notices.state.value.pending.single().kind)
+            assertEquals(NoticeSeverity.FAILURE, notices.state.value.pending.single().notice.severity)
             advanceTimeBy(31_000)
             notices.prune()
             assertEquals(CacheClearState.FAILED, model.clearState.value)
