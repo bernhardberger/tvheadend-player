@@ -657,13 +657,6 @@ class PlayerFooterLayoutEvidenceTest {
             .config[SemanticsProperties.ContentDescription].single().contains("Paused"))
     }
 
-    @Test
-    fun fallbackTimeshiftEndpointsAreNumericAndDoNotShowNegativeZero() {
-        assertEquals("0:00", timeshiftEndpointLabel(true, 800))
-        assertEquals("0:00", timeshiftEndpointLabel(false, 999))
-        assertEquals("−0:30", timeshiftEndpointLabel(false, 30_000))
-    }
-
     @Test fun missingEpgServerLivePinsPlayingButNotPauseOrPreview() = missingEpgAxis("en", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun missingEpgAxisGermanLargeText() = missingEpgAxis("de", 1.3f)

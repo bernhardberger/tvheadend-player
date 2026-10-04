@@ -841,6 +841,7 @@ class DepthMotionEvidenceTest {
     private fun capture(name: String) = write(name, draw())
 
     private fun write(name: String, bitmap: Bitmap) {
+        if (!java.lang.Boolean.getBoolean("tvhplayer.writeMotionCaptures")) return
         val directory = File("build/outputs/motion-captures").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))

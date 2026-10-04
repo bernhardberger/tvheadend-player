@@ -79,6 +79,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -385,8 +387,11 @@ class ChannelsStandardLayoutEvidenceTest {
 
     // ---- captures ----
 
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun captureEnglishNormal() = captureSet("en", 1f)
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun captureGermanNormal() = captureSet("de", 1f)
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun captureEnglishEnlarged() = captureSet("en", 1.3f)
 
     private fun captureSet(locale: String, fontScale: Float) {

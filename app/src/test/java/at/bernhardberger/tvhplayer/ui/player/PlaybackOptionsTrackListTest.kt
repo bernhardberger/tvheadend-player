@@ -46,6 +46,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -67,8 +69,10 @@ class PlaybackOptionsTrackListTest {
 
     @Test fun english() = trackList("en", 1f, ENGLISH)
 
+    @Category(VisualCapture::class)
     @Test fun englishLargeText() = trackList("en", 1.3f, ENGLISH)
 
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun german() = trackList("de", 1f, GERMAN)
 

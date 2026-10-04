@@ -488,7 +488,7 @@ class RecordingRecoveryPositionTest {
             while (!condition()) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(5) }
         }
 
-        suspend fun settleMain() { repeat(100) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(5) } }
+        suspend fun settleMain() { repeat(20) { tick() } }
     }
 
     /**
@@ -638,7 +638,7 @@ class RecordingRecoveryPositionTest {
         const val RECORDING_MS = 30 * 60_000
         const val WAV_HEADER = 44
         const val LOAD_CHECK_BYTES = 10_000 // 10 s of the recording
-        val TICK: java.time.Duration = java.time.Duration.ofMillis(10)
+        val TICK: java.time.Duration = java.time.Duration.ofMillis(50)
         val RECORDING_START: Instant = Instant.fromEpochSeconds(1_700_000_000)
 
         fun wav(lengthMs: Int): ByteArray = java.nio.ByteBuffer.allocate(WAV_HEADER + lengthMs)

@@ -8,12 +8,14 @@ cd "$ROOT_DIR"
 # SDK fix can be tested before it is published. Such a run cannot prove public SDK consumption, so
 # it drops the provenance gate and reports a weaker conclusion. It never gates a release.
 staged_sdk=false
+capture_tests=exclude
 for argument in "$@"; do
     case "$argument" in
         --staged-sdk) staged_sdk=true ;;
+        --visual-captures) capture_tests=all ;;
         *)
             printf 'error: unknown option: %s\n' "$argument" >&2
-            printf 'usage: tools/verify [--staged-sdk]\n' >&2
+            printf 'usage: tools/verify [--staged-sdk] [--visual-captures]\n' >&2
             exit 1
             ;;
     esac
@@ -61,6 +63,7 @@ printf '==> Static rule checks\n'
 python3 tools/static_rules.py
 
 printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
+printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "$capture_tests"
 ./gradlew \
     testDebugUnitTest \
     lintDebug \
@@ -68,6 +71,7 @@ printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
     assembleDebug \
     "${provenance_tasks[@]}" \
     "${gradle_arguments[@]}" \
+    "-Ptvhplayer.captureTests=$capture_tests" \
     --console=plain --no-scan
 
 printf '==> External native dependency and packaged APK integrity\n'

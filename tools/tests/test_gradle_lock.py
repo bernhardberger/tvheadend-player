@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import fcntl
 from pathlib import Path
 import shutil
 import subprocess
@@ -179,6 +180,44 @@ class GradleLockTest(unittest.TestCase):
                     self.assertNotEqual(0, result.returncode)
                     self.assertIn("TVHPLAYER_GRADLE_SLOTS", result.stderr)
                     self.assertFalse((fixture / "starts.log").exists())
+
+    def test_queue_reports_wait_and_acquisition_without_starting_java_early(self) -> None:
+        for slots in (1, 2):
+            with self.subTest(slots=slots), tempfile.TemporaryDirectory() as directory:
+                fixture = Path(directory)
+                wrapper = install_wrapper(fixture)
+                install_java(fixture, "printf 'started\\n' >> \"$GRADLE_LOCK_TEST_LOG\"\n")
+                (fixture / "locks").mkdir()
+                locks = []
+                process = None
+                try:
+                    for slot in range(slots):
+                        name = "gradle.lock" if slot == 0 else f"gradle.lock.{slot}"
+                        lock = (fixture / "locks" / name).open("w")
+                        locks.append(lock)
+                        fcntl.flock(lock, fcntl.LOCK_EX)
+                    queue_log = fixture / "queue.log"
+                    with queue_log.open("w") as output:
+                        process = subprocess.Popen(
+                            [str(wrapper), "help"], env=self.environment(fixture, "queued", str(slots)),
+                            stdout=output, stderr=output,
+                        )
+                        lines = wait_for_lines(queue_log, 1, timeout=5)
+                        self.assertTrue(any("Gradle queue: waiting" in line for line in lines), lines)
+                        self.assertFalse((fixture / "starts.log").exists())
+                        for lock in locks:
+                            fcntl.flock(lock, fcntl.LOCK_UN)
+                        self.assertEqual(0, process.wait(timeout=5))
+                    text = queue_log.read_text()
+                    self.assertEqual(1, text.count("Gradle queue: waiting"))
+                    self.assertRegex(text, r"acquired a slot after \d+s; starting Gradle")
+                    self.assertEqual("started\n", (fixture / "starts.log").read_text())
+                finally:
+                    for lock in locks:
+                        lock.close()
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.wait(timeout=5)
 
 
 if __name__ == "__main__":

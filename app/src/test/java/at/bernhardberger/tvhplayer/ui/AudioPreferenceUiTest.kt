@@ -29,6 +29,8 @@ import java.io.File
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -42,12 +44,15 @@ class AudioPreferenceUiTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun englishSettings() = settings("en", 1f)
+    @Category(VisualCapture::class)
     @Test fun englishLargeLanguagePicker() = settings("en", 1.3f)
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanSettings() = settings("de", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeLanguagePicker() = settings("de", 1.3f)
     @Test fun englishAutomaticAudio() = audio("en")
+    @Category(VisualCapture::class)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanAutomaticAudio() = audio("de")
 

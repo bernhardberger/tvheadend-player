@@ -17,6 +17,27 @@ kotlin {
     jvmToolchain(21)
 }
 
+// Explicit opt-in categories keep behavior tests in mixed evidence classes in the routine lane.
+val captureTests = providers.gradleProperty("tvhplayer.captureTests").orElse("all").get()
+require(captureTests in setOf("all", "exclude", "only")) {
+    "tvhplayer.captureTests must be all, exclude or only"
+}
+val testForks = providers.gradleProperty("tvhplayer.testForks").orElse("2").get()
+require(testForks in setOf("1", "2")) { "tvhplayer.testForks must be 1 or 2" }
+tasks.withType<Test>().configureEach {
+    // Separate JVMs isolate Robolectric/Compose globals. Keep visual capture runs serial.
+    maxParallelForks = if (captureTests == "exclude") testForks.toInt() else 1
+    // Motion regressions still render/assert every sampled frame in the routine lane.
+    // Encoding their diagnostic PNGs belongs to explicit visual-evidence runs.
+    systemProperty("tvhplayer.writeMotionCaptures", captureTests != "exclude")
+    useJUnit {
+        when (captureTests) {
+            "exclude" -> excludeCategories("at.bernhardberger.tvhplayer.testutil.VisualCapture")
+            "only" -> includeCategories("at.bernhardberger.tvhplayer.testutil.VisualCapture")
+        }
+    }
+}
+
 android {
     testBuildType = if (providers.gradleProperty("tvhplayer.profileTests").orNull == "true") "profile" else "debug"
     namespace = "at.bernhardberger.tvhplayer"

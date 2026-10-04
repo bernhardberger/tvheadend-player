@@ -2,6 +2,7 @@
 @file:OptIn(
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
@@ -27,6 +28,8 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -231,12 +234,13 @@ class AudioInterruptionRuntimeTest {
     @Test fun explicitTimeshiftResumeResolvesPermanentAndNoisyInterruptions() = exercise {
         for (event in listOf(AudioInterruption.PERMANENT_LOSS, AudioInterruption.NOISY)) {
             live(timeshift = true)
+            val previousSpeeds = connection.speeds.toList()
             focus.send(event)
             await { !player.playWhenReady }
             val requests = focus.requests.size
             assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
             assertTrue(player.playWhenReady)
-            assertEquals(100, connection.speeds.last())
+            assertEquals(previousSpeeds + listOf(0, 100), connection.speeds)
             assertEquals(requests + 1, focus.requests.size)
         }
     }
@@ -357,17 +361,6 @@ class AudioInterruptionRuntimeTest {
         assertTrue(player.playWhenReady)
         assertTrue(connection.speeds.isEmpty())
         assertEquals(2, focus.requests.size)
-    }
-
-    @Test fun oneTimeshiftPlayActionRequestsFocusAndResumesServerOnce() = exercise {
-        live(timeshift = true)
-        focus.send(AudioInterruption.PERMANENT_LOSS)
-        await { !player.playWhenReady }
-        val requests = focus.requests.size
-        assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
-        assertTrue(player.playWhenReady)
-        assertEquals(requests + 1, focus.requests.size)
-        assertEquals(listOf(0, 100), connection.speeds)
     }
 
     @Test fun pauseQueuedDuringMutedResumePausesLocallyAndOnServer() = exercise {
@@ -609,13 +602,13 @@ class AudioInterruptionRuntimeTest {
         assertTrue(startupBuffer.isLiveTarget)
     }
 
-    @Test fun interruptionDuringAdmittedRecoveryBackoffRetunesOnceAfterGain() = exercise {
+    @Test fun interruptionDuringAdmittedRecoveryBackoffRetunesOnceAfterGain() = exercise(virtualTime = true) {
         awaitSecondRecoveryBackoff()
         val subscriptions = connection.subscribeCount
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { !player.playWhenReady && connection.speeds == listOf(0) }
         // The backoff passes while the interruption holds playback: nothing retunes.
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         assertEquals(subscriptions, connection.subscribeCount)
         assertFalse(player.playWhenReady)
@@ -626,12 +619,12 @@ class AudioInterruptionRuntimeTest {
         await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertFalse(audioDisabled())
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         assertEquals(subscriptions + 1, connection.subscribeCount)
     }
 
-    @Test fun rejectedInterruptionHoldKeepsTheAdmittedRecoveryAndItsMute() = exercise {
+    @Test fun rejectedInterruptionHoldKeepsTheAdmittedRecoveryAndItsMute() = exercise(virtualTime = true) {
         awaitSecondRecoveryBackoff()
         val subscriptions = connection.subscribeCount
         val requests = focus.requests.size
@@ -643,17 +636,17 @@ class AudioInterruptionRuntimeTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertTrue(audioDisabled())
         assertEquals(requests, focus.requests.size)
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         assertEquals(subscriptions + 1, connection.subscribeCount)
     }
 
-    @Test fun permanentLossDuringRecoveryBackoffRetunesOnlyOnExplicitPlay() = exercise {
+    @Test fun permanentLossDuringRecoveryBackoffRetunesOnlyOnExplicitPlay() = exercise(virtualTime = true) {
         awaitSecondRecoveryBackoff()
         val subscriptions = connection.subscribeCount
         focus.send(AudioInterruption.PERMANENT_LOSS)
         await { !player.playWhenReady && connection.speeds == listOf(0) }
-        delay(2_500)
+        advanceRecoveryTime()
         focus.send(AudioInterruption.GAIN)
         settle()
         assertFalse(player.playWhenReady)
@@ -680,7 +673,7 @@ class AudioInterruptionRuntimeTest {
         await { connection.subscribeCount == subscriptions + 1 }
     }
 
-    @Test fun interruptedRecoveryNeverRetunesAReplacementTarget() = exercise {
+    @Test fun interruptedRecoveryNeverRetunesAReplacementTarget() = exercise(virtualTime = true) {
         awaitSecondRecoveryBackoff()
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { !player.playWhenReady }
@@ -707,7 +700,7 @@ class AudioInterruptionRuntimeTest {
         await { !player.playWhenReady }
         recording()
         runtime.play()
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         assertEquals(subscriptions + 1, connection.subscribeCount)
         assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
@@ -730,7 +723,7 @@ class AudioInterruptionRuntimeTest {
         assertFalse(runtime.state.value is AppPlaybackState.Recovering)
     }
 
-    @Test fun stopAndDetachEndAnInterruptedRecovery() = exercise {
+    @Test fun stopAndDetachEndAnInterruptedRecovery() = exercise(virtualTime = true) {
         awaitSecondRecoveryBackoff()
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { !player.playWhenReady }
@@ -757,12 +750,12 @@ class AudioInterruptionRuntimeTest {
         val beforeDetach = focus.requests.last()
         runtime.detach()
         beforeDetach(AudioInterruption.GAIN)
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         assertEquals(subscriptions + 1, connection.subscribeCount)
     }
 
-    @Test fun backgroundTurnsAnInterruptedRecoveryIntoOneForegroundRetune() = exercise {
+    @Test fun backgroundTurnsAnInterruptedRecoveryIntoOneForegroundRetune() = exercise(virtualTime = true) {
         awaitSecondRecoveryBackoff()
         val subscriptions = connection.subscribeCount
         focus.send(AudioInterruption.TRANSIENT_LOSS)
@@ -771,7 +764,7 @@ class AudioInterruptionRuntimeTest {
         runtime.onAppBackgrounded()
         await { runtime.activeTarget.value == null }
         callback(AudioInterruption.GAIN)
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         assertEquals(subscriptions, connection.subscribeCount)
         runtime.onAppForegrounded()
@@ -1117,7 +1110,7 @@ class AudioInterruptionRuntimeTest {
         assertEquals(2, connection.subscribeCount)
     }
 
-    @Test fun pauseDuringTheBackoffOfAnAdmittedDeferredRecoveryKeepsItOwedWithoutAnotherAttempt() = exercise {
+    @Test fun pauseDuringTheBackoffOfAnAdmittedDeferredRecoveryKeepsItOwedWithoutAnotherAttempt() = exercise(virtualTime = true) {
         live(timeshift = true)
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
         await { connection.subscribeCount == 2 }
@@ -1136,7 +1129,7 @@ class AudioInterruptionRuntimeTest {
         // Admitted after the gain as the second attempt, it waits out its backoff.
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
         assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.pauseTimeshiftPlayback())
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         // Its retune found the viewer's Pause: nothing retuned or played over it.
         assertFalse(player.playWhenReady)
@@ -1248,11 +1241,11 @@ class AudioInterruptionRuntimeTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
     }
 
-    @Test fun pauseDuringTheBackoffOfAnOrdinaryRecoveryKeepsItOwedUntilPlay() = exercise {
+    @Test fun pauseDuringTheBackoffOfAnOrdinaryRecoveryKeepsItOwedUntilPlay() = exercise(virtualTime = true) {
         awaitSecondRecoveryBackoff()
         // The viewer pauses while the second attempt waits out its backoff.
         assertEquals(TimeshiftCommandResult.ACCEPTED, runtime.pauseTimeshiftPlayback())
-        delay(2_500)
+        advanceRecoveryTime()
         settle()
         // Its retune found the viewer's Pause: nothing retuned or played over it.
         assertFalse(player.playWhenReady)
@@ -1579,11 +1572,25 @@ class AudioInterruptionRuntimeTest {
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
     }
 
-    private fun exercise(granted: Boolean = true, block: suspend Fixture.() -> Unit) = runBlocking {
-        val fixture = Fixture(CoroutineScope(coroutineContext + SupervisorJob()), granted)
+    private fun exercise(granted: Boolean = true, virtualTime: Boolean = false, block: suspend Fixture.() -> Unit) = runBlocking {
+        val scheduler = if (virtualTime) TestCoroutineScheduler() else null
+        val dispatcher = scheduler?.let { StandardTestDispatcher(it) } ?: coroutineContext
+        val fixture = Fixture(CoroutineScope(dispatcher + SupervisorJob()), granted, scheduler)
+        // Keep real Media3/SDK threads moving without automatically advancing recovery timers.
+        // The driver stays on the Robolectric test thread, including nested runBlocking calls.
+        val pump = scheduler?.let {
+            launch {
+                while (isActive) {
+                    scheduler.runCurrent()
+                    delay(1)
+                }
+            }
+        }
         try { withTimeout(15_000) { fixture.block() } }
         finally {
+            pump?.cancel()
             fixture.scope.cancel()
+            scheduler?.runCurrent()
             fixture.runtime.detach()
             fixture.player.release()
             fixture.session.shutdown()
@@ -1605,7 +1612,7 @@ class AudioInterruptionRuntimeTest {
         fun send(event: AudioInterruption) { callback?.invoke(event) }
     }
 
-    private class Fixture(val scope: CoroutineScope, granted: Boolean) {
+    private class Fixture(val scope: CoroutineScope, granted: Boolean, private val scheduler: TestCoroutineScheduler?) {
         private val context = ApplicationProvider.getApplicationContext<Application>()
         val focus = FakeFocus(granted)
         val connection = ScriptedSubscriptionConnection().apply {
@@ -1681,6 +1688,7 @@ class AudioInterruptionRuntimeTest {
             settings, profiles.startupBufferIdentity(), scope)
         val runtime = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),
+            elapsedRealtime = { scheduler?.currentTime ?: android.os.SystemClock.elapsedRealtime() },
             startupBuffer = startupBuffer)
         val commands: PlaybackTargetCommandSerialization get() = AppPlaybackRuntime::class.java.getDeclaredField("targetCommands").let {
             it.isAccessible = true; it.get(runtime) as PlaybackTargetCommandSerialization
@@ -1764,5 +1772,10 @@ class AudioInterruptionRuntimeTest {
         }
 
         suspend fun settle() { repeat(5) { shadowOf(Looper.getMainLooper()).idle(); delay(10) } }
+
+        fun advanceRecoveryTime() {
+            checkNotNull(scheduler).advanceTimeBy(2_500)
+            scheduler.runCurrent()
+        }
     }
 }

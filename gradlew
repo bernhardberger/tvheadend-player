@@ -127,9 +127,18 @@ if command -v flock >/dev/null 2>&1; then
     gradle_lock_dir=/tmp/tvheadend-player-gradle-$gradle_lock_uid
     mkdir -p "$gradle_lock_dir" || die "Unable to create the Gradle lock directory"
     chmod 700 "$gradle_lock_dir" || die "Unable to secure the Gradle lock directory"
+    gradle_wait_started=
     if [ "$gradle_lock_slots" -eq 1 ]; then
         exec 9>"$gradle_lock_dir/gradle.lock" || die "Unable to open the Gradle lock"
-        flock -x 9 || die "Unable to acquire the Gradle lock"
+        flock -n -E 75 -x 9
+        gradle_lock_status=$?
+        if [ "$gradle_lock_status" -eq 75 ]; then
+            gradle_wait_started=$(date +%s)
+            warn "Gradle queue: waiting for a shared build slot (1 configured)"
+            flock -x 9 || die "Unable to acquire the Gradle lock"
+        elif [ "$gradle_lock_status" -ne 0 ]; then
+            die "Unable to acquire the Gradle lock"
+        fi
     else
         # Slot 0 is the single-slot lock, so wrappers without slots still count.
         while :; do
@@ -144,8 +153,16 @@ if command -v flock >/dev/null 2>&1; then
                 [ "$gradle_lock_status" -eq 75 ] || die "Unable to acquire the Gradle lock"
                 gradle_lock_slot=$(( gradle_lock_slot + 1 ))
             done
+            if [ -z "$gradle_wait_started" ]; then
+                gradle_wait_started=$(date +%s)
+                warn "Gradle queue: waiting for a shared build slot ($gradle_lock_slots configured)"
+            fi
             sleep 1
         done
+    fi
+    if [ -n "$gradle_wait_started" ]; then
+        gradle_wait_finished=$(date +%s)
+        warn "Gradle queue: acquired a slot after $((gradle_wait_finished - gradle_wait_started))s; starting Gradle"
     fi
 elif [ "$( uname -s )" = Linux ]; then
     die "flock is required to serialize TVHeadend Player Gradle builds"
