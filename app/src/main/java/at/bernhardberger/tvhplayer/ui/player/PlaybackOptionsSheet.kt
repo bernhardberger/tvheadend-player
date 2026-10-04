@@ -67,15 +67,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.dialog
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.toggleableState
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -87,7 +82,7 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
-import androidx.tv.material3.Switch
+import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
@@ -1090,11 +1085,10 @@ private fun StatsOptionsPage(
         backFocusRequester = headerBackFocus,
         downFocusRequester = statsFocus,
     )
-    PlaybackOptionRow(
+    SettingsSwitchRow(
         label = stringResource(R.string.stats_for_nerds),
-        selected = selected,
+        checked = selected,
         onClick = { onSelectedChange(!selected) },
-        showSwitch = true,
         modifier = Modifier.padding(PanelRowsPadding).containedFocus(
             requester = statsFocus,
             orderedFocus = listOf(statsFocus),
@@ -1177,12 +1171,11 @@ private fun PlaybackOptionRow(
     supportingTestTag: String? = null,
     selected: Boolean = false,
     showChevron: Boolean = false,
-    showSwitch: Boolean = false,
     enabled: Boolean = true,
 ) {
     ListItem(
         enabled = enabled,
-        selected = if (showSwitch) false else selected,
+        selected = selected,
         onClick = onClick,
         headlineContent = {
             Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1202,11 +1195,6 @@ private fun PlaybackOptionRow(
         },
         trailingContent = {
             when {
-                showSwitch -> Switch(
-                    checked = selected,
-                    onCheckedChange = null,
-                    modifier = Modifier.clearAndSetSemantics { },
-                )
                 showChevron -> Icon(
                     painterResource(R.drawable.ic_keyboard_arrow_right),
                     contentDescription = null,
@@ -1225,17 +1213,7 @@ private fun PlaybackOptionRow(
                     }
                     true
                 }
-            }
-            .then(
-                if (showSwitch) {
-                    Modifier.semantics {
-                        role = Role.Switch
-                        toggleableState = ToggleableState(selected)
-                    }
-                } else {
-                    Modifier
-                }
-            ),
+            },
     )
 }
 
