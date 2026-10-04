@@ -2,6 +2,15 @@
 
 ## Standard workflow
 
+Choose the lane for the evidence needed:
+
+| Need | Lane |
+|---|---|
+| Logic and deterministic static layout | Local JVM/production-composable tests and fake-state captures |
+| Integrated UI iteration with the operator | [Notebook032 TV preview](notebook-tv-preview.md): existing Android TV emulator, working launcher, keyboard and fullscreen viewer |
+| Automated emulator capture/instrumentation | LXC119 procedure below; preserve each test's pinned identity |
+| Physical remote, video and motion acceptance | G10 under [device-targets.md](device-targets.md) |
+
 Use official Android CLI with explicit `--device` for ordinary installs and
 current-screen captures, Gradle/AGP for builds, AndroidJUnitRunner for
 instrumentation, and Perfetto for profiling. Use explicit-serial ADB only for
@@ -27,6 +36,8 @@ timeout --kill-after=5s 30m ./tools/verify
 not permission to change dependencies. `tools/verify` includes the published SDK
 and native provenance gates. It compiles Android tests but does not run them.
 Use the `gradle-run` skill for bounded logs, cancellation and live-test isolation.
+
+## LXC119 automated capture lane
 
 Use the existing remote lane only to obtain the ADB tunnel. This example runs a
 single bounded ADB command; for a sequence, use one owner shell/script as the
@@ -105,6 +116,15 @@ cancellation; wait and verify neither process remains. Do not clear data or
 uninstall to perform cleanup. Exiting the tunnel closes its SSH forward; leave
 the existing emulator service/boot state alone. The external helper owns tunnel
 lifecycle, not Player install or test policy.
+
+## Notebook032 interactive previews
+
+Use [notebook-tv-preview.md](notebook-tv-preview.md) for the reusable interactive
+lane: exact target identity, private connection configuration, service reuse/start,
+fullscreen controls, verified APK updates and safe captures. Its operator-confirmed
+launcher/keyboard/fullscreen behavior does not replace physical-TV acceptance.
+Interactive previews may remain open for the operator; the force-stop cleanup in
+the LXC119 test procedure above does not apply to an active human preview.
 
 ## Android CLI qualification
 

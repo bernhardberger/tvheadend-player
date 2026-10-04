@@ -57,7 +57,7 @@ entire skill family. Multiple rows apply only when their concerns are affected.
 | Appliance launch, HOME, GUIDE, wake, Simple TV | `docs/appliance-mode-spec.md`, relevant sections of `docs/appliance-mode-plan.md` |
 | Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; native provenance references only for dependency/native work; dated assessments only for a named upgrade/finding |
 | SDK adoption or app/SDK contract diagnosis | `tvheadend-sdk-adoption` |
-| Physical TV or emulator operations, ADB, install, device capture or key injection | `android-tv-device-testing`; `docs/device-targets.md` for physical targets |
+| Physical TV or emulator operations, interactive previews, ADB, install, capture or key injection | `android-tv-device-testing`; `docs/android-tooling.md` for lane selection; `docs/device-targets.md` for physical targets |
 | Gradle execution or build/test/lint diagnosis | `gradle-run` |
 | Product identity | `docs/product-identity-plan.md` |
 | Signing, publication, rollback | `docs/release-process.md` |
@@ -133,6 +133,11 @@ Prefer deterministic offline captures of production composables with fake state
 for static visual review. Record canvas, locale, font scale, and focus state and
 keep generated evidence ignored. This can prove only the captured composition;
 it does not replace integrated or physical-TV gates.
+
+For interactive UI iteration after local checks, prefer the existing Notebook032
+Android TV emulator and fullscreen viewer: `docs/notebook-tv-preview.md`. Keep
+deterministic captures in their existing offline lane and use the G10 for final
+physical-TV acceptance. Reuse the configured AVD rather than rebuilding the setup.
 
 ## Device, credential, and release safety
 

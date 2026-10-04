@@ -27,7 +27,8 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `client-module.md` | UI-free `:client` library ownership, dependency rules and placement rule; read before adding runtime, persistence or domain code. |
 | `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
-| `android-tooling.md` | Standard build and explicit-target offline emulator workflow; qualified Android CLI and R8 payload limits. |
+| `android-tooling.md` | Build/install/capture conventions and lane selection: Notebook032 interactive preview, LXC119 automated capture, physical TV acceptance; qualified CLI and R8 limits. |
+| `notebook-tv-preview.md` | Operational Notebook032 Android TV preview runbook: reuse/start, fullscreen keyboard control, verified APK updates, captures and ownership. Read for interactive UI iteration. |
 | `profiling.md` | Offline/configured-server profiling, optional R8 arm, guarded sustained traces, timestamped video and physical-TV limits. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
