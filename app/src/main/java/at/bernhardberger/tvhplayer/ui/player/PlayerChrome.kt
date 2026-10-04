@@ -23,7 +23,7 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import coil3.ImageLoader
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -134,7 +134,9 @@ internal fun PlayerChrome(
                 lastLineEndReserve = lastLineEndReserve,
                 identityGap = PlayerChromeTokens.identityTextGap,
             ) { faded ->
-                val placed = onCardPlaced?.let { sink -> Modifier.onGloballyPositioned { sink(it.boundsInRoot()) } } ?: Modifier
+                val placed = onCardPlaced?.let { sink -> Modifier.onGloballyPositioned {
+                    sink(it.findRootCoordinates().localBoundingBoxOf(it, clipBounds = false))
+                } } ?: Modifier
                 PlayerIdentityCard(content, imageLoader, currentSession,
                     faded.then(card).then(placed).onFocusChanged {
                         if (it.isFocused && !channelCardHeld) cardHeld = false

@@ -289,6 +289,33 @@ Anatomy per Material for TV / design kit:
 - Static captures prove composition only. Motion, focus feel, readability over
   video, overscan and remote-repeat behaviour are physical-TV gates.
 
+### Page motion
+
+The player shares one linear master progress: Down 500 ms, Up/Back 400 ms,
+reversing the same per-element windows continuously. Sections stay at their rest
+positions; there is no full-viewport pull. Controls rise 96dp and fade (0–220 ms;
+Program info fades by 140 ms). Details tabs, artwork, text and actions rise
+120/160/200/240dp over 120–420/150–460/180–480/200–500 ms. Exits use emphasized
+acceleration, entrances emphasized deceleration. The clock stays pinned above
+the dim; details clear it by at least 8dp. Tabs retain their horizontal 300 ms step.
+
+The player keeps its Program info cue. The rail preview rises 120dp (0–200 ms);
+tiles leave above the viewport (60–360 ms), fading by 260 ms. Its real schedule
+headline alone peeks at 55% alpha on the rail keyline, then moves to the rows'
+keyline (0–420 ms); both use emphasized (0.3,0,0,1). Channels fades/slides in
+16dp horizontally (300–500 ms, standard deceleration). Schedule rows rise 160dp
+over 160–500 ms, with 30 ms stagger for the first six rows, all settled by 500 ms.
+Scrims are stationary: constant gentle top gradient, details dim in 0–300 ms
+(standard deceleration; linear crossfade from the rail veil), controls bottom
+gradient out 200–350 ms linearly. No gradient edge travels with content.
+
+Only the section at rest accepts focus. Departing focus and semantics drop
+immediately, then details focus its first action (schedule: Now row), or the
+invoking control/rail channel is restored after return. The rail stays expanded
+and does not replay its sideways reveal. The departing details retain their
+channel/event until return settles, then dispose; section 1 stays composed.
+Opening side panels, dialogs, auto-hide and zap reveals retain their own motion.
+
 ## 7. Settings · sliding-depth navigation (Variant C)
 
 Accepted 2026-09-15; static design in Penpot page

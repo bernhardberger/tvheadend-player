@@ -177,6 +177,21 @@ class StaticRulesTest(unittest.TestCase):
                    'AppTabRow {}\nTabContent()\nAnimatedContent(targetState = page) {}')
         self.assertEqual([], find_static_rule_violations(self.root))
 
+    def test_page_motion_rejects_direct_slides_and_alias_imports_in_ui(self):
+        ui = "app/src/main/java/at/bernhardberger/tvhplayer/ui/"
+        for name in ("slideInVertically", "slideOutVertically", "slideInHorizontally", "slideOutHorizontally"):
+            for source in (f"{name}(spec) {{ it }}", f"import androidx.compose.animation.{name} as travel"):
+                with self.subTest(source=source):
+                    self.write(ui + "player/Screen.kt", source)
+                    self.assertTrue(any("SharedPageMotion:" in item for item in find_static_rule_violations(self.root)))
+
+    def test_page_motion_allows_shared_owner_local_disclosure_and_non_code(self):
+        ui = "app/src/main/java/at/bernhardberger/tvhplayer/ui/"
+        self.write(ui + "BrowseMotionPolicy.kt", "slideInVertically(spec) { it }")
+        self.write(ui + "player/PlayerIdentityCard.kt", "slideInVertically(spec) { it / 4 }")
+        self.write(ui + "player/Screen.kt", '// slideInVertically(spec)\nval text = "slideOutHorizontally"\nBrowseMotionPolicy.pageScroll<Float>()')
+        self.assertEqual([], find_static_rule_violations(self.root))
+
 
 if __name__ == "__main__":
     unittest.main()

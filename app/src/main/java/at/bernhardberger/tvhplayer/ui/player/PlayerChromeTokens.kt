@@ -40,11 +40,12 @@ internal object PlayerChromeTokens {
 
     /** Full-width top fade behind the clock: 0.64 at the edge, 0.40 at 56dp, clear at 112dp. */
     val topScrimHeight = 112.dp
-    val topScrim = Brush.verticalGradient(
+    val topScrimStops = arrayOf(
         0f to Color.Black.copy(alpha = 0.72f),
         0.5f to Color.Black.copy(alpha = 0.48f),
         1f to Color.Transparent,
     )
+    val topScrim = Brush.verticalGradient(*topScrimStops)
 
     /**
      * The bottom scrim of a footer [height] px tall, drawn in the footer's own bounds: clear at its

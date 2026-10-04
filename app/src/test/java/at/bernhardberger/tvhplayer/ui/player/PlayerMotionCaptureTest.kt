@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -40,10 +42,12 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import coil3.ImageLoader
 import coil3.map.Mapper
 import coil3.request.Options
@@ -53,6 +57,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -171,6 +176,70 @@ class PlayerMotionCaptureTest {
         )
     }
 
+    /** Per-element page choreography, with a stationary clock and viewport scrims. */
+    @Category(VisualCapture::class)
+    @Test fun controlsAndDetailsPageScroll() = pageScroll(rail = false)
+
+    @Category(VisualCapture::class)
+    @Test fun railAndSchedulePageScroll() = pageScroll(rail = true)
+
+    private fun pageScroll(rail: Boolean) {
+        lateinit var layers: LivePlayerLayerState
+        show { loader, session ->
+            layers = rememberLivePlayerLayerState()
+            val details = remember { ProgramDetailsState().apply { reset(startOnSchedule = rail) } }
+            LaunchedEffect(Unit) { layers.showControls() }
+            PlayerPage(details = Unit.takeIf { layers.infoOpen },
+                railHeader = if (rail) ({ ProgrammeScheduleHeader("1 · Documentary") }) else null,
+                player = {
+                    live(loader, session, behind = false,
+                        rail = layers.takeIf { rail }, downHint = "Program info".takeUnless { rail })
+                }) {
+                LiveProgrammeInfoOverlay(
+                    event = programme, channelIdentity = "1 · Documentary", channelName = "Documentary",
+                    recordingScheduled = false, canRecord = true, recordingState = LiveInfoRecordingState.Idle,
+                    confirmationVisible = false, restoreRecordFocus = false,
+                    onRecord = {}, onRecordingActivate = {}, onRecordingDismiss = {},
+                    onClose = {}, fromChannelRail = rail,
+                    details = { recordFocus, firstFocus ->
+                        ProgramDetails(
+                            state = details, current = programme, schedule = listOf(programme, next),
+                            nowSec = 1_800, channelIdentity = "1 · Documentary",
+                            tile = { event, modifier ->
+                                ProgrammeHero(event.image, ChannelId(1), "1", ArtworkId(1), loader, session, modifier)
+                            },
+                            recordingFor = { null }, canModifyRecordings = true,
+                            recordFocus = recordFocus, firstFocus = firstFocus, onAction = {},
+                        )
+                    },
+                )
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        val pair = if (rail) "rail-schedule" else "controls-details"
+        if (rail) {
+            compose.runOnIdle { layers.openChannelDrawer(); Snapshot.sendApplyNotifications() }
+            repeat(2) { compose.mainClock.advanceTimeByFrame() }
+            compose.mainClock.advanceTimeBy(16, ignoreFrameDuration = true)
+            capture("rail-opening-16ms", directory = "ui-page-scroll",
+                focus = "rail entering from the card", timing = "16 ms after reveal start")
+            compose.mainClock.advanceTimeBy(1_000)
+        }
+        capture("$pair-rest", directory = "ui-page-scroll")
+        compose.runOnIdle { layers.openInfo(); Snapshot.sendApplyNotifications() }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(120, ignoreFrameDuration = true)
+        capture("$pair-down-120ms", directory = "ui-page-scroll", focus = "inert during page motion", timing = "120 ms after transition start")
+        compose.mainClock.advanceTimeBy(130, ignoreFrameDuration = true)
+        capture("$pair-down-250ms", directory = "ui-page-scroll", focus = "inert during page motion", timing = "250 ms after transition start")
+        compose.mainClock.advanceTimeBy(1_000)
+        capture("$pair-down-settled", directory = "ui-page-scroll", focus = if (rail) "schedule first row" else "details initial action")
+        compose.runOnIdle { layers.closeInfo(returnToRail = rail); Snapshot.sendApplyNotifications() }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(200, ignoreFrameDuration = true)
+        capture("$pair-back-200ms", directory = "ui-page-scroll", focus = "inert during page motion", timing = "200 ms after transition start")
+    }
+
     /** A zap with the controls up: the header crossfades in place (frames 3 and 6). */
     @Test fun zapWithControlsVisibleCrossfadesInPlace() {
         var zapped by mutableStateOf(false)
@@ -224,6 +293,7 @@ class PlayerMotionCaptureTest {
         frames: List<Int>,
         focus: String,
         settledFocus: String = focus,
+        captureSettled: Boolean = true,
     ) {
         val changedAt = compose.mainClock.currentTime
         var drawn = 0
@@ -240,7 +310,7 @@ class PlayerMotionCaptureTest {
             )
         }
         compose.mainClock.advanceTimeBy(1_000)
-        capture("$prefix-settled", focus = settledFocus, directory = directory, timing = "settled (+1000 ms)")
+        if (captureSettled) capture("$prefix-settled", focus = settledFocus, directory = directory, timing = "settled (+1000 ms)")
     }
 
     @Composable
@@ -252,7 +322,11 @@ class PlayerMotionCaptureTest {
         mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
         entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
         panelOpen: Boolean = false,
+        /** The in-place channel rail over the controls, as the live player shows it. */
+        rail: LivePlayerLayerState? = null,
+        downHint: String? = null,
     ) {
+        var railAnchor by remember { mutableStateOf<Rect?>(null) }
         val timeshift = AppTimeshiftState(
             available = true,
             bufferStartMs = -600_000,
@@ -267,7 +341,7 @@ class PlayerMotionCaptureTest {
         )
         PlayerChrome(
             mode = mode,
-            content = PlayerChromeContent("", liveInfoBarData(if (zapped) 2 else 1,
+            content = PlayerChromeContent("20:15", liveInfoBarData(if (zapped) 2 else 1,
                 if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, "")),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,
@@ -283,6 +357,31 @@ class PlayerMotionCaptureTest {
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             entry = entry,
             panelOpen = panelOpen,
+            downHint = downHint,
+            decorationCoversControls = rail?.channelDrawerOpen == true,
+            onCardPlaced = { railAnchor = it },
+            controlsDecoration = { _, controls ->
+                if (rail == null) controls() else QuickZapPresentation(
+                    expanded = rail.channelRailPresented,
+                    channelsAvailable = true,
+                    inPlaceAnchor = { railAnchor },
+                    preview = { QuickZapTrayPreview(
+                        channel = channels.first(), event = programme, next = next,
+                        nowSec = 1_800, imageLoader = loader, currentSession = session,
+                        modifier = Modifier.padding(horizontal = PlayerChromeTokens.gridMargin),
+                    ) },
+                    controls = controls,
+                    channelContent = {
+                        ChannelDrawer(
+                            channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
+                            recordingChannelIds = emptySet(), nowEvent = { programme }, imageLoader = loader,
+                            currentSession = session, active = rail.channelDrawerOpen,
+                            nowSec = 1_800, onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
+                            onOpenSchedule = { _, _ -> }, entryFocusId = ChannelId(1), inPlace = true,
+                        )
+                    },
+                )
+            },
         )
     }
 

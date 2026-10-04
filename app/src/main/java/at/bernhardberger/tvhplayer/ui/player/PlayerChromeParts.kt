@@ -140,7 +140,9 @@ internal fun playerGlanceBadges(diagnostics: AppPlaybackDiagnostics, tracks: Tra
 @Composable
 internal fun PlayerChromeHeader(clock: String, modifier: Modifier = Modifier) {
     Box(modifier) {
-        Box(Modifier.fillMaxWidth().height(PlayerChromeTokens.topScrimHeight).background(PlayerChromeTokens.topScrim))
+        if (LocalPlayerPageScrim.current == null || LocalPlayerControlsMotion.current == null) {
+            Box(Modifier.fillMaxWidth().height(PlayerChromeTokens.topScrimHeight).background(PlayerChromeTokens.topScrim))
+        }
         Text(clock, style = MaterialTheme.typography.titleLarge, maxLines = 1, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
             modifier = Modifier.align(Alignment.TopEnd).padding(top = TvOverlayTopPadding, end = PlayerChromeTokens.gridMargin)
                 .testTag("player-top-cluster"))

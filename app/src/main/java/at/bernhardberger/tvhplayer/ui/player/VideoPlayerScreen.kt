@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
+
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 
@@ -10,8 +12,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -835,12 +835,11 @@ fun VideoPlayerScreen(
         infoMutation = null
         layerState.dismissRecordingConfirmation()
         restoreRecordFocus = false
-        layerState.closeInfo()
+        layerState.closeInfo(returnToRail = infoRailChannelId != null)
         infoRailChannelId?.let {
             railEntryId = it
             railEntryStep = 0
             selectedId = it
-            layerState.openChannelDrawer()
             infoRailChannelId = null
             return
         }
@@ -1686,9 +1685,19 @@ fun VideoPlayerScreen(
                     ?.let { selectedId = it }
             }
         }
+        PlayerPage(
+            details = (detailsChannel to detailsBaseEvent).takeIf {
+                layerState.infoOpen && (foregroundLayer == PlayerForegroundLayer.INFO ||
+                    foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
+            },
+            railHeader = if (layerState.channelRailPresented || programDetails.scheduleEntry && layerState.infoOpen) ({
+                val channel = channels.firstOrNull { it.id == (infoRailChannelId ?: selectedId) }
+                ProgrammeScheduleHeader(listOfNotNull(channel?.visibleChannelNumber?.toString(), channel?.name).joinToString(" · "))
+            }) else null,
+            player = { keepControls ->
         PlayerChrome(
             mode = playerChromeMode(
-                controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen,
+                controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
                 // A pending or dispatched step holds the Banner up after its own timer ran out.
                 banner = !channelUnavailable && (bannerSeekPreview != null ||
                     (layerState.chrome.bannerVisible && foregroundLayer == PlayerForegroundLayer.NONE)),
@@ -1732,7 +1741,7 @@ fun VideoPlayerScreen(
             imageLoader = imageLoader,
             currentSession = currentSession,
             entry = layerState.chrome.controlsEntry,
-            panelOpen = layerState.optionsPage != null || layerState.infoOpen,
+            panelOpen = layerState.optionsPage != null,
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = {
                 dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
@@ -1781,7 +1790,8 @@ fun VideoPlayerScreen(
             decorationCoversControls = channelRailOpen,
             controlsDecoration = { emphasisAlpha, controls ->
                 QuickZapPresentation(
-                    expanded = channelRailOpen,
+                    // Keep the departing rail expanded throughout its vertical step.
+                    expanded = layerState.channelRailPresented,
                     // Trial: no peek, Down opens Info; the list keys still open the rail.
                     channelsAvailable = false,
                     peekAlpha = emphasisAlpha,
@@ -1840,16 +1850,17 @@ fun VideoPlayerScreen(
                     // The rail opens out of the channel card, on its line.
                     inPlaceAnchor = { channelCardBounds },
                 )
+                // The rail's playing-channel label belongs to the same moving page.
+                PlayingChannelChip(
+                    visible = layerState.channelRailPresented,
+                    channelLabel = listOfNotNull(currentChannelNumber?.toString(), currentChannelName.takeIf { it.isNotBlank() })
+                        .joinToString(" · "),
+                    title = channelsVm.nowEvent(currentChannelId, nowSec)
+                        ?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }?.title,
+                    modifier = Modifier.align(Alignment.TopStart).pageMotion(0..200,
+                        BrowseMotionPolicy.pageAccelerate, dy = (-120).dp, entering = false),
+                )
             },
-        )
-        // Trial: while the rail browses, what keeps playing stays named top-left.
-        PlayingChannelChip(
-            visible = channelRailOpen,
-            channelLabel = listOfNotNull(currentChannelNumber?.toString(), currentChannelName.takeIf { it.isNotBlank() })
-                .joinToString(" · "),
-            title = channelsVm.nowEvent(currentChannelId, nowSec)
-                ?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }?.title,
-            modifier = Modifier.align(Alignment.TopStart),
         )
         // Full recovery and the unavailable message replace even an exiting ring.
         if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center))
@@ -1863,16 +1874,12 @@ fun VideoPlayerScreen(
             modifier = Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()),
         )
 
-        PlayerPanelVisibility(
-            Unit.takeIf {
-                layerState.infoOpen &&
-                    (foregroundLayer == PlayerForegroundLayer.INFO ||
-                        foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
             },
-        ) {
-            val detailsIdentity = listOfNotNull(detailsChannel?.visibleChannelNumber?.toString(), detailsChannel?.name)
+        ) { (shownChannel, shownEvent) ->
+            val shownChannelId = shownChannel?.id ?: shownEvent?.channelId ?: currentChannelId
+            val detailsIdentity = listOfNotNull(shownChannel?.visibleChannelNumber?.toString(), shownChannel?.name)
                 .joinToString(" · ")
-            val watch: (() -> Unit)? = detailsChannel?.takeIf { it.id != currentChannelId }?.let { channel ->
+            val watch: (() -> Unit)? = shownChannel?.takeIf { it.id != currentChannelId }?.let { channel ->
                 {
                     infoRailChannelId = null
                     infoPendingAction = null
@@ -1884,9 +1891,9 @@ fun VideoPlayerScreen(
                 }
             }
             LiveProgrammeInfoOverlay(
-                event = detailsBaseEvent,
+                event = shownEvent,
                 channelIdentity = detailsIdentity,
-                channelName = detailsChannel?.name.orEmpty(),
+                channelName = shownChannel?.name.orEmpty(),
                 recordingScheduled = currentRecording != null,
                 canRecord = recordActionEligible,
                 recordingState = LiveInfoRecordingState.Idle,
@@ -1904,9 +1911,9 @@ fun VideoPlayerScreen(
                 },
                 onRecordFocusRestored = { restoreRecordFocus = false },
                 details = { recordFocus, firstFocus ->
-                    val shown = detailsBaseEvent ?: return@LiveProgrammeInfoOverlay
-                    val schedule = remember(observation, detailsChannelId, shown.id) {
-                        channelSchedule(shown, { after -> observation.nextEvent(detailsChannelId, after) })
+                    val shown = shownEvent ?: return@LiveProgrammeInfoOverlay
+                    val schedule = remember(observation, shownChannelId, shown.id) {
+                        channelSchedule(shown, { after -> observation.nextEvent(shownChannelId, after) })
                     }
                     ProgramDetails(
                         state = programDetails,
@@ -1917,9 +1924,9 @@ fun VideoPlayerScreen(
                         tile = { event, tileModifier ->
                             ProgrammeHero(
                                 image = event.image,
-                                channelId = detailsChannelId,
-                                channelNumber = detailsChannel?.visibleChannelNumber?.toString().orEmpty(),
-                                picon = detailsChannel?.icon,
+                                channelId = shownChannelId,
+                                channelNumber = shownChannel?.visibleChannelNumber?.toString().orEmpty(),
+                                picon = shownChannel?.icon,
                                 imageLoader = imageLoader,
                                 currentSession = currentSession,
                                 modifier = tileModifier,

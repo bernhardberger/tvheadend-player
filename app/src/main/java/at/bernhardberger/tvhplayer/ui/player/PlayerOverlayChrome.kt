@@ -12,10 +12,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
@@ -24,6 +34,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
@@ -66,6 +77,21 @@ internal fun PlayerOverlayChrome(
     // controls revealed by a zap fade in where they rest.
     val motion = LocalPlayerControlsMotion.current
     val railExpansion = LocalInPlaceRailExpansion.current
+    val viewport = LocalPlayerPageScrim.current.takeIf { motion != null }
+    var footerHeight by remember { mutableIntStateOf(0) }
+    var footerObstruction by remember { mutableStateOf(0.dp) }
+    // Notices rest at the screen's bottom while the page below the controls is in view.
+    val pageActive = LocalPlayerPageActive.current
+    SideEffect { noticeObstruction?.value = if (pageActive) footerObstruction else 0.dp }
+    SideEffect {
+        viewport?.bottom = { opacity ->
+            val height = footerHeight + scrimRise()
+            val alpha = opacity * (1f - railExpansion())
+            if (alpha > 0f) translate(top = size.height - height) {
+                drawRect(PlayerChromeTokens.bottomScrim(height, this), size = Size(size.width, height), alpha = alpha)
+            }
+        }
+    }
     val travels = LocalPlayerControlsEntry.current == PlayerControlsEntry.TRAVEL
     val entering = motion?.animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))
     fun GraphicsLayerScope.enterFrom(offset: Dp) {
@@ -84,15 +110,22 @@ internal fun PlayerOverlayChrome(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .graphicsLayer { enterFrom(PlayerMotion.ChromeOffset); riseFromBanner(); alpha = 1f - railExpansion() }
+                .pageMotion(0..220, BrowseMotionPolicy.pageAccelerate, dy = (-96).dp, entering = false)
+                .graphicsLayer {
+                    enterFrom(PlayerMotion.ChromeOffset); riseFromBanner(); alpha = 1f - railExpansion()
+                    // Paint the departing controls, not a footer-sized offscreen texture.
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                }
+                .drawWithContent { if (railExpansion() < 1f) drawContent() }
                 .testTag("player-footer")
                 .onSizeChanged { size ->
+                    footerHeight = size.height
                     // Ignore the empty gradient runout; keep content and bottom safe area clear.
-                    noticeObstruction?.value = with(density) {
+                    footerObstruction = with(density) {
                         (size.height.toDp() - footerPadding.calculateTopPadding()).coerceAtLeast(0.dp)
                     }
                 }
-                .drawWithCache {
+                .then(if (viewport != null) Modifier else Modifier.drawWithCache {
                     val scrim = PlayerChromeTokens.bottomScrim(size.height, this)
                     onDrawBehind {
                         val rise = scrimRise()
@@ -101,7 +134,7 @@ internal fun PlayerOverlayChrome(
                             translate(top = -rise) { drawRect(tall, size = size.copy(height = size.height + rise)) }
                         }
                     }
-                }
+                })
                 .padding(footerPadding),
             content = footerContent,
         )

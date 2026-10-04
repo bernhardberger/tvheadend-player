@@ -51,6 +51,11 @@ internal class LivePlayerLayerState(
     var infoOpen by mutableStateOf(false)
         private set
 
+    var infoFromRail by mutableStateOf(false)
+        private set
+    /** The rail stays expanded while its page steps down to the schedule and back. */
+    val channelRailPresented: Boolean get() = channelDrawerOpen || (infoOpen && infoFromRail)
+
     var recordingConfirmationVisible by mutableStateOf(false)
         private set
 
@@ -116,6 +121,7 @@ internal class LivePlayerLayerState(
     }
 
     fun openInfo() {
+        infoFromRail = channelDrawerOpen
         chrome.yieldToLayer(controls = false)
         channelDrawerOpen = false
         optionsPage = null
@@ -124,10 +130,14 @@ internal class LivePlayerLayerState(
         infoOpen = true
     }
 
-    fun closeInfo() {
+    fun closeInfo(returnToRail: Boolean = false) {
         recordingConfirmationVisible = false
         infoOpen = false
-        showControls()
+        if (returnToRail) {
+            // Resume the same rail visit, including its original controls focus target.
+            channelDrawerOpen = true
+            chrome.yieldToLayer(controls = false)
+        } else showControls()
     }
 
     fun showRecordingConfirmation() {

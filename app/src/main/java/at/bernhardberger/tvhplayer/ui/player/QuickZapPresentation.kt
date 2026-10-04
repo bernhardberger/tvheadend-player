@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,11 +38,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import kotlin.math.roundToInt
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 
 /** One motion value coordinates departing chrome and the persistent, peeking channel row. */
 @Composable
@@ -57,8 +61,12 @@ internal fun QuickZapPresentation(
      */
     inPlaceAnchor: (() -> Rect?)? = null,
 ) {
+    val railPeek = LocalPlayerRailPeek.current.takeIf { inPlaceAnchor != null }
+    // Keep the card reveal intact until its peek has faded away. The peek starts only at the
+    // expansion's settled end, not at a guessed delay after the opening key.
+    val holdForPeek = railPeek != null && (railPeek.currentState || !railPeek.isIdle)
     val expansion = animateFloatAsState(
-        if (expanded) 1f else 0f,
+        if (expanded || holdForPeek) 1f else 0f,
         animationSpec = if (expanded) {
             tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate)
         } else {
@@ -66,6 +74,8 @@ internal fun QuickZapPresentation(
         },
         label = "quick-zap-expansion",
     )
+    val revealed by remember(expansion) { derivedStateOf { expansion.value == 1f } }
+    LaunchedEffect(expanded, revealed, railPeek) { railPeek?.targetState = expanded && revealed }
     var previewHeight by remember { mutableIntStateOf(0) }
     if (inPlaceAnchor != null) {
         InPlaceRail(expanded, expansion::value, inPlaceAnchor, channelContent, preview, controls)
@@ -98,12 +108,14 @@ internal fun QuickZapPresentation(
                     // controls' own scrim; only the open tray adds one.
                     .drawBehind {
                         val span = PlayerChromeTokens.bottomScrimSpan.toPx().coerceAtMost(size.height)
-                        drawRect(
+                        if (expansion.value > 0f) drawRect(
                             Brush.verticalGradient(
                                 *PlayerChromeTokens.bottomScrimStops,
                                 startY = size.height - span,
                                 endY = size.height,
                             ),
+                            topLeft = Offset(0f, size.height - span),
+                            size = size.copy(height = span),
                             alpha = expansion.value,
                         )
                     }
@@ -145,6 +157,28 @@ private fun InPlaceRail(
 ) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     var previewTop by remember { mutableIntStateOf(0) }
+    var railBottom by remember { mutableIntStateOf(0) }
+    val pageProgress = LocalPlayerPageProgress.current
+    val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
+    val revealed by remember(expansion) { derivedStateOf { expansion() == 1f } }
+    val viewport = LocalPlayerPageScrim.current
+    val railScrim: androidx.compose.ui.graphics.drawscope.DrawScope.(Float) -> ShaderBrush? = { opacity ->
+        val alpha = opacity * expansion()
+        if (alpha > 0f) {
+            val header = PlayerChromeTokens.topScrimHeight.toPx() / size.height.coerceAtLeast(1f)
+            val top = ((previewTop - TvOverlayFooterGradientRunout.toPx()) / size.height.coerceAtLeast(1f)).coerceIn(0f, 1f)
+            val preview = (previewTop / size.height.coerceAtLeast(1f)).coerceIn(top, 1f)
+            Brush.verticalGradient(
+                0f to Color.Transparent,
+                header.coerceIn(0f, top) to Color.Black.copy(alpha = RailVeil * alpha),
+                top to Color.Black.copy(alpha = RailVeil * alpha),
+                preview to Color.Black.copy(alpha = 0.60f * alpha),
+                1f to Color.Black.copy(alpha = 0.92f * alpha),
+            ) as ShaderBrush
+        } else null
+    }
+    androidx.compose.runtime.SideEffect { viewport?.rail = railScrim }
+    androidx.compose.runtime.DisposableEffect(viewport) { onDispose { viewport?.rail = { null } } }
     Box(Modifier.fillMaxSize().clipToBounds().onGloballyPositioned { origin = it.positionInRoot() }) {
         Box(
             Modifier.fillMaxSize()
@@ -156,62 +190,54 @@ private fun InPlaceRail(
             CompositionLocalProvider(LocalInPlaceRailExpansion provides expansion) { controls() }
         }
         if (!expanded && expansion() == 0f) return@Box
+        // Revealed sideways from the card's own bounds, its growing edges faded. Masked per child,
+        // so the offscreen buffer covers only the preview and the cards, never the whole screen.
+        fun reveal(preview: Boolean = false) = if (revealed) Modifier else Modifier
+            .graphicsLayer {
+                // Preview opacity and mask opacity share the same child-sized buffer.
+                alpha = (expansion() * 2.5f).coerceAtMost(1f) * if (preview) expansion() else 1f
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithContent {
+                if (expansion() == 0f) return@drawWithContent
+                drawContent()
+                val e = expansion()
+                val card = anchor() ?: return@drawWithContent
+                val left = (card.left - origin.x) * (1f - e)
+                val right = (card.right - origin.x) + (size.width - (card.right - origin.x)) * e
+                val feather = RevealFeather.toPx()
+                val from = left - feather
+                val span = (right + feather) - from
+                drawRect(
+                    Brush.horizontalGradient(
+                        0f to Color.Transparent,
+                        (feather / span) to Color.Black,
+                        ((span - feather) / span) to Color.Black,
+                        1f to Color.Transparent,
+                        startX = from, endX = right + feather,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
         Layout(
             content = {
                 Box(
                     Modifier.padding(bottom = PlayerChromeTokens.previewCardGap)
-                        .graphicsLayer { alpha = expansion() }
+                        .then(if (leavingPage) Modifier.pageMotion(0..200, BrowseMotionPolicy.pageAccelerate,
+                            dy = (-120).dp, entering = false) else Modifier)
+                        .then(reveal(preview = true))
                         .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
                         .testTag("player-zap-preview-slot"),
                     contentAlignment = Alignment.BottomStart,
                 ) { preview() }
-                Box(Modifier.testTag("player-zap-tray")) { channelContent() }
+                // Only the moving reveal needs a feather mask; there is no edge at rest.
+                Box(Modifier.then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
+                    entering = false, alphaWindow = 60..260, dyPx = { -railBottom.toFloat() }) else Modifier)
+                    .then(reveal())
+                    .testTag("player-zap-tray")) { channelContent() }
             },
             modifier = Modifier.fillMaxSize()
-                .drawBehind {
-                    // The picture dims a little below the header's own fade, so no clear band shows
-                    // between that fade and this one, while the clock stays as it was; dark from the
-                    // preview down.
-                    val runout = TvOverlayFooterGradientRunout.toPx()
-                    val header = PlayerChromeTokens.topScrimHeight.toPx() / size.height.coerceAtLeast(1f)
-                    val top = (previewTop - runout).coerceAtLeast(0f) / size.height.coerceAtLeast(1f)
-                    val preview = previewTop.toFloat() / size.height.coerceAtLeast(1f)
-                    drawRect(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            header.coerceIn(0f, top.coerceIn(0f, 1f)) to Color.Black.copy(alpha = RailVeil),
-                            top.coerceIn(0f, 1f) to Color.Black.copy(alpha = RailVeil),
-                            preview.coerceIn(top.coerceIn(0f, 1f), 1f) to Color.Black.copy(alpha = 0.60f),
-                            1f to Color.Black.copy(alpha = 0.92f),
-                        ),
-                        alpha = expansion(),
-                    )
-                }
-                .graphicsLayer {
-                    alpha = (expansion() * 2.5f).coerceAtMost(1f)
-                    compositingStrategy = CompositingStrategy.Offscreen
-                }
-                .drawWithContent {
-                    drawContent()
-                    // Revealed sideways from the card's own bounds, its growing edges faded.
-                    val e = expansion()
-                    val card = anchor() ?: return@drawWithContent
-                    val left = (card.left - origin.x) * (1f - e)
-                    val right = (card.right - origin.x) + (size.width - (card.right - origin.x)) * e
-                    val feather = RevealFeather.toPx()
-                    val from = left - feather
-                    val span = (right + feather) - from
-                    drawRect(
-                        Brush.horizontalGradient(
-                            0f to Color.Transparent,
-                            (feather / span) to Color.Black,
-                            ((span - feather) / span) to Color.Black,
-                            1f to Color.Transparent,
-                            startX = from, endX = right + feather,
-                        ),
-                        blendMode = BlendMode.DstIn,
-                    )
-                },
+                .then(if (viewport == null) Modifier.drawBehind { railScrim(1f)?.let { drawRect(it) } } else Modifier),
         ) { measurables, constraints ->
             val loose = constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
             val previewPlaceable = measurables[0].measure(loose)
@@ -221,6 +247,7 @@ private fun InPlaceRail(
             val top = card?.let { (it.top - origin.y).roundToInt() - RailTopInset.roundToPx() }
                 ?: (constraints.maxHeight - railPlaceable.height - 96.dp.roundToPx())
             previewTop = top - previewPlaceable.height
+            railBottom = top + railPlaceable.height
             layout(constraints.maxWidth, constraints.maxHeight) {
                 previewPlaceable.place(0, top - previewPlaceable.height)
                 railPlaceable.place(0, top)

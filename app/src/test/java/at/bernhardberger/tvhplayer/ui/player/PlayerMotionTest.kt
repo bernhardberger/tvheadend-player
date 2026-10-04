@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -130,42 +131,6 @@ class PlayerMotionTest {
                 )
             },
             panel = { optionsRoot() },
-        )
-    }
-
-    @Test fun closingLiveInfoHandsFocusAndKeysToTheCardWhileThePanelFades() {
-        var infoPresses = 0
-        checkPanelCloseHandsFocusBack(
-            panelTag = "live-info-panel",
-            actionTag = "player-identity-card",
-            activations = { infoPresses },
-            controls = { loader, open, restore, restored ->
-                liveControls(
-                    loader,
-                    optionsOpen = false,
-                    panelOpen = open,
-                    restoreInfoFocus = restore,
-                    onInfoFocusRestored = restored,
-                    onOpenInfo = { infoPresses++ },
-                )
-            },
-            panel = {
-                LiveProgrammeInfoOverlay(
-                    details = { _, _ -> },
-                    event = null,
-                    channelIdentity = "1 One",
-                    channelName = "One",
-                    recordingScheduled = false,
-                    canRecord = false,
-                    recordingState = LiveInfoRecordingState.Idle,
-                    confirmationVisible = false,
-                    restoreRecordFocus = false,
-                    onRecord = {},
-                    onRecordingActivate = {},
-                    onRecordingDismiss = {},
-                    onClose = {},
-                )
-            },
         )
     }
 

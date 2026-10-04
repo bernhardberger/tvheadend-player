@@ -63,8 +63,9 @@ internal fun LiveProgrammeInfoOverlay(
     val paneTitle = stringResource(R.string.player_info_pane_title)
     val recordAvailable = event != null && !recordingScheduled && canRecord
     // ProgramDetails owns its tab/content focus. Only the unavailable view has a Close action.
-    LaunchedEffect(event?.id) {
-        if (event != null || restoreRecordFocus) return@LaunchedEffect
+    val pageActive = LocalPlayerPageActive.current
+    LaunchedEffect(event?.id, pageActive) {
+        if (!pageActive || event != null || restoreRecordFocus) return@LaunchedEffect
         withFrameNanos { }
         closeFocus.requestFocus()
     }
@@ -74,8 +75,9 @@ internal fun LiveProgrammeInfoOverlay(
         event?.id,
         recordingScheduled,
         canRecord,
+        pageActive,
     ) {
-        if (!restoreRecordFocus) return@LaunchedEffect
+        if (!pageActive || !restoreRecordFocus) return@LaunchedEffect
         withFrameNanos { }
         val target = if (recordAvailable) recordFocus else closeFocus
         if (target.requestFocus()) onRecordFocusRestored()
@@ -127,8 +129,8 @@ private fun UnavailableProgrammeInfo(
     onUp: () -> Unit,
 ) {
     val readingFocus = remember { FocusRequester() }
-    Column(Modifier.fillMaxSize()) {
-        PlayerDownHint(stringResource(if (fromChannelRail) R.string.nav_channels else R.string.details_back_to_tv),
+    Column(Modifier.fillMaxSize().pageMotion(150..480, dy = 160.dp)) {
+        if (!LocalPlayerPageRailHeader.current) PlayerDownHint(stringResource(if (fromChannelRail) R.string.nav_channels else R.string.details_back_to_tv),
             Modifier.align(Alignment.End).padding(end = 72.dp).testTag("details-player-hint"), up = true)
         Spacer(Modifier.height(24.dp))
         PlayerInfoReadingContent(

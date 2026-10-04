@@ -149,8 +149,9 @@ internal fun PlayerChromeControls(
         "player-seekbar" -> if (timelineFocusable) timelineFocus else initialFocus
         else -> null
     }
-    LaunchedEffect(actions.active, restoreFocus, seekable, pausable) {
-        if (actions.active) {
+    val pageActive = LocalPlayerPageActive.current
+    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive) {
+        if (actions.active && pageActive) {
             val target = when (restoreFocus) {
                 null -> null
                 PlayerIdentityCardTag -> cardFocus
@@ -460,6 +461,8 @@ internal fun PlayerChromeControls(
         )
         // Trial: what Down opens, centred between the start and end groups.
         if (downHint != null) PlayerDownHint(downHint, Modifier.align(Alignment.Center)
+            .pageMotion(0..140, at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy.pageAccelerate,
+                entering = false, inheritedFade = 0..220)
             .graphicsLayer { alpha = actionsAlpha() * chromeAlpha.value }.testTag("player-down-hint"))
         }
     }

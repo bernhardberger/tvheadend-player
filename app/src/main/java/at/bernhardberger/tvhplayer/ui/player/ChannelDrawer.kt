@@ -106,11 +106,14 @@ fun ChannelDrawer(
     // Trial: the rail opens in place of the channel card: card-sized tiles on its keyline, Down
     // opens its schedule, Up has nowhere to go.
     inPlace: Boolean = false,
+    // The in-place rail's schedule hint, also while the rail steps to and from that schedule.
 ) {
     val ids = remember(channels) { channels.map { it.id } }
     val numbers = remember(channels) { channels.associate { it.id to it.visibleChannelNumber } }
     val requesters = remember(ids) { ids.associateWith { FocusRequester() } }
-    val listState = rememberLazyListState()
+    // Start on the entry card, rather than measure item 0 then discard it after scrollToItem.
+    val initialId = entryFocusId.takeIf { active } ?: playingChannelId ?: selectedId
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = ids.indexOf(initialId).coerceAtLeast(0))
     var focusedId by remember { mutableStateOf(playingChannelId ?: selectedId) }
     var entered by remember { mutableStateOf(false) }
     var focusedCatalog by remember { mutableStateOf(emptyList<ChannelId>()) }
@@ -129,7 +132,7 @@ fun ChannelDrawer(
     // The viewport reaches this far past both screen edges so the next cards of a held
     // D-pad are already composed and placed; otherwise each step past the edge runs a
     // synchronous beyond-bounds search inside key dispatch and the rail stalls.
-    val offscreen = 440.dp
+    val offscreen = if (inPlace) PlayerChromeTokens.channelCardWidth + PlayerChromeTokens.gridGutter else 440.dp
     val offscreenPx = with(LocalDensity.current) { offscreen.roundToPx() }
     val edgeInsetPx = with(LocalDensity.current) { edgeInset.toPx() } + offscreenPx
     // The rail keeps the focused card on the start keyline: the row scrolls, and at the list
@@ -140,7 +143,12 @@ fun ChannelDrawer(
                 offset - edgeInsetPx
         }
     }
-    LaunchedEffect(ids, active, playingChannelId, entryFocusId) {
+    val pageActive = LocalPlayerPageActive.current
+    LaunchedEffect(ids, active, playingChannelId, entryFocusId, pageActive) {
+        if (!pageActive) {
+            entered = false
+            return@LaunchedEffect
+        }
         if (playingChannelId != observedPlayingId) {
             // Null means awaiting presentation, not a different channel selection.
             // Preserve the local pick until a non-null confirmation resolves it.
@@ -298,21 +306,6 @@ fun ChannelDrawer(
             }
         }
         }
-        if (inPlace && active) channels.firstOrNull { it.id == focusedId }?.let { channel ->
-            val identity = listOfNotNull(channel.visibleChannelNumber?.toString(), channel.name).joinToString(" · ")
-            Box(Modifier.fillMaxWidth().layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                layout(placeable.width, 0) {
-                    val position = coordinates
-                    val bottom = position?.findRootCoordinates()?.size?.height ?: 0
-                    val top = position?.positionInRoot()?.y ?: 0f
-                    placeable.place(0, (bottom - top).roundToInt() - 14.dp.roundToPx())
-                }
-            }) {
-                PlayerDownHint("$identity · ${stringResource(R.string.details_tab_schedule)}",
-                    Modifier.padding(horizontal = edgeInset).testTag("player-rail-schedule-peek"))
-            }
-        }
     }
 }
 
@@ -350,11 +343,8 @@ private fun InPlaceZapTile(
             image = {
                 ChannelCardFace(channel.icon, channel.id, channel.name.orEmpty(), imageLoader, currentSession,
                     logoTag = "player-channel-${channel.id.value}-picon", nameTag = "player-channel-${channel.id.value}-name")
-                Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ChannelTitle(number, channel.name.takeIf { channel.icon != null }.orEmpty(),
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.weight(1f).testTag("player-channel-${channel.id.value}-identity"))
+                ChannelCardLabel(number?.toString(), channel.name.takeIf { channel.icon != null },
+                    tag = "player-channel-${channel.id.value}-identity") {
                     ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
                         recordingNow = recording, playbackIndicator = playbackIndicator)
                 }

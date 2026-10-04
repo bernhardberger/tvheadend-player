@@ -356,7 +356,7 @@ internal fun BoxScope.ChannelCardLabel(
     val text = listOfNotNull(number?.takeIf(String::isNotBlank), name?.takeIf(String::isNotBlank)).joinToString(" ")
     Row(
         Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = ChannelCardLabelBottom),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (text.isNotEmpty()) Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface,

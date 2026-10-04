@@ -10,6 +10,7 @@ import android.app.Application
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
@@ -1450,17 +1451,76 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("details-more-info"), focused())
     }
 
-    @Test fun playerInfoRailDownOpensFocusedChannelsScheduleAndBackRestoresTheRail() {
+    @Test fun channelCardRailAnimatesOpenAndClosedWithoutReplacingControls() {
+        screen()
+        key(Key.DirectionUp)
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        val footer = compose.onNodeWithTag("player-footer").fetchSemanticsNode()
+        assertEquals(1f, pageAlpha(footer), 0.001f)
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput {
+            keyDown(Key.DirectionRight)
+            advanceEventTime(600)
+            keyUp(Key.DirectionRight)
+        }
+        compose.mainClock.advanceTimeBy(96)
+        compose.waitForIdle()
+        val openingFooter = compose.onNodeWithTag("player-footer", useUnmergedTree = true).fetchSemanticsNode()
+        val openingAlpha = pageAlpha(openingFooter)
+        assertTrue("rail is partway open, footer alpha=$openingAlpha", openingAlpha > 0f && openingAlpha < 1f)
+        assertEquals("opening preserves the controls composition", footer.id, openingFooter.id)
+        assertFalse("the schedule peek is not composed during the card reveal", exists("details-heading"))
+        settle()
+        assertEquals(listOf("player-channel-card-2"), focused())
+        assertEquals(0f, pageAlpha(openingFooter), 0.001f)
+        assertTrue(exists("details-heading"))
+        compose.onRoot().performKeyInput { pressKey(Key.Back) }
+        compose.mainClock.advanceTimeBy(96)
+        compose.waitForIdle()
+        val closingFooter = compose.onNodeWithTag("player-footer", useUnmergedTree = true).fetchSemanticsNode()
+        val closingAlpha = pageAlpha(closingFooter)
+        assertEquals("the peek leaves before the card collapses", 0f, closingAlpha, 0.001f)
+        compose.mainClock.advanceTimeBy(160)
+        compose.waitForIdle()
+        assertFalse("the peek is gone during collapse", exists("details-heading"))
+        assertTrue("rail then collapses", pageAlpha(closingFooter) > 0f)
+        assertEquals("closing preserves the controls composition", footer.id, closingFooter.id)
+        settle()
+        assertEquals(1f, pageAlpha(closingFooter), 0.001f)
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun playerInfoRailDownOpensFocusedChannelsScheduleAndBackRestoresTheRail() {
         screen()
         publishRailProgrammes()
         openInfoRail()
         assertFalse(exists("player-rail-key-hints"))
-        assertTrue(texts("player-rail-schedule-peek").contains("Name 1"))
+        assertTrue(texts("details-heading").contains("Name 1"))
         key(Key.DirectionRight)
-        assertTrue(texts("player-rail-schedule-peek").contains("Name 2"))
+        assertTrue(texts("details-heading").contains("Name 2"))
+        val header = compose.onNodeWithTag("details-heading", useUnmergedTree = true).fetchSemanticsNode()
+        assertEquals(0.55f, pageAlpha(header), 0.001f)
+        assertEquals(0f, pageAlpha(compose.onNodeWithTag("details-player-hint", useUnmergedTree = true).fetchSemanticsNode()), 0f)
+        val railCard = compose.onNodeWithTag("player-channel-card-1", useUnmergedTree = true).fetchSemanticsNode()
+        assertEquals("peek uses the rail's first-column keyline", railCard.layoutInfo.coordinates.positionInRoot().x,
+            header.layoutInfo.coordinates.positionInRoot().x, 1f)
+        val farCard = compose.onNodeWithTag("player-channel-card-3", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
         assertEquals(listOf("player-channel-card-2"), focused())
         key(Key.DirectionDown)
+        assertEquals("the peek is the schedule header, not a replacement", header.id,
+            compose.onNodeWithTag("details-heading", useUnmergedTree = true).fetchSemanticsNode().id)
+        assertTrue("the rail leaves fully above the viewport",
+            farCard.positionInRoot().y + farCard.size.height <= 0f)
         assertEquals(listOf("details-schedule-21"), focused())
+        assertEquals("schedule headline stays on the rail keyline", railCard.layoutInfo.coordinates.positionInRoot().x,
+            header.layoutInfo.coordinates.positionInRoot().x, 1f)
+        val thumbnail = compose.onNodeWithTag("details-schedule-21", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+        // Focus scales the first thumbnail around its centre; compare the underlying layout keyline.
+        val thumbnailLeft = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(thumbnail.size.width / 2f, 0f)).x - thumbnail.size.width / 2f
+        assertEquals("schedule thumbnails share the headline keyline", header.layoutInfo.coordinates.positionInRoot().x,
+            thumbnailLeft, 1f)
         assertFalse(exists("details-tab-0"))
         assertFalse(exists("details-tab-1"))
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
@@ -1470,9 +1530,88 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("details-watch"), focused())
         key(Key.Back)
         assertEquals(listOf("details-schedule-21"), focused())
-        key(Key.Back)
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.Back) }
+        compose.mainClock.advanceTimeBy(300)
+        assertTrue("the same rail cards remain composed", farCard.isAttached)
+        val position = farCard.positionInRoot()
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        var brightest = 0
+        for (x in position.x.toInt().coerceAtLeast(0) until (position.x + farCard.size.width).toInt().coerceAtMost(bitmap.width))
+            for (y in position.y.toInt().coerceAtLeast(0) until (position.y + farCard.size.height).toInt().coerceAtMost(bitmap.height))
+                brightest = maxOf(brightest, android.graphics.Color.red(bitmap.getPixel(x, y)))
+        bitmap.recycle()
+        assertTrue("return paints the far card without replaying the sideways reveal: $brightest", brightest > 180)
+        settle()
+        compose.mainClock.autoAdvance = true
         assertFalse(exists("live-info-panel"))
         assertEquals(listOf("player-channel-card-2"), focused())
+    }
+
+    @Test fun programInfoMovesElementsNotSectionsThenRestoresFocusAndDisposesDetails() {
+        screen()
+        key(Key.DirectionDown)
+        val controls = compose.onNodeWithTag("player-pause", useUnmergedTree = true).fetchSemanticsNode().layoutInfo
+        val first = compose.onNodeWithTag("player-page-first").fetchSemanticsNode().layoutInfo.coordinates
+        val scrim = compose.onNodeWithTag("player-page-scrim").fetchSemanticsNode().layoutInfo.coordinates
+        val footerNode = compose.onNodeWithTag("player-footer").fetchSemanticsNode()
+        val footer = footerNode.layoutInfo.coordinates
+        val footerTop = footer.positionInRoot().y
+        val clock = compose.onNodeWithTag("player-top-cluster", useUnmergedTree = true).fetchSemanticsNode()
+        val clockTop = clock.boundsInRoot.top
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(250)
+        val second = compose.onNodeWithTag("player-page-second").fetchSemanticsNode().layoutInfo.coordinates
+        val tabs = compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+        assertTrue(pageAlpha(footerNode) < 1f)
+        assertTrue(pageAlpha(compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode()) > 0f)
+        val midTabsTop = tabs.positionInRoot().y
+        assertTrue("footer rises instead of pulling the viewport", footer.positionInRoot().y < footerTop)
+        assertEquals(0f, first.positionInRoot().y, 0f)
+        assertEquals(0f, second.positionInRoot().y, 0f)
+        assertEquals(clockTop, clock.boundsInRoot.top, 0f)
+        assertEquals(0f, scrim.positionInRoot().y, 0f)
+        assertTrue("neither moving section exposes an action", focused().none { it == "player-pause" || it == "live-info-record" })
+        settle()
+        assertTrue("tabs enter from below their rest", midTabsTop > tabs.positionInRoot().y)
+        assertTrue("clock ${clock.boundsInRoot} clears the details row at ${tabs.positionInRoot().y}",
+            tabs.positionInRoot().y - clock.boundsInRoot.bottom >= 8f)
+        assertEquals(listOf("live-info-record"), focused())
+        assertTrue("the controls stay composed behind the details", controls.isAttached)
+        compose.onRoot().performKeyInput { pressKey(Key.Back) }
+        compose.mainClock.advanceTimeBy(120)
+        assertTrue(second.isAttached)
+        assertEquals(0f, second.positionInRoot().y, 0f)
+        assertEquals(0f, scrim.positionInRoot().y, 0f)
+        settle()
+        assertFalse(second.isAttached)
+        assertEquals(listOf("player-pause"), focused())
+        compose.mainClock.autoAdvance = true
+        assertTrue("the return reuses the same controls", controls.isAttached)
+        assertTrue(exists("player-actions"))
+    }
+
+    /** Read the actual layer via Compose's inspector, without a production test seam. */
+    private fun pageAlpha(node: androidx.compose.ui.semantics.SemanticsNode): Float =
+        node.layoutInfo.getModifierInfo().mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
+            .filter { it.nameFallback == "graphicsLayer" }.fold(1f) { alpha, layer ->
+                @Suppress("UNCHECKED_CAST")
+                val block = layer.inspectableElements.first { it.name == "block" }.value as androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit
+                alpha * androidx.compose.ui.graphics.GraphicsLayerScope().apply(block).alpha
+            }
+
+    /** [key] returns from the details: they stay composed until the transition settles. */
+    private fun stepBackFromDetails(key: Key) {
+        val details = compose.onNodeWithTag("live-info-panel").fetchSemanticsNode().layoutInfo
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(key) }
+        compose.mainClock.advanceTimeBy(220)
+        assertTrue("the details are still stepping out", details.isAttached)
+        settle()
+        assertFalse("the details leave once the step ends", details.isAttached)
+        compose.mainClock.autoAdvance = true
     }
 
     @Test fun playerInfoRailKeepsWatchHiddenForThePlayingChannel() {

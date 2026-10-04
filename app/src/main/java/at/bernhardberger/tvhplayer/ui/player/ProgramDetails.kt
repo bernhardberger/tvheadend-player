@@ -203,9 +203,11 @@ internal fun ProgramDetails(
     val tabFocus = remember { FocusRequester() }
     val tabMotion = rememberTabContentMotion(state.tab) { state.tab }
     val recording = recordingFor(event)
-    // Inset one grid column from the margins on both sides (columns 2–11 of 12).
-    Column(modifier.fillMaxSize().padding(horizontal = DetailsInset), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically,
+    // Only the rail's schedule shares its keyline; programme details retain columns 2–11.
+    val railSchedule = LocalPlayerPageRailHeader.current && state.scheduleEntry && state.opened == null
+    Column(modifier.fillMaxSize().padding(horizontal = if (railSchedule) 0.dp else DetailsInset), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+        if (!LocalPlayerPageRailHeader.current) Row(Modifier.fillMaxWidth().height(48.dp)
+            .pageMotion(120..420, dy = 120.dp).testTag("details-top-row"), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
         if (tabs) {
             AppTabRow(
@@ -247,7 +249,7 @@ internal fun ProgramDetails(
         PlayerDownHint(stringResource(if (state.scheduleEntry) R.string.nav_channels else R.string.details_back_to_tv),
             Modifier.testTag("details-player-hint"), up = true)
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        Box(Modifier.weight(1f).fillMaxWidth().pageMotion(150..480, dy = 160.dp)) {
             val detailsContent: @Composable () -> Unit = {
                 if (state.readMore) FullDescription(event, nowSec, channelIdentity, recording?.state, tile)
                 else DetailsTab(
@@ -332,7 +334,9 @@ private fun DetailsTab(
     val tags = shownActions.map { it.tag }
     val focusTargets = remember(tags) { tags.associateWith { FocusRequester() } }
     val owner = LocalTabOwner.current
-    LaunchedEffect(event.id, state.focusRequest, tags, state.tab) {
+    val pageActive = LocalPlayerPageActive.current
+    LaunchedEffect(event.id, state.focusRequest, tags, state.tab, pageActive) {
+        if (!pageActive) return@LaunchedEffect
         if (owner?.isCurrent == false) return@LaunchedEffect
         if (state.tabFocused || state.opened == null && state.tab != 0) return@LaunchedEffect
         withFrameNanos { }
@@ -449,7 +453,9 @@ private fun Schedule(
             if (owner?.isCurrent == false) return
             rows.getValue(schedule[index].id).requestFocus()
         }
-        LaunchedEffect(state.focusRequest, state.tab) {
+        val pageActive = LocalPlayerPageActive.current
+        LaunchedEffect(state.focusRequest, state.tab, pageActive) {
+            if (!pageActive) return@LaunchedEffect
             if (!state.tabFocused && state.tab == 1) focusRow(schedule.indexOfFirst { it.id == state.returnRow }.coerceAtLeast(0))
         }
         LazyColumn(state = list, verticalArrangement = Arrangement.spacedBy(ScheduleGap),

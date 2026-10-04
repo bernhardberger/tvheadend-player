@@ -149,6 +149,16 @@ def find_static_rule_violations(root: Path) -> list[str]:
                     f"{line_number(code, match.start())} uses {label}"
                 )
 
+        ui = "app/src/main/java/at/bernhardberger/tvhplayer/ui/"
+        # Recent-row expansion is a local disclosure, not movement between pages.
+        slide_owners = {ui + "BrowseMotionPolicy.kt", ui + "player/PlayerIdentityCard.kt"}
+        if relative_path.startswith(ui) and relative_path not in slide_owners:
+            for match in re.finditer(r"\bslide(?:In|Out)(?:Vertically|Horizontally)\b", code):
+                violations.append(
+                    f"SharedPageMotion: {relative_path}:"
+                    f"{line_number(code, match.start())} uses direct page travel outside the shared motion owner"
+                )
+
     resource_paths = [path for production_root in production_roots
                       for path in sorted((production_root / "res").rglob("*.xml"))]
     for path in resource_paths:

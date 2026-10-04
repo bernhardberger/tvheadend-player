@@ -57,6 +57,16 @@ internal fun PlayerControlsLayer(
         modifier = modifier,
     ) {
         val appear = animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))
+        val viewport = LocalPlayerPageScrim.current
+        val fade = animateShown(
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+            tween(if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+            "viewport-chrome",
+        )
+        androidx.compose.runtime.SideEffect { viewport?.alpha = { fade.value * appear.value } }
+        androidx.compose.runtime.DisposableEffect(viewport) {
+            onDispose { viewport?.alpha = { 0f } }
+        }
         PlayerMotionFrame(leaving = leaving, modifier = Modifier.graphicsLayer {
             if (transition.targetState == EnterExitState.Visible) alpha = appear.value
         }) {
