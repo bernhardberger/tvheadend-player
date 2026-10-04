@@ -163,7 +163,9 @@ packet with exact paths, tests, and gate, may run
 Gradle with the repository rules, and returns changed files, test evidence, and
 open questions; it never touches Git, devices, signing, or publication, and
 never runs concurrently with the primary or another writer's edits in the same
-worktree. The primary reviews the diff, runs the final gate, and commits.
+worktree. The primary reviews the diff, selects checks under `AGENTS.md`, reuses
+the child's unchanged successful evidence, and commits when authorized. A child
+return does not by itself trigger full verification.
 Read-only review begins after that
 delta is stable. This is the writable child's stricter contract. For primary
 work, follow `AGENTS.md`: coordinate actual conflicting edits and serialize
@@ -376,8 +378,11 @@ for that named upgrade decision and remaining physical playback matrix.
 
 OpenCode loads and validates its own project configuration when a session
 starts. Tool changes use the relevant tests under `tools/tests`; changes to the
-verification entry point run the complete tool test suite. The final product
-maintenance gate remains:
+verification entry point run the complete tool test suite. Small local changes
+finish with affected tests and owning compilation; docs/config-only changes use
+relevant static checks. `AGENTS.md` defines full-gate triggers: completed-batch
+integration, release, broad/cross-module, build/dependency, or high-risk runtime
+changes. Task completion alone does not trigger the full product gate:
 
 ```bash
 ./tools/verify

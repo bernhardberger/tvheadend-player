@@ -37,6 +37,77 @@ not permission to change dependencies. `tools/verify` includes the published SDK
 and native provenance gates. It compiles Android tests but does not run them.
 Use the `gradle-run` skill for bounded logs, cancellation and live-test isolation.
 
+### Fast local iteration
+
+For a small local change, run the owning test method or class and finish once the
+affected checks pass. Test tasks compile their dependencies; do not add a separate
+compile invocation for the same code. A compile-only change can use the owning
+compile task. Add tests only for real regressions or meaningful uncovered behavior,
+not automatically for equivalent reuse or mechanical cleanup.
+
+Run `tools/verify` once when integrating a completed batch, before release, or for
+broad/cross-module, build/dependency, or high-risk runtime changes, per `AGENTS.md`.
+Task completion or a local checkpoint commit alone does not trigger it. Reuse
+unchanged successful evidence and retain explicit device/signing/SDK/release gates.
+Report the checks actually run; focused checks are not full verification.
+
+For example, check one affected class (substitute its name):
+
+```bash
+timeout --kill-after=5s 20m ./gradlew :app:testDebugUnitTest --tests '*PlaybackOptionsTrackListTest' -Ptvhplayer.captureTests=exclude --console=plain --no-scan
+```
+
+For a broader app check, exclude the marked visual capture scenarios:
+
+```bash
+timeout --kill-after=5s 20m ./gradlew :app:testDebugUnitTest -Ptvhplayer.captureTests=exclude --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:testDebugUnitTest -Ptvhplayer.captureTests=only --console=plain --no-scan
+```
+
+The `VisualCapture` JUnit category marks the settings, playback-panel and player-chrome
+capture suites, plus capture methods in the navigation-shell, channel-layout and
+player-chrome evidence classes. Ordinary assertions in those mixed classes stay in
+the routine lane. Other tests may still write diagnostic images. Add the category to
+new dedicated capture scenarios rather than filtering whole classes by filename.
+Direct Gradle runs default to `all`. `tools/verify` uses `exclude`: ordinary behavior,
+focused layout smoke checks and clipping/focus regressions remain in the routine gate.
+Audio preferences, startup-buffer choices and playback track lists retain English/default
+and German/1.3× smoke cases; redundant combinations join the extended visual matrix.
+Player geometry, badge visibility and other targeted large-text regressions remain routine.
+Depth-motion regressions render and check every sampled frame in both routine and
+full runs; routine runs skip encoding their diagnostic PNGs. Use `all` (or
+`tools/verify --visual-captures`) to regenerate those motion images.
+For UI/layout changes, run affected visual scenarios when relevant. Run the extended
+matrix for broad visual changes or visual acceptance (including its assertions):
+
+```bash
+timeout --kill-after=5s 30m ./tools/verify --visual-captures
+```
+
+Use that command instead of routine verify when both lanes are needed, or run the
+`only` command above when routine verification has already passed. Text-scaling and
+localization requirements still apply; this changes test cadence, not the UI contract.
+These modes select tests, not just whether PNG files are written. App tests remain
+uncached until their external inputs and outputs are fully declared.
+
+Routine app tests (`exclude`, including `tools/verify`) use two separate JVM workers,
+running different classes concurrently while keeping methods within a class serial.
+Use `-Ptvhplayer.testForks=1` with Gradle for serial diagnosis or lower memory use;
+supported values are `1` and `2`. Visual modes (`all` and `only`) remain single-worker.
+The 970-case routine suite measured 59s with one worker versus 45s with two; total
+OpenCode service memory peaked at 10.7GiB versus 12.1GiB in those runs, with no memory
+pressure events. This increases test concurrency within one build, not build-slot count.
+A subsequent same-suite comparison measured 50.1s / 50.6s / 49.1s at two / three /
+four workers. A reverse-order confirmation measured 47.2s at four versus 44.1s at
+two, so retain two: higher worker counts showed no consistent gain. All runs passed;
+the initial comparison recorded no memory-pressure events. These timings cover
+fresh app-test execution with warm build prerequisites, not clean compilation or
+full verification, and service memory includes other OpenCode work.
+
+When another worktree holds the shared build slot, `gradlew` reports that it is
+waiting and prints the queue duration on admission. This time is outside Gradle's
+own build duration. The slot count and resource limits are unchanged.
+
 ## LXC119 automated capture lane
 
 Use the existing remote lane only to obtain the ADB tunnel. This example runs a

@@ -24,7 +24,8 @@ permission:
 
 Implement exactly one delegated slice of the TVHeadend Player Android TV app
 and return evidence. The writable primary that dispatched you owns the task,
-reviews your diff, runs the final gate, and commits.
+reviews your diff, selects any remaining checks under `AGENTS.md`, and commits
+when authorized. Your return alone does not trigger full verification.
 
 ## Hard limits
 
@@ -60,9 +61,10 @@ reviews your diff, runs the final gate, and commits.
   accessibility semantics. Load `android-tv-compose-ux` for any Compose change.
 - Do not alter the Media3/HTSP playback baseline (extractor, stream readers,
   renderer or decoder selection, native extensions) as a side effect.
-- Keep policy in plain Kotlin so JVM tests cover it; every behavior change ships
-  with a focused regression test. Do not add tests for model names or prompt
-  wording.
+- Keep policy in plain Kotlin so JVM tests cover it. Use existing focused tests;
+  add or extend tests for real regressions or meaningful uncovered contracts,
+  not automatically for equivalent reuse or mechanical cleanup. Do not add tests
+  for model names or prompt wording.
 - Load focused `kotlin-*` and `compose-*` skills for the actual implementation
   question, not every skill associated with a touched file.
 
