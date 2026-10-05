@@ -88,7 +88,7 @@ private val CardHeight = PlayerChromeTokens.channelCardHeight
 /**
  * The info bar's identity, in the quick-zap card's kit: a [CompactCard] whose image slot holds the
  * channel's picon (or name), centred over the channel's own colour or the programme's dimmed
- * artwork, and whose title slot holds the number. With [onClick] (the controls) it takes focus,
+ * artwork; its number and name lead the info bar's text. With [onClick] (the controls) it takes focus,
  * says what it opens to accessibility services; the caller's [modifier] places it in the
  * focus graph. Without [onClick] (the Banner) it takes no focus and says nothing.
  */
@@ -99,26 +99,34 @@ internal fun PlayerIdentityCard(
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    /** Trial: Left/Right on the focused card open the channel rail. */
+    /** The live channel card: it opens the channel list and the recent row instead of Info. */
     channelCard: Boolean = false,
-    /** Trial: the recent channels, newest first, a row above the card that Up opens. */
+    /** With [channelCard], whether Left/Right step through channels; the card then shows its arrows. */
+    channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
+    /** The recent channels, newest first, a row above the card that Up opens. */
     recents: List<RecentChannelPeek> = emptyList(),
     recentOpen: Boolean = false,
     onRecentOpenChange: (Boolean) -> Unit = {},
-    /** Trial: OK on a recent chip, by its index in [recents]. */
+    /** OK on a recent chip, by its index in [recents]. */
     onRecentClick: (Int) -> Unit = {},
-    /** Trial: a key moving through the recent row, which keeps the controls up. */
+    /** A key moving through the recent row, which keeps the controls up. */
     onRecentInteraction: () -> Unit = {},
-    /** Trial: keeps the focused look while the rail stands in for the card. */
+    /** Keeps the focused look while the rail stands in for the card. */
     held: Boolean = false,
+    /** Whether focus is on the card or inside its recent row. */
+    onFocusWithinChanged: (Boolean) -> Unit = {},
 ) {
-    val opens = stringResource(if (channelCard) R.string.player_channel_card_hint else R.string.player_info)
+    val opens = stringResource(when {
+        !channelCard -> R.string.player_info
+        channelCardStepping -> R.string.player_channel_card_hint
+        else -> R.string.player_channel_card_hint_fixed
+    })
     val interactions = remember { MutableInteractionSource() }
     val focused by interactions.collectIsFocusedAsState()
     val mainFocus = remember { FocusRequester() }
     // The tag stands before anything that clears semantics, which would drop it with the rest.
     val tagged = modifier.testTag(PlayerIdentityCardTag).size(CardWidth, CardHeight)
-    Box {
+    Box(if (onClick == null) Modifier else Modifier.onFocusChanged { onFocusWithinChanged(it.hasFocus) }) {
     CompactCard(
         onClick = onClick ?: {},
         interactionSource = interactions,
@@ -129,17 +137,18 @@ internal fun PlayerIdentityCard(
             tagged.focusRequester(mainFocus).semantics { contentDescription = opens }
         },
         image = {
+            // The number and name lead the info bar's text, so the card carries only its picon.
             IdentityCardImage(content, imageLoader, currentSession)
-            ChannelCardLabel(content.info.channelNumber, content.info.channelName.takeIf { content.picon != null })
-            if (channelCard && onClick != null && (focused || held)) {
-                // Inside the card beside the logo, on its line: the card steps through channels. In the
-                // card's own slot they zoom with it and stay above the focused card's raised surface.
-                val tint = MaterialTheme.colorScheme.onSurface
+            if (channelCard && channelCardStepping && onClick != null) {
+                // Inside the card beside the logo, on its line: the card steps through channels. Faint at
+                // rest, so the card says it steps before it has focus. In the card's own slot they zoom
+                // with it and stay above the focused card's raised surface.
+                val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused || held) 1f else RestingArrowAlpha)
                 Icon(painterResource(R.drawable.ic_keyboard_arrow_left), contentDescription = null, tint = tint,
-                    modifier = Modifier.align(Alignment.CenterStart).padding(start = ArrowInset, bottom = PiconLift)
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = ArrowInset)
                         .size(24.dp).testTag("player-identity-previous"))
                 Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = ArrowInset, bottom = PiconLift)
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = ArrowInset)
                         .size(24.dp).testTag("player-identity-next"))
             }
         },
@@ -153,7 +162,7 @@ internal fun PlayerIdentityCard(
 }
 
 /**
- * Trial: the recent channels, a row of logo chips above the channel card. Up on the card opens it onto
+ * The recent channels, a row of logo chips above the channel card. Up on the card opens it onto
  * the newest; Left/Right move along it, OK switches, Down or Back return to the card, and it closes
  * once focus leaves it.
  */
@@ -200,16 +209,10 @@ private fun BoxScope.RecentRow(
             enter = fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)),
             exit = fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)),
         ) {
-            // Full strength and shadowed: it stands higher than the controls, where the scrim is thin.
-            val tint = MaterialTheme.colorScheme.onSurface
-            Row(Modifier.padding(start = RecentOverflow, bottom = RecentHintGap).testTag("player-identity-recent-hint")
-                .clearAndSetSemantics {},
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
-                    modifier = Modifier.size(24.dp).rotate(-90f))
-                Text(stringResource(R.string.player_row_recent), color = tint, maxLines = 1,
-                    style = MaterialTheme.typography.titleSmall.copy(shadow = HintShadow))
-            }
+            // The same directional hint as "Program info" below; shadowed, as it stands higher than the
+            // controls, where the scrim is thin.
+            PlayerDownHint(stringResource(R.string.player_row_recent), Modifier.padding(start = RecentOverflow, bottom = RecentHintGap)
+                .testTag("player-identity-recent-hint").clearAndSetSemantics {}, up = true, shadow = HintShadow)
         }
         AnimatedVisibility(
             visible = open,
@@ -257,7 +260,7 @@ private fun BoxScope.RecentRow(
 }
 
 /**
- * Trial: a recent channel as a mini wide card: a small near-black tile with its picon (or name), and
+ * A recent channel as a mini wide card: a small near-black tile with its picon (or name), and
  * beside it its number and name over what is on now. The tile takes focus, as a wide card's image does.
  */
 @Composable
@@ -311,11 +314,11 @@ private fun RecentChip(
     }
 }
 
-/** Trial: the hint's distance above the card, clear of its focus outline and zoom. */
+/** The hint's distance above the card, clear of its focus outline and zoom. */
 private val RecentHintGap = 12.dp
 
 /**
- * Trial: the recent mini wide cards: a 16:9 tile and its text, each a third of the row between the
+ * The recent mini wide cards: a 16:9 tile and its text, each a third of the row between the
  * margins (844dp at 960dp wide), so long names end inside it.
  */
 private val RecentItemWidth = 260.dp
@@ -326,36 +329,42 @@ private val RecentChipGap = 32.dp
 private val RecentMarkWidth = 72.dp
 private val RecentMarkHeight = 32.dp
 
-/** Trial: how far a focused chip's zoom and outline reach past it. */
+/** How far a focused chip's zoom and outline reach past it. */
 private val RecentOverflow = 8.dp
 
-/** Trial: lifts the hint and the row's title off a bright picture. */
+/** Lifts the hint and the row's title off a bright picture. */
 private val HintShadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 8f)
 
-/** Trial: the channel cards' scale; [held] keeps the focused size without focus, so nothing grows or shrinks. */
+/** The channel cards' scale; [held] keeps the focused size without focus, so nothing grows or shrinks. */
 internal fun channelCardScale(held: Boolean = false) = CardDefaults.scale(
     scale = if (held) PlayerChromeTokens.cardFocusedScale else 1f,
     focusedScale = PlayerChromeTokens.cardFocusedScale,
 )
 
-/** Trial: an arrow's inset from the card's edge, in the room beside the logo. */
+/** An arrow's inset from the card's edge, in the room beside the logo. */
 private val ArrowInset = 4.dp
 
+/** The arrows' strength on the card without focus. */
+private const val RestingArrowAlpha = 0.4f
+
 /**
- * Trial: "number name" along a channel card's bottom, in the player and in the rail alike. It stands
- * clear of the progress along the card's bottom edge, whether the card shows one or not, so it never
- * moves between them. A card without a picon shows its name on the face, and only the number here.
+ * "number name" along a rail card's bottom. It stands clear of the progress along the card's bottom
+ * edge, whether the card shows one or not, so it never moves between them. A card without a picon
+ * shows its name on the face, and only the number here.
  */
 @Composable
 internal fun BoxScope.ChannelCardLabel(
     number: String?,
     name: String?,
     tag: String = "player-identity-label",
+    /** Fades the label in step with its card's [ChannelCardFace] lift, clear of the rising picon. */
+    alpha: () -> Float = { 1f },
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val text = listOfNotNull(number?.takeIf(String::isNotBlank), name?.takeIf(String::isNotBlank)).joinToString(" ")
     Row(
-        Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = ChannelCardLabelBottom),
+        Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = ChannelCardLabelBottom)
+            .graphicsLayer { this.alpha = alpha() },
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -368,7 +377,7 @@ internal fun BoxScope.ChannelCardLabel(
 /** The label's distance from the card's bottom edge: the progress's 3dp and the gap above it. */
 private val ChannelCardLabelBottom = 12.dp
 
-/** Trial: a recent channel, shown in the row above the channel card. */
+/** A recent channel, shown in the row above the channel card. */
 internal data class RecentChannelPeek(
     val picon: ArtworkId?,
     val number: String,
@@ -384,7 +393,7 @@ private val PiconHeight = 60.dp
 private val PiconLift = 12.dp
 
 /**
- * Trial: a channel card's face, shared by the player's channel card and the rail's: its picon, or its
+ * A channel card's face, shared by the player's channel card and the rail's: its picon, or its
  * name without one, on a plain surface.
  */
 @Composable
@@ -400,11 +409,14 @@ internal fun BoxScope.ChannelCardFace(
     markWidth: Dp = PiconWidth,
     markHeight: Dp = PiconHeight,
     lift: Dp = PiconLift,
+    /** How much of [lift] applies: the rail card opening over the player's centred picon starts at 0 and rises. */
+    liftFraction: () -> Float = { 1f },
 ) {
-    // Fills the card, which sizes the slot the mark is centred in. Trial: a plain surface for every
+    // Fills the card, which sizes the slot the mark is centred in. A plain surface for every
     // channel; the picon carries the colour.
     Box(Modifier.fillMaxSize().then(if (!backdrop) Modifier else Modifier.background(TvSurfaceColors.containerLowest)))
-    val mark = Modifier.align(Alignment.Center).padding(bottom = lift).size(markWidth, markHeight)
+    val mark = Modifier.align(Alignment.Center).graphicsLayer { translationY = -lift.toPx() / 2 * liftFraction() }
+        .size(markWidth, markHeight)
     if (picon != null) {
         PiconBox(imageLoader, picon, mark.testTag(logoTag), currentSession)
     } else {
@@ -424,14 +436,16 @@ private fun BoxScope.IdentityCardImage(
     val artwork = remember(currentSession, content.artwork) {
         currentSession?.let { session -> ArtworkId.parse(content.artwork)?.let { AppArtworkSource(session, it) } }
     }
+    // The label leads the info bar's text rather than the card, so the mark sits in the card's centre.
     if (artwork == null) {
-        ChannelCardFace(content.picon, content.channelId, content.info.channelName, imageLoader, currentSession)
+        ChannelCardFace(content.picon, content.channelId, content.info.channelName, imageLoader, currentSession, lift = 0.dp)
     } else {
         Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLow)) {
-            // The picture is a backdrop: dimmed where it is drawn, so the picon and the number read over it.
+            // The picture is a backdrop: dimmed where it is drawn, so the picon reads over it.
             AsyncImage(artwork, null, imageLoader, Modifier.fillMaxSize().testTag("player-identity-artwork"), contentScale = ContentScale.Crop,
                 colorFilter = ColorFilter.tint(Color.Black.copy(alpha = ArtworkScrim), BlendMode.SrcAtop))
-            ChannelCardFace(content.picon, null, content.info.channelName, imageLoader, currentSession, backdrop = false)
+            ChannelCardFace(content.picon, null, content.info.channelName, imageLoader, currentSession, backdrop = false,
+                lift = 0.dp)
         }
     }
 }

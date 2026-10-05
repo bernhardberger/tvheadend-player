@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.withKeyDown
 import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -77,11 +78,9 @@ class PlayerIdentityCardTest {
         assertEquals("it stands on the info bar's bottom edge", bar.bottom, card.bottom, 0.5f)
         val mark = bounds(if (exists("player-identity-logo")) "player-identity-logo" else "player-identity-name")
         assertEquals("the mark is centred across the card", card.center.x, mark.center.x, 0.5f)
-        assertEquals("the mark is lifted clear of the number", card.center.y - 6f, mark.center.y, 0.5f)
+        assertEquals("without a label the mark sits in the card's centre", card.center.y, mark.center.y, 0.5f)
         assertEquals("on the bar row's start edge", bounds("player-timeline-labels").left, card.left, 0.5f)
-        val label = compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).fetchSemanticsNode()
-            .config.getOrNull(SemanticsProperties.Text)?.single()?.text
-        assertTrue("the number leads the label: $label", label?.startsWith("1") == true)
+        assertTrue("the card carries no label of its own", !exists("player-identity-label"))
     }
 
     @Test fun everyLineKeepsItsPlaceBesideTheCardWhateverTheProgrammeHas() {
@@ -96,7 +95,8 @@ class PlayerIdentityCardTest {
                 }
             }
         }
-        val full = listOf("player-info-bar", "player-info-title", "player-info-subtitle", "player-info-last-row").associateWith(::bounds)
+        val full = listOf("player-info-bar", "player-info-eyebrow", "player-info-title", "player-info-programme", "player-info-last-row")
+            .associateWith(::bounds)
         val cases = mapOf(
             "no subtitle" to info.copy(subtitle = null),
             "no Next" to info.copy(next = null),
@@ -108,16 +108,59 @@ class PlayerIdentityCardTest {
             compose.runOnIdle { info = case }
             compose.waitForIdle()
             assertEquals("$name: the bar keeps its height", full.getValue("player-info-bar").height, bounds("player-info-bar").height, 0.5f)
+            assertEquals("$name: the channel keeps its place", full.getValue("player-info-eyebrow").top, bounds("player-info-eyebrow").top, 0.5f)
             assertEquals("$name: the title keeps its place", full.getValue("player-info-title").top, bounds("player-info-title").top, 0.5f)
-            if (exists("player-info-subtitle")) assertEquals("$name: the subtitle keeps its place",
-                full.getValue("player-info-subtitle").top, bounds("player-info-subtitle").top, 0.5f)
-            if (exists("player-info-last-row")) {
-                if (case.recordedDate == null) assertEquals("$name: Next keeps its place",
-                    full.getValue("player-info-last-row").top, bounds("player-info-last-row").top, 0.5f)
-                else assertEquals("$name: the episode groups closely with the title",
-                    bounds("player-info-title").bottom + 2f, bounds("player-info-last-row").top, 0.5f)
-            }
+            if (exists("player-info-programme")) assertEquals("$name: the programme line keeps its place",
+                full.getValue("player-info-programme").top, bounds("player-info-programme").top, 0.5f)
+            if (exists("player-info-last-row")) assertEquals("$name: the last row keeps its place",
+                full.getValue("player-info-last-row").top, bounds("player-info-last-row").top, 0.5f)
         }
+    }
+
+    @Test fun theChannelLeadsAndTheProgrammeLineStandsUnderTheTitle() {
+        chrome(PlayerChromeMode.CONTROLS, info = PlayerInfoBarData("1", "One", "Title", "20:15–21:45", subtitle = "Episode", next = "21:45 News"))
+        val eyebrow = bounds("player-info-eyebrow")
+        val title = bounds("player-info-title")
+        val programme = bounds("player-info-programme")
+        val last = bounds("player-info-last-row")
+        assertTrue("the channel stands above the title", eyebrow.bottom <= title.top + 0.5f)
+        assertTrue("the time, metadata and subtitle stand under it", title.bottom <= programme.top + 0.5f)
+        assertTrue("Next stands under them", programme.bottom <= last.top + 0.5f)
+        assertEquals("card and text block share the bar's bottom", bounds("player-info-bar").bottom, last.bottom, 1f)
+    }
+
+    @Test fun withSteppingOffLeftAndRightOnTheChannelCardDoNeitherZapNorOpenTheRail() {
+        chrome(PlayerChromeMode.CONTROLS, channelCard = true, stepping = false)
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-identity-card"), focused())
+        assertFalse("no arrows without stepping", exists("player-identity-previous") || exists("player-identity-next"))
+        val hint = ApplicationProvider.getApplicationContext<Application>().getString(R.string.player_channel_card_hint_fixed)
+        assertEquals("the card does not promise stepping", listOf(hint), cardDescription())
+        key(Key.DirectionLeft)
+        key(Key.DirectionRight)
+        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionRight) { advanceEventTime(1_200) } }
+        settle()
+        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionLeft) { advanceEventTime(1_200) } }
+        settle()
+        assertEquals("focus stays on the card", listOf("player-identity-card"), focused())
+        assertEquals("no channel change", emptyList<Int>(), zaps)
+        assertEquals("no rail", emptyList<Int>(), steps)
+    }
+
+    @Test fun withSteppingOnTheChannelCardShowsArrowsTapsChangeChannelAndHoldOpensTheRail() {
+        chrome(PlayerChromeMode.CONTROLS, channelCard = true, stepping = true)
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-identity-card"), focused())
+        assertTrue("the arrows show", exists("player-identity-previous") && exists("player-identity-next"))
+        key(Key.DirectionRight)
+        key(Key.DirectionLeft)
+        assertEquals("a tap changes channel", listOf(1, -1), zaps)
+        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionRight) { advanceEventTime(1_200) } }
+        settle()
+        assertEquals("a hold opens the rail stepping that way", listOf(1), steps)
+        assertEquals("and does not also change channel", listOf(1, -1), zaps)
     }
 
     @Test fun inTheBannerTheCardIsAPictureWithoutFocus() {
@@ -228,6 +271,8 @@ class PlayerIdentityCardTest {
     private var restoreFocus by mutableStateOf<String?>(null)
     private var restores = 0
     private var toggles = 0
+    private val zaps = mutableListOf<Int>()
+    private val steps = mutableListOf<Int>()
     private var options = 0
     private val reported = mutableListOf<String>()
 
@@ -236,6 +281,8 @@ class PlayerIdentityCardTest {
         info: PlayerInfoBarData = liveInfoBarData(1, "One", null, null, false, 1_800, "Programme"),
         timeshift: AppTimeshiftState = this.timeshift,
         livePause: LivePauseAvailability? = null,
+        channelCard: Boolean = false,
+        stepping: Boolean = false,
     ) {
         this.timeshift = timeshift
         val loader = ImageLoader(ApplicationProvider.getApplicationContext<Application>())
@@ -246,13 +293,16 @@ class PlayerIdentityCardTest {
                     content = PlayerChromeContent("20:15", info),
                     timeline = PlayerChromeTimeline.Live(this.timeshift, nowSec = 1_800),
                     actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS && !panelOpen, paused = false,
-                        livePause = livePause, record = false, restoreFocus = restoreFocus),
+                        livePause = livePause, restoreFocus = restoreFocus),
                     imageLoader = loader, currentSession = null,
                     onTogglePause = { toggles++ }, onSeek = {}, onStop = {}, onInfo = { infos++ }, onOptions = { options++ },
                     onInteraction = {}, panelOpen = panelOpen,
                     onPauseUnavailable = { toggles++ },
                     onActionFocused = { reported += it },
                     onFocusRestored = { restores++; restoreFocus = null },
+                    channelCardStepping = stepping,
+                    onChannelStep = if (channelCard) { direction, _ -> steps += direction } else null,
+                    onChannelZap = if (channelCard) { direction, _ -> zaps += direction } else null,
                 )
             }
         }

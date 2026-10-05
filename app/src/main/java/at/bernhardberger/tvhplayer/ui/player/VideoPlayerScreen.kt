@@ -367,6 +367,7 @@ fun VideoPlayerScreen(
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: NoticeCenter = koinInject(),
+    channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -422,11 +423,8 @@ fun VideoPlayerScreen(
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
     var restoreInfoFocus by remember { mutableStateOf(false) }
-    var restoreRecordFocus by remember { mutableStateOf(false) }
     val programDetails = remember { ProgramDetailsState() }
     var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
-    var infoOpenedFromRecord by remember { mutableStateOf(false) }
-    var restoreRecordActionFocus by remember { mutableStateOf(false) }
     // Trial: the channel card's placeholder and the action Down opened Info from.
     // Trial: the channel the card's first Left/Right stepped to, focused as the rail opens.
     var railEntryId by remember { mutableStateOf<ChannelId?>(null) }
@@ -809,16 +807,13 @@ fun VideoPlayerScreen(
         }
     }
 
-    fun openInfo(fromRecord: Boolean = false, returnTo: String? = null) {
+    fun openInfo(returnTo: String? = null) {
         programDetails.reset()
         infoRailChannelId = null
         infoPendingAction = null
         infoMutation = null
-        infoOpenedFromRecord = fromRecord
-        infoReturnAction = returnTo ?: lastChromeAction.takeIf { layerState.chrome.controlsVisible && !fromRecord }
+        infoReturnAction = returnTo ?: lastChromeAction.takeIf { layerState.chrome.controlsVisible }
         restoreInfoFocus = false
-        restoreRecordActionFocus = false
-        restoreRecordFocus = fromRecord
         layerState.openInfo()
     }
 
@@ -826,7 +821,6 @@ fun VideoPlayerScreen(
         infoPendingAction = null
         infoMutation = null
         layerState.dismissRecordingConfirmation()
-        restoreRecordFocus = false
         programDetails.focusContent()
     }
 
@@ -834,7 +828,6 @@ fun VideoPlayerScreen(
         infoPendingAction = null
         infoMutation = null
         layerState.dismissRecordingConfirmation()
-        restoreRecordFocus = false
         layerState.closeInfo(returnToRail = infoRailChannelId != null)
         infoRailChannelId?.let {
             railEntryId = it
@@ -843,8 +836,7 @@ fun VideoPlayerScreen(
             infoRailChannelId = null
             return
         }
-        restoreInfoFocus = !infoOpenedFromRecord && infoReturnAction == null
-        restoreRecordActionFocus = infoOpenedFromRecord
+        restoreInfoFocus = infoReturnAction == null
     }
 
     /**
@@ -1741,7 +1733,6 @@ fun VideoPlayerScreen(
                 restoreFocus = when {
                     infoReturnAction != null && !layerState.infoOpen -> infoReturnAction
                     restoreInfoFocus -> PlayerIdentityCardTag
-                    restoreRecordActionFocus -> "player-record"
                     restoreOptionsFocus -> "player-settings"
                     else -> layerState.restoreChannelAction
                 },
@@ -1763,7 +1754,6 @@ fun VideoPlayerScreen(
             onInfo = {
                 openInfo()
             },
-            onRecord = { openInfo(fromRecord = true) },
             onOptions = {
                 restoreOptionsFocus = false
                 layerState.openOptions()
@@ -1773,7 +1763,6 @@ fun VideoPlayerScreen(
             onFocusRestored = {
                 infoReturnAction = null
                 restoreInfoFocus = false
-                restoreRecordActionFocus = false
                 restoreOptionsFocus = false
                 layerState.onChannelActionRestored()
             },
@@ -1783,12 +1772,14 @@ fun VideoPlayerScreen(
                 openInfo(returnTo = lastChromeAction ?: "player-pause")
             },
             downHint = stringResource(R.string.player_down_programme_info),
-            // Trial: a held Left/Right on the card opens the rail stepping that way; OK opens it in place.
+            channelCardStepping = channelCardStepping,
+            onChannelCardFocusChanged = layerState.chrome::onChannelCardFocusChanged,
+            // With stepping, a held Left/Right on the card opens the rail stepping that way; OK opens it in place.
             onChannelStep = { direction, _ -> openRailFromCard(direction) },
             onCardClick = { openRailFromCard(0) },
-            // Trial: a short Left/Right on the card changes channel like CH+/-: the first at once, a burst settles.
+            // With stepping, a short Left/Right on the card changes channel like CH+/-: the first at once, a burst settles.
             onChannelZap = { direction, keyTimeMs -> tuneAdjacentChannel(direction, keyTimeMs) },
-            // Trial: Up on the card focuses the last other channel's card above it; OK there switches.
+            // Up on the card opens the recent channels above it; OK on one switches to it.
             recents = recentChannels.map(recentPeekOf),
             onRecentPick = { index -> recentChannels.getOrNull(index)?.let { tuneChannel(it) } },
             recentRowOpen = recentRowOpen,
@@ -1829,8 +1820,6 @@ fun VideoPlayerScreen(
                                 infoPendingAction = null
                                 infoMutation = null
                                 infoReturnAction = null
-                                infoOpenedFromRecord = false
-                                restoreRecordFocus = false
                                 restoreInfoFocus = false
                                 railEntryId = channel.id
                                 railEntryStep = 0
@@ -1896,7 +1885,7 @@ fun VideoPlayerScreen(
                 canRecord = recordActionEligible,
                 recordingState = LiveInfoRecordingState.Idle,
                 confirmationVisible = false,
-                restoreRecordFocus = restoreRecordFocus,
+                restoreRecordFocus = false,
                 onRecord = { activateInfoRecording() },
                 onRecordingActivate = { activateInfoRecording() },
                 onRecordingDismiss = ::dismissRecordingDialog,
@@ -1906,7 +1895,6 @@ fun VideoPlayerScreen(
                     layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_UP)
                     closeInfo()
                 },
-                onRecordFocusRestored = { restoreRecordFocus = false },
                 details = { recordFocus, firstFocus ->
                     val shown = shownEvent ?: return@LiveProgrammeInfoOverlay
                     val schedule = remember(observation, shownChannelId, shown.id) {

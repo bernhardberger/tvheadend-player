@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.core
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,6 +41,13 @@ class PlayerAutoHidePolicyTest {
         blocked.forEach { context ->
             assertFalse(context.toString(), playerControlsAutoHideEligible(context))
         }
+    }
+
+    @Test
+    fun theChannelCardAndItsRecentRowWaitLongerThanTheRestOfTheControls() {
+        assertEquals(5_000L, playerControlsAutoHideTimeoutMillis(5_000L, channelCardFocused = false))
+        assertEquals(30_000L, playerControlsAutoHideTimeoutMillis(5_000L, channelCardFocused = true))
+        assertEquals("a longer base is never shortened", 60_000L, playerControlsAutoHideTimeoutMillis(60_000L, channelCardFocused = true))
     }
 
     private fun eligibleContext() = PlayerAutoHideContext(

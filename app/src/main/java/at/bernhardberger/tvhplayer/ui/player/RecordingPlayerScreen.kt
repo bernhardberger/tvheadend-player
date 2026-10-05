@@ -651,7 +651,6 @@ fun RecordingPlayerScreen(
                 actions = PlayerChromeActions(
                     active = chrome.controlsVisible && optionsPage == null,
                     paused = !playWhenReady,
-                    record = false,
                     restoreFocus = when {
                         restoreQuickListControl != null -> restoreQuickListControl
                         restoreInfoActionFocus -> PlayerIdentityCardTag

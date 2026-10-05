@@ -100,10 +100,10 @@ fun ChannelDrawer(
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: (Int?) -> Unit,
     onOpenSchedule: ((Channel, Int) -> Unit)? = null,
-    // Trial: the card's first Left/Right opens the rail on this channel, then steps it once.
+    // The card's first Left/Right opens the rail on this channel, then steps it once.
     entryFocusId: ChannelId? = null,
     entryStep: Int = 0,
-    // Trial: the rail opens in place of the channel card: card-sized tiles on its keyline, Down
+    // The rail opens in place of the channel card: card-sized tiles on its keyline, Down
     // opens its schedule, Up has nowhere to go.
     inPlace: Boolean = false,
     // The in-place rail's schedule hint, also while the rail steps to and from that schedule.
@@ -121,7 +121,7 @@ fun ChannelDrawer(
     var pendingPickId by remember { mutableStateOf<ChannelId?>(null) }
     var confirmedId by remember { mutableStateOf(playingChannelId) }
     var reanchorId by remember { mutableStateOf<ChannelId?>(null) }
-    // Trial: the entry card is focused from its first frame, standing in for the channel card,
+    // The entry card is focused from its first frame, standing in for the channel card,
     // until focus leaves it.
     var entryLeft by remember { mutableStateOf(false) }
     val emptyFocus = remember { FocusRequester() }
@@ -202,7 +202,7 @@ fun ChannelDrawer(
         requesters.getValue(target).requestFocus()
         focusedCatalog = ids
         entered = true
-        // Trial: the step the key asked for slides in at once, while the rail opens.
+        // The step the key asked for slides in at once, while the rail opens.
         if (entryStep != 0 && target == entryFocusId) {
             withFrameNanos { }
             if (focusedId == target) focusManager.moveFocus(if (entryStep > 0) FocusDirection.Right else FocusDirection.Left)
@@ -272,6 +272,7 @@ fun ChannelDrawer(
                     // Opening, the entry card stands in for the channel card; closing, the focused
                     // one keeps its look while the rail folds back into the card.
                     held = inPlace && (if (active) channel.id == entryFocusId && !entryLeft else channel.id == focusedId),
+                    entry = inPlace && channel.id == entryFocusId,
                     channel = channel,
                     number = ChannelNavigation.numberForId(ids, numbers, channel.id),
                     event = nowEvent(channel.id),
@@ -310,10 +311,12 @@ fun ChannelDrawer(
 }
 
 
+private val FullLift: () -> Float = { 1f }
+
 /**
- * Trial: a standard card the size of the player's channel card. Its face is the channel's colour,
- * picon and "number name", with the programme's progress along its bottom edge; the programme's
- * title and subtitle stand below it.
+ * A standard card the size of the player's channel card. Its face is the channel's picon and
+ * "number name", with the programme's progress along its bottom edge; the programme's title and
+ * subtitle stand below it.
  */
 @Composable
 private fun InPlaceZapTile(
@@ -328,6 +331,7 @@ private fun InPlaceZapTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     held: Boolean = false,
+    entry: Boolean = false,
 ) {
     val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
     val interactions = remember { MutableInteractionSource() }
@@ -341,10 +345,14 @@ private fun InPlaceZapTile(
             scrimBrush = SolidColor(Color.Transparent),
             modifier = modifier.size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight),
             image = {
+                // The card the rail opens over (or folds back into) has the player's card's centred picon, which
+                // rises as its label arrives; every other card stands at full lift.
+                val lift = if (held || entry) LocalChannelCardLift.current else FullLift
                 ChannelCardFace(channel.icon, channel.id, channel.name.orEmpty(), imageLoader, currentSession,
-                    logoTag = "player-channel-${channel.id.value}-picon", nameTag = "player-channel-${channel.id.value}-name")
+                    logoTag = "player-channel-${channel.id.value}-picon", nameTag = "player-channel-${channel.id.value}-name",
+                    liftFraction = lift)
                 ChannelCardLabel(number?.toString(), channel.name.takeIf { channel.icon != null },
-                    tag = "player-channel-${channel.id.value}-identity") {
+                    tag = "player-channel-${channel.id.value}-identity", alpha = lift) {
                     ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
                         recordingNow = recording, playbackIndicator = playbackIndicator)
                 }
@@ -393,9 +401,10 @@ private fun CompactZapCard(
     modifier: Modifier = Modifier,
     inPlace: Boolean = false,
     held: Boolean = false,
+    entry: Boolean = false,
 ) {
     if (inPlace) {
-        InPlaceZapTile(channel, number, event, nowSec, playbackIndicator, recording, imageLoader, currentSession, onClick, modifier, held)
+        InPlaceZapTile(channel, number, event, nowSec, playbackIndicator, recording, imageLoader, currentSession, onClick, modifier, held, entry)
         return
     }
     val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }

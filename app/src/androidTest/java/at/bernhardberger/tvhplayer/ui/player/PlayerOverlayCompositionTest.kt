@@ -578,9 +578,8 @@ class PlayerOverlayCompositionTest {
         composeRule.onNodeWithTag("player-info").assertDoesNotExist()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-stop").assertIsFocused()
+        composeRule.onNodeWithTag("player-record").assertDoesNotExist()
         composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
-        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("player-record").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
         composeRule.onNodeWithContentDescription("Settings").assertExists()
@@ -594,7 +593,7 @@ class PlayerOverlayCompositionTest {
         assertTrue(timeline.bottom <= actionsAfter.top)
 
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
-        composeRule.onNodeWithTag("player-record").assertIsFocused()
+        composeRule.onNodeWithTag("player-stop").assertIsFocused()
     }
 
     private fun event(id: Int, start: Long, stop: Long, title: String) = EpgEvent.create(

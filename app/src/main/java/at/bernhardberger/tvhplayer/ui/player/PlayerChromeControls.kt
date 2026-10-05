@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.focusable
@@ -77,7 +78,6 @@ internal fun PlayerChromeControls(
     onTogglePause: () -> Unit,
     onSeek: (Long) -> Unit,
     onStop: () -> Unit,
-    onRecord: () -> Unit,
     onOptions: () -> Unit,
     onInteraction: () -> Unit,
     onCommitSeek: () -> Unit,
@@ -93,7 +93,9 @@ internal fun PlayerChromeControls(
     onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
     downHint: String? = null,
     onRecent: (() -> Unit)? = null,
-    /** Trial: the footer scrim reaches up behind the open Recent row. */
+    /** Whether Left/Right on the channel card change channel (tap) or open the rail (hold). */
+    channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
+    /** The footer scrim reaches up behind the open Recent row. */
     scrimRise: () -> Float = { 0f },
 ) {
     val live = timeline as? PlayerChromeTimeline.Live
@@ -106,7 +108,6 @@ internal fun PlayerChromeControls(
     val pauseFocus = remember { FocusRequester() }
     val cardFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
-    val recordFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
     val seekable = when (timeline) {
@@ -155,7 +156,6 @@ internal fun PlayerChromeControls(
             val target = when (restoreFocus) {
                 null -> null
                 PlayerIdentityCardTag -> cardFocus
-                "player-record" -> recordFocus.takeIf { actions.record }
                 "player-settings" -> settingsFocus
                 "player-stop" -> stopFocus
                 "player-seekbar" -> timelineFocus.takeIf { timelineFocusable }
@@ -263,7 +263,7 @@ internal fun PlayerChromeControls(
         // The card stands above everything else that takes focus: Down leads to the timeline or,
         // when that takes no focus, to the action row's entry; nothing else is reachable from it.
         val cardBelow = if (timelineFocusable) timelineFocus else initialFocus
-        // Trial: the Left/Right press on the card still undecided between a zap (released) and the rail (held).
+        // The Left/Right press on the card still undecided between a zap (released) and the rail (held).
         var cardPressKey by remember { mutableStateOf<Key?>(null) }
         val cardModifier = Modifier.focusRequester(cardFocus)
             .onFocusChanged {
@@ -287,7 +287,7 @@ internal fun PlayerChromeControls(
                         }
                         true
                     }
-                    // Trial: Up opens the recent channels' row above this card.
+                    // Up opens the recent channels' row above this card.
                     onRecent != null && event.key == Key.DirectionUp -> {
                         if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                             onInteraction()
@@ -295,23 +295,26 @@ internal fun PlayerChromeControls(
                         }
                         true
                     }
-                    // Trial: a Left/Right press changes channel when released; held, it opens the rail
-                    // stepping that way, and the held key's repeats run on through the rail.
+                    // A Left/Right press changes channel when released; held, it opens the rail stepping
+                    // that way, and the held key's repeats run on through the rail. Without stepping the
+                    // card takes both keys and does nothing with them.
                     onChannelZap != null && (event.key == Key.DirectionLeft || event.key == Key.DirectionRight) -> {
-                        val direction = if (event.key == Key.DirectionRight) 1 else -1
-                        val native = event.nativeKeyEvent
-                        when (event.type) {
-                            KeyEventType.KeyDown -> when {
-                                native.repeatCount == 0 -> { onInteraction(); cardPressKey = event.key }
-                                cardPressKey == event.key -> {
-                                    cardPressKey = null
-                                    onChannelStep?.invoke(direction, native.eventTime)
+                        if (channelCardStepping) {
+                            val direction = if (event.key == Key.DirectionRight) 1 else -1
+                            val native = event.nativeKeyEvent
+                            when (event.type) {
+                                KeyEventType.KeyDown -> when {
+                                    native.repeatCount == 0 -> { onInteraction(); cardPressKey = event.key }
+                                    cardPressKey == event.key -> {
+                                        cardPressKey = null
+                                        onChannelStep?.invoke(direction, native.eventTime)
+                                    }
                                 }
-                            }
-                            KeyEventType.KeyUp -> if (cardPressKey == event.key) {
-                                cardPressKey = null
-                                onInteraction()
-                                onChannelZap(direction, native.downTime)
+                                KeyEventType.KeyUp -> if (cardPressKey == event.key) {
+                                    cardPressKey = null
+                                    onInteraction()
+                                    onChannelZap(direction, native.downTime)
+                                }
                             }
                         }
                         true
@@ -417,8 +420,7 @@ internal fun PlayerChromeControls(
         Box {
         PlayerActionRow(
             settingsFocus = settingsFocus,
-            onSettings = onOptions, onRecord = onRecord.takeIf { actions.record },
-            recordFocus = recordFocus,
+            onSettings = onOptions,
             onStop = onStop,
             stopFocus = stopFocus,
             onInteraction = onInteraction,
@@ -459,7 +461,7 @@ internal fun PlayerChromeControls(
                     }
                 },
         )
-        // Trial: what Down opens, centred between the start and end groups.
+        // What Down opens, centred between the start and end groups.
         if (downHint != null) PlayerDownHint(downHint, Modifier.align(Alignment.Center)
             .pageMotion(0..140, at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy.pageAccelerate,
                 entering = false, inheritedFade = 0..220)
@@ -470,11 +472,11 @@ internal fun PlayerChromeControls(
 }
 
 @Composable
-internal fun PlayerDownHint(text: String, modifier: Modifier = Modifier, up: Boolean = false) {
+internal fun PlayerDownHint(text: String, modifier: Modifier = Modifier, up: Boolean = false, shadow: Shadow? = null) {
     val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         androidx.tv.material3.Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
             modifier = Modifier.size(24.dp).rotate(if (up) -90f else 90f))
-        Text(text, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
+        Text(text, style = MaterialTheme.typography.labelLarge.copy(shadow = shadow), color = tint, maxLines = 1)
     }
 }

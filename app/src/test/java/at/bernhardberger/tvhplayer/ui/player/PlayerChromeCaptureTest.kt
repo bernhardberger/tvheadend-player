@@ -301,6 +301,12 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
             if (next == Scene.CHANNEL_CARD) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
+            if (next == Scene.CHANNEL_CARD && fontScale == 1f) {
+                // The card and the text block beside it stand on the same bottom edge; their heights differ.
+                fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertEquals("the card and the last row share the bottom edge",
+                    bounds(PlayerIdentityCardTag).bottom, bounds("player-info-last-row").bottom, 1f)
+            }
             if (next == Scene.PROGRAMME_SCHEDULE) compose.onNodeWithTag("details-schedule-42").assertIsFocused()
             if (next == Scene.RAIL_SCHEDULE) compose.onNodeWithTag("details-schedule-52").assertIsFocused()
             if (next == Scene.RAIL_PROGRAMME_OPENED) compose.onNodeWithTag("details-record").assertIsFocused()

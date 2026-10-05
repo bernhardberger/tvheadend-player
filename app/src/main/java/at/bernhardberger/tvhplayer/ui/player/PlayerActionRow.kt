@@ -50,8 +50,6 @@ internal fun PlayerActionRow(
     onStop: () -> Unit,
     onInteraction: () -> Unit,
     modifier: Modifier = Modifier,
-    onRecord: (() -> Unit)? = null,
-    recordFocus: FocusRequester? = null,
     paused: Boolean = false,
     stopFocus: FocusRequester? = null,
     onActionFocused: (String) -> Unit = {},
@@ -60,17 +58,14 @@ internal fun PlayerActionRow(
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
-    val record = stringResource(R.string.record)
     val stop = stringResource(R.string.stop_playback)
     val actions = listOf(
         PlayerAction("player-pause", playPause,
             if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
         PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, stopFocus),
-        PlayerAction("player-record", record, R.drawable.ic_fiber_manual_record, onRecord, recordFocus),
         PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
     )
-    // Play/Pause and Stop stand at the start; the rest, from its first action there is, at the end.
-    val endGroupStart = if (onRecord != null) "player-record" else "player-settings"
+    // Play/Pause and Stop stand at the start; Settings at the end.
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -80,7 +75,7 @@ internal fun PlayerActionRow(
     ) {
         actions.forEach { (tag, label, icon, action, focus) ->
             key(tag) {
-                if (tag == endGroupStart) Spacer(Modifier.weight(1f))
+                if (tag == "player-settings") Spacer(Modifier.weight(1f))
                 if (action != null) {
                     val actionModifier = Modifier
                         .testTag(tag)

@@ -82,7 +82,7 @@ internal class LivePlayerLayerState(
         private set
 
     fun onActionFocused(action: String) = profileTrace("P44:focus:control") {
-        lastFocusedAction = action.takeIf { it in setOf("player-pause", PlayerIdentityCardTag, "player-record", "player-settings") }
+        lastFocusedAction = action.takeIf { it in setOf("player-pause", PlayerIdentityCardTag, "player-settings") }
         lastFocusedControl = lastFocusedAction ?: action.takeIf { it == "player-stop" }
     }
 

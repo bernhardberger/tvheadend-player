@@ -209,6 +209,37 @@ class QuickZapPresentationTest {
         assertTrue(draws > 0)
     }
 
+    @Test fun onlyTheCardTheRailOpensOverRisesWithTheExpansion() {
+        var lift by mutableStateOf(0f)
+        compose.setContent {
+            view = LocalView.current
+            val loader = remember { ImageLoader(view.context) }
+            TVHeadendPlayerTheme {
+                CompositionLocalProvider(LocalChannelCardLift provides { lift }) {
+                    ChannelDrawer(channels.take(2), channels[0].id, channels[0].id, recordingChannelIds = emptySet(),
+                        nowEvent = { null }, imageLoader = loader, onFocusChannel = {}, onPickChannel = {},
+                        onCloseDrawer = {}, inPlace = true, entryFocusId = channels[0].id)
+                }
+            }
+        }
+        compose.waitForIdle()
+        // How far a card's picon stands above the card's centre.
+        fun rise(id: Int): Float {
+            fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+            val card = node("player-channel-card-$id")
+            return card.size.height / 2f - card.localBoundingBoxOf(node("player-channel-$id-picon"), clipBounds = false).center.y
+        }
+        assertEquals("the opening card starts where the player's centred picon is", 0f, rise(1), 0.01f)
+        assertEquals("every other card stands at full lift", 6f, rise(2), 0.01f)
+        compose.runOnIdle { lift = 0.5f }
+        compose.waitForIdle()
+        assertEquals(3f, rise(1), 0.01f)
+        assertEquals(6f, rise(2), 0.01f)
+        compose.runOnIdle { lift = 1f }
+        compose.waitForIdle()
+        assertEquals(6f, rise(1), 0.01f)
+    }
+
     @Test fun identityAndFocusedRailCardHaveTheSameGeometry() {
         val inspectorEnabled = androidx.compose.ui.platform.isDebugInspectorInfoEnabled
         androidx.compose.ui.platform.isDebugInspectorInfoEnabled = true
@@ -258,14 +289,17 @@ class QuickZapPresentationTest {
                 }.first()
             val identity = "player-identity-card"
             val rail = "player-channel-card-1"
-            val identityLabel = label("player-identity-label", identity)
-            val railLabel = label("player-channel-1-identity", rail)
+            // Only the rail's card carries the label; the player's card leads the info bar's text with it instead.
             println("CARD_GEOMETRY identitySize=${node(identity).layoutInfo.coordinates.size} railSize=${node(rail).layoutInfo.coordinates.size} " +
                 "identityPicon=${rect("player-identity-logo", identity)} railPicon=${rect("player-channel-1-picon", rail)} " +
-                "identityLabel=$identityLabel railLabel=$railLabel identityCorner=${corner(identity)} railCorner=${corner(rail)}")
+                "railLabel=${label("player-channel-1-identity", rail)} identityCorner=${corner(identity)} railCorner=${corner(rail)}")
             assertEquals(node(identity).layoutInfo.coordinates.size, node(rail).layoutInfo.coordinates.size)
-            assertEquals(rect("player-identity-logo", identity), rect("player-channel-1-picon", rail))
-            identityLabel.zip(railLabel).forEach { (a, b) -> assertEquals(a, b, 0.01f) }
+            // The rail's picon is lifted clear of its label; the player's card has none and centres it.
+            val identityPicon = rect("player-identity-logo", identity)
+            val railPicon = rect("player-channel-1-picon", rail)
+            assertEquals(identityPicon.size, railPicon.size)
+            assertEquals(identityPicon.left, railPicon.left, 0.01f)
+            assertEquals(identityPicon.top, railPicon.top + 6f, 0.01f)
             assertEquals(corner(identity), corner(rail), 0.01f)
         } finally {
             androidx.compose.ui.platform.isDebugInspectorInfoEnabled = inspectorEnabled

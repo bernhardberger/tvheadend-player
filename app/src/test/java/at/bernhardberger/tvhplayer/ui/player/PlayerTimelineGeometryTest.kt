@@ -256,7 +256,7 @@ class PlayerTimelineGeometryTest {
         // The last line and its text: Next; without Next the subtitle; without guide data the title.
         val infos = listOf(
             Triple("a long Next line", "player-info-last-text", PlayerInfoBarData("1", "One", "Programme", "00:00–01:00", subtitle = "Subtitle", next = long)),
-            Triple("a long subtitle without Next", "player-info-subtitle", PlayerInfoBarData("1", "One", "Programme", "00:00–01:00", subtitle = long)),
+            Triple("a long subtitle without Next", "player-info-programme", PlayerInfoBarData("1", "One", "Programme", "00:00–01:00", subtitle = long)),
             Triple("a long title without guide data", "player-info-title", PlayerInfoBarData("1", "One", long, "")),
         )
         val mode = if (banner) PlayerChromeMode.BANNER else PlayerChromeMode.CONTROLS

@@ -55,7 +55,7 @@ internal fun QuickZapPresentation(
     preview: @Composable () -> Unit,
     controls: @Composable () -> Unit,
     /**
-     * Trial: the channel card's bounds in root coordinates. With it, the rail opens out of the card:
+     * The channel card's bounds in root coordinates. With it, the rail opens out of the card:
      * its cards on the card's line, revealed sideways from the card, and nothing travels up.
      */
     inPlaceAnchor: (() -> Rect?)? = null,
@@ -142,7 +142,7 @@ internal fun QuickZapPresentation(
     }
 }
 
-/** Trial: the cards' top focus reserve inside the rail, above the first card's top edge. */
+/** The cards' top focus reserve inside the rail, above the first card's top edge. */
 private val RailTopInset = 12.dp
 
 @Composable
@@ -224,7 +224,9 @@ private fun InPlaceRail(
                 Box(Modifier.then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
                     entering = false, alphaWindow = 60..260, dyPx = { -pageTravel.toFloat() }) else Modifier)
                     .then(reveal())
-                    .testTag("player-zap-tray")) { channelContent() }
+                    .testTag("player-zap-tray")) {
+                    CompositionLocalProvider(LocalChannelCardLift provides expansion) { channelContent() }
+                }
             },
             modifier = Modifier.fillMaxSize(),
         ) { measurables, constraints ->
@@ -248,8 +250,11 @@ private fun InPlaceRail(
     }
 }
 
-/** Trial: how far the in-place rail has opened, for the controls' footer to give way to it. */
+/** How far the in-place rail has opened, for the controls' footer to give way to it. */
 internal val LocalInPlaceRailExpansion = compositionLocalOf<() -> Float> { { 0f } }
 
-/** Trial: the soft edge of the rail's sideways reveal. */
+/** How far the rail's opening has raised the picon of the card it opens over, from the player card's centre; fully outside the in-place rail. */
+internal val LocalChannelCardLift = compositionLocalOf<() -> Float> { { 1f } }
+
+/** The soft edge of the rail's sideways reveal. */
 private val RevealFeather = 96.dp

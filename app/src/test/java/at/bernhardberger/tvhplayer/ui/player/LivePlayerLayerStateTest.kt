@@ -75,7 +75,7 @@ class LivePlayerLayerStateTest {
     @Test
     fun shelfDismissalRestoresInvokerWithoutChangingTuneCloseBehavior() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
-        for (action in listOf("player-pause", "player-identity-card", "player-record", "player-settings", "player-stop")) {
+        for (action in listOf("player-pause", "player-identity-card", "player-settings", "player-stop")) {
             state.showControls()
             state.onActionFocused(action)
             state.openChannelDrawer()
@@ -260,7 +260,7 @@ class LivePlayerLayerStateTest {
             optionsOpen = state.optionsPage != null,
         )
         state.showControls()
-        state.onActionFocused("player-record")
+        state.onActionFocused("player-settings")
 
         assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK))
         assertTrue(state.chrome.controlsVisible)
@@ -286,7 +286,7 @@ class LivePlayerLayerStateTest {
         assertNull(state.optionsPage)
         assertFalse(state.optionsQuickList)
         assertTrue(state.chrome.controlsVisible)
-        assertEquals("player-record", state.restoreChannelAction)
+        assertEquals("player-settings", state.restoreChannelAction)
         // Keys no longer count once the list is closed.
         val closedPresses = state.quickList.keyPresses
         state.onKeyDown()

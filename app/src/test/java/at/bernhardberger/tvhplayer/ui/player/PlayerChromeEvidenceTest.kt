@@ -233,9 +233,9 @@ class PlayerChromeEvidenceTest {
     private fun lastRowLayout(recorded: Boolean) {
         var gapPx = 0f
         compose.setContent { TVHeadendPlayerTheme {
-            gapPx = with(LocalDensity.current) { (if (recorded) 2.dp else 8.dp).toPx() }
+            gapPx = with(LocalDensity.current) { 8.dp.toPx() }
             Box(Modifier.fillMaxSize()) {
-                // Live: Next is the last row, under the subtitle; recording: the episode, under the title.
+                // Live: Next is the last row; recording: the episode; both under the programme line.
                 InfoBar(info(recorded), emptyList(), null, Modifier.fillMaxWidth().align(Alignment.BottomCenter).testTag("bar"))
             }
         } }
@@ -244,8 +244,8 @@ class PlayerChromeEvidenceTest {
         val text = bounds("player-info-last-text")
         val row = bounds("player-info-last-row")
         val bar = bounds("bar")
-        val above = if (recorded) title else bounds("player-info-subtitle")
-        assertEquals("the episode groups with the title; Next has its own separation", gapPx, text.top - above.bottom, 1f)
+        val above = bounds("player-info-programme")
+        assertEquals("the last row stands a fixed gap under the programme line", gapPx, text.top - above.bottom, 1f)
         assertEquals("the row is as tall as its text", text.height, row.height, 1f)
         assertEquals("the row runs to the bar's end: nothing takes room at its end", bar.right, row.right, 1f)
         assertEquals("the row starts where the title starts", title.left, row.left, 1f)
@@ -334,11 +334,11 @@ class PlayerChromeEvidenceTest {
         } }
         compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-info-eyebrow", useUnmergedTree = true).assertExists()
         compose.runOnIdle { withLogo = false }
         compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-info-eyebrow", useUnmergedTree = true).assertExists()
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")

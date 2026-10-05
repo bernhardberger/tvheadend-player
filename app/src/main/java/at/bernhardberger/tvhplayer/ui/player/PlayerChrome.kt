@@ -59,7 +59,6 @@ internal fun PlayerChrome(
     modifier: Modifier = Modifier,
     entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
     panelOpen: Boolean = false,
-    onRecord: () -> Unit = onInfo,
     onCommitSeek: () -> Unit = {},
     onPauseUnavailable: (reason: String) -> Unit = {},
     onActionFocused: (String) -> Unit = {},
@@ -72,23 +71,27 @@ internal fun PlayerChrome(
     /** A recording's marker navigation, opened from its timeline. */
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     onSeekMarker: (Long) -> Unit = {},
-    /** Trial: holding Left/Right on the focused channel card opens the rail stepping that way (-1, +1). */
+    /** Holding Left/Right on the focused channel card opens the rail stepping that way (-1, +1). */
     onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
-    /** Trial: a short Left/Right press on the focused channel card changes channel (-1, +1). */
+    /** A short Left/Right press on the focused channel card changes channel (-1, +1). */
     onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
-    /** Trial: OK on the identity card; without it the card opens Info. */
+    /** OK on the identity card; without it the card opens Info. */
     onCardClick: (() -> Unit)? = null,
-    /** Trial: what Down from the action row opens, shown centred in the row. */
+    /** What Down from the action row opens, shown centred in the row. */
     downHint: String? = null,
-    /** Trial: the recent channels, newest first: a row above the channel card that Up opens; OK switches. */
+    /** The recent channels, newest first: a row above the channel card that Up opens; OK switches. */
     recents: List<RecentChannelPeek> = emptyList(),
     onRecentPick: ((Int) -> Unit)? = null,
     recentRowOpen: Boolean = false,
     onRecentRowOpenChange: (Boolean) -> Unit = {},
-    /** Trial: the rail stands in for the channel card, which keeps its focused look meanwhile. */
+    /** The rail stands in for the channel card, which keeps its focused look meanwhile. */
     channelCardHeld: Boolean = false,
-    /** Trial: where the identity card is, in root coordinates, for the rail to open from. */
+    /** Where the identity card is, in root coordinates, for the rail to open from. */
     onCardPlaced: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
+    /** Whether Left/Right on the channel card change channel (tap) or open the rail (hold). */
+    channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
+    /** Focus arrived on, or left, the channel card or its recent row. */
+    onChannelCardFocusChanged: (Boolean) -> Unit = {},
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
     PlayerControlsLayer(
@@ -143,16 +146,18 @@ internal fun PlayerChrome(
                     },
                     onClick = { onInteraction(); (onCardClick ?: onInfo)() }.takeIf { shown == PlayerChromeMode.CONTROLS },
                     channelCard = onChannelStep != null,
+                    channelCardStepping = channelCardStepping,
                     recents = if (onRecentPick != null) recents else emptyList(),
                     recentOpen = recentRowOpen && shown == PlayerChromeMode.CONTROLS,
                     onRecentOpenChange = onRecentRowOpenChange,
                     onRecentClick = { onInteraction(); onRecentPick?.invoke(it) },
                     onRecentInteraction = onInteraction,
-                    held = cardHeld && shown == PlayerChromeMode.CONTROLS)
+                    held = cardHeld && shown == PlayerChromeMode.CONTROLS,
+                    onFocusWithinChanged = onChannelCardFocusChanged)
             }
         }
         CompositionLocalProvider(LocalStateCellInset provides stateCell) {
-        // Trial: the footer's scrim rises behind the open Recent row so it reads over a bright picture.
+        // The footer's scrim rises behind the open Recent row so it reads over a bright picture.
         val recentRise by animateDpAsState(
             if (recentRowOpen && shown == PlayerChromeMode.CONTROLS && recents.isNotEmpty()) RecentRowScrimRise else 0.dp,
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
@@ -174,7 +179,6 @@ internal fun PlayerChrome(
                 onTogglePause = onTogglePause,
                 onSeek = onSeek,
                 onStop = onStop,
-                onRecord = onRecord,
                 onOptions = onOptions,
                 onInteraction = onInteraction,
                 onCommitSeek = onCommitSeek,
@@ -188,6 +192,7 @@ internal fun PlayerChrome(
                 onSeekMarker = onSeekMarker,
                 onChannelStep = onChannelStep,
                 onChannelZap = onChannelZap,
+                channelCardStepping = channelCardStepping,
                 downHint = downHint,
                 onRecent = { onRecentRowOpenChange(true) }.takeIf { recents.isNotEmpty() && onRecentPick != null },
             )
@@ -301,5 +306,5 @@ internal fun PlayerPresentedLiveTimeline(
     )
 }
 
-/** Trial: the open Recent row's height above the channel card, which the footer's scrim covers. */
+/** The open Recent row's height above the channel card, which the footer's scrim covers. */
 private val RecentRowScrimRise = 124.dp

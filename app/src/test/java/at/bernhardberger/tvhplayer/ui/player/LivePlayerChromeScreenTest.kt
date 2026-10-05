@@ -1642,6 +1642,22 @@ class LivePlayerChromeScreenTest {
         compose.mainClock.autoAdvance = true
     }
 
+    @Test fun withSteppingOffHoldingLeftOrRightOnTheChannelCardDoesNotOpenTheRailAndTheRecordActionIsGone() {
+        screen(channelCardStepping = false)
+        assertFalse("the live controls have no Record action", exists("player-record"))
+        key(Key.DirectionUp)
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        compose.onRoot().performKeyInput {
+            keyDown(Key.DirectionRight)
+            advanceEventTime(600)
+            keyUp(Key.DirectionRight)
+        }
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse("no rail opens", exists("player-channel-card-2"))
+        assertEquals("focus stays on the card", listOf(PlayerIdentityCardTag), focused())
+    }
+
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun playerInfoRailDownOpensFocusedChannelsScheduleAndBackRestoresTheRail() {
         screen()
@@ -2111,6 +2127,7 @@ class LivePlayerChromeScreenTest {
         )
 
     private fun screen(
+        channelCardStepping: Boolean = true,
         onClose: () -> Unit = {},
         failing: Boolean = false,
         fontScale: Float = 1f,
@@ -2190,7 +2207,7 @@ class LivePlayerChromeScreenTest {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                             channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
-                            contentAllowed = contentAllowed(), notices = notices,
+                            contentAllowed = contentAllowed(), notices = notices, channelCardStepping = channelCardStepping,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                         scrimUnderTest.value?.let { Box(Modifier.fillMaxSize().background(Color.White).then(it)) }
