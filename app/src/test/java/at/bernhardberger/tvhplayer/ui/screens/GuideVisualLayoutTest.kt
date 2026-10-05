@@ -28,7 +28,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -103,6 +103,7 @@ import kotlin.time.Instant
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideVisualLayoutTest {
+    // v2 keeps effects on the UI scheduler after Guide's Dispatchers.Default work completes.
     @get:Rule val compose = createComposeRule()
     private val models = ViewModelStore()
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
