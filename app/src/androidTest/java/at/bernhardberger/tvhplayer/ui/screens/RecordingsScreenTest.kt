@@ -19,6 +19,7 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.isDisplayed
@@ -287,7 +288,8 @@ class RecordingsScreenTest {
 
         composeRule.onNodeWithTag("recordings-folder-News").assertIsDisplayed()
             .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("folder-preview-recording-7").assertIsFocused()
+        waitForFocus("recording-list-entry-7")
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused().pressCenter()
         waitForFocus("recording-list-entry-7")
@@ -363,7 +365,7 @@ class RecordingsScreenTest {
                     }
                 }
             }
-            composeRule.runOnIdle { assertEquals(listOf("Series", "Season"), state.archivePath.value) }
+            composeRule.runOnIdle { assertEquals(listOf("Series", "Season"), state.archivePath) }
             composeRule.onAllNodes(isFocused()).assertCountEquals(1)
             dispatchBack()
             repeat(12) { frame ->
@@ -373,7 +375,7 @@ class RecordingsScreenTest {
                 if (frame in listOf(0, 2, 5, 11)) captureBrowseFrame(composeRule.onRoot(), "folder-back-frame-$frame")
             }
             composeRule.onNodeWithTag("recordings-folder-Series/Season").assertIsFocused()
-            composeRule.runOnIdle { assertEquals(listOf("Series"), state.archivePath.value) }
+            composeRule.runOnIdle { assertEquals(listOf("Series"), state.archivePath) }
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
@@ -391,7 +393,7 @@ class RecordingsScreenTest {
     fun archivePagingMotionKeepsDirectionThroughFocusHandoff() = assertArchivePagingMotion(inFolder = false)
 
     @Test
-    fun scrolledFolderBackRestoresViewportThenRootBackReturnsToDrawer() {
+    fun scrolledFolderBackRestoresViewportThenRootBackReturnsToArchiveTab() {
         val state = RecordingsScreenState()
         val entries = (1..20).map {
             recording(id = it, title = "Episode $it", path = "Folder ${it.toString().padStart(2, '0')}/episode.ts")
@@ -416,9 +418,9 @@ class RecordingsScreenTest {
         repeat(14) { composeRule.onAllNodes(isFocused())[0].performKeyInput { pressKey(Key.DirectionDown) } }
         val folder = composeRule.onNodeWithTag("recordings-folder-Folder 15").assertIsFocused()
         val beforeTop = folder.fetchSemanticsNode().boundsInRoot.top
-        val beforeIndex = state.archiveScrollPositions["archive:"]
-        val beforeOffset = state.archiveScrollOffsets["archive:"]
-        assertTrue("Fixture must have a scrolled parent", requireNotNull(beforeIndex) > 0)
+        val beforeIndex = state.archiveNavigation.stack.active.firstVisibleIndex
+        val beforeOffset = state.archiveNavigation.stack.active.scrollOffset
+        assertTrue("Fixture must have a scrolled parent", beforeIndex > 0)
         captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-parent-before")
         folder.pressCenter()
         waitForFocus("recording-list-entry-15")
@@ -427,14 +429,15 @@ class RecordingsScreenTest {
         waitForFocus("recordings-folder-Folder 15")
         composeRule.runOnIdle {
             assertFalse(drawerActive)
-            assertEquals(beforeIndex, state.archiveScrollPositions["archive:"])
-            assertEquals(beforeOffset, state.archiveScrollOffsets["archive:"])
+            assertEquals(beforeIndex, state.archiveNavigation.stack.active.firstVisibleIndex)
+            assertEquals(beforeOffset, state.archiveNavigation.stack.active.scrollOffset)
         }
         assertEquals(beforeTop, folder.fetchSemanticsNode().boundsInRoot.top, 1f)
         captureBrowseFrame(composeRule.onRoot(), "folder-scrolled-parent-restored")
         dispatchBack()
         composeRule.waitForIdle()
-        composeRule.runOnIdle { assertTrue("Root Back retains shell behavior", drawerActive) }
+        composeRule.onNodeWithText("Archive").assertIsFocused()
+        composeRule.runOnIdle { assertFalse(drawerActive) }
     }
 
     @Test
@@ -492,7 +495,7 @@ class RecordingsScreenTest {
         composeRule.onNodeWithText(if (modeSteps == 1) "Schedule" else "Problems").assertIsFocused()
         composeRule.runOnIdle {
             assertFalse(drawerActive)
-            assertEquals(listOf("Series", "Season"), state.archivePath.value)
+            assertEquals(listOf("Series", "Season"), state.archivePath)
         }
         dispatchBack()
         composeRule.waitForIdle()
@@ -538,7 +541,7 @@ class RecordingsScreenTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             assertFalse(drawerActive)
-            assertEquals(listOf("Series"), state.archivePath.value)
+            assertEquals(listOf("Series"), state.archivePath)
         }
         composeRule.onAllNodes(isFocused())[0].performKeyInput {
             repeat(modeSteps) { pressKey(Key.DirectionLeft) }
@@ -549,7 +552,7 @@ class RecordingsScreenTest {
         waitForFocus("recordings-folder-Series")
         composeRule.runOnIdle {
             assertFalse(drawerActive)
-            assertTrue(state.archivePath.value.isEmpty())
+            assertTrue(state.archivePath.isEmpty())
         }
     }
 
@@ -582,9 +585,8 @@ class RecordingsScreenTest {
         try {
             composeRule.onNodeWithTag("recordings-folder-Series").pressCenter()
             composeRule.mainClock.advanceTimeUntil(timeoutMillis = 500) {
-                state.archivePath.value == listOf("Series") && state.selectedKeys["archive:Series"] != null
+                composeRule.onAllNodes(hasTestTag("recording-list-entry-1") and isFocused()).fetchSemanticsNodes().isNotEmpty()
             }
-            composeRule.onAllNodes(hasTestTag("recording-list-entry-1") and isFocused()).assertCountEquals(0)
             composeRule.onAllNodes(isFocused())[0].performKeyInput {
                 keyDown(Key.DirectionUp); keyUp(Key.DirectionUp)
             }
@@ -665,7 +667,7 @@ class RecordingsScreenTest {
         waitForFocus("recording-list-entry-2")
         composeRule.runOnIdle {
             assertFalse(drawerActive)
-            assertEquals(if (remainingPath.contains('/')) listOf("Series") else emptyList<String>(), state.archivePath.value)
+            assertEquals(if (remainingPath.contains('/')) listOf("Series") else emptyList<String>(), state.archivePath)
         }
     }
 
@@ -792,7 +794,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun movingUpFromFolderPreviewReturnsToSelectedModeWithoutChangingIt() {
+    fun movingUpFromFirstEnteredFolderRowReturnsToSelectedModeWithoutChangingDepth() {
         val entries = listOf(
             recording(id = 7, title = "Evening News", path = "News/evening-news.ts")
         )
@@ -803,7 +805,8 @@ class RecordingsScreenTest {
 
         composeRule.onNodeWithTag("recordings-folder-News")
             .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("folder-preview-recording-7")
+        waitForFocus("recording-list-entry-7")
+        composeRule.onNodeWithTag("recording-list-entry-7")
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionUp) }
 
@@ -812,7 +815,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun backUnwindsPreviewFolderAndDetailsBeforeLeavingRecordings() {
+    fun backUnwindsEnteredFolderAndDetailsBeforeLeavingRecordings() {
         val entries = listOf(
             recording(id = 7, title = "Evening News", path = "News/evening-news.ts")
         )
@@ -823,7 +826,8 @@ class RecordingsScreenTest {
 
         composeRule.onNodeWithTag("recordings-folder-News")
             .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("folder-preview-recording-7")
+        waitForFocus("recording-list-entry-7")
+        composeRule.onNodeWithTag("recording-list-entry-7")
             .assertIsFocused()
         dispatchBack()
         composeRule.onNodeWithTag("recordings-folder-News").assertIsFocused().pressCenter()
@@ -840,7 +844,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun disabledBackLeavesFolderPreviewForTheShell() {
+    fun disabledBackLeavesEnteredFolderForTheShell() {
         var shellBackCount = 0
         val entries = listOf(
             recording(id = 7, title = "Evening News", path = "News/evening-news.ts")
@@ -857,11 +861,12 @@ class RecordingsScreenTest {
 
         composeRule.onNodeWithTag("recordings-folder-News")
             .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("folder-preview-recording-7")
+        waitForFocus("recording-list-entry-7")
+        composeRule.onNodeWithTag("recording-list-entry-7")
             .assertIsFocused()
         dispatchBack()
 
-        composeRule.onNodeWithTag("folder-preview-recording-7").assertIsFocused()
+        composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
         composeRule.runOnIdle { assertEquals(1, shellBackCount) }
     }
 
@@ -1304,12 +1309,10 @@ class RecordingsScreenTest {
             composeRule.mainClock.advanceTimeBy(96)
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("recording-list-entry-101").assertIsFocused()
-            val archivePosition = state.archiveScrollPositions["archive:"] to state.archiveScrollOffsets["archive:"]
-            val archiveSelection = state.selectedKeys["archive:"]
+            val archiveFrame = state.archiveNavigation.stack.active
             composeRule.mainClock.advanceTimeBy(96)
             composeRule.waitForIdle()
-            assertEquals(archivePosition, state.archiveScrollPositions["archive:"] to state.archiveScrollOffsets["archive:"])
-            assertEquals(archiveSelection, state.selectedKeys["archive:"])
+            assertEquals(archiveFrame, state.archiveNavigation.stack.active)
             composeRule.onNodeWithTag("recording-list-entry-101").assertIsFocused()
 
             composeRule.onNodeWithText("Schedule").requestFocus()
@@ -1776,12 +1779,12 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
         }
 
-        composeRule.onNodeWithTag("recordings-archive-list").performScrollToIndex(299)
+        composeRule.onNode(hasScrollToIndexAction() and hasAnyAncestor(hasTestTag("depth-active"))).performScrollToIndex(299)
         composeRule.onNodeWithText("Recording 1").assertIsDisplayed()
     }
 
     @Test
-    fun removingFocusedOffscreenRecordingRestoresFocusAtStartOfList() {
+    fun removingFocusedOffscreenRecordingRestoresFocusAtDeterministicNeighbor() {
         var entries by mutableStateOf(
             (1..50).map { id ->
                 recording(
@@ -1798,15 +1801,15 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme { TestRecordingsScreen(entries = entries) }
         }
 
-        composeRule.onNodeWithTag("recordings-archive-list").performScrollToIndex(49)
+        composeRule.onNode(hasScrollToIndexAction() and hasAnyAncestor(hasTestTag("depth-active"))).performScrollToIndex(49)
         composeRule.onNodeWithTag("recording-list-entry-1").requestFocus().assertIsFocused()
         composeRule.runOnIdle { entries = entries.filterNot { it.id == DvrEntryId(1) } }
 
-        waitForFocus("recording-list-entry-50")
+        waitForFocus("recording-list-entry-2")
     }
 
     @Test
-    fun removingFocusedFolderPreviewRecordingRestoresFirstRemainingPreview() {
+    fun removingFocusedEnteredFolderRecordingRestoresRemainingNeighbor() {
         var entries by mutableStateOf(
             (1..2).map { id ->
                 recording(
@@ -1826,12 +1829,13 @@ class RecordingsScreenTest {
         composeRule.onNodeWithTag("recordings-folder-News").performKeyInput {
             pressKey(Key.DirectionRight)
         }
-        composeRule.onNodeWithTag("folder-preview-recording-2").assertIsFocused()
+        waitForFocus("recording-list-entry-2")
+        composeRule.onNodeWithTag("recording-list-entry-2").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithTag("folder-preview-recording-1").assertIsFocused()
+        composeRule.onNodeWithTag("recording-list-entry-1").assertIsFocused()
         composeRule.runOnIdle { entries = entries.filterNot { it.id == DvrEntryId(1) } }
 
-        composeRule.onNodeWithTag("folder-preview-recording-2").assertIsFocused()
+        waitForFocus("recording-list-entry-2")
     }
 
     @Test
@@ -1881,7 +1885,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun longRecordingTitleDoesNotMoveLeadingOrTrailingContent() {
+    fun longRecordingTitleKeepsLeadingAndBelowTitleMetadataAligned() {
         val entries = listOf(
             recording(id = 1, title = "News", path = "recording-1.ts"),
             recording(
@@ -1909,13 +1913,13 @@ class RecordingsScreenTest {
             useUnmergedTree = true,
         )
             .fetchSemanticsNode().boundsInRoot
-        val shortTrailing = composeRule.onNodeWithTag(
-            "recording-list-trailing-1",
+        val shortMetadata = composeRule.onNodeWithTag(
+            "recording-list-metadata-1",
             useUnmergedTree = true,
         )
             .fetchSemanticsNode().boundsInRoot
-        val longTrailing = composeRule.onNodeWithTag(
-            "recording-list-trailing-2",
+        val longMetadata = composeRule.onNodeWithTag(
+            "recording-list-metadata-2",
             useUnmergedTree = true,
         )
             .fetchSemanticsNode().boundsInRoot
@@ -1930,9 +1934,11 @@ class RecordingsScreenTest {
 
         assertEquals(shortRow.height, longRow.height, 1f)
         assertEquals(shortLeading.top - shortRow.top, longLeading.top - longRow.top, 1f)
-        assertEquals(shortTrailing.top - shortRow.top, longTrailing.top - longRow.top, 1f)
+        assertEquals(shortMetadata.top - shortRow.top, longMetadata.top - longRow.top, 1f)
         assertEquals(shortHeadline.height, longHeadline.height, 1f)
-        assertTrue(longHeadline.right <= longTrailing.left)
+        assertEquals(longHeadline.left, longMetadata.left, 1f)
+        assertTrue(longHeadline.bottom <= longMetadata.top)
+        assertTrue(longLeading.right <= longHeadline.left)
     }
 
     private fun recording(

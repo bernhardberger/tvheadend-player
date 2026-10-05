@@ -214,6 +214,12 @@ rapid changes interrupt toward the latest target. Headers stay stationary.
   Screens do not add their own safe-area padding.
 - One `SideRail` hosts the standard **push** drawer; content translates and
   clips at its trailing edge, it does not reflow.
+- The accepted browse grid uses twelve 52dp columns, 20dp gutters and 58dp
+  nominal margins on the reference canvas. Channels, Archive and Settings use
+  an active column at x130, width340, and passive content at x562, width340
+  (92dp separation, 432dp depth stride). Native focus growth has its own reserve;
+  grid gutters do not replace it. Keep the existing rail and global safe-padding
+  inputs; apply these browse coordinates inside the owning layouts.
 - **Warm playback**: when live playback continues behind an ordinary
   destination, one global black scrim sits above the video and below
   navigation, content and notices at **0.84** across ordinary destinations.
@@ -229,7 +235,13 @@ rapid changes interrupt toward the latest target. Headers stay stationary.
   128dp beyond the drawer edge, without a stop at the drawer boundary. The drawer remains
   above it and retains standard push behaviour. These are product values, not
   Material requirements. The backing applies to every browse destination;
-  the shared sidebar scene and scope-tab transitions do not clip at the drawer
+  the active sheet's content paints **above** this gradient, while departing
+  sheets remain beneath it. Do not dim the current sheet's headings, icons,
+   rows or focus fill. The shell draws the backing first; the outermost departing
+   contribution receives screen-aligned black source-atop attenuation. This
+   preserves its alpha and transparent gaps without dimming active content or
+   applying the backing twice to nested outgoing layers.
+  The shared sidebar scene and scope-tab transitions do not clip at the drawer
   edge. Each scrolling list still owns its vertical viewport clipping.
 
 ## 5. Navigation drawer
@@ -298,9 +310,9 @@ Accepted 2026-09-15; static design in Penpot page
 - One active list column; the next level is a read-only **preview** to its
   right. Entering a level slides the child into the active slot and moves the
   parent fully off-screen. The container supports arbitrary depth and is
-  reusable (recording folders are a candidate consumer; not designed yet).
-- Geometry on the 80dp shell: active column x128, width 352; preview x588
-  (108dp gap), 460dp step. Playback and the warm scrim stay stationary; only
+  reused by Archive folder browsing (§9).
+- Shared-grid geometry on the 80dp shell: active column x130, width340; preview
+  x562 (92dp gap), 432dp step. Playback and the warm scrim stay stationary; only
   columns move.
 - Motion and emphasis follow AOSP TvSettings' two-panel transition: preview
   opacity 0.6; the slide is a long decelerating tween (1000ms, cubic-bezier
@@ -371,50 +383,135 @@ tuner loss and interruption are failures, limit expiry is informational.
 - Unknown timing is shown as unknown; never interpolate across unrelated
   coordinates or imply seekability that is not verified.
 
-### Channels · standard immersive browse
+### Channels · immersive browse and programme preview
 
-Revised by operator acceptance 2026-09-19 after G10 viewing: standard rows replace
-the dense version; the implemented picon/content/marker arrangement is retained
-rather than restoring the earlier Penpot anatomy. Static design in Penpot page
-`411cd6b7-a446-8042-8008-a3866b9562cf`, board C3c
-`baab38e6-8768-8070-8008-a9c62d36a24c`. C3b
-`baab38e6-8768-8070-8008-a9c12c3a31a7` is the superseded dense variant.
+Visual baseline accepted for implementation 2026-10-04 after the coordinated
+browse concept review. This replaces the former headline-free, no-artwork C3c
+composition while retaining its native rows, focus and playback contracts.
 
-- Channels is **immersive**: no destination headline, live video visible behind
-  the content, and readability comes from the shell-owned warm-playback scrim in
-  §4. There is no duplicate content-local scrim and no rail/list boundary seam.
-- Scope tabs sit at the list's leading axis (x116 on the 960×540 canvas: the
-   shell's 24dp inset plus the list's 12dp focus reserve) at y32. The standard list
-  starts at y80, is 340dp wide, and runs to the bottom of the screen behind a
-  48dp fade. Rows scroll out under the fade; **focus never enters it** — the
-  list's bring-into-view policy shortens the viewport by the fade plus breathing
-  room so a focused row is never clipped by it or by its focus scale.
+- The **Channels** headline shares the browse heading axis at x130, y32 on the
+  960×540 reference canvas. Scope tabs sit at x130, y80; rows begin below them.
+  At larger text, header/scope bands grow from their actual text measurements.
+  Header actions appear only when backed by working, authorized behavior; the
+  concept's Search/View placeholders are not inert production controls.
+- Live video remains behind the content under the shell-owned warm-playback
+  scrim in §4. There is no duplicate screen-local video scrim or rail/list seam.
+- The list's leading axis includes the shell's 24dp inset and a further 26dp,
+  with its 12dp focus reserve inside that additional inset. Standard rows are
+  340dp wide, with a 92dp visual gap to the passive 340dp preview at x562.
+  The list runs to the screen bottom behind a
+  48dp fade. A matching local top fade appears only while earlier rows exist;
+  returning to the first-row boundary removes it. Headings, tabs and the preview
+  are outside these masks. Rows scroll out under the fades; **settled focus never
+  enters them** — native scrolling and explicit restoration share the readable
+  viewport, including focus-scale breathing room. The TV pivot policy must settle
+  at the top boundary without alternating scroll requests or flickering the fade.
 - Rows are the library's standard `ListItem`: native padding, height and growth
-   at 1.3× fonts, with a 60×36 bare picon in the leading slot (aspect preserved,
-   no logo box or background), native 16sp headline and Material 14sp `bodyMedium` supporting text,
-   indication and focus scale. Rows are 4dp apart. The
+  at 1.3× fonts, with a 60×36 bare picon in the leading slot (aspect preserved,
+  no logo box or background), native 16sp headline and Material 14sp `bodyMedium`
+  supporting text, indication and focus scale. Rows are 4dp apart. The
   row is one D-pad target; the title is `[number]  [name]`.
 - The supporting line is `HH:MM · programme title` for the **current** programme;
-   there is no minutes-left label. Start time keeps its natural width and only
-   the title ellipsizes, from real text layout. Unknown EPG shows the no-EPG label
+  there is no minutes-left label. Start time keeps its natural width and only
+  the title ellipsizes, from real text layout. Unknown EPG shows the no-EPG label
   with no timing and no progress.
 - Passive progress is a 2dp strip under the supporting line, spanning the text
   column, identical on focused, unfocused, playing and recording rows.
 - Playing and recording markers sit beside the title and appear only when they
   apply; no slot is reserved for an absent state. They are decorative and
   non-focusable, and they shorten only the title.
-- Focused-programme detail is immersive text, not a panel: bottom-anchored at
-  x492, 420dp wide, with channel label, title, timing and metadata, a 4dp
-   progress strip, a description of up to five actual lines and the next programme.
-   The block grows upward above the next line, including at 1.3× font scale;
-   bounded text cannot overlap. It holds no focus target and no
-  artwork; there is no poster or fanart API in this composition.
-- Because the block holds no focus, it **crossfades** rather than hard-cutting as
+- The preview starts beside the list and stays within the trailing/bottom safe
+  insets. Use available programme artwork in a **16:9** slot, otherwise a contained
+  picon over restrained ambient color, otherwise the ordinary channel glyph over
+  a neutral surface. Loading/error retain the same slot and fallback. Artwork may
+  be deliberately cover-cropped; logos stay uncropped. Use existing session-bound
+  artwork loading, never an external artwork-discovery service.
+- Short channel identity, start–end time and truthful programme progress occupy
+  the image's bottom content area over a local black gradient. Unknown timing and
+  progress are omitted. This image-local gradient is separate from the shell's
+  video and navigation scrims. Keep fallback imagery clear of the embedded text.
+- Programme title and a separately supplied subtitle remain outside the image.
+  Absent subtitles leave no gap; never derive them from title punctuation.
+  Use native `titleLarge` (22/28) for the title, at most two lines;
+  `titleMedium` (16/24) for the subtitle; and `bodyMedium` (14/20) in
+  `onSurfaceVariant` for the synopsis. These passive roles replace the earlier
+  oversized headline/body treatment; user text scaling remains intact.
+  Image/title and title/subtitle use 4dp gaps. Following G10 feedback, artwork is
+  **constant across programmes**: 340×191.25dp at the reference viewport, including
+  1.3× text. Only viewport/type configuration may reduce that 16:9 slot to reserve
+  at least one title line, one subtitle line and the footer; metadata never resizes it.
+- **Next stays at the bottom** of the detail column (y508 at the reference viewport).
+  Reserve its one-line footer and 8dp separation even when no Next metadata exists;
+  leave it empty rather than inventing a programme. Fit measured whole text lines
+  above it: synopsis yields first (up to three lines, two at 1.3×, including complete
+  omission), then title/subtitle ellipsize while retaining at least one line each.
+  Preserve native type sizes and the stable artwork/title anchors.
+- The preview is passive and never an additional D-pad target. It **crossfades** rather than hard-cutting as
   the browsed row changes: a 160ms dissolve, short enough that fast row-to-row
   browsing still feels immediate. Each state resolves its own EPG, so the
-  outgoing copy keeps the channel it was written for. Height differs between
-  programmes, so the size snaps and the taller copy is left unclipped instead of
-  animating text baselines against the bottom anchor.
+  outgoing copy keeps the channel it was written for. Layout adapts without
+  animating text baselines. Missing programme metadata does not itself make a
+  channel unwatchable. Do not add a persistent OK reminder.
+
+### Guide and Recordings · browse cohesion
+
+The shared-grid follow-up extends the 2026-10-04 visual baseline. Archive now
+uses the depth model below; destination entry, scope selection, details-first
+activation, DVR eligibility, confirmations and current-session guards remain.
+
+- Headings share x130/y32 and scopes y80 on the reference canvas. Use native TV
+  Material rows/cards and indication with reserved focus-growth space. Text scale
+  changes the available rows/columns, never the native font sizes.
+- Guide keeps date/Now/Search together using existing working actions, with
+  trailing focus clearance. Its 172dp channel gutter and 8dp gap put the timeline
+  at x310, extending 650dp to the physical edge, with the ruler above
+  the programme rows. Timeline and channel content may continue to the physical
+  trailing/bottom edges beneath local 48dp fades. Leading/top fades appear only
+  when more content exists there. Headers, controls and scopes remain clear.
+  Settled focused cells remain inside the unfaded area; real data/history bounds
+  must not imply unavailable overflow. Preserve physical Left earlier/Right later.
+- At a terminal physical edge, reserve 48dp plus native focus-growth allowance
+  rather than letting focus touch the screen edge. This is blank spatial padding,
+  not additional time availability. Ruler, cells and Now share its mapping;
+  normal cells retain their full duration allocation. Apply it on physical right
+  for LTR future bounds and physical left for RTL history bounds. Continuing
+  edges retain overflow and fades, and time capacity is not reduced a second time.
+- Guide's continuous 2dp current-time marker paints above cells and their focus
+  treatment using the same time mapping as event widths and the ruler. Its ruler
+  marker stays visible during vertical scrolling; the line follows the local
+  content fade. Gaps are explicitly labeled without implying available programmes.
+- Guide's normal native rows are 80dp high; larger text increases that height.
+  The channel number and contained 44×20dp picon share a compact upper line.
+  The name uses native `titleSmall` (14/20), up to two lines, across the 156dp
+  inner width below it. Measure both header and programme typography when growing
+  lanes (104dp at the reference 1.3× scale); do not shrink fonts or distort logos.
+  The visible time span adapts to measured labels (normally three hours, two
+  with enlarged text). This does not change the three-hour acquisition window
+  or the existing history/future availability policy.
+- Recordings uses native growing rows, with date/duration/status below titles.
+  Archive, Schedule and Problems remain separate; Schedule and Problems are flat
+  lists with full-row native focus clearance. Reserve trailing layout space so
+  the complete focused shape remains at least 48dp from the physical screen edge;
+  an unclipped shape alone is not sufficient. Preserve larger caller safe insets.
+- Archive shares Settings' depth owner, geometry, motion and parent restoration.
+  One folder level is active; the right column is an inert preview of the focused
+  folder's immediate children, or passive metadata for a recording. It is not a
+  recent-descendant shortcut and never receives focus independently. Both preview
+  forms are excluded from accessibility traversal as well as D-pad actions.
+- OK/Right enters a folder. Left/Back returns to its parent and invoking row with
+  the parent viewport retained. OK on a recording opens existing details; Right
+  does not activate it. Details/confirmations return to the same recording. At
+  root, Back reaches the Archive tab and Left reaches the drawer; Up from the
+  first row reaches mode tabs without losing the folder location.
+- Keep a 32dp level-heading slot above the rows, growing with text metrics. Root
+  leaves it blank; nested levels show their current folder. Do not add a focusable
+  breadcrumb or duplicate Up action. Preview and active headings share geometry.
+- Removed paths reconcile to a surviving ancestor; valid empty levels retain an
+  explicit empty state and usable Back. Refreshes cannot steal focus from tabs,
+  the drawer or a dialog. Rendered-visit ownership and permission to request focus
+  are separate; departing visits cannot reconcile the shared navigation state.
+  Folder identity, recording order and permission/session fences
+  come from the existing domain/SDK owners.
 
 ## 10. Player
 

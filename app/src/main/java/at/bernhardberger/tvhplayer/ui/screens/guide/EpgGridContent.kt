@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -29,8 +29,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
 import at.bernhardberger.tvhplayer.core.shouldComposeTimelineCell
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -42,6 +46,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.Button
@@ -69,7 +74,6 @@ import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseTabOwner
 import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -78,8 +82,17 @@ import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 import coil3.ImageLoader
 
-private val CHANNEL_HEADER_WIDTH = 190.dp
-private val TIMELINE_ROW_HEIGHT = 76.dp
+@Composable
+internal fun guideTimelineRowHeight(): Dp = with(LocalDensity.current) {
+    val titleLines = MaterialTheme.typography.titleSmall.lineHeight.toDp() * 2
+    // Preserve both complete name lines below the identity strip, and the native
+    // programme ListItem's time line plus its 12dp top/bottom content padding.
+    maxOf(
+        80.dp * fontScale,
+        maxOf(20.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp()) + 4.dp + titleLines + 12.dp,
+        titleLines + MaterialTheme.typography.bodySmall.lineHeight.toDp() + 24.dp,
+    )
+}
 
 @Composable
 internal fun TimelineTimeRuler(
@@ -87,21 +100,25 @@ internal fun TimelineTimeRuler(
     windowEndSec: Long,
     nowSecProvider: () -> Long,
     modifier: Modifier = Modifier,
+    earlierContent: Boolean = false,
+    laterContent: Boolean = false,
 ) {
     val nowSec = nowSecProvider()
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(38.dp),
+            .height(with(LocalDensity.current) {
+                maxOf(28.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp() + 12.dp)
+            }),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
             modifier = Modifier
-                .width(CHANNEL_HEADER_WIDTH)
+                .width(GuideChannelWidth)
                 .fillMaxHeight(),
             shape = MaterialTheme.shapes.small,
             colors = SurfaceDefaults.colors(
-                containerColor = TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha),
+                containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
         ) {
@@ -109,30 +126,38 @@ internal fun TimelineTimeRuler(
                 Text(
                     text = stringResource(R.string.epg_channels_heading),
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp),
                 )
             }
         }
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(GuideChannelGap))
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.small)
-                .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha)),
+                .testTag("epg-time-ruler"),
         ) {
-            repeat(6) { markerIndex ->
-                val markerOffset = maxWidth * (markerIndex / 6f)
+            val density = LocalDensity.current
+            val trackWidthPx = with(density) { maxWidth.toPx() }
+            Box(Modifier.fillMaxSize().guideViewportFades(0f, trackWidthPx, earlierContent, laterContent)) {
+            val firstTick = Math.floorDiv(windowStartSec + 1799L, 1800L) * 1800L
+            for (tick in firstTick until windowEndSec step 1800L) {
+                val markerOffset = with(density) {
+                    guideTimePositionPx(tick, windowStartSec, windowEndSec, trackWidthPx).toDp()
+                }
                 Column(
                     modifier = Modifier
-                        .offset(x = markerOffset)
+                        .align(AbsoluteAlignment.TopLeft)
+                        .absoluteOffset(x = markerOffset)
                         .fillMaxHeight(),
+                    horizontalAlignment = AbsoluteAlignment.Left,
                 ) {
                     Text(
-                        text = formatHm(windowStartSec + markerIndex * 30 * 60L),
+                        text = formatHm(tick),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 6.dp, top = 4.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                     Spacer(Modifier.height(3.dp))
                     Box(
@@ -146,26 +171,21 @@ internal fun TimelineTimeRuler(
                 }
             }
             if (nowSec in windowStartSec until windowEndSec) {
-                val nowFraction = (nowSec - windowStartSec).toFloat() /
-                    (windowEndSec - windowStartSec).coerceAtLeast(1L)
+                val nowOffset = with(density) {
+                    guideTimePositionPx(nowSec, windowStartSec, windowEndSec, trackWidthPx).toDp()
+                }
                 Box(
                     modifier = Modifier
-                        .offset(x = maxWidth * nowFraction - 5.dp)
-                        .width(10.dp)
-                        .height(10.dp)
-                        .align(Alignment.TopStart)
+                        .align(AbsoluteAlignment.BottomLeft)
+                        .absoluteOffset(x = nowOffset - 4.dp)
+                        .width(8.dp)
+                        .height(8.dp)
                         .background(
                             color = MaterialTheme.colorScheme.primary,
-                            shape = MaterialTheme.shapes.extraSmall,
+                            shape = CircleShape,
                         ),
                 )
-                Box(
-                    modifier = Modifier
-                        .offset(x = maxWidth * nowFraction)
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.primary),
-                )
+            }
             }
         }
     }
@@ -192,6 +212,8 @@ internal fun TimelineChannelRow(
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
     visibleRowWidthPx: Int? = null,
+    focusStartInset: Dp = 0.dp,
+    focusEndInset: Dp = 0.dp,
 ) {
     val nowSec = nowSecProvider()
     // Share one zone lookup across the row's cells, refreshed on the existing clock.
@@ -203,7 +225,8 @@ internal fun TimelineChannelRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(TIMELINE_ROW_HEIGHT)
+            .height(guideTimelineRowHeight())
+            .testTag("epg-channel-row-${channel.id.value}")
             .profileViewportItem { "guideRow:$channelIndex:$windowStartSec:${events.size}" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -214,7 +237,7 @@ internal fun TimelineChannelRow(
             currentSession = currentSession,
             selected = selectedEventId != null,
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(GuideChannelGap))
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
@@ -224,8 +247,9 @@ internal fun TimelineChannelRow(
                 .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small),
         ) {
             val density = LocalDensity.current
+            val layoutDirection = LocalLayoutDirection.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
-                with(density) { CHANNEL_HEADER_WIDTH.roundToPx() + 4.dp.roundToPx() },
+                with(density) { GuideChannelWidth.roundToPx() + GuideChannelGap.roundToPx() },
             )
             events.forEach { event ->
                 val span = timelineEventSpan(
@@ -234,11 +258,21 @@ internal fun TimelineChannelRow(
                     windowStartSec = windowStartSec,
                     windowEndSec = windowEndSec,
                 ) ?: return@forEach
-                val start = maxWidth * span.startFraction
-                val width = maxWidth * (span.endFraction - span.startFraction)
                 val isFocusTarget = selectedEventId == event.id
+                val fullStart = maxWidth * span.startFraction
+                val fullEnd = maxWidth * span.endFraction
+                val readableWidth = (maxWidth - focusStartInset - focusEndInset).coerceAtLeast(0.dp)
+                val oversized = isFocusTarget && fullEnd - fullStart > readableWidth
+                // Only oversized programmes use a readable fragment. Normal cells retain
+                // their full time allocation; the shared terminal viewport reserves scale.
+                val start = if (oversized) maxOf(fullStart, focusStartInset) else fullStart
+                val end = if (oversized) minOf(fullEnd, maxWidth - focusEndInset) else fullEnd
+                val width = (end - start).coerceAtLeast(0.dp)
                 if (!shouldComposeTimelineCell(
-                        startPx = with(density) { start.roundToPx() },
+                        // Shell clipping is logical-leading; the time axis is physical.
+                        startPx = with(density) {
+                            (if (layoutDirection == LayoutDirection.Rtl) maxWidth - end else start).roundToPx()
+                        },
                         widthPx = with(density) { width.roundToPx() },
                         visibleWidthPx = visibleTrackWidthPx,
                         isFocusTarget = isFocusTarget,
@@ -267,7 +301,8 @@ internal fun TimelineChannelRow(
                         onOpenDetails = { onOpenDetails(event) },
                         width = width,
                         modifier = Modifier
-                            .offset(x = start)
+                            .align(AbsoluteAlignment.TopLeft)
+                            .absoluteOffset(x = start)
                             .width(width)
                             .fillMaxHeight()
                             .profileViewportItem { "guideCell:$channelIndex:${event.id.value}" },
@@ -291,17 +326,6 @@ internal fun TimelineChannelRow(
                 )
             }
 
-            if (nowSec in windowStartSec until windowEndSec) {
-                val nowFraction = (nowSec - windowStartSec).toFloat() /
-                    (windowEndSec - windowStartSec)
-                Box(
-                    modifier = Modifier
-                        .offset(x = maxWidth * nowFraction)
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-            }
         }
     }
 }
@@ -316,8 +340,9 @@ internal fun TimelineChannelHeader(
 ) {
     Surface(
         modifier = Modifier
-            .width(CHANNEL_HEADER_WIDTH)
-            .fillMaxHeight(),
+            .width(GuideChannelWidth)
+            .fillMaxHeight()
+            .testTag("epg-channel-header-${channel.id.value}"),
         colors = SurfaceDefaults.colors(
             containerColor = if (selected) {
                 TvSurfaceColors.containerHighest
@@ -328,28 +353,43 @@ internal fun TimelineChannelHeader(
         ),
         shape = MaterialTheme.shapes.small,
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
                 .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
-            PiconBox(
-                imageLoader = imageLoader,
-                currentSession = currentSession,
-                piconPath = channel.icon,
-                modifier = Modifier
-                    .width(44.dp)
-                    .height(30.dp),
-            )
-            Spacer(Modifier.width(TvSpacing8))
-            ChannelTitle(
-                number = number,
-                name = channel.name.orEmpty(),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
+            ) {
+                if (number != null) {
+                    Text(
+                        text = number.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                if (channel.icon != null) {
+                    PiconBox(
+                        imageLoader = imageLoader,
+                        currentSession = currentSession,
+                        piconPath = channel.icon,
+                        modifier = Modifier
+                            .width(44.dp)
+                            .height(20.dp)
+                            .testTag("epg-channel-picon-${channel.id.value}"),
+                    )
+                }
+            }
+            Text(
+                text = channel.name.orEmpty(),
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
-                modifier = Modifier.weight(1f),
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -420,7 +460,7 @@ internal fun TimelineProgrammeCell(
             modifier = Modifier
                 .browseTabFocus()
                 .fillMaxSize()
-                .padding(horizontal = 1.dp, vertical = 2.dp)
+                .padding(horizontal = 4.dp)
                 // The panel shape is drawn, not clipped: a clip here would cancel the
                 // library focus scale the surface applies outside this modifier.
                 .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)

@@ -17,6 +17,12 @@ val TvSpacing80 = 80.dp
 /** Stable title/action slot shared by peer top-level browse destinations. */
 val TvBrowseHeaderHeight = 40.dp
 
+/** Nominal browse columns; native focus overflow is reserved inside the leading inset. */
+val TvBrowseColumnWidth = 340.dp
+val TvBrowseColumnGap = 92.dp
+val TvBrowseLeadingInset = 26.dp
+val TvBrowseTrailingInset = 58.dp
+
 // ---- Product opacity ----
 const val TvTextPrimaryAlpha = 1.00f
 const val TvTextSecondaryAlpha = 0.88f
@@ -62,8 +68,8 @@ val ChannelScopeItemMaxWidth = 196.dp
 val TvNavigationRailGradientRunout = TvSpacing32
 
 /** Settings C logical geometry. Shell inset and drawer translation are separate. */
-val SettingsDepthColumnWidth = 352.dp
-val SettingsDepthColumnGap = 108.dp
+val SettingsDepthColumnWidth = TvBrowseColumnWidth
+val SettingsDepthColumnGap = TvBrowseColumnGap
 val SettingsDepthHeadingHeight = 60.dp
 val SettingsDepthRowMinHeight = 56.dp
 

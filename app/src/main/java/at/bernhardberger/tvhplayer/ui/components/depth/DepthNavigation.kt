@@ -32,7 +32,14 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import at.bernhardberger.tvhplayer.ui.components.BrowseContentLayer
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import kotlin.math.roundToInt
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 
@@ -41,6 +48,7 @@ class DepthRow(
     val item: DepthItem,
     val onActivate: () -> Unit = {},
     val leafLevelId: String? = null,
+    val previewLevelId: String? = item.childLevelId,
     val content: @Composable (Modifier, () -> Unit) -> Unit,
 )
 
@@ -52,6 +60,8 @@ class DepthLevel(
     // Editors forward non-editing Left here before a read-only text field consumes it.
     val activeContent: (@Composable (FocusRequester, (KeyEvent) -> Boolean) -> Unit)? = null,
     val initialItemId: String? = null,
+    val passiveContent: (@Composable () -> Unit)? = null,
+    val emptyContent: (@Composable () -> Unit)? = null,
 )
 
 /** One composed column in the sliding strip. Path is its visual identity. */
@@ -145,11 +155,17 @@ fun DepthNavigation(
     onRootBack: (() -> Unit)? = null,
     previewAlpha: Float = DepthPreviewAlpha,
     isCurrent: Boolean = true,
+    onRootLeft: (() -> Unit)? = onRootBack,
+    onFirstRowUp: (() -> Unit)? = null,
+    activeFocusRequester: FocusRequester? = null,
+    pageKeyDirection: ((Int) -> Int?)? = null,
 ) {
     val stack = state.stack
     fun resolve(id: String): DepthLevel {
         val candidate = levels[id]
-        return candidate?.takeIf { it.rows.isNotEmpty() || it.activeContent != null } ?: fallbackLevel(id)
+        return candidate?.takeIf {
+            it.rows.isNotEmpty() || it.activeContent != null || it.passiveContent != null || it.emptyContent != null
+        } ?: fallbackLevel(id)
     }
     val level = resolve(stack.active.levelId)
     val identities = level.rows.map { it.item }
@@ -163,6 +179,7 @@ fun DepthNavigation(
     var editorLeftExit by remember { mutableStateOf(false) }
     var pendingRootBack by remember { mutableStateOf<Int?>(null) }
     var pendingRootVisit by remember { mutableLongStateOf(0L) }
+    var pendingExit by remember { mutableStateOf<(() -> Unit)?>(null) }
     val stepPixels = with(LocalDensity.current) { (columnWidth + columnGap).roundToPx() }
     // Sibling preview fade duration is the framework long animation time, not a guessed
     // constant. AOSP preview replace uses config_longAnimTime for both fade_in and fade_out.
@@ -211,8 +228,12 @@ fun DepthNavigation(
             } else current.onActivate()
         }
     }
-    SideEffect { if (state.stack == stack && reconciled != stack) state.update(reconciled) }
-    BackHandler(isCurrent && backEnabled && initialFocusEnabled && stack.canPop) { pop() }
+    SideEffect {
+        if (latestIsCurrent.value && state.stack == stack && reconciled != stack) state.update(reconciled)
+    }
+    BackHandler(isCurrent && backEnabled && initialFocusEnabled && (stack.canPop || onRootBack != null)) {
+        if (stack.canPop) pop() else onRootBack?.invoke()
+    }
 
     val desired = buildList {
         reconciled.frames.forEachIndexed { index, frame ->
@@ -221,11 +242,10 @@ fun DepthNavigation(
             if (columnLevel.activeContent == null) add(DepthStripColumn(path, columnLevel, frame))
         }
         if (level.activeContent == null) {
-            val previewKey = reconciled.previewKey(identities)
-            val childId = previewKey?.childLevelId
-            if (childId != null && reconciled.acceptsPreview(previewKey, identities)) {
+            val childId = level.rows.firstOrNull { it.item.id == reconciled.active.focusedItemId }?.previewLevelId
+            if (childId != null) {
                 val previewLevel = resolve(childId)
-                if (previewLevel.activeContent == null && previewLevel.rows.isNotEmpty()) {
+                if (previewLevel.activeContent == null) {
                     add(DepthStripColumn(reconciled.path + childId, previewLevel, DepthFrame(childId)))
                 }
             }
@@ -254,14 +274,24 @@ fun DepthNavigation(
         val code = native.keyCode
         val back = code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_DPAD_LEFT
         val right = code == KeyEvent.KEYCODE_DPAD_RIGHT
-        if (!back && !right) return@onPreviewKeyEvent false
+        val up = code == KeyEvent.KEYCODE_DPAD_UP
+        if (!back && !right && !up) return@onPreviewKeyEvent false
+        val exit = when (code) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> onRootLeft
+            KeyEvent.KEYCODE_BACK -> onRootBack
+            KeyEvent.KEYCODE_DPAD_UP -> onFirstRowUp.takeIf {
+                state.stack.active.focusedItemId == level.rows.firstOrNull()?.item?.id
+            }
+            else -> null
+        }
         val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
             when {
                 level.activeContent != null -> false // The editor/IME owns input before local Back.
                 back && backEnabled && state.stack.canPop -> { pop(); true }
-                back && backEnabled && onRootBack != null -> {
+                (back && backEnabled || up) && exit != null -> {
                     pendingRootBack = code
                     pendingRootVisit = state.stack.visit
+                    pendingExit = exit
                     true
                 }
                 code == KeyEvent.KEYCODE_DPAD_RIGHT -> {
@@ -275,7 +305,9 @@ fun DepthNavigation(
         // Root handoff leaves this key owner; finish its cycle before moving to the drawer.
         if (native.action == KeyEvent.ACTION_UP && pendingRootBack == code) {
             pendingRootBack = null
-            if (!native.isCanceled && !state.stack.canPop && pendingRootVisit == state.stack.visit) onRootBack?.invoke()
+            val action = pendingExit
+            pendingExit = null
+            if (!native.isCanceled && pendingRootVisit == state.stack.visit) action?.invoke()
         }
         consumed
     }.onKeyEvent { event ->
@@ -314,7 +346,9 @@ fun DepthNavigation(
                             columnWidth = columnWidth,
                             contentPadding = contentPadding,
                             previewAlpha = previewAlpha,
-                            initialFocusEnabled = initialFocusEnabled,
+                             initialFocusEnabled = initialFocusEnabled,
+                             activeFocusRequester = activeFocusRequester,
+                             pageKeyDirection = pageKeyDirection,
                             list = listState(column.path, column.frame),
                             identities = if (column.path == state.stack.path) identities else column.level.rows.map { it.item },
                             onFocusItem = { itemId, items, owned ->
@@ -358,7 +392,7 @@ fun DepthNavigation(
                                 if (path != null) {
                                     val childId = path.last()
                                     val previewLevel = resolve(childId)
-                                    if (previewLevel.activeContent == null && previewLevel.rows.isNotEmpty()) {
+                                    if (previewLevel.activeContent == null) {
                                         val column = DepthStripColumn(path, previewLevel, DepthFrame(childId))
                                         key(column.path) {
                                             val columnVisit = state.stack.visit
@@ -378,7 +412,9 @@ fun DepthNavigation(
                                                 columnWidth = columnWidth,
                                                 contentPadding = contentPadding,
                                                 previewAlpha = previewAlpha,
-                                                initialFocusEnabled = initialFocusEnabled,
+                                                 initialFocusEnabled = initialFocusEnabled,
+                                                 activeFocusRequester = null,
+                                                 pageKeyDirection = null,
                                                 list = listState(column.path, column.frame),
                                                 identities = column.level.rows.map { it.item },
                                                 onFocusItem = { itemId, items, owned ->
@@ -436,6 +472,7 @@ fun DepthNavigation(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun DepthStripPane(
     column: DepthStripColumn,
     activePath: List<String>,
@@ -449,6 +486,8 @@ private fun DepthStripPane(
     contentPadding: PaddingValues,
     previewAlpha: Float,
     initialFocusEnabled: Boolean,
+    activeFocusRequester: FocusRequester?,
+    pageKeyDirection: ((Int) -> Int?)?,
     list: LazyListState,
     identities: List<DepthItem>,
     onFocusItem: (String, List<DepthItem>, Long) -> Unit,
@@ -458,18 +497,27 @@ private fun DepthStripPane(
     viewportOffset: Int,
     onViewport: (Int, Int, Long, List<DepthItem>) -> Unit,
 ) {
-    val active = column.path == activePath && isCurrent
+    val visuallyActive = column.path == activePath
+    val active = visuallyActive && isCurrent
     val capturedVisit = visit
     val latestActive = rememberUpdatedState(active)
     val latestStillOwning = rememberUpdatedState(stillOwning)
     val latestFocusedId = rememberUpdatedState(focusedItemId)
-    val targetAlpha = if (active) 1f else previewAlpha
+    val latestFocusEnabled = rememberUpdatedState(initialFocusEnabled)
+    val targetAlpha = if (active || column.level.passiveContent != null) 1f else previewAlpha
     val alpha by animateFloatAsState(
         targetValue = targetAlpha,
         animationSpec = tween(DepthAlphaMillis),
         label = "depth-column-alpha",
     )
     val focus = remember { mutableStateMapOf<String, FocusRequester>() }
+    val scope = rememberCoroutineScope()
+    val bringIntoViewSpec = LocalBringIntoViewSpec.current
+    var pageJob by remember { mutableStateOf<Job?>(null) }
+    var pageTarget by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(active, capturedVisit, initialFocusEnabled, identities) {
+        onDispose { pageJob?.cancel(); pageTarget = null }
+    }
     val targetId = focusedItemId
     LaunchedEffect(capturedVisit, active, initialFocusEnabled, column.level.rows.map { it.item.id }) {
         if (!active || !initialFocusEnabled) return@LaunchedEffect
@@ -477,7 +525,7 @@ private fun DepthStripPane(
         val targetIndex = column.level.rows.indexOfFirst { it.item.id == targetId }
         if (targetIndex < 0) return@LaunchedEffect
         suspend fun stillThisTarget() =
-            latestStillOwning.value(capturedVisit) && latestFocusedId.value == targetId
+            latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && latestFocusedId.value == targetId
         if (list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) {
             if (!stillThisTarget()) return@LaunchedEffect
             list.scrollToItem(viewportIndex, viewportOffset)
@@ -500,56 +548,104 @@ private fun DepthStripPane(
                 }
         }
     }
-    Column(
-        Modifier
-            .offset { IntOffset(xOffset, 0) }
-            .width(columnWidth)
-            .fillMaxHeight()
-            .graphicsLayer { this.alpha = alpha }
-            .padding(top = contentPadding.calculateTopPadding())
-            .then(
-                when {
-                    active -> Modifier.testTag("depth-active")
-                    column.path.size == activePath.size + 1 ->
-                        Modifier.clearAndSetSemantics { }.testTag("depth-preview")
-                    else -> Modifier.clearAndSetSemantics { }
-                },
-            ),
-    ) {
-        column.level.heading(column.path.size > 1)
-        LazyColumn(
-            state = list,
-            contentPadding = PaddingValues(
-                top = 4.dp,
-                bottom = contentPadding.calculateBottomPadding(),
-            ),
-            modifier = Modifier.fillMaxSize()
-                .focusProperties {
-                    onEnter = {
-                        if (latestActive.value) focus[latestFocusedId.value]?.requestFocus()
-                    }
-                }.focusGroup(),
+    BrowseContentLayer(departing = !visuallyActive) { layer ->
+        Column(
+            Modifier
+                .offset { IntOffset(xOffset, 0) }
+                .width(columnWidth)
+                .fillMaxHeight()
+                .zIndex(if (visuallyActive) 1f else 0f)
+                .graphicsLayer { this.alpha = alpha }
+                .then(layer)
+                .padding(top = contentPadding.calculateTopPadding())
+                .then(
+                    when {
+                        active -> Modifier.testTag("depth-active")
+                        column.path.size == activePath.size + 1 ->
+                            Modifier.testTag("depth-preview").clearAndSetSemantics { }
+                        else -> Modifier.clearAndSetSemantics { }
+                    },
+                ),
         ) {
-            itemsIndexed(column.level.rows, key = { _, row -> row.item.id }) { _, row ->
-                val requester = remember(row.item.id) { FocusRequester() }
-                DisposableEffect(row.item.id, active) {
-                    if (active) focus[row.item.id] = requester
-                    onDispose { if (focus[row.item.id] === requester) focus.remove(row.item.id) }
-                }
-                row.content(
-                    Modifier.focusRequester(requester)
-                        .focusProperties {
-                            canFocus = active
-                            right = FocusRequester.Cancel
-                            if (stackCanPop) left = FocusRequester.Cancel
+            column.level.heading(column.path.size > 1)
+            if (column.level.passiveContent != null) {
+                column.level.passiveContent.invoke()
+                return@Column
+            }
+            if (column.level.rows.isEmpty()) {
+                column.level.emptyContent?.invoke()
+                return@Column
+            }
+            LazyColumn(
+                state = list,
+                contentPadding = PaddingValues(
+                    top = 4.dp,
+                    bottom = maxOf(4.dp, contentPadding.calculateBottomPadding()),
+                ),
+                modifier = Modifier.fillMaxSize()
+                    .then(if (active && activeFocusRequester != null) Modifier.focusRequester(activeFocusRequester) else Modifier)
+                    .onFocusChanged {
+                        if (!it.hasFocus) { pageJob?.cancel(); pageTarget = null }
+                    }
+                    .onPreviewKeyEvent { event ->
+                        if (!active) return@onPreviewKeyEvent false
+                        val native = event.nativeKeyEvent
+                        val direction = pageKeyDirection?.invoke(native.keyCode)
+                        if (direction == null) {
+                            if (native.action == KeyEvent.ACTION_DOWN) { pageJob?.cancel(); pageTarget = null }
+                            return@onPreviewKeyEvent false
                         }
-                                    .onFocusChanged {
-                                        if (it.isFocused && latestActive.value &&
-                                            latestStillOwning.value(capturedVisit)) {
-                                            onFocusItem(row.item.id, identities, capturedVisit)
-                                        }
-                                    },
-                            ) { if (latestActive.value) onActivate(row, capturedVisit) }
+                        if (native.action == KeyEvent.ACTION_DOWN) {
+                            val current = identities.indexOfFirst { it.id == (pageTarget ?: latestFocusedId.value) }
+                            val target = (current + direction * (list.layoutInfo.visibleItemsInfo.size - 1).coerceAtLeast(1))
+                                .coerceIn(0, identities.lastIndex)
+                            val id = identities[target].id
+                            pageJob?.cancel()
+                            pageTarget = id
+                            pageJob = scope.launch {
+                                val layout = list.layoutInfo
+                                val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                                    layout.beforeContentPadding.toFloat(),
+                                    (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).toFloat(),
+                                    layout.viewportSize.height.toFloat(),
+                                ).roundToInt()
+                                list.animateScrollToItem(target, focusOffset)
+                                snapshotFlow { focus[id] }.first { it != null }
+                                if (latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && pageTarget == id) {
+                                    focus[id]?.requestFocus()
+                                    pageTarget = null
+                                }
+                            }
+                        }
+                        true
+                    }
+                    .focusProperties {
+                        onEnter = {
+                            if (latestActive.value) focus[latestFocusedId.value]?.requestFocus()
+                        }
+                    }.focusGroup(),
+            ) {
+                itemsIndexed(column.level.rows, key = { _, row -> row.item.id }) { _, row ->
+                    val requester = remember(row.item.id) { FocusRequester() }
+                    DisposableEffect(row.item.id, active) {
+                        if (active) focus[row.item.id] = requester
+                        onDispose { if (focus[row.item.id] === requester) focus.remove(row.item.id) }
+                    }
+                    row.content(
+                        Modifier.focusRequester(requester)
+                            .focusProperties {
+                                canFocus = active
+                                right = FocusRequester.Cancel
+                                if (stackCanPop) left = FocusRequester.Cancel
+                            }
+                            .onFocusChanged {
+                                if (it.isFocused && latestActive.value &&
+                                    latestStillOwning.value(capturedVisit)) {
+                                    onFocusItem(row.item.id, identities, capturedVisit)
+                                }
+                            },
+                    ) { if (latestActive.value) onActivate(row, capturedVisit) }
+                }
             }
         }
     }
