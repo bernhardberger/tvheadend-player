@@ -1304,8 +1304,37 @@ class LivePlayerChromeScreenTest {
         val thumbnail = compose.onNodeWithTag("details-schedule-11", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
         val thumbnailLeft = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(thumbnail.size.width / 2f, 0f)).x - thumbnail.size.width / 2f
         assertEquals("only details-tab content is inset", if (rail) 58f else 130f, thumbnailLeft, 0.5f)
+        val thumbnailTop = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(0f, thumbnail.size.height / 2f)).y - thumbnail.size.height / 2f
+        assertEquals("Now keeps trial.49's start position", 168f, thumbnailTop, 0.5f)
+        assertEquals("peek fractions use the reference canvas", 960, view.width)
+        assertEquals("peek fractions use the reference canvas", 540, view.height)
+        assertEquals("row gap is fixed", 13, list.layoutInfo.mainAxisItemSpacing)
+        assertEquals("viewport bleeds to the screen bottom", 540f, node.boundsInRoot.bottom, 0.5f)
+        val heading = compose.onNodeWithTag(if (rail) "details-heading" else "details-tabs", useUnmergedTree = true).fetchSemanticsNode()
+        assertTrue("peek stays below the headline/tabs", node.boundsInRoot.top >= heading.boundsInRoot.bottom)
         println("SCHEDULE rail=$rail viewport=${list.layoutInfo.viewportSize.height}")
         val failures = mutableListOf<String>()
+        fun assertPeeks() {
+            val viewport = node.boundsInRoot
+            val cards = list.layoutInfo.visibleItemsInfo.map { item ->
+                val coordinates = compose.onNodeWithTag("details-schedule-${11 + item.index}", useUnmergedTree = true)
+                    .fetchSemanticsNode().layoutInfo.coordinates
+                val top = coordinates.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y
+                val bottom = coordinates.localToRoot(androidx.compose.ui.geometry.Offset(0f, coordinates.size.height.toFloat())).y
+                top to bottom
+            }
+            fun fraction(top: Boolean): Float {
+                val edge = if (top) viewport.top else viewport.bottom
+                val card = cards.singleOrNull { (a, b) -> a < edge && b > edge } ?: return 0f
+                return (if (top) card.second - edge else edge - card.first) / (card.second - card.first)
+            }
+            if (list.canScrollBackward && fraction(true) !in 0.3f..0.55f)
+                failures += "top peek rail=$rail fraction=${fraction(true)} viewport=$viewport cards=$cards"
+            if (list.canScrollForward && fraction(false) !in 0.3f..0.55f)
+                failures += "bottom peek rail=$rail fraction=${fraction(false)} viewport=$viewport cards=$cards"
+        }
+        assertPeeks()
+        assertFalse("Now has no previous row", list.canScrollBackward)
         fun scrollPosition(): Int = list.firstVisibleItemIndex *
             (list.layoutInfo.visibleItemsInfo.first().size + list.layoutInfo.mainAxisItemSpacing) + list.firstVisibleItemScrollOffset
         fun step(down: Boolean) {
@@ -1321,6 +1350,9 @@ class LivePlayerChromeScreenTest {
                 val bottom = coordinates.localToRoot(androidx.compose.ui.geometry.Offset(0f, coordinates.size.height.toFloat())).y
                 if (top < node.boundsInRoot.top - 1 || bottom > node.boundsInRoot.bottom + 1)
                     failures += "focused row clipped rail=$rail down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
+                if ((list.canScrollBackward && top < node.boundsInRoot.top + 24f) ||
+                    (list.canScrollForward && bottom > node.boundsInRoot.bottom - 32f))
+                    failures += "focused row enters fade rail=$rail down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
             }
             println("SCHEDULE rail=$rail down=$down offsets=$values")
             if (values.zipWithNext().any { (a, b) -> if (down) b < a else b > a }) failures += "wrong direction: $values"
@@ -1329,6 +1361,10 @@ class LivePlayerChromeScreenTest {
         repeat(3) { step(down = true) }
         assertEquals(listOf("details-schedule-14"), focused())
         assertTrue(list.canScrollBackward && list.canScrollForward)
+        assertPeeks()
+        val precedingRow = compose.onNodeWithTag("details-schedule-13", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+        assertTrue("one complete row above focus stays below the top fade",
+            precedingRow.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y >= node.boundsInRoot.top + 24f)
         val position = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
         val fade = node.layoutInfo.getModifierInfo().first {
             (it.modifier as? androidx.compose.ui.platform.InspectableValue)?.nameFallback == "drawWithContent"
@@ -1359,14 +1395,27 @@ class LivePlayerChromeScreenTest {
         assertEquals("Back preserves index and pixel offset", position, restored.firstVisibleItemIndex to restored.firstVisibleItemScrollOffset)
         repeat(3) { step(down = false) }
         assertEquals(listOf("details-schedule-11"), focused())
+        assertFalse("return to Now removes the top fade", list.canScrollBackward)
+        assertPeeks()
         repeat(2) { key(Key.DirectionDown) }
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(32)
+        compose.waitForIdle()
+        assertEquals("interrupt the fourth row's scroll", listOf("details-schedule-14"), focused())
         key(Key.DirectionCenter)
+        assertEquals("the interrupted row opens details", listOf("details-record"), focused())
+        assertEquals("opening a programme does not also activate Record", 0,
+            compose.onAllNodes(isDialog()).fetchSemanticsNodes().size)
         val interruptedPosition = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
         key(Key.Back)
         assertEquals("Back does not restart an interrupted focus scroll", interruptedPosition,
             list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset)
+        assertEquals("Back restores the interrupted row", listOf("details-schedule-14"), focused())
+        repeat(8) { key(Key.DirectionDown) }
+        assertEquals(listOf("details-schedule-22"), focused())
+        assertFalse("last row has no following peek or fade", list.canScrollForward)
+        node = compose.onNodeWithTag("details-schedule", useUnmergedTree = true).fetchSemanticsNode()
+        assertPeeks()
         assertTrue(failures.joinToString("\n"), failures.isEmpty())
     }
 

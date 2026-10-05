@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -446,18 +447,27 @@ private fun Schedule(
     val rows = remember(schedule.map { it.id }) { schedule.associate { it.id to FocusRequester() } }
     // Restoring focus must not restart even an interrupted scroll. Native traversal enables it.
     var navigating by remember { mutableStateOf(false) }
-    val bringIntoView = remember {
-        object : BringIntoViewSpec {
-            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
-                if (navigating) offset - (containerSize * 0.3f).coerceAtMost(containerSize - size) else 0f
-        }
-    }
     val typography = MaterialTheme.typography
     val rowHeight = maxOf(ScheduleTileHeight, 12.dp + with(LocalDensity.current) {
         typography.titleMedium.lineHeight.toDp() + typography.bodyMedium.lineHeight.toDp() + typography.bodySmall.lineHeight.toDp()
     })
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val bottomRoom = (maxHeight * 0.7f - rowHeight)
+        val topPeek = 24.dp
+        val bottomPeek = 32.dp
+        val pitch = rowHeight + ScheduleGap
+        // Bleed only into the gap below the tabs/headline; Now retains its original position.
+        val topBleed = 22.dp
+        val topRoom = ScheduleFocusPadding + topBleed
+        val viewportHeight = maxHeight + topBleed
+        // A previous-card tail and one complete row sit above the focused row.
+        val pivot = with(LocalDensity.current) { (pitch * 2 - ScheduleTileHeight + topPeek).toPx() }
+        val bringIntoView = remember(pivot) {
+            object : BringIntoViewSpec {
+                override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                    if (navigating) offset - pivot.coerceAtMost(containerSize - size) else 0f
+            }
+        }
+        val bottomRoom = (viewportHeight - with(LocalDensity.current) { pivot.toDp() } - rowHeight)
             .coerceAtLeast(ScheduleFocusPadding)
         val pageActive = LocalPlayerPageActive.current
         LaunchedEffect(state.focusRequest, state.tab, pageActive) {
@@ -471,18 +481,18 @@ private fun Schedule(
         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyColumn(state = list, verticalArrangement = Arrangement.spacedBy(ScheduleGap),
             contentPadding = PaddingValues(start = ScheduleFocusPadding, end = ScheduleFocusPadding,
-                top = ScheduleFocusPadding, bottom = bottomRoom),
+                top = topRoom, bottom = bottomRoom),
             modifier = Modifier
-                .fillMaxHeight().width(ScheduleWidth + ScheduleFocusPadding * 2)
-                .offset(x = -ScheduleFocusPadding)
+                .wrapContentHeight(Alignment.Top, unbounded = true)
+                .height(viewportHeight).width(ScheduleWidth + ScheduleFocusPadding * 2)
+                .offset(x = -ScheduleFocusPadding, y = -topBleed)
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
                     drawContent()
-                    val fade = 32.dp.toPx()
                     if (list.canScrollBackward) drawRect(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black), endY = fade), blendMode = BlendMode.DstIn)
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black), endY = topPeek.toPx()), blendMode = BlendMode.DstIn)
                     if (list.canScrollForward) drawRect(
-                        Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
+                        Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - bottomPeek.toPx(), endY = size.height),
                         blendMode = BlendMode.DstIn)
                 }
                 .testTag("details-schedule")) {
@@ -774,5 +784,5 @@ private val ScheduleWidth = 620.dp
 private val ScheduleTileWidth = 124.dp
 private val ScheduleTileHeight = ScheduleTileWidth * 9 / 16
 private val ScheduleFocusPadding = 12.dp
-private val ScheduleGap = PlayerChromeTokens.gridGutter
+private val ScheduleGap = 13.dp
 private const val ScheduleLimit = 16

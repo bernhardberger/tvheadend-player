@@ -264,6 +264,8 @@ class PlayerMotionCaptureTest {
                 capture("details-schedule-rest", directory = "ui-page-scroll", focus = "schedule Now row")
             }
             compose.onNodeWithTag("details-schedule-1").assertIsFocused()
+            capture("${if (rail) "rail" else "details-tab"}-schedule-now", directory = "ui-schedule-scroll",
+                focus = "schedule Now row")
             repeat(3) { key(Key.DirectionDown) }
             compose.onNodeWithTag("details-schedule-103").assertIsFocused()
             capture("${if (rail) "rail" else "details-tab"}-schedule-down-three", directory = "ui-schedule-scroll",

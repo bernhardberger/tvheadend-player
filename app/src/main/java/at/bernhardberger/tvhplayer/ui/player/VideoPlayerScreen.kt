@@ -1472,15 +1472,18 @@ fun VideoPlayerScreen(
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (layerState.infoOpen) {
-                    if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
-                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
-                        return@onPreviewKeyEvent true
-                    }
                     if (event.key == Key.Back) {
+                        // Rebuilding details can detach the KeyUp target. A fresh Back down is
+                        // still a new press, not a repeat of that unfinished revealing cycle.
                         if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN && event.nativeKeyEvent.repeatCount == 0) {
                             layerState.beginOpeningKeyCycle(keyCode)
                             handlePlaybackBack()
                         }
+                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
+                        return@onPreviewKeyEvent true
+                    }
+                    if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
+                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
                         return@onPreviewKeyEvent true
                     }
                     // Details owns navigation; no playback or options key
